@@ -202,14 +202,22 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
   Future<void> _startCrossfade(int nextIndex) async {
     if (nextIndex < 0 || nextIndex >= _songs.length) return;
-    if (_crossfadeManager.isCrossfading || _crossfadeStartInFlight) return;
+    if (_crossfadeManager.isCrossfading ||
+        _crossfadeStartInFlight ||
+        !_activePlayer.playing) {
+      return;
+    }
+    final admissionFadeId = _crossfadeManager.currentFadeId;
     _crossfadeStartInFlight = true;
     if (!await _tripleBufferPipeline.claimInactive(PlayerClaim.crossfade)) {
       _crossfadeStartInFlight = false;
       _failedCrossfadeClaims++;
       if (_failedCrossfadeClaims >= 3) {
         _failedCrossfadeClaims = 0;
-        await playSongAt(nextIndex);
+        if (_activePlayer.playing &&
+            _crossfadeManager.currentFadeId == admissionFadeId) {
+          await playSongAt(nextIndex);
+        }
       }
       return;
     }
@@ -223,7 +231,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         // yet and returned - leaving this fade to start the incoming player
         // audible while the transport stays paused: audio the user cannot
         // stop from the UI, with the old track still shown.
-        if (!_activePlayer.playing) return;
+        if (!_activePlayer.playing ||
+            _crossfadeManager.currentFadeId != admissionFadeId) {
+          return;
+        }
         _crossfadeManager.beginCrossfade(nextIndex);
         final currentFadeId = _crossfadeManager.nextFadeId();
         // Feeds CrossfadeManager.triggerMargin: the next fade must fire early
@@ -1563,8 +1574,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       // audio; it frees the player that receives the next preload. Neither
       // failure may abort a transition that is already audible.
       await _bestEffort(outgoing.stop, 'stop the finished track');
-      await _bestEffort(() => outgoing.setVolume(_volume),
-          'reset the finished track volume');
+      await _bestEffort(
+          () => outgoing.setVolume(_volume), 'reset the finished track volume');
       _tripleBufferPipeline.clearPreload();
       handoverDone = true;
       return true;

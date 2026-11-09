@@ -12,7 +12,7 @@
 #endif
 
 SincResampler::SincResampler() {
-    setRates(48000.0, 48000.0);
+    generatePolyphaseTable();
     setEnabled(false);
     reset();
 }
@@ -82,8 +82,9 @@ void SincResampler::recomputeActiveScale() {
 }
 
 void SincResampler::setRates(double inRate, double outRate) {
-    if (inRate <= 0.0 || outRate <= 0.0) return;
-    if (std::abs(inRate_ - inRate) < 0.1 && std::abs(outRate_ - outRate) < 0.1) return;
+    if (!std::isfinite(inRate) || !std::isfinite(outRate) ||
+        inRate <= 0.0 || outRate <= 0.0) return;
+    if (inRate_ == inRate && outRate_ == outRate) return;
 
     inRate_ = inRate;
     outRate_ = outRate;
@@ -115,11 +116,12 @@ void SincResampler::applyParams(const ResamplerParamSet& params) {
 
 void SincResampler::reset() {
     phase_ = 0.0;
+    phaseFraction_ = 0.0;
     writePos_ = 0;
     availableFrames_ = 0;
-    // No ring memset: availableFrames_ == 0 means nothing is readable until new
-    // input is written, and this runs on the audio thread (256 KB memset was a
-    // measurable callback-time spike on parameter changes).
+    historyFrames_ = 0;
+    // No ring memset: the explicit history bound zero-pads FIR reads before
+    // this stream's first frame, including after a rate change/flush.
 }
 
 int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
@@ -151,7 +153,7 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
 }
 
 int SincResampler::processPlanar(const float* const* in, float* const* out, int inFrames, int channels, int maxOutFrames) {
-    if (!enabled_ || inFrames <= 0 || std::abs(ratio_ - 1.0) < 1e-5) {
+    if (!enabled_ || inFrames <= 0 || isBypassed()) {
         int count = std::min(inFrames, maxOutFrames);
         if (in != out) {
             for (int ch = 0; ch < channels; ++ch) {
@@ -184,6 +186,8 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
             sourceOffset = std::min(overflow, framesToWrite);
             framesToWrite -= sourceOffset;
             phase_ = 0.0;
+            phaseFraction_ = 0.0;
+            historyFrames_ = 0;
         }
     }
 
@@ -197,9 +201,8 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
 
     int outFrames = 0;
     while (phase_ < static_cast<double>(availableFrames_ - HALF_TAPS) && outFrames < maxOutFrames) {
-        const double samplePos = phase_;
-        const int baseInt = static_cast<int>(std::floor(samplePos));
-        const double frac = samplePos - static_cast<double>(baseInt);
+        const int baseInt = static_cast<int>(phase_);
+        const double frac = phaseFraction_;
 
         const int phaseIdx = std::clamp(
             static_cast<int>(frac * NUM_PHASES),
@@ -248,10 +251,10 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
                 if (ri3 < 0) ri3 += FIFO_CAPACITY;
 
                 const float samples[4] = {
-                    ringBuf_[ch][ri0],
-                    ringBuf_[ch][ri1],
-                    ringBuf_[ch][ri2],
-                    ringBuf_[ch][ri3]
+                    ro0 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri0] : 0.0f,
+                    ro1 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri1] : 0.0f,
+                    ro2 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri2] : 0.0f,
+                    ro3 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri3] : 0.0f
                 };
                 float32x4_t vSamp = vld1q_f32(samples);
                 float32x4_t vCoeff = vld1q_f32(&coeffs[tap]);
@@ -269,7 +272,9 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
                 const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
                 if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
-                sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+                if (readOffset <= availableFrames_ + historyFrames_) {
+                    sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+                }
             }
 #else
             for (int tap = startTap; tap < endTap; ++tap) {
@@ -277,7 +282,9 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
                 if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
 
-                sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+                if (readOffset <= availableFrames_ + historyFrames_) {
+                    sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+                }
             }
 #endif
             // Restore unity DC gain for the truncated (quality<Ultra) window;
@@ -286,13 +293,20 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
         }
 
         outFrames++;
-        phase_ += ratio_;
+        phaseFraction_ += ratio_;
+        const double advance = std::floor(phaseFraction_);
+        phaseFraction_ -= advance;
+        phase_ += advance;
     }
 
-    const int consumedInt = static_cast<int>(std::floor(phase_));
+    // At extreme downsampling ratios phase may jump beyond all available
+    // input. Keep that pending skip until future input arrives; subtracting the
+    // whole phase here would restart early and emit too many samples per chunk.
+    const int consumedInt = std::min(availableFrames_, static_cast<int>(std::floor(phase_)));
     if (consumedInt > 0) {
         phase_ -= static_cast<double>(consumedInt);
-        availableFrames_ = std::max(0, availableFrames_ - consumedInt);
+        availableFrames_ -= consumedInt;
+        historyFrames_ = std::min(HALF_TAPS, historyFrames_ + consumedInt);
     }
 
     if (droppedFrames) {

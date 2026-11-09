@@ -94,12 +94,10 @@ class TestPulsrAudioHandler extends BaseAudioHandler
       BehaviorSubject<List<MediaItem>>.seeded([])
         ..addStream(_queueController.stream);
 
-  final StreamController<PlaybackState> _playbackStateController =
-      StreamController<PlaybackState>.broadcast();
+  final BehaviorSubject<PlaybackState> _playbackStateController =
+      BehaviorSubject<PlaybackState>.seeded(PlaybackState());
   @override
-  BehaviorSubject<PlaybackState> get playbackState =>
-      BehaviorSubject<PlaybackState>.seeded(PlaybackState())
-        ..addStream(_playbackStateController.stream);
+  BehaviorSubject<PlaybackState> get playbackState => _playbackStateController;
 
   final StreamController<String> _errorController =
       StreamController<String>.broadcast();
@@ -522,10 +520,27 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     bool autoPlay = true,
   }) async {}
 
+  @override
+  Future<bool> playbackRateMustRemainUnity() async => false;
+
   double? lastSetSpeed;
   @override
   Future<void> setSpeed(double speed) async {
     lastSetSpeed = speed;
+    playbackState.add(playbackState.value.copyWith(speed: speed));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
+  }
+
+  double _pitch = 1.0;
+  @override
+  double get pitch => _pitch;
+
+  @override
+  Future<void> setPitch(double pitch) async {
+    _pitch = pitch;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackPitch, pitch);
   }
 
   @override

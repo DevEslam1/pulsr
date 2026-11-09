@@ -380,66 +380,166 @@ void main() {
 
     test(
         'native outgoing ramp is armed per-sample while the incoming player '
-        'is stepped (no full-volume buffer leak)', () async {
-      final curvesArmed = <MockAudioPlayer, List<double>>{};
-      when(() => mockPlayerA.dspSetGainCurve(any(),
-          segmentMs: any(named: 'segmentMs'))).thenAnswer((inv) async {
-        curvesArmed[mockPlayerA] =
-            (inv.positionalArguments[0] as List).cast<double>();
-        return true;
+        'is stepped (no full-volume buffer leak)', () {
+      fakeAsync((async) {
+        final curvesArmed = <MockAudioPlayer, List<double>>{};
+        when(() => mockPlayerA.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((inv) async {
+          curvesArmed[mockPlayerA] =
+              (inv.positionalArguments[0] as List).cast<double>();
+          return true;
+        });
+        when(() => mockPlayerB.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((inv) async {
+          curvesArmed[mockPlayerB] =
+              (inv.positionalArguments[0] as List).cast<double>();
+          return true;
+        });
+
+        final outgoingVolumes = <double>[];
+        final incomingVolumes = <double>[];
+        when(() => mockPlayerA.setVolume(any())).thenAnswer((inv) async {
+          outgoingVolumes.add(inv.positionalArguments[0] as double);
+        });
+        when(() => mockPlayerB.setVolume(any())).thenAnswer((inv) async {
+          incomingVolumes.add(inv.positionalArguments[0] as double);
+        });
+
+        crossfadeManager.curve = CrossfadeCurve.equalPower;
+        final fadeId = crossfadeManager.nextFadeId();
+        var completed = false;
+        unawaited(crossfadeManager
+            .crossfadeVolumes(
+              active: mockPlayerA,
+              inactive: mockPlayerB,
+              fromActiveVol: 0.9,
+              toInactiveVol: 0.8,
+              duration: const Duration(milliseconds: 60),
+              fadeId: fadeId,
+            )
+            .then((_) => completed = true));
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 60));
+        expect(completed, isTrue);
+
+        // Only the outgoing player is armed with a native curve. The incoming
+        // player is never armed: pinning its base volume at the target while a
+        // native multiplier ramps from 0 leaks an already-buffered full-gain
+        // buffer the moment the base is raised.
+        final oldCurve = curvesArmed[mockPlayerA]!;
+        expect(curvesArmed.containsKey(mockPlayerB), isFalse);
+        expect(oldCurve.first, closeTo(1.0, 1e-9));
+        expect(oldCurve.last, closeTo(0.0, 1e-9));
+
+        // Incoming is stepped from near silence up to exactly its target, and
+        // never jumps to the target early.
+        expect(incomingVolumes, isNotEmpty);
+        expect(incomingVolumes.first, lessThan(0.4));
+        expect(incomingVolumes.last, closeTo(0.8, 1e-9));
+        for (var i = 1; i < incomingVolumes.length; i++) {
+          expect(
+              incomingVolumes[i], greaterThanOrEqualTo(incomingVolumes[i - 1]));
+        }
+        expect(incomingVolumes.every((v) => v <= 0.8 + 1e-9), isTrue);
+
+        // Outgoing keeps its base volume during the armed ramp; only the final
+        // exact endpoint write (0.0) is sent.
+        verify(() => mockPlayerA.setVolume(0.0)).called(1);
+        verifyNever(() =>
+            mockPlayerA.setVolume(any(that: inInclusiveRange(0.001, 0.999))));
       });
-      when(() => mockPlayerB.dspSetGainCurve(any(),
-          segmentMs: any(named: 'segmentMs'))).thenAnswer((inv) async {
-        curvesArmed[mockPlayerB] =
-            (inv.positionalArguments[0] as List).cast<double>();
-        return true;
+    });
+
+    test('cancel waits for native clearing and stops fade timers immediately',
+        () {
+      fakeAsync((async) {
+        final clear = Completer<bool>();
+        final volumes = <double>[];
+        when(() => mockPlayerA.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => true);
+        when(() => mockPlayerA.dspClearGainCurve())
+            .thenAnswer((_) => clear.future);
+        when(() => mockPlayerB.setVolume(any())).thenAnswer((inv) async {
+          volumes.add(inv.positionalArguments[0] as double);
+        });
+        unawaited(crossfadeManager.crossfadeVolumes(
+          active: mockPlayerA,
+          inactive: mockPlayerB,
+          fromActiveVol: 1.0,
+          toInactiveVol: 1.0,
+          duration: const Duration(milliseconds: 100),
+          fadeId: crossfadeManager.nextFadeId(),
+        ));
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 10));
+        final count = volumes.length;
+        var cancelled = false;
+        unawaited(crossfadeManager
+            .cancel(mockPlayerB, mockPlayerA, restoreVolume: 0.7)
+            .then((_) => cancelled = true));
+        async.flushMicrotasks();
+        async.elapse(const Duration(milliseconds: 100));
+        expect(cancelled, isFalse);
+        expect(volumes.length, count);
+        clear.complete(true);
+        async.flushMicrotasks();
+        expect(cancelled, isTrue);
+        expect(volumes.last, 0.7);
       });
+    });
 
-      final outgoingVolumes = <double>[];
-      final incomingVolumes = <double>[];
-      when(() => mockPlayerA.setVolume(any())).thenAnswer((inv) async {
-        outgoingVolumes.add(inv.positionalArguments[0] as double);
+    test('cancel refuses volume restoration when an armed curve is not cleared',
+        () {
+      fakeAsync((async) {
+        when(() => mockPlayerA.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => true);
+        unawaited(crossfadeManager.crossfadeVolumes(
+          active: mockPlayerA,
+          inactive: mockPlayerB,
+          fromActiveVol: 1.0,
+          toInactiveVol: 1.0,
+          duration: const Duration(milliseconds: 100),
+          fadeId: crossfadeManager.nextFadeId(),
+        ));
+        async.flushMicrotasks();
+        unawaited(expectLater(
+            crossfadeManager.cancel(mockPlayerB, mockPlayerA,
+                restoreVolume: 0.7),
+            throwsStateError));
+        async.flushMicrotasks();
+        verifyNever(() => mockPlayerA.setVolume(0.7));
+        verifyNever(() => mockPlayerB.setVolume(0.7));
       });
-      when(() => mockPlayerB.setVolume(any())).thenAnswer((inv) async {
-        incomingVolumes.add(inv.positionalArguments[0] as double);
+    });
+
+    test('cancel waits for an in-flight curve arm before releasing the fade',
+        () {
+      fakeAsync((async) {
+        final arm = Completer<bool>();
+        when(() => mockPlayerA.dspSetGainCurve(any(),
+            segmentMs: any(named: 'segmentMs'))).thenAnswer((_) => arm.future);
+        when(() => mockPlayerA.dspClearGainCurve())
+            .thenAnswer((_) async => true);
+        unawaited(crossfadeManager.crossfadeVolumes(
+          active: mockPlayerA,
+          inactive: mockPlayerB,
+          fromActiveVol: 1.0,
+          toInactiveVol: 1.0,
+          duration: const Duration(milliseconds: 100),
+          fadeId: crossfadeManager.nextFadeId(),
+        ));
+        async.flushMicrotasks();
+        var cancelled = false;
+        unawaited(crossfadeManager
+            .cancel(mockPlayerB, mockPlayerA)
+            .then((_) => cancelled = true));
+        async.flushMicrotasks();
+        expect(cancelled, isFalse);
+        arm.complete(true);
+        async.flushMicrotasks();
+        expect(cancelled, isTrue);
+        verify(() => mockPlayerA.dspClearGainCurve()).called(greaterThan(0));
       });
-
-      crossfadeManager.curve = CrossfadeCurve.equalPower;
-      final fadeId = crossfadeManager.nextFadeId();
-      await crossfadeManager.crossfadeVolumes(
-        active: mockPlayerA,
-        inactive: mockPlayerB,
-        fromActiveVol: 0.9,
-        toInactiveVol: 0.8,
-        duration: const Duration(milliseconds: 60),
-        fadeId: fadeId,
-      );
-
-      // Only the outgoing player is armed with a native curve. The incoming
-      // player is never armed: pinning its base volume at the target while a
-      // native multiplier ramps from 0 leaks an already-buffered full-gain
-      // buffer the moment the base is raised.
-      final oldCurve = curvesArmed[mockPlayerA]!;
-      expect(curvesArmed.containsKey(mockPlayerB), isFalse);
-      expect(oldCurve.first, closeTo(1.0, 1e-9));
-      expect(oldCurve.last, closeTo(0.0, 1e-9));
-
-      // Incoming is stepped from near silence up to exactly its target, and
-      // never jumps to the target early.
-      expect(incomingVolumes, isNotEmpty);
-      expect(incomingVolumes.first, lessThan(0.4));
-      expect(incomingVolumes.last, closeTo(0.8, 1e-9));
-      for (var i = 1; i < incomingVolumes.length; i++) {
-        expect(
-            incomingVolumes[i], greaterThanOrEqualTo(incomingVolumes[i - 1]));
-      }
-      expect(incomingVolumes.every((v) => v <= 0.8 + 1e-9), isTrue);
-
-      // Outgoing keeps its base volume during the armed ramp; only the final
-      // exact endpoint write (0.0) is sent.
-      verify(() => mockPlayerA.setVolume(0.0)).called(1);
-      verifyNever(() =>
-          mockPlayerA.setVolume(any(that: inInclusiveRange(0.001, 0.999))));
     });
 
     test('cancel clears native curves before restoring volumes', () async {

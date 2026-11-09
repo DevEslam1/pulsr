@@ -3,6 +3,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'handler_test_harness.dart';
 
@@ -95,6 +97,29 @@ void main() {
   });
 
   group('speed and pitch', () {
+    test('boundary forces unity for live/restored writes without losing prefs', () async {
+      handler = await ready();
+      await handler!.setSpeed(1.5);
+      await handler!.setPitch(0.8);
+      await handler!.setSkipSilenceEnabled(true);
+      await handler!.setBitPerfectTransportPolicy(true);
+      expect(handler!.playbackState.value.speed, 1.0);
+      expect(handler!.pitch, 1.0);
+      expect(handler!.skipSilenceEnabled, false);
+      await handler!.setSpeed(2.0);
+      await handler!.setPitch(1.2);
+      await handler!.restorePersistedSpeed();
+      await handler!.restorePersistedPitch();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getDouble(PrefsKeys.playbackSpeed), 1.5);
+      expect(prefs.getDouble(PrefsKeys.playbackPitch), 0.8);
+      expect(handler!.playbackState.value.speed, 1.0);
+      expect(handler!.pitch, 1.0);
+      await handler!.setBitPerfectTransportPolicy(false);
+      expect(handler!.playbackState.value.speed, 1.5);
+      expect(handler!.pitch, 0.8);
+      expect(handler!.skipSilenceEnabled, true);
+    });
     test('setSpeed clamps, emits and persists', () async {
       handler = await ready();
       await handler!.setSpeed(1.5);

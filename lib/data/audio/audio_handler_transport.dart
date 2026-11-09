@@ -75,8 +75,12 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // becoming-noisy handler re-arms it AFTER calling pause() (item 2).
     _pausedForNoisy = false;
     ErrorLogger.addBreadcrumb('Playback paused', category: 'player');
-    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-        restoreVolume: _preCrossfadeVolume ?? _volume);
+    final pauseFuture = _activePlayer.pause();
+    await Future.wait([
+      pauseFuture,
+      _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+          restoreVolume: _preCrossfadeVolume ?? _volume),
+    ]);
     _saveCurrentPosition();
     unawaited(saveCurrentPositionImmediate());
     // If an online source is still being fetched/loaded (the track is not
@@ -566,29 +570,32 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   double get pitch => _pitch;
 
+  Future<bool> playbackRateMustRemainUnity() async =>
+      AudioQualityInfo.dsdDopActive ||
+      (_bitPerfectTransportBypass ??
+          await _isBitPerfectBypassActivePrefs(_cachedPrefs));
+
+  Future<void> _applyPlaybackSpeed(double speed) async {
+    await Future.wait([_playerA.setSpeed(speed), _playerB.setSpeed(speed)]);
+    playbackState.add(playbackState.value.copyWith(speed: speed));
+  }
+
+  Future<void> _applyPlaybackPitch(double pitch) async {
+    await Future.wait([_playerA.setPitch(pitch), _playerB.setPitch(pitch)]);
+    _pitch = pitch;
+  }
+
   Future<void> restorePersistedSpeed() async {
     try {
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       _advancedSpeedEnabled =
           prefs.getBool(PrefsKeys.advancedPlaybackSpeed) ?? false;
-      final saved = prefs.getDouble(PrefsKeys.playbackSpeed);
-      if (saved != null) {
-        final clamped = saved.clamp(minPlaybackSpeed, maxPlaybackSpeed);
-        await Future.wait([
-          _playerA.setSpeed(clamped),
-          _playerB.setSpeed(clamped),
-        ]);
-        playbackState.add(playbackState.value.copyWith(speed: clamped));
-      }
-      final savedPitch = prefs.getDouble(PrefsKeys.playbackPitch);
-      if (savedPitch != null) {
-        final clampedPitch = savedPitch.clamp(0.5, 2.0);
-        _pitch = clampedPitch;
-        await Future.wait([
-          _playerA.setPitch(clampedPitch),
-          _playerB.setPitch(clampedPitch),
-        ]);
-      }
+      final locked = await playbackRateMustRemainUnity();
+      final saved = prefs.getDouble(PrefsKeys.playbackSpeed) ?? 1.0;
+      await _applyPlaybackSpeed(locked || !saved.isFinite
+          ? 1.0
+          : saved.clamp(minPlaybackSpeed, maxPlaybackSpeed));
+      await restorePersistedPitch();
     } catch (_) {}
   }
 
@@ -596,24 +603,22 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     try {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
       final savedPitch = prefs.getDouble(PrefsKeys.playbackPitch) ?? 1.0;
-      final clampedPitch = savedPitch.clamp(0.5, 2.0);
-      _pitch = clampedPitch;
-      await Future.wait([
-        _playerA.setPitch(clampedPitch),
-        _playerB.setPitch(clampedPitch),
-      ]);
+      await _applyPlaybackPitch(
+          await playbackRateMustRemainUnity() || !savedPitch.isFinite
+              ? 1.0
+              : savedPitch.clamp(0.5, 2.0));
     } catch (_) {}
   }
 
   @override
   Future<void> setSpeed(double speed) async {
     if (!speed.isFinite) return;
+    if (await playbackRateMustRemainUnity()) {
+      await _applyPlaybackSpeed(1.0);
+      return; // Forced unity is effective policy, never a saved user preference.
+    }
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
-    await Future.wait([
-      _playerA.setSpeed(clamped),
-      _playerB.setSpeed(clamped),
-    ]);
-    playbackState.add(playbackState.value.copyWith(speed: clamped));
+    await _applyPlaybackSpeed(clamped);
     try {
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
@@ -625,12 +630,12 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   Future<void> setPitch(double pitch) async {
     if (!pitch.isFinite) return;
+    if (await playbackRateMustRemainUnity()) {
+      await _applyPlaybackPitch(1.0);
+      return;
+    }
     final clamped = pitch.clamp(0.5, 2.0);
-    _pitch = clamped;
-    await Future.wait([
-      _playerA.setPitch(clamped),
-      _playerB.setPitch(clamped),
-    ]);
+    await _applyPlaybackPitch(clamped);
     try {
       final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackPitch, clamped);
@@ -932,6 +937,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   // library). Declaring these here keeps the mixin stateless and lets the
   // analyser type-check each mixin against the host's private members.
   AudioPlayer get _activePlayer;
+  bool? get _bitPerfectTransportBypass;
 
   bool get _advancedSpeedEnabled;
   set _advancedSpeedEnabled(bool value);

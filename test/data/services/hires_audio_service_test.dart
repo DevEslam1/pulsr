@@ -61,6 +61,22 @@ void main() {
     _messenger.setMockMethodCallHandler(_permissions, null);
   });
 
+  test('follow accepts standard lower music rates at the service boundary', () async {
+    _messenger.setMockMethodCallHandler(_method, (call) async =>
+        call.method == 'setTargetOutputFormat' ? true : _output(
+          rates: [8000, 11025, 12000, 16000, 22050, 24000, 32000]));
+    await service.getAudioOutputInfo();
+    for (final rate in [8000, 11025, 12000, 16000, 22050, 24000, 32000]) {
+      expect(HiResAudioService.followTrackRateToApply(trackSampleRate: rate,
+          lastRequestedSampleRate: null, isBluetooth: false,
+          followTrackEnabled: true), rate);
+      expect(await service.setTargetOutputFormat(sampleRate: rate, bitDepth: 24), true);
+    }
+    expect(HiResAudioService.followTrackRateToApply(trackSampleRate: 32000,
+        lastRequestedSampleRate: null, isBluetooth: false,
+        followTrackEnabled: false), null);
+  });
+
   test('getAudioOutputInfo parses the native payload', () async {
     final info = await service.getAudioOutputInfo();
     expect(info.deviceName, 'Test DAC');

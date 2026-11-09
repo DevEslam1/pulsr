@@ -20,10 +20,11 @@ function Invoke-AuditTool([string]$exe, [string[]]$toolArgs) {
 }
 
 $cacheFiles = @(rg --files (Join-Path $env:USERPROFILE '.gradle/caches'))
-$commonJar = $cacheFiles | Where-Object { $_ -match 'media3-common-1\.4\.1[\\/]jars[\\/]classes\.jar$' } | Select-Object -First 1
-$exoplayerJar = $cacheFiles | Where-Object { $_ -match 'media3-exoplayer-1\.4\.1[\\/]jars[\\/]classes\.jar$' } | Select-Object -First 1
+$commonJar = $cacheFiles | Where-Object { $_ -match 'media3-common-1\.9\.2(?:[\\/]jars[\\/]classes|-runtime)\.jar$' } | Select-Object -First 1
+$exoplayerJar = $cacheFiles | Where-Object { $_ -match 'media3-exoplayer-1\.9\.2(?:[\\/]jars[\\/]classes|-runtime)\.jar$' } | Select-Object -First 1
 $guavaJar = $cacheFiles | Where-Object { $_ -match 'guava-.*android\.jar$' } | Select-Object -First 1
-if (!$commonJar) { throw 'Run the Android Gradle build first to cache Media3 1.4.1.' }
+$annotationJar = $cacheFiles | Where-Object { $_ -match 'annotation-jvm-[0-9.]+\.jar$' } | Select-Object -First 1
+if (!$commonJar -or !$exoplayerJar) { throw 'Run the Android Gradle build first to cache Media3 1.9.2.' }
 $androidJar = Join-Path $SdkRoot 'platforms/android-35/android.jar'
 $javaSources = @(
     (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/AaudioNativeBridge.java'),
@@ -31,6 +32,8 @@ $javaSources = @(
     (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/FloatDspAudioSink.java'),
     (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/NativeDspAudioProcessor.java'),
     (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/Pcm16Quantizer.java'),
+    (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/PulsrAudioSink.java'),
+    (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/OutputSinkControl.java'),
     (Join-Path $repo 'android/app/src/test/java/com/ryanheise/just_audio/AaudioBridgeSmoke.java'),
     (Join-Path $PSScriptRoot 'audio_bridge_smoke/AudioEffectsPlugin.java'),
     (Join-Path $PSScriptRoot 'audio_bridge_smoke/NativeDspSmoke.java'),
@@ -39,14 +42,19 @@ $javaSources = @(
     (Join-Path $PSScriptRoot 'audio_bridge_smoke/OutputRoutingSmoke.java'),
     (Join-Path $repo 'third_party/just_audio/android/src/main/java/com/ryanheise/just_audio/PulsrOutputRouting.java')
 )
-Invoke-AuditTool (Join-Path $JdkRoot 'bin/javac.exe') (@('--release', '17', '-cp', "$commonJar;$exoplayerJar;$androidJar", '-h', $headers, '-d', $classes) + $javaSources)
+$compileClasspath = "$commonJar;$exoplayerJar;$androidJar"
+if ($guavaJar) { $compileClasspath += ";$guavaJar" }
+if ($annotationJar) { $compileClasspath += ";$annotationJar" }
+Invoke-AuditTool (Join-Path $JdkRoot 'bin/javac.exe') (@('--release', '17', '-cp', $compileClasspath, '-h', $headers, '-d', $classes) + $javaSources)
 
 $llvmBin = Join-Path $SdkRoot "ndk/$NdkVersion/toolchains/llvm/prebuilt/windows-x86_64/bin"
 $exports = & (Join-Path $llvmBin 'llvm-nm.exe') -D $NativeLibrary
 if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect native library.' }
-$header = Get-Content (Join-Path $headers 'com_ryanheise_just_audio_AaudioNativeBridge.h') -Raw
-foreach ($match in [regex]::Matches($header, 'Java_[A-Za-z0-9_]+')) {
-    if (!($exports -match "\b$($match.Value)$")) { throw "JNI export missing: $($match.Value)" }
+foreach ($headerName in @('com_ryanheise_just_audio_AaudioNativeBridge.h', 'com_ryanheise_just_audio_NativeDspAudioProcessor.h')) {
+    $header = Get-Content (Join-Path $headers $headerName) -Raw
+    foreach ($match in [regex]::Matches($header, 'Java_[A-Za-z0-9_]+')) {
+        if (!($exports -match "\b$($match.Value)$")) { throw "JNI export missing: $($match.Value)" }
+    }
 }
 
 $classFiles = @(Get-ChildItem -LiteralPath $classes -Recurse -Filter '*.class' | ForEach-Object FullName)

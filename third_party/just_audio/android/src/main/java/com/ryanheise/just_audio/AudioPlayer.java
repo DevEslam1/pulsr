@@ -1128,7 +1128,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     /** Called by the sink wrapper whenever its active DSP processor changes. */
     private void onActiveDspProcessorChanged(NativeDspAudioProcessor processor) {
         dspAudioProcessor = processor;
-        if (processor != null && tapSrcTargetRate != 0) {
+        if (processor != null) {
             processor.setTapSrcTargetRate(tapSrcTargetRate);
         }
     }
@@ -1145,7 +1145,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     /** Called on the playback thread when a float swap failed; report it. */
     private void onFloatOutputRejected(String reason, Exception cause) {
-        Log.w(TAG, "Float output rejected (" + reason + "); keeping current sink", cause);
+        floatOutputEnabled = false;
+        Log.w(TAG, "Float output rejected (" + reason + "); using PCM16 precision fallback", cause);
         notifyOutputModeToDart(reason, aaudioOutputEnabled, false);
     }
 

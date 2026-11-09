@@ -38,6 +38,22 @@ enum BitPerfectChainVerdict {
 int effectiveSourceBitDepth({required int tagged, required int decoded}) =>
     decoded > tagged ? decoded : tagged;
 
+/// Fold observed processing facts, not slider positions or output preferences.
+/// Unknown gain is deliberately not unity. A direct raw USB tee skips the
+/// player-volume stage but not source rate/pitch/frame edits.
+bool chainSamplesModified({
+  required bool dspProcessing,
+  required double effectiveGain,
+  double speed = 1.0,
+  double pitch = 1.0,
+  bool silenceSkip = false,
+  bool crossfade = false,
+  bool duckOrSleepFade = false,
+  bool rawUsb = false,
+}) => dspProcessing || speed != 1.0 || pitch != 1.0 || silenceSkip ||
+    crossfade || duckOrSleepFade ||
+    (!rawUsb && (!effectiveGain.isFinite || (effectiveGain - 1.0).abs() > 1e-9));
+
 class BitPerfectChainAssessment {
   final BitPerfectChainVerdict verdict;
   final int sourceSampleRate;
@@ -111,6 +127,11 @@ BitPerfectChainAssessment assessBitPerfectChain({
   bool digitalVolumeAttenuated = false,
   bool rateVerified = true,
   bool sourceCodecUnconfirmed = false,
+  bool sourceLossy = false,
+  bool sourceFloat = false,
+  bool sourceRepresentationUnknown = false,
+  bool directUsbActive = false,
+  int rawPcmBitDepth = 0,
   String? failureReason,
 }) {
   if (!requested) {
@@ -143,6 +164,19 @@ BitPerfectChainAssessment assessBitPerfectChain({
       outputSampleRate: outputSampleRate,
       outputBitDepth: outputBitDepth,
       reasonCode: 'dop_carrier_not_measured',
+    );
+  }
+
+  if (sourceLossy || (sourceBitDepth > 24 &&
+      (sourceFloat || sourceRepresentationUnknown || !directUsbActive ||
+          !rateVerified || rawPcmBitDepth < sourceBitDepth))) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: sourceLossy ? 'source_lossy' : 'source_precision_not_preserved',
     );
   }
 

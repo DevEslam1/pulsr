@@ -6,6 +6,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
+#include <cstdint>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -57,6 +58,13 @@ public:
     // Multi-channel planar processing: consumes inFrames and writes up to maxOutFrames
     int processPlanar(const float* const* in, float* const* out, int inFrames, int channels, int maxOutFrames);
 
+    // Conservative capacity bound, including buffered input. Lets a streaming
+    // caller reject too-small output buffers before consuming any input.
+    int64_t maximumOutputFrames(int inFrames) const {
+        return static_cast<int64_t>(std::ceil(
+            (static_cast<double>(availableFrames_) + inFrames) / ratio_));
+    }
+
 private:
     void generatePolyphaseTable();
     // Recomputes the per-phase DC-gain correction for the active tap window.
@@ -70,7 +78,10 @@ private:
     double inRate_ = 48000.0;
     double outRate_ = 48000.0;
     double ratio_ = 1.0;
+    // Integer unread-input offset and fractional phase are separate so FIFO
+    // chunk boundaries cannot change floating-point phase accumulation.
     double phase_ = 0.0;
+    double phaseFraction_ = 0.0;
     bool enabled_ = false;
     int quality_ = 3;
     int activeHalfTaps_ = TAPS_PER_PHASE / 2;
@@ -89,4 +100,5 @@ private:
     float ringBuf_[MAX_CHANNELS][FIFO_CAPACITY] = {};
     int writePos_ = 0;
     int availableFrames_ = 0;
+    int historyFrames_ = 0;
 };

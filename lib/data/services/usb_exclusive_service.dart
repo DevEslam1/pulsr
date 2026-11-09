@@ -62,6 +62,8 @@ class UsbExclusiveStatus {
   final int streamingSampleRate;
   final int streamingBitDepth;
   final int streamingChannels;
+  /// Last successfully forwarded raw integer source depth; zero is nonraw.
+  final int rawPcmBitDepth;
   final String? deviceName;
   final int? vendorId;
   final int? productId;
@@ -94,6 +96,7 @@ class UsbExclusiveStatus {
     this.streamingSampleRate = 0,
     this.streamingBitDepth = 0,
     this.streamingChannels = 0,
+    this.rawPcmBitDepth = 0,
     this.deviceName,
     this.vendorId,
     this.productId,
@@ -124,6 +127,7 @@ class UsbExclusiveStatus {
     int? streamingSampleRate,
     int? streamingBitDepth,
     int? streamingChannels,
+    int? rawPcmBitDepth,
     String? deviceName,
     int? vendorId,
     int? productId,
@@ -154,6 +158,7 @@ class UsbExclusiveStatus {
       streamingSampleRate: streamingSampleRate ?? this.streamingSampleRate,
       streamingBitDepth: streamingBitDepth ?? this.streamingBitDepth,
       streamingChannels: streamingChannels ?? this.streamingChannels,
+      rawPcmBitDepth: rawPcmBitDepth ?? this.rawPcmBitDepth,
       deviceName: deviceName ?? this.deviceName,
       vendorId: vendorId ?? this.vendorId,
       productId: productId ?? this.productId,
@@ -194,6 +199,8 @@ class UsbExclusiveStatus {
       streamingSampleRate: i(map['streamingSampleRate']) ?? 0,
       streamingBitDepth: i(map['streamingBitDepth']) ?? 0,
       streamingChannels: i(map['streamingChannels']) ?? 0,
+      rawPcmBitDepth: map['streamingActive'] == true
+          ? (i(map['rawPcmBitDepth']) ?? 0) : 0,
       deviceName: map['deviceName'] as String?,
       vendorId: i(map['vendorId']),
       productId: i(map['productId']),

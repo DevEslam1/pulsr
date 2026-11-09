@@ -1,5 +1,6 @@
 // android/app/src/test/cpp/test_rt_alloc.cpp
 #include "../../main/cpp/AudioDspEngine.h"
+#include "../../main/cpp/UsbGapFader.h"
 #include <iostream>
 #include <vector>
 #include <cassert>
@@ -181,6 +182,27 @@ void runRtAllocGuardTest() {
 
         assert(g_rt_alloc_count.load() == 0);
         assert(PreparedIr::getCacheMutexLockCount() == 0);
+    }
+
+    // Packed USB healthy/gap/recovery/repeated-gap processing uses only fixed
+    // state, including all-channel 32-bit recovery. No callback allocation.
+    for (int bytes : {2, 3, 4}) {
+        pulsr::UsbGapFader fader;
+        pulsr::SinkDitherState dither;
+        fader.configure(768000.0, 8, bytes);
+        std::vector<uint8_t> packed(4096 * 8 * bytes, 0x32);
+        g_rt_alloc_count.store(0);
+        g_rt_guard_enabled.store(true);
+        fader.applyReal(packed.data(), 4096, dither);
+        for (int i = 0; i < 100; ++i) {
+            fader.fillGap(packed.data(), 17, dither);
+            fader.fillGap(packed.data(), 23, dither);
+            fader.applyReal(packed.data(), 31, dither);
+            fader.fillGap(packed.data(), 1, dither);
+            fader.applyReal(packed.data(), 4096, dither);
+        }
+        g_rt_guard_enabled.store(false);
+        assert(g_rt_alloc_count.load() == 0);
     }
 
     std::cout << "  RT Allocations: " << g_rt_alloc_count.load()

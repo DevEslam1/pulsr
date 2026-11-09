@@ -102,6 +102,16 @@ public final class AAudioAudioSink implements AudioSink {
     // lazily in handleBuffer and grown on demand; never shrunk.
     private ByteBuffer pcm32ScratchBuffer;
     private ByteBuffer nonDirectScratchBuffer;
+    private FloatDspAudioSink.PcmFrameEditor frameEditor;
+    private ByteBuffer pendingEditedInput;
+    private ByteBuffer pendingEditedOutput;
+    private int pendingEditedEnd;
+    private long pendingEditedTimeUs;
+    private int pendingEditedUnits;
+
+    boolean hasStagedInput() { return pendingEditedInput != null; }
+    FloatDspAudioSink.PcmFrameEditor frameEditor() { return frameEditor; }
+    void adoptFrameEditor(FloatDspAudioSink.PcmFrameEditor editor) { frameEditor = editor; }
 
     private float volume = 1.0f;
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
@@ -225,6 +235,14 @@ public final class AAudioAudioSink implements AudioSink {
         } else {
             encoding = AaudioNativeBridge.ENCODING_PCM_I24_PACKED;
         }
+        // Trimming removes declared non-program frames without changing samples.
+        try {
+            frameEditor = new FloatDspAudioSink.PcmFrameEditor(inputFormat, null);
+        } catch (IllegalArgumentException | ArithmeticException e) {
+            throw new ConfigurationException(e, inputFormat);
+        }
+        pendingEditedInput = null;
+        pendingEditedOutput = null;
         // Close any stream from a previous configuration before reopening.
         closeHandle();
         long newHandle;
@@ -282,7 +300,8 @@ public final class AAudioAudioSink implements AudioSink {
     public boolean handleBuffer(ByteBuffer buffer, long presentationStartUs,
             int encodedAccessUnitCount) throws InitializationException,
             WriteException {
-        if (routePending && configuredFormat != null) {
+        if (routePending && configuredFormat != null && pendingEditedOutput == null) {
+            FloatDspAudioSink.PcmFrameEditor previousEditor = frameEditor;
             routePending = false;
             Format previousFormat = configuredFormat;
             int previousDevice = openedDeviceId;
@@ -301,12 +320,15 @@ public final class AAudioAudioSink implements AudioSink {
                     return false;
                 }
             }
+            frameEditor = previousEditor;
         }
         if (handle == 0L) {
+            int bufferSize = configuredFormat != null ? configuredFormat.pcmEncoding : 0;
             throw new InitializationException(0,
                     configuredFormat != null ? configuredFormat.sampleRate : 0,
                     configuredFormat != null ? configuredFormat.channelCount : 0,
-                    configuredFormat != null ? configuredFormat.pcmEncoding : 0,
+                    /* bufferSize= */ bufferSize,
+                    /* audioTrackBufferSize= */ bufferSize,
                     configuredFormat, /* isRecoverable= */ false,
                     /* audioTrackException= */ null);
         }
@@ -317,6 +339,34 @@ public final class AAudioAudioSink implements AudioSink {
         }
         int remaining = buffer.remaining();
         if (remaining == 0) {
+            return true;
+        }
+
+        if (pendingEditedOutput != null || (frameEditor != null && frameEditor.edits())) {
+            if (pendingEditedOutput == null) {
+                ByteBuffer edited = frameEditor.prepare(buffer);
+                pendingEditedOutput = pcmEncoding == C.ENCODING_PCM_32BIT
+                        ? convert32BitToFloat(edited) : edited;
+                pendingEditedInput = buffer;
+                pendingEditedEnd = buffer.limit();
+                pendingEditedTimeUs = presentationStartUs;
+                pendingEditedUnits = encodedAccessUnitCount;
+                frameEditor.commit();
+            } else if (pendingEditedInput != buffer) {
+                throw new IllegalStateException("Retry the same PCM buffer");
+            }
+            if (pendingEditedOutput.hasRemaining()) {
+                int written = bridge.write(handle, pendingEditedOutput,
+                        pendingEditedOutput.position(), pendingEditedOutput.remaining());
+                if (written < 0 || written > pendingEditedOutput.remaining())
+                    throw new WriteException(-1, configuredFormat, true);
+                pendingEditedOutput.position(pendingEditedOutput.position() + written);
+                updateMeasuredRoute();
+                if (pendingEditedOutput.hasRemaining()) return false;
+            }
+            buffer.position(pendingEditedEnd);
+            pendingEditedOutput = null;
+            pendingEditedInput = null;
             return true;
         }
 
@@ -344,7 +394,7 @@ public final class AAudioAudioSink implements AudioSink {
             nonDirectScratchBuffer.flip();
             int written = bridge.write(handle, nonDirectScratchBuffer, 0,
                     remaining);
-            if (written < 0) {
+            if (written < 0 || written > remaining) {
                 throw new WriteException(-1, configuredFormat,
                         /* isRecoverable= */ true);
             }
@@ -363,7 +413,7 @@ public final class AAudioAudioSink implements AudioSink {
         int offset = writeBuffer.position();
         int written = bridge.write(handle, writeBuffer, offset,
                 remaining);
-        if (written < 0) {
+        if (written < 0 || written > remaining) {
             throw new WriteException(-1, configuredFormat,
                     /* isRecoverable= */ true);
         }
@@ -401,27 +451,45 @@ public final class AAudioAudioSink implements AudioSink {
         return pcm32ScratchBuffer;
     }
 
+    void transferPendingTo(FloatDspAudioSink target) {
+        target.acceptPreparedPcm(pendingEditedOutput,
+                pcmEncoding == C.ENCODING_PCM_32BIT ? C.ENCODING_PCM_FLOAT : pcmEncoding,
+                pendingEditedInput, pendingEditedEnd, pendingEditedTimeUs, pendingEditedUnits, frameEditor);
+        pendingEditedOutput = null;
+        pendingEditedInput = null;
+    }
+
     @Override
     public void playToEndOfStream() throws WriteException {
         if (handle == 0L || eosWritten) {
             return;
         }
+        if (pendingEditedOutput != null && pendingEditedInput != null) {
+            try {
+                if (!handleBuffer(pendingEditedInput, basePositionUs, 1)) return;
+            } catch (InitializationException e) {
+                WriteException failure = new WriteException(-1, configuredFormat, true);
+                failure.initCause(e);
+                throw failure;
+            }
+        }
+        if (frameEditor != null) frameEditor.endOfStream();
         eosWritten = true;
         handledEndOfStream = true;
     }
 
     @Override
     public boolean isEnded() {
-        return handledEndOfStream && handle != 0L
+        return pendingEditedOutput == null && handledEndOfStream && handle != 0L
                 && bridge.getFramesRead(handle)
                         >= bridge.getFramesWritten(handle);
     }
 
     @Override
     public boolean hasPendingData() {
-        return handle != 0L
+        return pendingEditedOutput != null || (handle != 0L
                 && bridge.getFramesRead(handle)
-                        < bridge.getFramesWritten(handle);
+                        < bridge.getFramesWritten(handle));
     }
 
     @Override
@@ -483,6 +551,11 @@ public final class AAudioAudioSink implements AudioSink {
     }
 
     @Override
+    public long getAudioTrackBufferSizeUs() {
+        return C.TIME_UNSET;
+    }
+
+    @Override
     public void setVolume(float volume) {
         this.volume = volume;
         if (handle != 0L) {
@@ -498,6 +571,9 @@ public final class AAudioAudioSink implements AudioSink {
 
     @Override
     public void flush() {
+        pendingEditedInput = null;
+        pendingEditedOutput = null;
+        if (frameEditor != null) frameEditor.flush();
         eosWritten = false;
         handledEndOfStream = false;
         pendingBasePosition = true;
@@ -508,6 +584,9 @@ public final class AAudioAudioSink implements AudioSink {
 
     @Override
     public void reset() {
+        pendingEditedInput = null;
+        pendingEditedOutput = null;
+        frameEditor = null;
         closeHandle();
         eosWritten = false;
         handledEndOfStream = false;

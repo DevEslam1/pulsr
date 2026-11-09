@@ -98,17 +98,31 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
     private boolean skipSilenceEnabled;
     private float volume = 1f;
-    private boolean playWhenReady;
+    private volatile boolean playWhenReady;
     private boolean tunnelingEnabled;
     private long outputStreamOffsetUs = C.TIME_UNSET;
     private int offloadMode = OFFLOAD_MODE_DISABLED;
     private int offloadDelayFrames;
     private int offloadPaddingFrames;
     private boolean enableAudioTrackPlaybackParams;
-    private boolean released;
+    private volatile boolean released;
+    private volatile boolean precisionFallback;
+    private boolean tapSrcFailed;
+    private boolean pendingModeRequested;
+    private boolean pendingForce;
+    @Nullable private NativeDspAudioProcessor continuousState;
+
+    private boolean hasStagedInput() {
+        return inner instanceof FloatDspAudioSink && ((FloatDspAudioSink) inner).hasStagedInput()
+                || inner instanceof AAudioAudioSink && ((AAudioAudioSink) inner).hasStagedInput();
+    }
+    private volatile int[] decodedPcm = new int[] {0, 0, 0};
+
+    int[] decodedPcmSnapshot() { return decodedPcm.clone(); }
+    boolean isPlayingForTelemetry() { return playWhenReady && format != null && !released; }
 
     // Current configuration and inner sink.
-    @Nullable private Format format;
+    @Nullable private volatile Format format;
     private int bufferSize;
     @Nullable private int[] outputChannels;
     private boolean endOfStreamQueued;
@@ -144,7 +158,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     private Mode desiredMode() {
         if (aaudioEnabled.get()) return Mode.AAUDIO;
-        return floatEnabled.get() ? Mode.FLOAT : Mode.DEFAULT;
+        return floatEnabled.get() && !precisionFallback ? Mode.FLOAT : Mode.DEFAULT;
     }
 
     /** Called from the app thread; the actual swap runs on the playback thread. */
@@ -156,6 +170,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     @Override
     public void requestModeChange(boolean force) {
         if (released) return;
+        // A new explicit float request may retry a previously rejected route.
+        if (!force && floatEnabled.get()) precisionFallback = false;
         final ExoPlayer player = playerSupplier.get();
         if (player == null) return;
         final boolean forceSwap = force;
@@ -170,10 +186,15 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     /** Runs on the playback thread; also directly callable from unit tests. */
     void applyPendingMode(boolean force) {
         if (released || format == null || currentInner == null) return;
+        if (hasStagedInput()) {
+            pendingModeRequested = true;
+            pendingForce |= force;
+            return;
+        }
         final Mode desired = desiredMode();
         if (force || desired != mode) {
             try {
-                swapTo(desired, true);
+                swapTo(desired, true, true);
             } catch (ConfigurationException | RuntimeException e) {
                 // A message target must never throw into the playback thread.
                 notifySinkError(e);
@@ -222,7 +243,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             return SINK_FORMAT_SUPPORTED_DIRECTLY;
         }
         if (format.pcmEncoding == C.ENCODING_PCM_FLOAT) {
-            return floatEnabled.get()
+            return (floatEnabled.get() && !precisionFallback) || aaudioEnabled.get()
                     ? SINK_FORMAT_SUPPORTED_DIRECTLY
                     : SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
         }
@@ -246,12 +267,14 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             @Nullable int[] outputChannels) throws ConfigurationException {
         if (released) throw new IllegalStateException("PulsrAudioSink released");
         this.format = inputFormat;
+        decodedPcm = new int[] {inputFormat.pcmEncoding, inputFormat.sampleRate, inputFormat.channelCount};
+        PulsrOutputRouting.observeDecoded(this, playerSupplier.get());
         this.bufferSize = specifiedBufferSize;
         this.outputChannels = outputChannels == null ? null : outputChannels.clone();
         this.endOfStreamQueued = false;
         final Mode desired = desiredMode();
         if (currentInner == null || mode != desired) {
-            swapTo(desired, false);
+            swapTo(desired, false, false);
         } else {
             inner.configure(inputFormat, specifiedBufferSize, this.outputChannels);
         }
@@ -275,9 +298,44 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             throw new IllegalStateException("configure() has not been called");
         }
         try {
+            boolean consumed = inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
+            if (pendingModeRequested && !hasStagedInput()) {
+                boolean force = pendingForce;
+                pendingModeRequested = false;
+                pendingForce = false;
+                applyPendingMode(force);
+            }
+            return consumed;
+        } catch (NativeDspAudioProcessor.TapSrcException e) {
+            // No source or editor state was committed. Reconfigure at source
+            // rate; never send wrong-rate passthrough bytes into the old track.
+            tapSrcFailed = true;
+            notifySinkError(e);
+            try {
+                swapTo(mode, false, true);
+            } catch (ConfigurationException failure) {
+                int pcmEncoding = format != null ? format.pcmEncoding : 0;
+                int sampleRate = format != null ? format.sampleRate : 0;
+                int channelCount = format != null ? format.channelCount : 0;
+                throw new InitializationException(0, sampleRate, channelCount,
+                        pcmEncoding, pcmEncoding, format, false, failure);
+            }
             return inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
         } catch (WriteException | InitializationException e) {
-            if (mode == Mode.AAUDIO && fallbackFromAaudio(e)) {
+            if (mode == Mode.AAUDIO) {
+                if (fallbackFromAaudio(e)) {
+                    return inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
+                }
+            }
+            if (mode == Mode.FLOAT) {
+                precisionFallback = true;
+                notifyFloatRejected(e instanceof InitializationException ? "initialize_failed" : "write_failed", e);
+                try {
+                    swapTo(Mode.DEFAULT, false, true);
+                } catch (ConfigurationException failure) {
+                    notifySinkError(failure);
+                    throw e;
+                }
                 return inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
             }
             throw e;
@@ -384,6 +442,11 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     }
 
     @Override
+    public long getAudioTrackBufferSizeUs() {
+        return inner != null ? inner.getAudioTrackBufferSizeUs() : C.TIME_UNSET;
+    }
+
+    @Override
     public void setVolume(float volume) {
         this.volume = volume;
         if (inner != null) inner.setVolume(volume);
@@ -393,6 +456,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     public void pause() {
         playWhenReady = false;
         if (inner != null) inner.pause();
+        if (currentInner != null && currentInner.processor != null)
+            currentInner.processor.releaseUsbProducer();
     }
 
     @Override
@@ -414,6 +479,12 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     public void reset() {
         endOfStreamQueued = false;
         format = null;
+        continuousState = null;
+        pendingModeRequested = false;
+        pendingForce = false;
+        decodedPcm = new int[] {0, 0, 0};
+        if (currentInner != null && currentInner.processor != null)
+            currentInner.processor.releaseUsbProducer();
         if (inner != null) inner.reset();
     }
 
@@ -421,6 +492,9 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     public void release() {
         if (released) return;
         released = true;
+        continuousState = null;
+        decodedPcm = new int[] {0, 0, 0};
+        PulsrOutputRouting.unobserveDecoded(this);
         if (currentInner != null) {
             releaseInner(currentInner);
             currentInner = null;
@@ -432,7 +506,12 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     // ---- swap mechanics ----
 
-    private void swapTo(Mode desired, boolean internal) throws ConfigurationException {
+    private void swapTo(Mode desired, boolean internal, boolean sameStream) throws ConfigurationException {
+        final Inner previous = currentInner;
+        // Error policy (internal) is independent of stream identity: SRC/write
+        // fallbacks must retain trimming even when their errors are propagated.
+        final Inner continuing = sameStream ? previous : null;
+        if (previous != null && previous.processor != null) continuousState = previous.processor;
         // An active exclusive AAudio stream blocks opening another one (and a
         // shared AudioTrack while it runs). When either side of the transition
         // is AAudio, stop the old backend first; the fallback chain below still
@@ -444,12 +523,13 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             currentInner = null;
             inner = null;
             mode = null;
+            if (processorListener != null) processorListener.onActiveProcessorChanged(null);
             releaseInner(old);
         }
         Mode appliedMode = desired;
         Inner candidate;
         try {
-            candidate = createConfigured(appliedMode);
+            candidate = createConfigured(appliedMode, continuing);
         } catch (ConfigurationException | RuntimeException first) {
             if (desired == Mode.AAUDIO) {
                 // The fallback listener flips the player's AAudio preference;
@@ -469,13 +549,13 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                 return;
             }
             try {
-                candidate = createConfigured(appliedMode);
+                candidate = createConfigured(appliedMode, continuing);
             } catch (ConfigurationException | RuntimeException second) {
                 if (appliedMode == Mode.FLOAT) {
                     notifyFloatRejected("configure_failed", second);
                     appliedMode = Mode.DEFAULT;
                     try {
-                        candidate = createConfigured(appliedMode);
+                        candidate = createConfigured(appliedMode, continuing);
                     } catch (ConfigurationException | RuntimeException third) {
                         failSwap(third, internal);
                         return;
@@ -487,15 +567,19 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             }
         }
 
-        // Carry any in-flight gain ramp/transition fade onto the replacement
-        // DSP chain so a mode switch mid-fade does not jump to unity.
-        if (candidate.processor != null && currentInner != null
-                && currentInner.processor != null
-                && currentInner.processor != candidate.processor) {
-            currentInner.processor.copyContinuousStateTo(candidate.processor);
-        }
-
         final Inner old = currentInner;
+        if (sameStream && previous != null && candidate.sink instanceof FloatDspAudioSink) {
+            // Continue only the unaccepted tail; carry gapless state across modes.
+            if (previous.sink instanceof FloatDspAudioSink)
+                ((FloatDspAudioSink) previous.sink).transferPendingTo((FloatDspAudioSink) candidate.sink);
+            else if (previous.nativeSink != null)
+                previous.nativeSink.transferPendingTo((FloatDspAudioSink) candidate.sink);
+        } else if (sameStream && previous != null && candidate.nativeSink != null) {
+            if (previous.sink instanceof FloatDspAudioSink)
+                candidate.nativeSink.adoptFrameEditor(((FloatDspAudioSink) previous.sink).frameEditor());
+            else if (previous.nativeSink != null)
+                candidate.nativeSink.adoptFrameEditor(previous.nativeSink.frameEditor());
+        }
         currentInner = candidate;
         inner = candidate.sink;
         mode = appliedMode;
@@ -503,6 +587,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             processorListener.onActiveProcessorChanged(
                     appliedMode == Mode.AAUDIO ? null : candidate.processor);
         }
+        if (tapSrcFailed && candidate.processor != null) candidate.processor.setTapSrcTargetRate(0);
         if (old != null) releaseInner(old);
 
         if (playWhenReady) inner.play();
@@ -515,13 +600,28 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         }
     }
 
-    private Inner createConfigured(Mode mode) throws ConfigurationException {
+    private Inner createConfigured(Mode mode, @Nullable Inner previous) throws ConfigurationException {
         Inner candidate = createInner(mode);
         try {
             applyState(candidate.sink);
-            candidate.sink.configure(format, bufferSize, outputChannels);
+            if (continuousState != null && candidate.processor != null)
+                continuousState.copyContinuousStateTo(candidate.processor);
+            // Listener owns the current device target. Install it BEFORE final
+            // configure/flush latches the output rate, including first playback.
+            if (processorListener != null) processorListener.onActiveProcessorChanged(candidate.processor);
+            if (tapSrcFailed && candidate.processor != null) candidate.processor.setTapSrcTargetRate(0);
+            if (previous != null && previous.sink instanceof FloatDspAudioSink
+                    && ((FloatDspAudioSink) previous.sink).hasStagedInput()
+                    && candidate.sink instanceof FloatDspAudioSink) {
+                ((FloatDspAudioSink) previous.sink).configurePendingReplacement(
+                        (FloatDspAudioSink) candidate.sink);
+            } else {
+                candidate.sink.configure(format, bufferSize, outputChannels);
+            }
             return candidate;
         } catch (ConfigurationException | RuntimeException failure) {
+            if (processorListener != null) processorListener.onActiveProcessorChanged(
+                    currentInner == null ? null : currentInner.processor);
             releaseInner(candidate);
             throw failure;
         }
@@ -547,7 +647,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             return false;
         }
         try {
-            swapTo(desiredMode(), true);
+            swapTo(desiredMode(), true, true);
         } catch (ConfigurationException e) {
             notifySinkError(e);
             return false;
@@ -563,7 +663,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     }
 
     private void notifyFloatRejected(String reason, Exception cause) {
-        Log.w(TAG, "Float output rejected (" + reason + "); keeping current sink", cause);
+        precisionFallback = true;
+        Log.w(TAG, "Float output rejected (" + reason + "); using dithered PCM16 (not bit-perfect)", cause);
         if (fallbackListener != null) {
             fallbackListener.onFloatRejected(reason, cause);
         }
@@ -606,19 +707,17 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             PulsrOutputRouting.observe(nativeSink);
             return new Inner(nativeSink, null, nativeSink, null);
         }
+        // Own the high-resolution path even for DEFAULT: Media3's stock
+        // converter discards PCM24/32 low bytes before custom DSP can see them.
         NativeDspAudioProcessor processor = new NativeDspAudioProcessor();
-        processor.setFloatOutput(requested == Mode.FLOAT);
+        processor.setFloatOutput(true);
         DefaultAudioSink defaultSink = new DefaultAudioSink.Builder(context)
                 .setEnableFloatOutput(requested == Mode.FLOAT)
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
-                .setAudioProcessors(requested == Mode.FLOAT
-                        ? new androidx.media3.common.audio.AudioProcessor[0]
-                        : new androidx.media3.common.audio.AudioProcessor[] { processor })
+                .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[0])
                 .build();
         PulsrOutputRouting.observe(defaultSink);
-        AudioSink outer = requested == Mode.FLOAT
-                ? new FloatDspAudioSink(defaultSink, processor)
-                : defaultSink;
+        AudioSink outer = new FloatDspAudioSink(defaultSink, processor, true, requested == Mode.DEFAULT);
         return new Inner(outer, defaultSink, null, processor);
     }
 

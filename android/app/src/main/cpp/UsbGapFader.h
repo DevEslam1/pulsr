@@ -9,16 +9,14 @@
 // delta-sigma DAC turns that into a tick. Rejoining real audio after the gap
 // steps it back up again.
 //
-// This class rides an envelope down to silence when the ring empties and back
-// up to unity when audio resumes, so neither boundary contains a step. One
-// envelope is shared by every channel of a frame, so it cannot skew the image.
-// The envelope is continuous in BOTH directions by construction: a gap shorter
-// than the fade does not restart from zero, it resumes from wherever the decay
-// had reached.
+// A gap fades the last emitted frame to silence. Recovery crossfades that
+// actual emitted frame to the incoming waveform, not merely its amplitude
+// envelope, so opposite-polarity recovery cannot step. Shared bounded fade
+// progress preserves the image; repeated gaps restart from the emitted sample.
 //
-// Steady-state cost is one frame unpacked per packet: when the envelope is at
-// unity the copied bytes are left exactly as packed, so normal playback is
-// bit-identical to not having this in the chain at all.
+// Steady-state cost is one frame unpacked per healthy packet: copied bytes are
+// left exactly as packed, so normal playback is bit-identical to not having
+// this in the chain at all. Recovery is necessarily non-bit-perfect.
 //
 // Host-testable: plain byte buffers, no usbfs.
 #pragma once
@@ -35,78 +33,84 @@ class UsbGapFader {
 public:
     static constexpr int MAX_CHANNELS = 8;
 
-    /// fadeMs is the time constant of the ride-down and ride-up. Two
-    /// milliseconds is inaudible as a fade and long enough that no single
-    /// sample step survives it.
+    /// fadeMs bounds both the gap fade and the recovery crossfade.
     void configure(double sampleRate, int channels, int bytesPerSample,
                    int fadeMs = 2) {
         channels_ = std::clamp(channels, 1, MAX_CHANNELS);
         bytesPerSample_ = std::clamp(bytesPerSample, 2, 4);
-        const double rate = sampleRate > 0.0 ? sampleRate : 48000.0;
-        fadeSamples_ = std::max(1, static_cast<int>(std::lround(rate * fadeMs / 1000.0)));
-        riseStep_ = 1.0 / static_cast<double>(fadeSamples_);
-        // Reaches ~0.7% (-43 dB) after one fade window, then the floor below
-        // turns it into exact zero.
-        decay_ = std::exp(-5.0 / static_cast<double>(fadeSamples_));
+        const double rate = std::isfinite(sampleRate) && sampleRate > 0.0
+                                ? std::clamp(sampleRate, 8000.0, 768000.0) : 48000.0;
+        fadeSamples_ = std::max(2, static_cast<int>(std::lround(
+            rate * std::clamp(fadeMs, 1, 20) / 1000.0)));
         reset();
     }
 
     void reset() {
+        inGap_ = false;
+        recoveryFrame_ = fadeSamples_;
+        gapFrame_ = 0;
         envelope_ = 1.0;
-        for (int c = 0; c < MAX_CHANNELS; ++c) last_[c] = 0.0f;
+        for (int c = 0; c < MAX_CHANNELS; ++c) last_[c] = base_[c] = 0.0;
     }
 
-    /// True while the envelope is recovering, i.e. the copied bytes still need
-    /// scaling. Unity means the pass-through path is taken.
-    bool recovering() const { return envelope_ < 1.0; }
+    bool recovering() const { return inGap_ || recoveryFrame_ < fadeSamples_; }
 
+    // Diagnostic fade progress, not a gain for the already-faded last sample.
     double envelope() const { return envelope_; }
 
-    /// Called after `frames` real frames have been copied into `data`. Either
-    /// it leaves them untouched (envelope at unity) and just remembers the last
-    /// frame, or it scales them in place and advances the envelope toward unity.
+    /// Healthy packets remain packed; recovery blends from the last gap frame
+    /// to the actual signal over one bounded window, across packet boundaries.
     void applyReal(uint8_t* data, int frames, SinkDitherState& st) {
-        if (frames <= 0) return;
+        if (!data || frames <= 0) return;
         const int frameBytes = FrameBytes();
-        if (envelope_ >= 1.0) {
+        if (!recovering()) {
             rememberFrame(data + static_cast<size_t>(frames - 1) * frameBytes);
             return;
         }
-        for (int f = 0; f < frames; ++f) {
-            uint8_t* frame = data + static_cast<size_t>(f) * frameBytes;
-            if (envelope_ >= 1.0) break;  // remainder stays as packed
-            scaleFrame(frame, envelope_, st);
-            envelope_ += riseStep_;
-            if (envelope_ > 1.0) envelope_ = 1.0;
+        if (inGap_) {
+            inGap_ = false;
+            recoveryFrame_ = 0;
+            for (int c = 0; c < channels_; ++c) base_[c] = last_[c];
         }
-        // The remembered level must be what actually went out the wire, so a
-        // gap that follows decays from the emitted value rather than the
-        // pre-fade one.
+        for (int f = 0; f < frames && recoveryFrame_ < fadeSamples_; ++f) {
+            uint8_t* frame = data + static_cast<size_t>(f) * frameBytes;
+            const double mix = static_cast<double>(recoveryFrame_) / (fadeSamples_ - 1);
+            // First frame exactly continues the gap; final frame and all
+            // following bytes are the real input without requantization.
+            if (mix < 1.0) {
+                for (int c = 0; c < channels_; ++c) {
+                    uint8_t* p = frame + static_cast<size_t>(c) * bytesPerSample_;
+                    Pack(base_[c] + mix * (Unpack(p) - base_[c]), p, st);
+                }
+            }
+            ++recoveryFrame_;
+            envelope_ = static_cast<double>(recoveryFrame_) / fadeSamples_;
+        }
         rememberFrame(data + static_cast<size_t>(frames - 1) * frameBytes);
     }
 
-    /// Writes `frames` frames that decay from the last emitted sample toward
-    /// silence. Once the envelope is below the 16-bit floor the output is exact
-    /// zero, so a long gap cannot accumulate a denormal tail.
+    /// Fade the last emitted sample to exact silence. Freeze a fresh base once
+    /// per gap, not per packet: multiplying it by an old envelope would apply
+    /// attenuation twice when a second gap interrupts recovery.
     void fillGap(uint8_t* data, int frames, SinkDitherState& st) {
-        if (frames <= 0) return;
+        if (!data || frames <= 0) return;
+        if (!inGap_) {
+            inGap_ = true;
+            gapFrame_ = 0;
+            recoveryFrame_ = 0;
+            for (int c = 0; c < channels_; ++c) base_[c] = last_[c];
+        }
         const int frameBytes = FrameBytes();
         for (int f = 0; f < frames; ++f) {
             uint8_t* frame = data + static_cast<size_t>(f) * frameBytes;
-            if (envelope_ <= 1e-7) {
-                for (int b = 0; b < frameBytes; ++b) frame[b] = 0;
-                for (int c = 0; c < channels_; ++c) last_[c] = 0.0f;
-                envelope_ = 0.0;
-                continue;
-            }
+            envelope_ = 1.0 - static_cast<double>(gapFrame_) / (fadeSamples_ - 1);
             for (int c = 0; c < channels_; ++c) {
-                PackPcmSample(static_cast<float>(last_[c]) *
-                                  static_cast<float>(envelope_),
-                              frame + static_cast<size_t>(c) * bytesPerSample_,
-                              bytesPerSample_, st);
+                Pack(base_[c] * envelope_,
+                     frame + static_cast<size_t>(c) * bytesPerSample_, st);
             }
-            envelope_ *= decay_;
+            if (gapFrame_ < fadeSamples_ - 1) ++gapFrame_;
         }
+        rememberFrame(data + static_cast<size_t>(frames - 1) * frameBytes);
     }
 
     int fadeSamples() const { return fadeSamples_; }
@@ -115,46 +119,45 @@ private:
     int FrameBytes() const { return channels_ * bytesPerSample_; }
 
     double Unpack(const uint8_t* p) const {
-        if (bytesPerSample_ == 2) {
-            return static_cast<double>(static_cast<int16_t>(
-                       static_cast<uint16_t>(p[0]) | (static_cast<uint16_t>(p[1]) << 8))) /
-                   32768.0;
-        }
-        if (bytesPerSample_ == 3) {
-            const int32_t raw = static_cast<int32_t>(p[0]) |
-                                (static_cast<int32_t>(p[1]) << 8) |
-                                (static_cast<int32_t>(static_cast<int8_t>(p[2])) << 16);
-            return static_cast<double>(raw) / 8388608.0;
-        }
-        const uint32_t u = static_cast<uint32_t>(p[0]) |
-                           (static_cast<uint32_t>(p[1]) << 8) |
-                           (static_cast<uint32_t>(p[2]) << 16) |
-                           (static_cast<uint32_t>(p[3]) << 24);
-        return static_cast<double>(static_cast<int32_t>(u)) / 2147483648.0;
+        uint32_t u = static_cast<uint32_t>(p[0]) |
+                     (static_cast<uint32_t>(p[1]) << 8);
+        if (bytesPerSample_ >= 3) u |= static_cast<uint32_t>(p[2]) << 16;
+        if (bytesPerSample_ == 4) u |= static_cast<uint32_t>(p[3]) << 24;
+        const int bits = bytesPerSample_ * 8;
+        // Unsigned construction avoids shifting negative integers for S24.
+        const int64_t raw = (u & (uint32_t{1} << (bits - 1)))
+            ? static_cast<int64_t>(u) - (int64_t{1} << bits)
+            : static_cast<int64_t>(u);
+        return static_cast<double>(raw) / LsbScaleForBits(bits);
     }
 
     void rememberFrame(const uint8_t* frame) {
+        // Double retains every int32 bit: no float roundtrip on healthy audio.
         for (int c = 0; c < channels_; ++c) {
-            last_[c] = static_cast<float>(
-                Unpack(frame + static_cast<size_t>(c) * bytesPerSample_));
+            last_[c] = Unpack(frame + static_cast<size_t>(c) * bytesPerSample_);
         }
     }
 
-    void scaleFrame(uint8_t* frame, double gain, SinkDitherState& st) {
-        for (int c = 0; c < channels_; ++c) {
-            uint8_t* p = frame + static_cast<size_t>(c) * bytesPerSample_;
-            PackPcmSample(static_cast<float>(Unpack(p) * gain), p,
-                          bytesPerSample_, st);
+    void Pack(double sample, uint8_t* dst, SinkDitherState& st) const {
+        const int bits = bytesPerSample_ * 8;
+        const int64_t half = int64_t{1} << (bits - 1);
+        const int64_t q = QuantizeLsbWithDither(sample * LsbScaleForBits(bits),
+            -half, half - 1, st, DitherHelpsAtBits(bits));
+        const uint32_t u = static_cast<uint32_t>(q);
+        for (int b = 0; b < bytesPerSample_; ++b) {
+            dst[b] = static_cast<uint8_t>((u >> (b * 8)) & 0xff);
         }
     }
 
     int channels_ = 2;
     int bytesPerSample_ = 2;
     int fadeSamples_ = 96;
-    double riseStep_ = 1.0 / 96.0;
-    double decay_ = 0.95;
+    bool inGap_ = false;
+    int gapFrame_ = 0;
+    int recoveryFrame_ = 96;
     double envelope_ = 1.0;
-    float last_[MAX_CHANNELS] = {};
+    double last_[MAX_CHANNELS] = {};
+    double base_[MAX_CHANNELS] = {};
 };
 
 }  // namespace pulsr

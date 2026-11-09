@@ -326,6 +326,10 @@ void main() {
       when(() => settings.stream).thenAnswer((_) => controller.stream);
 
       final hiRes = MockHiResAudioService();
+      when(() => hiRes.outputDeviceStream)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => settings.validateBitPerfectTrackSource(any()))
+          .thenAnswer((_) async => true);
       when(() => hiRes.setTargetOutputFormat(
             sampleRate: any(named: 'sampleRate'),
             bitDepth: any(named: 'bitDepth'),

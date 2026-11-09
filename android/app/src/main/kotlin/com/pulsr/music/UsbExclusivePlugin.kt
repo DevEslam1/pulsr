@@ -129,11 +129,16 @@ class UsbExclusivePlugin(
     ): Int
     private external fun nativeUsbStreamStartWithFormat(
         fd: Int, endpoint: Int, interfaceNumber: Int, altSetting: Int,
-        sampleRate: Int, channels: Int, bytesPerSample: Int,
+        sampleRate: Int, channels: Int, bytesPerSample: Int, validBitDepth: Int,
     ): Int
     private external fun nativeUsbStreamStop()
     private external fun nativeUsbStreamIsActive(): Boolean
+    private external fun nativeUsbStreamGetRawPcmBitDepth(): Int
     private external fun nativeUsbStreamGetLastError(): Int
+
+    private fun safeRawPcmBitDepth(): Int = if (streaming && safeIsStreamActive()) {
+        try { nativeUsbStreamGetRawPcmBitDepth() } catch (_: Throwable) { 0 }
+    } else 0
     private external fun nativeUsbStreamGetUnderrunCount(): Long
     private external fun nativeUsbStreamGetOverrunCount(): Long
     private external fun nativeUsbStreamGetBufferedMs(): Double
@@ -558,6 +563,7 @@ class UsbExclusivePlugin(
             "streamingSupported" to (nativeLoaded && directCapable),
             "streamingSampleRate" to (streamFormat?.sampleRate ?: 0),
             "streamingBitDepth" to (streamFormat?.wireBitDepth ?: 0),
+            "rawPcmBitDepth" to safeRawPcmBitDepth(),
             "streamingChannels" to (streamFormat?.wireChannels ?: 0),
             "hardwareVolumeDb" to hardwareVolume?.currentDb,
             "hardwareVolumeApplied" to (hardwareVolume?.applied == true),
@@ -606,6 +612,7 @@ class UsbExclusivePlugin(
         "streamingSupported" to false,
         "streamingSampleRate" to 0,
         "streamingBitDepth" to 0,
+        "rawPcmBitDepth" to 0,
         "streamingChannels" to 0,
         "hardwareVolumeDb" to null,
         "hardwareVolumeApplied" to false,
@@ -807,6 +814,7 @@ class UsbExclusivePlugin(
             "streamingActive" to (streaming && isNativeActive()),
             "streamingSampleRate" to (streamFormat?.sampleRate ?: 0),
             "streamingBitDepth" to (streamFormat?.wireBitDepth ?: 0),
+            "rawPcmBitDepth" to safeRawPcmBitDepth(),
             "streamingChannels" to (streamFormat?.wireChannels ?: 0),
         )
 
@@ -830,11 +838,6 @@ class UsbExclusivePlugin(
             }
         }
         clearStreaming()
-        if (bitDepth == 32) {
-            lastStreamResultCode = 3
-            Log.w(TAG, "Step format: 32-bit float conversion is not bit-perfect")
-            return failure("source_32bit_float_conversion_not_lossless")
-        }
         if (!nativeLoaded) {
             lastStreamResultCode = -1
             Log.w(TAG, "Step native: native library not available")
@@ -932,6 +935,7 @@ class UsbExclusivePlugin(
             }
             val resultCode = nativeUsbStreamStartWithFormat(
                 fd, epAddress, epInterface, epAlt, sampleRate, wireChannels, streamBytes,
+                selected.bitResolution,
             )
             lastStreamResultCode = resultCode
             if (resultCode != 0 || !isNativeActive()) {

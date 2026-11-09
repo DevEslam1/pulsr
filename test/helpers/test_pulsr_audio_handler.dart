@@ -1,6 +1,7 @@
 // test/helpers/test_pulsr_audio_handler.dart
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/comparison_slot.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -8,6 +9,7 @@ import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/models/headphone_profile.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TestPulsrAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler
@@ -69,12 +71,10 @@ class TestPulsrAudioHandler extends BaseAudioHandler
       BehaviorSubject<List<MediaItem>>.seeded([])
         ..addStream(_queueController.stream);
 
-  final StreamController<PlaybackState> _playbackStateController =
-      StreamController<PlaybackState>.broadcast();
+  final BehaviorSubject<PlaybackState> _playbackStateController =
+      BehaviorSubject<PlaybackState>.seeded(PlaybackState());
   @override
-  BehaviorSubject<PlaybackState> get playbackState =>
-      BehaviorSubject<PlaybackState>.seeded(PlaybackState())
-        ..addStream(_playbackStateController.stream);
+  BehaviorSubject<PlaybackState> get playbackState => _playbackStateController;
 
   final StreamController<String> _errorController =
       StreamController<String>.broadcast();
@@ -504,10 +504,27 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  @override
+  Future<bool> playbackRateMustRemainUnity() async => false;
+
   double? lastSetSpeed;
   @override
   Future<void> setSpeed(double speed) async {
     lastSetSpeed = speed;
+    playbackState.add(playbackState.value.copyWith(speed: speed));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
+  }
+
+  double _pitch = 1.0;
+  @override
+  double get pitch => _pitch;
+
+  @override
+  Future<void> setPitch(double pitch) async {
+    _pitch = pitch;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackPitch, pitch);
   }
 
   @override

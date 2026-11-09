@@ -101,9 +101,31 @@ inline bool DitherHelpsAtBits(int bits) { return bits < 32; }
 /// Negative values are shifted with sign but every byte is masked, so the
 /// result is the two's-complement little-endian the UAC/AAudio containers
 /// expect.
+inline bool IsPcmWireFormat(int bytesPerSample, int validBits) {
+    return bytesPerSample >= 2 && bytesPerSample <= 4 &&
+        (validBits == 16 || validBits == 24 || validBits == 32) &&
+        validBits <= bytesPerSample * 8;
+}
+
+// Integer transport never passes through float: prepend zero low bytes so the
+// source sign bit stays at the wire subslot's MSB, including negative samples.
+inline int PackRawPcmSample(const uint8_t* src, int sourceBits, uint8_t* dst,
+                            int bytesPerSample, int validBits) {
+    if (!src || !dst || !IsPcmWireFormat(bytesPerSample, validBits) ||
+        (sourceBits != 16 && sourceBits != 24 && sourceBits != 32) ||
+        sourceBits > validBits) return 0;
+    const int sourceBytes = sourceBits / 8;
+    const int padding = bytesPerSample - sourceBytes;
+    for (int b = 0; b < padding; ++b) dst[b] = 0;
+    for (int b = 0; b < sourceBytes; ++b) dst[padding + b] = src[b];
+    return bytesPerSample;
+}
+
 inline int PackPcmSample(float v, uint8_t* dst, int bytesPerSample,
-                         SinkDitherState& st) {
-    const int bits = bytesPerSample * 8;
+                         SinkDitherState& st, int validBitDepth = 0) {
+    if (bytesPerSample < 2 || bytesPerSample > 4) return 0;
+    const int bits = validBitDepth == 0 ? bytesPerSample * 8 : validBitDepth;
+    if (!IsPcmWireFormat(bytesPerSample, bits)) return 0;
     const double scale = LsbScaleForBits(bits);
     if (scale == 0.0 || dst == nullptr) return 0;
     const int64_t half = static_cast<int64_t>(1) << (bits - 1);
@@ -111,10 +133,31 @@ inline int PackPcmSample(float v, uint8_t* dst, int bytesPerSample,
         std::isfinite(v) ? static_cast<double>(v) * scale : 0.0;
     const int64_t q = QuantizeLsbWithDither(scaled, -half, half - 1, st,
                                            DitherHelpsAtBits(bits));
-    dst[0] = static_cast<uint8_t>(q & 0xFF);
-    dst[1] = static_cast<uint8_t>((q >> 8) & 0xFF);
-    if (bytesPerSample >= 3) dst[2] = static_cast<uint8_t>((q >> 16) & 0xFF);
-    if (bytesPerSample == 4) dst[3] = static_cast<uint8_t>((q >> 24) & 0xFF);
+    const uint32_t wire = static_cast<uint32_t>(q) << (bytesPerSample * 8 - bits);
+    for (int b = 0; b < bytesPerSample; ++b) {
+        dst[b] = static_cast<uint8_t>(wire >> (8 * b));
+    }
+    return bytesPerSample;
+}
+
+// Gap processing may operate on the whole wire grid. Requantize its output at
+// the DAC's valid depth without a float roundtrip or biased padding truncation.
+inline int RequantizePcmValidBits(uint8_t* data, int bytesPerSample, int validBits,
+                                  SinkDitherState& st) {
+    if (!data || !IsPcmWireFormat(bytesPerSample, validBits)) return 0;
+    const int wireBits = bytesPerSample * 8;
+    const int shift = wireBits - validBits;
+    if (shift == 0) return bytesPerSample;
+    uint32_t u = 0;
+    for (int b = 0; b < bytesPerSample; ++b) u |= static_cast<uint32_t>(data[b]) << (8 * b);
+    const int64_t signedValue = (u & (uint32_t{1} << (wireBits - 1)))
+        ? static_cast<int64_t>(u) - (int64_t{1} << wireBits) : static_cast<int64_t>(u);
+    const int64_t half = int64_t{1} << (validBits - 1);
+    const int64_t q = QuantizeLsbWithDither(
+        static_cast<double>(signedValue) / (uint64_t{1} << shift),
+        -half, half - 1, st, DitherHelpsAtBits(validBits));
+    u = static_cast<uint32_t>(q) << shift;
+    for (int b = 0; b < bytesPerSample; ++b) data[b] = static_cast<uint8_t>(u >> (8 * b));
     return bytesPerSample;
 }
 

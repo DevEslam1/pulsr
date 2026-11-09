@@ -163,6 +163,62 @@ public class AAudioAudioSinkTest {
     }
 
     @Test
+    public void gaplessDelayPaddingAndPartialWritesNeverDropLastProgramFrame() throws Exception {
+        FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 4;
+        AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16().buildUpon().setEncoderDelay(1).setEncoderPadding(1).build(), 0, null);
+        sink.flush();
+        ByteBuffer source = ByteBuffer.allocateDirect(16).order(java.nio.ByteOrder.nativeOrder());
+        source.putShort((short) 1).putShort((short) 2)
+                .putShort((short) 10).putShort((short) 11)
+                .putShort((short) 20).putShort((short) 21)
+                .putShort((short) 30).putShort((short) 31).flip();
+        assertFalse(sink.handleBuffer(source, 90, 1));
+        assertEquals(0, source.position());
+        ByteBuffer written = ByteBuffer.wrap(bridge.writtenBytes).order(java.nio.ByteOrder.nativeOrder());
+        assertEquals(10, written.getShort());
+        assertEquals(11, written.getShort());
+        assertEquals(20, written.getShort());
+        assertTrue(sink.hasPendingData());
+        assertTrue(sink.handleBuffer(source, 90, 1));
+        assertEquals(16, source.position());
+        written = ByteBuffer.wrap(bridge.writtenBytes).order(java.nio.ByteOrder.nativeOrder());
+        assertEquals(20, written.getShort());
+        assertEquals(21, written.getShort());
+        ByteBuffer next = ByteBuffer.allocateDirect(4).order(java.nio.ByteOrder.nativeOrder());
+        next.putShort((short) 40).putShort((short) 41).flip();
+        assertTrue(sink.handleBuffer(next, 100, 1));
+        written = ByteBuffer.wrap(bridge.writtenBytes).order(java.nio.ByteOrder.nativeOrder());
+        assertEquals(30, written.getShort());
+        assertEquals(31, written.getShort());
+        sink.playToEndOfStream();
+        assertTrue(sink.isEnded());
+        sink.release();
+    }
+
+    @Test
+    public void byteAwareTrimRetainsPacked24AndFloatSamplesUnchanged() throws Exception {
+        for (int encoding : new int[] {C.ENCODING_PCM_24BIT, C.ENCODING_PCM_FLOAT}) {
+            int sampleBytes = encoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+            FakeBridge bridge = new FakeBridge();
+            bridge.writeResult = sampleBytes * 2;
+            AAudioAudioSink sink = newSink(bridge);
+            sink.configure(pcm16().buildUpon().setPcmEncoding(encoding)
+                    .setEncoderDelay(1).setEncoderPadding(1).build(), 0, null);
+            byte[] codes = new byte[sampleBytes * 6];
+            for (int i = 0; i < codes.length; i++) codes[i] = (byte) (i * 17 + 1);
+            ByteBuffer source = ByteBuffer.allocateDirect(codes.length);
+            source.put(codes).flip();
+            assertTrue(sink.handleBuffer(source, 0, 1));
+            org.junit.Assert.assertArrayEquals(java.util.Arrays.copyOfRange(codes,
+                    sampleBytes * 2, sampleBytes * 4), bridge.writtenBytes);
+            sink.playToEndOfStream();
+            sink.release();
+        }
+    }
+
+    @Test
     public void positionIsUnavailableUntilTheFirstBufferRebasesIt()
             throws Exception {
         final FakeBridge bridge = new FakeBridge();

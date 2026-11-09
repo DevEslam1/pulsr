@@ -2,6 +2,7 @@
 #include <jni.h>
 #include <android/log.h>
 #include <atomic>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -1345,7 +1346,9 @@ std::atomic<int> g_producerChannels{0};
 
 JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
-        JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels, jobject gainBuffer) {
+        JNIEnv* env, jclass /* clazz */, jlong engineHandle, jobject byteBuffer,
+        jint offsetBytes, jint frameCount, jint channels, jobject gainBuffer,
+        jobject sourcePcm, jint sourceOffset, jint sourceBitDepth, jint sourceSampleRate) {
     if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
     g_producerChannels.store(static_cast<int>(channels), std::memory_order_relaxed);
     // FIX M-2: Reject the engineHandle==0 render fallback. The process-wide
@@ -1353,7 +1356,6 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     // runs processInterleaved, so it never sets a render-thread hazard and its
     // retired snapshots are reclaimed eagerly. Rendering through it here would
     // violate that invariant, so a null handle is a caller error: no-op.
-    if (engineHandle == 0) return 0;
     // A negative or unaligned offset would let `requiredBytes` under-count and
     // address memory before the mapped region; reject it like the AAudio path.
     if (offsetBytes < 0 || (offsetBytes % static_cast<jint>(sizeof(float))) != 0) return 0;
@@ -1363,8 +1365,45 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     jlong capacity = env->GetDirectBufferCapacity(byteBuffer);
     jlong requiredBytes = static_cast<jlong>(offsetBytes) +
         static_cast<jlong>(frameCount) * channels * static_cast<jlong>(sizeof(float));
-    if (capacity < 0 || requiredBytes > capacity) return 0;
+    if (capacity < 0 || requiredBytes > capacity ||
+        static_cast<uint64_t>(requiredBytes) > SIZE_MAX) return 0;
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
+    if (reinterpret_cast<uintptr_t>(floatBuffer) % alignof(float) != 0) return 0;
+    auto& usb = pulsr::UsbAudioSink::instance();
+    const bool exclusive = usb.IsExclusive();
+    const size_t blockBytes = static_cast<size_t>(frameCount) * channels * sizeof(float);
+    const auto reject = [&](int error) -> jint {
+        if (exclusive || usb.IsExclusive()) {
+            usb.ReportWriteError(error);
+            return INT32_MIN; // Java emits independent silence; retained PCM may alias.
+        }
+        return 0;
+    };
+    if (engineHandle == 0) return reject(EINVAL);
+    const uint8_t* sourceBytes = nullptr;
+    if (sourcePcm) {
+        if ((sourceBitDepth != 16 && sourceBitDepth != 24 && sourceBitDepth != 32) ||
+            sourceOffset < 0 || sourceSampleRate <= 0 ||
+            sourceOffset % (channels * (sourceBitDepth / 8)) != 0) return reject(EINVAL);
+        const auto* sourceAddr = static_cast<const uint8_t*>(env->GetDirectBufferAddress(sourcePcm));
+        const jlong sourceCapacity = env->GetDirectBufferCapacity(sourcePcm);
+        const jlong sourceLength = static_cast<jlong>(frameCount) * channels * (sourceBitDepth / 8);
+        if (!sourceAddr || sourceCapacity < 0 || sourceOffset > sourceCapacity ||
+            sourceLength > sourceCapacity - sourceOffset ||
+            static_cast<uint64_t>(sourceOffset) + static_cast<uint64_t>(sourceLength) > SIZE_MAX) {
+            return reject(EINVAL);
+        }
+        sourceBytes = sourceAddr + sourceOffset;
+        // Processing/muting the float view must not overwrite retained raw PCM.
+        const uintptr_t src = reinterpret_cast<uintptr_t>(sourceBytes);
+        const uintptr_t dst = reinterpret_cast<uintptr_t>(floatBuffer);
+        if ((src <= dst && dst - src < static_cast<uint64_t>(sourceLength)) ||
+            (dst < src && src - dst < blockBytes)) {
+            return reject(EINVAL);
+        }
+    } else if (sourceBitDepth != 0 || sourceOffset != 0) {
+        return reject(EINVAL);
+    }
     // Optional per-frame transport gain (one float per frame). Null means
     // transparent unity; an invalid non-null buffer declines the whole block so
     // the Java tap can fall back to applying the gain itself.
@@ -1372,8 +1411,9 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     if (gainBuffer) {
         void* gainAddr = env->GetDirectBufferAddress(gainBuffer);
         jlong gainCapacity = env->GetDirectBufferCapacity(gainBuffer);
-        if (!gainAddr || gainCapacity < static_cast<jlong>(frameCount) * static_cast<jlong>(sizeof(float))) {
-            return 0;
+        if (!gainAddr || reinterpret_cast<uintptr_t>(gainAddr) % alignof(float) != 0 ||
+            gainCapacity < static_cast<jlong>(frameCount) * static_cast<jlong>(sizeof(float))) {
+            return reject(EINVAL);
         }
         transportGains = reinterpret_cast<const float*>(gainAddr);
     }
@@ -1381,24 +1421,31 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     // revalidation against teardown. No locks, no shared_ptr traffic.
     EngineLease lease(static_cast<int64_t>(engineHandle));
     auto* engine = lease.get();
-    if (!engine) return 0;
+    if (!engine) return reject(ENODEV);
     try {
-        jint processed = static_cast<jint>(engine->processInterleaved(floatBuffer, frameCount, channels, transportGains));
-        // USB exclusive streaming: tee the processed PCM to the isochronous USB
-        // sink and mute the HAL path so audio is never doubled if Android
-        // re-routes to another output.
-        auto& usb = pulsr::UsbAudioSink::instance();
-        if (usb.IsActive()) {
-            usb.WriteInterleaved(floatBuffer, frameCount, channels);
-            std::memset(floatBuffer, 0,
-                        static_cast<size_t>(frameCount) * channels * sizeof(float));
+        const jint processed = static_cast<jint>(engine->processInterleaved(
+            floatBuffer, frameCount, channels, transportGains));
+        if (exclusive || usb.IsExclusive()) {
+            if (processed != frameCount) return reject(EIO);
+            const bool raw = engine->wasLastBlockBitPerfect();
+            bool written = false;
+            if (raw) {
+                if (!sourceBytes) return reject(EINVAL); // float cannot preserve S32 LSBs
+                written = usb.WritePcm(sourceBytes, frameCount, channels, sourceBitDepth,
+                                      sourceSampleRate, static_cast<int64_t>(engineHandle));
+            } else {
+                written = usb.WriteInterleaved(floatBuffer, frameCount, channels,
+                    static_cast<int>(engine->getSampleRate()), static_cast<int64_t>(engineHandle));
+            }
+            // Success OR rejection is exclusive: positive acknowledgement makes
+            // Java consume the zeroed float view, never copy raw into the HAL.
+            std::memset(floatBuffer, 0, blockBytes);
+            if (!written) return frameCount; // sink already recorded actionable errno
             return processed;
         }
-        // Negative frame count is an explicit bit-perfect acknowledgment. The
-        // Java PCM tap must skip its gain ramp and copy the original bytes.
         return engine->wasLastBlockBitPerfect() ? -processed : processed;
     } catch (...) {
-        return 0;
+        return reject(EIO);
     }
 }
 
@@ -1421,34 +1468,51 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
     } catch (...) {}
 }
 
-// Tap-side SRC: converts one interleaved float block srcRate -> dstRate ahead
-// of the DSP chain (see AudioDspEngine::resampleForTap). Returns output frames
-// written into outBuffer, or 0 on any validation/engine failure so the Java
-// tap can fall back to 1:1 passthrough.
+// Configuration-thread only: Java calls from onFlush, never queueInput.
+JNIEXPORT void JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativePrepareTapSrc(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle,
+        jint sourceRate, jint destinationRate, jint channels) {
+    if (engineHandle == 0 || sourceRate <= 0 || destinationRate <= 0 ||
+        channels <= 0 || channels > 8) return;
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    if (!lease.get()) return;
+    try {
+        lease.get()->prepareTapResampler(sourceRate, destinationRate, channels);
+    } catch (...) {}
+}
+
+JNIEXPORT void JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeReleaseUsbProducer(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    pulsr::UsbAudioSink::instance().ReleaseProducer(static_cast<int64_t>(engineHandle));
+}
+
+// Negative results distinguish rejection from zero-frame SRC priming.
 JNIEXPORT jint JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResampleTap(
         JNIEnv* env, jclass /* clazz */, jlong engineHandle,
         jobject inBuffer, jint inFrames, jint channels,
         jobject outBuffer, jint maxOutFrames, jdouble srcRate, jdouble dstRate) {
-    if (!inBuffer || !outBuffer || engineHandle == 0) return 0;
-    if (inFrames <= 0 || channels <= 0 || channels > 8 || maxOutFrames <= 0) return 0;
+    if (!inBuffer || !outBuffer || engineHandle == 0) return -1;
+    if (inFrames <= 0 || channels <= 0 || channels > 8 || maxOutFrames <= 0) return -1;
     void* inAddr = env->GetDirectBufferAddress(inBuffer);
     void* outAddr = env->GetDirectBufferAddress(outBuffer);
-    if (!inAddr || !outAddr) return 0;
+    if (!inAddr || !outAddr) return -1;
     const jlong inCapacity = env->GetDirectBufferCapacity(inBuffer);
     const jlong outCapacity = env->GetDirectBufferCapacity(outBuffer);
-    if (inCapacity < static_cast<jlong>(inFrames) * channels * static_cast<jlong>(sizeof(float))) return 0;
-    if (outCapacity < static_cast<jlong>(maxOutFrames) * channels * static_cast<jlong>(sizeof(float))) return 0;
+    if (inCapacity < static_cast<jlong>(inFrames) * channels * static_cast<jlong>(sizeof(float))) return -1;
+    if (outCapacity < static_cast<jlong>(maxOutFrames) * channels * static_cast<jlong>(sizeof(float))) return -1;
     EngineLease lease(static_cast<int64_t>(engineHandle));
     auto* engine = lease.get();
-    if (!engine) return 0;
+    if (!engine) return -1;
     try {
         return static_cast<jint>(engine->resampleForTap(
             reinterpret_cast<const float*>(inAddr), inFrames,
             reinterpret_cast<float*>(outAddr), maxOutFrames,
             channels, srcRate, dstRate));
     } catch (...) {
-        return 0;
+        return -1;
     }
 }
 
@@ -1484,10 +1548,11 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStart(
 JNIEXPORT jint JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStartWithFormat(
         JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,
-        jint interfaceNumber, jint altSetting, jint sampleRate, jint channels, jint bytesPerSample) {
-    const int bps = (bytesPerSample == 3 || bytesPerSample == 4) ? static_cast<int>(bytesPerSample) : 2;
+        jint interfaceNumber, jint altSetting, jint sampleRate, jint channels,
+        jint bytesPerSample, jint validBitDepth) {
     auto res = pulsr::UsbAudioSink::instance().Open(
-               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, bps);
+               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels,
+               bytesPerSample, validBitDepth);
     return static_cast<jint>(res);
 }
 
@@ -1519,6 +1584,12 @@ JNIEXPORT jint JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetLastError(
         JNIEnv* /* env */, jobject /* thiz */) {
     return pulsr::UsbAudioSink::instance().GetLastError();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetRawPcmBitDepth(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return pulsr::UsbAudioSink::instance().GetRawPcmBitDepth();
 }
 
 JNIEXPORT jlong JNICALL

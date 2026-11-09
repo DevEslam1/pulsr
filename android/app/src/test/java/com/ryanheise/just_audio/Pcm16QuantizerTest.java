@@ -28,6 +28,23 @@ public class Pcm16QuantizerTest {
     }
 
     @Test
+    public void tinyInt32LowBitStillReachesDitherInsteadOfNearGridTruncation() {
+        int nonzero = 0;
+        for (int i = 0; i < 2000; i++) {
+            short value = Pcm16Quantizer.fromFloat(1f / 2147483648f);
+            assertTrue(value >= -1 && value <= 1);
+            if (value != 0) nonzero++;
+        }
+        assertTrue("a near-grid tolerance silently bypassed dither for int32 LSBs", nonzero > 100);
+    }
+
+    @Test
+    public void unityInteger16IsExactlyUnditheredForEveryCode() {
+        for (int sample = Short.MIN_VALUE; sample <= Short.MAX_VALUE; sample++)
+            assertEquals(sample, Pcm16Quantizer.fromFloat(sample / 32768f));
+    }
+
+    @Test
     public void silenceOnlyProducesDitherNoise() {
         for (int i = 0; i < 10_000; i++) {
             final short value = Pcm16Quantizer.fromFloat(0f);

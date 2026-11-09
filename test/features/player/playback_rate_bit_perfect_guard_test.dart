@@ -5,7 +5,13 @@ import 'package:pulsr/features/player/cubit/controllers/player_playback_options_
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _MockAudioHandler extends Mock implements PulsrAudioHandler {}
+import 'player_test_support.dart';
+
+class _MockAudioHandler extends Mock implements PulsrAudioHandler {
+  _MockAudioHandler() {
+    stubPlaybackRateHandler(this);
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -47,7 +53,6 @@ void main() {
     final handler = _MockAudioHandler();
     when(() => handler.minPlaybackSpeed).thenReturn(0.5);
     when(() => handler.maxPlaybackSpeed).thenReturn(3.0);
-    when(() => handler.setSpeed(any())).thenAnswer((_) async {});
 
     var state = const PlayerState();
     final controller = PlayerPlaybackOptionsController(

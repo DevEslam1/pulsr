@@ -57,6 +57,16 @@ Map<String, Object?> _statusMap({
     };
 
 void main() {
+  test('raw integer source depth parses, copies and expires with transport', () {
+    final active = UsbExclusiveStatus.fromMap({
+      'streamingActive': true, 'rawPcmBitDepth': 32,
+    });
+    expect(active.rawPcmBitDepth, 32);
+    expect(active.copyWith(streamingBitDepth: 32).rawPcmBitDepth, 32);
+    expect(active.copyWith(rawPcmBitDepth: 0).rawPcmBitDepth, 0);
+    expect(UsbExclusiveStatus.fromMap({'rawPcmBitDepth': 32}).rawPcmBitDepth, 0);
+    expect(UsbExclusiveStatus.none.rawPcmBitDepth, 0);
+  });
   TestWidgetsFlutterBinding.ensureInitialized();
 
   final service = UsbExclusiveService();

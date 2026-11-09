@@ -124,6 +124,15 @@ void ChannelManager::applyParams(const ChannelManagerParamSet& params) {
     }
 }
 
+bool ChannelManager::canBoost(int channels) const {
+    if (!rampingDown_ && (!stageEnabled_ || !params_.enabled)) return false;
+    const int count = std::min({channels, params_.channelCount, MAX_CHANNELS});
+    for (int ch = 0; ch < count; ++ch) {
+        if (currentGain_[ch] > 1.0f || targetGain_[ch] > 1.0f) return true;
+    }
+    return false;
+}
+
 void ChannelManager::processInterleaved(float* buffer, int frames, int channels) {
     if (buffer == nullptr || frames <= 0 || channels <= 0) return;
     if (!rampingDown_ && (!stageEnabled_ || !params_.enabled)) return;

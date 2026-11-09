@@ -4,6 +4,28 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UsbControlProtocolTest {
+    @Test fun integer32RequiresTrueValidBitsNotJustFourByteSubslot() {
+        val padded24 = UsbAudioControlParser.AltSettingFormat(1, 1, 1, 1024, 4, 24, 2, null, emptyList())
+        val raw32 = padded24.copy(altSetting = 2, bitResolution = 32)
+        val parsed = UsbAudioControlParser.Result(2, null, 1, altSettingFormats = listOf(padded24))
+        assertNull(UsbAudioProtocol.selectFormat(parsed, 48000, 32, 2))
+        assertEquals(raw32, UsbAudioProtocol.selectFormat(
+            parsed.copy(altSettingFormats = listOf(padded24, raw32)), 48000, 32, 2))
+        assertEquals(padded24, UsbAudioProtocol.selectFormat(parsed, 48000, 24, 2))
+    }
+
+    @Test fun failedNativeMixerClearRetainsOwnershipAndRetryReleasesIt() {
+        var owned = true
+        assertFalse(HiResDacPlugin.clearMixerOwnership({ false }, { owned = false }))
+        assertTrue(owned)
+        assertFalse(HiResDacPlugin.clearMixerOwnership({ throw IllegalStateException("busy") }, { owned = false }))
+        assertTrue(owned)
+        assertFalse(HiResDacPlugin.clearMixerOwnership({ null }, { owned = false }))
+        assertTrue(owned)
+        assertTrue(HiResDacPlugin.clearMixerOwnership({ true }, { owned = false }))
+        assertFalse(owned)
+    }
+
     private data class Request(val type: Int, val request: Int, val value: Int, val index: Int, val size: Int)
 
     private class Device(val version: Int) : UsbControlTransfer {

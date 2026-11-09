@@ -186,7 +186,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   // each one picks up the locale that is active at that moment.
   static String get _favoriteOffLabel =>
       L10nHolder.current?.mediaControlUnfavorite ?? 'Unfavorite';
-  static String get _favoriteOnLabel => L10nHolder.current?.favorite ?? 'Favorite';
+  static String get _favoriteOnLabel =>
+      L10nHolder.current?.favorite ?? 'Favorite';
   static String get _shuffleLabel => L10nHolder.current?.shuffle ?? 'Shuffle';
   static String get _repeatLabel => L10nHolder.current?.repeat ?? 'Repeat';
 
@@ -1128,6 +1129,57 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   double _volume = 1.0;
   double get volume => _volume;
+
+  /// Actual player gain, including per-song offsets, ducking and sleep fades.
+  double get effectiveSoftwareGain => _activePlayer.volume;
+  bool get transportSamplesModified =>
+      playbackState.value.speed != 1.0 ||
+      pitch != 1.0 ||
+      skipSilenceEnabled ||
+      _crossfadeManager.isCrossfading ||
+      _crossfadeManager.isNativeCurveArmedOnOutgoing ||
+      _sleepFadeFactor != 1.0 ||
+      _duckActive;
+
+  @override
+  bool? _bitPerfectTransportBypass;
+
+  /// Reconcile the live transport without changing saved speed/pitch/silence
+  /// choices. Set the boundary guard before awaiting any player writes.
+  Future<void> setBitPerfectTransportPolicy(bool enabled) async {
+    final previous = _bitPerfectTransportBypass;
+    _bitPerfectTransportBypass = enabled;
+    if (enabled) {
+      await cancelActiveCrossfade();
+      await _applyPlaybackSpeed(1.0);
+      await _applyPlaybackPitch(1.0);
+      await Future.wait([
+        _playerA.setSkipSilenceEnabled(false),
+        _playerB.setSkipSilenceEnabled(false),
+      ]);
+    } else if (previous == true) {
+      await restorePersistedSpeed();
+      final skip = silenceSkipController.enabled;
+      await Future.wait([
+        _playerA.setSkipSilenceEnabled(skip),
+        _playerB.setSkipSilenceEnabled(skip),
+      ]);
+    }
+  }
+
+  /// Stop both software fades and native curves even if the saved duration is
+  /// already zero. Preserve the actual held gain, not the slider/RG target.
+  Future<void> cancelActiveCrossfade() async {
+    final heldGain = _activePlayer.volume;
+    if (_crossfadeManager.isNativeCurveArmedOnOutgoing) {
+      // The native curve's gain is unobservable. Clearing it while playing
+      // could jump to full gain, so leave playback paused for an explicit resume.
+      await _activePlayer.pause();
+    }
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+        restoreVolume: heldGain);
+    setCrossfadeDuration(Duration.zero);
+  }
 
   /// Most recent ANDROID system STREAM_MUSIC volume ratio (0..1), fed by the
   /// [AudioEffectsChannel.onSystemVolumeChanged] stream and the explicit
@@ -2171,9 +2223,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                           _loadSongPaused(0, initialPosition: Duration.zero));
                     }
                   } else {
-                    unawaited(
-                        _advanceAtTrackBoundary().catchError(
-                            (Object e, StackTrace st) {
+                    unawaited(_advanceAtTrackBoundary()
+                        .catchError((Object e, StackTrace st) {
                       ErrorLogger.log('Auto-advance failed',
                           error: e, stackTrace: st, category: 'AudioHandler');
                     }));

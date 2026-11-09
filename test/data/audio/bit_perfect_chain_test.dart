@@ -3,6 +3,46 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/audio/bit_perfect_chain.dart';
 
 void main() {
+  test('int32 requires observed raw integer USB, never a wider float tag', () {
+    BitPerfectChainAssessment assess({bool usb = false, int raw = 0,
+      bool floating = false, bool unknown = false, bool rate = true}) =>
+        assessBitPerfectChain(requested: true, active: true,
+          sourceSampleRate: 48000,
+          sourceBitDepth: effectiveSourceBitDepth(tagged: 16, decoded: 32),
+          outputSampleRate: 48000, outputBitDepth: 32,
+          directUsbActive: usb, rawPcmBitDepth: raw,
+          sourceFloat: floating, sourceRepresentationUnknown: unknown,
+          rateVerified: rate);
+    expect(assess().isVerified, false);
+    expect(assess(usb: true, raw: 24).isVerified, false);
+    expect(assess(usb: true, raw: 32).isVerified, true);
+    expect(assess(usb: true, raw: 32, floating: true).isVerified, false);
+    expect(assess(usb: true, raw: 32, unknown: true).isVerified, false);
+    expect(assess(usb: true, raw: 32, rate: false).isVerified, false);
+  });
+  test('all effective modifying stages downgrade a clean-format chain', () {
+    bool edits({double gain = 1, double speed = 1, double pitch = 1,
+      bool skip = false, bool fade = false, bool duck = false, bool dsp = false,
+      bool raw = false}) => chainSamplesModified(dspProcessing: dsp,
+          effectiveGain: gain, speed: speed, pitch: pitch, silenceSkip: skip,
+          crossfade: fade, duckOrSleepFade: duck, rawUsb: raw);
+    expect(edits(), false);
+    expect(edits(gain: double.nan), true);
+    expect(edits(gain: 0.8), true);
+    expect(edits(speed: 1.1), true);
+    expect(edits(pitch: 0.9), true);
+    expect(edits(skip: true), true);
+    expect(edits(fade: true), true);
+    expect(edits(duck: true), true);
+    expect(edits(dsp: true), true);
+    expect(edits(gain: 0.5, raw: true), false);
+    expect(edits(speed: 1.1, raw: true), true);
+    final lossy = assessBitPerfectChain(requested: true, active: true,
+        sourceSampleRate: 48000, sourceBitDepth: 16,
+        outputSampleRate: 48000, outputBitDepth: 24, sourceLossy: true);
+    expect(lossy.reasonCode, 'source_lossy');
+    expect(lossy.isVerified, false);
+  });
   group('effectiveSourceBitDepth', () {
     test('the decoder probe wins over a stale tag', () {
       expect(effectiveSourceBitDepth(tagged: 16, decoded: 24), 24);

@@ -101,6 +101,44 @@ int main() {
                   << std::endl;
     }
 
+    // 5. Positive-gain query follows the live ramp, including disable drain,
+    //    but ignores attenuation and channels outside the processed layout.
+    {
+        ChannelManager manager;
+        ChannelManagerParamSet params;
+        params.enabled = true;
+        params.channelCount = 6;
+        params.trimDb[4] = 6.0f;
+        manager.applyParams(params);
+        assert(manager.canBoost(6)); // Ramp target before first boosted sample.
+        assert(!manager.canBoost(2));
+        std::vector<float> buffer(128 * 6, 0.8f);
+        for (int i = 0; i < 10; ++i) manager.processInterleaved(buffer.data(), 128, 6);
+        params.trimDb[4] = -6.0f;
+        manager.applyParams(params);
+        assert(manager.canBoost(6)); // Current gain remains positive.
+        for (int i = 0; i < 10; ++i) manager.processInterleaved(buffer.data(), 128, 6);
+        assert(!manager.canBoost(6));
+        params.trimDb[4] = 6.0f;
+        manager.applyParams(params);
+        for (int i = 0; i < 10; ++i) manager.processInterleaved(buffer.data(), 128, 6);
+        params.enabled = false;
+        manager.applyParams(params);
+        manager.setEnabled(false);
+        assert(manager.isRamping());
+        assert(manager.canBoost(6));
+        for (int i = 0; i < 10; ++i) manager.processInterleaved(buffer.data(), 128, 6);
+        assert(!manager.isRamping());
+        assert(!manager.canBoost(6));
+        params.enabled = true;
+        params.trimDb[4] = 0.0f;
+        params.trimDb[7] = 12.0f;
+        manager.applyParams(params);
+        manager.setEnabled(true);
+        assert(!manager.canBoost(8)); // Declared six-channel layout excludes ch7.
+        std::cout << "  positive gain query follows ramp and layout boundaries." << std::endl;
+    }
+
     std::cout << "[PASS] ChannelManager tests passed." << std::endl;
     return 0;
 }

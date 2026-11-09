@@ -418,7 +418,25 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
 
   @override
-  Future<void> setSpeed(double speed) async {}
+  Future<bool> playbackRateMustRemainUnity() async => false;
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    playbackState.add(playbackState.value.copyWith(speed: speed));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
+  }
+
+  double _pitch = 1.0;
+  @override
+  double get pitch => _pitch;
+
+  @override
+  Future<void> setPitch(double pitch) async {
+    _pitch = pitch;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackPitch, pitch);
+  }
 
   @override
   Future<void> validatePlayerState() async {}
@@ -461,6 +479,8 @@ void main() {
     lastPositionMs: 0,
     source: 'local',
   );
+
+  setUpAll(() => registerFallbackValue(sampleSong1));
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
@@ -709,6 +729,10 @@ void main() {
         () async {
       final mockHiRes = MockHiResAudioService();
       final mockSettings = MockSettingsCubit();
+      when(() => mockHiRes.outputDeviceStream)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockSettings.validateBitPerfectTrackSource(any()))
+          .thenAnswer((_) async => true);
       when(() => mockSettings.state).thenReturn(
         const SettingsState(
             followTrackSampleRate: true, bitPerfectOutput: true),
@@ -737,6 +761,7 @@ void main() {
         isClosed: () => false,
       );
 
+      addTearDown(dspController.dispose);
       final trackWithZeroDepth = SongsTableData(
         id: 200,
         title: 'Zero Depth Track',
@@ -769,6 +794,10 @@ void main() {
         () async {
       final mockHiRes = MockHiResAudioService();
       final mockSettings = MockSettingsCubit();
+      when(() => mockHiRes.outputDeviceStream)
+          .thenAnswer((_) => const Stream.empty());
+      when(() => mockSettings.validateBitPerfectTrackSource(any()))
+          .thenAnswer((_) async => true);
       when(() => mockSettings.state).thenReturn(
         const SettingsState(
             followTrackSampleRate: true, bitPerfectOutput: true),
@@ -808,6 +837,7 @@ void main() {
         isClosed: () => false,
       );
 
+      addTearDown(dspController.dispose);
       final track1 = SongsTableData(
         id: 1,
         title: 'Track 1',

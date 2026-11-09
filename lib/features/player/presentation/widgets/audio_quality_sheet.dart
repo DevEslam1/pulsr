@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -90,7 +91,9 @@ class AudioQualitySheet extends StatelessWidget {
       streamingQuality: streamingQuality,
     );
 
-    return Align(
+    return _buildLiveChainContent(
+      outputDevice, settingsState, dspSlice, currentSong ?? song,
+      (assessment, usbStatus) => Align(
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -428,6 +431,7 @@ class AudioQualitySheet extends StatelessWidget {
                     p,
                     activeColor,
                     info,
+                    assessment,
                   ),
 
                   const SizedBox(height: AppSpacing.s20),
@@ -451,6 +455,7 @@ class AudioQualitySheet extends StatelessWidget {
                     p,
                     activeColor,
                     info,
+                    assessment,
                   ),
 
                   const SizedBox(height: AppSpacing.s20),
@@ -558,23 +563,16 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.s10),
 
-                  StreamBuilder<UsbExclusiveStatus>(
-                    stream: UsbExclusiveService().statusStream,
-                    initialData: UsbExclusiveService().lastStatus,
-                    builder: (context, usbSnapshot) {
-                      final usbStatus = usbSnapshot.data ?? UsbExclusiveService().lastStatus;
-                      return _buildVisualSignalChain(
-                        context,
-                        info,
-                        outputDevice,
-                        settingsState,
-                        p,
-                        activeColor,
-                        dspSlice,
-                        currentSong,
-                        usbStatus: usbStatus,
-                      );
-                    },
+                  _buildVisualSignalChain(
+                    context,
+                    info,
+                    outputDevice,
+                    settingsState,
+                    p,
+                    activeColor,
+                    dspSlice,
+                    assessment,
+                    usbStatus: usbStatus,
                   ),
 
                   const SizedBox(height: AppSpacing.s20),
@@ -609,6 +607,87 @@ class AudioQualitySheet extends StatelessWidget {
           ),
         ),
       ),
+    ));
+  }
+
+  Widget _buildLiveChainContent(
+    AudioOutputInfo? outputDevice,
+    SettingsState? settingsState,
+    DspSlice dsp,
+    SongsTableData source,
+    Widget Function(BitPerfectChainAssessment, UsbExclusiveStatus) builder,
+  ) {
+    PulsrAudioHandler? handler;
+    if (getIt.isRegistered<PulsrAudioHandler>()) {
+      handler = getIt<PulsrAudioHandler>();
+    }
+    final usb = UsbExclusiveService();
+    return StreamBuilder<UsbExclusiveStatus>(
+      stream: usb.statusStream,
+      initialData: usb.lastStatus,
+      builder: (context, snapshot) => StreamBuilder<PlaybackState>(
+        stream: handler?.playbackState,
+        initialData: handler?.playbackState.value,
+        builder: (context, _) {
+          final status = snapshot.data ?? usb.lastStatus;
+          return builder(_assessLiveChain(
+              outputDevice, settingsState, dsp, source, status, handler), status);
+        },
+      ),
+    );
+  }
+
+  BitPerfectChainAssessment _assessLiveChain(
+    AudioOutputInfo? outputDevice,
+    SettingsState? settings,
+    DspSlice dsp,
+    SongsTableData source,
+    UsbExclusiveStatus usb,
+    PulsrAudioHandler? handler,
+  ) {
+    final requested = settings?.bitPerfectOutput == true;
+    final bypassed = settings?.strictBitPerfect == true ||
+        AudioConflicts.dspBypassActive(
+          bitPerfectOutput: requested,
+          bypassDspOnBitPerfect: settings?.bypassDspOnBitPerfect ?? true,
+          device: outputDevice,
+        );
+    final direct = usb.streamingActive && outputDevice?.isUsbDac == true &&
+        outputDevice?.isBluetooth != true;
+    final gain = handler?.effectiveSoftwareGain ?? double.nan;
+    final stages = dsp.isDspActive || dsp.stereoBalance != 0.0 ||
+        dsp.monoMix || dsp.isDitherEnabled ||
+        (settings?.replayGainMode != null &&
+            settings!.replayGainMode != ReplayGainMode.off) ||
+        settings?.dvcEnabled == true;
+    final representation = AudioConflicts.classifySourceSampleFormat(
+        codec: source.codec);
+    final codec = AudioConflicts.classifySourceCodec(
+        path: source.path, codec: source.codec);
+    return assessBitPerfectChain(
+      requested: requested,
+      // Neither an AAudio preference nor an attached USB DAC proves ownership.
+      active: outputDevice?.isBluetooth != true &&
+          (direct || outputDevice?.isBitPerfectActive == true),
+      sourceSampleRate: source.sampleRate ?? 0,
+      sourceBitDepth: effectiveSourceBitDepth(tagged: source.bitDepth ?? 0,
+          decoded: outputDevice?.decodedBitDepth ?? 0),
+      outputSampleRate: direct ? usb.streamingSampleRate : outputDevice?.sampleRate ?? 0,
+      outputBitDepth: direct ? usb.streamingBitDepth : outputDevice?.bitDepth ?? 0,
+      isDsdDop: AudioQualityInfo.dsdDopActive,
+      samplesModified: (handler?.transportSamplesModified ?? true) ||
+          chainSamplesModified(dspProcessing: !bypassed && stages,
+              effectiveGain: gain, rawUsb: direct && usb.rawPcmBitDepth > 0),
+      directUsbActive: direct,
+      rawPcmBitDepth: direct ? usb.rawPcmBitDepth : 0,
+      sourceFloat: representation == AudioSourceSampleFormat.float,
+      sourceRepresentationUnknown: representation == AudioSourceSampleFormat.unknown,
+      sourceLossy: source.source == SongSource.radio || codec == AudioSourceCodecState.lossy,
+      sourceCodecUnconfirmed: codec == AudioSourceCodecState.unknown,
+      channelsAltered: direct && usb.channelMismatchFrames > 0,
+      digitalVolumeAttenuated: !direct && gain < 1.0,
+      rateVerified: !direct || usb.rateVerified,
+      failureReason: outputDevice?.bitPerfectFailureReason,
     );
   }
 
@@ -1001,10 +1080,9 @@ class AudioQualitySheet extends StatelessWidget {
     PulsrPalette p,
     Color activeColor,
     AudioQualityInfo info,
+    BitPerfectChainAssessment assessment,
   ) {
-    final isBitPerfectEnabled = cubit?.state.bitPerfectOutput == true;
-    final isBitPerfectActive =
-        isBitPerfectEnabled && outputDevice?.isBitPerfectActive == true;
+    final isBitPerfectActive = assessment.isVerified;
     final currentTarget =
         isBitPerfectActive ? 0 : (outputDevice?.targetSampleRate ?? 0);
 
@@ -1099,11 +1177,11 @@ class AudioQualitySheet extends StatelessWidget {
     PulsrPalette p,
     Color activeColor,
     AudioQualityInfo info,
+    BitPerfectChainAssessment assessment,
   ) {
     final isBitPerfectEnabled = cubit?.state.bitPerfectOutput == true;
     final blockedReason = AudioConflicts.bitPerfectBlockedReason(outputDevice);
-    final isBitPerfectActive =
-        isBitPerfectEnabled && (outputDevice?.isBitPerfectActive == true);
+    final isBitPerfectActive = assessment.isVerified;
     final currentTarget =
         isBitPerfectActive ? 0 : (outputDevice?.targetBitDepth ?? 0);
 
@@ -1187,17 +1265,17 @@ class AudioQualitySheet extends StatelessWidget {
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s14, vertical: AppSpacing.sm),
           decoration: BoxDecoration(
-            color: isBitPerfectEnabled
+            color: isBitPerfectActive
                 ? goldAccent.withValues(alpha: 0.12)
                 : p.surfaceContainer,
             borderRadius: AppRadii.r14All,
             border: Border.all(
-              color: isBitPerfectEnabled
+              color: isBitPerfectActive
                   ? goldAccent.withValues(alpha: 0.7)
                   : p.hairline,
-              width: isBitPerfectEnabled ? 1.5 : 1.0,
+              width: isBitPerfectActive ? 1.5 : 1.0,
             ),
-            boxShadow: isBitPerfectEnabled
+            boxShadow: isBitPerfectActive
                 ? [
                     BoxShadow(
                       color: goldAccent.withValues(alpha: 0.15),
@@ -1212,14 +1290,14 @@ class AudioQualitySheet extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppSpacing.xs),
                 decoration: BoxDecoration(
-                  color: isBitPerfectEnabled
+                  color: isBitPerfectActive
                       ? goldAccent.withValues(alpha: 0.22)
                       : p.surface,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.stars_rounded,
-                  color: isBitPerfectEnabled ? goldAccent : p.textSecondary,
+                  color: isBitPerfectActive ? goldAccent : p.textSecondary,
                   size: 20,
                 ),
               ),
@@ -1235,7 +1313,7 @@ class AudioQualitySheet extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: AppFontSize.bodySmall,
-                            color: isBitPerfectEnabled
+                            color: isBitPerfectActive
                                 ? goldAccent
                                 : p.textPrimary,
                           ),
@@ -1292,7 +1370,7 @@ class AudioQualitySheet extends StatelessWidget {
                                 ? blockedReason
                                 : (isBitPerfectEnabled
                                     ? (isBitPerfectActive
-                                        ? 'Exclusive mixer configured; hardware fidelity not verified'
+                                        ? 'Source format preserved; DAC sample identity not measured'
                                         : context.l10n.bpPassThroughArmed)
                                     : 'Requests exclusive USB mixing where supported'),
                             style: TextStyle(
@@ -1492,18 +1570,17 @@ class AudioQualitySheet extends StatelessWidget {
     PulsrPalette p,
     Color activeColor,
     DspSlice dsp,
-    SongsTableData? currentSong, {
+    BitPerfectChainAssessment assessment, {
     UsbExclusiveStatus? usbStatus,
   }) {
     final requested = settingsState?.bitPerfectOutput == true;
-    final bool isBitPerfect =
-        requested && outputDevice?.isBitPerfectActive == true;
     // The bypass guardrail is what the engine acts on, so the chain has to use
     // the same rule as the conflict helpers: Bit-Perfect plus bypass on a
     // non-Bluetooth route. Requiring the live mixer confirmation as well made
     // the two disagree - and the chain claimed a stage was editable while the
     // engine was already muting it - whenever the path was armed or paused.
-    final bool dspBypassed = AudioConflicts.dspBypassActive(
+    final bool dspBypassed = settingsState?.strictBitPerfect == true ||
+        AudioConflicts.dspBypassActive(
       bitPerfectOutput: requested,
       bypassDspOnBitPerfect: settingsState?.bypassDspOnBitPerfect ?? true,
       device: outputDevice,
@@ -1538,78 +1615,14 @@ class AudioQualitySheet extends StatelessWidget {
       ...namedStages,
       if (unnamedStages > 0) context.l10n.bpMoreEffects(unnamedStages),
     ];
-    // Everything that touches the samples, not only the stages with a chain
-    // label: the panner, dither, software gain (DVC) and ReplayGain are all
-    // edits, and leaving them out upgraded the verdict to "verified".
-    final bool anyStageEdits = dsp.isDspActive ||
-        dsp.stereoBalance != 0.0 ||
-        dsp.monoMix ||
-        dsp.isDitherEnabled;
-    final bool gainEdits = settingsState != null &&
-        (settingsState.replayGainMode != ReplayGainMode.off ||
-            settingsState.dvcEnabled);
-    // Direct-sink channel remap (duplication/silence/drop) is a sample edit the
-    // format comparison cannot see; the sink counts every remapped frame.
     final effectiveUsbStatus = usbStatus ?? UsbExclusiveService().lastStatus;
-    final bool channelsAltered =
-        effectiveUsbStatus.streamingActive && effectiveUsbStatus.channelMismatchFrames > 0;
     final String dspLabel = dspBypassed
         ? context.l10n.bpDspBypassed
         : (activeStages.isEmpty
             ? context.l10n.bpDspCleanPath
             : activeStages.join(' + '));
-    // App volume is applied by the AudioTrack on the mixer path. The UAC2
-    // tee writes pre-volume samples, and AAudio exclusive locks PCM volume
-    // to unity, so neither should be flagged for a low app slider.
-    double softwareVolume = 1.0;
-    try {
-      if (getIt.isRegistered<PulsrAudioHandler>()) {
-        softwareVolume = getIt<PulsrAudioHandler>().volume;
-      }
-    } catch (_) {}
-    final assessment = assessBitPerfectChain(
-      requested: requested,
-      active: outputDevice?.isBitPerfectActive == true,
-      sourceSampleRate: currentSong?.sampleRate ?? 0,
-      // The decoder is the truth source: a 24-bit ALAC tagged 16 must not
-      // make a 16-bit output look verified.
-      sourceBitDepth: effectiveSourceBitDepth(
-        tagged: currentSong?.bitDepth ?? 0,
-        decoded: outputDevice?.decodedBitDepth ?? 0,
-      ),
-      // Prefer the direct USB sink's negotiated rate/depth when it is active;
-      // fall back to the AudioTrack output device values otherwise.
-      outputSampleRate: (effectiveUsbStatus.streamingActive &&
-              effectiveUsbStatus.streamingSampleRate > 0)
-          ? effectiveUsbStatus.streamingSampleRate
-          : (outputDevice?.sampleRate ?? 0),
-      outputBitDepth: (effectiveUsbStatus.streamingActive &&
-              effectiveUsbStatus.streamingBitDepth > 0)
-          ? effectiveUsbStatus.streamingBitDepth
-          : (outputDevice?.bitDepth ?? 0),
-      isDsdDop: AudioQualityInfo.dsdDopActive,
-      // Every Android PCM path here is float32; 32-bit integer sources cannot
-      // survive that conversion, so format agreement is not sample identity.
-      samplesModified: currentSong?.bitDepth == 32 ||
-          (!dspBypassed && (anyStageEdits || gainEdits)),
-      channelsAltered: channelsAltered,
-      digitalVolumeAttenuated: !effectiveUsbStatus.streamingActive &&
-          settingsState?.aaudioOutputEnabled != true &&
-          !effectiveUsbStatus.hardwareVolumeApplied &&
-          softwareVolume < 0.999,
-      // Bug fix: when bit-perfect is active via Android 14 AudioMixerAttributes
-      // (native exclusive path), the direct USB sink is NOT running and
-      // rateVerified stays false. Gate the verified flag on the transport: only
-      // require the direct-sink readback when the direct sink is actually open.
-      rateVerified: !effectiveUsbStatus.streamingActive ||
-          effectiveUsbStatus.rateVerified,
-      sourceCodecUnconfirmed: AudioConflicts.classifySourceCodec(
-            path: currentSong?.path,
-            codec: currentSong?.codec,
-          ) ==
-          AudioSourceCodecState.unknown,
-      failureReason: outputDevice?.bitPerfectFailureReason,
-    );
+    // The selectors and chain share one live format-preservation verdict.
+    final isBitPerfect = assessment.isVerified;
     final resamplerLabel = switch (assessment.verdict) {
       BitPerfectChainVerdict.verified =>
         '${_sampleRateLabel(assessment.outputSampleRate)} / '
@@ -2003,7 +2016,7 @@ String _outputStreamDescription(AudioOutputInfo? output) {
       : null;
   return 'App stream: ${_sampleRateLabel(output.sampleRate)} / ${output.bitDepth}-bit '
       '${output.pcmEncoding == 4 ? "float" : "PCM"}'
-      '${bufferMs == null ? '' : ' • buffer ~$bufferMs ms'}';
+      '${bufferMs == null ? '' : ' • primary buffer hint ~$bufferMs ms'}';
 }
 
 String _sampleRateLabel(int rate) {

@@ -696,7 +696,6 @@ class AudioConflicts {
     'exclusive_requires_usb_dac',
   };
 
-
   static const Set<String> _losslessCodecs = {
     'flac',
     'alac',
@@ -815,14 +814,17 @@ class AudioConflicts {
     // Normalize: lowercase, trim, drop parameters after ';'
     var normCodec = codec?.trim().toLowerCase();
     if (normCodec != null && normCodec.contains('codecs=')) {
-      final match = RegExp(r'''codecs=["']?([^"'\s;]+)''').firstMatch(normCodec);
+      final match =
+          RegExp(r'''codecs=["']?([^"'\s;]+)''').firstMatch(normCodec);
       if (match != null) {
         normCodec = match.group(1)?.trim();
       }
     } else {
       normCodec = normCodec?.split(';').first.trim();
     }
-    if ((normCodec == null || normCodec.isEmpty || normCodec.startsWith('audio/')) &&
+    if ((normCodec == null ||
+            normCodec.isEmpty ||
+            normCodec.startsWith('audio/')) &&
         mimeType != null &&
         mimeType.contains('codecs=')) {
       final match = RegExp(r'''codecs=["']?([^"'\s;]+)''')
@@ -832,7 +834,8 @@ class AudioConflicts {
       }
     }
     final normMime = mimeType?.trim().toLowerCase().split(';').first.trim();
-    final lowerPath = path?.trim().toLowerCase().split('?').first.split('#').first ?? '';
+    final lowerPath =
+        path?.trim().toLowerCase().split('?').first.split('#').first ?? '';
 
     // 1. Codec matching (if present)
     if (normCodec != null && normCodec.isNotEmpty) {
@@ -852,7 +855,8 @@ class AudioConflicts {
           normCodec.startsWith('vorbis')) {
         return AudioSourceCodecState.lossy;
       }
-      if (_ambiguousExtensions.any((ext) => normCodec == ext.replaceFirst('.', ''))) {
+      if (_ambiguousExtensions
+          .any((ext) => normCodec == ext.replaceFirst('.', ''))) {
         return AudioSourceCodecState.unknown;
       }
     }
@@ -900,8 +904,8 @@ class AudioConflicts {
   }) {
     var normCodec = codec?.trim().toLowerCase();
     if (normCodec != null && normCodec.contains('codecs=')) {
-      final match = RegExp(r'''codecs=["']?([^"'\s;]+)''')
-          .firstMatch(normCodec);
+      final match =
+          RegExp(r'''codecs=["']?([^"'\s;]+)''').firstMatch(normCodec);
       if (match != null) normCodec = match.group(1)?.trim();
     } else {
       normCodec = normCodec?.split(';').first.trim();
@@ -914,7 +918,8 @@ class AudioConflicts {
           normCodec.contains('float')) {
         return AudioSourceSampleFormat.float;
       }
-      if (normCodec.startsWith('pcm_s') ||
+      if (const {'flac', 'alac', 'ape', 'tta'}.contains(normCodec) ||
+          normCodec.startsWith('pcm_s') ||
           normCodec.startsWith('pcm_u') ||
           normCodec == 'pcm' ||
           normCodec.contains('s32') ||
@@ -939,6 +944,8 @@ class AudioConflicts {
     bool isLossy = false,
     String? codec,
     String? mimeType,
+    bool integer32DirectUsbEligible = false,
+    bool requireConfirmedCodec = false,
   }) {
     final lower = path?.toLowerCase() ?? '';
     // Radio detection: explicit flag or radio:// scheme only.
@@ -955,6 +962,17 @@ class AudioConflicts {
         path: path,
         mimeType: mimeType,
       );
+      if (format == AudioSourceSampleFormat.integer &&
+          integer32DirectUsbEligible &&
+          !radio &&
+          classifySourceCodec(
+                  path: path,
+                  codec: codec,
+                  mimeType: mimeType,
+                  isLossy: isLossy) ==
+              AudioSourceCodecState.lossless) {
+        return null;
+      }
       return bitPerfectReasonMessage(
         format == AudioSourceSampleFormat.integer
             ? 'source_32bit_integer_conversion_not_lossless'
@@ -976,7 +994,9 @@ class AudioConflicts {
           'Live radio and lossy streams cannot be played bit-perfect.';
     }
 
-    // AudioSourceCodecState.lossless and AudioSourceCodecState.unknown both return null (allowed through)
+    if (requireConfirmedCodec && state == AudioSourceCodecState.unknown) {
+      return bitPerfectReasonMessage('source_codec_unconfirmed');
+    }
     return null;
   }
 

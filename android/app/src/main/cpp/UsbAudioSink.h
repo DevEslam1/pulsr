@@ -18,8 +18,9 @@
 // per-packet sample counts toward the DAC's clock to limit drift.
 //
 // HONEST SCOPE: this is unvalidated against physical hardware. It is only
-// activated by the explicit "USB Bit-Perfect Streaming" action, and any open
-// failure releases the interface and leaves the normal HAL path untouched.
+// activated by the explicit "USB Bit-Perfect Streaming" action. Startup failure
+// restores HAL only after submitted USB ownership has been drained; a failed
+// drain retains buffers and HAL exclusivity until control teardown succeeds.
 #ifndef PULSR_USB_AUDIO_SINK_H_
 #define PULSR_USB_AUDIO_SINK_H_
 
@@ -43,6 +44,11 @@ enum class UsbStreamResult : int32_t {
     InvalidArgs = 5
 };
 
+static_assert(std::atomic<int64_t>::is_always_lock_free &&
+              std::atomic<uint64_t>::is_always_lock_free &&
+              std::atomic<uint32_t>::is_always_lock_free,
+              "USB render admission/status must use lock-free atomics");
+
 class UsbAudioSink {
 public:
     static UsbAudioSink& instance();
@@ -51,9 +57,13 @@ public:
     // endpointAddress: isochronous OUT endpoint (bit 7 clear).
     // interfaceNumber/altSetting: the claimed AudioStreaming interface.
     UsbStreamResult Open(int fd, int endpointAddress, int interfaceNumber, int altSetting,
-                         int sampleRate, int channels, int bytesPerSample);
+                         int sampleRate, int channels, int bytesPerSample,
+                         int validBitDepth = 0);
     void Close();
     bool IsActive() const;
+    // HAL exclusivity lasts until control teardown drains USB ownership, even
+    // if the worker self-exits. Faults must not silently leak to normal output.
+    bool IsExclusive() const { return exclusive_.load(std::memory_order_acquire); }
     int GetLastError() const { return lastError_.load(std::memory_order_acquire); }
     uint64_t GetUnderrunCount() const { return underrunCount_.load(std::memory_order_relaxed); }
     uint64_t GetOverrunCount() const { return overrunCount_.load(std::memory_order_relaxed); }
@@ -94,7 +104,17 @@ public:
     // Audio-thread call: packs float [-1,1] to the configured interleaved wire
     // format (S16_LE / S24_3LE / S32_LE per bytesPerSample_) and appends to the
     // ring. Non-blocking; excess data is dropped (never blocks playback).
-    void WriteInterleaved(const float* buffer, int frames, int channels);
+    bool WriteInterleaved(const float* buffer, int frames, int channels,
+                          int sampleRate, int64_t producerId);
+    bool WritePcm(const uint8_t* buffer, int frames, int channels,
+                  int sourceBitDepth, int sampleRate, int64_t producerId);
+    void ReleaseProducer(int64_t id);
+    void ReportWriteError(int error);
+    int GetRawPcmBitDepth() const {
+        const uint64_t status = rawPcmStatus_.load(std::memory_order_acquire);
+        return (status >> 8) == deliveryEpoch_.load(std::memory_order_acquire)
+            ? static_cast<int>(status & 0xff) : 0;
+    }
 
     int sampleRate() const { return sampleRate_; }
     int channels() const { return channels_; }
@@ -106,21 +126,35 @@ private:
     UsbAudioSink& operator=(const UsbAudioSink&) = delete;
 
     void workerLoop();
-    bool submitAll();
+    using UrbSubmit = int (*)(int fd, void* urb);
+    static int submitUsbfsUrb(int fd, void* urb);
+    // Establishes startup exclusivity before submitting; injectable syscall for
+    // host ownership regressions (production always uses usbfs).
+    bool submitAll(UrbSubmit submit = submitUsbfsUrb);
     void releaseResources();
-    void drainUrbCompletions();
+    bool drainUrbCompletions();
+    bool beginWrite(int64_t producerId);
+    void endWrite();
+    bool writeBlock(const float* floats, const uint8_t* pcm, int frames,
+                    int channels, int sourceBitDepth, int sampleRate, int64_t producerId);
+    bool markReaped(void* urb, bool* feedback, size_t* index);
+    bool hasOutstandingUrbs() const;
+    bool submitUrb(void* urb, bool feedback, size_t index,
+                   UrbSubmit submit = submitUsbfsUrb);
+    static int completionError(const void* urb, bool feedback, int packets, int maxBytes);
+    friend struct UsbAudioSinkTestAccess;
 
     // --- Async feedback (anti-drift) support, FIX 2 ---
-    // Reads raw configuration descriptors over usbfs (same request the rate
-    // query uses) so Open can locate the feedback IN endpoint without any extra
-    // JNI plumbing.
+    // Open fetches configuration descriptors once for timing and feedback.
     static std::vector<uint8_t> fetchConfigDescriptor(int fd);
-    // Returns the async feedback IN endpoint address for (interface, alt), or 0
-    // if none; *outPacketSize receives its wMaxPacketSize when found.
-    static int findFeedbackEndpoint(int fd, int interfaceNumber, int altSetting,
+    // Parses that complete configuration: endpoint address when found, 0 only
+    // for proven absence, or -1 for malformed/truncated/missing interface data.
+    // *outPacketSize receives wMaxPacketSize only on a successful parse.
+    static int findFeedbackEndpoint(const uint8_t* config, size_t len,
+                                    int interfaceNumber, int altSetting,
                                     int* outPacketSize);
-    // Allocates and submits the feedback iso-IN URB pool. Best-effort: a failure
-    // leaves OUT streaming running at the nominal rate.
+    // Allocates/submits feedback. A failure fails startup; unified teardown
+    // cancels and reaps both pools by identity before any buffers can be freed.
     bool setupFeedbackUrbs();
     // Decodes one feedback sample and updates feedbackRatePerSec_ (worker only).
     void applyFeedback(const uint8_t* data, int len);
@@ -129,14 +163,23 @@ private:
     void freeFeedbackResources();
 
     std::atomic<bool> active_{false};
+    std::atomic<bool> exclusive_{false};
     std::atomic<bool> running_{false};
     std::atomic<int> lastError_{0};
     std::atomic<uint64_t> underrunCount_{0};
     std::atomic<uint64_t> overrunCount_{0};
     std::atomic<uint64_t> channelMismatchFrames_{0};
-    // In-flight audio-thread producers. releaseResources() sets active_=false
-    // then waits for this to drain before freeing/reassigning the ring buffer.
-    std::atomic<int> activeWriters_{0};
+    // One atomic gate covers admission AND teardown. Bit 0 = admitted writer,
+    // bit 1 = closed. Closing cannot miss a producer between check and entry.
+    static constexpr uint32_t kWriterBusy = 1;
+    static constexpr uint32_t kWriterClosed = 2;
+    std::atomic<uint32_t> writerGate_{kWriterClosed};
+    std::atomic<int64_t> producerOwner_{0};
+    std::atomic<int> producerRawDepth_{0};
+    std::atomic<uint64_t> rawPcmStatus_{0}; // delivery epoch in high bits, depth in low byte
+    std::atomic<uint64_t> deliveryEpoch_{0};
+    std::mutex controlMutex_; // Open/Close only; never render/worker
+    bool sinkDepthPublished_ = false;
 
     int fd_ = -1;
     int endpoint_ = 0;
@@ -144,7 +187,8 @@ private:
     int altSetting_ = 0;
     int sampleRate_ = 48000;
     int channels_ = 2;
-    int bytesPerSample_ = 2;  // 2=S16, 3=S24_3LE, 4=S32
+    int bytesPerSample_ = 2;  // wire subslot bytes
+    int validBitDepth_ = 16;
     // TPDF state for the packing step. Persists across blocks on purpose: a
     // per-call state would restart the sequence every block and make the dither
     // noise periodic, which is a tonal artifact instead of a noise floor.
@@ -178,6 +222,7 @@ private:
     std::vector<uint8_t> feedbackUrbStorage_;
     std::vector<uint8_t*> feedbackBuffers_;
     std::vector<void*> feedbackUrbs_;
+    std::vector<uint8_t> feedbackOwned_;
     size_t feedbackUrbStride_ = 0;
 
     std::thread worker_;
@@ -186,12 +231,17 @@ private:
     std::vector<uint8_t> urbStorage_;
     std::vector<uint8_t*> urbBuffers_;
     std::vector<void*> urbs_;
+    std::vector<uint8_t> urbOwned_;
+    std::vector<int> urbRawDepth_;
+    std::vector<uint64_t> urbDeliveryEpoch_;
     size_t urbStride_ = 0;
     int numUrbs_ = 0;
 
     // Lock-free single-producer single-consumer (SPSC) byte ring buffer.
     // Audio thread produces; USB worker thread consumes. Wait-free for audio thread.
     std::vector<uint8_t> ring_;
+    // Depth at each frame's first byte, published with ringWrite_. 0 = float.
+    std::vector<uint8_t> ringRawDepth_;
     size_t ringMask_ = 0;
     alignas(64) std::atomic<size_t> ringWrite_{0};
     alignas(64) std::atomic<size_t> ringRead_{0};

@@ -40,6 +40,9 @@ public:
 
     bool isEnabled() const { return stageEnabled_ && (params_.enabled || rampingDown_); }
     bool isRamping() const { return rampingDown_; }
+    // Render-thread query: includes live gain and the ramp destination, even
+    // during disable drain. Only channels actually processed can boost.
+    bool canBoost(int channels) const;
     int getChannelCount() const { return params_.channelCount; }
 
 private:

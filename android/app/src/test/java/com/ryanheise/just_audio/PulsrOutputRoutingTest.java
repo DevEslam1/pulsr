@@ -59,6 +59,41 @@ public class PulsrOutputRoutingTest {
         assertFalse(nativeSinks().contains(sink));
     }
 
+    @Test
+    public void decodedTelemetryIsPerPlayerAcrossDefaultAndAaudioAndClearsAtReset() throws Exception {
+        androidx.media3.common.Format pcm24 = new androidx.media3.common.Format.Builder()
+                .setSampleMimeType(androidx.media3.common.MimeTypes.AUDIO_RAW)
+                .setSampleRate(44100).setChannelCount(2)
+                .setPcmEncoding(androidx.media3.common.C.ENCODING_PCM_24BIT).build();
+        androidx.media3.common.Format pcm16 = pcm24.buildUpon().setSampleRate(48000)
+                .setPcmEncoding(androidx.media3.common.C.ENCODING_PCM_16BIT).build();
+        androidx.media3.exoplayer.audio.AudioSink first = mock(androidx.media3.exoplayer.audio.AudioSink.class);
+        androidx.media3.exoplayer.audio.AudioSink second = mock(androidx.media3.exoplayer.audio.AudioSink.class);
+        PulsrAudioSink a = new PulsrAudioSink(org.robolectric.RuntimeEnvironment.getApplication(),
+                () -> false, () -> false, () -> 50, () -> false, () -> playerA, p -> {}, null,
+                (nativeMode, floatMode) -> new PulsrAudioSink.Inner(first, null, null, null));
+        PulsrAudioSink b = new PulsrAudioSink(org.robolectric.RuntimeEnvironment.getApplication(),
+                () -> true, () -> false, () -> 50, () -> false, () -> playerB, p -> {}, null,
+                (nativeMode, floatMode) -> new PulsrAudioSink.Inner(second, null, null, null));
+        a.configure(pcm24, 0, null);
+        a.play();
+        b.configure(pcm16, 0, null);
+        org.junit.Assert.assertArrayEquals(new int[] {pcm24.pcmEncoding, 44100, 2},
+                PulsrOutputRouting.decodedPcmSnapshot());
+        org.junit.Assert.assertArrayEquals(new int[] {pcm16.pcmEncoding, 48000, 2},
+                PulsrOutputRouting.decodedPcmSnapshot(playerB));
+        b.play();
+        org.junit.Assert.assertArrayEquals(new int[] {0, 0, 0}, PulsrOutputRouting.decodedPcmSnapshot());
+        a.pause();
+        org.junit.Assert.assertArrayEquals(new int[] {pcm16.pcmEncoding, 48000, 2},
+                PulsrOutputRouting.decodedPcmSnapshot());
+        b.reset();
+        org.junit.Assert.assertArrayEquals(new int[] {0, 0, 0}, PulsrOutputRouting.decodedPcmSnapshot(playerB));
+        a.release();
+        b.release();
+        org.junit.Assert.assertArrayEquals(new int[] {0, 0, 0}, PulsrOutputRouting.decodedPcmSnapshot());
+    }
+
     @SuppressWarnings("unchecked")
     private static Set<AAudioAudioSink> nativeSinks() throws Exception {
         final Field field = PulsrOutputRouting.class.getDeclaredField("nativeSinks");

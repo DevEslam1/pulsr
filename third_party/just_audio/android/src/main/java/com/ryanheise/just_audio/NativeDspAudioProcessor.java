@@ -46,7 +46,11 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     private static native void nativeResetEngine(long engineHandle);
     private static native int nativeProcessDirectFloatBuffer(
             long engineHandle, ByteBuffer buffer, int offsetBytes, int frameCount, int channels,
-            ByteBuffer gainBuffer);
+            ByteBuffer gainBuffer, ByteBuffer sourcePcm, int sourceOffset,
+            int sourceBitDepth, int sourceSampleRate);
+    private static native void nativeReleaseUsbProducer(long engineHandle);
+    private static native void nativePrepareTapSrc(
+            long engineHandle, int sourceRate, int destinationRate, int channels);
     private static native int nativeResampleTap(
             long engineHandle, ByteBuffer inBuffer, int inFrames, int channels,
             ByteBuffer outBuffer, int maxOutFrames, double srcRate, double dstRate);
@@ -184,6 +188,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         // idempotent, so the engine can never be double-destroyed.
         engineLock.writeLock().lock();
         try {
+            releaseUsbProducer();
             long h = nativeEngineHandle.getAndSet(0);
             if (h != 0 && NATIVE_AVAILABLE) {
                 try {
@@ -380,8 +385,77 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
     }
 
+    /** A rate-changing failure must never consume source-rate PCM. */
+    static final class TapSrcException extends RuntimeException {
+        TapSrcException(String message, Throwable cause) { super(message, cause); }
+    }
+
+    private TapSrcException tapSrcFailure;
+
+    // These seams execute the actual production handoff, including the original
+    // byte offset. JVM tests override only JNI, not queueInput/conversion.
+    int processNativeBlock(ByteBuffer buffer, int frames, int channels, ByteBuffer gains,
+            ByteBuffer source, int sourceOffset, int sourceDepth, int sourceRate) {
+        engineLock.readLock().lock();
+        try {
+            long handle = nativeEngineHandle.get();
+            return handle == 0 ? 0 : nativeProcessDirectFloatBuffer(handle, buffer, 0,
+                    frames, channels, gains, source, sourceOffset, sourceDepth, sourceRate);
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
+    int resampleTapBlock(ByteBuffer input, int frames, int channels,
+            ByteBuffer output, int maxFrames, int sourceRate, int destinationRate) {
+        engineLock.readLock().lock();
+        try {
+            long handle = nativeEngineHandle.get();
+            if (handle == 0) throw new TapSrcException("Tap SRC engine unavailable", null);
+            return nativeResampleTap(handle, input, frames, channels, output, maxFrames,
+                    sourceRate, destinationRate);
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
+    void prepareTapSrc(int sourceRate, int destinationRate, int channels) {
+        engineLock.readLock().lock();
+        try {
+            long handle = nativeEngineHandle.get();
+            if (handle == 0) throw new TapSrcException("Tap SRC engine unavailable", null);
+            nativePrepareTapSrc(handle, sourceRate, destinationRate, channels);
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
+    public void releaseUsbProducer() {
+        engineLock.readLock().lock();
+        try {
+            long handle = nativeEngineHandle.get();
+            if (handle != 0) {
+                try { nativeReleaseUsbProducer(handle); }
+                catch (RuntimeException | UnsatisfiedLinkError e) {
+                    logJniFailureOnce("nativeReleaseUsbProducer", e);
+                }
+            }
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
     @Override
     public void queueInput(ByteBuffer inputBuffer) {
+        queueInput(inputBuffer, inputAudioFormat.encoding == C.ENCODING_PCM_16BIT
+                ? inputBuffer.duplicate() : null,
+                inputAudioFormat.encoding == C.ENCODING_PCM_16BIT ? 16 : 0,
+                inputAudioFormat.sampleRate);
+    }
+
+    /** Original integer PCM is read-only metadata for native USB raw delivery. */
+    public void queueInput(ByteBuffer inputBuffer, ByteBuffer sourcePcm,
+            int sourceBitDepth, int sourceSampleRate) {
         int position = inputBuffer.position();
         int limit = inputBuffer.limit();
         int frameCount = (limit - position) / inputAudioFormat.bytesPerFrame;
@@ -418,23 +492,20 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             final int maxOut = (int) Math.ceil(frameCount * ratio)
                     + (int) Math.ceil(64.0 * ratio) + 32;
             FloatBuffer resampled = ensureResampleScratch(maxOut * channelCount);
-            int got = 0;
-            engineLock.readLock().lock();
+            if (tapSrcFailure != null) throw tapSrcFailure;
+            final int got;
             try {
-                final long handle = nativeEngineHandle.get();
-                if (handle != 0) {
-                    try {
-                        got = nativeResampleTap(handle, scratch, frameCount, channelCount,
-                                resampleScratch, maxOut,
-                                inputAudioFormat.sampleRate, outputAudioFormat.sampleRate);
-                    } catch (RuntimeException | UnsatisfiedLinkError e) {
-                        logJniFailureOnce("nativeResampleTap", e);
-                    }
-                }
-            } finally {
-                engineLock.readLock().unlock();
+                got = resampleTapBlock(scratch, frameCount, channelCount,
+                        resampleScratch, maxOut,
+                        inputAudioFormat.sampleRate, outputAudioFormat.sampleRate);
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
+                throw new TapSrcException("Tap SRC failed before source consumption", e);
             }
-            emitFrames = got > 0 && got <= maxOut ? got : 0;
+            if (got < 0 || got > maxOut) {
+                throw new TapSrcException("Invalid Tap SRC frame count: " + got, null);
+            }
+            // Zero is valid priming, unlike a negative result or JNI failure.
+            emitFrames = got;
             emitFloats = resampled;
             emitNativeBuffer = resampleScratch;
         }
@@ -520,38 +591,32 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
         int processed = emitFrames;
         boolean bitPerfect = false;
+        boolean exclusiveSilence = false;
         // Frames whose gain the engine already applied. Anything at or beyond
         // this count (engine absent, declined, or processed only a head) gets
         // the gain in the Java output loop below.
         int nativeGainedFrames = 0;
-        if (NATIVE_AVAILABLE) {
-            // Read side: release() (write side) cannot destroy the engine while
-            // we are inside the native call.
-            engineLock.readLock().lock();
+        if (emitFrames > 0 && isNativeAvailableForConfiguration()) {
+            final boolean rawEligible = !tapSrcActive
+                    && sourcePcm != null && sourcePcm.isDirect()
+                    && (sourceBitDepth == 16 || sourceBitDepth == 24 || sourceBitDepth == 32)
+                    && sourceSampleRate == inputAudioFormat.sampleRate
+                    && sourcePcm.remaining() == (long) frameCount * channelCount * (sourceBitDepth / 8);
             try {
-                final long handle = nativeEngineHandle.get();
-                if (handle != 0) {
-                    try {
-                        processed = nativeProcessDirectFloatBuffer(
-                                handle, emitNativeBuffer, 0, emitFrames, channelCount,
-                                gains == null ? null : gainScratch);
-                        bitPerfect = processed < 0;
-                        if (bitPerfect) processed = -processed;
-                        // Any positive return means the engine ran and applied
-                        // the gain buffer itself (on every path, including the
-                        // bit-perfect bypass).
-                        if (processed > 0 && gains != null) {
-                            nativeGainedFrames = processed;
-                        }
-                    } catch (RuntimeException | UnsatisfiedLinkError e) {
-                        // A JNI RuntimeException must never escape queueInput.
-                        logJniFailureOnce("nativeProcessDirectFloatBuffer", e);
-                        processed = emitFrames;
-                        bitPerfect = false;
-                    }
-                }
-            } finally {
-                engineLock.readLock().unlock();
+                processed = processNativeBlock(emitNativeBuffer, emitFrames, channelCount,
+                        gains == null ? null : gainScratch,
+                        rawEligible ? sourcePcm : null,
+                        rawEligible ? sourcePcm.position() : 0,
+                        rawEligible ? sourceBitDepth : 0, sourceSampleRate);
+                exclusiveSilence = processed == Integer.MIN_VALUE;
+                bitPerfect = processed < 0 && !exclusiveSilence;
+                if (exclusiveSilence) processed = emitFrames;
+                else if (bitPerfect) processed = -processed;
+                if (processed > 0 && gains != null) nativeGainedFrames = processed;
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
+                logJniFailureOnce("nativeProcessDirectFloatBuffer", e);
+                processed = emitFrames;
+                bitPerfect = false;
             }
         }
         if (processed <= 0 || processed > emitFrames) {
@@ -582,6 +647,13 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
         final boolean outputIsFloat = outputAudioFormat.encoding == C.ENCODING_PCM_FLOAT;
         ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
+        if (exclusiveSilence) {
+            output.limit(processed * outputAudioFormat.bytesPerFrame);
+            while (output.hasRemaining()) output.put((byte) 0);
+            output.flip();
+            inputBuffer.position(limit);
+            return;
+        }
         if (bitPerfect && gains == null) {
             // No curve and unity static gain were already verified under
             // rampLock above, and the engine confirmed sample-identical bypass:
@@ -616,6 +688,8 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onFlush() {
+        releaseUsbProducer();
+        tapSrcFailure = null;
         tapSrcActive = inputAudioFormat.sampleRate > 0 && outputAudioFormat.sampleRate > 0
                 && inputAudioFormat.sampleRate != outputAudioFormat.sampleRate;
         // The engine runs at the PROCESSING rate: the tap-SRC output rate when
@@ -643,6 +717,13 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 }
             } finally {
                 engineLock.readLock().unlock();
+            }
+        }
+        if (tapSrcActive) {
+            try {
+                prepareTapSrc(inputAudioFormat.sampleRate, outputAudioFormat.sampleRate, ch);
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
+                tapSrcFailure = new TapSrcException("Tap SRC preparation failed", e);
             }
         }
         // NOTE: a completed fade-out (rampGains == null, staticGain == 0) is
@@ -687,6 +768,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     }
 
     private void resetNativeEngineLocked() {
+        releaseUsbProducer();
         if (!NATIVE_AVAILABLE) return;
         engineLock.readLock().lock();
         try {

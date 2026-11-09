@@ -10,8 +10,9 @@ bool _isNear(double a, double b) => (a - b).abs() < 0.001;
 Future<bool> _isBitPerfectBypassActivePrefs(SharedPreferences? cached) async {
   try {
     final prefs = cached ?? await SharedPreferences.getInstance();
-    return (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
-        (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+    return (prefs.getBool(PrefsKeys.strictBitPerfect) ?? false) ||
+        ((prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+            (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true));
   } catch (_) {
     return false;
   }
@@ -338,8 +339,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   Future<void> setSkipSilenceEnabled(bool enabled) async {
     try {
       // Silence skipping removes frames and would break the exact bitstream.
-      if (enabled && await _isBitPerfectBypassActivePrefs(_cachedPrefs)) {
-        enabled = false;
+      if (enabled && await playbackRateMustRemainUnity()) {
+        await _playerA.setSkipSilenceEnabled(false);
+        await _playerB.setSkipSilenceEnabled(false);
+        return; // Keep the saved user choice while policy forces bypass.
       }
       silenceSkipController.setEnabled(enabled);
       await _playerA.setSkipSilenceEnabled(enabled);
@@ -440,7 +443,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     try {
       await silenceSkipController.load();
       final enabled = silenceSkipController.enabled &&
-          !await _isBitPerfectBypassActivePrefs(_cachedPrefs);
+          !await playbackRateMustRemainUnity();
       if (enabled) {
         await _playerA.setSkipSilenceEnabled(true);
         await _playerB.setSkipSilenceEnabled(true);
@@ -578,6 +581,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   void _broadcastState(PlaybackEvent event);
 
   SharedPreferences? get _cachedPrefs;
+  Future<bool> playbackRateMustRemainUnity();
 
   int get _consecutiveFailures;
   set _consecutiveFailures(int value);

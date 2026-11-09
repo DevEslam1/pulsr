@@ -163,6 +163,7 @@ class PlayerPlaybackOptionsController {
   double get maxPlaybackPitch => 2.0;
 
   Future<void> setPlaybackSpeed(double speed) async {
+    if (!speed.isFinite) return;
     final s = _getState();
     final prevSpeed = s.playbackSpeed;
     final clamped = speed.clamp(minPlaybackSpeed, maxPlaybackSpeed);
@@ -170,14 +171,22 @@ class PlayerPlaybackOptionsController {
         !checkPlaybackRateGuard('Playback speed')) {
       return;
     }
-    _emit(s.copyWith(playback: s.playback.copyWith(playbackSpeed: clamped)));
     try {
       await _audioHandler.setSpeed(clamped);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(PrefsKeys.playbackSpeed, clamped);
-      // A-01: remember this track's speed for its next resume.
+      final effective = _audioHandler.playbackState.value.speed;
+      if (!_isClosed()) {
+        final current = _getState();
+        _emit(current.copyWith(
+            playback: current.playback.copyWith(playbackSpeed: effective)));
+      }
+      // The handler alone persists the global choice. A raced forced-unity
+      // no-op must not be saved by a second controller-level writer.
+      if (await _audioHandler.playbackRateMustRemainUnity() ||
+          effective != clamped) {
+        return;
+      }
       final songId = s.currentSong?.id;
-      if (songId != null) {
+      if (songId != null && _getState().currentSong?.id == songId) {
         await _perSongPlaybackStore.setSpeed(songId.toString(), clamped);
       }
     } catch (e, st) {
@@ -195,6 +204,7 @@ class PlayerPlaybackOptionsController {
   }
 
   Future<void> setPlaybackPitch(double pitch) async {
+    if (!pitch.isFinite) return;
     final s = _getState();
     final prevPitch = s.playbackPitch;
     final clamped = pitch.clamp(minPlaybackPitch, maxPlaybackPitch);
@@ -202,14 +212,20 @@ class PlayerPlaybackOptionsController {
         !checkPlaybackRateGuard('Pitch shift')) {
       return;
     }
-    _emit(s.copyWith(playback: s.playback.copyWith(playbackPitch: clamped)));
     try {
       await _audioHandler.setPitch(clamped);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble(PrefsKeys.playbackPitch, clamped);
-      // A-01: remember this track's pitch for its next resume.
+      final effective = _audioHandler.pitch;
+      if (!_isClosed()) {
+        final current = _getState();
+        _emit(current.copyWith(
+            playback: current.playback.copyWith(playbackPitch: effective)));
+      }
+      if (await _audioHandler.playbackRateMustRemainUnity() ||
+          effective != clamped) {
+        return;
+      }
       final songId = s.currentSong?.id;
-      if (songId != null) {
+      if (songId != null && _getState().currentSong?.id == songId) {
         await _perSongPlaybackStore.setPitch(songId.toString(), clamped);
       }
     } catch (e, st) {
@@ -354,8 +370,10 @@ class PlayerPlaybackOptionsController {
     if (s.currentSong?.id != song.id) return;
     _emit(s.copyWith(
       playback: s.playback.copyWith(
-        playbackSpeed: speedSucceeded ? speed! : s.playbackSpeed,
-        playbackPitch: pitchSucceeded ? pitch! : s.playbackPitch,
+        playbackSpeed: speedSucceeded
+            ? _audioHandler.playbackState.value.speed
+            : s.playbackSpeed,
+        playbackPitch: pitchSucceeded ? _audioHandler.pitch : s.playbackPitch,
         currentSongVolumeOverrideDb: gainDb,
         currentSongEqOverride: eqPreset,
       ),

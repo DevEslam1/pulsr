@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
+#include <future>
 #include <thread>
 #include <vector>
 
@@ -67,27 +68,32 @@ int main() {
         std::atomic<bool> stop{false};
         std::atomic<bool> inRender{false};
         std::atomic<int> renders{0};
+        std::promise<bool> acquired;
+        auto acquiredFuture = acquired.get_future();
+        std::promise<void> teardownPublished;
+        auto teardownFuture = teardownPublished.get_future();
         std::thread worker([&]() {
             while (!stop.load(std::memory_order_acquire)) {
                 auto lease = registry.acquireForRender(handle);
                 if (!lease.engine) {
+                    if (renders.load() == 0) acquired.set_value(false);
                     break;
                 }
                 inRender.store(true, std::memory_order_release);
-                ++renders;
-                std::this_thread::sleep_for(std::chrono::microseconds(200));
+                if (++renders == 1) {
+                    acquired.set_value(true);
+                    teardownFuture.wait();
+                }
                 inRender.store(false, std::memory_order_release);
                 registry.releaseForRender(lease.slot);
             }
         });
 
-        for (int spin = 0; spin < 1000 && renders.load() == 0; ++spin) {
-            std::this_thread::yield();
-        }
-        check(renders.load() > 0, "worker acquired a render lease");
+        check(acquiredFuture.get(), "worker acquired a render lease");
 
         const int slot = registry.beginTeardown(handle);
         check(slot >= 0, "teardown starts while renderer is active");
+        teardownPublished.set_value();
         registry.waitForRenderers(slot);
         check(!inRender.load(std::memory_order_acquire),
               "waitForRenderers returns only after the render block exits");

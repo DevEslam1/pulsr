@@ -75,27 +75,84 @@ public final class NativeDspSmoke {
         AudioEffectsPlugin.nativeSetActiveStages(0);
     }
 
+    private static void checkTapSrc(NativeDspAudioProcessor processor) throws Exception {
+        AudioEffectsPlugin.nativeSetBitPerfectParams(false, false);
+        AudioEffectsPlugin.nativeSetActiveStages(0);
+        processor.setFloatOutput(true);
+        processor.setGainCurve(new double[] {1, 1}, 1);
+        for (int[] rates : new int[][] {{44100, 48000}, {96000, 48000}, {48000, 8000}}) {
+            processor.setTapSrcTargetRate(rates[1]);
+            AudioProcessor.AudioFormat format = processor.configure(
+                    new AudioProcessor.AudioFormat(rates[0], 2, C.ENCODING_PCM_FLOAT));
+            check(format.sampleRate == rates[1], "tap SRC must declare its actual destination rate");
+            processor.flush();
+            check(processor.isTapSrcActive(), "tap SRC must be active after configure/flush");
+            int outputFrames = 0;
+            float last = 0;
+            for (int block = 0; block < 24; block++) {
+                ByteBuffer input = ByteBuffer.allocateDirect(2048 * 8).order(ByteOrder.nativeOrder());
+                for (int frame = 0; frame < 2048; frame++) input.putFloat(0.25f).putFloat(0.25f);
+                input.flip();
+                processor.queueInput(input);
+                check(!input.hasRemaining(), "successful SRC must consume its source");
+                ByteBuffer output = processor.getOutput().order(ByteOrder.nativeOrder());
+                check(output.remaining() % 8 == 0, "SRC output must contain whole stereo frames");
+                outputFrames += output.remaining() / 8;
+                while (output.hasRemaining()) {
+                    float left = output.getFloat(), right = output.getFloat();
+                    check(Float.isFinite(left) && Math.abs(left) < 1, "SRC output must remain finite/bounded");
+                    check(left == right, "SRC must preserve matched stereo channels");
+                    last = left;
+                }
+            }
+            double expectedFrames = 24 * 2048.0 * rates[1] / rates[0];
+            check(Math.abs(outputFrames - expectedFrames) < 2048,
+                    "SRC frame count must follow the declared conversion ratio");
+            check(Math.abs(last - 0.25f) < 0.002f, "SRC must preserve steady-state unity gain");
+        }
+        processor.setTapSrcTargetRate(48000);
+        processor.configure(new AudioProcessor.AudioFormat(6000, 2, C.ENCODING_PCM_FLOAT));
+        processor.flush();
+        ByteBuffer rejected = ByteBuffer.allocateDirect(64 * 8).order(ByteOrder.nativeOrder());
+        for (int frame = 0; frame < 64; frame++) rejected.putFloat(0.25f).putFloat(0.25f);
+        rejected.flip();
+        try {
+            processor.queueInput(rejected);
+            throw new AssertionError("failed native SRC preparation must reject rather than prime");
+        } catch (NativeDspAudioProcessor.TapSrcException expected) {
+            check(rejected.position() == 0, "native SRC rejection must retain the source block");
+        }
+        AudioEffectsPlugin.nativeSetBitPerfectParams(true, false);
+        processor.configure(new AudioProcessor.AudioFormat(44100, 2, C.ENCODING_PCM_FLOAT));
+        processor.flush();
+        check(!processor.isTapSrcActive(), "bit-perfect bypass must suppress tap SRC");
+        processor.setTapSrcTargetRate(0);
+        AudioEffectsPlugin.nativeSetBitPerfectParams(false, false);
+    }
+
     public static void main(String[] args) throws Exception {
         check(AaudioNativeBridge.ensureAvailable(), "library must load");
         NativeDspAudioProcessor processor = new NativeDspAudioProcessor();
         processor.configure(new AudioProcessor.AudioFormat(48000, 2, C.ENCODING_PCM_16BIT));
         processor.flush();
         try {
-            // The native engine bypasses all stages; Java must also bypass its ramp.
             for (boolean bypass : new boolean[] {true, false, true, false}) {
-                // Arm every native stage when bypassing; isolate the Java gain
-                // ramp when processing so a limiter delay cannot mask the test.
                 AudioEffectsPlugin.nativeSetActiveStages(bypass ? -1 : 0);
                 AudioEffectsPlugin.nativeSetBitPerfectParams(bypass, false);
-                processor.setGainCurve(new double[] {0.5, 0.5}, 1);
-                ByteBuffer input = pcm16();
-                processor.queueInput(input);
-                ByteBuffer output = processor.getOutput().order(ByteOrder.nativeOrder());
-                check(output.remaining() == 65536 * 2, "frame count must survive toggle");
-                for (int sample = Short.MIN_VALUE; sample <= Short.MAX_VALUE; sample++) {
-                    short expected = bypass ? (short) sample : Pcm16Quantizer.fromFloat(sample / 32768f * 0.5f);
-                    short actual = output.getShort();
-                    check(actual == expected, "PCM16 mismatch bypass=" + bypass + " sample=" + sample + " expected=" + expected + " actual=" + actual);
+                for (double gain : new double[] {1, 0.5, 0}) {
+                    processor.setGainCurve(new double[] {gain, gain}, 1);
+                    ByteBuffer input = pcm16();
+                    processor.queueInput(input);
+                    ByteBuffer output = processor.getOutput().order(ByteOrder.nativeOrder());
+                    check(output.remaining() == 65536 * 2, "frame count must survive toggle");
+                    for (int sample = Short.MIN_VALUE; sample <= Short.MAX_VALUE; sample++) {
+                        double expected = sample * gain;
+                        short actual = output.getShort();
+                        double tolerance = expected == Math.rint(expected) ? 0 : 1.5;
+                        check(Math.abs(actual - expected) <= tolerance,
+                                "PCM16 mismatch bypass=" + bypass + " gain=" + gain
+                                        + " sample=" + sample + " expected=" + expected + " actual=" + actual);
+                    }
                 }
             }
             processor.setFloatOutput(true);
@@ -103,7 +160,7 @@ public final class NativeDspSmoke {
             processor.flush();
             AudioEffectsPlugin.nativeSetBitPerfectParams(true, false);
             AudioEffectsPlugin.nativeSetActiveStages(-1);
-            processor.setGainCurve(new double[] {0.2, 0.2}, 1);
+            processor.setGainCurve(new double[] {1, 1}, 1);
             int[] patterns = {0, 0x80000000, 0x3f800000, 0xbf800000, 0x7fc01234, 0x7f800000};
             ByteBuffer floats = ByteBuffer.allocateDirect(patterns.length * 4).order(ByteOrder.nativeOrder());
             for (int pattern : patterns) floats.putInt(pattern);
@@ -128,7 +185,9 @@ public final class NativeDspSmoke {
                     for (int frame = 0; frame < frames; ++frame) {
                         float left = faded.getFloat(), right = faded.getFloat();
                         check(left == right, "profile fade must preserve stereo balance");
-                        check(Math.abs(left - previous) < 0.0002f, "profile fade must not step or pop");
+                        check(Math.abs(left - previous) < 0.0002f,
+                                "profile fade step rate=" + rate + " muted=" + muted
+                                        + " frame=" + frame + " previous=" + previous + " actual=" + left);
                         check(left >= 0 && left <= 0.25001f, "sleep/crossfade gain must remain composed");
                         previous = left;
                     }
@@ -137,11 +196,12 @@ public final class NativeDspSmoke {
                 }
             }
             checkQuranWarmth(processor);
+            checkTapSrc(processor);
         } finally {
             AudioEffectsPlugin.nativeSetBitPerfectParams(false, false);
             AudioEffectsPlugin.nativeSetActiveStages(0);
             processor.release();
         }
-        System.out.println("PASS: Java/JNI PCM16 and float bypass; independent 44.1/48k profile fades preserve sleep/crossfade gain, stereo and exact endpoints");
+        System.out.println("PASS: Java/JNI PCM16 unity bypass, effective transport gain/mute, float bit identity, profile fades, and configured tap SRC");
     }
 }

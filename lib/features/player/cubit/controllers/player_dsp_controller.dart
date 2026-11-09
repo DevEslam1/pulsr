@@ -13,6 +13,7 @@ import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/audio_handler.dart';
+import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../data/audio/bluetooth_quality_policy.dart';
 import '../../../../data/audio/comparison_slot.dart';
 import '../../../../data/audio/dsp_param_ranges.dart';
@@ -129,9 +130,8 @@ class PlayerDspController {
   }
 
   void _startDeviceProfileWatcher() {
-    final service = _deviceProfileService;
     final hiRes = _hiResAudioService;
-    if (service == null || hiRes == null) return;
+    if (hiRes == null) return;
     _deviceSub = hiRes.outputDeviceStream.listen((device) {
       onOutputDeviceChanged(device);
     });

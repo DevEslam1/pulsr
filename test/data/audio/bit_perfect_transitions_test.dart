@@ -75,6 +75,61 @@ void main() {
     expect(cubit.state.bitPerfectOutput, false);
     expect(bypassCalls, [true, false]);
   });
+  test('strict preserves decoder precision without requiring AAudio', () async {
+    await cubit.setFloatOutputEnabled(false);
+    await cubit.setStrictBitPerfect(true);
+    expect(cubit.state.floatOutputEnabled, true);
+    expect(cubit.state.aaudioOutputEnabled, false);
+    await cubit.setFloatOutputEnabled(false);
+    expect(cubit.state.floatOutputEnabled, true);
+  });
+
+  for (final stopConfirmed in [true, false]) {
+    test('boot strict direct bypass failure retains ON until teardown $stopConfirmed', () async {
+      await cubit.close();
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.strictBitPerfect: true, PrefsKeys.bitPerfectOutput: true,
+        PrefsKeys.bypassDspOnBitPerfect: true,
+        PrefsKeys.floatOutputEnabled: false,
+        'target_output_sample_rate': 96000, 'target_output_bit_depth': 16,
+      });
+      const usb = MethodChannel(PulsrChannels.usbExclusive);
+      var running = false;
+      bool? strictRequest;
+      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(usb, (call) async {
+        if (call.method == 'startStreaming') {
+          strictRequest = (call.arguments as Map)['strict'] as bool;
+          running = true;
+          return {'success': true, 'streamingActive': true};
+        }
+        if (call.method == 'stopStreaming') {
+          if (stopConfirmed) running = false;
+          return {'success': stopConfirmed};
+        }
+        return {'attached': true, 'permitted': true, 'deviceId': 7,
+          'streamingSupported': true, 'streamingActive': running,
+          'streamingSampleRate': 48000, 'streamingBitDepth': 24,
+          'streamingChannels': 2, 'rateVerified': true};
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(usb, null));
+      when(() => hires.setBitPerfectMode(any())).thenAnswer((_) async => false);
+      messenger.setMockMethodCallHandler(effectsChannel, (call) async {
+        if (call.method == 'setBypassDspForBitPerfect') return false;
+        return null;
+      });
+      cubit = SettingsCubit(scannerService: _Scanner(), hiResAudioService: hires);
+      await cubit.preferencesReady;
+      expect(strictRequest, true);
+      expect(running, !stopConfirmed);
+      expect(cubit.state.bitPerfectOutput, !stopConfirmed);
+      expect(cubit.state.strictBitPerfect, !stopConfirmed);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(PrefsKeys.bitPerfectOutput), !stopConfirmed);
+      verifyNever(() => hires.setTargetOutputFormat(sampleRate: 96000, bitDepth: 16));
+    });
+  }
+
   test('strict refuses disabling bypass or follow-track', () async {
     await cubit.setStrictBitPerfect(true);
     await cubit.setBypassDspOnBitPerfect(false);

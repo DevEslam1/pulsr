@@ -69,7 +69,7 @@ public final class FloatSinkSmoke {
                     check(sink.handleBuffer(input, 0, 1), "retry must finish");
                     check(!input.hasRemaining(), "source must be consumed after retry");
                     for (float sample : new float[] {0.5f, -0.5f, 0.25f, -0.25f}) {
-                        float expected = sample * (bypass ? 1f : 0.5f);
+                        float expected = sample * 0.5f;
                         check(capture.captured.getFloat() == expected, "float DSP toggle or duplicate processing failure");
                     }
                 }

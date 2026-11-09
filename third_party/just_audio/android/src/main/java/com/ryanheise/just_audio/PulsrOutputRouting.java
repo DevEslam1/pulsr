@@ -19,6 +19,13 @@ public final class PulsrOutputRouting {
     // of active sinks if the renderer holds the only strong reference internally.
     private static final Set<DefaultAudioSink> sinks = new HashSet<>();
     private static final Set<AAudioAudioSink> nativeSinks = new HashSet<>();
+    private static final Map<PulsrAudioSink, ExoPlayer> decodedOwners = new WeakHashMap<>();
+
+    static synchronized void observeDecoded(PulsrAudioSink sink, ExoPlayer player) {
+        decodedOwners.put(sink, player);
+    }
+
+    static synchronized void unobserveDecoded(PulsrAudioSink sink) { decodedOwners.remove(sink); }
     private static AudioDeviceInfo preferred;
     private static Field audioTrackField;
     private static Field audioOutputField;
@@ -148,12 +155,23 @@ public final class PulsrOutputRouting {
      * Decoded PCM truth probe: [encoding, sampleRate, channels] of the last
      * Media3 float-tap configure, or zeros when it has not run yet.
      */
-    public static int[] decodedPcmSnapshot() {
-        return new int[] {
-            FloatDspAudioSink.lastDecodedPcmEncoding,
-            FloatDspAudioSink.lastDecodedSampleRate,
-            FloatDspAudioSink.lastDecodedChannelCount,
-        };
+    public static synchronized int[] decodedPcmSnapshot() {
+        PulsrAudioSink active = null;
+        for (PulsrAudioSink sink : decodedOwners.keySet()) {
+            if (!sink.isPlayingForTelemetry()) continue;
+            // During crossfade there is no unique active session. Unknown is
+            // safer than mixing one player's decoder with another's output.
+            if (active != null) return new int[] {0, 0, 0};
+            active = sink;
+        }
+        return active == null ? new int[] {0, 0, 0} : active.decodedPcmSnapshot();
+    }
+
+    public static synchronized int[] decodedPcmSnapshot(ExoPlayer player) {
+        for (Map.Entry<PulsrAudioSink, ExoPlayer> entry : decodedOwners.entrySet()) {
+            if (entry.getValue() == player) return entry.getKey().decodedPcmSnapshot();
+        }
+        return new int[] {0, 0, 0};
     }
 
     /** True while a native AAudio sink is registered (playing or idle). */

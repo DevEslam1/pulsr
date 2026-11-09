@@ -46,6 +46,8 @@ class TransitionDecision {
 class CrossfadeManager {
   final Mutex _fadeMutex = Mutex();
   final List<Timer> _activeTimers = [];
+  final Set<AudioPlayer> _playersWithArmedCurves = {};
+  final Set<Future<bool>> _pendingCurveArms = {};
 
   Duration duration = Duration.zero;
   CrossfadeCurve curve = CrossfadeCurve.equalPower;
@@ -356,17 +358,28 @@ class CrossfadeManager {
   /// platform or failure so callers can fall back to stepped ramps.
   Future<bool> _armNativeCurve(
       AudioPlayer player, List<double> gains, int segmentMs) async {
+    Future<bool>? pending;
     try {
-      return await player.dspSetGainCurve(gains, segmentMs: segmentMs) == true;
+      pending = player.dspSetGainCurve(gains, segmentMs: segmentMs);
+      _pendingCurveArms.add(pending);
+      final applied = await pending;
+      if (applied) _playersWithArmedCurves.add(player);
+      return applied;
     } catch (_) {
       return false;
+    } finally {
+      if (pending != null) _pendingCurveArms.remove(pending);
     }
   }
 
-  /// Best-effort native curve clear (ignore failures — platform may not
-  /// support it; a stale curve then still terminates at its last value).
-  void _clearNativeCurve(AudioPlayer player) {
-    player.dspClearGainCurve().catchError((_) => false);
+  Future<bool> _clearNativeCurve(AudioPlayer player) async {
+    try {
+      final cleared = await player.dspClearGainCurve();
+      if (cleared) _playersWithArmedCurves.remove(player);
+      return cleared;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Gradually transitions the volume of [player] from [from] to [to] over [fadeDuration]
@@ -409,7 +422,7 @@ class CrossfadeManager {
     _activeFadeCompleters.add(completer);
     completer.future
         .whenComplete(() => _activeFadeCompleters.remove(completer));
-    final stopwatch = clock.stopwatch()..start();
+    final stopwatch = clock.stopwatch();
 
     // --- Native sample-accurate path (Pulsr Android fork) ---
     // Fade-out: player volume stays at `from`, a 1→0 multiplier follows the
@@ -447,6 +460,7 @@ class CrossfadeManager {
       if (!completer.isCompleted) completer.complete();
       return;
     }
+    stopwatch.start();
     if (nativeArmed) {
       Timer? singleTimer;
       singleTimer = Timer(Duration(milliseconds: totalMs.round()), () {
@@ -562,7 +576,7 @@ class CrossfadeManager {
     _activeFadeCompleters.add(completer);
     completer.future
         .whenComplete(() => _activeFadeCompleters.remove(completer));
-    final stopwatch = clock.stopwatch()..start();
+    final stopwatch = clock.stopwatch();
 
     // Only the OUTGOING player may use the native per-sample gain ramp. The
     // INCOMING player is always ramped with stepped absolute setVolume calls.
@@ -606,6 +620,7 @@ class CrossfadeManager {
     // would start loud then drop and fade in. Stepping the incoming player's
     // ABSOLUTE volume never lets the base jump past the current fade gain, so
     // no full-gain buffer can leak.
+    stopwatch.start();
     double lastFraction = 0.0;
     // A normal 10 ms tick advances 10/totalMs; flag only a jump of 5x that
     // (and never below 5%), so short fades don't count as glitches.
@@ -689,58 +704,53 @@ class CrossfadeManager {
     AudioPlayer activePlayer, {
     double restoreVolume = 1.0,
   }) async {
-    // Clear any armed native gain curves BEFORE restoring volumes: a
-    // mid-fade curve would otherwise multiply the restored volume down to
-    // its held gain and leave the player audibly quiet after a cancel.
-    // Always clear regardless of isCrossfading state (M-04).
-    _clearNativeCurve(inactivePlayer);
-    _clearNativeCurve(activePlayer);
-    if (_outgoingWithArmedCurve != null) {
-      _clearNativeCurve(_outgoingWithArmedCurve!);
-      _outgoingWithArmedCurve = null;
-    }
-    _nativeCurveArmedOnOutgoing = false;
-
+    final armed = Set<AudioPlayer>.of(_playersWithArmedCurves);
+    final pendingArms = List<Future<bool>>.of(_pendingCurveArms);
     final hadActiveFade = isCrossfading ||
         _activeTimers.isNotEmpty ||
-        _activeFadeCompleters.isNotEmpty;
-    if (!hadActiveFade) return;
-
-    // Detach the completer NOW: beginCrossfade() may install a new one while
-    // the awaits below are in flight, and that one must not be completed here.
+        _activeFadeCompleters.isNotEmpty ||
+        armed.isNotEmpty;
     final completer = _crossfadeCompleter;
     _crossfadeCompleter = null;
-
-    _fadeId++; // Invalidate any in-progress fade timers
-    for (final t in _activeTimers) {
-      t.cancel();
+    _fadeId++;
+    for (final timer in _activeTimers) {
+      timer.cancel();
     }
     _activeTimers.clear();
-    // The cancelled timers can no longer complete their fade futures; resolve
-    // them here so an awaited fadeVolume/crossfadeVolumes (and the mutex held
-    // across it) does not hang forever. Local reference & clear before iterating (C-02).
     _completeActiveFades();
-    isCrossfading = false; // Set BEFORE stopping players
+    isCrossfading = false;
     pendingIndex = null;
     activeTransitionPlan = null;
 
     try {
+      await Future.wait(pendingArms.map((arm) => arm.catchError((_) => false)));
+      armed.addAll(_playersWithArmedCurves);
+      final players = {
+        inactivePlayer,
+        activePlayer,
+        ...armed,
+        if (_outgoingWithArmedCurve != null) _outgoingWithArmedCurve!,
+      };
+      final cleared = await Future.wait(players.map(_clearNativeCurve));
+      var index = 0;
+      for (final player in players) {
+        if (armed.contains(player) && !cleared[index]) {
+          throw StateError('Could not clear the active native gain curve.');
+        }
+        index++;
+      }
+      _outgoingWithArmedCurve = null;
+      _nativeCurveArmedOnOutgoing = false;
+      if (!hadActiveFade) return;
       await inactivePlayer.stop();
       await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
       await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
     } catch (e, st) {
-      ErrorLogger.log(
-        'Error canceling crossfade players',
-        error: e,
-        stackTrace: st,
-        category: 'CrossfadeManager',
-      );
-    }
-
-    // Complete the detached completer exactly once
-    // FIX-B04: Guard against completing an already completed crossfade completer
-    if (completer != null && !completer.isCompleted) {
-      completer.complete();
+      ErrorLogger.log('Error canceling crossfade players',
+          error: e, stackTrace: st, category: 'CrossfadeManager');
+      rethrow;
+    } finally {
+      if (completer != null && !completer.isCompleted) completer.complete();
     }
   }
 
@@ -786,12 +796,15 @@ class CrossfadeManager {
   /// Disposes active timers and resources.
   void dispose() {
     _fadeId++;
-    // Clear any native gain curves on players before tearing down timers (M-04)
-    if (_outgoingWithArmedCurve != null) {
-      _clearNativeCurve(_outgoingWithArmedCurve!);
-      _outgoingWithArmedCurve = null;
-      _nativeCurveArmedOnOutgoing = false;
+    final players = {
+      ..._playersWithArmedCurves,
+      if (_outgoingWithArmedCurve != null) _outgoingWithArmedCurve!,
+    };
+    for (final player in players) {
+      _clearNativeCurve(player);
     }
+    _outgoingWithArmedCurve = null;
+    _nativeCurveArmedOnOutgoing = false;
     for (final t in _activeTimers) {
       t.cancel();
     }

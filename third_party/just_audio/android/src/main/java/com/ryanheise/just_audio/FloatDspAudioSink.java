@@ -31,21 +31,14 @@ import java.nio.ShortBuffer;
 @androidx.media3.common.util.UnstableApi
 final class FloatDspAudioSink extends ForwardingAudioSink {
     private static final String TAG = "FloatDspAudioSink";
-    // Hi-res truth probe: the decoded PCM encoding/rate/channels of the most
-    // recent configure, so playback code reports the REAL decoded depth instead
-    // of the requested one. FLAC via the libflac extension reports 24/32-bit
-    // here; a silent fallback to the platform FLAC decoder shows 16-bit. Read
-    // these statics from app code (e.g. a method-channel getter) or watch the
-    // TAG log line. (This covers the default float-DSP path; the AAudio-exclusive
-    // path replaces this sink and is not probed here.)
-    public static volatile int lastDecodedPcmEncoding = C.ENCODING_INVALID;
-    public static volatile int lastDecodedSampleRate = 0;
-    public static volatile int lastDecodedChannelCount = 0;
+    // Decoded input telemetry is session-scoped in PulsrAudioSink/PulsrOutputRouting.
     // Pre-sized so handleBuffer never allocates in steady state.
     private static final int PRESIZE_SAMPLES = 32768;
 
     private final NativeDspAudioProcessor processor;
     private final boolean forceFloatForPcm16;
+    private final boolean pcm16Boundary;
+    private ByteBuffer quantizedOutput;
     private boolean processFloat;
     private int inputEncoding;
     // Reusable conversion staging: direct float bytes + a reusable decode array.
@@ -63,6 +56,101 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private int lastSampleRate = -1;
     private int lastChannelCount = -1;
     private int lastPcmEncoding = C.ENCODING_INVALID;
+    private PcmFrameEditor frameEditor;
+    private Format lastInputFormat;
+    private Format configuredOutputFormat;
+    private int lastBufferSize;
+    private boolean eosQueued;
+    private Format deferredFormat;
+    private int deferredBufferSize;
+    private int[] deferredChannels;
+
+    /** Shared byte-preserving gapless editor; no conversion precedes the native tee. */
+    static final class PcmFrameEditor {
+        final int sampleBytes;
+        final int inputFrameBytes;
+        final int outputFrameBytes;
+        final int[] channels;
+        final boolean remapped;
+        final int initialDelayBytes;
+        int delayBytes;
+        byte[] tail;
+        int tailSize;
+        ByteBuffer staging;
+        byte[] nextTail;
+        int nextTailSize;
+        int nextDelay;
+        boolean started;
+
+        PcmFrameEditor(Format format, int[] mapping) {
+            sampleBytes = format.pcmEncoding == C.ENCODING_PCM_16BIT ? 2
+                    : format.pcmEncoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+            inputFrameBytes = sampleBytes * format.channelCount;
+            channels = mapping == null ? null : mapping.clone();
+            boolean changed = mapping != null && mapping.length != format.channelCount;
+            if (mapping != null) {
+                if (mapping.length == 0) throw new IllegalArgumentException("Empty channel map");
+                for (int i = 0; i < mapping.length; i++) {
+                    if (mapping[i] < 0 || mapping[i] >= format.channelCount)
+                        throw new IllegalArgumentException("Invalid channel map");
+                    changed |= mapping[i] != i;
+                }
+            }
+            remapped = changed;
+            outputFrameBytes = sampleBytes * (mapping == null ? format.channelCount : mapping.length);
+            initialDelayBytes = Math.multiplyExact(Math.max(0, format.encoderDelay), inputFrameBytes);
+            delayBytes = initialDelayBytes;
+            tail = new byte[Math.multiplyExact(Math.max(0, format.encoderPadding), inputFrameBytes)];
+            nextTail = new byte[tail.length];
+        }
+
+        boolean edits() { return delayBytes != 0 || tail.length != 0 || remapped; }
+
+        ByteBuffer prepare(ByteBuffer source) {
+            if (source.remaining() % inputFrameBytes != 0)
+                throw new IllegalArgumentException("Incomplete PCM frame");
+            if (!edits()) return source.duplicate().order(ByteOrder.nativeOrder());
+            int skipped = Math.min(delayBytes, source.remaining());
+            nextDelay = delayBytes - skipped;
+            int available = tailSize + source.remaining() - skipped;
+            int emitBytes = Math.max(0, available - tail.length);
+            int outputBytes = emitBytes / inputFrameBytes * outputFrameBytes;
+            if (staging == null || staging.capacity() < outputBytes)
+                staging = ByteBuffer.allocateDirect(Math.max(16384, outputBytes)).order(ByteOrder.nativeOrder());
+            staging.clear();
+            for (int f = 0; f < emitBytes; f += inputFrameBytes) {
+                int count = outputFrameBytes / sampleBytes;
+                for (int c = 0; c < count; c++) {
+                    int channel = channels == null ? c : channels[c];
+                    for (int b = 0; b < sampleBytes; b++)
+                        staging.put(byteAt(source, skipped, f + channel * sampleBytes + b));
+                }
+            }
+            nextTailSize = available - emitBytes;
+            for (int i = 0; i < nextTailSize; i++)
+                nextTail[i] = byteAt(source, skipped, emitBytes + i);
+            staging.flip();
+            return staging;
+        }
+
+        private byte byteAt(ByteBuffer source, int skipped, int index) {
+            return index < tailSize ? tail[index]
+                    : source.get(source.position() + skipped + index - tailSize);
+        }
+
+        void commit() {
+            if (!edits()) return;
+            started = true;
+            delayBytes = nextDelay;
+            byte[] old = tail;
+            tail = nextTail;
+            nextTail = old;
+            tailSize = nextTailSize;
+        }
+
+        void flush() { tailSize = 0; delayBytes = started ? 0 : initialDelayBytes; }
+        void endOfStream() { tailSize = 0; }
+    }
 
     FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor) {
         this(delegate, processor, true);
@@ -75,9 +163,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
      */
     FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor,
             boolean forceFloatForPcm16) {
+        this(delegate, processor, forceFloatForPcm16, false);
+    }
+
+    FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor,
+            boolean forceFloatForPcm16, boolean pcm16Boundary) {
         super(delegate);
         this.processor = processor;
         this.forceFloatForPcm16 = forceFloatForPcm16;
+        this.pcm16Boundary = pcm16Boundary;
         if (this.processor != null) {
             this.processor.setFloatOutput(true);
         }
@@ -104,15 +198,19 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     @Override
     public void configure(Format format, int bufferSize, int[] outputChannels)
             throws ConfigurationException {
+        if (pendingInput != null) {
+            deferredFormat = format;
+            deferredBufferSize = bufferSize;
+            deferredChannels = outputChannels == null ? null : outputChannels.clone();
+            return;
+        }
         final int encoding = format.pcmEncoding;
         final boolean sameInput = processFloat
                 && format.sampleRate == lastSampleRate
                 && format.channelCount == lastChannelCount
                 && encoding == lastPcmEncoding;
         inputEncoding = encoding;
-        lastDecodedPcmEncoding = encoding;
-        lastDecodedSampleRate = format.sampleRate;
-        lastDecodedChannelCount = format.channelCount;
+        // Telemetry is owned by PulsrAudioSink per player, not last configure globals.
         Log.i(TAG, "decoded PCM " + pcmEncodingName(encoding)
                 + " @ " + format.sampleRate + " Hz, " + format.channelCount + "ch");
 
@@ -122,6 +220,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 || encoding == C.ENCODING_PCM_32BIT;
         final boolean bypass16 = !forceFloatForPcm16 && encoding == C.ENCODING_PCM_16BIT;
         if (processor == null || !supported || bypass16) {
+            frameEditor = null;
+            lastInputFormat = format;
             if (processor != null && !supported) {
                 Log.w(TAG, "Unsupported PCM encoding " + encoding
                         + "; native DSP bypassed for this format");
@@ -134,12 +234,25 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             return;
         }
 
+        try {
+            // An identical configure during a partial write is negotiation, not
+            // a new stream: keep its tail and declared trimming state.
+            if (pendingInput == null || frameEditor == null) {
+                frameEditor = new PcmFrameEditor(format, outputChannels);
+            }
+        } catch (IllegalArgumentException | ArithmeticException e) {
+            throw new ConfigurationException(e, format);
+        }
+        lastInputFormat = format;
+        lastBufferSize = bufferSize;
+        eosQueued = false;
+        final int mappedChannels = outputChannels == null ? format.channelCount : outputChannels.length;
         final AudioProcessor.AudioFormat output;
         try {
             // Re-evaluate even on identical decoded input: the SRC target or
             // native bit-perfect policy may have changed since the last track.
             output = processor.configure(new AudioProcessor.AudioFormat(
-                    format.sampleRate, format.channelCount, C.ENCODING_PCM_FLOAT));
+                    format.sampleRate, mappedChannels, C.ENCODING_PCM_FLOAT));
         } catch (AudioProcessor.UnhandledAudioFormatException e) {
             throw new ConfigurationException(e, format);
         }
@@ -162,30 +275,49 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 Log.w(TAG, "int32 PCM converted to float32 (24 significant bits); not bit-perfect");
             }
         }
-        super.configure(active ? format.buildUpon()
-                .setSampleRate(output.sampleRate)
-                .setChannelCount(output.channelCount)
-                .setPcmEncoding(output.encoding).build() : format, bufferSize, outputChannels);
+        try {
+            configuredOutputFormat = format.buildUpon()
+                    .setSampleRate(active ? output.sampleRate : format.sampleRate)
+                    .setChannelCount(active ? output.channelCount : mappedChannels)
+                    .setPcmEncoding(pcm16Boundary ? C.ENCODING_PCM_16BIT : (active ? output.encoding : encoding))
+                    .setEncoderDelay(0).setEncoderPadding(0).build();
+            super.configure(configuredOutputFormat, bufferSize, null);
+        } catch (RuntimeException e) {
+            throw new ConfigurationException(e, format);
+        }
     }
 
     @Override
     public boolean handleBuffer(ByteBuffer input, long presentationTimeUs, int accessUnits)
             throws InitializationException, WriteException {
         if (!input.hasRemaining()) return true;
-        if (!processFloat || processor == null) {
+        if ((!processFloat || processor == null) && frameEditor == null) {
             return super.handleBuffer(input, presentationTimeUs, accessUnits);
         }
         if (pendingOutput == null) {
-            ByteBuffer pcm = input.duplicate().order(ByteOrder.nativeOrder());
-            if (inputEncoding != C.ENCODING_PCM_FLOAT) {
-                pcm = convertToFloat(pcm);
-            }
-            final int pcmStart = pcm.position();
-            processor.queueInput(pcm);
+            final boolean edited = frameEditor != null && frameEditor.edits();
+            ByteBuffer original = frameEditor == null ? input.duplicate().order(ByteOrder.nativeOrder())
+                    : frameEditor.prepare(input);
+            ByteBuffer pcm = original.duplicate().order(ByteOrder.nativeOrder());
             final int sampleBytes = inputEncoding == C.ENCODING_PCM_16BIT ? 2
                     : inputEncoding == C.ENCODING_PCM_24BIT ? 3 : 4;
-            pendingInputEnd = input.position() + (pcm.position() - pcmStart) / 4 * sampleBytes;
-            pendingOutput = processor.getOutput();
+            if (processFloat && processor != null) {
+                if (inputEncoding != C.ENCODING_PCM_FLOAT) pcm = convertToFloat(pcm);
+                final int pcmStart = pcm.position();
+                if (inputEncoding == C.ENCODING_PCM_FLOAT || (frameEditor != null && frameEditor.remapped)) {
+                    processor.queueInput(pcm);
+                } else {
+                    // Capture BEFORE conversion; packed conversion advances only its own view.
+                    processor.queueInput(pcm, original, sampleBytes * 8, lastInputFormat.sampleRate);
+                }
+                pendingInputEnd = edited ? input.limit()
+                        : input.position() + (pcm.position() - pcmStart) / 4 * sampleBytes;
+                pendingOutput = boundaryOutput(processor.getOutput(), processorOutputFormat.encoding);
+            } else {
+                pendingInputEnd = input.limit();
+                pendingOutput = boundaryOutput(pcm, inputEncoding);
+            }
+            if (edited) frameEditor.commit();
             pendingInput = input;
             pendingPresentationTimeUs = presentationTimeUs;
             pendingAccessUnits = accessUnits;
@@ -199,7 +331,153 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         input.position(pendingInputEnd);
         pendingOutput = null;
         pendingInput = null;
+        try {
+            applyDeferredConfiguration();
+        } catch (ConfigurationException e) {
+            throw new InitializationException(0, lastInputFormat.sampleRate, lastInputFormat.channelCount,
+                    lastInputFormat.pcmEncoding, lastInputFormat.pcmEncoding, lastInputFormat, false, e);
+        }
         return !input.hasRemaining();
+    }
+
+    private void applyDeferredConfiguration() throws ConfigurationException {
+        if (deferredFormat == null) return;
+        Format next = deferredFormat;
+        int[] channels = deferredChannels;
+        deferredFormat = null;
+        PcmFrameEditor previous = frameEditor;
+        Format previousFormat = lastInputFormat;
+        configure(next, deferredBufferSize, channels);
+        if (previous != null && next.equals(previousFormat)
+                && java.util.Arrays.equals(previous.channels, channels)) frameEditor = previous;
+    }
+
+    /** Quantize once, after DSP, never by dropping packed integer low bytes. */
+    private ByteBuffer boundaryOutput(ByteBuffer output, int encoding) {
+        if (!pcm16Boundary || encoding == C.ENCODING_PCM_16BIT) return output;
+        int bytes = encoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+        int samples = output.remaining() / bytes;
+        if (quantizedOutput == null || quantizedOutput.capacity() < samples * 2)
+            quantizedOutput = ByteBuffer.allocateDirect(Math.max(16384, samples * 2)).order(ByteOrder.nativeOrder());
+        quantizedOutput.clear();
+        ByteBuffer input = output.duplicate().order(ByteOrder.nativeOrder());
+        for (int i = 0; i < samples; i++) {
+            if (encoding == C.ENCODING_PCM_FLOAT) {
+                quantizedOutput.putShort(Pcm16Quantizer.fromFloat(input.getFloat()));
+            } else {
+                int code;
+                if (bytes == 3) {
+                    code = (input.get() & 0xff) | ((input.get() & 0xff) << 8) | (input.get() << 16);
+                } else {
+                    code = input.getInt();
+                }
+                double scaled = code / (bytes == 3 ? 256.0 : 65536.0);
+                double dither = 0;
+                if (scaled != Math.rint(scaled)) {
+                    java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+                    dither = rng.nextDouble() - rng.nextDouble();
+                }
+                long quantized = Math.round(scaled + dither);
+                quantizedOutput.putShort((short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, quantized)));
+            }
+        }
+        quantizedOutput.flip();
+        return quantizedOutput;
+    }
+
+    void acceptPreparedPcm(ByteBuffer pcm, int encoding, ByteBuffer input, int inputEnd,
+            long timeUs, int units, PcmFrameEditor editor) {
+        frameEditor = editor;
+        if (pcm == null) return;
+        ByteBuffer view = pcm.duplicate().order(ByteOrder.nativeOrder());
+        if (processFloat && processor != null) {
+            if (encoding == C.ENCODING_PCM_FLOAT) {
+                processor.queueInput(view);
+            } else {
+                int previousEncoding = inputEncoding;
+                inputEncoding = encoding;
+                ByteBuffer floats = convertToFloat(view.duplicate().order(ByteOrder.nativeOrder()));
+                inputEncoding = previousEncoding;
+                processor.queueInput(floats, view, editor.sampleBytes * 8, lastInputFormat.sampleRate);
+            }
+            pendingOutput = boundaryOutput(processor.getOutput(), processorOutputFormat.encoding);
+        } else {
+            pendingOutput = boundaryOutput(view, encoding);
+        }
+        pendingInput = input;
+        pendingInputEnd = inputEnd;
+        pendingPresentationTimeUs = timeUs;
+        pendingAccessUnits = units;
+    }
+
+    boolean hasStagedInput() { return pendingInput != null; }
+    PcmFrameEditor frameEditor() { return frameEditor; }
+
+    /** Configure the track for already-processed bytes, not the queued source. */
+    void configurePendingReplacement(FloatDspAudioSink target) throws ConfigurationException {
+        target.configure(lastInputFormat, lastBufferSize, frameEditor.channels);
+        if (target.configuredOutputFormat.sampleRate != configuredOutputFormat.sampleRate
+                || target.configuredOutputFormat.channelCount != configuredOutputFormat.channelCount) {
+            // A new route/SRC target affects future input only. Its old-rate tail
+            // must still reach the replacement track at the rate it was produced.
+            target.deferredFormat = lastInputFormat;
+            target.deferredBufferSize = lastBufferSize;
+            target.deferredChannels = frameEditor.channels;
+            target.configurePendingTrack(configuredOutputFormat);
+        }
+    }
+
+    private void configurePendingTrack(Format pendingFormat) throws ConfigurationException {
+        configuredOutputFormat = configuredOutputFormat.buildUpon()
+                .setSampleRate(pendingFormat.sampleRate)
+                .setChannelCount(pendingFormat.channelCount).build();
+        super.configure(configuredOutputFormat, lastBufferSize, null);
+    }
+
+    void transferPendingTo(FloatDspAudioSink target) {
+        if (deferredFormat != null) {
+            target.deferredFormat = deferredFormat;
+            target.deferredBufferSize = deferredBufferSize;
+            target.deferredChannels = deferredChannels;
+            deferredFormat = null;
+            deferredChannels = null;
+        }
+        target.pendingOutput = pendingOutput == null ? null : target.boundaryOutput(pendingOutput,
+                pcm16Boundary ? C.ENCODING_PCM_16BIT
+                        : (processFloat ? processorOutputFormat.encoding : inputEncoding));
+        target.pendingInput = pendingInput;
+        target.pendingInputEnd = pendingInputEnd;
+        target.pendingPresentationTimeUs = pendingPresentationTimeUs;
+        target.pendingAccessUnits = pendingAccessUnits;
+        target.frameEditor = frameEditor;
+        pendingOutput = null;
+        pendingInput = null;
+    }
+
+    @Override
+    public void pause() {
+        if (processor != null) processor.releaseUsbProducer();
+        super.pause();
+    }
+
+    @Override
+    public void playToEndOfStream() throws WriteException {
+        // Last declared padding is intentionally discarded, not emitted as music.
+        if (!eosQueued && frameEditor != null) frameEditor.endOfStream();
+        eosQueued = true;
+        if (pendingOutput != null && pendingOutput.hasRemaining()) {
+            try {
+                if (!super.handleBuffer(pendingOutput, pendingPresentationTimeUs, pendingAccessUnits)) return;
+            } catch (InitializationException e) {
+                WriteException failure = new WriteException(-1, lastInputFormat, true);
+                failure.initCause(e);
+                throw failure;
+            }
+            if (pendingInput != null) pendingInput.position(pendingInputEnd);
+            pendingOutput = null;
+            pendingInput = null;
+        }
+        super.playToEndOfStream();
     }
 
     @Override
@@ -214,8 +492,12 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     @Override
     public void flush() {
+        eosQueued = false;
+        if (frameEditor != null) frameEditor.flush();
         pendingOutput = null;
         pendingInput = null;
+        try { applyDeferredConfiguration(); }
+        catch (ConfigurationException e) { throw new IllegalStateException("Deferred PCM configuration failed", e); }
         if (processFloat && processor != null) {
             processor.flush();
             // Seek/discontinuity: clear the native engine state (filter history,
@@ -228,6 +510,13 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     @Override
     public void reset() {
+        frameEditor = null;
+        deferredFormat = null;
+        deferredChannels = null;
+        quantizedOutput = null;
+        lastInputFormat = null;
+        eosQueued = false;
+        if (processor != null) processor.releaseUsbProducer();
         pendingOutput = null;
         pendingInput = null;
         converted = null;

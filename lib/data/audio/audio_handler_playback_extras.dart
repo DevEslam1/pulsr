@@ -231,7 +231,7 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   Future<void> setSilenceSkipSensitivity(int v) async {
     silenceSkipController.setSensitivity(v);
     final enabled = silenceSkipController.enabled &&
-        !await _isBitPerfectBypassActivePrefs(_cachedPrefs);
+        !await playbackRateMustRemainUnity();
     try {
       await _playerA.setSkipSilenceEnabled(enabled);
       await _playerB.setSkipSilenceEnabled(enabled);
@@ -261,6 +261,7 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   AudioPlayer get _activePlayer;
 
   SharedPreferences? get _cachedPrefs;
+  Future<bool> playbackRateMustRemainUnity();
 
   CrossfadeManager get _crossfadeManager;
 

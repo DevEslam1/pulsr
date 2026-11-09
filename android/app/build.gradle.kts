@@ -195,7 +195,7 @@ dependencies {
     testImplementation("org.mockito:mockito-core:5.14.2")
     // The vendored just_audio plugin exposes Media3 only through its AAR, so
     // these Java lifecycle tests need the ExoPlayer API on the test classpath.
-    testImplementation("androidx.media3:media3-exoplayer:1.4.1")
+    testImplementation("androidx.media3:media3-exoplayer:1.9.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:rules:1.6.1")

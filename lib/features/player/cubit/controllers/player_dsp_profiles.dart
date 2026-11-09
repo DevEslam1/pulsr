@@ -4,6 +4,8 @@ part of 'player_dsp_controller.dart';
 extension PlayerDspProfilesExtension on PlayerDspController {
   Future<void> onOutputDeviceChanged(AudioOutputInfo device) async {
     if (_isClosed()) return;
+    final song = _getState().currentSong;
+    if (song != null) unawaited(maybeFollowTrackSampleRate(song));
     // Route-aware DSP that must track EVERY device/codec change, independent of
     // the device-profile auto-switch services below (fix #1 crossfeed gating +
     // fix #2 codec-aware music compensation). Runs before the dedup/early

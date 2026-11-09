@@ -35,7 +35,7 @@ final class Pcm16Quantizer {
         if (!Float.isFinite(value)) return 0;
         final double scaled = (double) value * 32768.0;
         final double dither;
-        if (Math.abs(scaled - Math.rint(scaled)) < 1e-4) {
+        if (scaled == Math.rint(scaled)) {
             // Already quantised by the native 16-bit noise-shaped dither stage;
             // do not add a second layer of TPDF dither.
             dither = 0.0;

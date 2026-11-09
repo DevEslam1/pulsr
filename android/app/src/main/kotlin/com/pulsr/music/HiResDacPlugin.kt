@@ -34,6 +34,13 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         private const val EVENT_CHANNEL = "com.pulsr.music/hires_dac_events"
         private const val REQUEST_CODE_BT_CONNECT = 9876
 
+        internal fun clearMixerOwnership(clear: () -> Any?, release: () -> Unit): Boolean {
+            val confirmed = try { clear() == true } catch (_: Throwable) { false }
+            if (!confirmed) return false
+            release()
+            return true
+        }
+
         /** Settings.Panel.ACTION_MEDIA_OUTPUT — the system media output switcher. */
         private const val ACTION_MEDIA_OUTPUT = "android.settings.panel.action.MEDIA_OUTPUT"
 
@@ -315,14 +322,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "setBitPerfectMode" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 val success = applyBitPerfectMode(enabled)
-                bitPerfectRequested = enabled && success && !directRouteFallbackActive
+                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
                 notifyDeviceChange()
                 result.success(success)
             }
             "setBitPerfectModeDetailed" -> {
                 val enabled = call.argument<Boolean>("enabled") ?: false
                 val success = applyBitPerfectMode(enabled)
-                bitPerfectRequested = enabled && success && !directRouteFallbackActive
+                if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
                 notifyDeviceChange()
                 result.success(mapOf("success" to success, "reason" to lastBitPerfectReason))
             }
@@ -673,7 +680,15 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private fun getConnectedA2dpDevice(): BluetoothDevice? {
         // 1. Try the fast path via A2DP profile proxy
         try {
-            val fromProxy = bluetoothA2dp?.connectedDevices?.firstOrNull()
+            val outputs = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                ?: return null
+            val routed = resolveCurrentRouteDevice(outputs)
+                ?.takeIf { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
+                ?: return null
+            val address = if (Build.VERSION.SDK_INT >= 28) routed.address else null
+            if (address.isNullOrBlank()) return null
+            val fromProxy = bluetoothA2dp?.connectedDevices
+                ?.firstOrNull { it.address == address }
             if (fromProxy != null) return fromProxy
         } catch (e: SecurityException) {
             Log.w(TAG, "BLUETOOTH_CONNECT permission missing — falling back to AudioManager: ${e.message}")
@@ -682,9 +697,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // 2. Fallback: AudioManager knows which A2DP device is routed; match it in
         //    bondedDevices (no BLUETOOTH_CONNECT needed to read bonded list on API < 31).
         return try {
-            val a2dpAudioDev = audioManager
-                ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                ?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
+            val outputs = audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                ?: return null
+            val a2dpAudioDev = resolveCurrentRouteDevice(outputs)
+                ?.takeIf { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
                 ?: return null
             // AudioDeviceInfo.address is API 28+
             val devAddress: String? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -996,7 +1012,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             mainHandler.postDelayed({
                 try { notifyDeviceChange() } catch (_: Exception) {}
             }, 600)
-            true
+            // A successful dispatch may negotiate asynchronously or fall back.
+            // Return true only for a current readback on the routed headset.
+            val actualStatus = getCodecStatusMethod.invoke(a2dp, device) ?: return false
+            val actual = getCodecConfigMethod.invoke(actualStatus)
+                as? BluetoothCodecConfig ?: return false
+            getConnectedA2dpDevice()?.address == device.address &&
+                actual.codecType == targetCodecType &&
+                actual.sampleRate == targetSampleRate &&
+                actual.bitsPerSample == targetBits &&
+                codecBitsToDepth(actual.bitsPerSample) != null
         } catch (e: Exception) {
             Log.w(TAG, "setBluetoothCodecPreference failed: ${e.message}")
             false
@@ -1278,7 +1303,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             val match = pool.firstOrNull { attr ->
                 val fmt = mixerAttrFormat(attr) ?: return@firstOrNull false
                 (targetSampleRate <= 0 || fmt.sampleRate == targetSampleRate) &&
-                    (targetBitDepth <= 0 || encodingBitDepth(fmt.encoding) == targetBitDepth)
+                    (targetBitDepth <= 0 ||
+                        (encodingBitDepth(fmt.encoding) >= targetBitDepth &&
+                            (fmt.encoding != AudioFormat.ENCODING_PCM_FLOAT || targetBitDepth <= 24)))
             }
             if (match != null) {
                 lastBitPerfectReason = null
@@ -1295,7 +1322,6 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     private fun applyBitPerfectMode(enabled: Boolean): Boolean {
         lastBitPerfectReason = null
-        bitPerfectRequested = false
         if (audioManager == null) {
             lastBitPerfectReason = "audio_manager_unavailable"
             return false
@@ -1309,21 +1335,23 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         if (!enabled) {
             val clearTarget = trackedUsb ?: usbDevice
-            if (mixerAttributesApplied && clearTarget != null && Build.VERSION.SDK_INT >= 34) {
-                try {
-                    var clearM = cachedClearMixerMethod
-                    if (clearM == null) {
-                        clearM = AudioManager::class.java.getMethod("clearPreferredMixerAttributes", AudioAttributes::class.java, AudioDeviceInfo::class.java)
-                        cachedClearMixerMethod = clearM
-                    }
+            val confirmed = clearMixerOwnership(clear = {
+                if (!mixerAttributesApplied) true
+                else if (clearTarget == null || Build.VERSION.SDK_INT < 34) false
+                else {
+                    val clearM = cachedClearMixerMethod ?: AudioManager::class.java.getMethod(
+                        "clearPreferredMixerAttributes", AudioAttributes::class.java,
+                        AudioDeviceInfo::class.java).also { cachedClearMixerMethod = it }
                     clearM.invoke(audioManager, mediaAttributes, clearTarget)
-                } catch (_: Throwable) {}
-            }
-            mixerAttributesApplied = false
-            bitPerfectRequested = false
-            directRouteFallbackActive = false
-            bitPerfectUsbDeviceId = null
-            return true
+                }
+            }, release = {
+                mixerAttributesApplied = false
+                bitPerfectRequested = false
+                directRouteFallbackActive = false
+                bitPerfectUsbDeviceId = null
+            })
+            if (!confirmed) lastBitPerfectReason = "clear_mixer_attributes_failed"
+            return confirmed
         }
 
         // Only the active route may be made exclusive. A DAC that is merely
@@ -1488,15 +1516,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // DSD512 is decoded to 768 kHz PCM natively; there is no standard
         // 1411.2 kHz DoP carrier, so this flag describes the PCM output path.
         val hasDsd512Pcm = rates.contains(768000)
-        val prefs = context.getSharedPreferences("pulsr_dac_prefs", Context.MODE_PRIVATE)
-        val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            usbDac.address.takeIf { it.isNotBlank() } ?: "default"
-        } else {
-            "default"
-        }
-        val devKey = "${usbDac.productName ?: "usb_dac"}_$address"
-        val explicitlyVerified = prefs.getBoolean("dop_verified_$devKey", false)
-        val dopVerified = explicitlyVerified || (isUac2 && (hasDsd64Carrier || hasDsd128Carrier || hasDsd256Carrier))
+        // Advertised carriers and UAC version are heuristics, not a measured
+        // DAC DoP lock. Ignore legacy persisted heuristic 'verified' flags.
+        val dopVerified = false
 
         return mapOf(
             "dsd64" to hasDsd64Carrier,
@@ -1524,18 +1546,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val isUac2 = (uac == UsbDacDiagnostics.UAC2 || uac == UsbDacDiagnostics.UAC3)
         val rates = usbDac.sampleRates.toSet()
         val hasCarrier = rates.contains(176400) || rates.contains(352800) || rates.contains(705600)
-        val verified = isUac2 && hasCarrier
-        val prefs = context.getSharedPreferences("pulsr_dac_prefs", Context.MODE_PRIVATE)
-        val address = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            usbDac.address.takeIf { it.isNotBlank() } ?: "default"
-        } else {
-            "default"
-        }
-        val devKey = "${usbDac.productName ?: "usb_dac"}_$address"
-        prefs.edit().putBoolean("dop_verified_$devKey", verified).apply()
         return mapOf(
-            "success" to verified,
-            "dopVerified" to verified,
+            "success" to false,
+            "dopVerified" to false,
+            "carrierAdvertised" to (isUac2 && hasCarrier),
+            "reason" to "dop_lock_not_measured",
             "isUac2" to isUac2,
             "hasCarrier" to hasCarrier,
             "deviceName" to (usbDac.productName ?: "USB DAC"),
@@ -1692,9 +1707,13 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             decodedDepth in 16..24
         val reportedDepth = if (floatCarriesDecoded) decodedDepth else sinkDepth
         val mixerActive = isUsb && !isBluetooth && isBitPerfectActive &&
+            stream[1] > 0 && sinkDepth > 0 &&
             (activeMixerRate == 0 || stream[1] == activeMixerRate) &&
             (activeMixerEncoding == 0 ||
-                reportedDepth == encodingBitDepth(activeMixerEncoding))
+                (stream[2] == activeMixerEncoding && sinkDepth >= reportedDepth) ||
+                (activeMixerEncoding != AudioFormat.ENCODING_PCM_FLOAT &&
+                    stream[2] != AudioFormat.ENCODING_PCM_FLOAT &&
+                    encodingBitDepth(activeMixerEncoding) >= sinkDepth))
         // Confirmed only when the sink itself is alive AND still owns the
         // endpoint it opened: a boolean alone could outlive a device unplug.
         val directStream = UsbExclusivePlugin.confirmedDirectStream()
@@ -1719,7 +1738,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // DAC truly receives the confirmed stream format; otherwise the only
         // readable truth is the mixer attributes/AHAL rate the platform opened.
         result["sampleRate"] = directStream?.sampleRate ?: stream[1]
+        // Compatibility property: Android's primary-output hint, never a
+        // route-specific measurement. Consumers must use live sampleRate.
         result["nativeSampleRate"] = nativeSampleRate
+        result["nativeSampleRateMeasured"] = false
         result["nativeFramesPerBuffer"] = nativeFrames
         result["bitDepth"] = directStream?.bitDepth ?: reportedDepth
         result["outputChannels"] = directStream?.channels ?: 0

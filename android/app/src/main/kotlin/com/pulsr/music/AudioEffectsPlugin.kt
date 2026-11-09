@@ -212,6 +212,58 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var _oemWarningLogged = false
     @Volatile private var isBitPerfectBypassActive = false
     @Volatile private var bypassSavedStages: Int? = null
+    private var bitPerfectSpatializerOwned = false
+    private var systemEffectsPolicy = "auto"
+
+    /** Only touch app-owned HAL effects; the global Spatializer follows the
+     * user's system policy and is restored only if we actually disabled it. */
+    private fun reconcileBitPerfectHal(bypass: Boolean): Boolean {
+        var complete = true
+        fun update(effect: AudioEffect?, enabled: Boolean) {
+            if (effect == null) return
+            try {
+                effect.enabled = enabled
+                if (effect.enabled != enabled) complete = false
+            } catch (_: Throwable) { complete = false }
+        }
+        if (bypass) {
+            update(legacyEqualizer, false)
+            update(virtualizer, false)
+            update(loudnessEnhancer, false)
+            update(bassBoost, false)
+            update(dynamicsProcessing, false)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
+            try {
+                val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                val spatializer = am?.spatializer
+                if (spatializer != null && spatializer.isAvailable) {
+                    if (bypass && spatializer.isEnabled) {
+                        if (systemEffectsPolicy == "leaveOn") {
+                            complete = false
+                        } else {
+                            spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
+                                .invoke(spatializer, false)
+                            if (spatializer.isEnabled) complete = false
+                            else bitPerfectSpatializerOwned = true
+                        }
+                    } else if (!bypass && bitPerfectSpatializerOwned) {
+                        if (!spatializer.isEnabled) {
+                            spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
+                                .invoke(spatializer, true)
+                        }
+                        if (spatializer.isEnabled) bitPerfectSpatializerOwned = false
+                        else complete = false
+                    }
+                }
+            } catch (_: Throwable) { complete = false }
+        }
+        val external = systemAudioEffectsController?.applyPolicy(systemEffectsPolicy, bypass)
+        if (bypass && external != null && external !in listOf(
+                SystemAudioEffectsController.Status.BYPASSED,
+                SystemAudioEffectsController.Status.UNSUPPORTED_DEVICE)) complete = false
+        return complete
+    }
     // Dither / bit-perfect snapshot state (mirrors DspParams.h defaults).
     // Default depth is 16: the native PCM sink is 16-bit, so that is the only
     // depth the always-on path can actually honour. Must match DspParams.h and
@@ -3364,6 +3416,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setSystemEffectsPolicy" -> {
                     val policy = call.argument<String>("policy") ?: "auto"
+                    systemEffectsPolicy = policy
                     val isHiResOrBitPerfect = call.argument<Boolean>("isHiResOrBitPerfect") ?: isBitPerfectBypassActive
                     val controller = systemAudioEffectsController ?: context?.let { SystemAudioEffectsController(it) }
                     val status = controller?.applyPolicy(policy, isHiResOrBitPerfect) ?: SystemAudioEffectsController.Status.UNSUPPORTED_DEVICE
@@ -3609,7 +3662,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                     }
-                    result.success(true)
+                    // Retry cleanup even on repeated bypass requests. Never
+                    // advertise success while a HAL/global stage still runs.
+                    result.success(if (reconcileBitPerfectHal(bypass)) true
+                        else notApplied("Bit-perfect HAL/system effect cleanup incomplete"))
                 }
 
                 "setDitherParams" -> {
@@ -4559,7 +4615,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun updateLegacyEqualizer() {
         val halEqSuppressed = isHalEqSuppressed()
-        if (!isEqEnabled || halEqSuppressed || currentAudioSessionId == 0 || dynamicsProcessing != null) {
+        if (isBitPerfectBypassActive || !isEqEnabled || halEqSuppressed || currentAudioSessionId == 0 || dynamicsProcessing != null) {
             try { legacyEqualizer?.enabled = false } catch (_: Exception) {}
             if (dynamicsProcessing != null || halEqSuppressed) {
                 try { legacyEqualizer?.release() } catch (_: Exception) {}

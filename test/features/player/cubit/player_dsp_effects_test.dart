@@ -1,5 +1,9 @@
 // Coverage for the uncovered branches of player_dsp_effects.dart.
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/channels.dart';
+import 'package:pulsr/data/services/hires_audio_service.dart';
+import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/comparison_slot.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
@@ -9,6 +13,8 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 
 import '../player_test_support.dart';
+
+class _FollowHiRes extends Mock implements HiResAudioService {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +39,91 @@ void main() {
     when(() => settings.state).thenReturn(const SettingsState());
     state = const PlayerState();
     controller = buildController();
+  });
+
+  group('follow-format regression', () {
+    late _FollowHiRes hires;
+    setUp(() {
+      hires = _FollowHiRes();
+      when(() => hires.outputDeviceStream)
+          .thenAnswer((_) => const Stream.empty());
+      controller.dispose();
+      controller = PlayerDspController(
+          audioHandler: handler,
+          settingsCubit: settings,
+          hiResAudioService: hires,
+          getState: () => state,
+          emit: (s) => state = s,
+          syncAudioEffects: () {},
+          isClosed: () => false);
+    });
+    tearDown(() => controller.dispose());
+    test('same rate/depth new codec validates before format dedup', () async {
+      const output = AudioOutputInfo(
+          deviceName: 'DAC',
+          isUsbDac: true,
+          sampleRate: 48000,
+          bitDepth: 24,
+          supportedSampleRates: [48000],
+          isBitPerfectActive: true);
+      when(() => settings.state).thenReturn(const SettingsState(
+          bitPerfectOutput: true,
+          followTrackSampleRate: true,
+          outputFormatNegotiationEnabled: true,
+          currentOutputDevice: output));
+      when(() => settings.bitPerfectViaDirectStream).thenReturn(false);
+      final good =
+          buildSong(1, path: '/music/a.flac', sampleRate: 48000, bitDepth: 24);
+      final unknown =
+          buildSong(2, path: '/music/b.m4a', sampleRate: 48000, bitDepth: 24);
+      when(() => settings.validateBitPerfectTrackSource(good))
+          .thenAnswer((_) async => true);
+      when(() => settings.validateBitPerfectTrackSource(unknown))
+          .thenAnswer((_) async => false);
+      when(() => settings.setBitPerfectTrackFormat(
+          sampleRate: 48000, bitDepth: 24)).thenAnswer((_) async => true);
+      when(() => settings.refreshOutputDevice()).thenAnswer((_) async {});
+      const usb = MethodChannel(PulsrChannels.usbExclusive);
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(usb, (_) async => {'channels': 2});
+      addTearDown(() => messenger.setMockMethodCallHandler(usb, null));
+      await controller.maybeFollowTrackSampleRate(good);
+      await controller.maybeFollowTrackSampleRate(unknown);
+      verify(() => settings.validateBitPerfectTrackSource(unknown)).called(1);
+      verify(() => settings.setBitPerfectTrackFormat(
+          sampleRate: 48000, bitDepth: 24)).called(1);
+    });
+    test('Bluetooth follow off dispatches nothing; unconfirmed requests retry',
+        () async {
+      const output = AudioOutputInfo(
+          deviceName: 'Buds',
+          isUsbDac: false,
+          sampleRate: 48000,
+          bitDepth: 24,
+          isBitPerfectActive: false,
+          isBluetooth: true,
+          btCodecName: 'LDAC',
+          btSampleRateHz: 48000,
+          btBitDepth: 24,
+          btSelectableSampleRates: [48000, 96000]);
+      var current = const SettingsState(
+          bluetoothHiResEnabled: true,
+          outputFormatNegotiationEnabled: true,
+          followTrackSampleRate: false,
+          currentOutputDevice: output);
+      when(() => settings.state).thenAnswer((_) => current);
+      when(() => settings.refreshOutputDevice()).thenAnswer((_) async {});
+      when(() => hires.setBluetoothSampleRate(96000))
+          .thenAnswer((_) async => true);
+      final song = buildSong(1, sampleRate: 96000, bitDepth: 24);
+      await controller.maybeFollowTrackSampleRate(song);
+      verifyNever(() => hires.setBluetoothSampleRate(96000));
+      current = current.copyWith(followTrackSampleRate: true);
+      await controller.maybeFollowTrackSampleRate(song);
+      await controller.maybeFollowTrackSampleRate(song);
+      verify(() => hires.setBluetoothSampleRate(96000)).called(2);
+    });
   });
 
   group('PlayerDspEffects gain staging', () {

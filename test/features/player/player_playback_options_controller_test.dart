@@ -5,6 +5,7 @@
 // memory, overlay toggles, sleep-timer and volume delegation.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/per_song_eq_store.dart';
 import 'package:pulsr/data/audio/per_song_playback_store.dart';
@@ -18,7 +19,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'player_test_support.dart';
 
-class _MockAudioHandler extends Mock implements PulsrAudioHandler {}
+class _MockAudioHandler extends Mock implements PulsrAudioHandler {
+  _MockAudioHandler() {
+    stubPlaybackRateHandler(this);
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -64,7 +69,6 @@ void main() {
     final handler = _MockAudioHandler();
     when(() => handler.minPlaybackSpeed).thenReturn(0.5);
     when(() => handler.maxPlaybackSpeed).thenReturn(3.0);
-    when(() => handler.setSpeed(any())).thenAnswer((_) async {});
 
     final store = PerSongPlaybackStore();
     var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(1)));
@@ -78,7 +82,12 @@ void main() {
     await controller.setPlaybackSpeed(9.0);
     expect(state.playbackSpeed, 3.0);
     expect(store.getSpeed('1'), closeTo(3.0, 1e-9));
+    expect(
+        (await SharedPreferences.getInstance())
+            .getDouble(PrefsKeys.playbackSpeed),
+        3.0);
     verify(() => handler.setSpeed(3.0)).called(1);
+    verify(() => handler.playbackRateMustRemainUnity()).called(1);
 
     // No current song still changes speed but skips memory persistence.
     final noSong = make(
@@ -130,7 +139,6 @@ void main() {
 
   test('setPlaybackPitch persists and rolls back on failure', () async {
     final handler = _MockAudioHandler();
-    when(() => handler.setPitch(any())).thenAnswer((_) async {});
 
     final store = PerSongPlaybackStore();
     var state = PlayerState(playback: PlaybackSlice(currentSong: buildSong(2)));
@@ -140,10 +148,95 @@ void main() {
     await controller.setPlaybackPitch(1.4);
     expect(state.playbackPitch, 1.4);
     expect(store.getPitch('2'), closeTo(1.4, 1e-9));
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getDouble(PrefsKeys.playbackPitch), 1.4);
+    verify(() => handler.playbackRateMustRemainUnity()).called(1);
 
     when(() => handler.setPitch(any())).thenThrow(Exception('boom'));
     await controller.setPlaybackPitch(0.6);
+    expect(state.playbackPitch, 1.4);
+    expect(store.getPitch('2'), 1.4);
+    expect(prefs.getDouble(PrefsKeys.playbackPitch), 1.4);
     expect(state.playback.errorMessage, 'Pitch change failed');
+  });
+
+  test('rate changes report observed values without saving unapplied requests',
+      () async {
+    final handler = _MockAudioHandler();
+    when(() => handler.minPlaybackSpeed).thenReturn(0.5);
+    when(() => handler.maxPlaybackSpeed).thenReturn(3.0);
+    when(() => handler.setSpeed(any())).thenAnswer((_) async {
+      handler.playbackState
+          .add(handler.playbackState.value.copyWith(speed: 1.1));
+    });
+    when(() => handler.setPitch(any())).thenAnswer((_) async {});
+    when(() => handler.pitch).thenReturn(1.05);
+
+    final store = PerSongPlaybackStore();
+    var state =
+        PlayerState(playback: PlaybackSlice(currentSong: buildSong(14)));
+    final controller = make(handler,
+        getState: () => state, emit: (s) => state = s, playbackStore: store);
+
+    await controller.setPlaybackSpeed(1.5);
+    await controller.setPlaybackPitch(1.4);
+
+    expect(state.playbackSpeed, 1.1);
+    expect(state.playbackPitch, 1.05);
+    expect(state.errorMessage, isNull);
+    expect(store.getSpeed('14'), isNull);
+    expect(store.getPitch('14'), isNull);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getDouble(PrefsKeys.playbackSpeed), isNull);
+    expect(prefs.getDouble(PrefsKeys.playbackPitch), isNull);
+    verify(() => handler.setSpeed(1.5)).called(1);
+    verify(() => handler.setPitch(1.4)).called(1);
+    verify(() => handler.playbackRateMustRemainUnity()).called(2);
+  });
+
+  test('a raced unity lock preserves globals and per-song playback memory',
+      () async {
+    SharedPreferences.setMockInitialValues({
+      PrefsKeys.playbackSpeed: 1.25,
+      PrefsKeys.playbackPitch: 0.8,
+    });
+    final handler = _MockAudioHandler();
+    when(() => handler.minPlaybackSpeed).thenReturn(0.5);
+    when(() => handler.maxPlaybackSpeed).thenReturn(3.0);
+    when(() => handler.playbackRateMustRemainUnity())
+        .thenAnswer((_) async => true);
+    when(() => handler.setSpeed(any())).thenAnswer((_) async {
+      handler.playbackState
+          .add(handler.playbackState.value.copyWith(speed: 1.0));
+    });
+    when(() => handler.setPitch(any())).thenAnswer((_) async {});
+
+    final store = PerSongPlaybackStore();
+    await store.setSpeed('15', 1.25);
+    await store.setPitch('15', 0.8);
+    final song = buildSong(15);
+    var state = PlayerState(playback: PlaybackSlice(currentSong: song));
+    final controller = make(handler,
+        getState: () => state,
+        emit: (s) => state = s,
+        playbackStore: store,
+        rateGuard: () => null);
+
+    await controller.setPlaybackSpeed(1.5);
+    await controller.setPlaybackPitch(1.4);
+    expect(state.playbackSpeed, 1.0);
+    expect(state.playbackPitch, 1.0);
+    verify(() => handler.playbackRateMustRemainUnity()).called(2);
+
+    await controller.applyPerSongPlaybackMemory(song);
+    expect(state.playbackSpeed, 1.0);
+    expect(state.playbackPitch, 1.0);
+    expect(state.errorMessage, isNull);
+    expect(store.getSpeed('15'), 1.25);
+    expect(store.getPitch('15'), 0.8);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getDouble(PrefsKeys.playbackSpeed), 1.25);
+    expect(prefs.getDouble(PrefsKeys.playbackPitch), 0.8);
   });
 
   test('setSongRating clamps, persists, and only emits for the current song',
@@ -314,8 +407,6 @@ void main() {
   test('applyPerSongPlaybackMemory restores speed, pitch, volume and EQ',
       () async {
     final handler = _MockAudioHandler();
-    when(() => handler.setSpeed(any())).thenAnswer((_) async {});
-    when(() => handler.setPitch(any())).thenAnswer((_) async {});
 
     final playbackStore = PerSongPlaybackStore();
     await playbackStore.setSpeed('8', 1.5);
@@ -345,7 +436,6 @@ void main() {
   test('applyPerSongPlaybackMemory bails on quran mode, mismatch and closed',
       () async {
     final handler = _MockAudioHandler();
-    when(() => handler.setSpeed(any())).thenAnswer((_) async {});
 
     final playbackStore = PerSongPlaybackStore();
     await playbackStore.setSpeed('9', 1.5);

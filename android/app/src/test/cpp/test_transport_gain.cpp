@@ -6,6 +6,7 @@
 // stage. Applying gain after dither scales the shaped quantisation noise and
 // breaks the shaper transfer function. These cases pin the placement down.
 #include "../../main/cpp/AudioDspEngine.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -156,6 +157,13 @@ int main() {
         auto engine = makeEngine();
         auto snap = baseSnapshot();
         snap->bitPerfect.enabled = true;
+        // Requested DSP/dither must remain bypassed, including unity gains.
+        snap->activeStages = STAGE_EQ | STAGE_DITHER | STAGE_LIMITER;
+        snap->eq.enabled = true;
+        snap->eq.preampDb = 6.0;
+        snap->dither.enabled = true;
+        snap->dither.targetBitDepth = 16;
+        snap->limiter.enabled = true;
         engine->setSampleRate(snap->sampleRate);
         engine->publishParams(snap);
 
@@ -173,6 +181,33 @@ int main() {
             if (work[i] != input[i] * gain) { scaled = false; break; }
         }
         check(scaled, "bit-perfect bypass must apply the transport gain exactly");
+        check(!engine->wasLastBlockBitPerfect(), "attenuated bypass cannot acknowledge bit-perfect");
+
+        std::fill(gains.begin(), gains.end(), 1.0f);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels, gains.data());
+        check(bitIdentical(work, input), "unity transport gains must bypass DSP/dither exactly");
+        check(engine->wasLastBlockBitPerfect(), "unity gains must restore the raw acknowledgment");
+        check(!engine->isLimiterActive(), "bit-perfect unity must not run the limiter");
+
+        gains[frames / 2] = std::nextafter(1.0f, 0.0f);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels, gains.data());
+        check(!engine->wasLastBlockBitPerfect(), "even one nonunity frame revokes raw acknowledgment");
+
+        for (int f = 0; f < frames; ++f) gains[f] = 1.0f - static_cast<float>(f) / (frames - 1);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels, gains.data());
+        check(!engine->wasLastBlockBitPerfect(), "sleep fade cannot acknowledge bit-perfect");
+        check(work.back() == 0.0f, "sleep fade must still reach silence in bit-perfect mode");
+        std::fill(gains.begin(), gains.end(), 0.0f);
+        for (int block = 0; block < 3; ++block) {
+            work = input;
+            engine->processInterleaved(work.data(), frames, channels, gains.data());
+            check(std::all_of(work.begin(), work.end(), [](float v) { return v == 0.0f; }),
+                  "bit-perfect request must never resurrect muted audio");
+            check(!engine->wasLastBlockBitPerfect(), "muted blocks must revoke raw acknowledgment");
+        }
     }
 
     {
@@ -218,6 +253,109 @@ int main() {
             if (std::abs(scaled - std::rint(scaled)) > 1e-2) { grid24 = false; break; }
         }
         check(grid24, "24-bit dither target must quantise the gained signal");
+    }
+
+    {
+        // Engine-level ChannelManager protection with both optional limiters
+        // off. Positive trims and their live ramps must still be guarded.
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = STAGE_CHANNEL_MANAGER;
+        snap->channelManager.enabled = true;
+        snap->channelManager.channelCount = 6;
+        snap->channelManager.trimDb[4] = 6.0f;
+        snap->limiter.enabled = false;
+        engine->publishParams(snap);
+        std::vector<float> work(128 * 6, 0.8f);
+        for (int b = 0; b < 20; ++b) {
+            std::fill(work.begin(), work.end(), 0.8f);
+            engine->processInterleaved(work.data(), 128, 6);
+            check(engine->isLimiterActive(), "positive surround trim must insert automatic protection");
+            check(std::all_of(work.begin(), work.end(), [](float v) {
+                return std::isfinite(v) && std::abs(v) < 0.99999f;
+            }), "+6 dB on 0.8 must be limited rather than hard-clipped");
+        }
+        auto attenuation = std::make_shared<DspParamSnapshot>(*snap);
+        attenuation->channelManager.trimDb[4] = -6.0f;
+        engine->publishParams(attenuation);
+        engine->processInterleaved(work.data(), 128, 6);
+        check(engine->isLimiterActive(), "positive-to-negative trim edit must protect the live ramp");
+        // Allow the existing 50 ms limiter release to settle before its
+        // lookahead bypass crossfade (not only the 20 ms channel gain ramp).
+        for (int b = 0; b < 240; ++b) {
+            std::fill(work.begin(), work.end(), 0.8f);
+            engine->processInterleaved(work.data(), 128, 6);
+        }
+        check(!engine->isLimiterActive(), "attenuation-only trim must stop forcing the limiter after drain");
+
+        engine->publishParams(snap);
+        for (int b = 0; b < 20; ++b) {
+            std::fill(work.begin(), work.end(), 0.8f);
+            engine->processInterleaved(work.data(), 128, 6);
+        }
+        auto disabled = std::make_shared<DspParamSnapshot>(*snap);
+        disabled->channelManager.enabled = false;
+        disabled->activeStages = 0;
+        engine->publishParams(disabled);
+        std::fill(work.begin(), work.end(), 0.8f);
+        engine->processInterleaved(work.data(), 128, 6);
+        check(engine->isLimiterActive(), "stage-bit disable must retain protection throughout gain drain");
+        // Allow the existing 50 ms limiter release to settle before its
+        // lookahead bypass crossfade (not only the 20 ms channel gain ramp).
+        for (int b = 0; b < 240; ++b) {
+            std::fill(work.begin(), work.end(), 0.8f);
+            engine->processInterleaved(work.data(), 128, 6);
+        }
+        check(!engine->isLimiterActive(), "completed disable and limiter drain must restore no-DSP path");
+        check(std::all_of(work.begin(), work.end(), [](float v) { return v == 0.8f; }),
+              "disabled channel stage must return to exact passthrough");
+    }
+    {
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = STAGE_CHANNEL_MANAGER;
+        snap->channelManager.enabled = true;
+        snap->channelManager.channelCount = 2;
+        snap->limiter.enabled = false;
+        engine->publishParams(snap);
+        const auto input = makeSignal(frames, channels);
+        auto work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(bitIdentical(work, input), "enabled neutral channel manager must stay bit-identical");
+        check(!engine->isLimiterActive(), "neutral channel manager must not force a limiter");
+        // A boost on a channel outside the declared/output layout cannot boost
+        // samples and must not force latency or limiting on the stereo output.
+        snap = std::make_shared<DspParamSnapshot>(*snap);
+        snap->channelManager.trimDb[7] = 12.0f;
+        snap->channelManager.trimDb[0] = -6.0f;
+        engine->publishParams(snap);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(!engine->isLimiterActive(), "attenuation and unused channel boosts must not force a limiter");
+    }
+
+    {
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        engine->publishParams(snap);
+        std::vector<float> work(4096 * channels, 0.5f);
+        engine->processInterleaved(work.data(), 4096, channels);
+        snap = std::make_shared<DspParamSnapshot>(*snap);
+        snap->bitPerfect.enabled = true;
+        snap->activeStages = UINT32_MAX;
+        engine->publishParams(snap);
+        work.assign(3 * channels, 0.5f);
+        engine->processInterleaved(work.data(), 3, channels);
+        snap = std::make_shared<DspParamSnapshot>(*snap);
+        snap->bitPerfect.enabled = false;
+        snap->activeStages = 0;
+        engine->publishParams(snap);
+        engine->resyncForTrack(44100, channels);
+        work.assign(2205 * channels, 0.5f);
+        std::vector<float> gains(2205, 0.5f);
+        engine->processInterleaved(work.data(), 2205, channels, gains.data());
+        check(std::all_of(work.begin(), work.end(), [](float value) { return value == 0.25f; }),
+              "bypass-to-dry rate change must not restore a dormant crossfeed mix");
     }
 
     if (gFailures != 0) {

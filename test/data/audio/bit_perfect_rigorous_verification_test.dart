@@ -19,94 +19,44 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  group('Bit-Perfect Rigorous Verification Suite', () {
-    // =========================================================================
-    // TEST 1: BIT-FOR-BIT NULL TEST (Zero Bit Error Rate Invariant)
-    // =========================================================================
-    group('1. Bit-for-Bit Byte Identity & Cryptographic Hash Null Test', () {
-      test('16-bit PCM pass-through preserves every bit across dynamic range',
-          () {
-        // Construct a 16-bit stereo frame buffer containing:
-        // - Edge boundaries: full positive (+32767), full negative (-32768)
-        // - LSB sensitivity: +1, -1, +2, -2
-        // - Zero crossings: 0
-        // - Pseudo-random dynamic waveform
-        final frameCount = 1024;
-        final channelCount = 2;
-        final bytesPerSample = 2;
-        final rawInput = Uint8List(frameCount * channelCount * bytesPerSample);
-        final byteData = ByteData.sublistView(rawInput);
-
-        final rng = Random(42);
-        for (int i = 0; i < frameCount * channelCount; i++) {
-          int sample;
-          if (i == 0) {
-            sample = 32767; // Maximum positive 16-bit
-          } else if (i == 1) {
-            sample = -32768; // Maximum negative 16-bit
-          } else if (i == 2) {
-            sample = 1; // 1 LSB positive (dither boundary)
-          } else if (i == 3) {
-            sample = -1; // 1 LSB negative
-          } else if (i == 4) {
-            sample = 0; // DC zero
-          } else {
-            // Dynamic waveform
-            sample = (sin(i * 0.05) * 20000 + (rng.nextInt(5) - 2))
-                .round()
-                .clamp(-32768, 32767);
+  group('Bit-perfect policy and PCM precision constraints', () {
+    group('1. PCM precision constraints and null-test negative controls', () {
+      test('float32 represents every normalized PCM16 integer exactly', () {
+        final value = Float32List(1);
+        for (var sample = -32768; sample <= 32767; sample++) {
+          value[0] = sample / 32768;
+          if ((value[0] * 32768).round() != sample) {
+            fail('PCM16 float32 roundtrip changed sample $sample');
           }
-          byteData.setInt16(i * 2, sample, Endian.little);
         }
-
-        final inputDigest = sha256.convert(rawInput).toString();
-
-        // Simulate bit-perfect zero-copy bypass
-        // In NativeDspAudioProcessor.java:
-        // ByteBuffer output = replaceOutputBuffer(processed * outputAudioFormat.bytesPerFrame);
-        // output.put(original);
-        final rawOutput = Uint8List.fromList(rawInput);
-        final outputDigest = sha256.convert(rawOutput).toString();
-
-        // 1. Exact cryptographic identity
-        expect(outputDigest, equals(inputDigest),
-            reason:
-                'SHA-256 hash must be identical down to the least significant bit.');
-
-        // 2. Exact byte-by-byte null test: Input XOR Output must equal 0 across all bytes
-        int bitErrors = 0;
-        for (int b = 0; b < rawInput.length; b++) {
-          final diff = rawInput[b] ^ rawOutput[b];
-          if (diff != 0) bitErrors++;
-        }
-        expect(bitErrors, equals(0),
-            reason: 'Bit Error Rate must be exactly 0.0000%');
       });
 
-      test('24-bit PCM Hi-Res pass-through preserves subtle 1-LSB nuances', () {
-        // 24-bit audio has 16,777,216 discrete quantization levels.
-        // A single LSB represents 1 / 8,388,608 = -144 dBFS.
-        final frameCount = 512;
-        final channelCount = 2;
-        final rawInput = Uint8List(frameCount * channelCount * 3);
-
-        for (int i = 0; i < frameCount * channelCount; i++) {
-          // 24-bit signed integer in little-endian (-8388608 to +8388607)
-          final sample = (i % 2 == 0) ? (i * 13) : -(i * 7);
-          final clamped = sample.clamp(-8388608, 8388607);
-          final byte0 = clamped & 0xFF;
-          final byte1 = (clamped >> 8) & 0xFF;
-          final byte2 = (clamped >> 16) & 0xFF;
-          rawInput[i * 3 + 0] = byte0;
-          rawInput[i * 3 + 1] = byte1;
-          rawInput[i * 3 + 2] = byte2;
+      test('float32 preserves PCM24 boundary and low-bit integer codes', () {
+        final value = Float32List(1);
+        final rng = Random(42);
+        final samples = [
+          -8388608,
+          -8388607,
+          -1,
+          0,
+          1,
+          8388606,
+          8388607,
+          for (var i = 0; i < 4096; i++) rng.nextInt(16777216) - 8388608,
+        ];
+        for (final sample in samples) {
+          value[0] = sample / 8388608;
+          expect((value[0] * 8388608).round(), sample);
         }
+      });
 
-        final inputDigest = sha256.convert(rawInput).toString();
-        final rawOutput = Uint8List.fromList(rawInput);
-        final outputDigest = sha256.convert(rawOutput).toString();
-
-        expect(outputDigest, equals(inputDigest));
+      test('float32 cannot preserve arbitrary PCM32 least-significant bits',
+          () {
+        final value = Float32List(1);
+        for (final sample in [2147483647, 1073741825, -1073741825]) {
+          value[0] = sample / 2147483648;
+          expect((value[0] * 2147483648).round(), isNot(sample));
+        }
       });
 
       test(

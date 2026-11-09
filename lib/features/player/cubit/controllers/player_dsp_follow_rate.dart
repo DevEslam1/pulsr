@@ -14,14 +14,33 @@ extension PlayerDspFollowRate on PlayerDspController {
     if (service == null || _settingsCubit == null) return;
     await _followSampleRateMutex.protect(() async {
       final settings = _settingsCubit!.state;
+      if (settings.bitPerfectOutput &&
+          !await _settingsCubit!.validateBitPerfectTrackSource(song)) {
+        _lastFollowedSampleRate = null;
+        return;
+      }
+      final following = settings.strictBitPerfect ||
+          (settings.outputFormatNegotiationEnabled &&
+              settings.followTrackSampleRate);
+      final usbStatus = UsbExclusiveService().lastStatus;
+      if (!following &&
+          usbStatus.streamingActive &&
+          usbStatus.streamingSampleRate != song.sampleRate) {
+        await _settingsCubit!.suspendDirectBitPerfectForTrack(
+            'Direct USB requires the source rate; follow-format is disabled.');
+        _lastFollowedSampleRate = null;
+        return;
+      }
       // The user's "Per-Track Output Format Negotiation" switch is the master
       // gate: off means keep one manual/manufacturer output format for the
       // whole session instead of renegotiating per track. Strict bit-perfect
       // promises the track's own format, so it cannot be silently muted by
       // that switch.
-      if (!settings.outputFormatNegotiationEnabled && !settings.strictBitPerfect) {
+      if (!settings.outputFormatNegotiationEnabled &&
+          !settings.strictBitPerfect) {
         return;
       }
+      if (!settings.followTrackSampleRate && !settings.strictBitPerfect) return;
       // Bluetooth Hi-Res: the A2DP link owns the format, so exclusive
       // bit-perfect is impossible, but when the codec advertises the track's
       // native rate we can ask it to switch — avoiding an unnecessary platform
@@ -36,6 +55,9 @@ extension PlayerDspFollowRate on PlayerDspController {
       // plus a device refresh, so skip the whole round-trip (this is the
       // default state: follow-track defaults ON, Bit-Perfect OFF).
       if (!settings.bitPerfectOutput) return;
+      // Validate EVERY source, even identical rate/depth. A codec or channel
+      // change is not a redundant format request, and missing metadata must not
+      // leave an exclusive endpoint clocked at the previous track's rate.
       final device = settings.currentOutputDevice;
       // The direct UAC2 sink (Bit-Perfect fallback) switches rate by
       // re-starting the isochronous stream; the platform mixer attributes
@@ -43,25 +65,29 @@ extension PlayerDspFollowRate on PlayerDspController {
       // fallback needs the live stream format.
       final usb = UsbExclusiveService();
       final directStreaming = usb.lastStatus.streamingActive;
-      final activeDevice = device?.availableDevices
-          .where((d) => d.isCurrent)
-          .firstOrNull;
+      final activeDevice =
+          device?.availableDevices.where((d) => d.isCurrent).firstOrNull;
       final deviceDepth = activeDevice?.maxBitDepth ?? (device?.bitDepth ?? 0);
       // An unread track depth is not a 16-bit track. Resolve it against the
       // live direct stream and the route's advertised depth so a 24-bit file
       // with missing metadata is never silently narrowed on the exclusive
       // path.
       final depth = resolveFollowBitDepth(
-        trackBitDepth: song.bitDepth ?? 0,
+        trackBitDepth: effectiveSourceBitDepth(
+            tagged: song.bitDepth ?? 0, decoded: device?.decodedBitDepth ?? 0),
         streamingBitDepth:
             directStreaming ? usb.lastStatus.streamingBitDepth : 0,
         deviceBitDepth: deviceDepth,
       );
       // The mode belongs in the dedup key: switching Bit-Perfect off and on
       // reopens the output, so the previous confirmation is no longer valid.
+      final producerChannels = await usb.getProducerChannels();
+      final trackChannels = producerChannels > 0 ? producerChannels : 2;
       final route =
-          '${device?.deviceName}|${device?.activeDeviceType}|${device?.isUsbDac}'
-          '|${settings.bitPerfectOutput}|${settings.strictBitPerfect}';
+          '${activeDevice?.id}|${usb.lastStatus.deviceId}|${device?.activeDeviceType}'
+          '|${settings.bitPerfectOutput}|${settings.strictBitPerfect}'
+          '|${song.codec}|${song.path.split('?').first.split('#').first.split('.').last}'
+          '|${device?.decodedPcmEncoding}|$trackChannels';
       final rate = HiResAudioService.followTrackRateToApply(
         trackSampleRate: song.sampleRate,
         lastRequestedSampleRate:
@@ -147,8 +173,6 @@ extension PlayerDspFollowRate on PlayerDspController {
         }
         // One owner applies the format and tears the mode down coherently if
         // the transport rejects it, instead of leaving a live endpoint behind.
-        final producerChannels = await usb.getProducerChannels();
-        final trackChannels = producerChannels > 0 ? producerChannels : 2;
         final applied = (trackChannels > 0 && trackChannels != 2)
             ? await _settingsCubit!.setBitPerfectTrackFormat(
                 sampleRate: decision.sampleRate,
@@ -203,12 +227,26 @@ extension PlayerDspFollowRate on PlayerDspController {
       codecSelectableBitDepths: device?.btSelectableBitDepths ?? const [],
     );
     final target = plan.alignCodecSampleRateTo;
-    if (target == null || target == _lastFollowedBtCodecRate) return;
+    if (target == null) return;
+    if (target == _lastFollowedBtCodecRate &&
+        device?.btSampleRateHz == target &&
+        (device?.btBitDepth ?? 0) > 0) {
+      return;
+    }
     try {
       final ok = await service.setBluetoothSampleRate(target);
       if (ok) {
-        _lastFollowedBtCodecRate = target;
         await settingsCubit.refreshOutputDevice();
+        final actual = settingsCubit.state.currentOutputDevice;
+        // Dispatch is not negotiation. Cache only a readback on the same route
+        // and codec with a known negotiated depth.
+        _lastFollowedBtCodecRate = actual?.isBluetooth == true &&
+                actual?.deviceName == device?.deviceName &&
+                actual?.btCodecName == device?.btCodecName &&
+                actual?.btSampleRateHz == target &&
+                (actual?.btBitDepth ?? 0) > 0
+            ? target
+            : null;
       } else {
         _lastFollowedBtCodecRate = null;
       }

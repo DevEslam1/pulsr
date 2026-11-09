@@ -157,6 +157,77 @@ int main() {
               "dither eligibility follows the mantissa floor");
     }
 
+    // ---- Raw integer transport and valid bits in wider subslots -----------
+    {
+        for (int bits : {16, 24, 32}) {
+            const uint32_t sign = uint32_t{1} << (bits - 1);
+            const uint32_t mask = bits == 32 ? UINT32_MAX : (uint32_t{1} << bits) - 1;
+            const uint32_t values[] = {0, 1, 3, sign - 1, sign - 2, sign - 127,
+                                       sign, sign + 1, mask, mask - 1, 0x12345679u & mask};
+            for (uint32_t value : values) {
+                uint8_t source[4];
+                for (int b = 0; b < 4; ++b) source[b] = static_cast<uint8_t>(value >> (8 * b));
+                for (int bytes = bits / 8; bytes <= 4; ++bytes) {
+                    for (int validBits : {16, 24, 32}) {
+                        if (!IsPcmWireFormat(bytes, validBits) || validBits < bits) continue;
+                        uint8_t out[6] = {0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA};
+                        check(PackRawPcmSample(source, bits, out + 1, bytes, validBits) == bytes,
+                              "supported raw format must pack successfully");
+                        for (int b = 0; b < bytes; ++b) {
+                            const int padding = bytes - bits / 8;
+                            const uint8_t expected = b < padding ? 0 : source[b - padding];
+                            check(out[b + 1] == expected, "raw rails/signs/LSBs must be exact and left aligned");
+                        }
+                        check(out[0] == 0xAA && out[bytes + 1] == 0xAA,
+                              "raw pack must respect subslot bounds");
+                        for (int b = 0; b < 4; ++b) {
+                            check(source[b] == static_cast<uint8_t>(value >> (8 * b)),
+                                  "raw pack must not mutate source bytes");
+                        }
+                    }
+                }
+            }
+        }
+        const uint8_t nearFs32[] = {0xFE, 0xFF, 0xFF, 0x7F};
+        uint8_t out[] = {0xAA, 0xAA, 0xAA, 0xAA};
+        check(PackRawPcmSample(nearFs32, 32, out, 4, 24) == 0 && out[0] == 0xAA,
+              "S32 to 24 valid bits must reject even with a four-byte subslot");
+        check(PackRawPcmSample(nearFs32, 32, out, 3, 24) == 0,
+              "raw depth reduction must never silently truncate");
+        check(PackRawPcmSample(nearFs32, 20, out, 4, 32) == 0,
+              "unsupported source depth must reject");
+        check(PackRawPcmSample(nullptr, 16, out, 2, 16) == 0,
+              "null raw source must reject");
+        check(PackRawPcmSample(nearFs32, 16, nullptr, 2, 16) == 0,
+              "null raw destination must reject");
+        SinkDitherState st;
+        PackPcmSample(-0.5f, out, 4, st, 24);
+        check(out[0] == 0 && decodeI32(out) == -1073741824,
+              "processed 24-in-32 must quantize at valid depth with zero low padding");
+        PackPcmSample(1.0f, out, 4, st, 16);
+        check(out[0] == 0 && out[1] == 0 && out[2] == 0xFF && out[3] == 0x7F,
+              "processed 16-in-32 rail must not quantize at 32 bits");
+        PackPcmSample(-1.0f, out, 3, st, 16);
+        check(out[0] == 0 && out[1] == 0 && out[2] == 0x80,
+              "processed negative 16-in-24 rail must remain left aligned");
+        const uint8_t grid[] = {0, 0x79, 0x56, 0xF4};
+        for (int b = 0; b < 4; ++b) out[b] = grid[b];
+        RequantizePcmValidBits(out, 4, 24, st);
+        for (int b = 0; b < 4; ++b) check(out[b] == grid[b], "valid-grid raw data must survive gap-grid requantization exactly");
+        int lower = 0, upper = 0;
+        for (int i = 0; i < 2000; ++i) {
+            out[0] = 0x80; out[1] = 1; out[2] = out[3] = 0; // 1.5 valid-depth LSB
+            RequantizePcmValidBits(out, 4, 24, st);
+            if (decodeI32(out) == 256) ++lower;
+            if (decodeI32(out) == 512) ++upper;
+            check(out[0] == 0, "gap-grid requantization must clear invalid padding");
+        }
+        check(lower > 0 && upper > 0 && lower + upper == 2000,
+              "off-grid fades must dither at valid depth rather than truncate padding");
+        check(PackPcmSample(0.5f, out, INT32_MAX, st) == 0,
+              "extreme container argument must reject without arithmetic overflow");
+    }
+
     // ---- Depth table -----------------------------------------------------
     check(LsbScaleForBits(16) == 32768.0, "16-bit LSB scale is 2^15");
     check(LsbScaleForBits(24) == 8388608.0, "24-bit LSB scale is 2^23");

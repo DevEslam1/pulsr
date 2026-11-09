@@ -43,6 +43,13 @@ class HiResAudioService {
   /// single gate that keeps an unsupported rate from being requested silently.
   static const Set<int> validTargetSampleRates = <int>{
     0,
+    8000,
+    11025,
+    12000,
+    16000,
+    22050,
+    24000,
+    32000,
     44100,
     48000,
     88200,
@@ -390,6 +397,7 @@ class HiResAudioService {
         : supportedSampleRateOptions(
             deviceSampleRates: cached.supportedSampleRates,
             directFormats: cached.directFormats,
+            ladder: validTargetSampleRates.where((r) => r > 0).toList(),
           );
     if (sampleRate > 0 &&
         supportedRates.isNotEmpty &&

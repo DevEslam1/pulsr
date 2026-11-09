@@ -74,40 +74,54 @@ constexpr int kTargetUrbDurationUs = 8000;
 } // namespace
 
 UsbAudioSink& UsbAudioSink::instance() {
+    // Construct registry first so control teardown can clear its broadcast
+    // safely during sink static destruction, even after worker self-exit.
+    static auto& registry = DspEngineRegistry::instance();
+    (void)registry;
     static UsbAudioSink sink;
     return sink;
 }
 
 UsbAudioSink::~UsbAudioSink() {
     Close();
+    if (hasOutstandingUrbs()) {
+        // A fatal reap error is not proof of returned kernel ownership. Keep
+        // header allocations and payloads alive even at static destruction.
+        // Payload pointers deliberately leak; moving storage preserves addresses.
+        (void)new std::vector<uint8_t>(std::move(urbStorage_));
+        (void)new std::vector<uint8_t>(std::move(feedbackUrbStorage_));
+    }
 }
 
 bool UsbAudioSink::IsActive() const {
     return active_.load(std::memory_order_acquire);
 }
 
-bool UsbAudioSink::submitAll() {
-#if defined(__linux__) || defined(__ANDROID__)
-    for (void* raw : urbs_) {
-        auto* urb = reinterpret_cast<struct usbdevfs_urb*>(raw);
-        if (ioctl(fd_, USBDEVFS_SUBMITURB, urb) < 0) {
+bool UsbAudioSink::submitAll(UrbSubmit submit) {
+    // HAL must stay muted even if only part of startup reaches the kernel and
+    // rollback cannot reap it. releaseResources clears this only after drain.
+    exclusive_.store(true, std::memory_order_release);
+    for (size_t i = 0; i < urbs_.size(); ++i) {
+        if (!submitUrb(urbs_[i], false, i, submit)) {
             return false;
         }
     }
-#endif
     return true;
 }
 
 UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
                                    int altSetting, int sampleRate, int channels,
-                                   int bytesPerSample) {
-    if (fd < 0 || channels <= 0 || channels > 8 || bytesPerSample < 2 ||
-        bytesPerSample > 4) {
-        lastError_.store(EINVAL, std::memory_order_relaxed);
+                                   int bytesPerSample, int validBitDepth) {
+    std::lock_guard<std::mutex> control(controlMutex_);
+    const int effectiveBits = validBitDepth == 0 && bytesPerSample >= 2 && bytesPerSample <= 4
+        ? bytesPerSample * 8 : validBitDepth;
+    if (fd < 0 || interfaceNumber < 0 || altSetting < 0 || channels <= 0 ||
+        channels > 8 || !IsPcmWireFormat(bytesPerSample, effectiveBits)) {
+        ReportWriteError(EINVAL);
         return UsbStreamResult::InvalidArgs;
     }
     if (sampleRate <= 0) {
-        lastError_.store(EINVAL, std::memory_order_relaxed);
+        ReportWriteError(EINVAL);
         return UsbStreamResult::RateUnsupported;
     }
     static const int kValidRates[] = {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
@@ -119,18 +133,19 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         }
     }
     if (!validRate) {
-        lastError_.store(EINVAL, std::memory_order_relaxed);
+        ReportWriteError(EINVAL);
         return UsbStreamResult::RateUnsupported;
     }
     // Isochronous OUT endpoint: addresses 1-15 with the IN bit clear. Checked
     // after the rate so an unsupported rate keeps reporting itself.
     if (endpointAddress <= 0 || endpointAddress > 0x0f || (endpointAddress & 0x80) != 0) {
-        lastError_.store(EINVAL, std::memory_order_relaxed);
+        ReportWriteError(EINVAL);
         return UsbStreamResult::InvalidArgs;
     }
 
     // Never tear down a live sink implicitly; caller must Stop first.
     if (active_.load()) {
+        ReportWriteError(EBUSY);
         return UsbStreamResult::ClaimFailed;
     }
 
@@ -140,15 +155,10 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     if (worker_.joinable()) {
         worker_.join();
     }
-    // Wait for any in-flight producer before reassigning the ring buffer below.
-    for (int spin = 0;
-         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 5000;
-         ++spin) {
-        std::this_thread::sleep_for(std::chrono::microseconds(100));
-    }
-    if (activeWriters_.load(std::memory_order_acquire) != 0) {
-        lastError_.store(EBUSY, std::memory_order_relaxed);
-        return UsbStreamResult::ClaimFailed;
+    releaseResources(); // also tears down a worker that self-exited
+    if (hasOutstandingUrbs()) {
+        lastError_.store(EBUSY, std::memory_order_release);
+        return UsbStreamResult::ClaimFailed; // never overwrite kernel-owned storage
     }
 
     lastError_.store(0, std::memory_order_relaxed);
@@ -163,6 +173,7 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     sampleRate_ = sampleRate;
     channels_ = channels;
     bytesPerSample_ = bytesPerSample;
+    validBitDepth_ = effectiveBits;
     producerDither_ = {};
     workerDither_ = {};
     gapFader_.configure(sampleRate, channels, bytesPerSample_);
@@ -173,6 +184,14 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     const auto timing = ParseEndpointTiming(config.data(), config.size(),
                                            interfaceNumber_, altSetting_, endpoint_, speed);
     if (timing.intervalUs <= 0 || timing.maxPacketBytes <= 0) {
+        lastError_.store(EINVAL, std::memory_order_relaxed);
+        releaseResources();
+        return UsbStreamResult::InvalidArgs;
+    }
+    feedbackEndpoint_ = findFeedbackEndpoint(config.data(), config.size(),
+                                             interfaceNumber_, altSetting_,
+                                             &feedbackPacketSize_);
+    if (feedbackEndpoint_ < 0) {
         lastError_.store(EINVAL, std::memory_order_relaxed);
         releaseResources();
         return UsbStreamResult::InvalidArgs;
@@ -219,8 +238,6 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     // Packet-sizing / feedback state consumed by the worker thread.
     frameAccumulator_ = 0;
     feedbackRatePerSec_ = sampleRate_;  // nominal until a feedback sample arrives
-    feedbackEndpoint_ = 0;
-    feedbackPacketSize_ = 0;
 
     // Power-of-two ring buffer capacity for mask-based indexing (at least 250ms slack).
     const size_t targetRingBytes = std::max(
@@ -229,6 +246,7 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     size_t cap = 2048;
     while (cap < targetRingBytes) cap <<= 1;
     ring_.assign(cap, 0);
+    ringRawDepth_.assign(cap, 0);
     ringMask_ = cap - 1;
     ringRead_.store(0, std::memory_order_relaxed);
     ringWrite_.store(0, std::memory_order_relaxed);
@@ -243,6 +261,9 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     urbStorage_.assign(urbStride_ * numUrbs_, 0);
     urbBuffers_.assign(numUrbs_, nullptr);
     urbs_.assign(numUrbs_, nullptr);
+    urbOwned_.assign(numUrbs_, 0);
+    urbRawDepth_.assign(numUrbs_, 0);
+    urbDeliveryEpoch_.assign(numUrbs_, deliveryEpoch_.load(std::memory_order_acquire));
 
     // Nominal (feedback-free) initial packet lengths. frameAccumulator_ is a
     // member so the worker thread continues the same fractional cadence when it
@@ -284,23 +305,24 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         return UsbStreamResult::SubmitFailed;
     }
 
-    // FIX 2: if the DAC exposes an async feedback IN endpoint on this alt
-    // setting, start reading it so the worker can track the DAC's clock. This
-    // is best-effort - a failure leaves OUT streaming at the nominal rate.
-    feedbackEndpoint_ = findFeedbackEndpoint(fd_, interfaceNumber_, altSetting_,
-                                             &feedbackPacketSize_);
+    // Explicit feedback is required when present: partial setup cannot safely
+    // masquerade as a nominal-rate asynchronous stream.
     if (feedbackEndpoint_ != 0) {
         if (!setupFeedbackUrbs()) {
-            feedbackEndpoint_ = 0;  // disable feedback; nominal rate still plays
+            releaseResources(); // drains OUT and IN by submitted identity
+            return UsbStreamResult::SubmitFailed;
         }
     }
 
     // The container this sink packs into is the grid every rendering engine
     // must shape for; the broadcast reaches the registered players and engines
     // registered later inherit it.
-    DspEngineRegistry::instance().setSinkBitDepth(bytesPerSample_ * 8);
+    DspEngineRegistry::instance().setSinkBitDepth(validBitDepth_);
+    sinkDepthPublished_ = true;
+    producerOwner_.store(0, std::memory_order_release);
     running_.store(true, std::memory_order_release);
     active_.store(true, std::memory_order_release);
+    writerGate_.store(0, std::memory_order_release);
     worker_ = std::thread([this] { workerLoop(); });
     return UsbStreamResult::Ok;
 #else
@@ -311,15 +333,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
 }
 
 void UsbAudioSink::Close() {
-    // A live stream being handed back means the next sink has its own depth (or
-    // one the app cannot observe), so stop constraining the engine's dither
-    // target instead of inheriting this one. Only done when a stream was really
-    // active: at process exit the static destructor runs after the engine may
-    // have been torn down, and an already-closed sink must not touch it again.
-    const bool wasActive = active_.exchange(false, std::memory_order_acq_rel);
-    if (wasActive) {
-        AudioDspEngine::instance().setSinkBitDepth(0);
-    }
+    std::lock_guard<std::mutex> control(controlMutex_);
+    writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
     // Always stop and join the worker, even if it already self-exited: a
     // joinable std::thread must never be reassigned (Open) or destroyed
     // (destructor), both of which call std::terminate().
@@ -333,36 +348,77 @@ void UsbAudioSink::Close() {
     releaseResources();
 }
 
-void UsbAudioSink::drainUrbCompletions() {
+bool UsbAudioSink::hasOutstandingUrbs() const {
+    return std::find(urbOwned_.begin(), urbOwned_.end(), 1) != urbOwned_.end() ||
+        std::find(feedbackOwned_.begin(), feedbackOwned_.end(), 1) != feedbackOwned_.end();
+}
+
+int UsbAudioSink::submitUsbfsUrb(int fd, void* urb) {
+    return ioctl(fd, USBDEVFS_SUBMITURB, urb);
+}
+
+bool UsbAudioSink::submitUrb(void* urb, bool feedback, size_t index, UrbSubmit submit) {
+    if (submit(fd_, urb) < 0) return false;
+    (feedback ? feedbackOwned_ : urbOwned_)[index] = 1;
+    return true;
+}
+
+bool UsbAudioSink::markReaped(void* urb, bool* feedback, size_t* index) {
+    for (size_t i = 0; i < urbs_.size(); ++i) {
+        if (urbs_[i] == urb && urbOwned_[i]) {
+            urbOwned_[i] = 0;
+            *feedback = false;
+            *index = i;
+            return true;
+        }
+    }
+    for (size_t i = 0; i < feedbackUrbs_.size(); ++i) {
+        if (feedbackUrbs_[i] == urb && feedbackOwned_[i]) {
+            feedbackOwned_[i] = 0;
+            *feedback = true;
+            *index = i;
+            return true;
+        }
+    }
+    return false; // unrelated/duplicate completion does not discharge ownership
+}
+
+bool UsbAudioSink::drainUrbCompletions() {
 #if defined(__linux__) || defined(__ANDROID__)
-    if (fd_ < 0) return;
-    // DISCARDURB is asynchronous: ask the kernel to cancel every URB (OUT and
-    // feedback IN), then reap until it hands them back (or we time out) so
-    // buffers are never freed while the kernel still owns/DMAs them.
-    for (void* raw : urbs_) {
-        if (raw != nullptr) {
-            ioctl(fd_, USBDEVFS_DISCARDURB, raw);
-        }
+    if (!hasOutstandingUrbs()) return true;
+    if (fd_ < 0) {
+        ReportWriteError(EBADF);
+        return false;
     }
-    for (void* raw : feedbackUrbs_) {
-        if (raw != nullptr) {
-            ioctl(fd_, USBDEVFS_DISCARDURB, raw);
-        }
+    for (size_t i = 0; i < urbs_.size(); ++i) {
+        if (urbOwned_[i]) ioctl(fd_, USBDEVFS_DISCARDURB, urbs_[i]);
     }
-    const int maxUrbs = static_cast<int>(urbs_.size() + feedbackUrbs_.size());
-    int drained = 0;
-    for (int spin = 0; drained < maxUrbs && spin < 200; ++spin) {
+    for (size_t i = 0; i < feedbackUrbs_.size(); ++i) {
+        if (feedbackOwned_[i]) ioctl(fd_, USBDEVFS_DISCARDURB, feedbackUrbs_[i]);
+    }
+    // Teardown is control-thread only. Cancellation has no safe timeout: a
+    // submitted header/payload stays allocated until that exact URB is reaped.
+    while (hasOutstandingUrbs()) {
         struct usbdevfs_urb* urb = nullptr;
-        if (ioctl(fd_, USBDEVFS_REAPURBNDELAY, &urb) < 0) {
+        if (ioctl(fd_, USBDEVFS_REAPURB, &urb) < 0) {
+            if (errno == EINTR) continue;
             if (errno == EAGAIN || errno == EINPROGRESS) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1));
                 continue;
             }
-            break; // ESHUTDOWN / ENOENT: no further completions will arrive
+            lastError_.store(errno, std::memory_order_release);
+            return false; // retain ALL storage; error is not an ownership proof
         }
-        if (urb != nullptr) ++drained;
+        bool feedback = false;
+        size_t index = 0;
+        if (!markReaped(urb, &feedback, &index)) {
+            // The claimed interface is exclusive. Unknown completions cannot
+            // be safely requeued or counted as our cancellation acknowledgments.
+            lastError_.store(EPROTO, std::memory_order_release);
+        }
     }
 #endif
+    return !hasOutstandingUrbs();
 }
 
 // ---- Async feedback (anti-drift) support, FIX 2 ----
@@ -399,45 +455,59 @@ std::vector<uint8_t> UsbAudioSink::fetchConfigDescriptor(int fd) {
 #endif
 }
 
-int UsbAudioSink::findFeedbackEndpoint(int fd, int interfaceNumber, int altSetting,
+int UsbAudioSink::findFeedbackEndpoint(const uint8_t* cfg, size_t len,
+                                       int interfaceNumber, int altSetting,
                                        int* outPacketSize) {
     if (outPacketSize) *outPacketSize = 0;
-    std::vector<uint8_t> cfg = fetchConfigDescriptor(fd);
-    if (cfg.size() < 4) return 0;
+    // A valid OUT descriptor can precede a truncated feedback descriptor. Its
+    // timing alone is not proof that this configuration has no feedback.
+    if (!cfg || len < 9 || cfg[0] < 9 || cfg[0] > len || cfg[1] != 0x02 ||
+        static_cast<size_t>(cfg[2] | (cfg[3] << 8)) != len) return -1;
 
-    int curIface = -1, curAlt = -1, curClass = 0, curSubclass = 0;
-    size_t i = 0;
-    while (i + 2 <= cfg.size()) {
-        uint8_t bLength = cfg[i];
-        if (bLength < 2 || i + bLength > cfg.size()) break;
-        uint8_t bType = cfg[i + 1];
-        if (bType == 0x04 && bLength >= 9) { // INTERFACE
-            curIface = cfg[i + 2];
-            curAlt = cfg[i + 3];
-            curClass = cfg[i + 5];
-            curSubclass = cfg[i + 6];
-        } else if (bType == 0x05 && bLength >= 7) { // ENDPOINT
-            // Restrict to the operational AudioStreaming interface + alt setting.
-            if (curClass == 0x01 && curSubclass == 0x02 &&
-                curIface == interfaceNumber && curAlt == altSetting) {
-                uint8_t addr = cfg[i + 2];
-                uint8_t attrs = cfg[i + 3];
-                int maxPacket = cfg[i + 4] | (cfg[i + 5] << 8);
-                bool isIso = (attrs & 0x03) == 0x01;
-                bool isIn = (addr & 0x80) != 0;
-                int usage = attrs & 0x30; // 0x10 => feedback usage
-                int synch = attrs & 0x0C; // 0x04 => asynchronous
-                if (isIso && isIn &&
+    bool selected = false, foundInterface = false;
+    int expectedEndpoints = 0, seenEndpoints = 0;
+    int endpoint = 0, packetSize = 0;
+    for (size_t i = 0; i < len;) {
+        if (len - i < 2) return -1;
+        const size_t bLength = cfg[i];
+        if (bLength < 2 || bLength > len - i) return -1;
+        const uint8_t bType = cfg[i + 1];
+        if (bType == 0x04) { // INTERFACE
+            if (bLength < 9 || (selected && seenEndpoints != expectedEndpoints)) return -1;
+            selected = cfg[i + 2] == interfaceNumber && cfg[i + 3] == altSetting &&
+                cfg[i + 5] == 0x01 && cfg[i + 6] == 0x02;
+            if (selected) {
+                if (foundInterface) return -1; // ambiguous duplicate interface/alt
+                foundInterface = true;
+                expectedEndpoints = cfg[i + 4];
+                seenEndpoints = 0;
+            }
+        } else if (bType == 0x05) { // ENDPOINT
+            if (bLength < 7) return -1;
+            if (selected) {
+                if (++seenEndpoints > expectedEndpoints) return -1;
+                const uint8_t addr = cfg[i + 2];
+                const uint8_t attrs = cfg[i + 3];
+                const int maxPacket = cfg[i + 4] | (cfg[i + 5] << 8);
+                const bool isIso = (attrs & 0x03) == 0x01;
+                const bool isIn = (addr & 0x80) != 0;
+                const int usage = attrs & 0x30; // 0x10 => feedback usage
+                const int synch = attrs & 0x0C; // 0x04 => asynchronous
+                if (endpoint == 0 && isIso && isIn &&
                     (usage == 0x10 || synch == 0x04 ||
                      (maxPacket >= 3 && maxPacket <= 8))) {
-                    if (outPacketSize) *outPacketSize = maxPacket;
-                    return addr;
+                    endpoint = addr;
+                    packetSize = maxPacket;
                 }
             }
         }
         i += bLength;
     }
-    return 0;
+    // Validate the entire descriptor chain, even after finding feedback, and
+    // use bNumEndpoints to reject omission at an otherwise valid boundary.
+    if (!foundInterface || (selected && seenEndpoints != expectedEndpoints)) return -1;
+    if (outPacketSize) *outPacketSize = packetSize;
+    return endpoint;
 }
 
 void UsbAudioSink::freeFeedbackResources() {
@@ -448,6 +518,7 @@ void UsbAudioSink::freeFeedbackResources() {
     feedbackBuffers_.shrink_to_fit();
     feedbackUrbs_.clear();
     feedbackUrbs_.shrink_to_fit();
+    feedbackOwned_.clear();
     feedbackUrbStorage_.clear();
     feedbackUrbStorage_.shrink_to_fit();
     feedbackUrbStride_ = 0;
@@ -458,33 +529,30 @@ void UsbAudioSink::freeFeedbackResources() {
 }
 
 void UsbAudioSink::releaseResources() {
-    // Stop accepting producers, then wait for any in-flight WriteInterleaved()
-    // to finish before touching the ring buffer.
+    writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
     active_.store(false, std::memory_order_release);
-    for (int spin = 0;
-         activeWriters_.load(std::memory_order_acquire) != 0 && spin < 5000;
-         ++spin) {
-        std::this_thread::sleep_for(std::chrono::microseconds(100));
+    while (writerGate_.load(std::memory_order_acquire) & kWriterBusy) {
+        std::this_thread::yield(); // control only; never free a live writer's ring
+    }
+    producerOwner_.store(0, std::memory_order_release);
+    producerRawDepth_.store(0, std::memory_order_release);
+    deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
+    rawPcmStatus_.store(0, std::memory_order_release);
+    if (sinkDepthPublished_) {
+        DspEngineRegistry::instance().setSinkBitDepth(0);
+        sinkDepthPublished_ = false; // clear even after the worker self-exited
     }
 
-    if (activeWriters_.load(std::memory_order_acquire) != 0) {
-#if defined(__ANDROID__)
-        __android_log_print(ANDROID_LOG_ERROR, "UsbAudioSink",
-            "releaseResources: writers still active after 500ms; leaking ring to prevent UAF");
-#else
-        fprintf(stderr, "UsbAudioSink: writers still active after 500ms; leaking ring to prevent UAF\n");
-#endif
-        return;
-    }
-
-    // Cancel + reap any URBs the kernel still owns before freeing their buffers.
-    drainUrbCompletions();
+    if (!drainUrbCompletions()) return; // preserve kernel-owned buffers on failure
 
     for (uint8_t* b : urbBuffers_) {
         delete[] b;
     }
     urbBuffers_.clear();
     urbs_.clear();
+    urbOwned_.clear();
+    urbRawDepth_.clear();
+    urbDeliveryEpoch_.clear();
     urbStorage_.clear();
     urbBuffers_.shrink_to_fit();
     urbs_.shrink_to_fit();
@@ -493,6 +561,8 @@ void UsbAudioSink::releaseResources() {
     freeFeedbackResources();
     ring_.clear();
     ring_.shrink_to_fit();
+    ringRawDepth_.clear();
+    ringRawDepth_.shrink_to_fit();
     ringMask_ = 0;
     if (claimed_ && fd_ >= 0) {
         int iface = interfaceNumber_;
@@ -509,6 +579,28 @@ void UsbAudioSink::releaseResources() {
     claimed_ = false;
     fd_ = -1;
     running_.store(false, std::memory_order_release);
+    exclusive_.store(false, std::memory_order_release); // only after USB ownership is drained
+}
+
+int UsbAudioSink::completionError(const void* raw, bool feedback, int packets, int maxBytes) {
+    const auto* urb = static_cast<const usbdevfs_urb*>(raw);
+    if (!urb || urb->number_of_packets != packets || packets <= 0 ||
+        urb->buffer_length < 0 || urb->buffer_length > maxBytes ||
+        urb->actual_length < 0 || urb->actual_length > urb->buffer_length) return EPROTO;
+    if (urb->status != 0) return urb->status < 0 ? -urb->status : EIO;
+    if (urb->error_count != 0) return EIO;
+    uint64_t requested = 0, actual = 0;
+    for (int p = 0; p < packets; ++p) {
+        const auto& packet = urb->iso_frame_desc[p];
+        if (packet.status != 0) return EIO;
+        if (packet.actual_length > packet.length ||
+            (!feedback && packet.actual_length != packet.length)) return EIO;
+        requested += packet.length;
+        actual += packet.actual_length;
+    }
+    if (requested != static_cast<uint64_t>(urb->buffer_length) ||
+        actual != static_cast<uint64_t>(urb->actual_length)) return EPROTO;
+    return 0;
 }
 
 void UsbAudioSink::workerLoop() {
@@ -552,15 +644,25 @@ void UsbAudioSink::workerLoop() {
         repeatedReadyPolls = 0;
         if (urb == nullptr) continue;
 
-        // FIX 2: a reaped IN URB (endpoint bit 7 set) is an async feedback
-        // sample. Decode it to nudge the OUT packet rate, then resubmit it. A
-        // feedback resubmit failure is NON-fatal: OUT playback keeps running at
-        // whatever rate was last decoded (or nominal).
-        if ((urb->endpoint & 0x80) != 0) {
+        bool feedback = false;
+        size_t urbIndex = 0;
+        if (!markReaped(urb, &feedback, &urbIndex)) {
+            ReportWriteError(EPROTO);
+            break; // never dereference an unrecognized returned pointer
+        }
+        const int fault = completionError(urb, feedback,
+            feedback ? feedbackPacketsPerUrb_ : packetsPerUrb_,
+            feedback ? feedbackPacketSize_ * feedbackPacketsPerUrb_ : bytesPerUrb_);
+        if (feedback) {
+            // Invalid IN completion/packet status cannot steer the DAC clock.
             uint8_t* fbuf = reinterpret_cast<uint8_t*>(urb->buffer);
-            for (int p = 0; p < urb->number_of_packets; ++p) {
+            if (urb->number_of_packets != feedbackPacketsPerUrb_) {
+                ReportWriteError(EPROTO);
+                break;
+            }
+            for (int p = 0; p < feedbackPacketsPerUrb_; ++p) {
                 const unsigned int got = urb->iso_frame_desc[p].actual_length;
-                if (got >= 3 && feedbackPacketSize_ > 0) {
+                if (fault == 0 && got == static_cast<unsigned int>(feedbackPacketSize_)) {
                     applyFeedback(fbuf, static_cast<int>(got));
                 }
                 fbuf += feedbackPacketSize_;
@@ -569,10 +671,26 @@ void UsbAudioSink::workerLoop() {
                 urb->iso_frame_desc[p].actual_length = 0;
                 urb->iso_frame_desc[p].status = 0;
             }
-            urb->buffer_length = feedbackPacketSize_ * urb->number_of_packets;
-            ioctl(fd_, USBDEVFS_SUBMITURB, urb);  // best-effort; ignore errors
+            if (fault != 0) {
+                ReportWriteError(fault);
+                feedbackRatePerSec_ = sampleRate_;
+            }
+            urb->buffer_length = feedbackPacketSize_ * feedbackPacketsPerUrb_;
+            urb->status = 0;
+            urb->actual_length = 0;
+            urb->error_count = 0;
+            if (!submitUrb(urb, true, urbIndex)) {
+                ReportWriteError(errno);
+                break; // loss of required feedback is a stream fault
+            }
             continue;
         }
+        if (fault != 0) {
+            ReportWriteError(fault);
+            break; // short/error OUT is not successfully delivered audio
+        }
+        rawPcmStatus_.store((urbDeliveryEpoch_[urbIndex] << 8) |
+            static_cast<uint64_t>(urbRawDepth_[urbIndex]), std::memory_order_release);
 
         // OUT URB: recompute every packet length from the fractional sample
         // accumulator stepped by the current (feedback-adjusted) rate, clamped
@@ -583,26 +701,53 @@ void UsbAudioSink::workerLoop() {
         uint8_t* dst = buf;
         int urbTotalBytes = 0;
         const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
+        int rawDepth = -1;
+        uint64_t deliveryEpoch = deliveryEpoch_.load(std::memory_order_acquire);
         for (int p = 0; p < urb->number_of_packets; ++p) {
             const int framesInPacket = NextPacketFrames(
                 frameAccumulator_, ratePerSec, serviceIntervalUs_, maxFramesPerPacket_);
             const size_t pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
 
             const size_t w = ringWrite_.load(std::memory_order_acquire);
-            const size_t avail = (w >= readPos) ? (w - readPos) : 0;
+            const size_t avail = w - readPos; // unsigned sequence arithmetic also survives counter wrap
             if (pktLen > 0 && avail >= pktLen) {
                 for (size_t i = 0; i < pktLen; ++i) {
                     dst[i] = ring_[(readPos + i) & mask];
                 }
+                bool packetRaw = false;
+                for (int f = 0; f < framesInPacket; ++f) {
+                    const int depth = ringRawDepth_[(readPos + static_cast<size_t>(f) * frameBytes) & mask];
+                    packetRaw = packetRaw || depth != 0;
+                    if (rawDepth == -1) rawDepth = depth;
+                    else if (rawDepth != depth) rawDepth = 0;
+                }
                 readPos += pktLen;
-                // Leaving a gap: ride the envelope back to unity instead of
-                // stepping straight onto the resumed audio.
+                if (packetRaw) {
+                    // A recovery ramp must never requantize raw S32 (or DoP).
+                    gapFader_.reset();
+                } else if (gapFader_.recovering()) {
+                    rawDepth = 0;
+                }
                 gapFader_.applyReal(dst, framesInPacket, workerDither_);
             } else if (pktLen > 0) {
-                // Decay the last emitted frame to silence rather than cutting
-                // it off, so the gap itself cannot click.
-                gapFader_.fillGap(dst, framesInPacket, workerDither_);
+                // Raw/DoP gaps must be silence, not synthesized marker/audio
+                // bytes. Processed PCM retains the existing click-reducing fade.
+                if (producerRawDepth_.load(std::memory_order_acquire) != 0) {
+                    std::memset(dst, 0, pktLen);
+                    gapFader_.reset();
+                } else {
+                    gapFader_.fillGap(dst, framesInPacket, workerDither_);
+                }
+                rawDepth = 0;
+                deliveryEpoch = deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel) + 1;
                 underrunCount_.fetch_add(1, std::memory_order_relaxed);
+            }
+            // Fades work in the subslot grid. Requantize to valid bits instead
+            // of biased low-byte truncation; already-on-grid/raw PCM stays exact.
+            if (validBitDepth_ < bytesPerSample_ * 8) {
+                for (size_t sample = 0; sample < pktLen; sample += bytesPerSample_) {
+                    RequantizePcmValidBits(dst + sample, bytesPerSample_, validBitDepth_, workerDither_);
+                }
             }
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktLen);
             urb->iso_frame_desc[p].actual_length = 0;
@@ -611,107 +756,142 @@ void UsbAudioSink::workerLoop() {
             urbTotalBytes += static_cast<int>(pktLen);
         }
         urb->buffer_length = urbTotalBytes;
+        urb->status = 0;
+        urb->actual_length = 0;
+        urb->error_count = 0;
+        urbRawDepth_[urbIndex] = std::max(rawDepth, 0);
+        urbDeliveryEpoch_[urbIndex] = deliveryEpoch;
         ringRead_.store(readPos, std::memory_order_release);
 
-        if (ioctl(fd_, USBDEVFS_SUBMITURB, urb) < 0) {
-            lastError_.store(errno, std::memory_order_release);
+        if (!submitUrb(urb, false, urbIndex)) {
+            ReportWriteError(errno);
             break;
         }
     }
     // Critical: set running_ and active_ to false on exit so sink never stays
     // in a zombie "playing but silent" state when the worker thread terminates.
+    writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
+    deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
     running_.store(false, std::memory_order_release);
     active_.store(false, std::memory_order_release);
 }
 
-void UsbAudioSink::WriteInterleaved(const float* buffer, int frames,
-                                    int channels) {
-    if (buffer == nullptr || frames <= 0 || channels <= 0) return;
+void UsbAudioSink::ReportWriteError(int error) {
+    lastError_.store(error == 0 ? EIO : error, std::memory_order_release);
+    deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
+}
 
-    // Register as an in-flight producer *before* the active_ check so
-    // releaseResources() cannot free the ring out from under us. Re-check
-    // active_ after incrementing to close the TOCTOU window.
-    activeWriters_.fetch_add(1, std::memory_order_acquire);
-    if (!active_.load(std::memory_order_acquire)) {
-        activeWriters_.fetch_sub(1, std::memory_order_release);
-        return;
+bool UsbAudioSink::beginWrite(int64_t producerId) {
+    uint32_t expectedGate = 0;
+    if (!writerGate_.compare_exchange_strong(expectedGate, kWriterBusy,
+            std::memory_order_acquire, std::memory_order_relaxed)) {
+        ReportWriteError((expectedGate & kWriterClosed) ? ENODEV : EBUSY);
+        return false;
     }
+    if (!active_.load(std::memory_order_acquire) || producerId == 0) {
+        ReportWriteError(producerId == 0 ? EINVAL : ENODEV);
+        endWrite();
+        return false;
+    }
+    int64_t owner = 0;
+    if (!producerOwner_.compare_exchange_strong(owner, producerId,
+            std::memory_order_acq_rel, std::memory_order_acquire) && owner != producerId) {
+        ReportWriteError(EBUSY);
+        endWrite();
+        return false;
+    }
+    return true;
+}
 
-    const int bps = bytesPerSample_;
-    const int sinkChannels = channels_;
-    if (sinkChannels <= 0) {
-        activeWriters_.fetch_sub(1, std::memory_order_release);
-        return;
+void UsbAudioSink::endWrite() {
+    writerGate_.fetch_and(~kWriterBusy, std::memory_order_release);
+}
+
+void UsbAudioSink::ReleaseProducer(int64_t id) {
+    if (id == 0) return;
+    int64_t expected = id;
+    if (producerOwner_.compare_exchange_strong(expected, 0,
+            std::memory_order_acq_rel, std::memory_order_relaxed)) {
+        deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
+    }
+}
+
+bool UsbAudioSink::WriteInterleaved(const float* buffer, int frames, int channels,
+                                    int sampleRate, int64_t producerId) {
+    return writeBlock(buffer, nullptr, frames, channels, 0, sampleRate, producerId);
+}
+
+bool UsbAudioSink::WritePcm(const uint8_t* buffer, int frames, int channels,
+                           int sourceBitDepth, int sampleRate, int64_t producerId) {
+    if (sourceBitDepth != 16 && sourceBitDepth != 24 && sourceBitDepth != 32) {
+        ReportWriteError(EINVAL);
+        return false;
+    }
+    return writeBlock(nullptr, buffer, frames, channels, sourceBitDepth, sampleRate, producerId);
+}
+
+bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frames,
+        int channels, int sourceBitDepth, int sampleRate, int64_t producerId) {
+    if ((!floats && !pcm) || frames <= 0 || channels <= 0 || channels > 8) {
+        ReportWriteError(EINVAL);
+        return false;
+    }
+    if (!beginWrite(producerId)) return false;
+    struct WriterExit {
+        UsbAudioSink* sink;
+        ~WriterExit() { sink->endWrite(); }
+    } exit{this};
+    if (channels != channels_) {
+        channelMismatchFrames_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
+        ReportWriteError(EINVAL);
+        return false; // no duplication, silence-fill, drop, or remap
+    }
+    if (sampleRate != sampleRate_ || sourceBitDepth > validBitDepth_) {
+        ReportWriteError(ERANGE);
+        return false; // no implicit SRC or lossy valid-depth reduction
     }
     const size_t cap = ring_.size();
-    const size_t mask = ringMask_;
-    if (cap == 0) {
-        activeWriters_.fetch_sub(1, std::memory_order_release);
-        return;
-    }
-
+    const size_t frameBytes = static_cast<size_t>(channels_) * bytesPerSample_;
     size_t w = ringWrite_.load(std::memory_order_relaxed);
-    size_t r = ringRead_.load(std::memory_order_acquire);
-    const size_t availSpace = (cap > (w - r)) ? (cap - (w - r) - 1) : 0;
-    // Only ever write whole sink frames: a partial frame shifts every
-    // subsequent channel slot and stays misaligned for the session.
-    const size_t availFrames = (availSpace / static_cast<size_t>(bps)) /
-                               static_cast<size_t>(sinkChannels);
-    const size_t framesToWrite = std::min(
-        static_cast<size_t>(frames), availFrames);
-
-    for (size_t f = 0; f < framesToWrite; ++f) {
-        for (int c = 0; c < sinkChannels; ++c) {
-            // The render block's channel count can differ from the rate the
-            // DAC was opened at. Map per frame instead of packing samples
-            // sequentially: mono is duplicated, extra sink channels get
-            // silence, and surplus source channels are dropped (no downmix).
-            float sample;
-            if (channels == sinkChannels || c < channels) {
-                sample = buffer[f * static_cast<size_t>(channels) + c];
-            } else if (channels == 1) {
-                sample = buffer[f];
-            } else {
-                sample = 0.0f;
-            }
+    const size_t r = ringRead_.load(std::memory_order_acquire);
+    const size_t occupied = w - r;
+    const size_t space = cap > occupied ? cap - occupied - 1 : 0;
+    if (cap == 0 || static_cast<size_t>(frames) > space / frameBytes) {
+        overrunCount_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
+        ReportWriteError(ENOSPC);
+        return false; // all-or-nothing: never report a partially delivered block
+    }
+    const int sourceBytes = sourceBitDepth / 8;
+    for (int f = 0; f < frames; ++f) {
+        ringRawDepth_[w & ringMask_] = static_cast<uint8_t>(sourceBitDepth);
+        for (int c = 0; c < channels_; ++c) {
+            const size_t sample = static_cast<size_t>(f) * channels_ + c;
             uint8_t packed[4];
-            // This pack is the last quantizer on the direct USB path: whatever
-            // the engine did, the bits written here are what the DAC receives.
-            PackPcmSample(sample, packed, bps, producerDither_);
-            for (int b = 0; b < bps; ++b) {
-                ring_[(w + b) & mask] = packed[b];
+            if (pcm) {
+                PackRawPcmSample(pcm + sample * sourceBytes, sourceBitDepth, packed,
+                                 bytesPerSample_, validBitDepth_);
+            } else {
+                PackPcmSample(floats[sample], packed, bytesPerSample_, producerDither_, validBitDepth_);
             }
-            w += bps;
+            for (int b = 0; b < bytesPerSample_; ++b) ring_[(w + b) & ringMask_] = packed[b];
+            w += bytesPerSample_;
         }
     }
+    producerRawDepth_.store(sourceBitDepth, std::memory_order_release);
+    if (sourceBitDepth == 0) deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
     ringWrite_.store(w, std::memory_order_release);
-
-    // Surface any channel remap (duplication/silence/drop) instead of letting it
-    // pass as sample-identical output.
-    if (channels != sinkChannels && framesToWrite > 0) {
-        channelMismatchFrames_.fetch_add(
-            static_cast<uint64_t>(framesToWrite), std::memory_order_relaxed);
-    }
-
-    if (framesToWrite < static_cast<size_t>(frames)) {
-        overrunCount_.fetch_add(
-            static_cast<uint64_t>(frames) - framesToWrite,
-            std::memory_order_relaxed);
-    }
-
-    activeWriters_.fetch_sub(1, std::memory_order_release);
+    return true;
 }
 
 double UsbAudioSink::GetBufferedMs() {
+    std::lock_guard<std::mutex> control(controlMutex_); // status/control, not render
     if (!active_.load(std::memory_order_acquire)) return 0.0;
     const size_t w = ringWrite_.load(std::memory_order_acquire);
-    const size_t r = ringRead_.load(std::memory_order_relaxed);
+    const size_t r = ringRead_.load(std::memory_order_acquire);
     const size_t count = (w >= r) ? (w - r) : 0;
     const int frameBytes = channels_ * bytesPerSample_;
-    double ringMs = 0.0;
-    if (frameBytes > 0 && sampleRate_ > 0) {
-        ringMs = (static_cast<double>(count) / static_cast<double>(frameBytes * sampleRate_)) * 1000.0;
-    }
+    const double ringMs = frameBytes > 0 && sampleRate_ > 0
+        ? static_cast<double>(count) * 1000.0 / (frameBytes * sampleRate_) : 0.0;
     const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_) * serviceIntervalUs_ / 1000.0;
     return ringMs + urbMs;
 }
@@ -719,7 +899,10 @@ double UsbAudioSink::GetBufferedMs() {
 bool UsbAudioSink::setupFeedbackUrbs() {
 #if defined(__linux__) || defined(__ANDROID__)
     if (feedbackEndpoint_ == 0 || fd_ < 0) return false;
-    if (feedbackPacketSize_ != 3 && feedbackPacketSize_ != 4) return false;
+    if (feedbackPacketSize_ != 3 && feedbackPacketSize_ != 4) {
+        lastError_.store(EINVAL, std::memory_order_release);
+        return false;
+    }
     numFeedbackUrbs_ = 2;
     feedbackPacketsPerUrb_ = 4;
     feedbackUrbStride_ = sizeof(struct usbdevfs_urb) +
@@ -730,6 +913,7 @@ bool UsbAudioSink::setupFeedbackUrbs() {
     feedbackUrbStorage_.assign(feedbackUrbStride_ * numFeedbackUrbs_, 0);
     feedbackBuffers_.assign(numFeedbackUrbs_, nullptr);
     feedbackUrbs_.assign(numFeedbackUrbs_, nullptr);
+    feedbackOwned_.assign(numFeedbackUrbs_, 0);
     const int fbBufBytes = feedbackPacketSize_ * feedbackPacketsPerUrb_;
 
     // Phase 1: allocate + initialize every URB (kernel owns none of them yet).
@@ -737,7 +921,10 @@ bool UsbAudioSink::setupFeedbackUrbs() {
         auto* urb = reinterpret_cast<struct usbdevfs_urb*>(
             feedbackUrbStorage_.data() + static_cast<size_t>(i) * feedbackUrbStride_);
         feedbackBuffers_[i] = new (std::nothrow) uint8_t[fbBufBytes]();
-        if (!feedbackBuffers_[i]) { freeFeedbackResources(); return false; }
+        if (!feedbackBuffers_[i]) {
+            lastError_.store(ENOMEM, std::memory_order_release);
+            return false; // caller rolls back OUT as well as unsubmitted IN
+        }
         std::memset(urb, 0, sizeof(struct usbdevfs_urb));
         urb->type = USBDEVFS_URB_TYPE_ISO;
         urb->endpoint = static_cast<unsigned char>(feedbackEndpoint_);
@@ -753,25 +940,11 @@ bool UsbAudioSink::setupFeedbackUrbs() {
         urb->buffer_length = fbBufBytes;
         feedbackUrbs_[i] = urb;
     }
-    // Phase 2: submit. On failure cancel+reap the already-queued URBs so no
-    // buffer is freed while the kernel still owns it, then disable feedback.
+    // On failure Open aborts the entire startup. Unified teardown tracks each
+    // OUT/IN identity, so an OUT completion can never count as a reaped IN.
     for (int i = 0; i < numFeedbackUrbs_; ++i) {
-        if (ioctl(fd_, USBDEVFS_SUBMITURB, feedbackUrbs_[i]) < 0) {
-            for (int j = 0; j < i; ++j) {
-                ioctl(fd_, USBDEVFS_DISCARDURB, feedbackUrbs_[j]);
-            }
-            for (int reaped = 0, spin = 0; reaped < i && spin < 200; ++spin) {
-                struct usbdevfs_urb* done = nullptr;
-                if (ioctl(fd_, USBDEVFS_REAPURBNDELAY, &done) < 0) {
-                    if (errno == EAGAIN || errno == EINPROGRESS) {
-                        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                        continue;
-                    }
-                    break;
-                }
-                if (done != nullptr) ++reaped;
-            }
-            freeFeedbackResources();
+        if (!submitUrb(feedbackUrbs_[i], true, static_cast<size_t>(i))) {
+            lastError_.store(errno, std::memory_order_release);
             return false;
         }
     }

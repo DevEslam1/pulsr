@@ -129,7 +129,7 @@ Uint8List _buildStereoWav({int seconds = 6, int sampleRate = 44100}) {
 }
 
 void main() {
-  group('Real Audio File Bit-Perfect Null & Transparency Verification', () {
+  group('WAV fixture, format policy, and DoP framing checks', () {
     const realWavPath = 'build/test_audio/playback-startup-test.wav';
     late File wavFile;
     late Uint8List wavFileRawBytes;
@@ -155,28 +155,6 @@ void main() {
       expect(wavInfo.bitsPerSample, equals(16));
       expect(wavInfo.pcmData.length, greaterThan(1000000),
           reason: 'File must contain substantial real audio PCM frames');
-    });
-
-    test('1. Bit-for-Bit Identity & SHA-256 Null Test on Real PCM Stream', () {
-      final inputDigest = sha256.convert(wavInfo.pcmData).toString();
-
-      // Simulate bit-perfect pass-through on the real PCM stream
-      final outputPcm = Uint8List.fromList(wavInfo.pcmData);
-      final outputDigest = sha256.convert(outputPcm).toString();
-
-      expect(outputDigest, equals(inputDigest),
-          reason:
-              'Cryptographic SHA-256 hash must be identical under Bit-Perfect pass-through');
-
-      // Byte-by-byte bitwise XOR null test
-      int bitErrors = 0;
-      for (int i = 0; i < wavInfo.pcmData.length; i++) {
-        if ((wavInfo.pcmData[i] ^ outputPcm[i]) != 0) {
-          bitErrors++;
-        }
-      }
-      expect(bitErrors, equals(0),
-          reason: 'Bit Error Rate across real audio data must be 0.000%');
     });
 
     test(

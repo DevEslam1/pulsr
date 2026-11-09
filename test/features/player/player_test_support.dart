@@ -4,8 +4,12 @@
 // audio handler that fills in the DSP/queue surface the shared helper leaves to
 // noSuchMethod, canonical song builders, and helpers to assemble a real
 // PlayerCubit / PlayerDspController / PlayerQueueController.
+import 'package:audio_service/audio_service.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/services/scrobbler_service.dart';
+import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/comparison_slot.dart';
 import 'package:pulsr/data/audio/stream_pre_resolver.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -16,6 +20,8 @@ import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/widgets/widget_service.dart';
+import 'package:rxdart/rxdart.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/test_pulsr_audio_handler.dart';
 
@@ -30,6 +36,29 @@ class MockWidgetService extends Mock implements WidgetService {}
 class MockScrobblerService extends Mock implements ScrobblerService {}
 
 class MockStreamPreResolver extends Mock implements StreamPreResolver {}
+
+/// Mirror the handler's observed rates and sole ownership of global writes.
+/// Individual tests can still override setters to reject or throw.
+void stubPlaybackRateHandler(PulsrAudioHandler handler) {
+  final playbackState = BehaviorSubject<PlaybackState>.seeded(PlaybackState());
+  addTearDown(playbackState.close);
+  var pitch = 1.0;
+  when(() => handler.playbackState).thenAnswer((_) => playbackState);
+  when(() => handler.pitch).thenAnswer((_) => pitch);
+  when(() => handler.playbackRateMustRemainUnity())
+      .thenAnswer((_) async => false);
+  when(() => handler.setSpeed(any())).thenAnswer((invocation) async {
+    final speed = invocation.positionalArguments.single as double;
+    playbackState.add(playbackState.value.copyWith(speed: speed));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
+  });
+  when(() => handler.setPitch(any())).thenAnswer((invocation) async {
+    pitch = invocation.positionalArguments.single as double;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(PrefsKeys.playbackPitch, pitch);
+  });
+}
 
 /// The shared helper leaves several DSP/queue methods to `noSuchMethod`, which
 /// throws. This subclass implements them as recording no-ops so the success
@@ -67,6 +96,18 @@ class RecordingAudioHandler extends TestPulsrAudioHandler {
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
     _record('setLookaheadLimiter');
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    _record('setSpeed');
+    await super.setSpeed(speed);
+  }
+
+  @override
+  Future<void> setPitch(double pitch) async {
+    _record('setPitch');
+    await super.setPitch(pitch);
   }
 
   @override

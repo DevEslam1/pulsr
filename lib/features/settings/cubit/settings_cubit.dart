@@ -25,6 +25,8 @@ import '../../../core/utils/l10n_holder.dart';
 import '../../../core/utils/platform_capabilities.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
+import '../../../data/audio/bit_perfect_chain.dart';
+import '../../../data/audio/output_format_negotiation.dart';
 import '../../../data/audio/dsd_decoder_helper.dart';
 import '../../../data/audio/tap_src_policy.dart';
 import '../../../data/db/app_database.dart';
@@ -566,7 +568,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(PrefsKeys.audioSessionLogEnabled) ?? true,
       outputFormatNegotiationEnabled:
           prefs.getBool(PrefsKeys.outputFormatNegotiationEnabled) ?? true,
-      floatOutputEnabled: prefs.getBool(PrefsKeys.floatOutputEnabled) ?? true,
+      floatOutputEnabled: strictBitPerfectLoaded ||
+          (prefs.getBool(PrefsKeys.floatOutputEnabled) ?? true),
       aaudioOutputEnabled:
           prefs.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
       dvcEnabled: prefs.getBool(PrefsKeys.dvcEnabled) ?? false,
@@ -1111,6 +1114,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           );
           safeEmit(state.copyWith(systemEffectsStatus: status));
         } catch (_) {}
+        if (loadedState.strictBitPerfect) {
+          await setFloatOutputEnabled(true);
+        }
         if (loadedState.bitPerfectOutput) {
           // Resolve the current route before touching exclusive output. A
           // merely attached DAC must not steal a Bluetooth/speaker session;
@@ -1126,33 +1132,60 @@ class SettingsCubit extends PulsrCubit<SettingsState>
             safeEmit(state.copyWith(
                 bitPerfectOutput: false, strictBitPerfect: false));
           } else {
-            final applied = await _hiResAudioService.setBitPerfectMode(true);
-            if (!applied) {
-              // Same fallback as the manual toggle: DACs without platform
-              // exclusive mixer attributes can still run Pulsr's direct USB sink.
-              final direct = await _tryStartDirectUsbStreaming();
-              if (!direct) {
-                // An unconfirmed start may still be holding the isochronous
-                // endpoint. Clearing the preference while it lives would
-                // orphan the stream, so keep the mode on unless teardown is
-                // actually confirmed.
-                final stillClaimed =
-                    _bitPerfectViaDirectStream && !await _stopDirectUsbStreaming();
-                if (stillClaimed) {
-                  safeEmit(state.copyWith(
-                    errorMessage:
-                        'The USB stream could not be confirmed or released. '
-                        'Bit-Perfect stays enabled; turn it off to release the DAC.',
-                  ));
-                } else {
-                  await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-                  await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-                  loadedState = loadedState.copyWith(
-                    bitPerfectOutput: false,
-                    strictBitPerfect: false,
-                  );
-                  safeEmit(state.copyWith(
-                      bitPerfectOutput: false, strictBitPerfect: false));
+            if (!state.aaudioOutputEnabled) {
+              await UsbExclusiveService().getStatus();
+            }
+            final song = getIt.isRegistered<PulsrAudioHandler>()
+                ? getIt<PulsrAudioHandler>().currentSong : null;
+            final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
+              path: song?.path,
+              codec: song?.codec,
+              bitDepth: effectiveSourceBitDepth(
+                tagged: song?.bitDepth ?? 0,
+                decoded: state.currentOutputDevice?.decodedBitDepth ?? 0,
+              ),
+              isRadio: song?.source == SongSource.radio,
+              integer32DirectUsbEligible: _integer32DirectUsbEligible,
+              requireConfirmedCodec: loadedState.strictBitPerfect && song != null,
+            );
+            final unknownRate = loadedState.strictBitPerfect && song != null &&
+                ((song.sampleRate ?? 0) <= 0 ||
+                    !HiResAudioService.validTargetSampleRates.contains(song.sampleRate));
+            if (sourceBlock != null || unknownRate) {
+              await _rollbackBitPerfectEnable(
+                  sourceBlock ?? 'Source sample rate is unconfirmed.');
+              loadedState = state;
+            } else {
+              final applied = !_currentSourceNeedsRawInteger &&
+                  await _hiResAudioService.setBitPerfectMode(true);
+              if (!applied) {
+                // Same fallback as the manual toggle: DACs without platform
+                // exclusive mixer attributes can still run Pulsr's direct USB sink.
+                final direct = await _tryStartDirectUsbStreaming(
+                    strict: loadedState.strictBitPerfect);
+                if (!direct) {
+                  // An unconfirmed start may still be holding the isochronous
+                  // endpoint. Clearing the preference while it lives would
+                  // orphan the stream, so keep the mode on unless teardown is
+                  // actually confirmed.
+                  final stillClaimed = _bitPerfectViaDirectStream &&
+                      !await _stopDirectUsbStreaming();
+                  if (stillClaimed) {
+                    safeEmit(state.copyWith(
+                      errorMessage:
+                          'The USB stream could not be confirmed or released. '
+                          'Bit-Perfect stays enabled; turn it off to release the DAC.',
+                    ));
+                  } else {
+                    await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
+                    await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+                    loadedState = loadedState.copyWith(
+                      bitPerfectOutput: false,
+                      strictBitPerfect: false,
+                    );
+                    safeEmit(state.copyWith(
+                        bitPerfectOutput: false, strictBitPerfect: false));
+                  }
                 }
               }
             }
@@ -1165,31 +1198,22 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           // Re-assert the DSP-bypass policy at boot: without this the Kotlin
           // effects plugin keeps its default (bypass off) after a restart and
           // the saved bit-perfect conflict rule is not enforced this session.
-          if (getIt.isRegistered<EqualizerManager>()) {
-            await getIt<EqualizerManager>().setBypassDspForBitPerfect(
-                loadedState.bitPerfectOutput &&
-                    loadedState.bypassDspOnBitPerfect);
-          } else {
-            await AudioEffectsChannel().setBypassDspForBitPerfect(
-                loadedState.bitPerfectOutput &&
-                    loadedState.bypassDspOnBitPerfect);
-          }
+          await _pushBitPerfectBypass(state.bitPerfectOutput &&
+              (state.bypassDspOnBitPerfect || state.strictBitPerfect));
         } catch (e, st) {
           ErrorLogger.log('Failed to restore native bit-perfect bypass',
               error: e, stackTrace: st, category: 'SettingsCubit');
           if (loadedState.bitPerfectOutput) {
-            await _hiResAudioService.setBitPerfectMode(false);
-            await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-            await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-            loadedState = loadedState.copyWith(
-                bitPerfectOutput: false, strictBitPerfect: false);
-            safeEmit(state.copyWith(
-                bitPerfectOutput: false, strictBitPerfect: false));
+            await _rollbackBitPerfectEnable(
+                'Failed to restore native bit-perfect bypass.');
+            loadedState = state;
           }
         }
         final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
         final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
-        if (savedSampleRate > 0 || savedBitDepth > 0) {
+        if (!state.strictBitPerfect && !state.followTrackSampleRate &&
+            !_bitPerfectViaDirectStream &&
+            (savedSampleRate > 0 || savedBitDepth > 0)) {
           await _hiResAudioService.setTargetOutputFormat(
             sampleRate: savedSampleRate,
             bitDepth: savedBitDepth,
