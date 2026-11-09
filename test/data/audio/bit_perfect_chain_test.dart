@@ -3,6 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/audio/bit_perfect_chain.dart';
 
 void main() {
+  group('effectiveSourceBitDepth', () {
+    test('the decoder probe wins over a stale tag', () {
+      expect(effectiveSourceBitDepth(tagged: 16, decoded: 24), 24);
+      expect(effectiveSourceBitDepth(tagged: 24, decoded: 16), 24);
+      expect(effectiveSourceBitDepth(tagged: 0, decoded: 24), 24);
+      expect(effectiveSourceBitDepth(tagged: 16, decoded: 0), 16);
+    });
+  });
+
   group('assessBitPerfectChain', () {
     test('reports notRequested when Bit-Perfect is off', () {
       final result = assessBitPerfectChain(
@@ -203,6 +212,36 @@ void main() {
       expect(result.verdict, BitPerfectChainVerdict.unverified);
       expect(result.reasonCode, 'samples_modified');
       expect(result.isVerified, isFalse);
+    });
+
+    test('digital volume attenuation downgrades an otherwise verified chain',
+        () {
+      final result = assessBitPerfectChain(
+        requested: true,
+        active: true,
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        outputSampleRate: 96000,
+        outputBitDepth: 24,
+        digitalVolumeAttenuated: true,
+      );
+
+      expect(result.verdict, BitPerfectChainVerdict.unverified);
+      expect(result.reasonCode, 'digital_volume_attenuation');
+    });
+
+    test('a rate mismatch still outranks volume attenuation', () {
+      final result = assessBitPerfectChain(
+        requested: true,
+        active: true,
+        sourceSampleRate: 44100,
+        sourceBitDepth: 16,
+        outputSampleRate: 48000,
+        outputBitDepth: 16,
+        digitalVolumeAttenuated: true,
+      );
+
+      expect(result.verdict, BitPerfectChainVerdict.resampled);
     });
   });
 }

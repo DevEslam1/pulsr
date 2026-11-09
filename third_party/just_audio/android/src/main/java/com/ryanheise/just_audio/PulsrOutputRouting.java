@@ -144,6 +144,23 @@ public final class PulsrOutputRouting {
         return false;
     }
 
+    /**
+     * Decoded PCM truth probe: [encoding, sampleRate, channels] of the last
+     * Media3 float-tap configure, or zeros when it has not run yet.
+     */
+    public static int[] decodedPcmSnapshot() {
+        return new int[] {
+            FloatDspAudioSink.lastDecodedPcmEncoding,
+            FloatDspAudioSink.lastDecodedSampleRate,
+            FloatDspAudioSink.lastDecodedChannelCount,
+        };
+    }
+
+    /** True while a native AAudio sink is registered (playing or idle). */
+    public static synchronized boolean hasAaudioSink() {
+        return !nativeSinks.isEmpty();
+    }
+
     public static synchronized int[] snapshot() {
         int[] nativeFallback = null;
         for (AAudioAudioSink sink : nativeSinks) {

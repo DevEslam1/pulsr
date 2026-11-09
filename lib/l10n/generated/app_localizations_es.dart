@@ -5279,7 +5279,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsFloatDspDesc =>
-      'Alta resolución primero: alimenta la cadena DSP nativa con muestras float32 para conservar la profundidad de fuentes de 24/32 bits (el contenido de 16 bits no se ve afectado). Los dispositivos no compatibles usan 16 bits de forma segura';
+      'Alta resolución primero: alimenta la cadena DSP nativa con muestras float32 para conservar la profundidad de fuentes de 24/32 bits (el contenido de 16 bits no se ve afectado). Los dispositivos no compatibles usan 16 bits de forma segura. Desactivada: las fuentes de 24/32 bits se reducen a 16 bits en esta ruta.';
 
   @override
   String get settingsFloatDspPath => 'Ruta DSP de coma flotante de 24/32 bits';
@@ -9770,8 +9770,16 @@ class AppLocalizationsEs extends AppLocalizations {
       'USB Audio Class 3 (UAC3) no es compatible con la reproducción Bit-Perfect.';
 
   @override
+  String get conflictSource32BitIntegerNotBitPerfect =>
+      'El audio entero de 32 bits necesita una etapa float32 antes del DAC y no puede reproducirse con bit-perfect.';
+
+  @override
   String get conflictSource32BitFloatNotBitPerfect =>
       'El audio de punto flotante de 32 bits requiere una conversión con pérdidas y no se puede reproducir en Bit-Perfect.';
+
+  @override
+  String get bpDigitalVolumeAttenuation =>
+      'Volumen digital por debajo del 100%: bit-perfect requiere ganancia unitaria';
 
   @override
   String get bpSourceCodecUnconfirmed => 'Códec de origen no confirmado';

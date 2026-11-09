@@ -5235,7 +5235,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get settingsFloatDspDesc =>
-      'الدقة العالية أولاً: يغذّي سلسلة DSP الأصلية بعينات float32 للحفاظ على عمق المصادر 24/32 بت (المحتوى 16 بت غير متأثر). الأجهزة غير المدعومة تتراجع بأمان إلى 16 بت';
+      'الدقة العالية أولاً: يغذّي سلسلة DSP الأصلية بعينات float32 للحفاظ على عمق المصادر 24/32 بت (المحتوى 16 بت غير متأثر). الأجهزة غير المدعومة تتراجع بأمان إلى 16 بت. عند الإيقاف: تُخفَّض مصادر 24/32 بت إلى 16 بت على هذا المسار.';
 
   @override
   String get settingsFloatDspPath => 'مسار DSP عائم 24/32 بت';
@@ -9623,8 +9623,16 @@ class AppLocalizationsAr extends AppLocalizations {
       'فئة صوت USB 3 (UAC3) غير مدعومة للتشغيل بدقة Bit-Perfect.';
 
   @override
+  String get conflictSource32BitIntegerNotBitPerfect =>
+      'يحتاج الصوت الصحيح 32 بت إلى مرحلة float32 قبل DAC ولا يمكن تشغيله بدقة بتية كاملة.';
+
+  @override
   String get conflictSource32BitFloatNotBitPerfect =>
       'يتطلب الصوت ذو الفاصلة العائمة 32 بت تحويلاً غير متطابق ولا يمكن تشغيله بدقة Bit-Perfect.';
+
+  @override
+  String get bpDigitalVolumeAttenuation =>
+      'مستوى الصوت الرقمي أقل من 100% — تتطلب الدقة البتية الكاملة وحدة الكسب';
 
   @override
   String get bpSourceCodecUnconfirmed => 'ترميز المصدر غير مؤكد';

@@ -385,7 +385,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (adaptiveQualityManager.enabled) {
       return adaptiveQualityManager.currentQuality;
     }
-    return _cachedPrefs?.getString('setting_streaming_quality') ?? 'high';
+    return _cachedPrefs?.getString(PrefsKeys.streamingQuality) ?? 'high';
   }
 
   final AdaptiveBufferEngine _adaptiveBufferEngine = AdaptiveBufferEngine();
@@ -740,8 +740,10 @@ class PulsrAudioHandler extends BaseAudioHandler
               (target.remoteId != null && target.remoteId == song.remoteId)) {
             final updated = target.copyWith(
               bitrateKbps: Value(bitrate),
-              codec: Value(codec),
-              sampleRate: Value(codec == 'OPUS' ? 48000 : 44100),
+              codec: codec != null ? Value(codec) : const Value.absent(),
+              sampleRate: codec == null
+                  ? const Value.absent()
+                  : Value(codec == 'OPUS' ? 48000 : 44100),
             );
             _songs[songIndex] = updated;
             if (mediaItem.value?.id == updated.id.toString()) {
@@ -1765,7 +1767,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         preferExclusive:
             _cachedPrefs?.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
         targetBufferMs:
-            _cachedPrefs?.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 150,
+            _cachedPrefs?.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 24,
       );
     } catch (e, st) {
       ErrorLogger.log('Failed to restore AAudio output setting',
@@ -2170,8 +2172,9 @@ class PulsrAudioHandler extends BaseAudioHandler
                     }
                   } else {
                     unawaited(
-                        skipToNext().catchError((Object e, StackTrace st) {
-                      ErrorLogger.log('Auto-advance skipToNext failed',
+                        _advanceAtTrackBoundary().catchError(
+                            (Object e, StackTrace st) {
+                      ErrorLogger.log('Auto-advance failed',
                           error: e, stackTrace: st, category: 'AudioHandler');
                     }));
                   }
@@ -2757,12 +2760,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       try {
         final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
         hedgedResolutionEnabled =
-            prefs.getBool('hedged_resolution_enabled') ?? true;
+            prefs.getBool(PrefsKeys.hedgedResolutionEnabled) ?? true;
         adaptiveQualityManager.enabled =
-            prefs.getBool('adaptive_quality_enabled') ?? true;
+            prefs.getBool(PrefsKeys.adaptiveQualityEnabled) ?? true;
         // Don't let stale adaptive_runtime_quality override setting_streaming_quality
-        final userQ = prefs.getString('setting_streaming_quality');
-        final savedQ = userQ ?? prefs.getString('adaptive_runtime_quality');
+        final userQ = prefs.getString(PrefsKeys.streamingQuality);
+        final savedQ =
+            userQ ?? prefs.getString(PrefsKeys.adaptiveRuntimeQuality);
         if (savedQ != null && savedQ.isNotEmpty) {
           adaptiveQualityManager.setQuality(savedQ);
         }

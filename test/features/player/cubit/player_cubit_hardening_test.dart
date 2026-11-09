@@ -19,7 +19,6 @@ import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/controllers/player_controllers.dart';
 import 'package:pulsr/features/player/cubit/managers/player_managers.dart';
-import 'package:pulsr/features/player/cubit/player_constants.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_scrobble_coordinator.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -706,7 +705,7 @@ void main() {
     });
 
     test(
-        'Fix #6: maybeFollowTrackSampleRate defaults bitDepth to 16 when track lacks bitDepth',
+        'Fix #6: maybeFollowTrackSampleRate resolves an unknown bitDepth without narrowing to 16-bit',
         () async {
       final mockHiRes = MockHiResAudioService();
       final mockSettings = MockSettingsCubit();
@@ -756,10 +755,12 @@ void main() {
       );
       await dspController.maybeFollowTrackSampleRate(trackWithZeroDepth);
 
-      // Verify PlayerConstants.defaultBitDepth (16) was sent rather than 0
+      // An unread track depth is not a 16-bit track: widening 16-bit audio
+      // into a 24-bit container is exact, while narrowing a 24/32-bit file
+      // whose tags were not read is lossy (see resolveFollowBitDepth).
       verify(() => mockHiRes.setTargetOutputFormat(
             sampleRate: any(named: 'sampleRate'),
-            bitDepth: PlayerConstants.defaultBitDepth,
+            bitDepth: 24,
           )).called(1);
     });
 

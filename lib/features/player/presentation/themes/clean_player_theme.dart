@@ -112,10 +112,10 @@ class CleanPlayerTheme extends StatelessWidget {
               top: true,
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.only(
+                padding: const EdgeInsetsDirectional.only(
                   top: AppSpacing.sm,
-                  left: AppSpacing.md,
-                  right: AppSpacing.md,
+                  start: AppSpacing.md,
+                  end: AppSpacing.md,
                   bottom: AppSpacing.xs,
                 ),
                 child: const SizedBox.expand(

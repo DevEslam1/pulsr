@@ -278,9 +278,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
     expect(find.textContaining(l10n.usbBpFailed), findsOneWidget);
 
-    // The Retry action re-runs the same owned transition.
+    // The Retry action re-runs the same owned transition. The failure banner is
+    // the app's floating toast (PulsrToast), not a Material SnackBar, so the
+    // action is matched by its label.
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.tap(find.byType(SnackBarAction), warnIfMissed: false);
+    await tester.tap(find.text(l10n.retry), warnIfMissed: false);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(modeRequests.where((v) => v).length, greaterThanOrEqualTo(2));

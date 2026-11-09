@@ -280,6 +280,67 @@ void main() {
           isTrue);
     });
   });
+
+  group('YtmResolvingSource.isRetryable5xx & retryWithBackoff', () {
+    test('matches structured HTTP 5xx status codes', () {
+      expect(
+          YtmResolvingSource.isRetryable5xx(
+              Exception('HTTP Status Error: 500')),
+          isTrue);
+      expect(
+          YtmResolvingSource.isRetryable5xx(
+              Exception('HTTP Status Error: 503')),
+          isTrue);
+      expect(
+          YtmResolvingSource.isRetryable5xx(
+              const HttpException('Response code 502')),
+          isTrue);
+    });
+
+    test('rejects bare digits in video IDs, byte counts, and 4xx errors', () {
+      expect(
+          YtmResolvingSource.isRetryable5xx(
+              const HttpException('Closed after 5 bytes for vid500xyz')),
+          isFalse);
+      expect(
+          YtmResolvingSource.isRetryable5xx(
+              Exception('clen=5001234 itag=251')),
+          isFalse);
+      expect(
+          YtmResolvingSource.isRetryable5xx(
+              Exception('HTTP Status Error: 403')),
+          isFalse);
+    });
+
+    test('retryWithBackoff defaults to 2 attempts on 5xx and 1 on non-5xx',
+        () async {
+      var calls5xx = 0;
+      await expectLater(
+        YtmResolvingSource.retryWithBackoff<String>(
+          () async {
+            calls5xx++;
+            throw Exception('HTTP Status Error: 503');
+          },
+          initialDelay: const Duration(milliseconds: 5),
+        ),
+        throwsException,
+      );
+      expect(calls5xx, 2);
+
+      var calls4xx = 0;
+      await expectLater(
+        YtmResolvingSource.retryWithBackoff<String>(
+          () async {
+            calls4xx++;
+            throw const HttpException('Closed after 5 bytes (status 403)');
+          },
+          initialDelay: const Duration(milliseconds: 5),
+        ),
+        throwsA(isA<HttpException>()),
+      );
+      expect(calls4xx, 1);
+    });
+  });
 }
 
 /// Pre-creates the byte-cache file for [videoId] so `LockCachingAudioSource`

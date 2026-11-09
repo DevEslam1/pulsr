@@ -24,6 +24,8 @@ import '../../../settings/cubit/settings_state.dart';
 import '../../../settings/presentation/widgets/bit_perfect_conflict_dialog.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../data/audio/audio_handler.dart';
 import 'pulsr_cast_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -1556,11 +1558,25 @@ class AudioQualitySheet extends StatelessWidget {
         : (activeStages.isEmpty
             ? context.l10n.bpDspCleanPath
             : activeStages.join(' + '));
+    // App volume is applied by the AudioTrack on the mixer path. The UAC2
+    // tee writes pre-volume samples, and AAudio exclusive locks PCM volume
+    // to unity, so neither should be flagged for a low app slider.
+    double softwareVolume = 1.0;
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        softwareVolume = getIt<PulsrAudioHandler>().volume;
+      }
+    } catch (_) {}
     final assessment = assessBitPerfectChain(
       requested: requested,
       active: outputDevice?.isBitPerfectActive == true,
       sourceSampleRate: currentSong?.sampleRate ?? 0,
-      sourceBitDepth: currentSong?.bitDepth ?? 0,
+      // The decoder is the truth source: a 24-bit ALAC tagged 16 must not
+      // make a 16-bit output look verified.
+      sourceBitDepth: effectiveSourceBitDepth(
+        tagged: currentSong?.bitDepth ?? 0,
+        decoded: outputDevice?.decodedBitDepth ?? 0,
+      ),
       // Prefer the direct USB sink's negotiated rate/depth when it is active;
       // fall back to the AudioTrack output device values otherwise.
       outputSampleRate: (effectiveUsbStatus.streamingActive &&
@@ -1577,6 +1593,10 @@ class AudioQualitySheet extends StatelessWidget {
       samplesModified: currentSong?.bitDepth == 32 ||
           (!dspBypassed && (anyStageEdits || gainEdits)),
       channelsAltered: channelsAltered,
+      digitalVolumeAttenuated: !effectiveUsbStatus.streamingActive &&
+          settingsState?.aaudioOutputEnabled != true &&
+          !effectiveUsbStatus.hardwareVolumeApplied &&
+          softwareVolume < 0.999,
       // Bug fix: when bit-perfect is active via Android 14 AudioMixerAttributes
       // (native exclusive path), the direct USB sink is NOT running and
       // rateVerified stays false. Gate the verified flag on the transport: only
@@ -1607,7 +1627,9 @@ class AudioQualitySheet extends StatelessWidget {
       BitPerfectChainVerdict.unverified =>
         assessment.reasonCode == 'source_codec_unconfirmed'
             ? context.l10n.bpSourceCodecUnconfirmed
-            : context.l10n.bpPlatformConversion,
+            : assessment.reasonCode == 'digital_volume_attenuation'
+                ? context.l10n.bpDigitalVolumeAttenuation
+                : context.l10n.bpPlatformConversion,
     };
     final resamplerColor = assessment.isProblem
         ? p.warning

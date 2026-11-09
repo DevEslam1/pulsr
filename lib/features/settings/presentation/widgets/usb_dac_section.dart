@@ -110,6 +110,10 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           position: PulsrToastPosition.top,
           maxLines: 6,
           message: '${context.l10n.usbBpFailed}: $failure',
+          // A refused claim is recoverable: keep the retry affordance the
+          // exclusive-mode failure needs, routed through the same owner.
+          actionLabel: context.l10n.retry,
+          onActionPressed: () => _toggleStreaming(true),
         );
       }
       await _refresh();

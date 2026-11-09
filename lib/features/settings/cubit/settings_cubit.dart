@@ -574,7 +574,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false,
       aaudioPreferExclusive:
           prefs.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
-      aaudioTargetBufferMs: prefs.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 150,
+      // 24 ms is a USB-DAC-safe default; 150 ms remains available for
+      // jittery links and is still the right value on Bluetooth.
+      aaudioTargetBufferMs: prefs.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 24,
       sincResamplerQuality: prefs.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
       bpmSyncCrossfadeEnabled:
           prefs.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false,

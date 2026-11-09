@@ -1680,9 +1680,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // MIXER_BEHAVIOR_BIT_PERFECT, so it counts as supported/active too.
         val finalIsBitPerfectSupported = isUsb && !isBluetooth
         val stream = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
+        val decoded = com.ryanheise.just_audio.PulsrOutputRouting.decodedPcmSnapshot()
+        val decodedDepth = encodingBitDepth(decoded[0])
+        val sinkDepth = encodingBitDepth(stream[2])
+        // A float32 sink carries a 16/24-bit decoder grid exactly, so the
+        // mixer comparison must use the decoded depth rather than the
+        // 32-bit float container. AAudio reports its own measured format;
+        // the Media3 probe is stale there and must not be substituted.
+        val floatCarriesDecoded = !com.ryanheise.just_audio.PulsrOutputRouting.hasAaudioSink() &&
+            stream[2] == AudioFormat.ENCODING_PCM_FLOAT &&
+            decodedDepth in 16..24
+        val reportedDepth = if (floatCarriesDecoded) decodedDepth else sinkDepth
         val mixerActive = isUsb && !isBluetooth && isBitPerfectActive &&
             (activeMixerRate == 0 || stream[1] == activeMixerRate) &&
-            (activeMixerEncoding == 0 || stream[2] == activeMixerEncoding)
+            (activeMixerEncoding == 0 ||
+                reportedDepth == encodingBitDepth(activeMixerEncoding))
         // Confirmed only when the sink itself is alive AND still owns the
         // endpoint it opened: a boolean alone could outlive a device unplug.
         val directStream = UsbExclusivePlugin.confirmedDirectStream()
@@ -1709,9 +1721,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["sampleRate"] = directStream?.sampleRate ?: stream[1]
         result["nativeSampleRate"] = nativeSampleRate
         result["nativeFramesPerBuffer"] = nativeFrames
-        result["bitDepth"] = directStream?.bitDepth ?: encodingBitDepth(stream[2])
+        result["bitDepth"] = directStream?.bitDepth ?: reportedDepth
         result["outputChannels"] = directStream?.channels ?: 0
         result["pcmEncoding"] = stream[2]
+        result["decodedBitDepth"] = decodedDepth
+        result["decodedSampleRate"] = decoded[1]
+        result["decodedPcmEncoding"] = decoded[0]
         result["isBitPerfectActive"] = finalIsBitPerfectActive
         result["isBitPerfectSupported"] = finalIsBitPerfectSupported
         result["isDirectSupported"] = isDirectSupported

@@ -490,6 +490,23 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       await refreshOutputDevice();
       return;
     }
+    // Silence skipping removes frames, so it cannot run beside a bit-exact
+    // claim. It is refused while the bypass is active, but a session that
+    // enabled it before Bit-Perfect would keep the Media3 processor running.
+    // Disable it here and restore the user's sensitivity on the way out.
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        final handler = getIt<PulsrAudioHandler>();
+        if (enabled && state.bypassDspOnBitPerfect) {
+          await handler.setSkipSilenceEnabled(false);
+        } else if (!enabled && state.silenceSkipSensitivity > 0) {
+          await handler.setSilenceSkipSensitivity(state.silenceSkipSensitivity);
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reconcile silence skip with Bit-Perfect',
+          error: e, stackTrace: st, category: 'SettingsAudioActions');
+    }
     await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
     if (!enabled) {
       markDirty('strictBitPerfect');
@@ -671,7 +688,13 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         // as `true` from the Strict enable path.
         await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, restoreBypass);
         await prefs.setBool(PrefsKeys.followTrackSampleRate, restoreFollowRate);
-        await _pushBitPerfectBypass(state.bitPerfectOutput && restoreBypass);
+        final targetBypass = state.bitPerfectOutput && restoreBypass;
+        // Only push a real change. Re-sending the value the native chain
+        // already holds rebuilds the processing chain for nothing, and Strict
+        // OFF commonly restores `true` while the chain is already bypassed.
+        if (targetBypass != state.bypassDspOnBitPerfect) {
+          await _pushBitPerfectBypass(targetBypass);
+        }
         safeEmit(state.copyWith(
           strictBitPerfect: false,
           bypassDspOnBitPerfect: restoreBypass,
@@ -1586,12 +1609,32 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// output, silently bypassing the user's EQ and gain would leave a chain with
   /// no processing and no bit-perfect either.
   Future<void> applyMaximumQualityPreset() async {
+    // Depth first: with the float DSP path off Media3 inserts a 16-bit
+    // converter ahead of the native chain, so a 24/32-bit source would reach
+    // the DAC as 16-bit no matter what Bit-Perfect later reports.
+    if (!state.floatOutputEnabled) {
+      await setFloatOutputEnabled(true);
+    }
+    // AAudio replaces the ExoPlayer sink the direct UAC2 tee lives in. On a
+    // USB DAC the tee is the path that can prove its format, so prefer it.
+    if (state.aaudioOutputEnabled &&
+        state.currentOutputDevice?.isUsbDac == true) {
+      await setAaudioOutputEnabled(false);
+      if (state.aaudioOutputEnabled) return;
+    }
     await setBitPerfectOutput(true);
     if (!state.bitPerfectOutput) return;
     await setBypassDspOnBitPerfect(true);
     if (!state.bypassDspOnBitPerfect) return;
-    await setReplayGainMode(ReplayGainMode.off);
+    // These stages edit or overlap the stream; a bit-exact claim cannot
+    // coexist with them. Order: crossfade before gapless (gapless refuses a
+    // non-zero crossfade), silence skip before it is re-armed anywhere.
+    await setCrossfade(0.0);
+    if (state.silenceSkipSensitivity > 0) {
+      await setSilenceSkipSensitivity(0);
+    }
     await setGapless(true);
+    await setReplayGainMode(ReplayGainMode.off);
   }
 
   /// Applies the "Smooth Playback" preset: no bit-perfect, automatic

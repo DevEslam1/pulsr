@@ -29,6 +29,15 @@ enum BitPerfectChainVerdict {
   unverified,
 }
 
+/// The source depth the chain should compare against.
+///
+/// The database tag is what the scanner read; the decoder probe is what the
+/// sink actually received. A 24-bit ALAC whose tag says 16 must be judged at
+/// 24, otherwise a 16-bit output is reported as a verified match. The wider
+/// of the two is always the truthful source depth.
+int effectiveSourceBitDepth({required int tagged, required int decoded}) =>
+    decoded > tagged ? decoded : tagged;
+
 class BitPerfectChainAssessment {
   final BitPerfectChainVerdict verdict;
   final int sourceSampleRate;
@@ -96,6 +105,10 @@ BitPerfectChainAssessment assessBitPerfectChain({
   bool isDsdNative = false,
   bool samplesModified = false,
   bool channelsAltered = false,
+  /// The active sink scales the samples with software/system volume below
+  /// unity. A bit-exact claim needs unity gain; below it the samples are
+  /// attenuated even when the format matches.
+  bool digitalVolumeAttenuated = false,
   bool rateVerified = true,
   bool sourceCodecUnconfirmed = false,
   String? failureReason,
@@ -230,6 +243,20 @@ BitPerfectChainAssessment assessBitPerfectChain({
       outputSampleRate: outputSampleRate,
       outputBitDepth: outputBitDepth,
       reasonCode: 'depth_truncated',
+    );
+  }
+
+  // Volume is checked last on purpose: a rate mismatch or a narrower output
+  // is the more serious finding and must keep its specific verdict. Volume
+  // only downgrades what would otherwise be called verified.
+  if (digitalVolumeAttenuated) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: 'digital_volume_attenuation',
     );
   }
 

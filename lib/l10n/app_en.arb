@@ -4094,7 +4094,7 @@
   "settingsExportSessionLogsDesc": "Share the on-device JSONL log of your recent playback sessions",
   "settingsExtendedSpeedRange": "Extended speed range",
   "settingsExtendedSpeedRangeSubtitle": "Allow 0.1x–8.0x playback speed (default 0.25x–4.0x)",
-  "settingsFloatDspDesc": "Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit",
+  "settingsFloatDspDesc": "Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit. Off: 24/32-bit sources are reduced to 16-bit on this path.",
   "settingsFloatDspPath": "24/32-bit Float DSP Path",
   "settingsGoogleCast": "Google Cast",
   "settingsHardwareAudioOutput": "Hardware Audio Output",
@@ -7362,9 +7362,17 @@
   "@uac3Unsupported": {
     "description": "Error message when device is UAC3 which is unsupported for direct bit-perfect streaming"
   },
+  "conflictSource32BitIntegerNotBitPerfect": "32-bit integer audio needs a float32 stage before the DAC and cannot be played bit-perfect.",
+  "@conflictSource32BitIntegerNotBitPerfect": {
+    "description": "Conflict message explaining 32-bit integer audio loses its low 8 bits in the float32 pipeline"
+  },
   "conflictSource32BitFloatNotBitPerfect": "32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.",
   "@conflictSource32BitFloatNotBitPerfect": {
     "description": "Conflict message explaining 32-bit float audio requires conversion and cannot be bit-perfect"
+  },
+  "bpDigitalVolumeAttenuation": "Digital volume below 100% — bit-perfect requires unity gain",
+  "@bpDigitalVolumeAttenuation": {
+    "description": "Verdict reason when software or system volume attenuates the bit-perfect stream"
   },
   "bpSourceCodecUnconfirmed": "Source codec not confirmed",
   "@bpSourceCodecUnconfirmed": {

@@ -9428,7 +9428,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsFloatDspDesc.
   ///
   /// In en, this message translates to:
-  /// **'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit'**
+  /// **'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit. Off: 24/32-bit sources are reduced to 16-bit on this path.'**
   String get settingsFloatDspDesc;
 
   /// No description provided for @settingsFloatDspPath.
@@ -17143,11 +17143,23 @@ abstract class AppLocalizations {
   /// **'USB Audio Class 3 (UAC3) is not supported for bit-perfect playback.'**
   String get uac3Unsupported;
 
+  /// Conflict message explaining 32-bit integer audio loses its low 8 bits in the float32 pipeline
+  ///
+  /// In en, this message translates to:
+  /// **'32-bit integer audio needs a float32 stage before the DAC and cannot be played bit-perfect.'**
+  String get conflictSource32BitIntegerNotBitPerfect;
+
   /// Conflict message explaining 32-bit float audio requires conversion and cannot be bit-perfect
   ///
   /// In en, this message translates to:
   /// **'32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.'**
   String get conflictSource32BitFloatNotBitPerfect;
+
+  /// Verdict reason when software or system volume attenuates the bit-perfect stream
+  ///
+  /// In en, this message translates to:
+  /// **'Digital volume below 100% — bit-perfect requires unity gain'**
+  String get bpDigitalVolumeAttenuation;
 
   /// Verdict reason when the audio source container is ambiguous and the decoder codec is unconfirmed
   ///

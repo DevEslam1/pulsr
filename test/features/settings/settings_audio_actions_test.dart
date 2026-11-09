@@ -66,8 +66,25 @@ void main() {
       addTearDown(cubit.close);
       await cubit.preferencesReady;
 
+      // Start from the worst realistic state: float DSP off (so a 24-bit
+      // source would be narrowed to 16-bit), AAudio on, a live crossfade
+      // and silence skipping on, with a USB DAC routed.
+      cubit.safeEmit(cubit.state.copyWith(
+        currentOutputDevice: usbDac,
+        floatOutputEnabled: false,
+        aaudioOutputEnabled: true,
+        crossfadeSeconds: 3.0,
+        silenceSkipSensitivity: 40,
+      ));
+
       await cubit.applyMaximumQualityPreset();
       expect(cubit.state.bitPerfectOutput, true);
+      // Maximum Quality must preserve 24/32-bit depth and remove every
+      // stage that would edit the stream.
+      expect(cubit.state.floatOutputEnabled, true);
+      expect(cubit.state.aaudioOutputEnabled, false);
+      expect(cubit.state.crossfadeSeconds, 0.0);
+      expect(cubit.state.silenceSkipSensitivity, 0);
       expect(cubit.state.bypassDspOnBitPerfect, true);
       expect(cubit.state.replayGainMode, ReplayGainMode.off);
       expect(cubit.state.gaplessPlayback, true);

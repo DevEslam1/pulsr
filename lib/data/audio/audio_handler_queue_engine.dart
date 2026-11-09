@@ -888,7 +888,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
     final fastArtUri = song.artworkUri != null
         ? Uri.tryParse(song.artworkUri!)
-        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+        : (song.remoteArtworkUrl != null &&
+                !song.remoteArtworkUrl!.startsWith('assets/')
             ? Uri.tryParse(song.remoteArtworkUrl!)
             : ArtworkUriResolver.getCachedArtworkUri(song.id));
     final item = PulsrAudioHandler._songToMediaItem(song, fastArtUri);
@@ -1155,7 +1156,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     final song = songsSnapshot[targetIndex];
     final fastArtUri = song.artworkUri != null
         ? Uri.tryParse(song.artworkUri!)
-        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+        : (song.remoteArtworkUrl != null &&
+                !song.remoteArtworkUrl!.startsWith('assets/')
             ? Uri.tryParse(song.remoteArtworkUrl!)
             : ArtworkUriResolver.getCachedArtworkUri(song.id));
     mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
@@ -1385,7 +1387,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
     final fastArtUri = song.artworkUri != null
         ? Uri.tryParse(song.artworkUri!)
-        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+        : (song.remoteArtworkUrl != null &&
+                !song.remoteArtworkUrl!.startsWith('assets/')
             ? Uri.tryParse(song.remoteArtworkUrl!)
             : ArtworkUriResolver.getCachedArtworkUri(song.id));
     mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
@@ -1450,6 +1453,165 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     );
   }
 
+  /// Automatic advance at a natural track boundary.
+  ///
+  /// Gapless mode advances natively, so this only special-cases the per-track
+  /// engine: when the successor is already prepared on the inactive player,
+  /// play it there instead of tearing the active player down. Anything else
+  /// (a missing/failed preload, repeat-one, end of queue) falls through to
+  /// [skipToNext]'s historical path.
+  ///
+  /// Kept separate from [skipToNext] on purpose: a *manual* skip happens while
+  /// the outgoing track is still audible, where a hard handover would click
+  /// and the audio_service contract must stay unchanged.
+  Future<void> _advanceAtTrackBoundary() async {
+    if (_gaplessMode && _gaplessLoaded) {
+      await skipToNext();
+      return;
+    }
+    cancelPrefetches();
+    // peek:true does not consume a pre-committed shuffle pick, so a fallback
+    // skipToNext() resolves the very same successor.
+    final nextIdx = _getNextIndex(peek: true);
+    if (nextIdx != null && nextIdx != _currentIndex) {
+      if (await _handoverToPreloaded(nextIdx)) return;
+    }
+    await skipToNext();
+  }
+
+  /// Plays [nextIndex] on the player that [TripleBufferPipeline.preloadNext]
+  /// already prepared, instead of tearing the active player down.
+  ///
+  /// The per-track engine used to advance by pausing and stopping the active
+  /// player, waiting a fixed 120 ms for the old decoder to die and then
+  /// re-preparing the successor on a brand-new AudioTrack (plus a fresh HAL
+  /// effect session). That teardown is the ~0.5 s hole between songs. The
+  /// successor's bytes are already buffered on the inactive player, so issuing
+  /// play() there and swapping the two player roles leaves only the sink's own
+  /// start latency.
+  ///
+  /// Returns false when the preload is missing, stale, or another engine owns
+  /// the inactive player; the caller then falls back to [playSongAt].
+  Future<bool> _handoverToPreloaded(int nextIndex) async {
+    if (_gaplessMode) return false;
+    if (_crossfadeManager.isCrossfading ||
+        _crossfadeManager.duration > Duration.zero) {
+      return false;
+    }
+    if (nextIndex < 0 || nextIndex >= _songs.length) return false;
+    final song = _songs[nextIndex];
+    if (_tripleBufferPipeline.preloadedSongId != song.id) return false;
+    if (!await _tripleBufferPipeline.claimInactive(PlayerClaim.handover)) {
+      return false;
+    }
+    var handoverDone = false;
+    try {
+      // Re-check under the claim: a queue edit or a newer preload may have
+      // landed while the claim awaited.
+      if (_songs.length <= nextIndex || _songs[nextIndex].id != song.id) {
+        return false;
+      }
+      if (_tripleBufferPipeline.preloadedSongId != song.id) return false;
+
+      final outgoing = _activePlayer;
+      final incoming = _inactivePlayer;
+      // A player parked at the end of a previous track cannot start from a
+      // plain play(); only a fresh source resets it. Hand such a case to
+      // [playSongAt] instead of "playing" a track that will not move.
+      if (incoming.processingState == ProcessingState.completed) {
+        return false;
+      }
+      // No generation bump here: the claim above already serialises this
+      // handover against any preload/crossfade on the inactive player, and a
+      // bump would cancel a user tap that landed in the same boundary window
+      // (playSongAt checks its token after every await).
+      await incoming.setVolume(_calculateReplayGainVolume(song));
+      // just_audio's play() future only completes on the next pause/stop, so
+      // awaiting it would park the handover for the whole track.
+      unawaited(incoming.play());
+
+      _isPlayerAActive = !_isPlayerAActive;
+      _currentIndex = nextIndex;
+      _savedQueueIndex = nextIndex;
+      final currentSessionId =
+          _isPlayerAActive ? _playerASessionId : _playerBSessionId;
+      _audioSessionIdRouter.handleSessionId(
+          currentSessionId ?? _activePlayer.androidAudioSessionId);
+      final fastArtUri = song.artworkUri != null
+          ? Uri.tryParse(song.artworkUri!)
+          : (song.remoteArtworkUrl != null &&
+                  !song.remoteArtworkUrl!.startsWith('assets/')
+              ? Uri.tryParse(song.remoteArtworkUrl!)
+              : ArtworkUriResolver.getCachedArtworkUri(song.id));
+      mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+      _notifyTrackChanged(song);
+      _planNextStreamResolution();
+      _repository.recordPlayHistory(song.id);
+      _broadcastState(_activePlayer.playbackEvent);
+      _saveCurrentPosition();
+
+      ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+        if (artUri != null &&
+            artUri != fastArtUri &&
+            _currentIndex == nextIndex &&
+            currentSong?.id == song.id) {
+          mediaItem.add(PulsrAudioHandler._songToMediaItem(song, artUri));
+        }
+      }).catchError((_) {});
+
+      // The outgoing track already reached its end, so stopping it cannot cut
+      // audio; it frees the player that receives the next preload. Neither
+      // failure may abort a transition that is already audible.
+      await _bestEffort(outgoing.stop, 'stop the finished track');
+      await _bestEffort(() => outgoing.setVolume(_volume),
+          'reset the finished track volume');
+      _tripleBufferPipeline.clearPreload();
+      handoverDone = true;
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Preloaded handover failed; falling back to a full load',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      return false;
+    } finally {
+      _tripleBufferPipeline.releaseInactive(PlayerClaim.handover);
+      // Schedule only after the claim is released: preloadNext() takes the
+      // same claim and would be refused while this handover still owns it,
+      // leaving the FOLLOWING boundary without a preload.
+      if (handoverDone) _scheduleLookaheadPreload(nextIndex);
+    }
+  }
+
+  /// Runs a best-effort teardown step, logging instead of throwing.
+  ///
+  /// A failed stop()/setVolume() on the player that just finished its track
+  /// must never abort a transition whose successor is already audible.
+  Future<void> _bestEffort(Future<void> Function() action, String what) async {
+    try {
+      await action();
+    } catch (e, st) {
+      ErrorLogger.log('Could not $what',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
+  /// Warms the successor (and N+2 when the buffer bucket allows) on the
+  /// inactive/prefetch players. Shared by [playSongAt]'s tail and the
+  /// preloaded handover so the lookahead depth rule lives in one place.
+  void _scheduleLookaheadPreload(int index) {
+    if (_gaplessMode) return;
+    final depth = _preloadCountForCurrentBucket;
+    if (depth < 1) return;
+    final warmIdx = _activePlayer.shuffleModeEnabled
+        ? _getNextIndex(peek: true)
+        : (index + 1 < _songs.length ? index + 1 : null);
+    if (warmIdx != null && warmIdx >= 0 && warmIdx < _songs.length) {
+      unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
+    }
+    if (depth >= 2 && _songs.length > index + 2) {
+      unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
+    }
+  }
+
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
     _pendingPlaybackStart = true;
@@ -1509,7 +1671,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     _currentIndex = index;
     final fastArtUri = song.artworkUri != null
         ? Uri.tryParse(song.artworkUri!)
-        : (song.remoteArtworkUrl != null && !song.remoteArtworkUrl!.startsWith('assets/')
+        : (song.remoteArtworkUrl != null &&
+                !song.remoteArtworkUrl!.startsWith('assets/')
             ? Uri.tryParse(song.remoteArtworkUrl!)
             : ArtworkUriResolver.getCachedArtworkUri(song.id));
     final item = PulsrAudioHandler._songToMediaItem(song, fastArtUri);
@@ -1565,21 +1728,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       // Unified preload depth: bucket drives ALL stages (scheduler via
       // _smartPrefetch above, triple-buffer here). minimal=1 holds only N+1,
       // standard=2 adds N+2, generous=3 keeps full lookahead.
-      final depth = _preloadCountForCurrentBucket;
-      // Only preload onto inactive player when crossfade is active
-      final warmIdx = (!_gaplessMode && _activePlayer.shuffleModeEnabled)
-          ? _getNextIndex(peek: true)
-          : (index + 1 < _songs.length ? index + 1 : null);
-      if (!_gaplessMode &&
-          depth >= 1 &&
-          warmIdx != null &&
-          warmIdx >= 0 &&
-          warmIdx < _songs.length) {
-        unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
-      }
-      if (!_gaplessMode && depth >= 2 && _songs.length > index + 2) {
-        unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
-      }
+      _scheduleLookaheadPreload(index);
     } on YtmException catch (e, st) {
       if (generation != _playGeneration) return;
       final info = YtmErrorClassifier.classify(e);

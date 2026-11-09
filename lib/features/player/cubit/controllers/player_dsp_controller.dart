@@ -32,7 +32,6 @@ import '../../../../data/services/settings_profiles_service.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
-import '../player_constants.dart';
 import '../player_state.dart';
 import 'dsp_effect_applier.dart';
 

@@ -1717,7 +1717,7 @@ class _SettingsState extends SettingsState {
       this.dvcEnabled = false,
       this.usbHardwareVolumeEnabled = false,
       this.aaudioPreferExclusive = true,
-      this.aaudioTargetBufferMs = 150,
+      this.aaudioTargetBufferMs = 24,
       this.sincResamplerQuality = 3,
       this.bpmSyncCrossfadeEnabled = false,
       this.automixEnabled = false,

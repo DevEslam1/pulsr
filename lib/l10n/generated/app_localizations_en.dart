@@ -5278,7 +5278,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsFloatDspDesc =>
-      'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit';
+      'Hi-res first: feeds the native DSP chain float32 samples so 24/32-bit sources keep their depth (16-bit content is unaffected). Unsupported devices safely fall back to 16-bit. Off: 24/32-bit sources are reduced to 16-bit on this path.';
 
   @override
   String get settingsFloatDspPath => '24/32-bit Float DSP Path';
@@ -9684,8 +9684,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'USB Audio Class 3 (UAC3) is not supported for bit-perfect playback.';
 
   @override
+  String get conflictSource32BitIntegerNotBitPerfect =>
+      '32-bit integer audio needs a float32 stage before the DAC and cannot be played bit-perfect.';
+
+  @override
   String get conflictSource32BitFloatNotBitPerfect =>
       '32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.';
+
+  @override
+  String get bpDigitalVolumeAttenuation =>
+      'Digital volume below 100% — bit-perfect requires unity gain';
 
   @override
   String get bpSourceCodecUnconfirmed => 'Source codec not confirmed';

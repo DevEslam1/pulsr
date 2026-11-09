@@ -591,6 +591,15 @@ enum AudioSourceCodecState {
   unknown,
 }
 
+/// The container's sample representation. A bit-depth tag alone cannot
+/// express it: a 32-bit WAV/FLAC can be integer or float, and the two need
+/// different explanations for why bit-perfect cannot carry them.
+enum AudioSourceSampleFormat {
+  integer,
+  float,
+  unknown,
+}
+
 /// Pure-logic conflict checker. Returns null if allowed, otherwise a human reason why the action must be blocked.
 class AudioConflicts {
   /// True when the native DSP bypass is active: Bit-Perfect output + its DSP
@@ -881,6 +890,48 @@ class AudioConflicts {
     return AudioSourceCodecState.unknown;
   }
 
+  /// Classifies the source's integer/float representation from the decoder
+  /// codec string, falling back to the MIME type. Extension alone is not
+  /// evidence: `.wav` can hold either `pcm_s32le` or `pcm_f32le`.
+  static AudioSourceSampleFormat classifySourceSampleFormat({
+    String? codec,
+    String? path,
+    String? mimeType,
+  }) {
+    var normCodec = codec?.trim().toLowerCase();
+    if (normCodec != null && normCodec.contains('codecs=')) {
+      final match = RegExp(r'''codecs=["']?([^"'\s;]+)''')
+          .firstMatch(normCodec);
+      if (match != null) normCodec = match.group(1)?.trim();
+    } else {
+      normCodec = normCodec?.split(';').first.trim();
+    }
+    final normMime = mimeType?.trim().toLowerCase().split(';').first.trim();
+
+    if (normCodec != null && normCodec.isNotEmpty) {
+      if (normCodec.contains('f32') ||
+          normCodec.contains('f64') ||
+          normCodec.contains('float')) {
+        return AudioSourceSampleFormat.float;
+      }
+      if (normCodec.startsWith('pcm_s') ||
+          normCodec.startsWith('pcm_u') ||
+          normCodec == 'pcm' ||
+          normCodec.contains('s32') ||
+          normCodec.contains('s24') ||
+          normCodec.contains('s16')) {
+        return AudioSourceSampleFormat.integer;
+      }
+    }
+    if (normMime != null && normMime.isNotEmpty) {
+      if (normMime.contains('float')) return AudioSourceSampleFormat.float;
+      if (normMime.contains('pcm') || normMime.contains('wav')) {
+        return AudioSourceSampleFormat.unknown;
+      }
+    }
+    return AudioSourceSampleFormat.unknown;
+  }
+
   static String? bitPerfectSourceBlockedReason({
     String? path,
     bool isRadio = false,
@@ -894,10 +945,21 @@ class AudioConflicts {
     // Never guess from HTTP URLs containing 'radio' (e.g. tracks named radiohead or radio folder).
     final bool radio = isRadio || lower.startsWith('radio://');
 
-    // 32-bit float PCM requires integer conversion in the USB sink, which is lossy.
-    // Surface the native rejection code early so the UI can show the dedicated 32-bit message.
+    // 32-bit PCM cannot be bit-perfect through this pipeline: float32 has a
+    // 24-bit mantissa, so an int32 source loses its low 8 bits and a float32
+    // source needs an integer DAC conversion. Name the actual representation
+    // instead of calling every 32-bit file "float".
     if (bitDepth == 32) {
-      return bitPerfectReasonMessage('source_32bit_float_conversion_not_lossless');
+      final format = classifySourceSampleFormat(
+        codec: codec,
+        path: path,
+        mimeType: mimeType,
+      );
+      return bitPerfectReasonMessage(
+        format == AudioSourceSampleFormat.integer
+            ? 'source_32bit_integer_conversion_not_lossless'
+            : 'source_32bit_float_conversion_not_lossless',
+      );
     }
 
     final state = classifySourceCodec(
@@ -971,6 +1033,9 @@ class AudioConflicts {
       case 'source_32bit_float_conversion_not_lossless':
         return L10nHolder.current?.conflictSource32BitFloatNotBitPerfect ??
             '32-bit floating point audio requires lossy conversion and cannot be played bit-perfect.';
+      case 'source_32bit_integer_conversion_not_lossless':
+        return L10nHolder.current?.conflictSource32BitIntegerNotBitPerfect ??
+            '32-bit integer audio needs a float32 stage before the DAC and cannot be played bit-perfect.';
       case 'target_format_unavailable':
         return L10nHolder.current?.conflictTargetFormatUnavailable ??
             'This USB DAC does not offer the selected sample rate / bit depth in exclusive mode.';

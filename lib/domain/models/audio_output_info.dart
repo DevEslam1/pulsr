@@ -167,6 +167,14 @@ class AudioOutputInfo {
   final bool isLeAudio;
   final bool bleAudioPresent;
 
+  /// What the decoder actually produced, not what the scanner tagged.
+  /// A 24-bit ALAC in an .m4a container is routinely tagged 16-bit; the
+  /// chain must judge the decoded depth or it would call a 16-bit output a
+  /// verified match.
+  final int decodedBitDepth;
+  final int decodedSampleRate;
+  final int decodedPcmEncoding;
+
   // Phase 4: output-path capability diagnostics
   final List<AudioDirectFormat> directFormats;
   final int usbAudioClass; // 0 = none/unknown, 1 = UAC1, 2 = UAC2, 3 = UAC3
@@ -214,6 +222,9 @@ class AudioOutputInfo {
     this.isBluetooth = false,
     this.isLeAudio = false,
     this.bleAudioPresent = false,
+    this.decodedBitDepth = 0,
+    this.decodedSampleRate = 0,
+    this.decodedPcmEncoding = 0,
     this.directFormats = const [],
     this.usbAudioClass = 0,
     this.usbDacLabel,
@@ -273,6 +284,9 @@ class AudioOutputInfo {
       isBluetooth: (map['isBluetooth'] as bool?) ?? false,
       isLeAudio: (map['isLeAudio'] as bool?) ?? false,
       bleAudioPresent: (map['bleAudioPresent'] as bool?) ?? false,
+      decodedBitDepth: (map['decodedBitDepth'] as num?)?.toInt() ?? 0,
+      decodedSampleRate: (map['decodedSampleRate'] as num?)?.toInt() ?? 0,
+      decodedPcmEncoding: (map['decodedPcmEncoding'] as num?)?.toInt() ?? 0,
       directFormats: () {
         final raw = map['directFormats'];
         final out = <AudioDirectFormat>[];
@@ -345,6 +359,9 @@ class AudioOutputInfo {
       'isBluetooth': isBluetooth,
       'isLeAudio': isLeAudio,
       'bleAudioPresent': bleAudioPresent,
+      'decodedBitDepth': decodedBitDepth,
+      'decodedSampleRate': decodedSampleRate,
+      'decodedPcmEncoding': decodedPcmEncoding,
       'directFormats': directFormats.map((d) => d.toMap()).toList(),
       'usbAudioClass': usbAudioClass,
       'usbDacLabel': usbDacLabel,
@@ -386,6 +403,9 @@ class AudioOutputInfo {
     bool? isBluetooth,
     bool? isLeAudio,
     bool? bleAudioPresent,
+    int? decodedBitDepth,
+    int? decodedSampleRate,
+    int? decodedPcmEncoding,
     List<AudioDirectFormat>? directFormats,
     int? usbAudioClass,
     String? usbDacLabel,
@@ -429,6 +449,9 @@ class AudioOutputInfo {
       isBluetooth: isBluetooth ?? this.isBluetooth,
       isLeAudio: isLeAudio ?? this.isLeAudio,
       bleAudioPresent: bleAudioPresent ?? this.bleAudioPresent,
+      decodedBitDepth: decodedBitDepth ?? this.decodedBitDepth,
+      decodedSampleRate: decodedSampleRate ?? this.decodedSampleRate,
+      decodedPcmEncoding: decodedPcmEncoding ?? this.decodedPcmEncoding,
       directFormats: directFormats ?? this.directFormats,
       usbAudioClass: usbAudioClass ?? this.usbAudioClass,
       usbDacLabel: usbDacLabel ?? this.usbDacLabel,
@@ -478,6 +501,9 @@ class AudioOutputInfo {
           isBluetooth == other.isBluetooth &&
           isLeAudio == other.isLeAudio &&
           bleAudioPresent == other.bleAudioPresent &&
+          decodedBitDepth == other.decodedBitDepth &&
+          decodedSampleRate == other.decodedSampleRate &&
+          decodedPcmEncoding == other.decodedPcmEncoding &&
           _listEquals(directFormats, other.directFormats) &&
           usbAudioClass == other.usbAudioClass &&
           usbDacLabel == other.usbDacLabel &&
@@ -518,6 +544,9 @@ class AudioOutputInfo {
         isBluetooth,
         isLeAudio,
         bleAudioPresent,
+        decodedBitDepth,
+        decodedSampleRate,
+        decodedPcmEncoding,
         Object.hashAll(directFormats),
         usbAudioClass,
         usbDacLabel,

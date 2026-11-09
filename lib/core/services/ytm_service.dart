@@ -1868,9 +1868,8 @@ class YtmService {
     // 12s budget. Run them as a staggered race instead of back-to-back so one
     // unresponsive client no longer holds the chain hostage: the first client
     // to return usable formats wins and the rest are abandoned. A block or an
-    // empty payload throws, which the race ignores, so only a real success can
-    // win. If every client fails the race throws and this tier answers null,
-    // exactly as the old sequential loop did.
+    // An empty payload throws (ignored by the race), so only a real success
+    // wins; when every client fails this tier answers null, as before.
     try {
       return await HedgedStreamResolver.race<YtmStream>(
         [for (final client in clients) () => attempt(client)],
@@ -1897,8 +1896,8 @@ class YtmService {
         if (attempt == maxRetries) {
           throw const YtmException('YTM_TIMEOUT', 'Request timed out');
         }
-        // Back off before retrying a timeout: a tight loop hammers an
-        // already-struggling route/VPN exit and hastens an IP block.
+        // Back off before a retry: a tight loop hammers a struggling route.
+        await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on MissingPluginException {
         throw const YtmException('YTM_UNSUPPORTED');
       } on SocketException catch (e) {

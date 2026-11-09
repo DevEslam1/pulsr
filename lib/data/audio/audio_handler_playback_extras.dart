@@ -57,20 +57,20 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   Future<void> setHedgedResolutionEnabled(bool v) async {
     hedgedResolutionEnabled = v;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-    await prefs.setBool('hedged_resolution_enabled', v);
+    await prefs.setBool(PrefsKeys.hedgedResolutionEnabled, v);
   }
 
   // F4: adaptive quality
   Future<void> setAdaptiveQualityEnabled(bool v) async {
     adaptiveQualityManager.enabled = v;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-    await prefs.setBool('adaptive_quality_enabled', v);
+    await prefs.setBool(PrefsKeys.adaptiveQualityEnabled, v);
   }
 
   Future<void> _maybeAdaptiveStepDown() async {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-    final ceiling = prefs.getString('setting_streaming_quality') ?? 'high';
+    final ceiling = prefs.getString(PrefsKeys.streamingQuality) ?? 'high';
     if (qualityRank(adaptiveQualityManager.currentQuality) >
         qualityRank(ceiling)) {
       adaptiveQualityManager.setQuality(ceiling);
@@ -82,7 +82,7 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
   Future<void> _maybeAdaptiveStepUp() async {
     if (!adaptiveQualityManager.enabled) return;
     final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-    final ceiling = prefs.getString('setting_streaming_quality') ?? 'high';
+    final ceiling = prefs.getString(PrefsKeys.streamingQuality) ?? 'high';
     if (qualityRank(adaptiveQualityManager.currentQuality) >
         qualityRank(ceiling)) {
       adaptiveQualityManager.setQuality(ceiling);

@@ -286,11 +286,15 @@ class YtmErrorClassifier {
   static final RegExp _botWordPattern =
       RegExp(r'\bbots?\b', caseSensitive: false);
 
-  static int? _httpStatusIn(String text) {
+  /// HTTP status embedded in a machine code or an error string, or null when
+  /// none is present.
+  static int? httpStatusIn(String text) {
     final match = _httpStatusPattern.firstMatch(text);
     if (match == null) return null;
     return int.tryParse(match.group(1)!);
   }
+
+  static int? _httpStatusIn(String text) => httpStatusIn(text);
 
   /// Signal a well-known HTTP status maps to, or null when the status carries
   /// no verdict of its own (2xx/3xx and 5xx, which are YouTube-side hiccups).

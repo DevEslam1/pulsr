@@ -106,6 +106,12 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       // chain, so plugging in a DAC must not silently silence an EQ, limiter or
       // crossfeed the user already has active.
       if (_getState().isDspActive) return;
+      // A 24/32-bit source is decoded to 16-bit before the chain when the
+      // float path is off; engaging Bit-Perfect without it would open an
+      // exclusive 16-bit stream and claim the source depth. Depth first.
+      if (!settings.state.floatOutputEnabled) {
+        await settings.setFloatOutputEnabled(true);
+      }
       if (!settings.state.bitPerfectOutput) {
         await settings.setBitPerfectOutput(true);
       }

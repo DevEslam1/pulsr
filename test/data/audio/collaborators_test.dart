@@ -380,5 +380,47 @@ void main() {
             artist: any(named: 'artist'),
           )).called(2);
     });
+
+    test('Leaves codec null when container and mimeType are unrecognized',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final ytmService = MockYtmService();
+      String? reportedCodec = 'sentinel';
+      int? reportedBitrate;
+      final pipeline = StreamResolutionPipeline(
+        ytmService: ytmService,
+        onStreamResolved: (_, bitrate, codec) {
+          reportedBitrate = bitrate;
+          reportedCodec = codec;
+        },
+      );
+      final song = _createMockSong(
+        2,
+        remoteId: 'xyz98765432',
+        source: SongSource.youtube,
+      );
+
+      when(() => ytmService.resolveStream(
+            any(),
+            quality: any(named: 'quality'),
+            forceRefresh: any(named: 'forceRefresh'),
+            preferM4a: any(named: 'preferM4a'),
+            title: any(named: 'title'),
+            artist: any(named: 'artist'),
+          )).thenAnswer((_) async => YtmStream(
+            videoId: 'xyz98765432',
+            url: 'https://stream.url/unknown',
+            mimeType: 'application/octet-stream',
+            container: 'bin',
+            bitrateKbps: 192,
+            duration: const Duration(minutes: 3),
+            title: 'Track',
+            artist: 'Artist',
+          ));
+
+      await pipeline.resolveStreamUrl(song);
+      expect(reportedBitrate, 192);
+      expect(reportedCodec, isNull);
+    });
   });
 }

@@ -8,7 +8,7 @@ import '../db/app_database.dart';
 import '../../core/utils/error_logger.dart';
 import 'playback_analytics.dart';
 
-enum PlayerClaim { none, crossfade, prefetch }
+enum PlayerClaim { none, crossfade, prefetch, handover }
 
 /// 3-player architecture (Active, Preloaded, Prefetched) for zero-latency
 /// transitions and lookahead caching.

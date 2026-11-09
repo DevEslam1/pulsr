@@ -446,7 +446,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         await _playerB.setSkipSilenceEnabled(true);
       }
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-      final normEnabled = prefs.getBool('audio_normalization_enabled') ?? false;
+      final normEnabled =
+          prefs.getBool(PrefsKeys.audioNormalizationEnabled) ?? false;
       final savedBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost);
       if (normEnabled && (savedBoost == null || _isNear(savedBoost, 0.0))) {
         // Apply mild loudness normalization for streams without ReplayGain tags only if user hasn't set custom boost
@@ -458,7 +459,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   Future<void> setAudioNormalizationEnabled(bool enabled) async {
     try {
       final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-      await prefs.setBool('audio_normalization_enabled', enabled);
+      await prefs.setBool(PrefsKeys.audioNormalizationEnabled, enabled);
       if (enabled) {
         if (_isNear(_equalizerManager.volumeBoost, 0.0)) {
           await _equalizerManager.setVolumeBoost(_kNormalizationBoost);
@@ -476,7 +477,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   bool get isAudioNormalizationEnabled {
     try {
-      return _cachedPrefs?.getBool('audio_normalization_enabled') ?? false;
+      return _cachedPrefs?.getBool(PrefsKeys.audioNormalizationEnabled) ??
+          false;
     } catch (_) {
       return false;
     }

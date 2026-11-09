@@ -207,6 +207,60 @@ void main() {
     expect(cubit.state.limiterLookaheadMs, 4.0);
   });
 
+  test('bit-perfect disables an already-on silence skip and restores it',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final handler = registeredHandler();
+    when(() => handler.setSkipSilenceEnabled(any()))
+        .thenAnswer((_) async {});
+    when(() => handler.setSilenceSkipSensitivity(any()))
+        .thenAnswer((_) async {});
+
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(hiresChannel, (call) async {
+      switch (call.method) {
+        case 'setBitPerfectModeDetailed':
+          return <String, dynamic>{'success': true};
+        case 'setBitPerfectMode':
+          return true;
+        case 'getAudioOutputInfo':
+          return <String, dynamic>{
+            'deviceName': 'USB DAC',
+            'isUsbDac': true,
+            'sampleRate': 96000,
+            'bitDepth': 24,
+            'isBitPerfectActive': true,
+          };
+        default:
+          return null;
+      }
+    });
+
+    final cubit = make();
+    addTearDown(cubit.close);
+    await cubit.preferencesReady;
+    cubit.safeEmit(cubit.state.copyWith(
+      currentOutputDevice: const AudioOutputInfo(
+        deviceName: 'USB DAC',
+        isUsbDac: true,
+        sampleRate: 96000,
+        bitDepth: 24,
+        isBitPerfectActive: true,
+      ),
+      bypassDspOnBitPerfect: true,
+      silenceSkipSensitivity: 60,
+    ));
+
+    await cubit.setBitPerfectOutput(true);
+    expect(cubit.state.bitPerfectOutput, isTrue);
+    verify(() => handler.setSkipSilenceEnabled(false)).called(1);
+
+    await cubit.setBitPerfectOutput(false);
+    expect(cubit.state.bitPerfectOutput, isFalse);
+    verify(() => handler.setSilenceSkipSensitivity(60)).called(1);
+  });
+
   test('Bluetooth route hard-blocks bit-perfect before touching native',
       () async {
     final cubit = make();

@@ -3636,7 +3636,7 @@
   "settingsExportSessionLogsDesc": "Comparte el log JSONL en el dispositivo de tus sesiones recientes",
   "settingsExtendedSpeedRange": "Rango de velocidad ampliado",
   "settingsExtendedSpeedRangeSubtitle": "Permite velocidad de 0,1x a 8,0x (predeterminado 0,25x–4,0x)",
-  "settingsFloatDspDesc": "Alta resolución primero: alimenta la cadena DSP nativa con muestras float32 para conservar la profundidad de fuentes de 24/32 bits (el contenido de 16 bits no se ve afectado). Los dispositivos no compatibles usan 16 bits de forma segura",
+  "settingsFloatDspDesc": "Alta resolución primero: alimenta la cadena DSP nativa con muestras float32 para conservar la profundidad de fuentes de 24/32 bits (el contenido de 16 bits no se ve afectado). Los dispositivos no compatibles usan 16 bits de forma segura. Desactivada: las fuentes de 24/32 bits se reducen a 16 bits en esta ruta.",
   "settingsFloatDspPath": "Ruta DSP de coma flotante de 24/32 bits",
   "settingsGoogleCast": "Google Cast",
   "settingsHardwareAudioOutput": "Salida de audio de hardware",
@@ -5665,6 +5665,11 @@
   "conflictLiveOrLossyNotBitPerfect": "Las transmisiones de radio en vivo y con pérdidas no se pueden reproducir en Bit-Perfect.",
   "uac1RateReadbackUnsupported": "Este DAC no admite la lectura de frecuencia de muestreo UAC1; Strict Bit-Perfect requiere frecuencias verificadas.",
   "uac3Unsupported": "USB Audio Class 3 (UAC3) no es compatible con la reproducción Bit-Perfect.",
+  "conflictSource32BitIntegerNotBitPerfect": "El audio entero de 32 bits necesita una etapa float32 antes del DAC y no puede reproducirse con bit-perfect.",
+  "@conflictSource32BitIntegerNotBitPerfect": {
+    "description": "Conflict message explaining 32-bit integer audio loses its low 8 bits in the float32 pipeline"
+  },
   "conflictSource32BitFloatNotBitPerfect": "El audio de punto flotante de 32 bits requiere una conversión con pérdidas y no se puede reproducir en Bit-Perfect.",
-  "bpSourceCodecUnconfirmed": "Códec de origen no confirmado"
+  "bpSourceCodecUnconfirmed": "Códec de origen no confirmado",
+  "bpDigitalVolumeAttenuation": "Volumen digital por debajo del 100%: bit-perfect requiere ganancia unitaria"
 }

@@ -64,10 +64,11 @@ class YtmResolvingSource extends StreamAudioSource {
   /// Optional explicit URL cache instance (used in tests).
   final YtmUrlCache? urlCache;
 
-  /// Retries on 5xx errors with exponential backoff (1s, 2s, 4s) up to 3 attempts.
+  /// Retries on HTTP 5xx errors with exponential backoff (1s, 2s) up to
+  /// [maxAttempts] (default 2: one initial attempt + one retry).
   static Future<T> retryWithBackoff<T>(
     Future<T> Function() operation, {
-    int maxAttempts = 3,
+    int maxAttempts = 2,
     Duration initialDelay = const Duration(seconds: 1),
   }) async {
     int attempt = 0;
@@ -77,19 +78,23 @@ class YtmResolvingSource extends StreamAudioSource {
       try {
         return await operation();
       } catch (e) {
-        final errStr = e.toString();
-        final is5xx = errStr.contains('500') ||
-            errStr.contains('502') ||
-            errStr.contains('503') ||
-            errStr.contains('504') ||
-            (e is HttpException && e.message.contains('5'));
-        if (attempt >= maxAttempts || !is5xx) {
+        if (attempt >= maxAttempts || !isRetryable5xx(e)) {
           rethrow;
         }
         await Future.delayed(delay);
         delay *= 2;
       }
     }
+  }
+
+  /// True when [e] carries a structured HTTP 5xx status code (e.g. `HTTP 503`,
+  /// `status: 500`, `YTM_HTTP_502`), using [YtmErrorClassifier.httpStatusIn]
+  /// rather than bare substring matching so numbers inside video IDs, byte
+  /// counts or itags never trigger spurious retries.
+  @visibleForTesting
+  static bool isRetryable5xx(Object e) {
+    final status = YtmErrorClassifier.httpStatusIn(e.toString());
+    return status != null && status >= 500 && status <= 599;
   }
 
   String? userAgent;
@@ -103,6 +108,7 @@ class YtmResolvingSource extends StreamAudioSource {
   String quality;
 
   LockCachingAudioSource? _inner;
+  File? _innerCacheFile;
   Future<LockCachingAudioSource>? _pending;
   DateTime? _resolvedExpiresAt;
 
@@ -173,8 +179,12 @@ class YtmResolvingSource extends StreamAudioSource {
     }
 
     try {
+      // Serialize initial byte-cache population per cache path when the file has
+      // not yet been written, so two concurrent sources for the same videoId
+      // never write the same `.part` file simultaneously.
       final inner = await _ensureInner();
-      try {
+      return await _withPathLockIfUncached(() async {
+        try {
         final res = await inner.request(start, end);
         try {
           _latency?.markStage(PlaybackStage.firstBytesReady);
@@ -226,6 +236,7 @@ class YtmResolvingSource extends StreamAudioSource {
           rethrow;
         }
       }
+    });
     } catch (err) {
       if (err == _permanentFailure) rethrow; // already recorded above
       _discardInner();
@@ -305,6 +316,7 @@ class YtmResolvingSource extends StreamAudioSource {
   void _discardInner({bool invalidateUrl = false}) {
     final old = _inner;
     _inner = null;
+    _innerCacheFile = null;
     _pending = null;
     old?.dispose();
     if (invalidateUrl) {
@@ -434,59 +446,87 @@ class YtmResolvingSource extends StreamAudioSource {
       if (!isNativeClient) 'Referer': 'https://music.youtube.com/',
     };
 
-    // Serialize creation per cache path so two sources for the same videoId
-    // never start writing the same file at exactly the same time.
+    // Serialize per cache path so two sources for the same videoId never
+    // initialize or write the same cache file simultaneously.
     final pathKey = cacheFile.path;
-    _cleanStalePathCreationLocks();
+    return _withPathLock(pathKey, () async {
+      final existing = _inner;
+      if (existing != null && !skipCache) return existing;
+      try {
+        final inner = LockCachingAudioSource(
+          Uri.parse(resolvedUrl),
+          headers: headers,
+          cacheFile: cacheFile,
+        );
+        _inner = inner;
+        _innerCacheFile = cacheFile;
+        try {
+          _latency?.markStage(PlaybackStage.sourceSet);
+        } catch (_) {}
 
+        // Trigger asynchronous background cache pruning if exceeding size limit
+        _cacheManager.pruneIfExceedsLimit().ignore();
+
+        return inner;
+      } catch (e) {
+        _inner = null;
+        _innerCacheFile = null;
+        _pending = null;
+        rethrow;
+      }
+    });
+  }
+
+  /// Runs [action] under the per-path mutex when the byte-cache file does not
+  /// yet exist on disk, preventing two concurrent [YtmResolvingSource] instances
+  /// for the same track from racing on the initial `.part` file download. Once
+  /// the cache file exists, reads proceed without locking.
+  Future<T> _withPathLockIfUncached<T>(Future<T> Function() action) async {
+    final file = _innerCacheFile;
+    if (file == null || file.existsSync()) {
+      return action();
+    }
+    return _withPathLock(file.path, action);
+  }
+
+  /// Acquires the per-path lock for [pathKey] and releases it in `finally` only
+  /// when this invocation actually owns the lock (using identity comparison so
+  /// a timed-out waiter never evicts another caller's active lock).
+  static Future<T> _withPathLock<T>(
+      String pathKey, Future<T> Function() action) async {
+    _cleanStalePathCreationLocks();
     late final Completer<void> ownedCompleter;
+    late final _PathLockEntry ownedEntry;
     var lockAcquired = false;
     try {
       while (true) {
         final completer = Completer<void>();
-        final entry = _pathCreationLocks.putIfAbsent(
-          pathKey,
-          () => _PathLockEntry(completer.future, DateTime.now()),
-        );
-
-        if (identical(entry.future, completer.future)) {
-          // We own the lock.
+        final candidate = _PathLockEntry(completer.future, DateTime.now());
+        final entry = _pathCreationLocks.putIfAbsent(pathKey, () => candidate);
+        if (identical(entry, candidate)) {
           ownedCompleter = completer;
+          ownedEntry = candidate;
           lockAcquired = true;
           break;
         }
-        // Another creation is in progress; wait for it then re-check.
         try {
           await entry.future.timeout(const Duration(seconds: 60));
-        } catch (_) {}
-        final existing = _inner;
-        if (existing != null) return existing;
-        // _inner still null — loop and re-compete for the lock.
+        } catch (_) {
+          if (identical(_pathCreationLocks[pathKey], entry)) {
+            _pathCreationLocks.remove(pathKey);
+          }
+        }
       }
-
-      final inner = LockCachingAudioSource(
-        Uri.parse(resolvedUrl),
-        headers: headers,
-        cacheFile: cacheFile,
-      );
-      _inner = inner;
-      try {
-        _latency?.markStage(PlaybackStage.sourceSet);
-      } catch (_) {}
-
-      // Trigger asynchronous background cache pruning if exceeding size limit
-      _cacheManager.pruneIfExceedsLimit().ignore();
-
-      return inner;
-    } catch (e) {
-      _inner = null;
-      _pending = null;
-      rethrow;
+      return await action();
     } finally {
-      if (lockAcquired && !ownedCompleter.isCompleted) {
-        ownedCompleter.complete();
+      if (lockAcquired) {
+        if (identical(_pathCreationLocks[pathKey], ownedEntry)) {
+          _pathCreationLocks.remove(pathKey);
+        }
+        if (!ownedCompleter.isCompleted) {
+          ownedCompleter.complete();
+        }
       }
-      _pathCreationLocks.remove(pathKey);
     }
   }
 

@@ -1,6 +1,7 @@
 // lib/data/audio/collaborators/stream_resolution_pipeline.dart
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -24,20 +25,14 @@ class StreamResolutionPipeline {
   final YtmService ytmService;
   final PlaybackLatencyTracker? Function()? getLatencyTracker;
   final String Function()? qualityProvider;
-  final void Function(SongsTableData song, int bitrateKbps, String codec)?
+  final void Function(SongsTableData song, int bitrateKbps, String? codec)?
       onStreamResolved;
-
-  /// Retained for call-site compatibility. Hedging now lives entirely in the
-  /// native extractor, which races its top two clients and bounds each call;
-  /// racing a second Dart-level chain here only doubled native load.
-  bool hedgedEnabled;
 
   final Map<String, _InFlightResolve> _inFlightResolves = {};
 
   StreamResolutionPipeline({
     required this.ytmService,
     this.getLatencyTracker,
-    this.hedgedEnabled = true,
     this.qualityProvider,
     this.onStreamResolved,
   });
@@ -74,12 +69,12 @@ class StreamResolutionPipeline {
 
     final effectivePrefs = prefs ?? await SharedPreferences.getInstance();
     final offlineOnly =
-        effectivePrefs.getBool('setting_offline_only_mode') ?? false;
+        effectivePrefs.getBool(PrefsKeys.offlineOnlyMode) ?? false;
     if (offlineOnly) {
       throw const YtmException(
           'OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
     }
-    final wifiOnly = effectivePrefs.getBool('setting_wifi_only_mode') ?? false;
+    final wifiOnly = effectivePrefs.getBool(PrefsKeys.wifiOnlyMode) ?? false;
     if (wifiOnly) {
       final isWifi = await ytmService.isWifiConnected();
       if (!isWifi) {
@@ -89,7 +84,7 @@ class StreamResolutionPipeline {
     }
     final effectiveQuality = quality ??
         qualityProvider?.call() ??
-        effectivePrefs.getString('setting_streaming_quality') ??
+        effectivePrefs.getString(PrefsKeys.streamingQuality) ??
         'high';
     final cacheKey = '$videoId:${effectiveQuality.toLowerCase()}';
 
@@ -129,15 +124,18 @@ class StreamResolutionPipeline {
               : effectiveQuality == 'medium'
                   ? 128
                   : 160);
-      final realCodec = stream.container.toUpperCase() == 'WEBM' ||
-              stream.mimeType.contains('webm') ||
-              stream.mimeType.contains('opus')
+      final containerUpper = stream.container.toUpperCase();
+      final mimeLower = stream.mimeType.toLowerCase();
+      final String? realCodec = containerUpper == 'WEBM' ||
+              mimeLower.contains('webm') ||
+              mimeLower.contains('opus')
           ? 'OPUS'
-          : (stream.container.toUpperCase() == 'M4A' ||
-                  stream.mimeType.contains('mp4') ||
-                  stream.mimeType.contains('aac')
+          : (containerUpper == 'M4A' ||
+                  mimeLower.contains('mp4') ||
+                  mimeLower.contains('m4a') ||
+                  mimeLower.contains('aac')
               ? 'AAC'
-              : 'OPUS');
+              : null);
 
       onStreamResolved?.call(song, realBitrate, realCodec);
 

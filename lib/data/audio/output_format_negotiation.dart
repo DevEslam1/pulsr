@@ -218,3 +218,27 @@ OutputFormatDecision negotiateOutputFormat({
 /// True when the route's transport is lossy Bluetooth (rate-capped).
 bool routesThroughBluetooth(OutputRoute route) =>
     route == OutputRoute.bluetooth;
+
+/// Resolves the bit depth to request for a track on the exclusive path.
+///
+/// A missing track depth must never collapse to 16-bit: that silently
+/// truncates a 24/32-bit file whose metadata was not read, and the DAC then
+/// receives a narrower stream than the source while the UI has no reason to
+/// say so. The order is: the track's own depth, then the depth the direct
+/// sink is already streaming at, then the route's advertised depth, and only
+/// then a 24-bit default (widening a 16-bit source into a 24-bit container
+/// is exact; narrowing a 24-bit source into 16 bits is not).
+int resolveFollowBitDepth({
+  required int trackBitDepth,
+  int streamingBitDepth = 0,
+  int deviceBitDepth = 0,
+}) {
+  if (trackBitDepth > 0) return trackBitDepth;
+  if (streamingBitDepth > 0) return streamingBitDepth;
+  if (deviceBitDepth == 16 ||
+      deviceBitDepth == 24 ||
+      deviceBitDepth == 32) {
+    return deviceBitDepth;
+  }
+  return 24;
+}

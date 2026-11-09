@@ -842,10 +842,10 @@ class _LyricsViewState extends State<LyricsView> {
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
           child: Container(
-            padding: EdgeInsets.only(
+            padding: EdgeInsetsDirectional.only(
               top: topSafe,
-              left: AppSpacing.lg,
-              right: AppSpacing.lg,
+              start: AppSpacing.lg,
+              end: AppSpacing.lg,
               bottom: AppSpacing.md,
             ),
             child: Column(

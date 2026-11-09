@@ -742,6 +742,32 @@ void main() {
       );
       expect(floatBlock, contains('32-bit floating point audio requires lossy conversion'));
 
+      // 5b. 32-bit integer is not float; it gets its own explanation.
+      final int32Block = AudioConflicts.bitPerfectSourceBlockedReason(
+        bitDepth: 32,
+        path: '/storage/music/master.wav',
+        codec: 'pcm_s32le',
+      );
+      expect(int32Block, contains('32-bit integer audio needs a float32 stage'));
+      final float32CodecBlock = AudioConflicts.bitPerfectSourceBlockedReason(
+        bitDepth: 32,
+        path: '/storage/music/master.wav',
+        codec: 'pcm_f32le',
+      );
+      expect(float32CodecBlock, contains('32-bit floating point audio'));
+      expect(
+        AudioConflicts.classifySourceSampleFormat(codec: 'pcm_s32le'),
+        AudioSourceSampleFormat.integer,
+      );
+      expect(
+        AudioConflicts.classifySourceSampleFormat(codec: 'pcm_f32le'),
+        AudioSourceSampleFormat.float,
+      );
+      expect(
+        AudioConflicts.classifySourceSampleFormat(path: '/music/a.wav'),
+        AudioSourceSampleFormat.unknown,
+      );
+
       // 6. Complete lossless extensions pass
       final flacBlock = AudioConflicts.bitPerfectSourceBlockedReason(
         bitDepth: 24,

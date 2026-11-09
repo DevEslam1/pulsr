@@ -36,10 +36,27 @@ extension PlayerDspFollowRate on PlayerDspController {
       // plus a device refresh, so skip the whole round-trip (this is the
       // default state: follow-track defaults ON, Bit-Perfect OFF).
       if (!settings.bitPerfectOutput) return;
-      final depth = (song.bitDepth != null && song.bitDepth! > 0)
-          ? song.bitDepth!
-          : PlayerConstants.defaultBitDepth;
       final device = settings.currentOutputDevice;
+      // The direct UAC2 sink (Bit-Perfect fallback) switches rate by
+      // re-starting the isochronous stream; the platform mixer attributes
+      // are not involved on that path. Resolve it here because the depth
+      // fallback needs the live stream format.
+      final usb = UsbExclusiveService();
+      final directStreaming = usb.lastStatus.streamingActive;
+      final activeDevice = device?.availableDevices
+          .where((d) => d.isCurrent)
+          .firstOrNull;
+      final deviceDepth = activeDevice?.maxBitDepth ?? (device?.bitDepth ?? 0);
+      // An unread track depth is not a 16-bit track. Resolve it against the
+      // live direct stream and the route's advertised depth so a 24-bit file
+      // with missing metadata is never silently narrowed on the exclusive
+      // path.
+      final depth = resolveFollowBitDepth(
+        trackBitDepth: song.bitDepth ?? 0,
+        streamingBitDepth:
+            directStreaming ? usb.lastStatus.streamingBitDepth : 0,
+        deviceBitDepth: deviceDepth,
+      );
       // The mode belongs in the dedup key: switching Bit-Perfect off and on
       // reopens the output, so the previous confirmation is no longer valid.
       final route =
@@ -56,11 +73,8 @@ extension PlayerDspFollowRate on PlayerDspController {
             settings.followTrackSampleRate || settings.strictBitPerfect,
       );
       if (rate == null) return;
-      // The direct UAC2 sink (Bit-Perfect fallback) switches rate by
-      // re-starting the isochronous stream; the platform mixer attributes are
-      // not involved on that path.
-      final usb = UsbExclusiveService();
-      final directStreaming = usb.lastStatus.streamingActive;
+      // `usb` and `directStreaming` are resolved above, before the depth
+      // fallback, which needs the live stream format.
       // Ownership survives a per-track suspend: the stream is stopped but the
       // preference and the sink claim stay armed for the next supported track.
       // The rate guard and the advertised-rate source must follow ownership,
