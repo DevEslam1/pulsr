@@ -314,11 +314,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             try {
                 swapTo(mode, false, true);
             } catch (ConfigurationException failure) {
-                int pcmEncoding = format != null ? format.pcmEncoding : 0;
-                int sampleRate = format != null ? format.sampleRate : 0;
-                int channelCount = format != null ? format.channelCount : 0;
-                throw new InitializationException(0, sampleRate, channelCount,
-                        pcmEncoding, pcmEncoding, format, false, failure);
+                throw new InitializationException("Source-rate fallback configuration failed", 0,
+                        format, false, failure);
             }
             return inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
         } catch (WriteException | InitializationException e) {

@@ -334,8 +334,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         try {
             applyDeferredConfiguration();
         } catch (ConfigurationException e) {
-            throw new InitializationException(0, lastInputFormat.sampleRate, lastInputFormat.channelCount,
-                    lastInputFormat.pcmEncoding, lastInputFormat.pcmEncoding, lastInputFormat, false, e);
+            throw new InitializationException("Deferred PCM configuration failed", 0,
+                    lastInputFormat, false, e);
         }
         return !input.hasRemaining();
     }

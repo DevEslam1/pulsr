@@ -128,11 +128,11 @@ void main() {
       await tester.pumpWidget(buildSubject());
       await tester.pumpAndSettle();
 
-      // 1. Top bar: Dismiss chevron and grab handle
-      expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsOneWidget);
+      // 1. Top bar: Down arrow removed, grab handle present
+      expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsNothing);
       expect(find.byType(PlayerPlayHandle), findsOneWidget);
 
-      // 2. Track Header: Add to Playlist, Favorite (Star), More (...)
+      // 2. Track Header: Add to Playlist, Favorite (Star), More / Song Options (...)
       expect(find.byIcon(Icons.playlist_add_rounded), findsOneWidget);
       expect(find.byIcon(Icons.star_outline_rounded), findsOneWidget);
       expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);

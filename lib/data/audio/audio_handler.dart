@@ -2990,6 +2990,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Completes when the handler's async init (effects/equalizer preference
   /// restore) has finished, so listeners can re-sync effect state that was
   /// read before the restore completed.
+  @override
   Future<void> get effectsReady => _effectsReadyCompleter.future;
 
   @override

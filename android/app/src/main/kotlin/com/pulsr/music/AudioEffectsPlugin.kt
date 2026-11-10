@@ -1745,6 +1745,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "getAutoDegradedStages", "setStereoBalance", "setMonoMix",
                 "setSincResamplerEnabled", "setSincResamplerQuality", "setSincResamplerRates",
                 "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
+                "setDacVoicingEnabled", "setDacVoicingParams",
                 "setStereoWidthEnabled", "setStereoWidthParams",
                 "setLoudnessContourEnabled", "setLoudnessContourParams",
                 "setSubCrossoverEnabled", "setSubCrossoverParams",

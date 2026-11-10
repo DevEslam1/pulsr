@@ -341,8 +341,8 @@ public class PulsrAudioSinkTest {
             source.position(8);
             if (initialization) {
                 when(rejected.handleBuffer(any(), anyLong(), anyInt())).thenThrow(
-                        new AudioSink.InitializationException(0, 48000, 2,
-                                C.ENCODING_PCM_FLOAT, C.ENCODING_PCM_FLOAT, FORMAT, false, null));
+                        new AudioSink.InitializationException("AudioTrack initialization failed", 0,
+                                FORMAT, false, null));
             } else {
                 when(rejected.handleBuffer(any(), anyLong(), anyInt())).thenThrow(
                         new AudioSink.WriteException(-1, FORMAT, true));

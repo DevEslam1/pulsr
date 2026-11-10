@@ -323,14 +323,8 @@ public final class AAudioAudioSink implements AudioSink {
             frameEditor = previousEditor;
         }
         if (handle == 0L) {
-            int bufferSize = configuredFormat != null ? configuredFormat.pcmEncoding : 0;
-            throw new InitializationException(0,
-                    configuredFormat != null ? configuredFormat.sampleRate : 0,
-                    configuredFormat != null ? configuredFormat.channelCount : 0,
-                    /* bufferSize= */ bufferSize,
-                    /* audioTrackBufferSize= */ bufferSize,
-                    configuredFormat, /* isRecoverable= */ false,
-                    /* audioTrackException= */ null);
+            throw new InitializationException("AAudio stream is not open", 0,
+                    configuredFormat, false, null);
         }
         if (pendingBasePosition) {
             basePositionUs = presentationStartUs;

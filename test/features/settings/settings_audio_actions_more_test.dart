@@ -41,6 +41,9 @@ class _SourceTransitionRig {
   bool mixerEnableWorks = true;
   bool mixerClearWorks = true;
   bool advertises32 = true;
+  bool permitted = true;
+  bool permissionGranted = true;
+  bool streamingSupported = true;
   bool streaming = false;
   int decodedDepth = 0;
   int deviceDepth = 24;
@@ -91,9 +94,9 @@ class _SourceTransitionRig {
       case 'getStatus':
         return {
           'attached': true,
-          'permitted': true,
+          'permitted': permitted,
           'deviceId': 7,
-          'streamingSupported': true,
+          'streamingSupported': permitted && streamingSupported,
           'streamingActive': streaming,
           'supportedRates': [48000, 96000],
           'streamingSampleRate': streamFormat['sampleRate'] ?? 0,
@@ -104,6 +107,10 @@ class _SourceTransitionRig {
             {'bitResolution': advertises32 ? 32 : 24},
           ],
         };
+      case 'requestPermission':
+        calls.add('usb:permission');
+        permitted = permissionGranted;
+        return permissionGranted;
       case 'startStreaming':
         calls.add('usb:start');
         expect(mixerActive, isFalse, reason: 'Mixer must release before USB');
@@ -221,6 +228,53 @@ void main() {
       addTearDown(cubit.close);
       await cubit.preferencesReady;
       return cubit;
+    }
+
+    for (final strict in [false, true]) {
+      test('direct fallback requests USB permission before probing formats, strict=$strict', () async {
+        rig.song = _transitionSong();
+        rig.mixerEnableWorks = false;
+        rig.permitted = false;
+        final cubit = await start(saved: false);
+
+        if (strict) {
+          await cubit.setStrictBitPerfect(true);
+        } else {
+          await cubit.setBitPerfectOutput(true);
+        }
+
+        expect(rig.calls, contains('usb:permission'));
+        expect(rig.starts.single['bitDepth'], 24);
+        expect(rig.starts.single['strict'], strict);
+        expect(cubit.bitPerfectViaDirectStream, isTrue);
+        expect(cubit.state.bitPerfectOutput, isTrue);
+        expect(cubit.state.strictBitPerfect, strict);
+      });
+
+      for (final denied in [false, true]) {
+        test('direct fallback refuses ${denied ? 'denied permission' : 'unsupported formats'} after permission request, strict=$strict', () async {
+          rig.song = _transitionSong();
+          rig.mixerEnableWorks = false;
+          rig.permitted = false;
+          rig.permissionGranted = !denied;
+          rig.streamingSupported = denied;
+          final cubit = await start(saved: false);
+
+          if (strict) {
+            await cubit.setStrictBitPerfect(true);
+          } else {
+            await cubit.setBitPerfectOutput(true);
+          }
+
+          expect(rig.calls, contains('usb:permission'));
+          expect(rig.starts, isEmpty);
+          expect(cubit.bitPerfectViaDirectStream, isFalse);
+          expect(cubit.state.bitPerfectOutput, isFalse);
+          expect(cubit.state.strictBitPerfect, isFalse);
+          expect(cubit.state.errorMessage,
+              contains(denied ? 'permission was not granted' : 'streamable USB Audio interface'));
+        });
+      }
     }
 
     final rejectedSources = {

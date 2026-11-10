@@ -251,12 +251,14 @@ const _batteryChannel = MethodChannel('com.pulsr.music/battery_optimization');
 /// tests, plus a mocked SharedPreferences map.
 void installHandlerChannelStubs({
   Map<String, Object> prefs = const {},
+  Future<void> Function(MethodCall)? beforeAudioEffectsCall,
 }) {
   SharedPreferences.setMockInitialValues(prefs);
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
   messenger.setMockMethodCallHandler(_audioEffectsChannel, (call) async {
+    await beforeAudioEffectsCall?.call(call);
     switch (call.method) {
       case 'getCapabilities':
       case 'getProcessingCapabilities':

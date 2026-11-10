@@ -1,6 +1,7 @@
 part of 'audio_handler.dart';
 
 mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
+  Future<void> get effectsReady;
   Future<Map<String, dynamic>?> _readCrashPositionRecovery();
 
   Future<void> restoreLastPlaybackSession() async {
@@ -942,6 +943,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       Duration? initialPosition,
       bool autoPlay = true}) async {
     _pendingPlaybackStart = songs.isNotEmpty && autoPlay;
+    await effectsReady;
+    if (songs.isNotEmpty && autoPlay && !_pendingPlaybackStart) return;
     if (songs.isEmpty) {
       _songs = [];
       _currentIndex = 0;

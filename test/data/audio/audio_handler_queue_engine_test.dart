@@ -1,7 +1,10 @@
 // test/data/audio/audio_handler_queue_engine_test.dart
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
@@ -122,6 +125,60 @@ void main() {
   });
 
   group('loadQueue', () {
+    for (final cancelDuringStartup in [false, true]) {
+      test(
+          cancelDuringStartup
+              ? 'pause during startup cancels queued autoplay'
+              : 'cold-start queue load waits for playback initialization',
+          () async {
+        final startupEntered = Completer<void>();
+        final startupReleased = Completer<void>();
+        installHandlerChannelStubs(beforeAudioEffectsCall: (call) async {
+          if (call.method == 'setDacVoicingParams') {
+            startupEntered.complete();
+            await startupReleased.future;
+          }
+        });
+        addTearDown(() {
+          if (!startupReleased.isCompleted) startupReleased.complete();
+        });
+        final playerA = AudioPlayer(
+          handleInterruptions: false,
+          handleAudioSessionActivation: false,
+        );
+        handler = PulsrAudioHandler.forTesting(
+          repository: repo,
+          ytmService: ytm,
+          playerA: playerA,
+          playerB: AudioPlayer(
+            handleInterruptions: false,
+            handleAudioSessionActivation: false,
+          ),
+          prefetchPlayer: AudioPlayer(
+            handleInterruptions: false,
+            handleAudioSessionActivation: false,
+          ),
+        );
+
+        await startupEntered.future;
+        final load = handler!.loadQueue(
+          [localSong(1, path: '/music/track.wav')],
+          autoPlay: cancelDuringStartup,
+        );
+        final completed = expectLater(load, completes);
+        await pumpEventQueue();
+        expect(playerA.audioSources, isEmpty);
+        if (cancelDuringStartup) await handler!.pause();
+        startupReleased.complete();
+        await completed;
+
+        expect(playerA.audioSources, hasLength(cancelDuringStartup ? 0 : 1));
+        expect(handler!.mediaItem.value?.title,
+            cancelDuringStartup ? isNull : 'Track 1');
+        expect(playerA.playing, isFalse);
+      });
+    }
+
     test('empty queue clears state and emits', () async {
       handler = await buildTestHandler(repository: repo, ytmService: ytm);
       await handler!.loadQueue([localSong(1)], autoPlay: false);

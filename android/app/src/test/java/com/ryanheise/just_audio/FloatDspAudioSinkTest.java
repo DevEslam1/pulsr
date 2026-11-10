@@ -81,6 +81,7 @@ public class FloatDspAudioSinkTest {
         @Override public void setAuxEffectInfo(androidx.media3.common.AuxEffectInfo info) {}
         @Override public void enableTunnelingV21() {}
         @Override public void disableTunneling() {}
+        @Override public long getAudioTrackBufferSizeUs() { return C.TIME_UNSET; }
         @Override public void setVolume(float volume) {}
         @Override public void pause() {}
         @Override public void flush() {}

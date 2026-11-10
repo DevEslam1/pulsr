@@ -6,11 +6,15 @@
 // active, and the live signal chain.
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/data/audio/audio_handler.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/domain/models/audio_quality_info.dart';
@@ -22,6 +26,21 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'player_sheet_test_support.dart';
+
+class _MockAudioHandler extends Mock implements PulsrAudioHandler {}
+
+void _registerUnityTransport() {
+  final handler = _MockAudioHandler();
+  final playback = BehaviorSubject<PlaybackState>.seeded(PlaybackState());
+  when(() => handler.playbackState).thenAnswer((_) => playback);
+  when(() => handler.effectiveSoftwareGain).thenReturn(1.0);
+  when(() => handler.transportSamplesModified).thenReturn(false);
+  getIt.registerSingleton<PulsrAudioHandler>(handler);
+  addTearDown(() async {
+    await getIt.unregister<PulsrAudioHandler>();
+    await playback.close();
+  });
+}
 
 const _usbDevice = AudioDeviceEntry(
   id: 1,
@@ -523,7 +542,7 @@ void main() {
     verify(() => settings.openBluetoothDevOptions()).called(1);
   });
 
-  testWidgets('bit-perfect active shows the exclusive mixer chip',
+  testWidgets('unknown transport and output format never show a verified mixer',
       (tester) async {
     tester.view.physicalSize = const Size(1400, 3000);
     tester.view.devicePixelRatio = 1.0;
@@ -549,8 +568,9 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.textContaining('Exclusive mixer'), findsWidgets);
-    expect(find.text(_l10n(tester).activeLabel), findsWidgets);
+    expect(find.textContaining('Exclusive mixer'), findsNothing);
+    expect(find.textContaining(_l10n(tester).bpChainVerified), findsNothing);
+    expect(find.text(_l10n(tester).armedLabel), findsWidgets);
   });
 
   testWidgets('bit-perfect enabled but unverified shows the armed badge',
@@ -575,6 +595,7 @@ void main() {
 
   testWidgets('active bit-perfect with an OS resample shows a warning',
       (tester) async {
+    _registerUnityTransport();
     final player = stubPlayerCubit(
       state: const PlayerState(
         playback: PlaybackSlice(currentSong: testSong),
@@ -759,6 +780,7 @@ void main() {
 
   testWidgets('dither and gain stages count as sample edits in the chain',
       (tester) async {
+    _registerUnityTransport();
     // Format agreement alone is not sample identity: the verdict used to only
     // look at EQ, limiter, crossfeed and reverb, so a chain with dither, the
     // panner or software gain applied still read "verified".
@@ -775,8 +797,8 @@ void main() {
     AudioQualityInfo.dsdDopActive = false;
     addTearDown(() => AudioQualityInfo.dsdDopActive = dopBefore);
     var currentDsp = const DspSlice(isDitherEnabled: true);
-    PlayerState playerState() =>
-        PlayerState(dsp: currentDsp, playback: const PlaybackSlice(currentSong: testSong));
+    PlayerState playerState() => PlayerState(
+        dsp: currentDsp, playback: const PlaybackSlice(currentSong: testSong));
     final changes = StreamController<PlayerState>.broadcast();
     final player = MockPlayerCubit();
     when(() => player.state).thenAnswer((_) => playerState());
@@ -839,7 +861,8 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.textContaining('(no_supported_mixer_attributes)'), findsNothing);
+    expect(
+        find.textContaining('(no_supported_mixer_attributes)'), findsNothing);
     expect(
       find.textContaining('does not advertise an exclusive mixer'),
       findsWidgets,

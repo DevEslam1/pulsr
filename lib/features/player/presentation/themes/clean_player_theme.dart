@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -26,6 +25,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
+import '../../../sheets/song_options_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
@@ -35,7 +35,6 @@ import '../widgets/canvas_backdrop.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
-import '../widgets/player_more_sheet.dart';
 import '../widgets/player_volume_bar.dart';
 import '../widgets/quran_mode_sheet.dart';
 import '../widgets/speed_picker_sheet.dart';
@@ -101,6 +100,31 @@ class CleanPlayerTheme extends StatelessWidget {
         (song.source == SongSource.youtube ||
             (song.remoteId != null && song.remoteId!.isNotEmpty));
 
+    final p = context.palette;
+    final isAmoled = themeMode == AppThemeMode.amoled;
+
+    final Color topBg;
+    final Color bottomBg;
+    if (state.isLyricsVisible || state.isQueueVisible) {
+      final darkLyricsBg = isAmoled ? Colors.black : p.bg;
+      topBg = isDark ? darkLyricsBg : p.bg;
+      bottomBg = topBg;
+    } else {
+      if (isAmoled) {
+        topBg = Color.alphaBlend(
+          Colors.black.withValues(alpha: 0.40),
+          props.bgColor,
+        );
+        bottomBg = Colors.black;
+      } else {
+        topBg = props.bgColor;
+        bottomBg = Color.alphaBlend(
+          Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
+          props.bgColor,
+        );
+      }
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final metrics = PlayerThemeMetrics.calculate(context, constraints);
@@ -150,6 +174,33 @@ class CleanPlayerTheme extends StatelessWidget {
           );
         } else {
           // Full-bleed edge-to-edge artwork fading into the background color
+          // Uses lightweight gradient overlay and clamped size for 60/120fps minimization
+          final artworkSize = (constraints.maxWidth * 1.5).clamp(360.0, 720.0);
+          final Widget artworkChild = (canvasEnabled &&
+                  !canvasAsBackdrop &&
+                  song != null)
+              ? CanvasBackdrop(
+                  song: song,
+                  isPlaying: state.isPlaying,
+                  isBackdropMode: false,
+                  fallbackArtwork: CachedArtwork(
+                    id: song.id,
+                    albumId: song.albumId,
+                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                    type: ArtworkType.AUDIO,
+                    size: artworkSize,
+                    borderRadius: 0,
+                  ),
+                )
+              : CachedArtwork(
+                  id: song?.id ?? 0,
+                  albumId: song?.albumId,
+                  remoteUrl: song?.remoteArtworkUrl ?? song?.artworkUri,
+                  type: ArtworkType.AUDIO,
+                  size: artworkSize,
+                  borderRadius: 0,
+                );
+
           upperStage = KeyedSubtree(
             key: const ValueKey('art_stage'),
             child: GestureDetector(
@@ -178,65 +229,45 @@ class CleanPlayerTheme extends StatelessWidget {
                   }
                 }
               },
-              child: SizedBox.expand(
-                child: ShaderMask(
-                  shaderCallback: (Rect bounds) {
-                    return const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black,
-                        Colors.black,
-                        Color(0xEE000000),
-                        Color(0x99000000),
-                        Color(0x33000000),
-                        Colors.transparent,
-                      ],
-                      stops: [0.0, 0.58, 0.74, 0.86, 0.95, 1.0],
-                    ).createShader(bounds);
-                  },
-                  blendMode: BlendMode.dstIn,
-                  child: Hero(
-                    tag: props.heroTag,
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      alignment: Alignment.topCenter,
-                      clipBehavior: Clip.hardEdge,
-                      child: SizedBox(
-                        width: constraints.maxWidth,
-                        height: constraints.maxWidth,
-                        child: (canvasEnabled &&
-                                !canvasAsBackdrop &&
-                                song != null)
-                            ? CanvasBackdrop(
-                                song: song,
-                                isPlaying: state.isPlaying,
-                                isBackdropMode: false,
-                                fallbackArtwork: CachedArtwork(
-                                  id: song.id,
-                                  albumId: song.albumId,
-                                  remoteUrl: song.remoteArtworkUrl ??
-                                      song.artworkUri,
-                                  type: ArtworkType.AUDIO,
-                                  size: constraints.biggest.longestSide,
-                                  borderRadius: 0,
-                                  highQuality: true,
-                                ),
-                              )
-                            : CachedArtwork(
-                                id: song?.id ?? 0,
-                                albumId: song?.albumId,
-                                remoteUrl: song?.remoteArtworkUrl ??
-                                    song?.artworkUri,
-                                type: ArtworkType.AUDIO,
-                                size: constraints.biggest.longestSide,
-                                borderRadius: 0,
-                                highQuality: true,
-                              ),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  RepaintBoundary(
+                    child: Hero(
+                      tag: props.heroTag,
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        alignment: Alignment.topCenter,
+                        clipBehavior: Clip.hardEdge,
+                        child: SizedBox(
+                          width: constraints.maxWidth,
+                          height: constraints.maxWidth,
+                          child: artworkChild,
+                        ),
                       ),
                     ),
                   ),
-                ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.transparent,
+                              bottomBg.withValues(alpha: 0.18),
+                              bottomBg.withValues(alpha: 0.65),
+                              bottomBg,
+                            ],
+                            stops: const [0.0, 0.52, 0.70, 0.88, 1.0],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -357,9 +388,10 @@ class CleanPlayerTheme extends StatelessWidget {
                 iconColor: Colors.white,
                 tooltip: context.l10n.moreOptions,
                 onTap: () {
-                  HapticFeedback.lightImpact();
-                  PlayerMoreSheet.show(context,
-                      song: song, activeColor: activeColor);
+                  if (song != null) {
+                    HapticFeedback.lightImpact();
+                    SongOptionsSheet.show(context, song: song);
+                  }
                 },
               ),
             ],
@@ -476,29 +508,31 @@ class CleanPlayerTheme extends StatelessWidget {
                 bottom: true,
                 child: Padding(
                   padding: EdgeInsets.only(bottom: paddingBottom),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      trackHeader,
-                      SizedBox(height: spacingTrackToSeek),
-                      cleanSeekBar,
-                      if (bookmarkBanner != null) ...[
-                        const SizedBox(height: 8.0),
-                        bookmarkBanner,
-                        const SizedBox(height: 8.0),
-                      ] else ...[
-                        SizedBox(height: spacingSeekToControls),
+                  child: RepaintBoundary(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        trackHeader,
+                        SizedBox(height: spacingTrackToSeek),
+                        cleanSeekBar,
+                        if (bookmarkBanner != null) ...[
+                          const SizedBox(height: 8.0),
+                          bookmarkBanner,
+                          const SizedBox(height: 8.0),
+                        ] else ...[
+                          SizedBox(height: spacingSeekToControls),
+                        ],
+                        transportControls,
+                        if (volumeBar != null) ...[
+                          const SizedBox(height: 8.0),
+                          volumeBar,
+                          const SizedBox(height: 8.0),
+                        ] else ...[
+                          SizedBox(height: spacingControlsToDock),
+                        ],
+                        downBar,
                       ],
-                      transportControls,
-                      if (volumeBar != null) ...[
-                        const SizedBox(height: 8.0),
-                        volumeBar,
-                        const SizedBox(height: 8.0),
-                      ] else ...[
-                        SizedBox(height: spacingControlsToDock),
-                      ],
-                      downBar,
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -508,31 +542,6 @@ class CleanPlayerTheme extends StatelessWidget {
 
         if (isInSplitView) {
           return content;
-        }
-
-        final p = context.palette;
-        final isAmoled = themeMode == AppThemeMode.amoled;
-
-        final Color topBg;
-        final Color bottomBg;
-        if (state.isLyricsVisible || state.isQueueVisible) {
-          final darkLyricsBg = isAmoled ? Colors.black : p.bg;
-          topBg = isDark ? darkLyricsBg : p.bg;
-          bottomBg = topBg;
-        } else {
-          if (isAmoled) {
-            topBg = Color.alphaBlend(
-              Colors.black.withValues(alpha: 0.40),
-              props.bgColor,
-            );
-            bottomBg = Colors.black;
-          } else {
-            topBg = props.bgColor;
-            bottomBg = Color.alphaBlend(
-              Colors.black.withValues(alpha: isDark ? 0.35 : 0.12),
-              props.bgColor,
-            );
-          }
         }
 
         // Rich, dynamic ambient backdrop matching the artwork palette
@@ -551,9 +560,9 @@ class CleanPlayerTheme extends StatelessWidget {
                 ),
               ),
             ),
-            content,
-            // Top bar affordance: Dismiss chevron (left) and grab handle (center)
-            Positioned(
+            RepaintBoundary(child: content),
+            // Top bar affordance: Grab handle (center)
+            const Positioned(
               top: 0,
               left: 0,
               right: 0,
@@ -561,29 +570,9 @@ class CleanPlayerTheme extends StatelessWidget {
                 top: true,
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16.0,
-                    vertical: 6.0,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _CleanActionCircleButton(
-                        icon: Icons.keyboard_arrow_down_rounded,
-                        iconColor: Colors.white,
-                        tooltip: context.l10n.close,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          if (context.canPop()) {
-                            context.pop();
-                          } else {
-                            context.go('/');
-                          }
-                        },
-                      ),
-                      const PlayerPlayHandle(),
-                      const SizedBox(width: 36, height: 36),
-                    ],
+                  padding: EdgeInsets.symmetric(vertical: 6.0),
+                  child: Center(
+                    child: PlayerPlayHandle(),
                   ),
                 ),
               ),
@@ -1277,24 +1266,9 @@ class _CleanDownBar extends StatelessWidget {
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 480),
-            child: Container(
+            child: Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(22),
-                color: Colors.white.withValues(alpha: 0.12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.14),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.20),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(

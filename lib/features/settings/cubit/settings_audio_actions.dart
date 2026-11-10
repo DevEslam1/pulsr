@@ -99,13 +99,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     try {
       final usb = UsbExclusiveService();
-      final status = await usb.getStatus();
+      var status = await usb.getStatus();
       if (!status.attached) {
         _lastDirectUsbFailure = 'the USB DAC is not visible to the app';
-        return false;
-      }
-      if (!status.streamingSupported) {
-        _lastDirectUsbFailure = 'this DAC does not expose a streamable USB Audio interface';
         return false;
       }
       if (!status.permitted) {
@@ -114,6 +110,15 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           _lastDirectUsbFailure = 'USB access permission was not granted';
           return false;
         }
+        status = await usb.getStatus();
+        if (!status.attached || !status.permitted) {
+          _lastDirectUsbFailure = 'USB access is no longer available';
+          return false;
+        }
+      }
+      if (!status.streamingSupported) {
+        _lastDirectUsbFailure = 'this DAC does not expose a streamable USB Audio interface';
+        return false;
       }
       final song = getIt.isRegistered<PulsrAudioHandler>()
           ? getIt<PulsrAudioHandler>().currentSong : null;
@@ -853,13 +858,17 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       }
       if (!isClosed) {
         final reason = _hiResAudioService.lastBitPerfectFailureReason;
+        final base = AudioConflicts.bitPerfectReasonMessage(reason) ??
+            (L10nHolder.current?.strictBitPerfectUnsupportedDevice ?? 'Strict Bit-Perfect is not supported by the current output device.');
+        final directHint = _lastDirectUsbFailure == null
+            ? ''
+            : ' Direct USB streaming also failed: $_lastDirectUsbFailure.';
         safeEmit(state.copyWith(
           strictBitPerfect: false,
           bitPerfectOutput: prevBitPerfect,
           bypassDspOnBitPerfect: prevBypass,
           followTrackSampleRate: prevFollowRate,
-          errorMessage: AudioConflicts.bitPerfectReasonMessage(reason) ??
-              (L10nHolder.current?.strictBitPerfectUnsupportedDevice ?? 'Strict Bit-Perfect is not supported by the current output device.'),
+          errorMessage: '$base$directHint',
         ));
       }
       await refreshOutputDevice();
