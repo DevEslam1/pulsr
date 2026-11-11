@@ -1794,9 +1794,13 @@ class AudioQualitySheet extends StatelessWidget {
                 ? '$dacLabel • ${_sampleRateLabel(assessment.outputSampleRate)} / '
                     '${assessment.outputBitDepth}-bit reported by platform'
                 : '$dacLabel • hardware format not verified',
-            icon: outputDevice?.isUsbDac == true
+            icon: outputDevice?.isUsb == true
                 ? Icons.usb_rounded
-                : Icons.speaker_rounded,
+                : (outputDevice?.isBt == true
+                    ? Icons.bluetooth_audio_rounded
+                    : (outputDevice?.isHeadphones == true
+                        ? Icons.headphones_rounded
+                        : Icons.speaker_rounded)),
             color: assessment.isVerified
                 ? AppColors.dacGold
                 : (assessment.isProblem ? p.warning : activeColor),

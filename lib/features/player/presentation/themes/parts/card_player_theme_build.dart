@@ -28,72 +28,141 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
           playerSliderStyle: c.state.playerSliderStyle,
         ));
-    final isTablet = context.isTablet;
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textTitleColor = isDark ? Colors.white : p.textPrimary;
     final textSubtitleColor = isDark ? Colors.white70 : p.textSecondary;
-    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    final foregroundContent = LayoutBuilder(
-      builder: (context, constraints) {
-        final metrics =
-            PlayerThemeMetrics.calculate(context, constraints);
-              final isLandscape = metrics.isLandscape;
+    final isWaveformActive = waveformSeekBarEnabled &&
+        playerSliderStyle == PlayerSliderStyle.normal;
+    final showVisualizer = visualizerStyle != VisualizerStyle.off &&
+        !isWaveformActive &&
+        !state.isLyricsVisible &&
+        !state.isQueueVisible &&
+        !PlayerSplitViewScope.of(context);
 
-              final viewSwitcher = PlayerViewSwitcher(
-                state: state,
-                cubit: cubit,
-                activeColor: activeColor,
-                isTablet: isTablet,
-                barWidth: metrics.pillBarWidth,
-                barHeight: metrics.pillBarHeight,
-                trackIcon: Icons.layers_rounded,
-                surfaceFillAlpha: 0.08,
-                borderAlpha: 0.15,
-              );
+    final visualizer = showVisualizer
+        ? Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.lg, vertical: AppSpacing.s2),
+            child: AudioVisualizer(
+              style: visualizerStyle,
+              color: activeColor,
+              height: visualizerStyle == VisualizerStyle.circular ? 64 : 40,
+              isPlaying: state.isPlaying,
+              audioSessionId: state.audioSessionId,
+              trackSeed: song?.id,
+            ),
+          )
+        : const SizedBox.shrink();
 
-              final bottomDock = PlayerBottomActionDock(
-                props: props,
-                isTablet: isTablet,
-                barWidth: metrics.pillBarWidth,
-                barHeight: metrics.dockBarHeight,
-                disableBlur: true,
-              );
-
-              final artworkCard = GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => cubit.toggleLyricsVisibility(),
-                onDoubleTap: () {
-                  switch (nowPlayingDoubleTap) {
-                    case NowPlayingDoubleTapAction.toggleFavorite:
-                      if (song != null) cubit.toggleFavorite(song.id);
-                      break;
-                    case NowPlayingDoubleTapAction.toggleLyrics:
-                      cubit.toggleLyricsVisibility();
-                      break;
-                    case NowPlayingDoubleTapAction.none:
-                      break;
-                  }
-                },
-                onHorizontalDragEnd: (details) {
-                  if (nowPlayingArtworkSwipe ==
-                          NowPlayingArtworkSwipeAction.nextPrev &&
-                      details.primaryVelocity != null) {
-                    if (details.primaryVelocity! < -200) {
-                      cubit.next();
-                    } else if (details.primaryVelocity! > 200) {
-                      cubit.previous();
-                    }
-                  }
-                },
-                child: Center(
-                  key: const ValueKey('artwork_card'),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: isLandscape ? 320 : double.infinity,
-                      maxWidth: isLandscape ? 320 : double.infinity,
+    return PlayerThemeScaffold(
+      props: props,
+      trackIcon: Icons.layers_rounded,
+      background: RepaintBoundary(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            song != null
+                ? CanvasBackdrop(
+                    song: song,
+                    isPlaying: state.isPlaying,
+                    isBackdropMode: true,
+                    fallbackArtwork: CachedArtwork(
+                      id: song.id,
+                      albumId: song.albumId,
+                      remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                      type: ArtworkType.AUDIO,
+                      size: double.infinity,
+                      highQuality: true,
                     ),
+                  )
+                : Container(color: p.bg),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [
+                          AppColors.scrimLight,
+                          AppColors.scrimAt(0.72),
+                          AppColors.scrimAt(0.94),
+                        ]
+                      : [
+                          AppColors.specularAt(0.35),
+                          AppColors.specularAt(0.65),
+                          AppColors.specularAt(0.92),
+                        ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+            PositionedDirectional(
+              bottom: -40,
+              start: -20,
+              end: -20,
+              height: context.isTablet ? 440 : 340,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment.center,
+                      radius: 0.85,
+                      colors: [
+                        activeColor.withValues(alpha: isDark ? 0.24 : 0.14),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      stage: (context, metrics) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => cubit.toggleLyricsVisibility(),
+        onDoubleTap: () {
+          switch (nowPlayingDoubleTap) {
+            case NowPlayingDoubleTapAction.toggleFavorite:
+              if (song != null) cubit.toggleFavorite(song.id);
+              break;
+            case NowPlayingDoubleTapAction.toggleLyrics:
+              cubit.toggleLyricsVisibility();
+              break;
+            case NowPlayingDoubleTapAction.none:
+              break;
+          }
+        },
+        onHorizontalDragEnd: (details) {
+          if (nowPlayingArtworkSwipe ==
+                  NowPlayingArtworkSwipeAction.nextPrev &&
+              details.primaryVelocity != null) {
+            if (details.primaryVelocity! < -200) {
+              cubit.next();
+            } else if (details.primaryVelocity! > 200) {
+              cubit.previous();
+            }
+          }
+        },
+        child: LayoutBuilder(
+          builder: (context, artConstraints) {
+            final double cardArtSize = PlayerThemeMetrics.safeArtworkSize(
+              availableWidth: artConstraints.maxWidth,
+              availableHeight: artConstraints.maxHeight,
+              isTablet: metrics.isTablet,
+              maxAllowedOverride: metrics.isLandscape ? 280.0 : null,
+            );
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  key: const ValueKey('artwork_card'),
+                  child: SizedBox(
+                    width: cardArtSize,
+                    height: cardArtSize,
                     child: AnimatedScale(
                       scale: state.isPlaying ? 1.0 : 0.97,
                       duration: context.motionMs(320),
@@ -157,345 +226,60 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                     ),
                   ),
                 ),
-              );
-
-              final centerDisplay = isInSplitView
-                  ? artworkCard
-                  : AnimatedSwitcher(
-                      duration: context.motionMs(320),
-                      transitionBuilder: (child, anim) =>
-                          playerOverlayTransitionBuilder(context, child, anim),
-                      child: state.isLyricsVisible
-                          ? LyricsView(
-                              key: ValueKey(
-                                  'lyrics_${song?.id}_${song?.remoteId}'),
-                              lyrics: state.lyrics,
-                              isLoading: state.isLoadingLyrics,
-                              activeColor: activeColor,
-                              source: state.lyricsSource,
-                            )
-                          : state.isQueueVisible
-                              ? const NowPlayingQueueView(
-                                  key: ValueKey('queue_view'))
-                              : KeyedSubtree(
-                                  key: const ValueKey('stage_card'),
-                                  child: artworkCard,
-                                ),
-                    );
-
-              final isWaveformActive = waveformSeekBarEnabled &&
-                  playerSliderStyle == PlayerSliderStyle.normal;
-              final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-                  !isWaveformActive &&
-                  !state.isLyricsVisible &&
-                  !state.isQueueVisible &&
-                  !isInSplitView;
-
-              final visualizer = showVisualizer
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg, vertical: AppSpacing.s2),
-                      child: AudioVisualizer(
-                        style: visualizerStyle,
-                        color: activeColor,
-                        height: visualizerStyle == VisualizerStyle.circular
-                            ? 64
-                            : 40,
-                        isPlaying: state.isPlaying,
-                        audioSessionId: state.audioSessionId,
-                        trackSeed: song?.id,
-                      ),
-                    )
-                  : const SizedBox.shrink();
-
-              final controlsColumn = PlayerControlsColumn(
-                props: props,
-                isTablet: isTablet,
-                isLandscape: isLandscape,
-                isInSplitView: isInSplitView,
-                heightRatio: metrics.heightRatio,
-                metrics: metrics,
-                trackHeader: PlayerTrackHeader(
-                  props: props,
-                  isTablet: isTablet,
-                  metrics: metrics,
-                  horizontalPadding: 0,
-                  tabletHorizontalPadding: 0,
-                  verticalPadding: 0,
-                  titleColor: textTitleColor,
-                  subtitleColor: textSubtitleColor,
-                  titleArtistGap: AppSpacing.s2,
-                ),
-                scaleMainButtonByHeight: true,
-                dense: true,
-                dock: bottomDock,
-              );
-
-              final bottomGlassCard = Container(
-                decoration: BoxDecoration(
-                  borderRadius: AppRadii.circular(
-                      resolveCustomRadius(context, AppRadii.r28)),
-                  color: p.playerCard,
-                  border: Border.all(
-                    color: p.hairline,
-                    width: 1.0,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          Colors.black.withValues(alpha: isDark ? 0.20 : 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
-                    AppSpacing.sm, AppSpacing.md, AppSpacing.s10),
-                child: controlsColumn,
-              );
-
-              if (isInSplitView) {
-                return Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Column(
-                    children: [
-                      Expanded(child: centerDisplay),
-                      bottomGlassCard,
-                    ],
-                  ),
-                );
-              }
-
-              if (isLandscape) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: Center(
-                          child: centerDisplay,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        flex: 6,
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: metrics.switcherBottomPad,
-                                ),
-                                child: viewSwitcher,
-                              ),
-                              bottomGlassCard,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              // Portrait Mode: Fallback to scrolling on very short screens
-              final isVeryShort = constraints.maxHeight < 560;
-              final isTrackView =
-                  !state.isLyricsVisible && !state.isQueueVisible;
-
-              if (isVeryShort && isTrackView) {
-                final double scrollArtSize =
-                    (constraints.maxHeight * 0.42).clamp(180.0, 300.0);
-
-                return SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      const PlayerPlayHandle(),
-                      PlayerTopBar(
-                        props: props,
-                        isTablet: isTablet,
-                        titleColor: textTitleColor,
-                        subtitleColor: textSubtitleColor,
-                      ),
-                      Padding(
-                        padding: EdgeInsets.only(
-                          top: metrics.switcherTopPad,
-                          bottom: metrics.switcherBottomPad,
-                        ),
-                        child: viewSwitcher,
-                      ),
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: scrollArtSize,
-                            maxHeight: scrollArtSize,
-                          ),
-                          child: centerDisplay,
-                        ),
-                      ),
-                      if (showVisualizer) visualizer,
-                      SizedBox(
-                          height:
-                              (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.md,
-                            vertical: AppSpacing.xxs),
-                        child: bottomGlassCard,
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return Column(
-                children: [
-                  const PlayerPlayHandle(),
-                  PlayerTopBar(
-                    props: props,
-                    isTablet: isTablet,
-                    titleColor: textTitleColor,
-                    subtitleColor: textSubtitleColor,
-                  ),
-
-                  // Top View Switcher (lyrics bar: Track | Lyrics | Queue)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      top: metrics.switcherTopPad,
-                      bottom: metrics.switcherBottomPad,
-                    ),
-                    child: viewSwitcher,
-                  ),
-
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, artConstraints) {
-                        final double availableWidth =
-                            artConstraints.maxWidth - (isTablet ? 64.0 : 36.0);
-                        final double availableHeight =
-                            artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
-                        final double maxAllowed = isTablet ? 560.0 : 420.0;
-                        final double rawSize =
-                            math.min(availableWidth, availableHeight);
-                        final double cardArtSize =
-                            rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
-
-                        return Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: (state.isLyricsVisible ||
-                                      state.isQueueVisible)
-                                  ? (isTablet ? 560.0 : double.infinity)
-                                  : cardArtSize,
-                              maxHeight: (state.isLyricsVisible ||
-                                      state.isQueueVisible)
-                                  ? double.infinity
-                                  : cardArtSize,
-                            ),
-                            child: centerDisplay,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  if (showVisualizer) visualizer,
-
-                  SizedBox(
-                      height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-
-                  // Bottom Card with Controls and EQ Action Dock
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-                    child: bottomGlassCard,
-                  ),
-                ],
-              );
-            },
-          );
-
-    if (isInSplitView) {
-      return foregroundContent;
-    }
-
-    return Stack(
-      children: [
-        // 1 & 2. Full-bleed Artwork Background & Adaptive Scrim (Isolated in RepaintBoundary)
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                song != null
-                    ? CanvasBackdrop(
-                        song: song,
-                        isPlaying: state.isPlaying,
-                        isBackdropMode: true,
-                        fallbackArtwork: CachedArtwork(
-                          id: song.id,
-                          albumId: song.albumId,
-                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                          type: ArtworkType.AUDIO,
-                          size: double.infinity,
-                          highQuality: true,
-                        ),
-                      )
-                    : Container(color: p.bg),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isDark
-                          ? [
-                              AppColors.scrimLight,
-                              AppColors.scrimAt(0.72),
-                              AppColors.scrimAt(0.94),
-                            ]
-                          : [
-                              AppColors.specularAt(0.35),
-                              AppColors.specularAt(0.65),
-                              AppColors.specularAt(0.92),
-                            ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                ),
-                // Subtle accent aura behind the floating card
-                PositionedDirectional(
-                  bottom: -40,
-                  start: -20,
-                  end: -20,
-                  height: isTablet ? 440 : 340,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment.center,
-                          radius: 0.85,
-                          colors: [
-                            activeColor.withValues(alpha: isDark ? 0.24 : 0.14),
-                            Colors.transparent,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                if (showVisualizer) visualizer,
               ],
+            );
+          },
+        ),
+      ),
+      chrome: (context, metrics) => Container(
+        decoration: BoxDecoration(
+          borderRadius: AppRadii.circular(
+              resolveCustomRadius(context, AppRadii.r28)),
+          color: p.playerCard,
+          border: Border.all(
+            color: p.hairline,
+            width: 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
+          ],
+        ),
+        padding: const EdgeInsetsDirectional.fromSTEB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.s10),
+        child: PlayerControlsColumn(
+          props: props,
+          isTablet: metrics.isTablet,
+          isLandscape: metrics.isLandscape,
+          isInSplitView: PlayerSplitViewScope.of(context),
+          heightRatio: metrics.heightRatio,
+          metrics: metrics,
+          trackHeader: PlayerTrackHeader(
+            props: props,
+            isTablet: metrics.isTablet,
+            metrics: metrics,
+            horizontalPadding: 0,
+            tabletHorizontalPadding: 0,
+            verticalPadding: 0,
+            titleColor: textTitleColor,
+            subtitleColor: textSubtitleColor,
+            titleArtistGap: AppSpacing.s2,
+          ),
+          scaleMainButtonByHeight: true,
+          dense: true,
+          dock: PlayerBottomActionDock(
+            props: props,
+            isTablet: metrics.isTablet,
+            barWidth: metrics.pillBarWidth,
+            barHeight: metrics.dockBarHeight,
+            disableBlur: true,
           ),
         ),
-
-        // 3. Foreground Content
-        SafeArea(child: foregroundContent),
-      ],
+      ),
     );
   }
 }

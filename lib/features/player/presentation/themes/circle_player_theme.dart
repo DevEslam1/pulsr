@@ -6,16 +6,12 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
-import '../widgets/lyrics_view.dart';
-import '../widgets/now_playing_queue_view.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
 

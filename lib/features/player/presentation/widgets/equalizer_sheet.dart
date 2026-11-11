@@ -2,7 +2,6 @@ import '../../../../core/widgets/throttled_slider.dart';
 // lib/features/player/presentation/widgets/equalizer_sheet.dart
 import 'dart:io';
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -38,6 +37,7 @@ import 'arbitrary_eq_sheet.dart';
 import 'live_prog_sheet.dart';
 import 'audio_quality_sheet.dart';
 import '../../../../core/di/injection.dart';
+import '../../cubit/controllers/dsp_slice_descriptors.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
@@ -57,11 +57,8 @@ part 'eq_ab_compare_bar.dart';
 
 // Rebuild gate for the whole DSP sheet (F-01 / C-01 / H2).
 //
-// B4/F-10: `a.dsp != b.dsp` is *not* safe here. EqPreset does not implement
-// value equality, so any gains-only tick (which constructs a fresh 'Custom'
-// EqPreset) would rebuild the entire 3-tab sheet on every drag frame. Gains are
-// consumed exclusively by the per-band BlocSelectors and the curve selector, so
-// this gate compares every other DspSlice field explicitly and ignores gains.
+// Table-driven DspSlice rebuild gate (one source of truth).
+// Position/tick changes are ignored, but any DSP change triggers rebuild.
 bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
   if (identical(a, b)) return false;
   if (a.errorMessage != b.errorMessage) return true;
@@ -69,90 +66,12 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
   final x = a.dsp;
   final y = b.dsp;
   if (identical(x, y)) return false;
-  return !_eqPresetRebuildEquals(x.eqPreset, y.eqPreset) ||
-      x.isEqEnabled != y.isEqEnabled ||
-      x.isVirtualizerEnabled != y.isVirtualizerEnabled ||
-      x.virtualizerStrength != y.virtualizerStrength ||
-      x.isVirtualizerSupported != y.isVirtualizerSupported ||
-      x.isDynamicsEnabled != y.isDynamicsEnabled ||
-      x.isDynamicsSupported != y.isDynamicsSupported ||
-      x.dynamicsPreset != y.dynamicsPreset ||
-      x.selectedHeadphoneProfile != y.selectedHeadphoneProfile ||
-      x.isSpatializerSupported != y.isSpatializerSupported ||
-      x.isSpatializerEnabled != y.isSpatializerEnabled ||
-      x.volumeBoost != y.volumeBoost ||
-      x.preampDb != y.preampDb ||
-      x.isVolumeBoostSupported != y.isVolumeBoostSupported ||
-      x.isBassBoostSupported != y.isBassBoostSupported ||
-      x.isCrossfeedEnabled != y.isCrossfeedEnabled ||
-      x.crossfeedDelayUs != y.crossfeedDelayUs ||
-      x.crossfeedFeedDb != y.crossfeedFeedDb ||
-      x.crossfeedMode != y.crossfeedMode ||
-      x.isLimiterEnabled != y.isLimiterEnabled ||
-      x.limiterThresholdDb != y.limiterThresholdDb ||
-      x.limiterReleaseMs != y.limiterReleaseMs ||
-      x.isReverbEnabled != y.isReverbEnabled ||
-      x.reverbPreset != y.reverbPreset ||
-      x.reverbWetDry != y.reverbWetDry ||
-      x.stereoBalance != y.stereoBalance ||
-      x.monoMix != y.monoMix ||
-      x.isSincResamplerEnabled != y.isSincResamplerEnabled ||
-      x.isDitherEnabled != y.isDitherEnabled ||
-      x.ditherTargetBitDepth != y.ditherTargetBitDepth ||
-      x.isSaturationEnabled != y.isSaturationEnabled ||
-      x.saturationDrive != y.saturationDrive ||
-      x.saturationMix != y.saturationMix ||
-      x.saturationTilt != y.saturationTilt ||
-      x.saturationMultiband != y.saturationMultiband ||
-      x.isStereoWidthEnabled != y.isStereoWidthEnabled ||
-      x.stereoWidth != y.stereoWidth ||
-      x.isLoudnessContourEnabled != y.isLoudnessContourEnabled ||
-      x.loudnessContourIntensity != y.loudnessContourIntensity ||
-      x.isSubCrossoverEnabled != y.isSubCrossoverEnabled ||
-      x.subCrossoverCornerHz != y.subCrossoverCornerHz ||
-      x.subCrossoverSlopeDbPerOct != y.subCrossoverSlopeDbPerOct ||
-      x.subCrossoverGain != y.subCrossoverGain ||
-      x.subCrossoverBassMono != y.subCrossoverBassMono ||
-      x.subCrossoverAntiPop != y.subCrossoverAntiPop ||
-      x.stereoWidthMultiband != y.stereoWidthMultiband ||
-      x.stereoWidthLow != y.stereoWidthLow ||
-      x.stereoWidthMid != y.stereoWidthMid ||
-      x.stereoWidthHigh != y.stereoWidthHigh ||
-      x.stereoWidthLowCrossoverHz != y.stereoWidthLowCrossoverHz ||
-      x.stereoWidthHighCrossoverHz != y.stereoWidthHighCrossoverHz ||
-      x.isMultibandCompressorEnabled != y.isMultibandCompressorEnabled ||
-      x.multibandCompressorF0 != y.multibandCompressorF0 ||
-      x.multibandCompressorF1 != y.multibandCompressorF1 ||
-      x.multibandCompressorF2 != y.multibandCompressorF2 ||
-      x.isDynamicEqEnabled != y.isDynamicEqEnabled ||
-      !listEquals(x.dynamicEqBands, y.dynamicEqBands) ||
-      x.isViperDdcEnabled != y.isViperDdcEnabled ||
-      x.viperDdcProfileName != y.viperDdcProfileName ||
-      x.isArbitraryEqEnabled != y.isArbitraryEqEnabled ||
-      x.arbitraryEqString != y.arbitraryEqString ||
-      x.arbitraryEqLinearPhase != y.arbitraryEqLinearPhase ||
-      x.isLiveProgEnabled != y.isLiveProgEnabled ||
-      x.liveProgCode != y.liveProgCode ||
-      x.liveProgStatus != y.liveProgStatus ||
-      x.isDynamicBassEnabled != y.isDynamicBassEnabled ||
-      x.dynamicBassStrength != y.dynamicBassStrength ||
-      x.dynamicBassPreset != y.dynamicBassPreset ||
-      x.hasOemAudio != y.hasOemAudio ||
-      !listEquals(x.detectedOemEngines, y.detectedOemEngines) ||
-      x.isQuranModeEnabled != y.isQuranModeEnabled ||
-      x.quranReciterStyle != y.quranReciterStyle;
-}
-
-/// Compares every [EqPreset] field except `gains` (the high-frequency field
-/// consumed by per-band selectors).
-bool _eqPresetRebuildEquals(EqPreset x, EqPreset y) {
-  if (identical(x, y)) return true;
-  return x.name == y.name &&
-      x.bassBoost == y.bassBoost &&
-      listEquals(x.gains, y.gains) &&
-      listEquals(x.customFrequencies, y.customFrequencies) &&
-      listEquals(x.qFactors, y.qFactors) &&
-      mapEquals(x.bandsMap, y.bandsMap);
+  for (final field in dspSliceFields) {
+    if (!field.valuesEqual(x, y)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 class EqualizerSheet extends StatefulWidget {
@@ -190,7 +109,6 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   String _searchQuery = '';
   bool _isLoadingProfiles = true;
   bool _isAbComparing = false;
-  Timer? _abCompareTimer;
   Timer? _crossfeedAuditionTimer;
   bool? _crossfeedPreAuditionEnabled;
   ComparisonSlot _activeComparisonSlot = ComparisonSlot.slotA;
@@ -248,8 +166,6 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         unawaited(manager.endAbComparison());
       }
     }
-    _abCompareTimer?.cancel();
-    _abCompareTimer = null;
     _crossfeedAuditionTimer?.cancel();
     _crossfeedAuditionTimer = null;
     _crossfeedPreAuditionEnabled = null;

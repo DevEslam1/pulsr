@@ -1791,6 +1791,9 @@ extension _EqSheetShell on _EqualizerSheetState {
                       );
                       return;
                     }
+                    if (!getIt.isRegistered<EqualizerManager>()) {
+                      return;
+                    }
                     CompressorLimiterSheet.show(
                       context,
                       equalizerManager: getIt<EqualizerManager>(),

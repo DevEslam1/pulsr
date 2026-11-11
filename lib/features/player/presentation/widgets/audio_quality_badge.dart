@@ -59,14 +59,15 @@ class AudioQualityBadge extends StatelessWidget {
         ? output.targetBitDepth
         : (output != null && output.bitDepth > 0 ? output.bitDepth : 16);
 
-    final deviceShortName = isUsb
-        ? 'USB DAC'
-        : (output?.deviceName.contains('Bluetooth') == true ||
-                output?.deviceName.contains('A2DP') == true
-            ? 'Bluetooth'
-            : (output?.deviceName.contains('Speaker') == true
-                ? 'Speaker'
-                : 'DAC'));
+    final deviceShortName = output == null
+        ? 'DAC'
+        : (output.isUsb
+            ? 'USB DAC'
+            : (output.isBt
+                ? 'Bluetooth'
+                : (output.isSpeaker
+                    ? 'Speaker'
+                    : 'DAC')));
 
     return Material(
       color: Colors.transparent,

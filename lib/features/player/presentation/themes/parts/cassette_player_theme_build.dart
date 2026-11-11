@@ -15,309 +15,71 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
           nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
         ));
-    final isTablet = context.isTablet;
-    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    final content = LayoutBuilder(
-      builder: (context, constraints) {
-        final metrics = PlayerThemeMetrics.calculate(context, constraints);
-        final isLandscape = metrics.isLandscape;
-
-            final viewSwitcher = PlayerViewSwitcher(
-              state: state,
-              cubit: cubit,
+    return PlayerThemeScaffold(
+      props: widget.props,
+      trackIcon: Icons.radio_rounded,
+      dockIconStyle: PlayerDockIconStyle.cassette,
+      stage: (context, metrics) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => cubit.togglePlayPause(),
+        onDoubleTap: () {
+          switch (nowPlayingDoubleTap) {
+            case NowPlayingDoubleTapAction.toggleFavorite:
+              if (song != null) cubit.toggleFavorite(song.id);
+              break;
+            case NowPlayingDoubleTapAction.toggleLyrics:
+              cubit.toggleLyricsVisibility();
+              break;
+            case NowPlayingDoubleTapAction.none:
+              break;
+          }
+        },
+        onHorizontalDragEnd: (details) {
+          if (nowPlayingArtworkSwipe == NowPlayingArtworkSwipeAction.nextPrev &&
+              details.primaryVelocity != null) {
+            if (details.primaryVelocity! < -200) {
+              cubit.next();
+            } else if (details.primaryVelocity! > 200) {
+              cubit.previous();
+            }
+          }
+        },
+        child: Center(
+          key: const ValueKey('cassette_view'),
+          child: Hero(
+            tag: widget.props.heroTag,
+            child: _CassetteBody(
+              props: widget.props,
               activeColor: activeColor,
-              isTablet: isTablet,
-              barWidth: metrics.pillBarWidth,
-              barHeight: metrics.pillBarHeight,
-              trackIcon: Icons.radio_rounded,
-              surfaceFillAlpha: 0.06,
-              borderAlpha: 0.12,
-            );
-
-            final bottomDock = PlayerBottomActionDock(
-              props: widget.props,
-              isTablet: isTablet,
-              barWidth: metrics.pillBarWidth,
-              barHeight: metrics.dockBarHeight,
-            );
-
-            final cassetteStage = GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => cubit.togglePlayPause(),
-              onDoubleTap: () {
-                switch (nowPlayingDoubleTap) {
-                  case NowPlayingDoubleTapAction.toggleFavorite:
-                    if (song != null) cubit.toggleFavorite(song.id);
-                    break;
-                  case NowPlayingDoubleTapAction.toggleLyrics:
-                    cubit.toggleLyricsVisibility();
-                    break;
-                  case NowPlayingDoubleTapAction.none:
-                    break;
-                }
-              },
-              onHorizontalDragEnd: (details) {
-                if (nowPlayingArtworkSwipe ==
-                        NowPlayingArtworkSwipeAction.nextPrev &&
-                    details.primaryVelocity != null) {
-                  if (details.primaryVelocity! < -200) {
-                    cubit.next();
-                  } else if (details.primaryVelocity! > 200) {
-                    cubit.previous();
-                  }
-                }
-              },
-              child: Center(
-                key: const ValueKey('cassette_view'),
-                child: Hero(
-                  tag: widget.props.heroTag,
-                  child: _CassetteBody(
-                    props: widget.props,
-                    activeColor: activeColor,
-                    spoolController: _spoolController,
-                    isLandscape: isLandscape,
-                    isTablet: isTablet,
-                  ),
-                ),
-              ),
-            );
-
-            final centerDisplay = isInSplitView
-                ? cassetteStage
-                : AnimatedSwitcher(
-                    duration: context.motionMs(320),
-                    transitionBuilder: (child, anim) =>
-                        playerOverlayTransitionBuilder(context, child, anim),
-                    child: state.isLyricsVisible
-                        ? LyricsView(
-                            key: ValueKey(
-                                'lyrics_${song?.id}_${song?.remoteId}'),
-                            lyrics: state.lyrics,
-                            isLoading: state.isLoadingLyrics,
-                            activeColor: activeColor,
-                            source: state.lyricsSource,
-                          )
-                        : state.isQueueVisible
-                            ? const NowPlayingQueueView(
-                                key: ValueKey('queue_view'),
-                              )
-                            : KeyedSubtree(
-                                key: const ValueKey('stage_cassette'),
-                                child: cassetteStage,
-                              ),
-                  );
-
-            final controlsColumn = PlayerControlsColumn(
-              props: widget.props,
-              isTablet: isTablet,
-              isLandscape: isLandscape,
-              isInSplitView: isInSplitView,
-              heightRatio: metrics.heightRatio,
-              metrics: metrics,
-              trackHeader: PlayerTrackHeader(
-                props: widget.props,
-                isTablet: isTablet,
-                metrics: metrics,
-              ),
-              scaleMainButtonByHeight: true,
-              dock: bottomDock,
-            );
-
-            if (isInSplitView) {
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Column(
-                  children: [
-                    Expanded(child: cassetteStage),
-                    controlsColumn,
-                  ],
-                ),
-              );
-            }
-
-            if (isLandscape) {
-              return SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: Center(
-                          child: centerDisplay,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        flex: 6,
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Padding(
-                                padding: EdgeInsets.only(
-                                  bottom: metrics.switcherBottomPad,
-                                ),
-                                child: viewSwitcher,
-                              ),
-                              controlsColumn,
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            // Portrait Mode: Fallback to scrolling on very short screens
-            final isVeryShort = constraints.maxHeight < 560;
-            final isTrackView = !state.isLyricsVisible && !state.isQueueVisible;
-
-            if (isVeryShort && isTrackView) {
-              final double scrollH =
-                  (constraints.maxHeight * 0.35).clamp(160.0, 260.0);
-
-              return SafeArea(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      const PlayerPlayHandle(),
-                      PlayerTopBar(props: widget.props, isTablet: isTablet),
-                      Padding(
-                        padding: EdgeInsets.only(
-                          top: metrics.switcherTopPad,
-                          bottom: metrics.switcherBottomPad,
-                        ),
-                        child: viewSwitcher,
-                      ),
-                      Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: 440.0,
-                            maxHeight: scrollH,
-                          ),
-                          child: centerDisplay,
-                        ),
-                      ),
-                      SizedBox(
-                          height:
-                              (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                        child: controlsColumn,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            return SafeArea(
-              child: Column(
-                children: [
-                  const PlayerPlayHandle(),
-                  PlayerTopBar(props: widget.props, isTablet: isTablet),
-
-                  // Top View Switcher (lyrics bar: Track | Lyrics | Queue)
-                  Padding(
-                    padding: EdgeInsets.only(
-                      top: metrics.switcherTopPad,
-                      bottom: metrics.switcherBottomPad,
-                    ),
-                    child: viewSwitcher,
-                  ),
-
-                  // Center: Cassette / Lyrics / Queue
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, artConstraints) {
-                        final double availableWidth =
-                            artConstraints.maxWidth - (isTablet ? 64.0 : 28.0);
-                        final double availableHeight =
-                            artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
-                        final double maxW = isTablet ? 560.0 : 440.0;
-                        final double maxH = isTablet ? 360.0 : 300.0;
-                        final double rawW = math.min(availableWidth, maxW);
-                        final double rawH = math.min(availableHeight, maxH);
-                        final double cassetteW = rawW <= 0 ? 0.0 : rawW;
-                        final double cassetteH = rawH <= 0 ? 0.0 : rawH;
-
-                        return Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: (state.isLyricsVisible ||
-                                      state.isQueueVisible)
-                                  ? (isTablet ? 560.0 : double.infinity)
-                                  : cassetteW,
-                              maxHeight: (state.isLyricsVisible ||
-                                      state.isQueueVisible)
-                                  ? double.infinity
-                                  : cassetteH,
-                            ),
-                            child: centerDisplay,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  SizedBox(
-                      height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-
-                  // Bottom Controls Section
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                    child: controlsColumn,
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-
-    if (isInSplitView) {
-      return content;
-    }
-
-    return Stack(
-      children: [
-        // Ambient Backdrop Glow
-        PositionedDirectional(
-          top: -30,
-          start: -20,
-          end: -20,
-          height: isTablet ? 500 : 380,
-          child: RepaintBoundary(
-            child: IgnorePointer(
-              child: AnimatedContainer(
-                duration: context.motionMs(500),
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 0.88,
-                    colors: [
-                      activeColor.withValues(
-                          alpha: state.isPlaying ? 0.26 : 0.15),
-                      activeColor.withValues(alpha: 0.06),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.54, 1.0],
-                  ),
-                ),
-              ),
+              spoolController: _spoolController,
+              isLandscape: metrics.isLandscape,
+              isTablet: metrics.isTablet,
             ),
           ),
         ),
-
-        content,
-      ],
+      ),
+      chrome: (context, metrics) => PlayerControlsColumn(
+        props: widget.props,
+        isTablet: metrics.isTablet,
+        isLandscape: metrics.isLandscape,
+        isInSplitView: PlayerSplitViewScope.of(context),
+        heightRatio: metrics.heightRatio,
+        metrics: metrics,
+        trackHeader: PlayerTrackHeader(
+          props: widget.props,
+          isTablet: metrics.isTablet,
+          metrics: metrics,
+        ),
+        scaleMainButtonByHeight: true,
+        dock: PlayerBottomActionDock(
+          props: widget.props,
+          isTablet: metrics.isTablet,
+          barWidth: metrics.pillBarWidth,
+          barHeight: metrics.dockBarHeight,
+          dockIconStyle: PlayerDockIconStyle.cassette,
+        ),
+      ),
     );
   }
 }

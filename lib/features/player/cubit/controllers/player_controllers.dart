@@ -8,3 +8,4 @@ export 'player_queue_controller.dart';
 export 'player_transport_controller.dart';
 export 'player_widget_bridge.dart';
 export 'queue_slot_data.dart';
+export 'dsp_slice_descriptors.dart';

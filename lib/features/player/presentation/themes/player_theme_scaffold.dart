@@ -370,6 +370,7 @@ class PlayerThemeScaffold extends StatelessWidget {
   final PlayerDockIconStyle dockIconStyle;
   final bool showLyricsAndQueueOverlays;
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics) body;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? chrome;
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
       trackInfo;
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
@@ -383,10 +384,12 @@ class PlayerThemeScaffold extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final bool hideTopBarInLandscape;
 
-  const PlayerThemeScaffold({
+  PlayerThemeScaffold({
     super.key,
     required this.props,
-    required this.body,
+    Widget Function(BuildContext context, PlayerThemeMetrics metrics)? body,
+    Widget Function(BuildContext context, PlayerThemeMetrics metrics)? stage,
+    this.chrome,
     this.background,
     this.ambientGlow,
     this.topBar,
@@ -402,7 +405,7 @@ class PlayerThemeScaffold extends StatelessWidget {
     this.viewSwitcher,
     this.padding = const EdgeInsets.symmetric(horizontal: 20),
     this.hideTopBarInLandscape = false,
-  });
+  }) : body = stage ?? body ?? ((context, metrics) => const SizedBox.shrink());
 
   @override
   Widget build(BuildContext context) {
@@ -532,26 +535,35 @@ class PlayerThemeScaffold extends StatelessWidget {
                         ],
                       );
 
-                final isInSplitView = PlayerSplitViewScope.of(context);
+                final Widget resolvedChrome = chrome != null
+                    ? chrome!(context, metrics)
+                    : Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (trackInfo != null) ...[
+                            trackInfo!(context, metrics),
+                            SizedBox(height: metrics.spacingTrackToSeek),
+                          ],
+                          resolvedSeekBar,
+                          SizedBox(height: metrics.spacingSeekToControls),
+                          resolvedControls,
+                          if (isInSplitView && !metrics.isVeryShortHeight)
+                            PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+                          SizedBox(height: metrics.spacingControlsToDock),
+                          resolvedDock,
+                          SizedBox(height: metrics.spacingBelowDock),
+                        ],
+                      );
+
+
                 if (isInSplitView) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
-                        Expanded(child: Center(child: body(context, metrics))),
-                        if (trackInfo != null) ...[
-                          trackInfo!(context, metrics),
-                          SizedBox(height: metrics.spacingTrackToSeek),
-                        ],
-                        resolvedSeekBar,
-                        SizedBox(height: metrics.spacingSeekToControls),
-                        resolvedControls,
-                        if (!metrics.isVeryShortHeight)
-                          PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
-                        SizedBox(height: metrics.spacingControlsToDock),
-                        resolvedDock,
-                        SizedBox(height: metrics.spacingBelowDock),
+                        Expanded(child: Center(child: resolvedCenter)),
+                        resolvedChrome,
                       ],
                     ),
                   );
@@ -590,17 +602,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                                     ),
                                     child: resolvedSwitcher,
                                   ),
-                                  if (trackInfo != null)
-                                    trackInfo!(context, metrics),
-                                  SizedBox(height: metrics.spacingTrackToSeek),
-                                  resolvedSeekBar,
-                                  SizedBox(
-                                      height: metrics.spacingSeekToControls),
-                                  resolvedControls,
-                                  SizedBox(
-                                      height: metrics.spacingControlsToDock),
-                                  resolvedDock,
-                                  SizedBox(height: metrics.spacingBelowDock),
+                                  resolvedChrome,
                                 ],
                               ),
                             ),
@@ -634,16 +636,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                             ),
                             child: resolvedCenter,
                           ),
-                          if (trackInfo != null) ...[
-                            trackInfo!(context, metrics),
-                            SizedBox(height: metrics.spacingTrackToSeek),
-                          ],
-                          resolvedSeekBar,
-                          SizedBox(height: metrics.spacingSeekToControls),
-                          resolvedControls,
-                          SizedBox(height: metrics.spacingControlsToDock),
-                          resolvedDock,
-                          SizedBox(height: metrics.spacingBelowDock),
+                          resolvedChrome,
                         ],
                       ),
                     ),
@@ -659,16 +652,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                       resolvedSwitcher,
                       SizedBox(height: metrics.switcherBottomPad),
                       Expanded(child: resolvedCenter),
-                      if (trackInfo != null) ...[
-                        trackInfo!(context, metrics),
-                        SizedBox(height: metrics.spacingTrackToSeek),
-                      ],
-                      resolvedSeekBar,
-                      SizedBox(height: metrics.spacingSeekToControls),
-                      resolvedControls,
-                      SizedBox(height: metrics.spacingControlsToDock),
-                      resolvedDock,
-                      SizedBox(height: metrics.spacingBelowDock),
+                      resolvedChrome,
                     ],
                   ),
                 );

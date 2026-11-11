@@ -336,6 +336,26 @@ class AudioOutputInfo {
     );
   }
 
+  bool get isUsb => isUsbDac || activeDeviceType == 'usb';
+
+  bool get isBt =>
+      isBluetooth ||
+      isLeAudio ||
+      bleAudioPresent ||
+      activeDeviceType == 'bluetooth' ||
+      activeDeviceType == 'ble' ||
+      activeDeviceType == 'hearing_aid';
+
+  bool get isHeadphones =>
+      activeDeviceType == 'wired' ||
+      activeDeviceType == 'wired_headset' ||
+      activeDeviceType == 'headphones';
+
+  bool get isSpeaker =>
+      activeDeviceType == 'builtin' ||
+      activeDeviceType == 'speaker' ||
+      activeDeviceType == 'builtin_speaker';
+
   Map<String, dynamic> toMap() {
     return {
       'deviceName': deviceName,

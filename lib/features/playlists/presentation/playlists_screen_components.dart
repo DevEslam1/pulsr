@@ -287,19 +287,95 @@ class _PlaylistCard extends StatelessWidget {
 class DashedBorderCard extends StatelessWidget {
   final Widget child;
   final Color color;
-  const DashedBorderCard({super.key, required this.child, required this.color});
+  final double borderRadius;
+  final double strokeWidth;
+  final double dashWidth;
+  final double dashSpace;
+
+  const DashedBorderCard({
+    super.key,
+    required this.child,
+    required this.color,
+    this.borderRadius = 18.0,
+    this.strokeWidth = 1.4,
+    this.dashWidth = 6.0,
+    this.dashSpace = 4.0,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: AppRadii.r18All,
-        border: Border.all(color: color.withValues(alpha: 0.45), width: 1.4),
-        color: color.withValues(alpha: 0.06),
+    return CustomPaint(
+      painter: _DashedRRectPainter(
+        color: color.withValues(alpha: 0.55),
+        strokeWidth: strokeWidth,
+        borderRadius: borderRadius,
+        dashWidth: dashWidth,
+        dashSpace: dashSpace,
       ),
-      child: child,
+      child: Container(
+        height: 58,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(borderRadius),
+          color: color.withValues(alpha: 0.06),
+        ),
+        child: child,
+      ),
     );
+  }
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  final Color color;
+  final double strokeWidth;
+  final double borderRadius;
+  final double dashWidth;
+  final double dashSpace;
+
+  const _DashedRRectPainter({
+    required this.color,
+    required this.strokeWidth,
+    required this.borderRadius,
+    required this.dashWidth,
+    required this.dashSpace,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        strokeWidth / 2,
+        strokeWidth / 2,
+        size.width - strokeWidth,
+        size.height - strokeWidth,
+      ),
+      Radius.circular(borderRadius),
+    );
+
+    final path = Path()..addRRect(rrect);
+    for (final metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final double length = (distance + dashWidth < metric.length)
+            ? dashWidth
+            : metric.length - distance;
+        canvas.drawPath(metric.extractPath(distance, distance + length), paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.borderRadius != borderRadius ||
+        oldDelegate.dashWidth != dashWidth ||
+        oldDelegate.dashSpace != dashSpace;
   }
 }

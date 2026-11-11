@@ -13,8 +13,6 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
-import '../widgets/lyrics_view.dart';
-import '../widgets/now_playing_queue_view.dart';
 import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';

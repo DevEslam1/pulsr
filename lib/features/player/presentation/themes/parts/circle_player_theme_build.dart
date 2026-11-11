@@ -2,11 +2,9 @@ part of '../circle_player_theme.dart';
 
 extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
   Widget _buildBody(BuildContext context) {
-    final p = context.palette;
     final state = widget.props.state;
     final cubit = widget.props.cubit;
     final activeColor = widget.props.activeColor;
-    final bgColor = widget.props.bgColor;
     final song = state.currentSong;
     final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
         SettingsCubit,
@@ -17,283 +15,71 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
           nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
           nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
         ));
-    final isTablet = context.isTablet;
-    final isInSplitView = PlayerSplitViewScope.of(context);
 
-    final content = LayoutBuilder(
-      builder: (context, constraints) {
-        final metrics = PlayerThemeMetrics.calculate(context, constraints);
-        final isLandscape = metrics.isLandscape;
-
-            final viewSwitcher = PlayerViewSwitcher(
-              state: state,
-              cubit: cubit,
+    return PlayerThemeScaffold(
+      props: widget.props,
+      trackIcon: Icons.album_rounded,
+      dockIconStyle: PlayerDockIconStyle.circle,
+      stage: (context, metrics) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => cubit.toggleLyricsVisibility(),
+        onDoubleTap: () {
+          switch (nowPlayingDoubleTap) {
+            case NowPlayingDoubleTapAction.toggleFavorite:
+              if (song != null) cubit.toggleFavorite(song.id);
+              break;
+            case NowPlayingDoubleTapAction.toggleLyrics:
+              cubit.toggleLyricsVisibility();
+              break;
+            case NowPlayingDoubleTapAction.none:
+              break;
+          }
+        },
+        onHorizontalDragEnd: (details) {
+          if (nowPlayingArtworkSwipe == NowPlayingArtworkSwipeAction.nextPrev &&
+              details.primaryVelocity != null) {
+            if (details.primaryVelocity! < -200) {
+              cubit.next();
+            } else if (details.primaryVelocity! > 200) {
+              cubit.previous();
+            }
+          }
+        },
+        child: Center(
+          key: const ValueKey('circle_artwork_view'),
+          child: Hero(
+            tag: widget.props.heroTag,
+            child: _CircleArtwork(
+              props: widget.props,
               activeColor: activeColor,
-              isTablet: isTablet,
-              barWidth: metrics.pillBarWidth,
-              barHeight: metrics.pillBarHeight,
-              trackIcon: Icons.album_rounded,
-              surfaceFillAlpha: 0.06,
-              borderAlpha: 0.12,
-            );
-
-            final bottomDock = PlayerBottomActionDock(
-              props: widget.props,
-              isTablet: isTablet,
-              barWidth: metrics.pillBarWidth,
-              barHeight: metrics.dockBarHeight,
-            );
-
-            final circleStage = GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => cubit.toggleLyricsVisibility(),
-              onDoubleTap: () {
-                switch (nowPlayingDoubleTap) {
-                  case NowPlayingDoubleTapAction.toggleFavorite:
-                    if (song != null) cubit.toggleFavorite(song.id);
-                    break;
-                  case NowPlayingDoubleTapAction.toggleLyrics:
-                    cubit.toggleLyricsVisibility();
-                    break;
-                  case NowPlayingDoubleTapAction.none:
-                    break;
-                }
-              },
-              onHorizontalDragEnd: (details) {
-                if (nowPlayingArtworkSwipe ==
-                        NowPlayingArtworkSwipeAction.nextPrev &&
-                    details.primaryVelocity != null) {
-                  if (details.primaryVelocity! < -200) {
-                    cubit.next();
-                  } else if (details.primaryVelocity! > 200) {
-                    cubit.previous();
-                  }
-                }
-              },
-              child: Center(
-                key: const ValueKey('circle_artwork_view'),
-                child: Hero(
-                  tag: widget.props.heroTag,
-                  child: _CircleArtwork(
-                    props: widget.props,
-                    activeColor: activeColor,
-                    rotationController: _rotationController,
-                    isTablet: isTablet,
-                    isLandscape: isLandscape,
-                  ),
-                ),
-              ),
-            );
-
-            final centerDisplay = isInSplitView
-                ? circleStage
-                : AnimatedSwitcher(
-                    duration: context.motionMs(320),
-                    transitionBuilder: (child, anim) =>
-                        playerOverlayTransitionBuilder(context, child, anim),
-                    child: state.isLyricsVisible
-                        ? LyricsView(
-                            key: ValueKey(
-                                'lyrics_${song?.id}_${song?.remoteId}'),
-                            lyrics: state.lyrics,
-                            isLoading: state.isLoadingLyrics,
-                            activeColor: activeColor,
-                            source: state.lyricsSource,
-                          )
-                        : state.isQueueVisible
-                            ? const NowPlayingQueueView(
-                                key: ValueKey('queue_view'),
-                              )
-                            : KeyedSubtree(
-                                key: const ValueKey('stage_circle'),
-                                child: circleStage,
-                              ),
-                  );
-
-            final controlsColumn = PlayerControlsColumn(
-              props: widget.props,
-              isTablet: isTablet,
-              isLandscape: isLandscape,
-              isInSplitView: isInSplitView,
-              heightRatio: metrics.heightRatio,
-              metrics: metrics,
-              trackHeader: PlayerTrackHeader(
-                props: widget.props,
-                isTablet: isTablet,
-                metrics: metrics,
-              ),
-              scaleMainButtonByHeight: true,
-              dock: bottomDock,
-            );
-
-            if (isInSplitView) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Column(
-                  children: [
-                    Expanded(child: circleStage),
-                    controlsColumn,
-                  ],
-                ),
-              );
-            }
-
-            if (isLandscape) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      flex: 5,
-                      child: Center(
-                        child: centerDisplay,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      flex: 6,
-                      child: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(
-                                bottom: metrics.switcherBottomPad,
-                              ),
-                              child: viewSwitcher,
-                            ),
-                            controlsColumn,
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            // Portrait Mode: Fallback to scrolling on very short screens
-            final isVeryShort = constraints.maxHeight < 560;
-            final isTrackView = !state.isLyricsVisible && !state.isQueueVisible;
-
-            if (isVeryShort && isTrackView) {
-              final double scrollSize =
-                  (constraints.maxHeight * 0.40).clamp(180.0, 300.0);
-
-              return SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                child: Column(
-                  children: [
-                    const PlayerPlayHandle(),
-                    PlayerTopBar(props: widget.props, isTablet: isTablet),
-                    Padding(
-                      padding: EdgeInsets.only(
-                        top: metrics.switcherTopPad,
-                        bottom: metrics.switcherBottomPad,
-                      ),
-                      child: viewSwitcher,
-                    ),
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: scrollSize,
-                          maxHeight: scrollSize,
-                        ),
-                        child: centerDisplay,
-                      ),
-                    ),
-                    SizedBox(
-                        height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                      child: controlsColumn,
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return Column(
-              children: [
-                const PlayerPlayHandle(),
-                PlayerTopBar(props: widget.props, isTablet: isTablet),
-
-                // Top View Switcher (lyrics bar: Track | Lyrics | Queue)
-                Padding(
-                  padding: EdgeInsets.only(
-                    top: metrics.switcherTopPad,
-                    bottom: metrics.switcherBottomPad,
-                  ),
-                  child: viewSwitcher,
-                ),
-
-                // Center: Spinning Circle / Lyrics / Queue
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, artConstraints) {
-                      final double availableWidth =
-                          artConstraints.maxWidth - (isTablet ? 64.0 : 36.0);
-                      final double availableHeight =
-                          artConstraints.maxHeight - (isTablet ? 36.0 : 20.0);
-                      final double maxAllowed = isTablet ? 560.0 : 420.0;
-                      final double rawSize =
-                          math.min(availableWidth, availableHeight);
-                      final double circleArtSize =
-                          rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed);
-
-                      return Center(
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth:
-                                (state.isLyricsVisible || state.isQueueVisible)
-                                    ? (isTablet ? 560.0 : double.infinity)
-                                    : circleArtSize,
-                            maxHeight:
-                                (state.isLyricsVisible || state.isQueueVisible)
-                                    ? double.infinity
-                                    : circleArtSize,
-                          ),
-                          child: centerDisplay,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                SizedBox(height: (isTablet ? 12.0 : 8.0) * metrics.heightRatio),
-
-                // Bottom Controls Section
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
-                  child: controlsColumn,
-                ),
-              ],
-            );
-          },
-        );
-
-    if (isInSplitView) {
-      return content;
-    }
-
-    return AnimatedContainer(
-      duration: context.motionMs(400),
-      curve: context.motionCurve(Curves.easeInOut),
-      decoration: BoxDecoration(
-        gradient: RadialGradient(
-          center: const Alignment(0, -0.26),
-          radius: 1.25,
-          colors: [
-            Color.lerp(bgColor, activeColor, 0.14) ?? bgColor,
-            bgColor,
-            p.bg,
-          ],
-          stops: const [0.0, 0.45, 1.0],
+              rotationController: _rotationController,
+              isTablet: metrics.isTablet,
+              isLandscape: metrics.isLandscape,
+            ),
+          ),
         ),
       ),
-      child: SafeArea(child: content),
+      chrome: (context, metrics) => PlayerControlsColumn(
+        props: widget.props,
+        isTablet: metrics.isTablet,
+        isLandscape: metrics.isLandscape,
+        isInSplitView: PlayerSplitViewScope.of(context),
+        heightRatio: metrics.heightRatio,
+        metrics: metrics,
+        trackHeader: PlayerTrackHeader(
+          props: widget.props,
+          isTablet: metrics.isTablet,
+          metrics: metrics,
+        ),
+        scaleMainButtonByHeight: true,
+        dock: PlayerBottomActionDock(
+          props: widget.props,
+          isTablet: metrics.isTablet,
+          barWidth: metrics.pillBarWidth,
+          barHeight: metrics.dockBarHeight,
+          dockIconStyle: PlayerDockIconStyle.circle,
+        ),
+      ),
     );
   }
 }

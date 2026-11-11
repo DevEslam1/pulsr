@@ -187,7 +187,7 @@ class _WaveformHeroStage extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 3D Perspective Tilt Squircle: Touch-responsive Matrix4 perspective rotation
 // ---------------------------------------------------------------------------
-class _TiltableArtworkSquircle extends StatelessWidget {
+class _TiltableArtworkSquircle extends StatefulWidget {
   final Widget child;
   final double size;
 
@@ -197,8 +197,79 @@ class _TiltableArtworkSquircle extends StatelessWidget {
   });
 
   @override
+  State<_TiltableArtworkSquircle> createState() =>
+      _TiltableArtworkSquircleState();
+}
+
+class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _springController;
+  late Animation<Offset> _tiltAnim;
+  Offset _currentTilt = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _springController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _tiltAnim = Tween<Offset>(begin: Offset.zero, end: Offset.zero).animate(
+      CurvedAnimation(parent: _springController, curve: Curves.easeOutCubic),
+    );
+    _springController.addListener(() {
+      setState(() {
+        _currentTilt = _tiltAnim.value;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _springController.dispose();
+    super.dispose();
+  }
+
+  void _onPanUpdate(DragUpdateDetails details) {
+    if (widget.size <= 0) return;
+    final half = widget.size / 2;
+    final dx = ((details.localPosition.dx - half) / half).clamp(-1.0, 1.0);
+    final dy = ((details.localPosition.dy - half) / half).clamp(-1.0, 1.0);
+    setState(() {
+      _currentTilt = Offset(dx, dy);
+    });
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    _tiltAnim = Tween<Offset>(
+      begin: _currentTilt,
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(parent: _springController, curve: Curves.easeOutCubic),
+    );
+    _springController.forward(from: 0.0);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return child;
+    final rotX = -_currentTilt.dy * 0.08;
+    final rotY = _currentTilt.dx * 0.08;
+    final transform = Matrix4.identity()
+      ..setEntry(3, 2, 0.0015)
+      ..rotateX(rotX)
+      ..rotateY(rotY);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onPanUpdate: _onPanUpdate,
+      onPanEnd: _onPanEnd,
+      onPanCancel: () => _onPanEnd(DragEndDetails()),
+      child: Transform(
+        alignment: FractionalOffset.center,
+        transform: transform,
+        child: widget.child,
+      ),
+    );
   }
 }
 

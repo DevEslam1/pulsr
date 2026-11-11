@@ -311,264 +311,145 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                   style: TextStyle(color: p.textSecondary)),
             ),
           isInSplit
-              ? Expanded(
-                  child: SingleChildScrollView(
-                    controller: _scrollController,
-                    physics: const BouncingScrollPhysics(),
-                    child: Column(
-                  children: List.generate(ayahs.length, (idx) {
-                final ayah = ayahs[idx];
-                final isCurrent = ayah.ayahNumber == activeAyah;
-                final isRevealed = _revealedAyahs.contains(ayah.ayahNumber);
-                final shouldBlur = _blindRecallMode && !isRevealed;
+              ? Expanded(child: _buildAyahList(context, p, ayahs, activeAyah, meta))
+              : ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 340),
+                  child: _buildAyahList(context, p, ayahs, activeAyah, meta),
+                ),
+          const QuranTextAttribution(),
+        ],
+      ),
+    );
+  }
 
-                _ayahKeys[ayah.ayahNumber] ??= GlobalKey();
+  Widget _buildAyahList(
+    BuildContext context,
+    PulsrPalette p,
+    List<QuranAyahText> ayahs,
+    int? activeAyah,
+    QuranMetadata? meta,
+  ) {
+    return SingleChildScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        children: List.generate(ayahs.length, (idx) {
+          final ayah = ayahs[idx];
+          final isCurrent = ayah.ayahNumber == activeAyah;
+          final isRevealed = _revealedAyahs.contains(ayah.ayahNumber);
+          final shouldBlur = _blindRecallMode && !isRevealed;
 
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                  child: GestureDetector(
-                    key: _ayahKeys[ayah.ayahNumber],
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      if (_blindRecallMode && !isRevealed) {
-                        setState(() => _revealedAyahs.add(ayah.ayahNumber));
-                      }
-                      if (meta != null && meta.ayahTimings.isNotEmpty) {
-                        final timing = meta.timingForAyah(ayah.ayahNumber);
-                        if (timing != null) {
-                          widget.onSeek?.call(timing.start);
-                        }
-                      }
-                    },
-                    child: AnimatedContainer(
-                      duration: context.motionMs(250),
-                      curve: Curves.easeOutCubic,
-                      padding: const EdgeInsets.all(AppSpacing.s12),
-                      decoration: BoxDecoration(
-                        color: isCurrent
-                            ? p.accent.withValues(alpha: 0.14)
-                            : p.surfaceContainerHigh.withValues(alpha: 0.5),
-                        borderRadius: AppRadii.r14All,
-                        border: Border.all(
-                          color: isCurrent ? p.accent : p.hairline,
-                          width: isCurrent ? 1.6 : 1.0,
-                        ),
-                        boxShadow: isCurrent
-                            ? [
-                                BoxShadow(
-                                  color: p.accent.withValues(alpha: 0.15),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 2),
-                                )
-                              ]
-                            : null,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+          _ayahKeys[ayah.ayahNumber] ??= GlobalKey();
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+            child: GestureDetector(
+              key: _ayahKeys[ayah.ayahNumber],
+              onTap: () {
+                HapticFeedback.selectionClick();
+                if (_blindRecallMode && !isRevealed) {
+                  setState(() => _revealedAyahs.add(ayah.ayahNumber));
+                }
+                if (meta != null && meta.ayahTimings.isNotEmpty) {
+                  final timing = meta.timingForAyah(ayah.ayahNumber);
+                  if (timing != null) {
+                    widget.onSeek?.call(timing.start);
+                  }
+                }
+              },
+              child: AnimatedContainer(
+                duration: context.motionMs(250),
+                curve: Curves.easeOutCubic,
+                padding: const EdgeInsets.all(AppSpacing.s12),
+                decoration: BoxDecoration(
+                  color: isCurrent
+                      ? p.accent.withValues(alpha: 0.14)
+                      : p.surfaceContainerHigh.withValues(alpha: 0.5),
+                  borderRadius: AppRadii.r14All,
+                  border: Border.all(
+                    color: isCurrent ? p.accent : p.hairline,
+                    width: isCurrent ? 1.6 : 1.0,
+                  ),
+                  boxShadow: isCurrent
+                      ? [
+                          BoxShadow(
+                            color: p.accent.withValues(alpha: 0.15),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          )
+                        ]
+                      : null,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Directionality(
+                      textDirection: TextDirection.rtl,
+                      child: Stack(
                         children: [
-                          // Verse Arabic Text
-                          Directionality(
-                            textDirection: TextDirection.rtl,
-                            child: Stack(
-                              children: [
-                                ExcludeSemantics(
-                                  excluding: shouldBlur,
-                                  child: Text(
-                                    '${ayah.textArabic} ﴿${ayah.ayahNumber}﴾',
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.titleLarge,
-                                      fontWeight: FontWeight.w700,
-                                      color:
-                                          isCurrent ? p.accent : p.textPrimary,
-                                      fontFamily: 'serif',
-                                      height: 1.8,
-                                    ),
-                                  ),
-                                ),
-                                if (shouldBlur)
-                                  Positioned.fill(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: p.surfaceContainer,
-                                        borderRadius: AppRadii.r10All,
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.touch_app_rounded,
-                                              size: 16, color: p.accent),
-                                          const SizedBox(width: AppSpacing.xxs),
-                                          Text(
-                                            context.l10n.quranTapToReveal,
-                                            style: TextStyle(
-                                              fontSize: AppFontSize.caption,
-                                              fontWeight: FontWeight.w700,
-                                              color: p.accent,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                          ExcludeSemantics(
+                            excluding: shouldBlur,
+                            child: Text(
+                              '${ayah.textArabic} ﴿${ayah.ayahNumber}﴾',
+                              style: TextStyle(
+                                fontSize: AppFontSize.titleLarge,
+                                fontWeight: FontWeight.w700,
+                                color: isCurrent ? p.accent : p.textPrimary,
+                                fontFamily: 'serif',
+                                height: 1.8,
+                              ),
                             ),
                           ),
-                          if (!shouldBlur && ayah.textEnglish.isNotEmpty) ...[
-                            const SizedBox(height: AppSpacing.xs),
-                            Directionality(
-                              textDirection: TextDirection.ltr,
-                              child: Text(
-                                ayah.textEnglish,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.caption,
-                                  color: isCurrent
-                                      ? p.textPrimary
-                                      : p.textSecondary,
-                                  fontStyle: FontStyle.italic,
-                                  height: 1.35,
+                          if (shouldBlur)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: p.surfaceContainer,
+                                  borderRadius: AppRadii.r10All,
+                                ),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.touch_app_rounded,
+                                        size: 16, color: p.accent),
+                                    const SizedBox(width: AppSpacing.xxs),
+                                    Text(
+                                      context.l10n.quranTapToReveal,
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.caption,
+                                        fontWeight: FontWeight.w700,
+                                        color: p.accent,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
-                          ],
                         ],
                       ),
                     ),
-                  ),
-                );
-              })),
-            ),
-          )
-        : ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 340),
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: List.generate(ayahs.length, (idx) {
-                  final ayah = ayahs[idx];
-                  final isCurrent = ayah.ayahNumber == activeAyah;
-                  final isRevealed = _revealedAyahs.contains(ayah.ayahNumber);
-                  final shouldBlur = _blindRecallMode && !isRevealed;
-
-                  _ayahKeys[ayah.ayahNumber] ??= GlobalKey();
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.s8),
-                    child: GestureDetector(
-                      key: _ayahKeys[ayah.ayahNumber],
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        if (_blindRecallMode && !isRevealed) {
-                          setState(() => _revealedAyahs.add(ayah.ayahNumber));
-                        }
-                        if (meta != null && meta.ayahTimings.isNotEmpty) {
-                          final timing = meta.timingForAyah(ayah.ayahNumber);
-                          if (timing != null) {
-                            widget.onSeek?.call(timing.start);
-                          }
-                        }
-                      },
-                      child: AnimatedContainer(
-                        duration: context.motionMs(250),
-                        curve: Curves.easeOutCubic,
-                        padding: const EdgeInsets.all(AppSpacing.s12),
-                        decoration: BoxDecoration(
-                          color: isCurrent
-                              ? p.accent.withValues(alpha: 0.14)
-                              : p.surfaceContainerHigh.withValues(alpha: 0.5),
-                          borderRadius: AppRadii.r14All,
-                          border: Border.all(
-                            color: isCurrent ? p.accent : p.hairline,
-                            width: isCurrent ? 1.6 : 1.0,
+                    if (!shouldBlur && ayah.textEnglish.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Text(
+                          ayah.textEnglish,
+                          style: TextStyle(
+                            fontSize: AppFontSize.caption,
+                            color: isCurrent ? p.textPrimary : p.textSecondary,
+                            fontStyle: FontStyle.italic,
+                            height: 1.35,
                           ),
-                          boxShadow: isCurrent
-                              ? [
-                                  BoxShadow(
-                                    color: p.accent.withValues(alpha: 0.15),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 2),
-                                  )
-                                ]
-                              : null,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Directionality(
-                              textDirection: TextDirection.rtl,
-                              child: Stack(
-                                children: [
-                                  ExcludeSemantics(
-                                    excluding: shouldBlur,
-                                    child: Text(
-                                      '${ayah.textArabic} ﴿${ayah.ayahNumber}﴾',
-                                      style: TextStyle(
-                                        fontSize: AppFontSize.titleLarge,
-                                        fontWeight: FontWeight.w700,
-                                        color: isCurrent ? p.accent : p.textPrimary,
-                                        fontFamily: 'serif',
-                                        height: 1.8,
-                                      ),
-                                    ),
-                                  ),
-                                  if (shouldBlur)
-                                    Positioned.fill(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: p.surfaceContainer,
-                                          borderRadius: AppRadii.r10All,
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.touch_app_rounded,
-                                                size: 16, color: p.accent),
-                                            const SizedBox(width: AppSpacing.xxs),
-                                            Text(
-                                              context.l10n.quranTapToReveal,
-                                              style: TextStyle(
-                                                fontSize: AppFontSize.caption,
-                                                fontWeight: FontWeight.w700,
-                                                color: p.accent,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            if (!shouldBlur && ayah.textEnglish.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.xs),
-                              Directionality(
-                                textDirection: TextDirection.ltr,
-                                child: Text(
-                                  ayah.textEnglish,
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.caption,
-                                    color: isCurrent
-                                        ? p.textPrimary
-                                        : p.textSecondary,
-                                    fontStyle: FontStyle.italic,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
                         ),
                       ),
-                    ),
-                  );
-                }),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const QuranTextAttribution(),
-        ],
+          );
+        }),
       ),
     );
   }

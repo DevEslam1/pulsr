@@ -154,6 +154,14 @@ class PlayerDockIconStyle {
     badgeFontSize: 8,
   );
 
+  static const PlayerDockIconStyle cd = common;
+  static const PlayerDockIconStyle circle = common;
+  static const PlayerDockIconStyle cassette = common;
+  static const PlayerDockIconStyle lyricsFocus = common;
+  static const PlayerDockIconStyle minimal = common;
+  static const PlayerDockIconStyle vinyl = common;
+  static const PlayerDockIconStyle waveform = common;
+
   static const PlayerDockIconStyle classic = PlayerDockIconStyle(
     inkWellRadius: 20,
     tooltipOutside: false,
@@ -771,14 +779,15 @@ class PlayerBottomActionDock extends StatelessWidget {
 
     final IconData outputIcon = isCast
         ? Icons.cast_connected_rounded
-        : (isUsb
-            ? Icons.usb_rounded
-            : (outputDevice?.deviceName.contains('Bluetooth') == true ||
-                    outputDevice?.deviceName.contains('A2DP') == true
-                ? Icons.bluetooth_audio_rounded
-                : (outputDevice?.deviceName.contains('Speaker') == true
-                    ? Icons.speaker_rounded
-                    : Icons.headphones_rounded)));
+        : (outputDevice == null
+            ? Icons.headphones_rounded
+            : (outputDevice.isUsb
+                ? Icons.usb_rounded
+                : (outputDevice.isBt
+                    ? Icons.bluetooth_audio_rounded
+                    : (outputDevice.isSpeaker
+                        ? Icons.speaker_rounded
+                        : Icons.headphones_rounded))));
 
     final isInSplit = PlayerSplitViewScope.of(context);
     final double effectiveBarWidth = isInSplit

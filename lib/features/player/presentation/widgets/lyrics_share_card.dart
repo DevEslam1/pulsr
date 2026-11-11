@@ -451,10 +451,11 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
 
       final title = widget.song?.title ?? 'Track';
       final artist = widget.song?.artist ?? 'Artist';
-      // ignore: deprecated_member_use
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: '$title - $artist | Pulsr Music',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: '$title - $artist | Pulsr Music',
+        ),
       );
     } catch (e, st) {
       ErrorLogger.log('Sharing lyrics card failed',

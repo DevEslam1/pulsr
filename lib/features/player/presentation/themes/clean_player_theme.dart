@@ -1227,20 +1227,20 @@ class _CleanDownBar extends StatelessWidget {
     final isInSplit = PlayerSplitViewScope.of(context);
     final splitTabCtrl = PlayerSplitViewScope.tabControllerOf(context);
 
-    final isUsb = outputDevice?.isUsbDac == true;
+    final isUsb = outputDevice?.isUsb == true;
     final IconData outputIcon = isCast
         ? Icons.cast_connected_rounded
-        : (isUsb
-            ? Icons.usb_rounded
-            : (outputDevice?.deviceName.contains('Bluetooth') == true ||
-                    outputDevice?.deviceName.contains('A2DP') == true
-                ? Icons.bluetooth_audio_rounded
-                : (outputDevice?.deviceName.contains('Speaker') == true
-                    ? Icons.speaker_rounded
-                    : (outputDevice?.deviceName.contains('Headphones') == true ||
-                            outputDevice?.deviceName.contains('Headset') == true
-                        ? Icons.headphones_rounded
-                        : Icons.airplay_rounded))));
+        : (outputDevice == null
+            ? Icons.airplay_rounded
+            : (outputDevice.isUsb
+                ? Icons.usb_rounded
+                : (outputDevice.isBt
+                    ? Icons.bluetooth_audio_rounded
+                    : (outputDevice.isSpeaker
+                        ? Icons.speaker_rounded
+                        : (outputDevice.isHeadphones
+                            ? Icons.headphones_rounded
+                            : Icons.airplay_rounded)))));
 
     int? remainingTracks;
     try {

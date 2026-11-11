@@ -13,26 +13,15 @@ extension _EqAbCompareBar on _EqualizerSheetState {
         child: GestureDetector(
           onTapDown: (_) {
             HapticFeedback.selectionClick();
-            _abCompareTimer?.cancel();
             _setStateSafe(() => _isAbComparing = true);
             cubit.startAbComparison();
-            _abCompareTimer = Timer(const Duration(seconds: 10), () {
-              if (mounted) {
-                _setStateSafe(() => _isAbComparing = false);
-              }
-              cubit.endAbComparison();
-            });
           },
           onTapUp: (_) {
             HapticFeedback.selectionClick();
-            _abCompareTimer?.cancel();
-            _abCompareTimer = null;
             _setStateSafe(() => _isAbComparing = false);
             cubit.endAbComparison();
           },
           onTapCancel: () {
-            _abCompareTimer?.cancel();
-            _abCompareTimer = null;
             _setStateSafe(() => _isAbComparing = false);
             cubit.endAbComparison();
           },
