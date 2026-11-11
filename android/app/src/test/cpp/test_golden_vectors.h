@@ -560,16 +560,20 @@ inline void runGoldenVectorF32BiquadsParityTest() {
     double rmsRef = std::sqrt(sumSqRef / (totalSamples - 500 * channels));
     double thdNoiseDeltaDb = 20.0 * std::log10(rmsDiff / rmsRef + 1e-15);
 
-    double refDb = 20.0 * std::log10(rmsRef);
-    double eqDb = 20.0 * std::log10(std::sqrt(sumSqDiff / (totalSamples - 500 * channels)));
-    double levelDeltaDb = std::abs(20.0 * std::log10(std::sqrt(sumSqRef / (totalSamples - 500 * channels))) -
-                                   20.0 * std::log10(std::sqrt(sumSqRef / (totalSamples - 500 * channels))));
+    double sumSqEq = 0.0;
+    for (int i = 500 * channels; i < totalSamples; ++i) {
+        sumSqEq += static_cast<double>(eqOutput[i]) * static_cast<double>(eqOutput[i]);
+    }
+    double rmsEq = std::sqrt(sumSqEq / (totalSamples - 500 * channels));
+    double eqDb = 20.0 * std::log10(rmsEq + 1e-15);
+    double refDb = 20.0 * std::log10(rmsRef + 1e-15);
+    double levelDeltaDb = std::abs(eqDb - refDb);
 
-    // Validate THD/noise delta is well below -50 dB (noise floor of single-precision float is ~-140 dB)
-    // and level difference vs double is < 0.001 dB
+    // Validate THD/noise delta is well below -50 dB and level difference vs double is < 0.001 dB
     assert(thdNoiseDeltaDb < -50.0);
-    std::cout << "  ✓ ParametricEQ biquad float32 THD/noise delta vs double reference: "
-              << thdNoiseDeltaDb << " dB (< -50 dB requirement, delta < 0.001 dB level error)." << std::endl;
+    assert(levelDeltaDb < 0.001);
+    std::cout << "  ✓ ParametricEQ biquad precision THD/noise delta vs double reference: "
+              << thdNoiseDeltaDb << " dB (level delta " << levelDeltaDb << " dB < 0.001 dB)." << std::endl;
 
     // 3. Test LoudnessContour shelf biquad stability & non-NaN verification
     LoudnessContour lc;

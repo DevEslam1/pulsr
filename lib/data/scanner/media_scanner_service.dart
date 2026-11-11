@@ -479,6 +479,9 @@ class MediaScannerService {
         minSizeBytes: minSizeKb * 1024,
         autoHideSystemMedia: autoHideSystemMedia,
         pathSeparator: Platform.pathSeparator,
+        allRawSongsForCounts: songsToProcess.length != songs.length
+            ? songs.map((s) => Map<String, dynamic>.from(s.getMap)).toList()
+            : null,
       );
 
       final parseResult =
@@ -600,11 +603,13 @@ class MediaScannerService {
         );
       }
     } catch (e, stack) {
-      _errorController.add(ScanError(
-        path: path,
-        message: 'Failed to rescan single file metadata',
-        error: e,
-      ));
+      if (!_errorController.isClosed) {
+        _errorController.add(ScanError(
+          path: path,
+          message: 'Failed to rescan single file metadata',
+          error: e,
+        ));
+      }
       ErrorLogger.log(
         'Failed to rescan single file metadata: $path',
         error: e,
@@ -656,19 +661,23 @@ class MediaScannerService {
 
       await _repository.updateAudioQuality(
         songId: songId,
-        sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : null,
+        sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : 44100,
         bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
         bitrateKbps:
             bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
-        codec: (codec != null && codec.isNotEmpty) ? codec : null,
+        codec: (codec != null && codec.isNotEmpty)
+            ? codec
+            : path.split('.').last.split('?').first.trim().toUpperCase(),
         loudnessRange: lraVal,
       );
     } catch (e, stack) {
-      _errorController.add(ScanError(
-        path: path,
-        message: 'Failed to enrich audio quality',
-        error: e,
-      ));
+      if (!_errorController.isClosed) {
+        _errorController.add(ScanError(
+          path: path,
+          message: 'Failed to enrich audio quality',
+          error: e,
+        ));
+      }
       ErrorLogger.log(
         'Failed to enrich audio quality: $path',
         error: e,
@@ -742,15 +751,18 @@ class MediaScannerService {
                 codec ??= 'OPUS';
               }
 
+              final path = song.path;
               updates.add((
                 songId: song.id,
                 path: song.path,
                 sampleRate:
-                    sampleRate != null && sampleRate > 0 ? sampleRate : null,
+                    sampleRate != null && sampleRate > 0 ? sampleRate : 44100,
                 bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
                 bitrateKbps:
                     bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
-                codec: (codec != null && codec.isNotEmpty) ? codec : null,
+                codec: (codec != null && codec.isNotEmpty)
+            ? codec
+            : path.split('.').last.split('?').first.trim().toUpperCase(),
                 loudnessRange: lraVal,
               ));
             }
@@ -792,6 +804,7 @@ class _ScanMediaInput {
   final int minSizeBytes;
   final bool autoHideSystemMedia;
   final String pathSeparator;
+  final List<Map<String, dynamic>>? allRawSongsForCounts;
 
   _ScanMediaInput({
     required this.rawSongs,
@@ -801,6 +814,7 @@ class _ScanMediaInput {
     this.minSizeBytes = 0,
     required this.autoHideSystemMedia,
     required this.pathSeparator,
+    this.allRawSongsForCounts,
   });
 }
 
@@ -877,11 +891,16 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     }
 
     // Skip if within a user-excluded folder (case-insensitive, normalized)
-    final normPath = path.toLowerCase();
+    final normPath = path.replaceAll('\\', '/').toLowerCase();
     final sep = input.pathSeparator;
     if (input.excludedFolders.any((folder) {
-      final normFolder = folder.toLowerCase();
-      final prefix = normFolder.endsWith(sep) ? normFolder : '$normFolder$sep';
+      var normFolder = folder.replaceAll('\\', '/').toLowerCase().trim();
+      while (normFolder.endsWith('/')) {
+        normFolder = normFolder.substring(0, normFolder.length - 1);
+      }
+      if (normFolder.isEmpty) return false;
+      final _ = sep;
+      final prefix = '$normFolder/';
       return normPath.startsWith(prefix) || normPath == normFolder;
     })) {
       continue;
@@ -958,9 +977,11 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         fileSize: Value(size),
         genre: Value(genre),
         year: Value(year),
-        codec: (initialCodec != null && initialCodec.isNotEmpty)
-            ? Value(initialCodec)
-            : const Value.absent(),
+        codec: initialCodec == null
+            ? const Value.absent() : const Value.absent(),
+            // (initialCodec is ignored until header read)
+            // Header-only; populated by enrichAudioQuality rather than file extension
+            // (initialCodec is ignored until header read)
       ),
     );
 
@@ -989,6 +1010,45 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     }
   }
 
+  if (input.allRawSongsForCounts != null) {
+    albumSongCounts.clear();
+    artistSongCounts.clear();
+    final seenIds = <int>{};
+    for (final raw in input.allRawSongsForCounts!) {
+      final id = parseInt(raw['_id']) ?? parseInt(raw['id']) ?? 0;
+      if (id <= 0 || !seenIds.add(id)) continue;
+      final duration = parseInt(raw['duration']) ?? 0;
+      if (duration < input.minDurationMs) continue;
+      final fileSize = parseInt(raw['_size']) ?? parseInt(raw['size']) ?? 0;
+      if (input.minSizeBytes > 0 && fileSize < input.minSizeBytes) continue;
+      final path = parseString(raw['_data']) ?? parseString(raw['data']) ?? '';
+      if (path.isEmpty || !AudioFormats.isSupportedExtension(path)) continue;
+      if (input.autoHideSystemMedia &&
+          MediaScannerService.isSystemIgnoredPath(path)) {
+        continue;
+      }
+      if (MediaScannerService.isInNomediaDirectory(path)) continue;
+      final normPath = path.replaceAll('\\', '/').toLowerCase();
+      if (input.excludedFolders.any((folder) {
+        var normFolder = folder.replaceAll('\\', '/').toLowerCase().trim();
+        while (normFolder.endsWith('/')) {
+          normFolder = normFolder.substring(0, normFolder.length - 1);
+        }
+        if (normFolder.isEmpty) return false;
+        return normPath == normFolder || normPath.startsWith('$normFolder/');
+      })) {
+        continue;
+      }
+      final albumId = parseInt(raw['album_id']) ?? parseInt(raw['albumId']);
+      final artistId = parseInt(raw['artist_id']) ?? parseInt(raw['artistId']);
+      if (albumId != null) {
+        albumSongCounts[albumId] = (albumSongCounts[albumId] ?? 0) + 1;
+      }
+      if (artistId != null) {
+        artistSongCounts[artistId] = (artistSongCounts[artistId] ?? 0) + 1;
+      }
+    }
+  }
   final finalAlbums = albumMap.entries.map((e) {
     return e.value.copyWith(songCount: Value(albumSongCounts[e.key] ?? 1));
   }).toList();

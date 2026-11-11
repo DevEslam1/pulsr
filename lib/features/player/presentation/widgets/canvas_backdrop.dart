@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../core/constants/app_blur.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/error_logger.dart';
@@ -264,12 +265,15 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
                     const downscale = 6.0;
                     final smallWidth = constraints.maxWidth / downscale;
                     final smallHeight = constraints.maxHeight / downscale;
+                    final effectiveSigma = AppBlur.canBlur(context)
+                        ? AppBlur.clampSigma(widget.blurSigma / downscale)
+                        : AppBlur.none;
                     return Transform.scale(
                       scale: downscale,
                       child: ImageFiltered(
                         imageFilter: ImageFilter.blur(
-                          sigmaX: widget.blurSigma / downscale,
-                          sigmaY: widget.blurSigma / downscale,
+                          sigmaX: effectiveSigma,
+                          sigmaY: effectiveSigma,
                         ),
                         child: SizedBox(
                           width: smallWidth,

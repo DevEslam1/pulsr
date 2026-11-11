@@ -116,17 +116,36 @@ public class AAudioAudioSinkTest {
     }
 
     @Test
-    public void exclusiveRejectsInt32RatherThanClaimingExactFloatConversion() throws Exception {
+    public void exclusiveRejectsInt32BelowApi31RatherThanClaimingExactFloatConversion() throws Exception {
         AAudioAudioSink sink = new AAudioAudioSink(true, 50);
         FakeBridge bridge = new FakeBridge();
         sink.setBridgeForTest(bridge);
+        sink.setDeviceApiLevelForTest(30);
         assertEquals(AudioSink.SINK_FORMAT_UNSUPPORTED, sink.getFormatSupport(pcm32()));
         try {
             sink.configure(pcm32(), 0, null);
-            org.junit.Assert.fail("exclusive int32 must not open a float stream");
+            org.junit.Assert.fail("exclusive int32 below API 31 must not open a float stream");
         } catch (AudioSink.ConfigurationException expected) {
             assertEquals(0, bridge.openedEncoding);
         }
+    }
+
+    @Test
+    public void exclusiveInt32Api31OpensNativeI32AndPreservesLeastSignificantBits() throws Exception {
+        FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 8;
+        AAudioAudioSink sink = new AAudioAudioSink(true, 50);
+        sink.setBridgeForTest(bridge);
+        assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY, sink.getFormatSupport(pcm32()));
+        sink.configure(pcm32(), 0, null);
+        assertEquals(AaudioNativeBridge.ENCODING_PCM_I32, bridge.openedEncoding);
+        assertEquals(android.media.AudioFormat.ENCODING_PCM_32BIT, sink.measuredStream()[2]);
+        ByteBuffer input = ByteBuffer.allocateDirect(8).order(java.nio.ByteOrder.nativeOrder());
+        input.putInt(0x40000000).putInt(0x40000001).flip();
+        assertTrue(sink.handleBuffer(input, 100L, 1));
+        ByteBuffer written = ByteBuffer.wrap(bridge.writtenBytes).order(java.nio.ByteOrder.nativeOrder());
+        assertEquals(0x40000000, written.getInt());
+        assertEquals(0x40000001, written.getInt());
     }
 
     @Test

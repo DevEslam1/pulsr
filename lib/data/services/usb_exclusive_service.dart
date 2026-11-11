@@ -410,11 +410,16 @@ class UsbExclusiveService {
       final status = await _readStatus();
       if (res is Map) {
         if (res['success'] == true) {
+          final openedDepth = status?.streamingBitDepth ?? 0;
+          final depthSatisfied = strict
+              ? openedDepth == bitDepth
+              : (openedDepth >= bitDepth &&
+                  (openedDepth == 16 || openedDepth == 24 || openedDepth == 32));
           return status != null && status.attached && status.permitted &&
                   status.streamingActive && status.deviceId == before.deviceId &&
                   status.deviceId != null &&
                   status.streamingSampleRate == sampleRate &&
-                  status.streamingBitDepth == bitDepth &&
+                  depthSatisfied &&
                   status.streamingChannels == channels
               ? UsbStreamResult.ok : UsbStreamResult.unknown;
         }

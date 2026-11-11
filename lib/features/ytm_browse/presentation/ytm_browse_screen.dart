@@ -7,6 +7,7 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 
 import '../../../../core/di/injection.dart';
@@ -615,8 +616,8 @@ class _BrowseTrackCard extends StatelessWidget {
           selected: isActive,
           label: context.l10n.songByArtist(item.title, item.subtitle),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
+            duration: context.motion(PulsrMotion.state),
+            curve: context.motionCurve(PulsrMotion.enter),
             width: cardWidth,
             decoration: BoxDecoration(
               color: isActive
@@ -669,8 +670,8 @@ class _BrowseTrackCard extends StatelessWidget {
                               if (wasSynchronouslyLoaded) return child;
                               return AnimatedOpacity(
                                 opacity: frame == null ? 0.0 : 1.0,
-                                duration: const Duration(milliseconds: 220),
-                                curve: Curves.easeOut,
+                                duration: context.motion(PulsrMotion.state),
+                                curve: context.motionCurve(Curves.easeOut),
                                 child: child,
                               );
                             },

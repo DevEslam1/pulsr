@@ -74,29 +74,39 @@ extension _EqAbCompareBar on _EqualizerSheetState {
       child: Row(
         children: [
           for (final slot in ComparisonSlot.values) ...[
-            InkWell(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                cubit.switchComparisonSlot(slot);
-              },
-              borderRadius: AppRadii.r8All,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  borderRadius: AppRadii.r8All,
-                ),
-                child: Text(
-                  slot.name.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
+            Builder(builder: (context) {
+              final isSelected = _activeComparisonSlot == slot;
+              final label = switch (slot) {
+                ComparisonSlot.slotA => 'A',
+                ComparisonSlot.slotB => 'B',
+                ComparisonSlot.slotC => 'C',
+                ComparisonSlot.slotD => 'D',
+              };
+              return InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  _setStateSafe(() => _activeComparisonSlot = slot);
+                  cubit.switchComparisonSlot(slot);
+                },
+                borderRadius: AppRadii.r8All,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
+                  decoration: BoxDecoration(
+                    color: isSelected ? p.accent : Colors.transparent,
+                    borderRadius: AppRadii.r8All,
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? p.onAccent : p.textSecondary,
+                    ),
                   ),
                 ),
-              ),
-            ),
+              );
+            }),
           ],
         ],
       ),

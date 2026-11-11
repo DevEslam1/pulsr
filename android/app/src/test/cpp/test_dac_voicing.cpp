@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <vector>
 
@@ -373,6 +374,55 @@ int main() {
         check(changed, "enabled voicing must alter the signal");
         check(engine->getPipelineLatencyFrames() >= engine->dacVoicing().getGroupDelayFrames(),
               "engine must report the voicing stage latency");
+    }
+
+    // --- Rapid off->on toggle continuity + NaN resilience ---
+    {
+        DacVoicing dv;
+        dv.applyParams(voicingParams(true, DacVoicing::Sharp, 1.0));
+        dv.setSampleRate(48000.0);
+        dv.setEnabled(true);
+        std::vector<float> warm(512 * 2);
+        for (int f = 0; f < 512; ++f) {
+            const float v = 0.5f * std::sin(2.0f * static_cast<float>(M_PI) * 440.0f * f / 48000.0f);
+            warm[f * 2] = v; warm[f * 2 + 1] = v;
+        }
+        dv.processInterleaved(warm.data(), 512, 2);
+        float lastWarm = warm.back();
+
+        dv.setEnabled(false);
+        std::vector<float> fadeDown(128 * 2);
+        for (int f = 0; f < 128; ++f) {
+            const float v = 0.5f * std::sin(2.0f * static_cast<float>(M_PI) * 440.0f * (512 + f) / 48000.0f);
+            fadeDown[f * 2] = v; fadeDown[f * 2 + 1] = v;
+        }
+        dv.processInterleaved(fadeDown.data(), 128, 2);
+        check(dv.isRamping(), "voicing must still be fading after 128 frames");
+
+        // Re-enable while still ramping down: must resume without zero-reset step click.
+        dv.setEnabled(true);
+        std::vector<float> fadeUp(256 * 2);
+        for (int f = 0; f < 256; ++f) {
+            const float v = 0.5f * std::sin(2.0f * static_cast<float>(M_PI) * 440.0f * (640 + f) / 48000.0f);
+            fadeUp[f * 2] = v; fadeUp[f * 2 + 1] = v;
+        }
+        dv.processInterleaved(fadeUp.data(), 256, 2);
+        float maxStep = std::abs(fadeDown[0] - lastWarm);
+        maxStep = std::max(maxStep, std::abs(fadeUp[0] - fadeDown.back()));
+        for (int f = 1; f < 256; ++f) {
+            maxStep = std::max(maxStep, std::abs(fadeUp[f * 2] - fadeUp[(f - 1) * 2]));
+        }
+        check(maxStep < 0.08f, "rapid off->on voicing toggle must remain click-free");
+
+        // NaN/Inf input must not poison output or state.
+        fadeUp[16] = std::numeric_limits<float>::quiet_NaN();
+        fadeUp[17] = std::numeric_limits<float>::infinity();
+        dv.processInterleaved(fadeUp.data(), 256, 2);
+        bool allFinite = true;
+        for (float v : fadeUp) {
+            if (!std::isfinite(v)) allFinite = false;
+        }
+        check(allFinite, "DacVoicing must sanitize NaN/Inf inputs cleanly");
     }
 
     if (gFailures != 0) {

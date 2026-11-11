@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/services/ambient_sound_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -420,7 +421,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
     return Padding(
       padding: widget.padding ?? EdgeInsets.zero,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
+        duration: context.motion(PulsrMotion.layout),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
           borderRadius: AppRadii.r14All,

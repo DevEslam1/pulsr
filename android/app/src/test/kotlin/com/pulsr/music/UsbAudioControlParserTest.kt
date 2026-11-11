@@ -295,6 +295,27 @@ class UsbAudioControlParserTest {
         assertEquals(24, fmt.bitResolution)
         assertEquals(2, fmt.channels)
         assertEquals(listOf(96000), fmt.supportedRates)
+        assertTrue(fmt.sampleRateControlSupported)
+    }
+
+    @Test
+    fun uac1CsEndpointDetectsMissingSampleRateControlAttribute() {
+        val uac1NoFreqControl = byteArrayOf(
+            // AudioStreaming interface #1 alt 1 (UAC1)
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x00, 0x00,
+            // UAC1 FORMAT_TYPE_I: 2 channels, 3-byte subframe, 24-bit, 2 rates (48k, 96k)
+            14, 0x24, 0x02, 0x01, 0x02, 0x03, 0x18, 0x02,
+            0x80.toByte(), 0xBB.toByte(), 0x00,
+            0x00, 0x77, 0x01,
+            // Iso OUT endpoint 0x01
+            7, 0x05, 0x01, 0x09, 0x20, 0x01, 0x01,
+            // CS_ENDPOINT (0x25), EP_GENERAL (0x01), bmAttributes = 0x00 (no sampling freq control)
+            7, 0x25, 0x01, 0x00, 0x00, 0x00, 0x00,
+        )
+        val result = UsbAudioControlParser.parse(uac1NoFreqControl)
+        val fmt = result.altSettingFormats.single()
+        assertEquals(listOf(48000, 96000), fmt.supportedRates)
+        assertFalse(fmt.sampleRateControlSupported)
     }
 
     /**

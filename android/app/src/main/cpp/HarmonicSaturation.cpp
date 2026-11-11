@@ -317,12 +317,27 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
         if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
             float yL = wetL - dcX_[0] + dcCoeff_ * dcY_[0];
             float yR = wetR - dcX_[1] + dcCoeff_ * dcY_[1];
-            dcX_[0] = wetL;
-            dcX_[1] = wetR;
-            dcY_[0] = yL;
-            dcY_[1] = yR;
+            if (!std::isfinite(yL) || std::abs(yL) < 1e-25f) {
+                yL = 0.0f;
+                dcX_[0] = 0.0f;
+                dcY_[0] = 0.0f;
+            } else {
+                dcX_[0] = wetL;
+                dcY_[0] = yL;
+            }
+            if (!std::isfinite(yR) || std::abs(yR) < 1e-25f) {
+                yR = 0.0f;
+                dcX_[1] = 0.0f;
+                dcY_[1] = 0.0f;
+            } else {
+                dcX_[1] = wetR;
+                dcY_[1] = yR;
+            }
             wetL = yL;
             wetR = yR;
+        } else {
+            dcX_[0] = 0.0f; dcY_[0] = 0.0f;
+            dcX_[1] = 0.0f; dcY_[1] = 0.0f;
         }
 
         dryTapL = dryL;
@@ -564,9 +579,18 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
 
                 if (mode != 0 || (modeCrossfadeProgress_ < 1.0f && prevMode_ != 0)) {
                     float y = wet - dcX_[ch] + dcCoeff_ * dcY_[ch];
-                    dcX_[ch] = wet;
-                    dcY_[ch] = y;
+                    if (!std::isfinite(y) || std::abs(y) < 1e-25f) {
+                        y = 0.0f;
+                        dcX_[ch] = 0.0f;
+                        dcY_[ch] = 0.0f;
+                    } else {
+                        dcX_[ch] = wet;
+                        dcY_[ch] = y;
+                    }
                     wet = y;
+                } else {
+                    dcX_[ch] = 0.0f;
+                    dcY_[ch] = 0.0f;
                 }
 
                 // Align dry tap with wet delay.

@@ -198,7 +198,6 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     }
   }
 
-  int _failedCrossfadeClaims = 0;
   bool _crossfadeStartInFlight = false;
 
   Future<void> _startCrossfade(int nextIndex) async {
@@ -212,17 +211,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     _crossfadeStartInFlight = true;
     if (!await _tripleBufferPipeline.claimInactive(PlayerClaim.crossfade)) {
       _crossfadeStartInFlight = false;
-      _failedCrossfadeClaims++;
-      if (_failedCrossfadeClaims >= 3) {
-        _failedCrossfadeClaims = 0;
-        if (_activePlayer.playing &&
-            _crossfadeManager.currentFadeId == admissionFadeId) {
-          await playSongAt(nextIndex);
-        }
-      }
       return;
     }
-    _failedCrossfadeClaims = 0;
     try {
       return await _crossfadeManager.protect(() async {
         if (_crossfadeManager.isCrossfading) return;
@@ -276,8 +266,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             return;
           }
 
+          final baseSpeed = perSongPlaybackStore
+                  .getSpeed(PulsrAudioHandler.trackKeyFor(nextSong)) ??
+              _userBaseSpeed;
           // Synchronize speed on inactive player before loading & playback
-          await _inactivePlayer.setSpeed(_activePlayer.speed);
+          await _inactivePlayer.setSpeed(baseSpeed);
           await _inactivePlayer.setPitch(_pitch);
 
           final canReusePreload =
@@ -511,10 +504,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                 if (automixPlan.incomingCueTime > 0.05) {
                   await _inactivePlayer.seek(automixPlan.incomingCueDuration);
                 }
-                // Tempo stretch: adjust playback speed on incoming track if sped up
-                if (automixPlan.incomingPlaybackRate > 1.0) {
+                // Tempo stretch: adjust playback speed on incoming track if needed
+                if ((automixPlan.incomingPlaybackRate - 1.0).abs() > 0.001) {
                   final targetSpeed =
-                      (_activePlayer.speed * automixPlan.incomingPlaybackRate)
+                      (baseSpeed * automixPlan.incomingPlaybackRate)
                           .clamp(0.25, 3.0);
                   await _inactivePlayer.setSpeed(targetSpeed);
                 }
@@ -531,9 +524,16 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
           // Pre-buffer track N+2 into _prefetchPlayer during crossfade window
           // (gated on depth>=2 so minimal-bucket / critical-battery skips it).
-          final nextNextIndex = _getNextIndex(peek: true);
+          final nextNextIndex = _activePlayer.shuffleModeEnabled
+              ? null
+              : (nextIndex + 1 < _songs.length
+                  ? nextIndex + 1
+                  : (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty
+                      ? (nextIndex + 1) % _songs.length
+                      : null));
           if (_preloadCountForCurrentBucket >= 2 &&
               nextNextIndex != null &&
+              nextNextIndex != nextIndex &&
               nextNextIndex >= 0 &&
               nextNextIndex < _songs.length) {
             unawaited(
@@ -577,13 +577,32 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
           _isPlayerAActive = !_isPlayerAActive;
           _generationCounter++;
-          _currentIndex = resolvedIndex;
+          _queueStateMachine.commitTransitionTo(
+            resolvedIndex,
+            shuffleModeEnabled: _activePlayer.shuffleModeEnabled,
+          );
           _savedQueueIndex = resolvedIndex;
+          if ((_activePlayer.speed - baseSpeed).abs() > 0.001) {
+            try {
+              await _activePlayer.setSpeed(baseSpeed);
+            } catch (e, st) {
+              ErrorLogger.log('Failed to restore speed after crossfade swap',
+                  error: e, stackTrace: st, category: 'AudioHandler');
+            }
+          }
 
           final currentSessionId =
               _isPlayerAActive ? _playerASessionId : _playerBSessionId;
           _audioSessionIdRouter.handleSessionId(
               currentSessionId ?? _activePlayer.androidAudioSessionId);
+          await _pushNativeReplayGain(nextSong);
+          try {
+            await _activePlayer
+                .setVolume(_calculateReplayGainVolume(nextSong));
+          } catch (e, st) {
+            ErrorLogger.log('Failed to apply replay gain volume on swap',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          }
           final initialArtUri =
               ArtworkUriResolver.getCachedArtworkUri(songId) ?? fastArtUri;
           mediaItem
@@ -597,6 +616,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                   .add(PulsrAudioHandler._songToMediaItem(nextSong, artUri));
             }
           }).catchError((_) {});
+          _notifyTrackChanged(nextSong);
           _planNextStreamResolution();
           _repository.recordPlayHistory(nextSong.id);
           _broadcastState(_activePlayer.playbackEvent);
@@ -619,18 +639,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           // so track-count-based timers decrement correctly.
           notifySleepTrackCompleted();
 
-          // Schedule lookahead preload for the next transition on the newly-inactive player
-          final depth = _preloadCountForCurrentBucket;
-          final warmIdx = (!_gaplessMode && _activePlayer.shuffleModeEnabled)
-              ? _getNextIndex(peek: true)
-              : (resolvedIndex + 1 < _songs.length ? resolvedIndex + 1 : null);
-          if (!_gaplessMode &&
-              depth >= 1 &&
-              warmIdx != null &&
-              warmIdx >= 0 &&
-              warmIdx < _songs.length) {
-            unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
-          }
+          // Release the crossfade claim before scheduling lookahead preload so
+          // preloadNext() can acquire PlayerClaim.prefetch on the newly-inactive player.
+          _tripleBufferPipeline.releaseInactive(PlayerClaim.crossfade);
+          _scheduleLookaheadPreload(resolvedIndex);
         } catch (e, st) {
           ErrorLogger.log('Error during crossfade playback',
               error: e, stackTrace: st, category: 'AudioHandler');
@@ -675,6 +687,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             try {
               await _inactivePlayer.stop();
             } catch (_) {}
+            try {
+              await _inactivePlayer.setSpeed(_userBaseSpeed);
+            } catch (e, st) {
+              ErrorLogger.log('Failed to reset inactive player speed on abort',
+                  error: e, stackTrace: st, category: 'AudioHandler');
+            }
             try {
               await _activePlayer.setVolume(initialActiveVolume);
             } catch (_) {}
@@ -1894,6 +1912,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   void notifySleepTrackCompleted();
 
   double get _pitch;
+  double get _userBaseSpeed;
+  Future<void> _pushNativeReplayGain(SongsTableData? song);
 
   int get _playGeneration;
   bool get _pendingPlaybackStart;

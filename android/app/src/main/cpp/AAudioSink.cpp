@@ -2,6 +2,7 @@
 #include "AAudioSink.h"
 #include "AudioDspEngine.h"
 
+#include <android/api-level.h>
 #include <android/log.h>
 
 #include <algorithm>
@@ -28,6 +29,7 @@ int32_t ContainerBytesPerFrame(AAudioSink::Encoding encoding, int32_t channels) 
         case AAudioSink::Encoding::Int16: sampleBytes = 2; break;
         case AAudioSink::Encoding::Float: sampleBytes = 4; break;
         case AAudioSink::Encoding::I24Packed: sampleBytes = 3; break;
+        case AAudioSink::Encoding::Int32: sampleBytes = 4; break;
         default: return 0;
     }
     return sampleBytes * channels;
@@ -38,6 +40,7 @@ aaudio_format_t ToAaudioFormat(AAudioSink::Encoding encoding) {
         case AAudioSink::Encoding::Int16: return AAUDIO_FORMAT_PCM_I16;
         case AAudioSink::Encoding::Float: return AAUDIO_FORMAT_PCM_FLOAT;
         case AAudioSink::Encoding::I24Packed: return AAUDIO_FORMAT_PCM_I24_PACKED;
+        case AAudioSink::Encoding::Int32: return AAUDIO_FORMAT_PCM_I32;
     }
     return AAUDIO_FORMAT_UNSPECIFIED;
 }
@@ -200,6 +203,11 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
     bytesPerFrame_ =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
     bitPerfect_ = config_.preferExclusive;
+    if (config_.encoding == Encoding::Int32 && android_get_device_api_level() < 31) {
+        lastError_ = "AAUDIO_FORMAT_PCM_I32 requires Android 12 (API 31)+";
+        if (error != nullptr) *error = lastError_;
+        return false;
+    }
     if (bytesPerFrame_ <= 0 || config_.sampleRate <= 0 ||
         config_.channelCount <= 0 || config_.channelCount > 8) {
         lastError_ = "invalid config";
@@ -388,6 +396,10 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
                 ApplyI16Volume(s, n, curVol, sinkDither_);
             } else if (config_.encoding == Encoding::I24Packed) {
                 ApplyI24PackedVolume(scratchPtr, chunkBytes, curVol, sinkDither_);
+            } else if (config_.encoding == Encoding::Int32) {
+                int32_t* s = reinterpret_cast<int32_t*>(scratchPtr);
+                const int n = chunkBytes / static_cast<int32_t>(sizeof(int32_t));
+                ApplyI32Volume(s, n, curVol, sinkDither_);
             }
             writeSrc = scratchPtr;
         }

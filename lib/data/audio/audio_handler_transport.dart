@@ -570,12 +570,15 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   double get pitch => _pitch;
 
+  double get userBaseSpeed => _userBaseSpeed;
+
   Future<bool> playbackRateMustRemainUnity() async =>
       AudioQualityInfo.dsdDopActive ||
       (_bitPerfectTransportBypass ??
           await _isBitPerfectBypassActivePrefs(_cachedPrefs));
 
   Future<void> _applyPlaybackSpeed(double speed) async {
+    _userBaseSpeed = speed;
     await Future.wait([_playerA.setSpeed(speed), _playerB.setSpeed(speed)]);
     playbackState.add(playbackState.value.copyWith(speed: speed));
   }
@@ -1000,6 +1003,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   double get _pitch;
   set _pitch(double value);
+
+  double get _userBaseSpeed;
+  set _userBaseSpeed(double value);
 
   int get _playGeneration;
   set _playGeneration(int value);

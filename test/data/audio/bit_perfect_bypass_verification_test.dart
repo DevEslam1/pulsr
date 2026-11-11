@@ -12,6 +12,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     calls.clear();
     AudioEffectsChannel.lastPushedBypassDspForBitPerfect = null;
+    AudioEffectsChannel.lastBypassRejectionReason = null;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
@@ -61,6 +62,36 @@ void main() {
       expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isNull);
     });
   }
+
+  test('a structured refusal carries the platform reason to the caller',
+      () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            channel,
+            (_) async => <Object?, Object?>{
+                  'applied': false,
+                  'reason': 'Bit-perfect HAL effect cleanup incomplete',
+                });
+    await expectLater(
+      AudioEffectsChannel().setBypassDspForBitPerfect(true),
+      throwsA(isA<StateError>().having(
+        (e) => e.message,
+        'message',
+        contains('Bit-perfect HAL effect cleanup incomplete'),
+      )),
+    );
+    expect(AudioEffectsChannel.lastBypassRejectionReason,
+        'Bit-perfect HAL effect cleanup incomplete');
+    expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isNull);
+  });
+
+  test('an accepted push clears a stale rejection reason', () async {
+    AudioEffectsChannel.lastBypassRejectionReason = 'stale reason';
+    await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+    expect(AudioEffectsChannel.lastBypassRejectionReason, isNull);
+    expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isTrue);
+  });
+
   test('unsupported platforms do not claim a native bypass change', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
     await AudioEffectsChannel().setBypassDspForBitPerfect(true);

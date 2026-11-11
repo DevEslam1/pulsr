@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -315,9 +316,13 @@ class _LyricLineWidget extends StatelessWidget {
       ],
     );
 
-    if (blur > 0.0) {
+    if (blur > 0.0 && AppBlur.canBlur(context)) {
+      final clampedBlur = AppBlur.clampSigma(blur);
       content = ImageFiltered(
-        imageFilter: ui.ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+        imageFilter: ui.ImageFilter.blur(
+          sigmaX: clampedBlur,
+          sigmaY: clampedBlur,
+        ),
         child: content,
       );
     }

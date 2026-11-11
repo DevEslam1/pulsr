@@ -138,6 +138,8 @@ void SubCrossover::process(float* L, float* R, int frames) {
         const float antiPopMix = static_cast<float>(std::clamp(curAntiPop, 0.0, 1.0));
         float l = L[i];
         float r = R[i];
+        if (!std::isfinite(l)) l = 0.0f;
+        if (!std::isfinite(r)) r = 0.0f;
 
         // 1. Bass Mono isolation: subtract side energy below cornerHz
         if (doBassMono) {
@@ -214,6 +216,8 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
             const int iR = i * channels + ch + 1;
             float l = buffer[iL];
             float r = buffer[iR];
+            if (!std::isfinite(l)) l = 0.0f;
+            if (!std::isfinite(r)) r = 0.0f;
 
             const int pair = ch >> 1;
             LpStage& s1 = stage1_[pair];

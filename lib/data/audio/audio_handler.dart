@@ -553,6 +553,9 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   void _notifyTrackChanged(SongsTableData song) {
+    _cueStartSeeked = false;
+    _cueAdvanceTriggered = false;
+    unawaited(_pushNativeReplayGain(song));
     if (!_onTrackChangedSubject.isClosed) {
       _onTrackChangedSubject.add(song);
     }
@@ -1149,21 +1152,29 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> setBitPerfectTransportPolicy(bool enabled) async {
     final previous = _bitPerfectTransportBypass;
     _bitPerfectTransportBypass = enabled;
-    if (enabled) {
-      await cancelActiveCrossfade();
-      await _applyPlaybackSpeed(1.0);
-      await _applyPlaybackPitch(1.0);
-      await Future.wait([
-        _playerA.setSkipSilenceEnabled(false),
-        _playerB.setSkipSilenceEnabled(false),
-      ]);
-    } else if (previous == true) {
-      await restorePersistedSpeed();
-      final skip = silenceSkipController.enabled;
-      await Future.wait([
-        _playerA.setSkipSilenceEnabled(skip),
-        _playerB.setSkipSilenceEnabled(skip),
-      ]);
+    try {
+      if (enabled) {
+        await cancelActiveCrossfade();
+        await _applyPlaybackSpeed(1.0);
+        await _applyPlaybackPitch(1.0);
+        await Future.wait([
+          _playerA.setSkipSilenceEnabled(false),
+          _playerB.setSkipSilenceEnabled(false),
+        ]);
+      } else if (previous == true) {
+        await restorePersistedSpeed();
+        final skip = silenceSkipController.enabled;
+        await Future.wait([
+          _playerA.setSkipSilenceEnabled(skip),
+          _playerB.setSkipSilenceEnabled(skip),
+        ]);
+      }
+    } catch (_) {
+      // A refused player write must not leave the boundary guard claiming a
+      // policy the transport never applied; the caller rolls the mode back and
+      // this flag gates every later speed/pitch/silence write.
+      _bitPerfectTransportBypass = previous;
+      rethrow;
     }
   }
 
@@ -1395,6 +1406,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volumeController?.setNativeRgActive(_nativeRgActive);
   }
 
+  @override
   Future<void> _pushNativeReplayGain(SongsTableData? song) async {
     Future<void> disableNative() async {
       _nativeRgActive = false;
@@ -1483,6 +1495,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       await _effectsReadyCompleter.future;
     }
     final song = currentSong;
+    final now = DateTime.now();
+    if (_lastNativeRgPush == null ||
+        _lastNativeRgSongId != song?.id ||
+        now.difference(_lastNativeRgPush!) > const Duration(seconds: 2)) {
+      _lastNativeRgPush = now;
+      _lastNativeRgSongId = song?.id;
+      await _pushNativeReplayGain(song);
+    }
     final target = _calculateReplayGainVolume(song);
     _volumeController?.updateSettings(userVolume: _volume);
     try {
@@ -1496,15 +1516,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (!_crossfadeManager.isCrossfading) {
       await _activePlayer
           .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
-    }
-
-    final now = DateTime.now();
-    if (_lastNativeRgPush == null ||
-        _lastNativeRgSongId != song?.id ||
-        now.difference(_lastNativeRgPush!) > const Duration(seconds: 2)) {
-      _lastNativeRgPush = now;
-      _lastNativeRgSongId = song?.id;
-      unawaited(_pushNativeReplayGain(song));
     }
   }
 
@@ -1649,7 +1660,15 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   @override
+  double _userBaseSpeed = 1.0;
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    final observer = _lifecycleObserver;
+    if (observer != null) {
+      observer.didChangeAppLifecycleState(state);
+      return;
+    }
     if (state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden ||
         state == AppLifecycleState.paused) {
@@ -1794,9 +1813,6 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> _init() async {
-    try {
-      WidgetsBinding.instance.addObserver(this);
-    } catch (_) {}
     _initSaveTimer();
     AudioMemoryManager.adaptBudgetToSystemRam();
     await _initPrefs();
@@ -2554,6 +2570,13 @@ class PulsrAudioHandler extends BaseAudioHandler
               case AudioInterruptionType.pause:
                 unawaited(AudioSessionLog.instance
                     .recordInterruption(AudioInterruptionKind.pause));
+                // Cancel any active transient UI sound ducking timer so it cannot
+                // restore volume mid-call or hold _duckDepthCounter elevated.
+                if (_systemSoundTimer != null) {
+                  _systemSoundTimer?.cancel();
+                  _systemSoundTimer = null;
+                  if (_duckDepthCounter > 0) _duckDepthCounter--;
+                }
                 // Stack-safe: keep the original pre-interruption state so an
                 // overlapping duck + call doesn't lose the resume decision.
                 _interruption.begin(InterruptionKind.pause,
@@ -2843,9 +2866,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       onDetached: () {
         unawaited(saveCurrentPositionImmediate());
       },
-      onHidden: () {
-        unawaited(saveCurrentPositionImmediate());
-      },
       onResume: () {
         if (_activePlayer.playing) {
           _smartPrefetch();
@@ -3067,17 +3087,17 @@ class PulsrAudioHandler extends BaseAudioHandler
       case 'toggleSleepTimer':
       case 'sleepTimer':
         if (_sleepTimerManager.isActive) {
-          _sleepTimerManager.cancelSleepTimer();
+          cancelSleepTimer();
           return false;
         } else {
           // 0 / negative would fire immediately and pause playback at once.
           final minutes =
               ((extras?['minutes'] as num?)?.toInt() ?? 30).clamp(1, 24 * 60);
-          _sleepTimerManager.startDurationTimer(Duration(minutes: minutes));
+          startSleepTimer(Duration(minutes: minutes));
           return true;
         }
       case 'cycleSpeed':
-        final currentSpeed = _activePlayer.speed;
+        final currentSpeed = userBaseSpeed;
         final nextSpeed =
             currentSpeed < 1.15 ? 1.25 : (currentSpeed < 1.4 ? 1.5 : 1.0);
         await setSpeed(nextSpeed);
@@ -3092,18 +3112,18 @@ class PulsrAudioHandler extends BaseAudioHandler
         return next.name;
       case 'cycleSleepTimer':
         if (!_sleepTimerManager.isActive) {
-          _sleepTimerManager.startDurationTimer(const Duration(minutes: 15));
+          startSleepTimer(const Duration(minutes: 15));
           return 15;
         } else {
           final curRemaining = _sleepTimerManager.remainingDuration.inSeconds;
           if (curRemaining <= 15 * 60) {
-            _sleepTimerManager.startDurationTimer(const Duration(minutes: 30));
+            startSleepTimer(const Duration(minutes: 30));
             return 30;
           } else if (curRemaining <= 30 * 60) {
-            _sleepTimerManager.startDurationTimer(const Duration(minutes: 45));
+            startSleepTimer(const Duration(minutes: 45));
             return 45;
           } else {
-            _sleepTimerManager.cancelSleepTimer();
+            cancelSleepTimer();
             return 0;
           }
         }
@@ -3243,9 +3263,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       } catch (_) {}
       _lifecycleObserver = null;
     }
-    try {
-      WidgetsBinding.instance.removeObserver(this);
-    } catch (_) {}
     _positionSaveTimer?.cancel();
     _positionSaveTimer = null;
     _seekDebounceTimer?.cancel();
@@ -3349,38 +3366,74 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   /// Transient system sound interruption: duck and auto-restore in 500ms.
   Future<void> handleSystemUiSoundInterruption() async {
-    if (_duckActive || !_activePlayer.playing) return;
-    _duckActive = true;
-    _interruption.begin(InterruptionKind.systemUiSound, playing: true);
+    if (!_activePlayer.playing) return;
+    if (_duckActive) {
+      // Participate in stack-safe duck depth so an overlapping navigation duck
+      // or call cannot be prematurely un-ducked by a 500ms UI sound timer.
+      if (_systemSoundTimer == null) {
+        _duckDepthCounter++;
+      }
+      _interruption.begin(InterruptionKind.systemUiSound, playing: true);
+    } else {
+      _duckDepthCounter = 1;
+      _preDuckRgTarget = _calculateReplayGainVolume(currentSong);
+      _preDuckSongId = currentSong?.id;
+      _preDuckVolume = _activePlayer.volume;
+      _preDuckInactiveVolume = _inactivePlayer.volume;
+      _duckActive = true;
+      _interruption.begin(InterruptionKind.systemUiSound, playing: true);
+    }
+
     // Schedule the restore timer BEFORE awaiting the duck. If setVolume throws
     // and we only created the timer afterwards, _duckActive would stay true
     // forever with no timer to clear it, permanently blocking later ducks.
     _systemSoundTimer?.cancel();
     _systemSoundTimer = Timer(const Duration(milliseconds: 500), () async {
-      if (_duckActive &&
-          _interruption.activeKind == InterruptionKind.systemUiSound) {
+      _systemSoundTimer = null;
+      _interruption.end(InterruptionKind.systemUiSound);
+      if (_duckDepthCounter > 0) _duckDepthCounter--;
+      if (_duckActive && _duckDepthCounter == 0) {
         _duckActive = false;
-        _interruption.end(InterruptionKind.systemUiSound);
-        // Compose with any in-flight sleep fade so this transient duck's
-        // restore doesn't wipe the fade for a tick.
-        final target = _calculateReplayGainVolume(currentSong);
+        _volumeController?.updateSettings(isDucked: false);
+        final currentTarget = _calculateReplayGainVolume(currentSong);
+        final sameTrack = _preDuckSongId == currentSong?.id;
+        final gainUnchanged = _preDuckRgTarget != null &&
+            (currentTarget - _preDuckRgTarget!).abs() < 0.001;
+        final sleepFading = _sleepFadeFactor < 0.999;
+        final restoreActive = (!sleepFading &&
+                _preDuckVolume != null &&
+                sameTrack &&
+                gainUnchanged)
+            ? _preDuckVolume!
+            : (currentTarget * _sleepFadeFactor).clamp(0.0, 1.0);
         try {
-          await _activePlayer
-              .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
+          await _activePlayer.setVolume(restoreActive.clamp(0.0, 1.0));
         } catch (_) {}
+        _preDuckVolume = null;
+        _preDuckInactiveVolume = null;
+        _preDuckSongId = null;
+        _preDuckRgTarget = null;
       }
     });
     try {
       final f = duckingController.duckFactor;
-      final curVol = _activePlayer.volume;
-      await _activePlayer.setVolume(f * curVol);
+      _volumeController?.updateSettings(duckFactor: f, isDucked: true);
+      await _activePlayer.setVolume(f * (_preDuckVolume ?? _activePlayer.volume));
     } catch (_) {
       // Ducking failed: restore state immediately instead of leaving the
       // 500 ms timer to do it (or not, if it never fires).
-      _duckActive = false;
-      _interruption.end(InterruptionKind.systemUiSound);
       _systemSoundTimer?.cancel();
       _systemSoundTimer = null;
+      _interruption.end(InterruptionKind.systemUiSound);
+      if (_duckDepthCounter > 0) _duckDepthCounter--;
+      if (_duckDepthCounter == 0) {
+        _duckActive = false;
+        _volumeController?.updateSettings(isDucked: false);
+        _preDuckVolume = null;
+        _preDuckInactiveVolume = null;
+        _preDuckSongId = null;
+        _preDuckRgTarget = null;
+      }
     }
   }
 

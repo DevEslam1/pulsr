@@ -16,10 +16,10 @@ class _VinylGroovesPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          Color(0xFF181A22),
-          Color(0xFF101116),
-          Color(0xFF090A0D),
-          Color(0xFF14151C),
+          PlayerMaterialColors.recordSheenCenter,
+          PlayerMaterialColors.recordSheenMid,
+          PlayerMaterialColors.recordSheenDeep,
+          PlayerMaterialColors.recordSheenRim,
         ],
         stops: const [0.3, 0.65, 0.92, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
@@ -67,7 +67,7 @@ class _VinylGroovesPainter extends CustomPainter {
 
     // Outer rim bead
     final rimPaint = Paint()
-      ..color = const Color(0xFF2B2E3C)
+      ..color = PlayerMaterialColors.recordRim
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawCircle(center, radius - 1, rimPaint);
@@ -134,7 +134,7 @@ class _PlatterStrobePainter extends CustomPainter {
   final bool isPlaying;
 
   _PlatterStrobePainter({
-    this.activeColor = const Color(0xFFE22D2D),
+    this.activeColor = PlayerMaterialColors.cartridgeAccentRed,
     this.isPlaying = true,
   });
 
@@ -276,15 +276,15 @@ class _TonearmPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          Color(0xFF2C2F3C),
-          Color(0xFF1B1D26),
-          Color(0xFF0F1015),
+          PlayerMaterialColors.gimbalHighlight,
+          PlayerMaterialColors.gimbalMid,
+          PlayerMaterialColors.gimbalShadow,
         ],
       ).createShader(Rect.fromCircle(center: pivot, radius: _gimbalRadius));
     canvas.drawCircle(pivot, _gimbalRadius, basePaint);
 
     final baseRimPaint = Paint()
-      ..color = const Color(0xFF424658)
+      ..color = PlayerMaterialColors.gimbalRim
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawCircle(pivot, _gimbalRadius, baseRimPaint);
@@ -301,7 +301,7 @@ class _TonearmPainter extends CustomPainter {
   void _drawCounterweight(Canvas canvas) {
     final stemPaint = Paint()
       ..shader = const LinearGradient(
-        colors: [Color(0xFF8B8E9B), Color(0xFF535664)],
+        colors: [PlayerMaterialColors.counterweightStemLight, PlayerMaterialColors.counterweightStemDark],
       ).createShader(const Rect.fromLTWH(-2.5, -34, 5, 34))
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
@@ -318,10 +318,10 @@ class _TonearmPainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Color(0xFF9EA2B2),
-          Color(0xFFE2E4EB),
-          Color(0xFF5A5D6C),
-          Color(0xFF383A46),
+          PlayerMaterialColors.counterweightEdge,
+          PlayerMaterialColors.counterweightHighlight,
+          PlayerMaterialColors.counterweightMid,
+          PlayerMaterialColors.counterweightShadow,
         ],
         stops: [0.0, 0.35, 0.75, 1.0],
       ).createShader(weightRect);
@@ -331,7 +331,7 @@ class _TonearmPainter extends CustomPainter {
     );
 
     final calibRect = const Rect.fromLTWH(-10, -18, 20, 4);
-    final calibPaint = Paint()..color = const Color(0xFF14151B);
+    final calibPaint = Paint()..color = PlayerMaterialColors.calibrationStrip;
     canvas.drawRect(calibRect, calibPaint);
 
     final tickPaint = Paint()
@@ -390,7 +390,7 @@ class _TonearmPainter extends CustomPainter {
 
   void _drawHeadshell(Canvas canvas, double l) {
     final collarPaint = Paint()
-      ..color = const Color(0xFFC0C3D0)
+      ..color = PlayerMaterialColors.collarMetal
       ..style = PaintingStyle.fill;
     canvas.drawCircle(Offset(-3, l * 0.90), _collarRadius, collarPaint);
 
@@ -408,7 +408,7 @@ class _TonearmPainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [Color(0xFF323544), Color(0xFF161820)],
+        colors: [PlayerMaterialColors.headshellHighlight, PlayerMaterialColors.headshellShadow],
       ).createShader(
           Rect.fromLTWH(headshellEnd.dx - 6, headshellStart.dy, 12, 22));
     canvas.drawPath(headshellPath, headshellPaint);
@@ -458,14 +458,14 @@ class _TonearmPainter extends CustomPainter {
       ).createShader(const Rect.fromLTWH(-7, -7, 14, 14));
     canvas.drawCircle(Offset.zero, _pivotBearingRadius, bearingPaint);
 
-    final centerScrewPaint = Paint()..color = const Color(0xFF1A1C24);
+    final centerScrewPaint = Paint()..color = PlayerMaterialColors.pivotCenterScrew;
     canvas.drawCircle(Offset.zero, _pivotCenterScrewRadius, centerScrewPaint);
   }
 
   void _drawArmRest(Canvas canvas, Offset pos) {
     // Rest post
     final postPaint = Paint()
-      ..color = const Color(0xFF282B36)
+      ..color = PlayerMaterialColors.armRestPost
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -477,7 +477,7 @@ class _TonearmPainter extends CustomPainter {
 
     // Rest cradle clip (small curved fork)
     final clipPaint = Paint()
-      ..color = const Color(0xFF4A4E60)
+      ..color = PlayerMaterialColors.armRestClip
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.8;
     canvas.drawArc(

@@ -1099,8 +1099,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             vertical: 2,
           ),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
+            duration: context.motion(PulsrMotion.state),
+            curve: context.motionCurve(PulsrMotion.enter),
             decoration: BoxDecoration(
               color: isActive
                   ? p.accent.withValues(alpha: 0.10)

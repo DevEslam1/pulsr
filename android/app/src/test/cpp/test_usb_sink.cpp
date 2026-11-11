@@ -9,7 +9,9 @@
 
 #include <atomic>
 #include <cerrno>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <thread>
 #if defined(__linux__) || defined(__ANDROID__)
 #include <linux/usbdevice_fs.h>
@@ -100,6 +102,15 @@ struct UsbAudioSinkTestAccess {
     static int feedbackEndpoint(const uint8_t* config, size_t len, int iface,
                                 int alt, int* packetSize) {
         return UsbAudioSink::findFeedbackEndpoint(config, len, iface, alt, packetSize);
+    }
+    static void setWrappedFill(UsbAudioSink& sink, size_t occupiedBytes) {
+        prepare(sink, 4, 32, 65536, 0);
+        const size_t readPos = std::numeric_limits<size_t>::max() - 1023;
+        sink.ringRead_.store(readPos);
+        sink.ringWrite_.store(readPos + occupiedBytes);
+        sink.numUrbs_ = 0;
+        sink.packetsPerUrb_ = 0;
+        sink.serviceIntervalUs_ = 1000;
     }
     static bool ownership(UsbAudioSink& sink) {
         sink.Close();
@@ -655,6 +666,31 @@ int main() {
               "Open must reject valid bits exceeding wire width before usbfs calls");
         check(sink.Open(10, 1, 1, 1, 48000, 2, 4, 20) == pulsr::UsbStreamResult::InvalidArgs,
               "Open must reject unsupported valid depth before usbfs calls");
+
+        // Ring occupancy across size_t wraparound + adaptive cadence steering.
+        Access::setWrappedFill(sink, 38400); // 100.0 ms at 48 kHz / 2ch / 4B
+        const double wrappedMs = sink.GetBufferedMs();
+        sink.Close();
+        check(std::abs(wrappedMs - 100.0) < 0.1,
+              "GetBufferedMs must survive unsigned size_t wraparound");
+
+        int steeredLow = UsbAudioSink::SteerPacketRateForRingFill(48000, 48000, 100, 1000);
+        check(steeredLow < 48000 && steeredLow >= 47952,
+              "low ring fill must steer cadence gently downward within -0.1%");
+        for (int s = 0; s < 200; ++s) {
+            steeredLow = UsbAudioSink::SteerPacketRateForRingFill(steeredLow, 48000, 0, 1000);
+        }
+        check(steeredLow == 47952, "low-fill cadence steering must clamp at -0.1%");
+        int steeredHigh = UsbAudioSink::SteerPacketRateForRingFill(48000, 48000, 900, 1000);
+        check(steeredHigh > 48000 && steeredHigh <= 48048,
+              "high ring fill must steer cadence gently upward within +0.1%");
+        check(UsbAudioSink::SteerPacketRateForRingFill(47980, 48000, 250, 1000) == 47980,
+              "hysteresis zone must hold tuned cadence without chatter");
+        int recovered = 47980;
+        for (int s = 0; s < 100; ++s) {
+            recovered = UsbAudioSink::SteerPacketRateForRingFill(recovered, 48000, 500, 1000);
+        }
+        check(recovered == 48000, "centered deadband must relax back to nominal rate");
     }
 
     // ---- Completion validation: not every reaped OUT actually played -------

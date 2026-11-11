@@ -378,7 +378,9 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                                   p.isDark ? 0.42 : 0.04) ??
                               bgColor,
                           bgColor,
-                          p.isDark ? const Color(0xFF080910) : p.bg,
+                          p.isDark
+                              ? PlayerMaterialColors.immersiveBackdrop
+                              : p.bg,
                         ],
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,

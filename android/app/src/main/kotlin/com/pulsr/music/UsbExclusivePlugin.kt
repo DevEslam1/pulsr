@@ -942,6 +942,11 @@ class UsbExclusivePlugin(
                 Log.w(TAG, "Step native_start: native start failed with result $resultCode")
                 return failure("native_stream_not_active") + mapOf("resultCode" to resultCode)
             }
+            // Re-assert the UAC1 endpoint sample rate after nativeUsbStreamStartWithFormat
+            // in case its USBDEVFS_SETINTERFACE ioctl reset the endpoint frequency on UAC1.
+            if (parsed.uacVersion == UsbAudioControlParser.UAC1) {
+                setDacSampleRate(conn, parsed, selected, sampleRate)
+            }
             // The request is remembered as the request (see StreamFormat): a
             // 16-bit track whose endpoint was opened at 24-bit must be
             // recognised as the same stream on the next track change.
@@ -974,9 +979,10 @@ class UsbExclusivePlugin(
         sampleRate: Int,
     ): UsbAudioProtocol.RateSetResult {
         val clock = UsbAudioProtocol.resolveActiveClock(transport(conn), parsed)
+        val fixedUac1 = selected.supportedRates.size == 1 || !selected.sampleRateControlSupported
         return UsbAudioProtocol.setSampleRateWithResult(
             transport(conn), parsed.uacVersion, clock, selected.endpointAddress,
-            sampleRate, selected.supportedRates.size == 1,
+            sampleRate, fixedUac1,
         )
     }
 

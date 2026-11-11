@@ -38,6 +38,13 @@ enum BitPerfectChainVerdict {
 int effectiveSourceBitDepth({required int tagged, required int decoded}) =>
     decoded > tagged ? decoded : tagged;
 
+/// The source sample rate the chain and transport should use.
+///
+/// The database tag is preferred when read; when the scanner has not yet
+/// enriched tags (or readTags failed), the live decoder probe is used.
+int effectiveSourceSampleRate({required int tagged, required int decoded}) =>
+    tagged > 0 ? tagged : (decoded > 0 ? decoded : 0);
+
 /// Fold observed processing facts, not slider positions or output preferences.
 /// Unknown gain is deliberately not unity. A direct raw USB tee skips the
 /// player-volume stage but not source rate/pitch/frame edits.

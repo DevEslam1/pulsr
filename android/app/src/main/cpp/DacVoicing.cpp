@@ -205,7 +205,7 @@ void DacVoicing::applyParams(const DacVoicingParamSet& params) {
 }
 
 void DacVoicing::setEnabled(bool enabled) {
-    if (enabled && !enabled_) {
+    if (enabled && !enabled_ && smoothedEnable_ <= 1e-4f) {
         reset();
     }
     enabled_ = enabled;
@@ -259,7 +259,8 @@ void DacVoicing::processInterleaved(float* buffer, int frames, int channels) {
         const float voicing = smoothedVoicing_;
 
         for (int ch = 0; ch < channels; ++ch) {
-            const float in = buffer[f * channels + ch];
+            float in = buffer[f * channels + ch];
+            if (!std::isfinite(in)) in = 0.0f;
 
             const int dryRead = (dryPos_ - delayBase_ + MAX_DELAY * 2) % MAX_DELAY;
             const float dryOut = dryDelay_[ch][dryRead];
@@ -300,6 +301,7 @@ void DacVoicing::processInterleaved(float* buffer, int frames, int channels) {
                 wet += c * ring[hIdx];
             }
             wet *= 1.0f / static_cast<float>(OVERSAMPLE);
+            if (!std::isfinite(wet)) wet = 0.0f;
 
             if (pad > 0) {
                 const int padRead = (dryPos_ - pad + MAX_DELAY * 2) % MAX_DELAY;

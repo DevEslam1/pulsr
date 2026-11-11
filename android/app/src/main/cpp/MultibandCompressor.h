@@ -12,7 +12,9 @@
 class MultibandCompressor {
 public:
     static constexpr int NUM_BANDS = 4;
-    static constexpr int MAX_CHUNK_FRAMES = 1024;
+    static constexpr int MAX_CHANNELS = 8;
+    static constexpr int MAX_PAIRS = MAX_CHANNELS / 2;
+    static constexpr int MAX_CHUNK_FRAMES = 256;
 
     MultibandCompressor();
 
@@ -49,10 +51,10 @@ private:
     MultibandCompressorParamSet pendingParams_;
     MultibandCompressorParamSet params_;
 
-    // 3 Crossovers to split into 4 bands
-    LinkwitzRiley4 crossoverMid_; // splits at crossoverFreqs[1] into LowHalf and HighHalf
-    LinkwitzRiley4 crossoverLow_; // splits LowHalf at crossoverFreqs[0] into Band 0 & Band 1
-    LinkwitzRiley4 crossoverHigh_;// splits HighHalf at crossoverFreqs[2] into Band 2 & Band 3
+    // 3 Crossovers to split into 4 bands per stereo pair
+    LinkwitzRiley4 crossoverMid_[MAX_PAIRS]; // splits at crossoverFreqs[1] into LowHalf and HighHalf
+    LinkwitzRiley4 crossoverLow_[MAX_PAIRS]; // splits LowHalf at crossoverFreqs[0] into Band 0 & Band 1
+    LinkwitzRiley4 crossoverHigh_[MAX_PAIRS];// splits HighHalf at crossoverFreqs[2] into Band 2 & Band 3
 
     // FIX M-11: allpass phase-compensation for flat (unity-bypass) reconstruction.
     // When each half's two sub-bands recombine they are multiplied by the allpass
@@ -68,8 +70,8 @@ private:
     // We reuse LinkwitzRiley4 (no dedicated allpass exists in CrossoverUtil) and
     // read its allpass as the lp+hp output sum; same cutoff + Butterworth Q as the
     // sibling crossover guarantees an exact phase match.
-    LinkwitzRiley4 allpassLowPath_;  // allpass @ f2, applied to the low half
-    LinkwitzRiley4 allpassHighPath_; // allpass @ f0, applied to the high half
+    LinkwitzRiley4 allpassLowPath_[MAX_PAIRS];  // allpass @ f2, applied to the low half
+    LinkwitzRiley4 allpassHighPath_[MAX_PAIRS]; // allpass @ f0, applied to the high half
 
     // Per-band ballistics
     double attackCoeff_[NUM_BANDS] = {};
@@ -81,6 +83,5 @@ private:
     double makeupSmoothCoeff_ = 0.0;
 
     // Scratch buffers for chunked processing (zero heap allocation during audio stream)
-    float bandBufferL_[NUM_BANDS][MAX_CHUNK_FRAMES] = {};
-    float bandBufferR_[NUM_BANDS][MAX_CHUNK_FRAMES] = {};
+    float bandBuffer_[NUM_BANDS][MAX_CHANNELS][MAX_CHUNK_FRAMES] = {};
 };

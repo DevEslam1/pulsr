@@ -116,4 +116,18 @@ inline void ApplyI16Volume(int16_t* data, int32_t sampleCount, float gain,
     }
 }
 
+/**
+ * Scales interleaved 32-bit PCM by `gain`, saturating to the int32 range.
+ * Native 32-bit int carries true 32-bit data (unlike float32), so 1-LSB TPDF
+ * dither keeps requantization noise decorrelated when scaling off-grid.
+ */
+inline void ApplyI32Volume(int32_t* data, int32_t sampleCount, float gain,
+                           SinkDitherState& st) {
+    for (int32_t i = 0; i < sampleCount; ++i) {
+        const double scaled = static_cast<double>(data[i]) * static_cast<double>(gain);
+        data[i] = static_cast<int32_t>(
+            QuantizeLsbWithDither(scaled, -2147483648LL, 2147483647LL, st));
+    }
+}
+
 }  // namespace pulsr

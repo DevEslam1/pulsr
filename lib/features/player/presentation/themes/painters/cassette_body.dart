@@ -47,14 +47,14 @@ class _CassetteBody extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Color(0xFF1E212B),
-                        Color(0xFF15171F),
-                        Color(0xFF101218),
+                        PlayerMaterialColors.cassetteBodyTop,
+                        PlayerMaterialColors.cassetteBodyMid,
+                        PlayerMaterialColors.circleSpindle,
                       ],
                     ),
                     borderRadius: AppRadii.r20All,
                     border: Border.all(
-                      color: const Color(0xFF343848),
+                      color: PlayerMaterialColors.cassetteBodyBorder,
                       width: 3.5,
                     ),
                     boxShadow: [
@@ -227,7 +227,7 @@ class _CassetteBody extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0C0E14),
+        color: PlayerMaterialColors.cassetteWell,
         borderRadius: AppRadii.r14All,
         border: Border.all(color: Colors.white24, width: 1.5),
         boxShadow: const [
@@ -272,18 +272,18 @@ class _CassetteBody extends StatelessWidget {
               width: 58,
               height: 22,
               decoration: BoxDecoration(
-                color: const Color(0xFF1B1D25),
+                color: PlayerMaterialColors.cassetteBridge,
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(8),
                 ),
-                border: Border.all(color: const Color(0xFF383C4E), width: 1.5),
+                border: Border.all(color: PlayerMaterialColors.cassetteBridgeBorder, width: 1.5),
               ),
               child: Center(
                 child: Container(
                   width: 26,
                   height: 6,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4C526A),
+                    color: PlayerMaterialColors.cassetteScrew,
                     borderRadius: AppRadii.r4All,
                   ),
                 ),
@@ -349,9 +349,9 @@ class _CassetteBody extends StatelessWidget {
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: const [
-                  Color(0xFF4A2F21),
-                  Color(0xFF321D14),
-                  Color(0xFF22130C),
+                  PlayerMaterialColors.cassetteTapeOuter,
+                  PlayerMaterialColors.cassetteTapeMid,
+                  PlayerMaterialColors.cassetteTapeInner,
                 ],
                 stops: const [0.35, 0.75, 1.0],
               ),
@@ -378,9 +378,9 @@ class _CassetteBody extends StatelessWidget {
                   height: 52,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFF0F1F5),
+                    color: PlayerMaterialColors.cassetteReelHub,
                     border:
-                        Border.all(color: const Color(0xFFB0B4C4), width: 3),
+                        Border.all(color: PlayerMaterialColors.cassetteReelRim, width: 3),
                     boxShadow: const [
                       BoxShadow(
                         color: Colors.black45,
@@ -393,7 +393,7 @@ class _CassetteBody extends StatelessWidget {
                       width: 22,
                       height: 22,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF0C0E14),
+                        color: PlayerMaterialColors.cassetteWell,
                         shape: BoxShape.circle,
                       ),
                       child: CustomPaint(painter: _SpoolTeethPainter()),
@@ -417,9 +417,9 @@ class _CassetteBody extends StatelessWidget {
         vertical: AppSpacing.s6,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E212B),
+        color: PlayerMaterialColors.cassetteBodyTop,
         borderRadius: AppRadii.r8All,
-        border: Border.all(color: const Color(0xFF2F3445), width: 1),
+        border: Border.all(color: PlayerMaterialColors.cassetteCapstanBorder, width: 1),
       ),
       child: Row(
         children: [
@@ -495,7 +495,7 @@ class _CassetteTapeCounter extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black,
         borderRadius: AppRadii.r4All,
-        border: Border.all(color: const Color(0xFF383C48), width: 1.2),
+        border: Border.all(color: PlayerMaterialColors.cassetteHeadBorder, width: 1.2),
         boxShadow: const [
           BoxShadow(
             color: Colors.black87,
@@ -513,7 +513,7 @@ class _CassetteTapeCounter extends StatelessWidget {
               height: 16,
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               decoration: BoxDecoration(
-                color: const Color(0xFF14161C),
+                color: PlayerMaterialColors.cassetteHeadFill,
                 borderRadius: AppRadii.circular(2),
               ),
               clipBehavior: Clip.hardEdge,
@@ -714,10 +714,10 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
               final isLit = idx < activeSegCount;
               final isPeak = idx == peakSegIndex && idx >= activeSegCount;
               final Color baseColor = idx >= 8
-                  ? const Color(0xFFFF1744)
+                  ? PlayerMaterialColors.cassetteVuPeak
                   : (idx >= 6
-                      ? const Color(0xFFFFD600)
-                      : const Color(0xFF00E676));
+                      ? PlayerMaterialColors.cassetteVuWarn
+                      : PlayerMaterialColors.cassetteVuNormal);
 
               final Color segColor = isLit
                   ? baseColor
@@ -776,7 +776,7 @@ class _CassetteScrew extends StatelessWidget {
         child: Container(
           width: 6,
           height: 1.2,
-          color: const Color(0xFF1E2028),
+          color: PlayerMaterialColors.cassetteShell,
         ),
       ),
     );
@@ -896,16 +896,16 @@ class _MagneticTapePathPainter extends CustomPainter {
 
     // --- 1. Guide Rollers (Metallic Bushings & Pins) ---
     final rollerBushingPaint = Paint()
-      ..color = const Color(0xFFC89E48)
+      ..color = PlayerMaterialColors.cassettePinchGold
       ..style = PaintingStyle.fill;
 
     final rollerRimPaint = Paint()
-      ..color = const Color(0xFF4A4E62)
+      ..color = PlayerMaterialColors.cassettePinchRim
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
 
     final rollerAxlePaint = Paint()
-      ..color = const Color(0xFF14161F)
+      ..color = PlayerMaterialColors.cassettePinchCore
       ..style = PaintingStyle.fill;
 
     for (final roller in [leftRoller, rightRoller]) {
@@ -947,9 +947,9 @@ class _MagneticTapePathPainter extends CustomPainter {
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: const [
-          Color(0xFF382015),
-          Color(0xFF4A2B1D),
-          Color(0xFF26140D),
+          PlayerMaterialColors.cassetteRibbonStart,
+          PlayerMaterialColors.cassetteRibbonMid,
+          PlayerMaterialColors.cassetteRibbonEnd,
         ],
       ).createShader(Rect.fromLTWH(0, 0, w, h))
       ..style = PaintingStyle.stroke

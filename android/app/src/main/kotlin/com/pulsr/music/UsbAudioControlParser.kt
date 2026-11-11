@@ -93,6 +93,12 @@ object UsbAudioControlParser {
         val feedbackEndpointAddress: Int?,
         /** Discrete/continuous rates declared by this alt (UAC1); empty for UAC2. */
         val supportedRates: List<Int>,
+        /**
+         * True when the UAC1 CS_ENDPOINT descriptor (0x25, EP_GENERAL) declares
+         * Sampling Frequency control support (bmAttributes bit 0 == 1), or when
+         * no CS_ENDPOINT descriptor was present (legacy default).
+         */
+        val sampleRateControlSupported: Boolean = true,
     )
 
     data class Result(
@@ -124,6 +130,7 @@ object UsbAudioControlParser {
     private const val DESC_INTERFACE = 0x04
     private const val DESC_ENDPOINT = 0x05
     private const val DESC_CS_INTERFACE = 0x24
+    private const val DESC_CS_ENDPOINT = 0x25
 
     private const val CLASS_AUDIO = 0x01
     private const val CLASS_VENDOR_SPECIFIC = 0xFF
@@ -308,6 +315,7 @@ object UsbAudioControlParser {
         var curOutEp = -1
         var curOutMaxPacket = 0
         var curFbEp = -1
+        var curSampleRateControl = true
         val curRates = mutableListOf<Int>()
 
         fun flushAltSetting() {
@@ -325,6 +333,7 @@ object UsbAudioControlParser {
                         channels = curChannels,
                         feedbackEndpointAddress = if (curFbEp >= 0) curFbEp else null,
                         supportedRates = curRates.distinct().sorted(),
+                        sampleRateControlSupported = curSampleRateControl,
                     ),
                 )
             }
@@ -335,6 +344,7 @@ object UsbAudioControlParser {
             curSubslot = 0
             curBitRes = 0
             curChannels = 0
+            curSampleRateControl = true
             curRates.clear()
         }
 
@@ -463,6 +473,18 @@ object UsbAudioControlParser {
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+
+                DESC_CS_ENDPOINT -> {
+                    if (isAudioStreamingInterface(currentClass, currentSubclass, currentProtocol, allowVendor) &&
+                        bLength >= 4 && curOutEp >= 0 && curFbEp < 0
+                    ) {
+                        val subtype = descriptors[i + 2].toInt() and 0xFF
+                        if (subtype == 0x01 && (uacVersion == UAC1 || (uacVersion == UAC_NONE && currentProtocol == 0x00))) {
+                            val bmAttributes = descriptors[i + 3].toInt() and 0xFF
+                            curSampleRateControl = (bmAttributes and 0x01) != 0
                         }
                     }
                 }

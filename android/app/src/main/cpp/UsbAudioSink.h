@@ -100,6 +100,11 @@ public:
                                               int endpointAddress, int usbSpeed);
     static int NextPacketFrames(uint64_t& accumulator, uint32_t ratePerSec,
                                 int intervalUs, int maxFramesPerPacket);
+    // Steers nominal packet cadence within +/-0.1% based on ring fill when the
+    // DAC exposes no async feedback IN endpoint, limiting clock-drift underruns
+    // or overruns without touching sample bits.
+    static int SteerPacketRateForRingFill(int currentRatePerSec, int nominalRate,
+                                          size_t occupiedBytes, size_t capacityBytes);
 
     // Audio-thread call: packs float [-1,1] to the configured interleaved wire
     // format (S16_LE / S24_3LE / S32_LE per bytesPerSample_) and appends to the

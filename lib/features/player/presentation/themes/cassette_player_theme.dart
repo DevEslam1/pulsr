@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';

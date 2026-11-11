@@ -206,35 +206,66 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
             if (!std::isfinite(r)) r = 0.0f;
             float32x2_t vx = { l, r };
 
-            // Treble shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
             float32x2_t ty = vsub_f32(
                 vadd_f32(vmul_f32(tb0, vx), vadd_f32(vmul_f32(tb1, tx1), vmul_f32(tb2, tx2))),
                 vadd_f32(vmul_f32(ta1, ty1), vmul_f32(ta2, ty2))
             );
-            tx2 = tx1; tx1 = vx;
-            ty2 = ty1; ty1 = ty;
+            float t0 = vget_lane_f32(ty, 0);
+            float t1 = vget_lane_f32(ty, 1);
+            if (!std::isfinite(t0) || !std::isfinite(t1)) {
+                float tx1a[2] = { vget_lane_f32(tx1, 0), vget_lane_f32(tx1, 1) };
+                float tx2a[2] = { vget_lane_f32(tx2, 0), vget_lane_f32(tx2, 1) };
+                float ty1a[2] = { vget_lane_f32(ty1, 0), vget_lane_f32(ty1, 1) };
+                float ty2a[2] = { vget_lane_f32(ty2, 0), vget_lane_f32(ty2, 1) };
+                if (!std::isfinite(t0)) { t0 = l; tx1a[0] = l; tx2a[0] = 0.0f; ty1a[0] = t0; ty2a[0] = 0.0f; }
+                else { tx2a[0] = tx1a[0]; tx1a[0] = l; ty2a[0] = ty1a[0]; ty1a[0] = t0; }
+                if (!std::isfinite(t1)) { t1 = r; tx1a[1] = r; tx2a[1] = 0.0f; ty1a[1] = t1; ty2a[1] = 0.0f; }
+                else { tx2a[1] = tx1a[1]; tx1a[1] = r; ty2a[1] = ty1a[1]; ty1a[1] = t1; }
+                tx1 = vld1_f32(tx1a); tx2 = vld1_f32(tx2a);
+                ty1 = vld1_f32(ty1a); ty2 = vld1_f32(ty2a);
+                float tClean[2] = { t0, t1 };
+                ty = vld1_f32(tClean);
+            } else {
+                tx2 = tx1; tx1 = vx;
+                ty2 = ty1; ty1 = ty;
+            }
 
-            // Bass shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
             float32x2_t by = vsub_f32(
                 vadd_f32(vmul_f32(bb0, ty), vadd_f32(vmul_f32(bb1, bx1), vmul_f32(bb2, bx2))),
                 vadd_f32(vmul_f32(ba1, by1), vmul_f32(ba2, by2))
             );
-            bx2 = bx1; bx1 = ty;
-            by2 = by1; by1 = by;
+            float b0l = vget_lane_f32(by, 0);
+            float b1l = vget_lane_f32(by, 1);
+            if (!std::isfinite(b0l) || !std::isfinite(b1l)) {
+                float bx1a[2] = { vget_lane_f32(bx1, 0), vget_lane_f32(bx1, 1) };
+                float bx2a[2] = { vget_lane_f32(bx2, 0), vget_lane_f32(bx2, 1) };
+                float by1a[2] = { vget_lane_f32(by1, 0), vget_lane_f32(by1, 1) };
+                float by2a[2] = { vget_lane_f32(by2, 0), vget_lane_f32(by2, 1) };
+                if (!std::isfinite(b0l)) { b0l = t0; bx1a[0] = t0; bx2a[0] = 0.0f; by1a[0] = b0l; by2a[0] = 0.0f; }
+                else { bx2a[0] = bx1a[0]; bx1a[0] = t0; by2a[0] = by1a[0]; by1a[0] = b0l; }
+                if (!std::isfinite(b1l)) { b1l = t1; bx1a[1] = t1; bx2a[1] = 0.0f; by1a[1] = b1l; by2a[1] = 0.0f; }
+                else { bx2a[1] = bx1a[1]; bx1a[1] = t1; by2a[1] = by1a[1]; by1a[1] = b1l; }
+                bx1 = vld1_f32(bx1a); bx2 = vld1_f32(bx2a);
+                by1 = vld1_f32(by1a); by2 = vld1_f32(by2a);
+            } else {
+                bx2 = bx1; bx1 = ty;
+                by2 = by1; by1 = by;
+            }
 
-            buffer[i * 2] = vget_lane_f32(by, 0);
-            buffer[i * 2 + 1] = vget_lane_f32(by, 1);
+            buffer[i * 2] = b0l;
+            buffer[i * 2 + 1] = b1l;
         }
 
-        treble_[0].x1 = vget_lane_f32(tx1, 0); treble_[1].x1 = vget_lane_f32(tx1, 1);
-        treble_[0].x2 = vget_lane_f32(tx2, 0); treble_[1].x2 = vget_lane_f32(tx2, 1);
-        treble_[0].y1 = vget_lane_f32(ty1, 0); treble_[1].y1 = vget_lane_f32(ty1, 1);
-        treble_[0].y2 = vget_lane_f32(ty2, 0); treble_[1].y2 = vget_lane_f32(ty2, 1);
+        auto flushReg = [](float v) { return (!std::isfinite(v) || std::abs(v) < 1e-25f) ? 0.0f : v; };
+        treble_[0].x1 = flushReg(vget_lane_f32(tx1, 0)); treble_[1].x1 = flushReg(vget_lane_f32(tx1, 1));
+        treble_[0].x2 = flushReg(vget_lane_f32(tx2, 0)); treble_[1].x2 = flushReg(vget_lane_f32(tx2, 1));
+        treble_[0].y1 = flushReg(vget_lane_f32(ty1, 0)); treble_[1].y1 = flushReg(vget_lane_f32(ty1, 1));
+        treble_[0].y2 = flushReg(vget_lane_f32(ty2, 0)); treble_[1].y2 = flushReg(vget_lane_f32(ty2, 1));
 
-        bass_[0].x1 = vget_lane_f32(bx1, 0); bass_[1].x1 = vget_lane_f32(bx1, 1);
-        bass_[0].x2 = vget_lane_f32(bx2, 0); bass_[1].x2 = vget_lane_f32(bx2, 1);
-        bass_[0].y1 = vget_lane_f32(by1, 0); bass_[1].y1 = vget_lane_f32(by1, 1);
-        bass_[0].y2 = vget_lane_f32(by2, 0); bass_[1].y2 = vget_lane_f32(by2, 1);
+        bass_[0].x1 = flushReg(vget_lane_f32(bx1, 0)); bass_[1].x1 = flushReg(vget_lane_f32(bx1, 1));
+        bass_[0].x2 = flushReg(vget_lane_f32(bx2, 0)); bass_[1].x2 = flushReg(vget_lane_f32(bx2, 1));
+        bass_[0].y1 = flushReg(vget_lane_f32(by1, 0)); bass_[1].y1 = flushReg(vget_lane_f32(by1, 1));
+        bass_[0].y2 = flushReg(vget_lane_f32(by2, 0)); bass_[1].y2 = flushReg(vget_lane_f32(by2, 1));
         return;
 #elif defined(PULSR_HAS_SSE2)
         const __m128 tb0 = _mm_set1_ps(static_cast<float>(treble_[0].b0));
@@ -270,32 +301,64 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
                 _mm_add_ps(_mm_mul_ps(tb0, vx), _mm_add_ps(_mm_mul_ps(tb1, tx1), _mm_mul_ps(tb2, tx2))),
                 _mm_add_ps(_mm_mul_ps(ta1, ty1), _mm_mul_ps(ta2, ty2))
             );
-            tx2 = tx1; tx1 = vx;
-            ty2 = ty1; ty1 = ty;
+            alignas(16) float ty_arr[4];
+            _mm_store_ps(ty_arr, ty);
+            if (!std::isfinite(ty_arr[0]) || !std::isfinite(ty_arr[1])) {
+                alignas(16) float tx1a[4], tx2a[4], ty1a[4], ty2a[4];
+                _mm_store_ps(tx1a, tx1); _mm_store_ps(tx2a, tx2);
+                _mm_store_ps(ty1a, ty1); _mm_store_ps(ty2a, ty2);
+                if (!std::isfinite(ty_arr[0])) { ty_arr[0] = l; tx1a[0] = l; tx2a[0] = 0.0f; ty1a[0] = ty_arr[0]; ty2a[0] = 0.0f; }
+                else { tx2a[0] = tx1a[0]; tx1a[0] = l; ty2a[0] = ty1a[0]; ty1a[0] = ty_arr[0]; }
+                if (!std::isfinite(ty_arr[1])) { ty_arr[1] = r; tx1a[1] = r; tx2a[1] = 0.0f; ty1a[1] = ty_arr[1]; ty2a[1] = 0.0f; }
+                else { tx2a[1] = tx1a[1]; tx1a[1] = r; ty2a[1] = ty1a[1]; ty1a[1] = ty_arr[1]; }
+                tx1 = _mm_set_ps(0.0f, 0.0f, tx1a[1], tx1a[0]);
+                tx2 = _mm_set_ps(0.0f, 0.0f, tx2a[1], tx2a[0]);
+                ty1 = _mm_set_ps(0.0f, 0.0f, ty1a[1], ty1a[0]);
+                ty2 = _mm_set_ps(0.0f, 0.0f, ty2a[1], ty2a[0]);
+                ty = _mm_set_ps(0.0f, 0.0f, ty_arr[1], ty_arr[0]);
+            } else {
+                tx2 = tx1; tx1 = vx;
+                ty2 = ty1; ty1 = ty;
+            }
 
             __m128 by = _mm_sub_ps(
                 _mm_add_ps(_mm_mul_ps(bb0, ty), _mm_add_ps(_mm_mul_ps(bb1, bx1), _mm_mul_ps(bb2, bx2))),
                 _mm_add_ps(_mm_mul_ps(ba1, by1), _mm_mul_ps(ba2, by2))
             );
-            bx2 = bx1; bx1 = ty;
-            by2 = by1; by1 = by;
-
             alignas(16) float by_arr[4];
             _mm_store_ps(by_arr, by);
+            if (!std::isfinite(by_arr[0]) || !std::isfinite(by_arr[1])) {
+                alignas(16) float bx1a[4], bx2a[4], by1a[4], by2a[4];
+                _mm_store_ps(bx1a, bx1); _mm_store_ps(bx2a, bx2);
+                _mm_store_ps(by1a, by1); _mm_store_ps(by2a, by2);
+                if (!std::isfinite(by_arr[0])) { by_arr[0] = ty_arr[0]; bx1a[0] = ty_arr[0]; bx2a[0] = 0.0f; by1a[0] = by_arr[0]; by2a[0] = 0.0f; }
+                else { bx2a[0] = bx1a[0]; bx1a[0] = ty_arr[0]; by2a[0] = by1a[0]; by1a[0] = by_arr[0]; }
+                if (!std::isfinite(by_arr[1])) { by_arr[1] = ty_arr[1]; bx1a[1] = ty_arr[1]; bx2a[1] = 0.0f; by1a[1] = by_arr[1]; by2a[1] = 0.0f; }
+                else { bx2a[1] = bx1a[1]; bx1a[1] = ty_arr[1]; by2a[1] = by1a[1]; by1a[1] = by_arr[1]; }
+                bx1 = _mm_set_ps(0.0f, 0.0f, bx1a[1], bx1a[0]);
+                bx2 = _mm_set_ps(0.0f, 0.0f, bx2a[1], bx2a[0]);
+                by1 = _mm_set_ps(0.0f, 0.0f, by1a[1], by1a[0]);
+                by2 = _mm_set_ps(0.0f, 0.0f, by2a[1], by2a[0]);
+            } else {
+                bx2 = bx1; bx1 = ty;
+                by2 = by1; by1 = by;
+            }
+
             buffer[i * 2] = by_arr[0];
             buffer[i * 2 + 1] = by_arr[1];
         }
 
+        auto flushReg = [](float v) { return (!std::isfinite(v) || std::abs(v) < 1e-25f) ? 0.0f : v; };
         alignas(16) float t_arr[4], b_arr[4];
-        _mm_store_ps(t_arr, tx1); treble_[0].x1 = t_arr[0]; treble_[1].x1 = t_arr[1];
-        _mm_store_ps(t_arr, tx2); treble_[0].x2 = t_arr[0]; treble_[1].x2 = t_arr[1];
-        _mm_store_ps(t_arr, ty1); treble_[0].y1 = t_arr[0]; treble_[1].y1 = t_arr[1];
-        _mm_store_ps(t_arr, ty2); treble_[0].y2 = t_arr[0]; treble_[1].y2 = t_arr[1];
+        _mm_store_ps(t_arr, tx1); treble_[0].x1 = flushReg(t_arr[0]); treble_[1].x1 = flushReg(t_arr[1]);
+        _mm_store_ps(t_arr, tx2); treble_[0].x2 = flushReg(t_arr[0]); treble_[1].x2 = flushReg(t_arr[1]);
+        _mm_store_ps(t_arr, ty1); treble_[0].y1 = flushReg(t_arr[0]); treble_[1].y1 = flushReg(t_arr[1]);
+        _mm_store_ps(t_arr, ty2); treble_[0].y2 = flushReg(t_arr[0]); treble_[1].y2 = flushReg(t_arr[1]);
 
-        _mm_store_ps(b_arr, bx1); bass_[0].x1 = b_arr[0]; bass_[1].x1 = b_arr[1];
-        _mm_store_ps(b_arr, bx2); bass_[0].x2 = b_arr[0]; bass_[1].x2 = b_arr[1];
-        _mm_store_ps(b_arr, by1); bass_[0].y1 = b_arr[0]; bass_[1].y1 = b_arr[1];
-        _mm_store_ps(b_arr, by2); bass_[0].y2 = b_arr[0]; bass_[1].y2 = b_arr[1];
+        _mm_store_ps(b_arr, bx1); bass_[0].x1 = flushReg(b_arr[0]); bass_[1].x1 = flushReg(b_arr[1]);
+        _mm_store_ps(b_arr, bx2); bass_[0].x2 = flushReg(b_arr[0]); bass_[1].x2 = flushReg(b_arr[1]);
+        _mm_store_ps(b_arr, by1); bass_[0].y1 = flushReg(b_arr[0]); bass_[1].y1 = flushReg(b_arr[1]);
+        _mm_store_ps(b_arr, by2); bass_[0].y2 = flushReg(b_arr[0]); bass_[1].y2 = flushReg(b_arr[1]);
         return;
 #endif
 #else
@@ -329,35 +392,66 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
             if (!std::isfinite(r)) r = 0.0;
             float64x2_t vx = { l, r };
 
-            // Treble shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
             float64x2_t ty = vsubq_f64(
                 vaddq_f64(vmulq_f64(tb0, vx), vaddq_f64(vmulq_f64(tb1, tx1), vmulq_f64(tb2, tx2))),
                 vaddq_f64(vmulq_f64(ta1, ty1), vmulq_f64(ta2, ty2))
             );
-            tx2 = tx1; tx1 = vx;
-            ty2 = ty1; ty1 = ty;
+            double t0 = vgetq_lane_f64(ty, 0);
+            double t1 = vgetq_lane_f64(ty, 1);
+            if (!std::isfinite(t0) || !std::isfinite(t1)) {
+                double tx1a[2] = { vgetq_lane_f64(tx1, 0), vgetq_lane_f64(tx1, 1) };
+                double tx2a[2] = { vgetq_lane_f64(tx2, 0), vgetq_lane_f64(tx2, 1) };
+                double ty1a[2] = { vgetq_lane_f64(ty1, 0), vgetq_lane_f64(ty1, 1) };
+                double ty2a[2] = { vgetq_lane_f64(ty2, 0), vgetq_lane_f64(ty2, 1) };
+                if (!std::isfinite(t0)) { t0 = l; tx1a[0] = l; tx2a[0] = 0.0; ty1a[0] = t0; ty2a[0] = 0.0; }
+                else { tx2a[0] = tx1a[0]; tx1a[0] = l; ty2a[0] = ty1a[0]; ty1a[0] = t0; }
+                if (!std::isfinite(t1)) { t1 = r; tx1a[1] = r; tx2a[1] = 0.0; ty1a[1] = t1; ty2a[1] = 0.0; }
+                else { tx2a[1] = tx1a[1]; tx1a[1] = r; ty2a[1] = ty1a[1]; ty1a[1] = t1; }
+                tx1 = vld1q_f64(tx1a); tx2 = vld1q_f64(tx2a);
+                ty1 = vld1q_f64(ty1a); ty2 = vld1q_f64(ty2a);
+                double tClean[2] = { t0, t1 };
+                ty = vld1q_f64(tClean);
+            } else {
+                tx2 = tx1; tx1 = vx;
+                ty2 = ty1; ty1 = ty;
+            }
 
-            // Bass shelf biquad: y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
             float64x2_t by = vsubq_f64(
                 vaddq_f64(vmulq_f64(bb0, ty), vaddq_f64(vmulq_f64(bb1, bx1), vmulq_f64(bb2, bx2))),
                 vaddq_f64(vmulq_f64(ba1, by1), vmulq_f64(ba2, by2))
             );
-            bx2 = bx1; bx1 = ty;
-            by2 = by1; by1 = by;
+            double b0l = vgetq_lane_f64(by, 0);
+            double b1l = vgetq_lane_f64(by, 1);
+            if (!std::isfinite(b0l) || !std::isfinite(b1l)) {
+                double bx1a[2] = { vgetq_lane_f64(bx1, 0), vgetq_lane_f64(bx1, 1) };
+                double bx2a[2] = { vgetq_lane_f64(bx2, 0), vgetq_lane_f64(bx2, 1) };
+                double by1a[2] = { vgetq_lane_f64(by1, 0), vgetq_lane_f64(by1, 1) };
+                double by2a[2] = { vgetq_lane_f64(by2, 0), vgetq_lane_f64(by2, 1) };
+                if (!std::isfinite(b0l)) { b0l = t0; bx1a[0] = t0; bx2a[0] = 0.0; by1a[0] = b0l; by2a[0] = 0.0; }
+                else { bx2a[0] = bx1a[0]; bx1a[0] = t0; by2a[0] = by1a[0]; by1a[0] = b0l; }
+                if (!std::isfinite(b1l)) { b1l = t1; bx1a[1] = t1; bx2a[1] = 0.0; by1a[1] = b1l; by2a[1] = 0.0; }
+                else { bx2a[1] = bx1a[1]; bx1a[1] = t1; by2a[1] = by1a[1]; by1a[1] = b1l; }
+                bx1 = vld1q_f64(bx1a); bx2 = vld1q_f64(bx2a);
+                by1 = vld1q_f64(by1a); by2 = vld1q_f64(by2a);
+            } else {
+                bx2 = bx1; bx1 = ty;
+                by2 = by1; by1 = by;
+            }
 
-            buffer[i * 2] = static_cast<float>(vgetq_lane_f64(by, 0));
-            buffer[i * 2 + 1] = static_cast<float>(vgetq_lane_f64(by, 1));
+            buffer[i * 2] = static_cast<float>(b0l);
+            buffer[i * 2 + 1] = static_cast<float>(b1l);
         }
 
-        treble_[0].x1 = vgetq_lane_f64(tx1, 0); treble_[1].x1 = vgetq_lane_f64(tx1, 1);
-        treble_[0].x2 = vgetq_lane_f64(tx2, 0); treble_[1].x2 = vgetq_lane_f64(tx2, 1);
-        treble_[0].y1 = vgetq_lane_f64(ty1, 0); treble_[1].y1 = vgetq_lane_f64(ty1, 1);
-        treble_[0].y2 = vgetq_lane_f64(ty2, 0); treble_[1].y2 = vgetq_lane_f64(ty2, 1);
+        auto flushReg = [](double v) { return (!std::isfinite(v) || std::abs(v) < 1e-25) ? 0.0 : v; };
+        treble_[0].x1 = flushReg(vgetq_lane_f64(tx1, 0)); treble_[1].x1 = flushReg(vgetq_lane_f64(tx1, 1));
+        treble_[0].x2 = flushReg(vgetq_lane_f64(tx2, 0)); treble_[1].x2 = flushReg(vgetq_lane_f64(tx2, 1));
+        treble_[0].y1 = flushReg(vgetq_lane_f64(ty1, 0)); treble_[1].y1 = flushReg(vgetq_lane_f64(ty1, 1));
+        treble_[0].y2 = flushReg(vgetq_lane_f64(ty2, 0)); treble_[1].y2 = flushReg(vgetq_lane_f64(ty2, 1));
 
-        bass_[0].x1 = vgetq_lane_f64(bx1, 0); bass_[1].x1 = vgetq_lane_f64(bx1, 1);
-        bass_[0].x2 = vgetq_lane_f64(bx2, 0); bass_[1].x2 = vgetq_lane_f64(bx2, 1);
-        bass_[0].y1 = vgetq_lane_f64(by1, 0); bass_[1].y1 = vgetq_lane_f64(by1, 1);
-        bass_[0].y2 = vgetq_lane_f64(by2, 0); bass_[1].y2 = vgetq_lane_f64(by2, 1);
+        bass_[0].x1 = flushReg(vgetq_lane_f64(bx1, 0)); bass_[1].x1 = flushReg(vgetq_lane_f64(bx1, 1));
+        bass_[0].x2 = flushReg(vgetq_lane_f64(bx2, 0)); bass_[1].x2 = flushReg(vgetq_lane_f64(bx2, 1));
+        bass_[0].y1 = flushReg(vgetq_lane_f64(by1, 0)); bass_[1].y1 = flushReg(vgetq_lane_f64(by1, 1));
+        bass_[0].y2 = flushReg(vgetq_lane_f64(by2, 0)); bass_[1].y2 = flushReg(vgetq_lane_f64(by2, 1));
         return;
 #elif defined(PULSR_HAS_SSE2)
         const __m128d tb0 = _mm_set1_pd(treble_[0].b0);
@@ -393,32 +487,60 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
                 _mm_add_pd(_mm_mul_pd(tb0, vx), _mm_add_pd(_mm_mul_pd(tb1, tx1), _mm_mul_pd(tb2, tx2))),
                 _mm_add_pd(_mm_mul_pd(ta1, ty1), _mm_mul_pd(ta2, ty2))
             );
-            tx2 = tx1; tx1 = vx;
-            ty2 = ty1; ty1 = ty;
+            alignas(16) double ty_arr[2];
+            _mm_store_pd(ty_arr, ty);
+            if (!std::isfinite(ty_arr[0]) || !std::isfinite(ty_arr[1])) {
+                alignas(16) double tx1a[2], tx2a[2], ty1a[2], ty2a[2];
+                _mm_store_pd(tx1a, tx1); _mm_store_pd(tx2a, tx2);
+                _mm_store_pd(ty1a, ty1); _mm_store_pd(ty2a, ty2);
+                if (!std::isfinite(ty_arr[0])) { ty_arr[0] = l; tx1a[0] = l; tx2a[0] = 0.0; ty1a[0] = ty_arr[0]; ty2a[0] = 0.0; }
+                else { tx2a[0] = tx1a[0]; tx1a[0] = l; ty2a[0] = ty1a[0]; ty1a[0] = ty_arr[0]; }
+                if (!std::isfinite(ty_arr[1])) { ty_arr[1] = r; tx1a[1] = r; tx2a[1] = 0.0; ty1a[1] = ty_arr[1]; ty2a[1] = 0.0; }
+                else { tx2a[1] = tx1a[1]; tx1a[1] = r; ty2a[1] = ty1a[1]; ty1a[1] = ty_arr[1]; }
+                tx1 = _mm_set_pd(tx1a[1], tx1a[0]); tx2 = _mm_set_pd(tx2a[1], tx2a[0]);
+                ty1 = _mm_set_pd(ty1a[1], ty1a[0]); ty2 = _mm_set_pd(ty2a[1], ty2a[0]);
+                ty = _mm_set_pd(ty_arr[1], ty_arr[0]);
+            } else {
+                tx2 = tx1; tx1 = vx;
+                ty2 = ty1; ty1 = ty;
+            }
 
             __m128d by = _mm_sub_pd(
                 _mm_add_pd(_mm_mul_pd(bb0, ty), _mm_add_pd(_mm_mul_pd(bb1, bx1), _mm_mul_pd(bb2, bx2))),
                 _mm_add_pd(_mm_mul_pd(ba1, by1), _mm_mul_pd(ba2, by2))
             );
-            bx2 = bx1; bx1 = ty;
-            by2 = by1; by1 = by;
-
             alignas(16) double by_arr[2];
             _mm_store_pd(by_arr, by);
+            if (!std::isfinite(by_arr[0]) || !std::isfinite(by_arr[1])) {
+                alignas(16) double bx1a[2], bx2a[2], by1a[2], by2a[2];
+                _mm_store_pd(bx1a, bx1); _mm_store_pd(bx2a, bx2);
+                _mm_store_pd(by1a, by1); _mm_store_pd(by2a, by2);
+                if (!std::isfinite(by_arr[0])) { by_arr[0] = ty_arr[0]; bx1a[0] = ty_arr[0]; bx2a[0] = 0.0; by1a[0] = by_arr[0]; by2a[0] = 0.0; }
+                else { bx2a[0] = bx1a[0]; bx1a[0] = ty_arr[0]; by2a[0] = by1a[0]; by1a[0] = by_arr[0]; }
+                if (!std::isfinite(by_arr[1])) { by_arr[1] = ty_arr[1]; bx1a[1] = ty_arr[1]; bx2a[1] = 0.0; by1a[1] = by_arr[1]; by2a[1] = 0.0; }
+                else { bx2a[1] = bx1a[1]; bx1a[1] = ty_arr[1]; by2a[1] = by1a[1]; by1a[1] = by_arr[1]; }
+                bx1 = _mm_set_pd(bx1a[1], bx1a[0]); bx2 = _mm_set_pd(bx2a[1], bx2a[0]);
+                by1 = _mm_set_pd(by1a[1], by1a[0]); by2 = _mm_set_pd(by2a[1], by2a[0]);
+            } else {
+                bx2 = bx1; bx1 = ty;
+                by2 = by1; by1 = by;
+            }
+
             buffer[i * 2] = static_cast<float>(by_arr[0]);
             buffer[i * 2 + 1] = static_cast<float>(by_arr[1]);
         }
 
+        auto flushReg = [](double v) { return (!std::isfinite(v) || std::abs(v) < 1e-25) ? 0.0 : v; };
         alignas(16) double t_arr[2], b_arr[2];
-        _mm_store_pd(t_arr, tx1); treble_[0].x1 = t_arr[0]; treble_[1].x1 = t_arr[1];
-        _mm_store_pd(t_arr, tx2); treble_[0].x2 = t_arr[0]; treble_[1].x2 = t_arr[1];
-        _mm_store_pd(t_arr, ty1); treble_[0].y1 = t_arr[0]; treble_[1].y1 = t_arr[1];
-        _mm_store_pd(t_arr, ty2); treble_[0].y2 = t_arr[0]; treble_[1].y2 = t_arr[1];
+        _mm_store_pd(t_arr, tx1); treble_[0].x1 = flushReg(t_arr[0]); treble_[1].x1 = flushReg(t_arr[1]);
+        _mm_store_pd(t_arr, tx2); treble_[0].x2 = flushReg(t_arr[0]); treble_[1].x2 = flushReg(t_arr[1]);
+        _mm_store_pd(t_arr, ty1); treble_[0].y1 = flushReg(t_arr[0]); treble_[1].y1 = flushReg(t_arr[1]);
+        _mm_store_pd(t_arr, ty2); treble_[0].y2 = flushReg(t_arr[0]); treble_[1].y2 = flushReg(t_arr[1]);
 
-        _mm_store_pd(b_arr, bx1); bass_[0].x1 = b_arr[0]; bass_[1].x1 = b_arr[1];
-        _mm_store_pd(b_arr, bx2); bass_[0].x2 = b_arr[0]; bass_[1].x2 = b_arr[1];
-        _mm_store_pd(b_arr, by1); bass_[0].y1 = b_arr[0]; bass_[1].y1 = b_arr[1];
-        _mm_store_pd(b_arr, by2); bass_[0].y2 = b_arr[0]; bass_[1].y2 = b_arr[1];
+        _mm_store_pd(b_arr, bx1); bass_[0].x1 = flushReg(b_arr[0]); bass_[1].x1 = flushReg(b_arr[1]);
+        _mm_store_pd(b_arr, bx2); bass_[0].x2 = flushReg(b_arr[0]); bass_[1].x2 = flushReg(b_arr[1]);
+        _mm_store_pd(b_arr, by1); bass_[0].y1 = flushReg(b_arr[0]); bass_[1].y1 = flushReg(b_arr[1]);
+        _mm_store_pd(b_arr, by2); bass_[0].y2 = flushReg(b_arr[0]); bass_[1].y2 = flushReg(b_arr[1]);
         return;
 #endif
 #endif

@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -873,7 +874,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                   vertical: 2,
                 ),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
+                  duration: context.motion(PulsrMotion.state),
                   decoration: BoxDecoration(
                     color: selected
                         ? p.accent.withValues(alpha: p.isDark ? 0.14 : 0.08)

@@ -173,7 +173,7 @@ class _CircleArtworkState extends State<_CircleArtwork> {
                         height: dialSize * 0.68,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFF101218),
+                          color: PlayerMaterialColors.circleSpindle,
                           border: Border.all(
                             color: AppColors.specularAt(0.32),
                             width: 2.5,
@@ -236,7 +236,7 @@ class _CircleArtworkState extends State<_CircleArtwork> {
                                   colors: [
                                     Colors.grey.shade300,
                                     Colors.grey.shade700,
-                                    const Color(0xFF161820),
+                                    PlayerMaterialColors.headshellShadow,
                                   ],
                                   stops: const [0.0, 0.6, 1.0],
                                 ),
@@ -298,9 +298,9 @@ class _RotaryBezelPainter extends CustomPainter {
     final housingPaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          Color(0xFF222632),
-          Color(0xFF161820),
-          Color(0xFF0E1015),
+          PlayerMaterialColors.circleRimOuter,
+          PlayerMaterialColors.headshellShadow,
+          PlayerMaterialColors.circleRimInner,
         ],
         stops: const [0.82, 0.94, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: outerRadius));

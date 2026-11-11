@@ -37,10 +37,20 @@ class InterruptionStateMachine {
 
   /// Records the start of [kind], snapshotting [playing].
   ///
-  /// Stack-safe: the first begin wins, so an overlapping duck + phone call
-  /// cannot clobber the original pre-interruption snapshot.
+  /// Stack-safe: the first begin wins for equal/lower priority, while a full
+  /// [InterruptionKind.pause] or [InterruptionKind.unknown] upgrades a
+  /// transient [InterruptionKind.systemUiSound] without losing the original
+  /// pre-interruption [_wasPlaying] snapshot.
   void begin(InterruptionKind kind, {required bool playing}) {
-    if (_activeKind != null) return;
+    if (_activeKind != null) {
+      if ((kind == InterruptionKind.pause ||
+              kind == InterruptionKind.unknown) &&
+          _activeKind == InterruptionKind.systemUiSound) {
+        _activeKind = kind;
+        _wasPlaying = _wasPlaying || playing;
+      }
+      return;
+    }
     _activeKind = kind;
     _wasPlaying = playing;
   }

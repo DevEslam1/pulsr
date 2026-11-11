@@ -52,6 +52,15 @@ void main() {
     });
   });
 
+  group('effectiveSourceSampleRate', () {
+    test('prefers the tag when read and falls back to the decoder probe', () {
+      expect(effectiveSourceSampleRate(tagged: 44100, decoded: 48000), 44100);
+      expect(effectiveSourceSampleRate(tagged: 0, decoded: 48000), 48000);
+      expect(effectiveSourceSampleRate(tagged: 96000, decoded: 0), 96000);
+      expect(effectiveSourceSampleRate(tagged: 0, decoded: 0), 0);
+    });
+  });
+
   group('assessBitPerfectChain', () {
     test('reports notRequested when Bit-Perfect is off', () {
       final result = assessBitPerfectChain(

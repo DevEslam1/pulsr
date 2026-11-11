@@ -72,6 +72,11 @@ class TripleBufferPipeline {
   Future<bool> claimInactive(PlayerClaim claim) async {
     return _claimMutex.protect(() async {
       if (_inactiveClaim != PlayerClaim.none && _inactiveClaim != claim) {
+        if (claim == PlayerClaim.crossfade &&
+            _inactiveClaim == PlayerClaim.prefetch) {
+          _inactiveClaim = claim;
+          return true;
+        }
         return false;
       }
       _inactiveClaim = claim;
@@ -104,13 +109,16 @@ class TripleBufferPipeline {
       if (!await claimInactive(PlayerClaim.prefetch)) return;
       var success = await _attemptPreload(nextSong);
       if (!success) {
+        if (_inactiveClaim != PlayerClaim.prefetch) return;
         // Retry once after 2 seconds
         await Future<void>.delayed(const Duration(seconds: 2));
+        if (_inactiveClaim != PlayerClaim.prefetch) return;
         if (isLoadStillValid != null && !isLoadStillValid!()) {
           return;
         }
         success = await _attemptPreload(nextSong);
         if (!success) {
+          if (_inactiveClaim != PlayerClaim.prefetch) return;
           _preloadFailedExpiry[nextSong.id] =
               DateTime.now().add(const Duration(seconds: 30));
           analytics?.recordPreloadFailure();
@@ -130,7 +138,10 @@ class TripleBufferPipeline {
       final tag = songToMediaItem(nextSong);
       final source = await resolveAudioSource(nextSong, tag);
       // The await above can outlast the track that scheduled this preload;
-      // never touch a player that is no longer the inactive one.
+      // never touch a player that is no longer the inactive one or was preempted.
+      if (_inactiveClaim != PlayerClaim.prefetch) {
+        return false;
+      }
       if (scheduledGen != null && scheduledGen != getGeneration?.call()) {
         return false;
       }
@@ -138,7 +149,8 @@ class TripleBufferPipeline {
         return false;
       }
       final inactivePlayer = getInactivePlayer();
-      if (scheduledGen != null && scheduledGen != getGeneration?.call()) {
+      if (_inactiveClaim != PlayerClaim.prefetch ||
+          (scheduledGen != null && scheduledGen != getGeneration?.call())) {
         return false;
       }
       await inactivePlayer.setAudioSource(source, preload: true);

@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/services/radio_station_store.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/theme/pulsr_button_style.dart';
@@ -420,18 +421,23 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   return GestureDetector(
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      _pageController.animateToPage(
-                        i,
-                        duration: const Duration(milliseconds: 320),
-                        curve: Curves.easeOutCubic,
-                      );
+                      final dur = context.motion(PulsrMotion.page);
+                      if (dur == Duration.zero) {
+                        _pageController.jumpToPage(i);
+                      } else {
+                        _pageController.animateToPage(
+                          i,
+                          duration: dur,
+                          curve: context.motionCurve(PulsrMotion.enter),
+                        );
+                      }
                     },
                     child: Container(
                       margin: const EdgeInsetsDirectional.only(end: 4.5),
                       padding: const EdgeInsets.symmetric(vertical: 4.0),
                       child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeOutCubic,
+                        duration: context.motion(PulsrMotion.layout),
+                        curve: context.motionCurve(PulsrMotion.enter),
                         width: isActive ? 20.0 : 5.5,
                         height: 5.5,
                         decoration: BoxDecoration(
@@ -1309,7 +1315,20 @@ class _PulsingLiveDotState extends State<_PulsingLiveDot>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
-    )..repeat(reverse: true);
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (context.motionEnabled) {
+      if (!_controller.isAnimating) {
+        _controller.repeat(reverse: true);
+      }
+    } else {
+      _controller.stop();
+      _controller.value = 1.0;
+    }
   }
 
   @override
@@ -1367,19 +1386,30 @@ class _MiniEqualizerBarsState extends State<_MiniEqualizerBars>
       vsync: this,
       duration: const Duration(milliseconds: 1100),
     );
-    if (widget.isPlaying) _anim.repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (widget.isPlaying && context.motionEnabled) {
+      if (!_anim.isAnimating) {
+        _anim.repeat();
+      }
+    } else {
+      _anim.stop();
+      _anim.reset();
+    }
   }
 
   @override
   void didUpdateWidget(covariant _MiniEqualizerBars oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isPlaying != oldWidget.isPlaying) {
-      if (widget.isPlaying) {
-        _anim.repeat();
-      } else {
-        _anim.stop();
-        _anim.reset();
-      }
+      _syncAnimation();
     }
   }
 

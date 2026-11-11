@@ -17,11 +17,11 @@ class _CdDiscPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          Color(0xFF1E2129),
-          Color(0xFF282D37),
-          Color(0xFF323846),
-          Color(0xFF20232C),
-          Color(0xFF16181F),
+          PlayerMaterialColors.cdSurfaceTop,
+          PlayerMaterialColors.cdSurfaceUpper,
+          PlayerMaterialColors.cdSurfaceMid,
+          PlayerMaterialColors.cdSurfaceLower,
+          PlayerMaterialColors.cdSurfaceBottom,
         ],
         stops: const [0.38, 0.55, 0.75, 0.92, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: radius));
@@ -264,7 +264,7 @@ class _CdTonearmPainter extends CustomPainter {
   void _drawArmRest(Canvas canvas, Offset base) {
     // Cradle pillar
     final restPaint = Paint()
-      ..color = const Color(0xFF1E212A)
+      ..color = PlayerMaterialColors.cdClampWell
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -276,7 +276,7 @@ class _CdTonearmPainter extends CustomPainter {
 
     // Cradle top fork
     final forkPaint = Paint()
-      ..color = const Color(0xFF383C4D)
+      ..color = PlayerMaterialColors.cdClampBorder
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     final forkPath = Path()
@@ -297,9 +297,9 @@ class _CdTonearmPainter extends CustomPainter {
     final basePaint = Paint()
       ..shader = RadialGradient(
         colors: const [
-          Color(0xFF3A3F4E),
-          Color(0xFF232733),
-          Color(0xFF141720),
+          PlayerMaterialColors.cdPivotHigh,
+          PlayerMaterialColors.cdPivotMid,
+          PlayerMaterialColors.cdPivotLow,
         ],
         stops: const [0.0, 0.65, 1.0],
       ).createShader(Rect.fromCircle(center: pivot, radius: _gimbalRadius));
@@ -322,7 +322,7 @@ class _CdTonearmPainter extends CustomPainter {
 
     // Inner concentric bezel
     final innerBezelPaint = Paint()
-      ..color = const Color(0xFF161922)
+      ..color = PlayerMaterialColors.cdPivotBase
       ..style = PaintingStyle.fill;
     canvas.drawCircle(pivot, _innerPivotRadius, innerBezelPaint);
 
@@ -336,7 +336,7 @@ class _CdTonearmPainter extends CustomPainter {
 
   void _drawCounterweight(Canvas canvas) {
     // Rear stem extension behind pivot
-    final stemPaint = Paint()..color = const Color(0xFF2C303D);
+    final stemPaint = Paint()..color = PlayerMaterialColors.cdStem;
     canvas.drawRRect(
       RRect.fromRectAndRadius(
         const Rect.fromLTWH(-3, -26, 6, 26),
@@ -350,10 +350,10 @@ class _CdTonearmPainter extends CustomPainter {
     final weightPaint = Paint()
       ..shader = const LinearGradient(
         colors: [
-          Color(0xFF5A6072),
-          Color(0xFF353945),
-          Color(0xFF21242C),
-          Color(0xFF4B5162),
+          PlayerMaterialColors.cdWeightHigh,
+          PlayerMaterialColors.cdWeightMid,
+          PlayerMaterialColors.cdWeightLow,
+          PlayerMaterialColors.cdWeightRim,
         ],
         stops: [0.0, 0.35, 0.7, 1.0],
       ).createShader(weightRect);
@@ -429,7 +429,7 @@ class _CdTonearmPainter extends CustomPainter {
   void _drawStylusHead(Canvas canvas, double l) {
     // Stylus cartridge connector collar
     final collarRect = Rect.fromLTWH(-3.5, l - 24, 7, 5);
-    final collarPaint = Paint()..color = const Color(0xFF282C38);
+    final collarPaint = Paint()..color = PlayerMaterialColors.cdCollar;
     canvas.drawRRect(
       RRect.fromRectAndRadius(collarRect, const Radius.circular(1.5)),
       collarPaint,
@@ -450,9 +450,9 @@ class _CdTonearmPainter extends CustomPainter {
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [
-          const Color(0xFF454B5C),
-          const Color(0xFF252833),
-          const Color(0xFF171920),
+          PlayerMaterialColors.cdHeadHigh,
+          PlayerMaterialColors.cdHeadMid,
+          PlayerMaterialColors.cdHeadLow,
         ],
       ).createShader(headRect);
     canvas.drawPath(headshellPath, headPaint);
@@ -493,7 +493,7 @@ class _CdTonearmPainter extends CustomPainter {
     canvas.drawCircle(Offset.zero, 6.5, capPaint);
 
     // Center screw dot
-    final screwPaint = Paint()..color = const Color(0xFF181A22);
+    final screwPaint = Paint()..color = PlayerMaterialColors.recordSheenCenter;
     canvas.drawCircle(Offset.zero, 2.4, screwPaint);
   }
 

@@ -33,9 +33,12 @@ class LyricsTranslationService {
   static const String _inputToolsEndpoint =
       'https://inputtools.google.com/request';
   static const String _cachePrefix = 'lyr_trans_v1_';
+  static const String _diskIndexKey = 'lyr_trans_index_v1';
+  static const int _maxDiskEntries = 100;
   static const int _maxBatchChars = 3200;
 
   static final Map<String, _CachedTranslation> _memoryCache = {};
+  static Future<void> _diskIndexChain = Future<void>.value();
   static final RegExp _markerRegex = RegExp(r'\uE000[^\uE001]*\uE001');
 
   final http.Client _client;
@@ -63,6 +66,14 @@ class LyricsTranslationService {
     return sha256.convert(utf8.encode(sb.toString())).toString();
   }
 
+  static void _putMemoryCache(String key, _CachedTranslation entry) {
+    _memoryCache.remove(key);
+    while (_memoryCache.length >= _maxMemoryEntries) {
+      _memoryCache.remove(_memoryCache.keys.first);
+    }
+    _memoryCache[key] = entry;
+  }
+
   /// Translates [lines] into [targetLanguage] (e.g. 'en', 'es', 'ja', 'ar').
   Future<LyricsTranslationResult> translateLyrics({
     required List<LyricsLine> lines,
@@ -82,16 +93,19 @@ class LyricsTranslationService {
       romanize: false,
     );
 
-    // 1. Check in-memory cache
-    final mem = _memoryCache[cacheKey];
-    if (mem != null && mem.texts.length == lines.length) {
-      return _buildResultFromCache(lines, mem, fromMemory: true);
+    // 1. Check in-memory cache (LRU touch)
+    final mem = _memoryCache.remove(cacheKey);
+    if (mem != null) {
+      _memoryCache[cacheKey] = mem;
+      if (mem.texts.length == lines.length) {
+        return _buildResultFromCache(lines, mem, fromMemory: true);
+      }
     }
 
     // 2. Check SharedPreferences cache
     final disk = await _readFromDiskCache(cacheKey);
     if (disk != null && disk.texts.length == lines.length) {
-      _memoryCache[cacheKey] = disk;
+      _putMemoryCache(cacheKey, disk);
       return _buildResultFromCache(lines, disk, fromMemory: false);
     }
 
@@ -126,10 +140,7 @@ class LyricsTranslationService {
         isRomanized: false,
       );
 
-      if (_memoryCache.length >= _maxMemoryEntries) {
-        _memoryCache.remove(_memoryCache.keys.first);
-      }
-      _memoryCache[cacheKey] = entry;
+      _putMemoryCache(cacheKey, entry);
       unawaited(_writeToDiskCache(cacheKey, entry));
 
       final updatedLines = List<LyricsLine>.generate(lines.length, (i) {
@@ -178,14 +189,17 @@ class LyricsTranslationService {
       romanize: true,
     );
 
-    final mem = _memoryCache[cacheKey];
-    if (mem != null && mem.texts.length == lines.length) {
-      return _buildResultFromCache(lines, mem, fromMemory: true);
+    final mem = _memoryCache.remove(cacheKey);
+    if (mem != null) {
+      _memoryCache[cacheKey] = mem;
+      if (mem.texts.length == lines.length) {
+        return _buildResultFromCache(lines, mem, fromMemory: true);
+      }
     }
 
     final disk = await _readFromDiskCache(cacheKey);
     if (disk != null && disk.texts.length == lines.length) {
-      _memoryCache[cacheKey] = disk;
+      _putMemoryCache(cacheKey, disk);
       return _buildResultFromCache(lines, disk, fromMemory: false);
     }
 
@@ -221,10 +235,7 @@ class LyricsTranslationService {
         isRomanized: true,
       );
 
-      if (_memoryCache.length >= _maxMemoryEntries) {
-        _memoryCache.remove(_memoryCache.keys.first);
-      }
-      _memoryCache[cacheKey] = entry;
+      _putMemoryCache(cacheKey, entry);
       unawaited(_writeToDiskCache(cacheKey, entry));
 
       final updatedLines = List<LyricsLine>.generate(lines.length, (i) {
@@ -512,18 +523,29 @@ class LyricsTranslationService {
   static Future<void> _writeToDiskCache(
     String key,
     _CachedTranslation entry,
-  ) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final map = {
-        'src': entry.sourceLanguage,
-        'tgt': entry.targetLanguage,
-        'texts': entry.texts,
-        'rm': entry.isRomanized,
-        'ts': DateTime.now().millisecondsSinceEpoch,
-      };
-      await prefs.setString('$_cachePrefix$key', jsonEncode(map));
-    } catch (_) {}
+  ) {
+    _diskIndexChain = _diskIndexChain.whenComplete(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final map = {
+          'src': entry.sourceLanguage,
+          'tgt': entry.targetLanguage,
+          'texts': entry.texts,
+          'rm': entry.isRomanized,
+          'ts': DateTime.now().millisecondsSinceEpoch,
+        };
+        await prefs.setString('$_cachePrefix$key', jsonEncode(map));
+        final index = prefs.getStringList(_diskIndexKey) ?? <String>[];
+        index.remove(key);
+        index.add(key);
+        while (index.length > _maxDiskEntries) {
+          final evicted = index.removeAt(0);
+          await prefs.remove('$_cachePrefix$evicted');
+        }
+        await prefs.setStringList(_diskIndexKey, index);
+      } catch (_) {}
+    });
+    return _diskIndexChain;
   }
 
   /// Clears in-memory and disk caches.
@@ -535,6 +557,7 @@ class LyricsTranslationService {
       for (final k in keys) {
         await prefs.remove(k);
       }
+      await prefs.remove(_diskIndexKey);
     } catch (_) {}
   }
 }

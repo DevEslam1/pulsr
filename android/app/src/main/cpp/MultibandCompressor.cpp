@@ -29,13 +29,15 @@ void MultibandCompressor::setSampleRate(double sampleRate) {
     // thump on the first block. LinkwitzRiley4::configure() already resets on a
     // rate change, but flush explicitly here so a stale register set can never
     // survive a rate swap (mirrors SubCrossover/LookaheadLimiter).
-    crossoverMid_.reset();
-    crossoverLow_.reset();
-    crossoverHigh_.reset();
-    // FIX M-11: the phase-compensation allpasses hold recursive state too; flush
-    // them on a rate swap alongside the crossovers so no stale register survives.
-    allpassLowPath_.reset();
-    allpassHighPath_.reset();
+    for (int p = 0; p < MAX_PAIRS; ++p) {
+        crossoverMid_[p].reset();
+        crossoverLow_[p].reset();
+        crossoverHigh_[p].reset();
+        // FIX M-11: the phase-compensation allpasses hold recursive state too; flush
+        // them on a rate swap alongside the crossovers so no stale register survives.
+        allpassLowPath_[p].reset();
+        allpassHighPath_[p].reset();
+    }
 }
 
 void MultibandCompressor::applyParams(const MultibandCompressorParamSet& params) {
@@ -54,15 +56,17 @@ void MultibandCompressor::updateCoefficients() {
     double f2hi = std::max(f2lo, sampleRate_ * 0.45);
     double f2 = std::clamp(params_.crossoverFreqs[2], f2lo, f2hi);
 
-    crossoverMid_.configure(sampleRate_, f1);
-    crossoverLow_.configure(sampleRate_, f0);
-    crossoverHigh_.configure(sampleRate_, f2);
-    // FIX M-11: phase-compensation allpasses mirror the sibling sub-crossover
-    // cutoffs (and Butterworth Q) so their allpass phase matches exactly: the low
-    // half is given crossoverHigh_'s allpass (f2), the high half crossoverLow_'s
-    // allpass (f0). configure() resets the LR4 state when the cutoff/rate moves.
-    allpassLowPath_.configure(sampleRate_, f2);
-    allpassHighPath_.configure(sampleRate_, f0);
+    for (int p = 0; p < MAX_PAIRS; ++p) {
+        crossoverMid_[p].configure(sampleRate_, f1);
+        crossoverLow_[p].configure(sampleRate_, f0);
+        crossoverHigh_[p].configure(sampleRate_, f2);
+        // FIX M-11: phase-compensation allpasses mirror the sibling sub-crossover
+        // cutoffs (and Butterworth Q) so their allpass phase matches exactly: the low
+        // half is given crossoverHigh_'s allpass (f2), the high half crossoverLow_'s
+        // allpass (f0). configure() resets the LR4 state when the cutoff/rate moves.
+        allpassLowPath_[p].configure(sampleRate_, f2);
+        allpassHighPath_[p].configure(sampleRate_, f0);
+    }
 
     for (int b = 0; b < NUM_BANDS; ++b) {
         const double attSec = std::clamp(params_.bands[b].attackMs, 0.1, 500.0) * 0.001;
@@ -77,11 +81,13 @@ void MultibandCompressor::updateCoefficients() {
 }
 
 void MultibandCompressor::reset() {
-    crossoverMid_.reset();
-    crossoverLow_.reset();
-    crossoverHigh_.reset();
-    allpassLowPath_.reset();
-    allpassHighPath_.reset();
+    for (int p = 0; p < MAX_PAIRS; ++p) {
+        crossoverMid_[p].reset();
+        crossoverLow_[p].reset();
+        crossoverHigh_[p].reset();
+        allpassLowPath_[p].reset();
+        allpassHighPath_[p].reset();
+    }
     smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
     for (int b = 0; b < NUM_BANDS; ++b) {
         envelope_[b] = 0.0;          // linear amplitude envelope, starts at silence
@@ -147,6 +153,11 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
     if (std::abs(smoothedEnabledMix_ - targetEnabledMix) < 1e-4f) {
         smoothedEnabledMix_ = targetEnabledMix;
     }
+    const int stride = channels;
+    const int activeChannels = std::min(channels, MAX_CHANNELS);
+    const int numPairs = activeChannels / 2;
+    const bool hasOddChannel = (activeChannels % 2) != 0;
+
     const float mixStep = (smoothedEnabledMix_ - startEnabledMix) / static_cast<float>(frames);
     float currentEnabledMix = startEnabledMix;
 
@@ -159,50 +170,82 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
         // 1. Split chunk into 4 frequency bands via Linkwitz-Riley 4th order
         //    crossovers, with allpass phase compensation for flat reconstruction.
         for (int i = 0; i < chunkFrames; ++i) {
-            const int inIdx = (offset + i) * channels;
-            const double inL = buffer[inIdx];
-            const double inR = (channels > 1) ? buffer[inIdx + 1] : inL;
+            const int frameBase = (offset + i) * stride;
+            for (int p = 0; p < numPairs; ++p) {
+                const int ch0 = p * 2;
+                const int ch1 = ch0 + 1;
+                double inL = buffer[frameBase + ch0];
+                double inR = buffer[frameBase + ch1];
+                if (!std::isfinite(inL)) inL = 0.0;
+                if (!std::isfinite(inR)) inR = 0.0;
 
-            double lowHalfL, lowHalfR, highHalfL, highHalfR;
-            crossoverMid_.process(inL, inR, lowHalfL, lowHalfR, highHalfL, highHalfR);
+                double lowHalfL, lowHalfR, highHalfL, highHalfR;
+                crossoverMid_[p].process(inL, inR, lowHalfL, lowHalfR, highHalfL, highHalfR);
 
-            // Allpass-compensate each half (LR4 allpass = LP + HP).
-            double apLpL, apLpR, apHpL, apHpR;
-            allpassLowPath_.process(lowHalfL, lowHalfR, apLpL, apLpR, apHpL, apHpR);
-            const double lowCompL = apLpL + apHpL;  // AP_f2(lowHalf)
-            const double lowCompR = apLpR + apHpR;
+                double apLpL, apLpR, apHpL, apHpR;
+                allpassLowPath_[p].process(lowHalfL, lowHalfR, apLpL, apLpR, apHpL, apHpR);
+                const double lowCompL = apLpL + apHpL;
+                const double lowCompR = apLpR + apHpR;
 
-            allpassHighPath_.process(highHalfL, highHalfR, apLpL, apLpR, apHpL, apHpR);
-            const double highCompL = apLpL + apHpL; // AP_f0(highHalf)
-            const double highCompR = apLpR + apHpR;
+                allpassHighPath_[p].process(highHalfL, highHalfR, apLpL, apLpR, apHpL, apHpR);
+                const double highCompL = apLpL + apHpL;
+                const double highCompR = apLpR + apHpR;
 
-            double b0L, b0R, b1L, b1R;
-            crossoverLow_.process(lowCompL, lowCompR, b0L, b0R, b1L, b1R);
+                double b0L, b0R, b1L, b1R;
+                crossoverLow_[p].process(lowCompL, lowCompR, b0L, b0R, b1L, b1R);
 
-            double b2L, b2R, b3L, b3R;
-            crossoverHigh_.process(highCompL, highCompR, b2L, b2R, b3L, b3R);
+                double b2L, b2R, b3L, b3R;
+                crossoverHigh_[p].process(highCompL, highCompR, b2L, b2R, b3L, b3R);
 
-            bandBufferL_[0][i] = static_cast<float>(b0L);
-            bandBufferR_[0][i] = static_cast<float>(b0R);
-            bandBufferL_[1][i] = static_cast<float>(b1L);
-            bandBufferR_[1][i] = static_cast<float>(b1R);
-            bandBufferL_[2][i] = static_cast<float>(b2L);
-            bandBufferR_[2][i] = static_cast<float>(b2R);
-            bandBufferL_[3][i] = static_cast<float>(b3L);
-            bandBufferR_[3][i] = static_cast<float>(b3R);
+                bandBuffer_[0][ch0][i] = static_cast<float>(b0L);
+                bandBuffer_[0][ch1][i] = static_cast<float>(b0R);
+                bandBuffer_[1][ch0][i] = static_cast<float>(b1L);
+                bandBuffer_[1][ch1][i] = static_cast<float>(b1R);
+                bandBuffer_[2][ch0][i] = static_cast<float>(b2L);
+                bandBuffer_[2][ch1][i] = static_cast<float>(b2R);
+                bandBuffer_[3][ch0][i] = static_cast<float>(b3L);
+                bandBuffer_[3][ch1][i] = static_cast<float>(b3R);
+            }
+            if (hasOddChannel) {
+                const int chLast = activeChannels - 1;
+                const int p = chLast / 2;
+                double inLast = buffer[frameBase + chLast];
+                if (!std::isfinite(inLast)) inLast = 0.0;
+
+                double lowHalfL, lowHalfR, highHalfL, highHalfR;
+                crossoverMid_[p].process(inLast, inLast, lowHalfL, lowHalfR, highHalfL, highHalfR);
+
+                double apLpL, apLpR, apHpL, apHpR;
+                allpassLowPath_[p].process(lowHalfL, lowHalfR, apLpL, apLpR, apHpL, apHpR);
+                const double lowCompL = apLpL + apHpL;
+
+                allpassHighPath_[p].process(highHalfL, highHalfR, apLpL, apLpR, apHpL, apHpR);
+                const double highCompL = apLpL + apHpL;
+
+                double b0L, b0R, b1L, b1R;
+                crossoverLow_[p].process(lowCompL, lowCompL, b0L, b0R, b1L, b1R);
+
+                double b2L, b2R, b3L, b3R;
+                crossoverHigh_[p].process(highCompL, highCompL, b2L, b2R, b3L, b3R);
+
+                bandBuffer_[0][chLast][i] = static_cast<float>(b0L);
+                bandBuffer_[1][chLast][i] = static_cast<float>(b1L);
+                bandBuffer_[2][chLast][i] = static_cast<float>(b2L);
+                bandBuffer_[3][chLast][i] = static_cast<float>(b3L);
+            }
         }
 
-        // 2. Process dynamic compression per band and sum back with dB-domain ballistics
+        // 2. Process dynamic compression per band (linked across active channels)
         for (int b = 0; b < NUM_BANDS; ++b) {
             for (int i = 0; i < chunkFrames; ++i) {
-                const float sL = bandBufferL_[b][i];
-                const float sR = bandBufferR_[b][i];
-
-                const double peak = std::max(std::abs(static_cast<double>(sL)), std::abs(static_cast<double>(sR)));
+                double peak = 0.0;
+                for (int ch = 0; ch < activeChannels; ++ch) {
+                    const double mag = std::abs(static_cast<double>(bandBuffer_[b][ch][i]));
+                    if (mag > peak) peak = mag;
+                }
                 const double envDb = (peak > 1e-6) ? (20.0 * std::log10(peak)) : -120.0;
                 const double targetGainDb = computeBandGain(b, envDb);
 
-                // Smooth gain reduction with attack/release ballistics in dB domain
                 const double coeff = (targetGainDb < smoothedGainDb_[b]) ? attackCoeff_[b] : releaseCoeff_[b];
                 smoothedGainDb_[b] = coeff * smoothedGainDb_[b] + (1.0 - coeff) * targetGainDb;
                 currentGainReductionDb_[b] = smoothedGainDb_[b];
@@ -210,19 +253,15 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
                 const double totalGainDb = smoothedGainDb_[b] + smoothedMakeupDb_[b];
                 const float linearGain = static_cast<float>(std::pow(10.0, totalGainDb / 20.0));
 
-                bandBufferL_[b][i] *= linearGain;
-                bandBufferR_[b][i] *= linearGain;
+                for (int ch = 0; ch < activeChannels; ++ch) {
+                    bandBuffer_[b][ch][i] *= linearGain;
+                }
             }
         }
 
         // 3. Recombine all 4 bands into output buffer with equal-power wet/dry crossfade
         for (int i = 0; i < chunkFrames; ++i) {
-            const int outIdx = (offset + i) * channels;
-            const float inL = buffer[outIdx];
-            const float inR = (channels > 1) ? buffer[outIdx + 1] : inL;
-
-            const float wetL = bandBufferL_[0][i] + bandBufferL_[1][i] + bandBufferL_[2][i] + bandBufferL_[3][i];
-            const float wetR = bandBufferR_[0][i] + bandBufferR_[1][i] + bandBufferR_[2][i] + bandBufferR_[3][i];
+            const int frameBase = (offset + i) * stride;
 
             float dryW, wetW;
             if (currentEnabledMix >= 0.9999f) {
@@ -237,9 +276,13 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
                 wetW = std::sin(angle);
             }
 
-            buffer[outIdx] = dryW * inL + wetW * wetL;
-            if (channels > 1) {
-                buffer[outIdx + 1] = dryW * inR + wetW * wetR;
+            for (int ch = 0; ch < activeChannels; ++ch) {
+                float inCh = buffer[frameBase + ch];
+                if (!std::isfinite(inCh)) inCh = 0.0f;
+                float wetCh = bandBuffer_[0][ch][i] + bandBuffer_[1][ch][i] +
+                              bandBuffer_[2][ch][i] + bandBuffer_[3][ch][i];
+                if (!std::isfinite(wetCh)) wetCh = 0.0f;
+                buffer[frameBase + ch] = dryW * inCh + wetW * wetCh;
             }
             currentEnabledMix += mixStep;
         }

@@ -41,9 +41,11 @@ extension PlayerPlaybackOptionsTrackState on PlayerPlaybackOptionsController {
   }
 
   /// Track-change hook: clears a stale loop scoped to the previous track,
-  /// restores any persisted loop for [song], seeds the per-track delay from the
-  /// engine, and mirrors both into state.
+  /// restores any persisted loop for [song], seeds the per-track delay, rating,
+  /// volume override, and bookmark prompt from the engine/stores, and mirrors
+  /// them into state so previous-track values never leak onto [song].
   Future<void> onCurrentSongChanged(SongsTableData song) async {
+    _syncPerTrackState(song);
     _syncTrackDelayFromHandler();
     if (_abLoopManagerOrNull != null) {
       try {
@@ -58,6 +60,40 @@ extension PlayerPlaybackOptionsTrackState on PlayerPlaybackOptionsController {
     _syncAbLoopFromHandler();
     await handleTrackChangeQuranMode(song);
     await _applyPerSongEqForTrack(song);
+  }
+
+  /// Resets and loads per-track rating, volume override, and bookmark position
+  /// for [song] so values from the previous track cannot leak across transitions.
+  void _syncPerTrackState(SongsTableData song) {
+    if (_isClosed()) return;
+    final s = _getState();
+    if (s.currentSong != null && s.currentSong!.id != song.id) return;
+    final key = song.id.toString();
+    int rating = 0;
+    try {
+      rating = _songRatingStore.getRating(key);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read song rating for $key',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+    }
+    double gainDb = 0.0;
+    try {
+      gainDb = _perSongVolumeStore.getGainDbForTrack(key);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read per-song volume gain for $key',
+          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+    }
+    final bookmark = storedBookmarkFor(song);
+    final bookmarkPos = (bookmark != null && bookmark.positionMs > 0)
+        ? Duration(milliseconds: bookmark.positionMs)
+        : null;
+    _emit(s.copyWith(
+      playback: s.playback.copyWith(
+        currentSongRating: rating,
+        currentSongVolumeOverrideDb: gainDb,
+        bookmarkPosition: bookmarkPos,
+      ),
+    ));
   }
 
   /// Mirrors the stored per-song EQ override into state and hands it to the

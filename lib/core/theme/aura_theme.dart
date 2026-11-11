@@ -314,26 +314,79 @@ class AuraTheme {
     return Color.lerp(gold, Colors.black, amount)!;
   }
 
+  static double _contrastRatio(Color fg, Color bg) {
+    final l1 = fg.computeLuminance();
+    final l2 = bg.computeLuminance();
+    return l1 > l2 ? (l1 + 0.05) / (l2 + 0.05) : (l2 + 0.05) / (l1 + 0.05);
+  }
+
   /// Darkens bright brand/status colours used as foreground text or icons on
-  /// a light surface until they clear the WCAG AA body-text threshold.
-  static Color _lightReadable(Color color, double amount) {
-    if (color.computeLuminance() <= 0.10) return color;
-    return Color.lerp(color, Colors.black, amount)!;
+  /// a light surface until they clear the WCAG AA/AAA body-text threshold,
+  /// including against an accent-tinted container on [Colors.white].
+  static Color _lightReadable(
+    Color color,
+    double amount, {
+    double minContrast = 4.55,
+    double containerAlpha = 0.12,
+  }) {
+    var candidate = color.computeLuminance() <= 0.10
+        ? color
+        : Color.lerp(color, Colors.black, amount)!;
+    var step = amount;
+    while (step < 0.92) {
+      final onSurface = _contrastRatio(candidate, Colors.white);
+      final blendedContainer = Color.alphaBlend(
+        candidate.withValues(alpha: containerAlpha),
+        Colors.white,
+      );
+      final onContainer = _contrastRatio(candidate, blendedContainer);
+      if (onSurface >= minContrast && onContainer >= 4.55) {
+        break;
+      }
+      step += 0.04;
+      candidate = Color.lerp(color, Colors.black, step.clamp(0.0, 0.92))!;
+    }
+    return candidate;
+  }
+
+  /// Lightens dark accents on dark surfaces if needed so they always clear
+  /// WCAG AA/AAA against [surface] and [accentContainer].
+  static Color _darkReadable(
+    Color color, {
+    required Color surface,
+    required double minContrast,
+    required double containerAlpha,
+  }) {
+    var candidate = color;
+    var step = 0.0;
+    while (step < 0.88) {
+      final onSurface = _contrastRatio(candidate, surface);
+      final blendedContainer = Color.alphaBlend(
+        candidate.withValues(alpha: containerAlpha),
+        surface,
+      );
+      final onContainer = _contrastRatio(candidate, blendedContainer);
+      if (onSurface >= minContrast && onContainer >= 4.55) {
+        break;
+      }
+      step += 0.04;
+      candidate = Color.lerp(color, Colors.white, step.clamp(0.0, 0.88))!;
+    }
+    return candidate;
   }
 
   static PulsrPalette _palette(
       Color accent, Brightness brightness, bool isAmoled,
       {bool dimWhitePoint = false, bool isHighContrast = false}) {
     final isDark = brightness == Brightness.dark;
-    // WCAG-correct black/white decision point (~0.179), matching [textOnAccent].
-    // The old 0.5 threshold picked white text on mid-luminance accents where
-    // dark text has higher contrast, dropping onPrimary/button labels below AA.
-    final onAccent =
-        accent.computeLuminance() > 0.179 ? AppColors.onBright : Colors.white;
 
     if (!isDark) {
-      final readableAccent =
-          _lightReadable(accent, isHighContrast ? 0.62 : 0.30);
+      final readableAccent = _lightReadable(
+        accent,
+        isHighContrast ? 0.62 : 0.30,
+        minContrast: isHighContrast ? 7.05 : 4.55,
+        containerAlpha: isHighContrast ? 0.22 : 0.12,
+      );
       final readableSuccess =
           _lightReadable(AppColors.success, isHighContrast ? 0.40 : 0.30);
       final readableError =
@@ -415,12 +468,28 @@ class AuraTheme {
       );
     }
 
+    final darkSurface = isHighContrast
+        ? const Color(0xFF050506)
+        : (isAmoled ? const Color(0xFF0B0B0E) : const Color(0xFF12121A));
+    final darkContainerAlpha =
+        isHighContrast ? 0.26 : (isAmoled ? 0.16 : 0.14);
+    final effectiveDarkAccent = _darkReadable(
+      accent,
+      surface: darkSurface,
+      minContrast: isHighContrast ? 7.05 : 4.55,
+      containerAlpha: darkContainerAlpha,
+    );
+    // WCAG-correct black/white decision point (~0.179), matching [textOnAccent].
+    final onAccent = effectiveDarkAccent.computeLuminance() > 0.179
+        ? AppColors.onBright
+        : Colors.white;
+
     if (isHighContrast) {
       return PulsrPalette(
-        accent: accent,
+        accent: effectiveDarkAccent,
         onAccent: onAccent,
-        accentContainer: accent.withValues(alpha: 0.26),
-        glow: accent.withValues(alpha: 0.50),
+        accentContainer: effectiveDarkAccent.withValues(alpha: 0.26),
+        glow: effectiveDarkAccent.withValues(alpha: 0.50),
         bg: Colors.black,
         surface: const Color(0xFF050506),
         surfaceContainer: const Color(0xFF111114),
@@ -432,8 +501,8 @@ class AuraTheme {
         scrimHeavy: AppColors.scrimAt(0.85),
         borderSubtle: Colors.white.withValues(alpha: 0.35),
         borderStrong: Colors.white.withValues(alpha: 0.70),
-        accentSoft: accent.withValues(alpha: 0.20),
-        accentMedium: accent.withValues(alpha: 0.35),
+        accentSoft: effectiveDarkAccent.withValues(alpha: 0.20),
+        accentMedium: effectiveDarkAccent.withValues(alpha: 0.35),
         successSoft: AppColors.success.withValues(alpha: 0.25),
         errorSoft: AppColors.error.withValues(alpha: 0.25),
         warningSoft: AppColors.warning.withValues(alpha: 0.25),
@@ -451,10 +520,10 @@ class AuraTheme {
     }
     if (isAmoled) {
       return PulsrPalette(
-        accent: accent,
+        accent: effectiveDarkAccent,
         onAccent: onAccent,
-        accentContainer: accent.withValues(alpha: 0.16),
-        glow: accent.withValues(alpha: 0.30),
+        accentContainer: effectiveDarkAccent.withValues(alpha: 0.16),
+        glow: effectiveDarkAccent.withValues(alpha: 0.30),
         bg: Colors.black,
         surface: const Color(0xFF0B0B0E),
         surfaceContainer: const Color(0xFF121216),
@@ -466,8 +535,8 @@ class AuraTheme {
         scrimHeavy: AppColors.scrimAt(0.85),
         borderSubtle: AppColors.specularAt(0.08),
         borderStrong: AppColors.specularAt(0.20),
-        accentSoft: accent.withValues(alpha: 0.12),
-        accentMedium: accent.withValues(alpha: 0.25),
+        accentSoft: effectiveDarkAccent.withValues(alpha: 0.12),
+        accentMedium: effectiveDarkAccent.withValues(alpha: 0.25),
         successSoft: AppColors.success.withValues(alpha: 0.15),
         errorSoft: AppColors.error.withValues(alpha: 0.15),
         warningSoft: AppColors.warning.withValues(alpha: 0.15),
@@ -485,10 +554,10 @@ class AuraTheme {
       );
     }
     return PulsrPalette(
-      accent: accent,
+      accent: effectiveDarkAccent,
       onAccent: onAccent,
-      accentContainer: accent.withValues(alpha: 0.14),
-      glow: accent.withValues(alpha: 0.28),
+      accentContainer: effectiveDarkAccent.withValues(alpha: 0.14),
+      glow: effectiveDarkAccent.withValues(alpha: 0.28),
       bg: const Color(0xFF0A0A0F),
       surface: const Color(0xFF12121A),
       surfaceContainer: const Color(0xFF1A1A24),
@@ -500,8 +569,8 @@ class AuraTheme {
       scrimHeavy: AppColors.scrimAt(0.70),
       borderSubtle: AppColors.specularAt(0.08),
       borderStrong: AppColors.specularAt(0.18),
-      accentSoft: accent.withValues(alpha: 0.12),
-      accentMedium: accent.withValues(alpha: 0.25),
+      accentSoft: effectiveDarkAccent.withValues(alpha: 0.12),
+      accentMedium: effectiveDarkAccent.withValues(alpha: 0.25),
       successSoft: AppColors.success.withValues(alpha: 0.15),
       errorSoft: AppColors.error.withValues(alpha: 0.15),
       warningSoft: AppColors.warning.withValues(alpha: 0.15),

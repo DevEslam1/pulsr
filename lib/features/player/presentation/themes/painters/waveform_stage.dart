@@ -451,7 +451,7 @@ class _GraphicSpectrumHudState extends State<_GraphicSpectrumHud> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A0C12).withValues(alpha: 0.85),
+        color: AppColors.logoInk.withValues(alpha: 0.85),
         borderRadius: AppRadii.r8All,
         border: Border.all(
           color: widget.activeColor.withValues(alpha: 0.28),

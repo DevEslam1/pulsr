@@ -15,6 +15,7 @@ public final class AaudioNativeBridge {
     public static final int ENCODING_PCM_I16 = 1;
     public static final int ENCODING_PCM_FLOAT = 2;
     public static final int ENCODING_PCM_I24_PACKED = 3;
+    public static final int ENCODING_PCM_I32 = 4;
 
     private static volatile boolean loadAttempted = false;
     private static boolean available = false;

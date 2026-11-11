@@ -7,6 +7,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 
 import '../../../core/config/app_config.dart';
@@ -360,8 +361,8 @@ class _SearchViewState extends State<_SearchView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AnimatedSize(
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
+                  duration: context.motion(PulsrMotion.state),
+                  curve: context.motionCurve(PulsrMotion.enter),
                   alignment: Alignment.topCenter,
                   child: compactHeader
                       ? const SizedBox(height: AppSpacing.xs)
@@ -421,7 +422,7 @@ class _SearchViewState extends State<_SearchView> {
         );
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
+      duration: context.motion(PulsrMotion.state),
       decoration: BoxDecoration(
         borderRadius: AppRadii.r16All,
         boxShadow: _hasFocus

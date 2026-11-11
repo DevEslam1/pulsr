@@ -35,6 +35,7 @@ public:
         Int16 = 1,       // AAUDIO_FORMAT_PCM_I16
         Float = 2,       // AAUDIO_FORMAT_PCM_FLOAT
         I24Packed = 3,   // AAUDIO_FORMAT_PCM_I24_PACKED (DoP carrier)
+        Int32 = 4,       // AAUDIO_FORMAT_PCM_I32 (API 31+)
     };
 
     struct Config {

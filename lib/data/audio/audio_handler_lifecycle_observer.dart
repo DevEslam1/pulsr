@@ -40,7 +40,10 @@ class AudioHandlerLifecycleObserver with WidgetsBindingObserver {
         break;
       case AppLifecycleState.hidden:
         if (onHidden != null) {
-          onHidden!();
+          if (!_inBackground) {
+            _inBackground = true;
+            onHidden!();
+          }
         } else {
           _enterBackground();
         }

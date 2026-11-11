@@ -84,10 +84,8 @@ class SleepTimerManager {
   }) {
     startSleepTimer(
       duration,
-      getActivePlayer: playerGetter ??
-          _lastPlayerGetter ??
-          () => throw StateError('No player available'),
-      onTimerExpired: onExpired ?? _onTimerExpiredCallback ?? () async {},
+      getActivePlayer: playerGetter ?? _lastPlayerGetter,
+      onTimerExpired: onExpired ?? _onTimerExpiredCallback,
     );
   }
 
@@ -137,9 +135,11 @@ class SleepTimerManager {
   void startSleepTimer(
     Duration duration, {
     bool fadeOut = true,
-    required Future<void> Function() onTimerExpired,
-    required AudioPlayer Function() getActivePlayer,
+    Future<void> Function()? onTimerExpired,
+    AudioPlayer Function()? getActivePlayer,
   }) {
+    final previousExpiredCallback = _onTimerExpiredCallback;
+    final previousPlayerGetter = _lastPlayerGetter;
     cancelSleepTimer();
     if (duration <= Duration.zero) return;
 
@@ -147,8 +147,8 @@ class SleepTimerManager {
     _mode = SleepTimerMode.duration;
     _remainingDuration = duration;
     _isFadeOutEnabled = fadeOut;
-    _onTimerExpiredCallback = onTimerExpired;
-    _lastPlayerGetter = getActivePlayer;
+    _onTimerExpiredCallback = onTimerExpired ?? previousExpiredCallback;
+    _lastPlayerGetter = getActivePlayer ?? previousPlayerGetter;
     final currentToken = ++_sleepFadeToken;
 
     if (!_sleepTimerRemainingSubject.isClosed) {
@@ -182,7 +182,14 @@ class SleepTimerManager {
         return;
       }
 
-      final player = _lastPlayerGetter?.call();
+      AudioPlayer? player;
+      if (_lastPlayerGetter != null) {
+        try {
+          player = _lastPlayerGetter!();
+        } catch (_) {
+          player = null;
+        }
+      }
       final isPlaying = player?.playing ?? true;
       if (!countDownWhilePaused && !isPlaying) {
         // Paused: countdown suspended while playback is paused
@@ -422,7 +429,14 @@ class SleepTimerManager {
     _isArmed = false;
     _sleepCountdownTickerCancel();
 
-    final player = _lastPlayerGetter?.call();
+    AudioPlayer? player;
+    if (_lastPlayerGetter != null) {
+      try {
+        player = _lastPlayerGetter!();
+      } catch (_) {
+        player = null;
+      }
+    }
     if ((_nativeCurveArmed || _nativeCurveArming) && player != null) {
       // The armed curve is a multiplier on the player's base volume. Clearing
       // it restores unity instantly, so silence the base first; otherwise a
@@ -457,32 +471,39 @@ class SleepTimerManager {
         player.playing) {
       await _fadeBeforePause(player, token);
     }
+    var expiredPaused = false;
     try {
       if (_onTimerExpiredCallback != null) {
         await _onTimerExpiredCallback!();
+        expiredPaused = true;
+      } else if (player != null) {
+        await player.pause();
+        expiredPaused = true;
       }
     } catch (e, st) {
       ErrorLogger.log('Error triggering sleep timer callback',
           error: e, stackTrace: st, category: 'SleepTimer');
     } finally {
-      if (onFadeFactor != null) {
-        // Coordinated mode: hand volume authority back to the handler by
-        // releasing the fade factor; it re-applies the clean, duck-aware
-        // target itself (the player is paused by now, so this just leaves the
-        // right level for the next resume). Never a stale/ducked snapshot.
-        try {
-          onFadeFactor!(1.0);
-        } catch (_) {}
-      } else if (_preFadeVolume != null && player != null) {
-        // Standalone mode: restore the pre-fade volume cleanly — but only if
-        // the player is still sitting at (or below) the faded level. If the
-        // user touched volume mid-fade, don't clobber their choice.
-        try {
-          final current = player.volume;
-          if (current <= _preFadeVolume! + 0.02) {
-            await player.setVolume(_preFadeVolume!.clamp(0.0, 1.0));
-          }
-        } catch (_) {}
+      if (expiredPaused) {
+        if (onFadeFactor != null) {
+          // Coordinated mode: hand volume authority back to the handler by
+          // releasing the fade factor; it re-applies the clean, duck-aware
+          // target itself (the player is paused by now, so this just leaves the
+          // right level for the next resume). Never a stale/ducked snapshot.
+          try {
+            onFadeFactor!(1.0);
+          } catch (_) {}
+        } else if (_preFadeVolume != null && player != null) {
+          // Standalone mode: restore the pre-fade volume cleanly — but only if
+          // the player is still sitting at (or below) the faded level. If the
+          // user touched volume mid-fade, don't clobber their choice.
+          try {
+            final current = player.volume;
+            if (current <= _preFadeVolume! + 0.02) {
+              await player.setVolume(_preFadeVolume!.clamp(0.0, 1.0));
+            }
+          } catch (_) {}
+        }
       }
       _preFadeVolume = null;
       _clearPersistedState();
@@ -508,10 +529,16 @@ class SleepTimerManager {
     _sleepCountdownTickerCancel();
     _remainingDuration = Duration.zero;
     _remainingTracks = 0;
-    _onTimerExpiredCallback = null;
 
+    AudioPlayer? player;
     if (_lastPlayerGetter != null) {
-      final player = _lastPlayerGetter!();
+      try {
+        player = _lastPlayerGetter!();
+      } catch (_) {
+        player = null;
+      }
+    }
+    if (player != null) {
       if (_nativeCurveArmed || _nativeCurveArming) {
         try {
           player.dspClearGainCurve().catchError((_) => false);

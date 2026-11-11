@@ -215,9 +215,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var bitPerfectSpatializerOwned = false
     private var systemEffectsPolicy = "auto"
 
-    /** Only touch app-owned HAL effects; the global Spatializer follows the
-     * user's system policy and is restored only if we actually disabled it. */
-    private fun reconcileBitPerfectHal(bypass: Boolean): Boolean {
+    /** Last external (vendor/OEM) effect verdict, recorded so diagnostics and
+     * the output-path verdict can report the chain as unverified instead of
+     * pretending nothing else touches the signal. */
+    @Volatile private var lastSystemEffectsStatus: String = "unknown"
+    @Volatile private var bitPerfectSystemEffectsActive = false
+
+    /** App-owned HAL effects must follow the bypass: they sit on the app's own
+     * audio session, so one left running colours a stream we call bit-perfect.
+     * Returns false only when an effect we control refused the change. */
+    private fun reconcileAppOwnedHal(bypass: Boolean): Boolean {
         var complete = true
         fun update(effect: AudioEffect?, enabled: Boolean) {
             if (effect == null) return
@@ -233,37 +240,58 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             update(bassBoost, false)
             update(dynamicsProcessing, false)
         }
+        return complete
+    }
+
+    /** Re-enable the app-owned HAL stages a bypass muted, using the user's live
+     * flags rather than the bypass snapshot. Shared by the normal disable path
+     * and by a refused enable, which must leave the chain exactly as it was. */
+    private fun restoreAppOwnedStagesAfterBypass() {
+        try { virtualizer?.enabled = isVirtualizerEnabled } catch (_: Exception) {}
+        try { loudnessEnhancer?.enabled = volumeBoostMilliBels > 0 } catch (_: Exception) {}
+        try { bassBoost?.enabled = bassBoostStrength > 0 } catch (_: Exception) {}
+        // Same suppression-aware DP enable rule as everywhere else.
+        updateDpEnabled()
+        updateLegacyEqualizer()
+    }
+
+    /** Vendor effects (Dolby/Dirac/SoundAlive/DAP) live on the output mix and
+     * are frequently un-attachable for a third-party app; the platform
+     * Spatializer is a user-facing system switch. Both are best effort: their
+     * state is recorded, never used to reject a bypass the app itself applied.
+     * Blocking on them made Bit-Perfect impossible on OEM devices (and under the
+     * "leave on" system-effects policy) even though the app-owned DSP had
+     * already been bypassed. */
+    private fun applyExternalSystemEffects(bypass: Boolean): SystemAudioEffectsController.Status? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
             try {
                 val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 val spatializer = am?.spatializer
                 if (spatializer != null && spatializer.isAvailable) {
-                    if (bypass && spatializer.isEnabled) {
-                        if (systemEffectsPolicy == "leaveOn") {
-                            complete = false
-                        } else {
-                            spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
-                                .invoke(spatializer, false)
-                            if (spatializer.isEnabled) complete = false
-                            else bitPerfectSpatializerOwned = true
-                        }
+                    if (bypass && spatializer.isEnabled && systemEffectsPolicy != "leaveOn") {
+                        spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
+                            .invoke(spatializer, false)
+                        bitPerfectSpatializerOwned = !spatializer.isEnabled
                     } else if (!bypass && bitPerfectSpatializerOwned) {
                         if (!spatializer.isEnabled) {
                             spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
                                 .invoke(spatializer, true)
                         }
                         if (spatializer.isEnabled) bitPerfectSpatializerOwned = false
-                        else complete = false
                     }
                 }
-            } catch (_: Throwable) { complete = false }
+            } catch (_: Throwable) {}
         }
-        val external = systemAudioEffectsController?.applyPolicy(systemEffectsPolicy, bypass)
-        if (bypass && external != null && external !in listOf(
-                SystemAudioEffectsController.Status.BYPASSED,
-                SystemAudioEffectsController.Status.UNSUPPORTED_DEVICE)) complete = false
-        return complete
+        return systemAudioEffectsController?.applyPolicy(systemEffectsPolicy, bypass)
     }
+
+    private fun recordSystemEffects(status: SystemAudioEffectsController.Status?, bypass: Boolean) {
+        lastSystemEffectsStatus = status?.value ?: "unknown"
+        bitPerfectSystemEffectsActive = bypass && status != null && status !in listOf(
+            SystemAudioEffectsController.Status.BYPASSED,
+            SystemAudioEffectsController.Status.UNSUPPORTED_DEVICE)
+    }
+
     // Dither / bit-perfect snapshot state (mirrors DspParams.h defaults).
     // Default depth is 16: the native PCM sink is 16-bit, so that is the only
     // depth the always-on path can actually honour. Must match DspParams.h and
@@ -357,6 +385,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
         }
         return false
+    }
+
+    /** Structured refusal so the Dart layer can show the platform reason instead
+     * of a generic "failed" toast. */
+    private fun notAppliedResult(reason: String): Map<String, Any?> {
+        notApplied(reason)
+        return mapOf("applied" to false, "reason" to reason)
     }
 
     // Deduplication caches for native effect parameter pushes (W7)
@@ -3599,6 +3634,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setBypassDspForBitPerfect" -> {
                     val bypass = call.argument<Boolean>("bypass") ?: false
                     val isDop = bypass && (call.argument<Boolean>("isDop") ?: isDopActive)
+                    // Snapshot the truthful state first: a refused request must not
+                    // leave the plugin (or the native chain) on the value the Dart
+                    // layer is about to roll back, otherwise the retry with the same
+                    // value silently skips the apply path and can never recover.
+                    val previousBypass = isBitPerfectBypassActive
+                    val previousDop = isDopActive
+                    var failure: String? = null
                     synchronized(stateLock) {
                         if (bypass != isBitPerfectBypassActive || isDop != isDopActive) {
                             if (bypass && !isBitPerfectBypassActive) bypassSavedStages = activeDspStages
@@ -3622,51 +3664,68 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                                 try {
                                     nativeSetBitPerfectParams(bypass, isDop)
                                 } catch (e: Throwable) {
-                                    result.success(notApplied("Bit-perfect bypass failed: ${e.message}"))
-                                    return
+                                    failure = "Bit-perfect bypass failed: ${e.message}"
                                 }
                             }
-                            isBitPerfectBypassActive = bypass
-                            isDopActive = isDop
-                            if (bypass) {
-                                // Immediately disable virtualizer/loudness/bass + native stages
-                                try { virtualizer?.enabled = false } catch (_: Exception) {}
-                                try { loudnessEnhancer?.enabled = false } catch (_: Exception) {}
-                                try { bassBoost?.enabled = false } catch (_: Exception) {}
-                                try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
-                                recalculateActiveStages()
-                            } else {
-                                recalculateActiveStages()
-                                try { virtualizer?.enabled = isVirtualizerEnabled } catch (_: Exception) {}
-                                try { loudnessEnhancer?.enabled = volumeBoostMilliBels > 0 } catch (_: Exception) {}
-                                try { bassBoost?.enabled = bassBoostStrength > 0 } catch (_: Exception) {}
-                                // Same suppression-aware DP enable rule as everywhere else.
-                                updateDpEnabled()
-                                updateLegacyEqualizer()
-                                restoreNativeStateAfterBypass()
-                                // Hearing-safety: re-establish DVC after leaving bit-perfect.
-                                // Fade down before restoring stream volume to max, then fade back up to dvcGain.
-                                if (dvcEnabled && isNativeDspLoaded) {
-                                    dvcActive = true
-                                    try {
-                                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                                        if (am != null) {
-                                            val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                                            if (max > 0) {
-                                                try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
+                            if (failure == null) {
+                                isBitPerfectBypassActive = bypass
+                                isDopActive = isDop
+                                if (bypass) {
+                                    // Immediately disable virtualizer/loudness/bass + native stages
+                                    try { virtualizer?.enabled = false } catch (_: Exception) {}
+                                    try { loudnessEnhancer?.enabled = false } catch (_: Exception) {}
+                                    try { bassBoost?.enabled = false } catch (_: Exception) {}
+                                    try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
+                                    recalculateActiveStages()
+                                } else {
+                                    recalculateActiveStages()
+                                    restoreAppOwnedStagesAfterBypass()
+                                    restoreNativeStateAfterBypass()
+                                    // Hearing-safety: re-establish DVC after leaving bit-perfect.
+                                    // Fade down before restoring stream volume to max, then fade back up to dvcGain.
+                                    if (dvcEnabled && isNativeDspLoaded) {
+                                        dvcActive = true
+                                        try {
+                                            val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                                            if (am != null) {
+                                                val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                                                if (max > 0) {
+                                                    try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
+                                                    am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
+                                                }
                                             }
-                                        }
-                                    } catch (_: Throwable) {}
-                                    try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
+                                        } catch (_: Throwable) {}
+                                        try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
+                                    }
                                 }
                             }
                         }
+                        // App-owned HAL stages are the only ones allowed to veto:
+                        // they run on our own session, so one left enabled would
+                        // colour a stream we call bit-perfect. Put everything back
+                        // when one refuses instead of failing half-applied.
+                        if (failure == null && !reconcileAppOwnedHal(bypass)) {
+                            isBitPerfectBypassActive = previousBypass
+                            isDopActive = previousDop
+                            if (previousBypass) {
+                                recalculateActiveStages()
+                            } else {
+                                restoreAppOwnedStagesAfterBypass()
+                                // Re-assert the native snapshot the bypass replaced.
+                                restoreNativeStateAfterBypass()
+                            }
+                            failure = "Bit-perfect HAL effect cleanup incomplete"
+                        }
                     }
-                    // Retry cleanup even on repeated bypass requests. Never
-                    // advertise success while a HAL/global stage still runs.
-                    result.success(if (reconcileBitPerfectHal(bypass)) true
-                        else notApplied("Bit-perfect HAL/system effect cleanup incomplete"))
+                    // Vendor/OEM effects and the platform Spatializer are recorded,
+                    // never a veto: they belong to the system policy and the output
+                    // route, and rejecting the request made Bit-Perfect unreachable
+                    // on devices that refuse session-0 effect control. A refused
+                    // request re-applies the previous state instead of the target.
+                    val externalTarget = if (failure == null) bypass else previousBypass
+                    recordSystemEffects(applyExternalSystemEffects(externalTarget), externalTarget)
+                    val reason = failure
+                    result.success(if (reason == null) true else notAppliedResult(reason))
                 }
 
                 "setDitherParams" -> {
@@ -4193,6 +4252,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "isSessionAttached" to isEffectPipelineAttached(),
             "dspPreference" to dspPreference,
             "isBitPerfectBypassActive" to isBitPerfectBypassActive,
+            "systemEffectsStatus" to lastSystemEffectsStatus,
+            "systemEffectsCompromised" to bitPerfectSystemEffectsActive,
             "isNativeDspLoaded" to isNativeDspLoaded,
             "appliedSampleRate" to nativeAppliedSampleRate,
             "lastAppliedGeneration" to nativeLastAppliedGeneration,

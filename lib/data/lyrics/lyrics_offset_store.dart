@@ -14,13 +14,20 @@ class LyricsOffsetStore {
   static const String _indexKey = 'lyrics_offset_index_v1';
   static const int maxEntries = 500;
 
-  /// Serializes all read-modify-write operations on [_indexKey]. Without this,
-  /// two concurrent `setOffsetMs` calls can each read the same index snapshot
-  /// and the second write silently drops the first key. Shared by every
+  /// Serializes all read-modify-write operations on [_indexKey] and writes to
+  /// SharedPreferences. Without this, two concurrent `setOffsetMs` or migration
+  /// calls can each read the same index snapshot and drop keys. Shared by every
   /// instance because SharedPreferences itself is process-global.
   static Future<void> _indexChain = Future<void>.value();
+  static Zone? _chainZone;
 
   static Future<T> _synchronized<T>(Future<T> Function() action) {
+    // Detach any chain left pending by a different torn-down Zone (e.g. a
+    // sibling FakeAsync widget-test zone that exited without awaiting writes).
+    if (_chainZone != null && !identical(_chainZone, Zone.current)) {
+      _indexChain = Future<void>.value();
+    }
+    _chainZone = Zone.current;
     final completer = Completer<T>();
     _indexChain = _indexChain.then((_) async {
       try {
@@ -67,12 +74,19 @@ class LyricsOffsetStore {
       final legKey = _legacyKey(path);
       final legOwner = prefs.getString('$legKey$_pathSuffix');
       if (legOwner == path) {
-        final val = prefs.getInt(legKey) ?? 0;
-        await prefs.setInt(key, val);
-        await prefs.setString('$key$_pathSuffix', path);
-        await prefs.remove(legKey);
-        await prefs.remove('$legKey$_pathSuffix');
-        return val;
+        return await _synchronized(() async {
+          final currentOwner = prefs.getString('$key$_pathSuffix');
+          if (currentOwner == path) {
+            return prefs.getInt(key) ?? 0;
+          }
+          final val = prefs.getInt(legKey) ?? 0;
+          await prefs.setInt(key, val);
+          await prefs.setString('$key$_pathSuffix', path);
+          await prefs.remove(legKey);
+          await prefs.remove('$legKey$_pathSuffix');
+          await _appendAndEvictIndex(prefs, key);
+          return val;
+        });
       }
       if (owner == null) {
         // Missing owner marker: the value cannot be attributed to this path
@@ -95,52 +109,53 @@ class LyricsOffsetStore {
   Future<void> setOffsetMs(String path, int offsetMs) async {
     if (path.isEmpty) return;
     final clamped = offsetMs.clamp(-5000, 5000);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = _key(path);
-      await prefs.setInt(key, clamped);
-      await prefs.setString('$key$_pathSuffix', path);
-      await _touchIndex(prefs, key);
-    } catch (e, st) {
-      ErrorLogger.log('Lyrics offset write failed',
-          error: e, stackTrace: st, category: 'Lyrics');
-    }
-  }
-
-  Future<void> _touchIndex(SharedPreferences prefs, String key) {
-    return _synchronized(() async {
+    await _synchronized(() async {
       try {
-        final index = prefs.getStringList(_indexKey) ?? <String>[];
-        index.remove(key);
-        index.add(key);
-        // Evict oldest beyond the bound (both value and path marker).
-        while (index.length > maxEntries) {
-          final evicted = index.removeAt(0);
-          await prefs.remove(evicted);
-          await prefs.remove('$evicted$_pathSuffix');
-        }
-        await prefs.setStringList(_indexKey, index);
+        final prefs = await SharedPreferences.getInstance();
+        final key = _key(path);
+        await prefs.setInt(key, clamped);
+        await prefs.setString('$key$_pathSuffix', path);
+        await _appendAndEvictIndex(prefs, key);
       } catch (e, st) {
-        ErrorLogger.log('Lyrics offset index update failed',
+        ErrorLogger.log('Lyrics offset write failed',
             error: e, stackTrace: st, category: 'Lyrics');
       }
     });
   }
 
-  Future<void> clearOffset(String path) async {
-    if (path.isEmpty) return;
+  Future<void> _appendAndEvictIndex(
+      SharedPreferences prefs, String key) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final key = _key(path);
-      await prefs.remove(key);
-      await prefs.remove('$key$_pathSuffix');
-      await _synchronized(() async {
-        final index = prefs.getStringList(_indexKey) ?? <String>[];
-        if (index.remove(key)) await prefs.setStringList(_indexKey, index);
-      });
+      final index = prefs.getStringList(_indexKey) ?? <String>[];
+      index.remove(key);
+      index.add(key);
+      // Evict oldest beyond the bound (both value and path marker).
+      while (index.length > maxEntries) {
+        final evicted = index.removeAt(0);
+        await prefs.remove(evicted);
+        await prefs.remove('$evicted$_pathSuffix');
+      }
+      await prefs.setStringList(_indexKey, index);
     } catch (e, st) {
-      ErrorLogger.log('Lyrics offset clear failed',
+      ErrorLogger.log('Lyrics offset index update failed',
           error: e, stackTrace: st, category: 'Lyrics');
     }
+  }
+
+  Future<void> clearOffset(String path) async {
+    if (path.isEmpty) return;
+    await _synchronized(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final key = _key(path);
+        await prefs.remove(key);
+        await prefs.remove('$key$_pathSuffix');
+        final index = prefs.getStringList(_indexKey) ?? <String>[];
+        if (index.remove(key)) await prefs.setStringList(_indexKey, index);
+      } catch (e, st) {
+        ErrorLogger.log('Lyrics offset clear failed',
+            error: e, stackTrace: st, category: 'Lyrics');
+      }
+    });
   }
 }

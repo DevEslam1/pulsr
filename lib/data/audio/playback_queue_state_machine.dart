@@ -105,6 +105,27 @@ class PlaybackQueueStateMachine {
     _currentIndex = index.clamp(0, _songs.length - 1);
   }
 
+  /// Commits a forward transition from the current index to [nextIndex],
+  /// recording the outgoing [_currentIndex] into [_shuffleHistory] when
+  /// [shuffleModeEnabled] is true and clearing [_pendingShuffleNext] before
+  /// updating [_currentIndex].
+  void commitTransitionTo(
+    int nextIndex, {
+    required bool shuffleModeEnabled,
+  }) {
+    if (shuffleModeEnabled &&
+        _songs.length > 1 &&
+        _currentIndex >= 0 &&
+        _currentIndex < _songs.length &&
+        _currentIndex != nextIndex) {
+      _shuffleHistory.add(_currentIndex);
+      if (_shuffleHistory.length > 50) {
+        _shuffleHistory.removeAt(0);
+      }
+    }
+    setCurrentIndex(nextIndex);
+  }
+
   /// Appends a song to the queue.
   void addSong(SongsTableData song) {
     _songs.add(song);

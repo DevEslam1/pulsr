@@ -7,6 +7,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -84,8 +85,8 @@ class HighlightedSongTile extends StatelessWidget {
               vertical: AppSpacing.s2,
             ),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOutCubic,
+              duration: context.motion(PulsrMotion.state),
+              curve: context.motionCurve(PulsrMotion.enter),
               decoration: BoxDecoration(
                 color: isActive
                     ? p.accent.withValues(alpha: 0.10)

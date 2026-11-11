@@ -2,12 +2,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
+import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../core/motion/pulsr_motion.dart';
-import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import 'nav_destinations.dart';
@@ -149,10 +149,16 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   p.surfaceContainerHigh.withValues(
-                                    alpha: widget.enableBlur ? 0.88 : 1.0,
+                                    alpha: AppBlur.canBlur(context,
+                                            enableBlur: widget.enableBlur)
+                                        ? 0.88
+                                        : 1.0,
                                   ),
                                   p.surfaceContainer.withValues(
-                                    alpha: widget.enableBlur ? 0.84 : 1.0,
+                                    alpha: AppBlur.canBlur(context,
+                                            enableBlur: widget.enableBlur)
+                                        ? 0.84
+                                        : 1.0,
                                   ),
                                 ],
                               ),
@@ -239,12 +245,15 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                             ),
                           );
 
-                          if (!widget.enableBlur ||
-                              GpuBudget.isGpuSaverActive) {
+                          if (!AppBlur.canBlur(context,
+                              enableBlur: widget.enableBlur)) {
                             return navContainer;
                           }
                           return BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                            filter: ImageFilter.blur(
+                              sigmaX: AppBlur.nav,
+                              sigmaY: AppBlur.nav,
+                            ),
                             child: navContainer,
                           );
                         },

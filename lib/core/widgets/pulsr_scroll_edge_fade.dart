@@ -1,5 +1,6 @@
 // lib/core/widgets/pulsr_scroll_edge_fade.dart
 import 'package:flutter/material.dart';
+import '../constants/app_colors.dart';
 
 /// Fades the trailing edge (and optionally leading edge) of horizontally
 /// scrolling content so a clipped chip, tab, or filter reads as "more to the
@@ -47,12 +48,12 @@ class PulsrScrollEdgeFade extends StatelessWidget {
             begin: isRtl ? Alignment.centerRight : Alignment.centerLeft,
             end: isRtl ? Alignment.centerLeft : Alignment.centerRight,
             colors: const [
-              Color(0x00FFFFFF),
-              Color(0xB3FFFFFF),
-              Color(0xFFFFFFFF),
-              Color(0xFFFFFFFF),
-              Color(0xB3FFFFFF),
-              Color(0x00FFFFFF),
+              AppColors.fadeStopTransparent,
+              AppColors.fadeStopMid,
+              AppColors.fadeStopOpaque,
+              AppColors.fadeStopOpaque,
+              AppColors.fadeStopMid,
+              AppColors.fadeStopTransparent,
             ],
             stops: [
               0.0,
@@ -70,10 +71,10 @@ class PulsrScrollEdgeFade extends StatelessWidget {
           begin: isRtl ? Alignment.centerRight : Alignment.centerLeft,
           end: isRtl ? Alignment.centerLeft : Alignment.centerRight,
           colors: const [
-            Color(0xFFFFFFFF),
-            Color(0xFFFFFFFF),
-            Color(0xB3FFFFFF),
-            Color(0x00FFFFFF),
+            AppColors.fadeStopOpaque,
+            AppColors.fadeStopOpaque,
+            AppColors.fadeStopMid,
+            AppColors.fadeStopTransparent,
           ],
           stops: [
             0.0,

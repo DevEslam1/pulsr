@@ -642,17 +642,24 @@ class DsdDecoderHelper {
     return byteData.buffer.asUint8List();
   }
 
-  /// Builds a 44-byte WAV header containing 24-bit stereo packed DoP PCM frames.
+  /// Builds a 44-byte WAV header containing 24-bit/32-bit stereo packed DoP PCM
+  /// frames or 8-bit raw Native DSD frames.
   static Uint8List buildDopWavContainer({
     required Uint8List dopPcmBytes,
     required int sampleRate,
     int channels = 2,
     int bitsPerSample = 24,
   }) {
-    if (sampleRate != 176400 && sampleRate != 352800 && sampleRate != 705600) {
+    const validDopRates = {176400, 352800, 705600};
+    const validNativeDsdRates = {2822400, 5644800, 11289600, 22579200};
+    final isValidDop = validDopRates.contains(sampleRate);
+    final isValidNativeDsd =
+        bitsPerSample == 8 && validNativeDsdRates.contains(sampleRate);
+    if (!isValidDop && !isValidNativeDsd) {
       throw ArgumentError(
         'Invalid DoP sample rate: $sampleRate. '
-        'DoP requires exact 176.4 kHz, 352.8 kHz, or 705.6 kHz carrier rate.',
+        'DoP requires exact 176.4 kHz, 352.8 kHz, or 705.6 kHz carrier rate '
+        '(or 2.8224–22.5792 MHz with 8-bit framing for Native DSD).',
       );
     }
     final int byteCount = dopPcmBytes.length;

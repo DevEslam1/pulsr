@@ -154,6 +154,11 @@ abstract class AppColors {
   static const Color specularStrong = Color(0x24FFFFFF);
   static const Color highlightSoft = Color(0x0AFFFFFF);
 
+  // Scroll-edge ShaderMask alpha gradient stops.
+  static const Color fadeStopOpaque = Color(0xFFFFFFFF);
+  static const Color fadeStopMid = Color(0xB3FFFFFF);
+  static const Color fadeStopTransparent = Color(0x00FFFFFF);
+
   // Integration brand accents.
   static const Color discordBlurple = Color(0xFF5865F2);
   static const Color quranEmerald = Color(0xFF10B981);

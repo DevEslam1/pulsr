@@ -51,7 +51,11 @@ class DatabaseHealthCheck {
   Future<DatabaseHealthReport> checkHealth() async {
     final integrityIssues = <String>[];
     final foreignKeyViolations = <String>[];
-    var isHealthy = true;
+    var isHealthy = !_db.migrationFailed;
+    if (_db.migrationFailed) {
+      integrityIssues.add(
+          'Database constraint migration (v11) failed and was rolled back');
+    }
 
     // 1. PRAGMA integrity_check
     try {
@@ -119,6 +123,15 @@ class DatabaseHealthCheck {
 
     // 4. FTS health verification
     var ftsHealthy = !AppDatabase.ftsRebuildFailed;
+    if (ftsHealthy && AppDatabase.ftsTrigramSupported) {
+      try {
+        await _db.customStatement(
+          "INSERT INTO songs_fts_trigram(songs_fts_trigram, rank) VALUES('integrity-check', 1);",
+        );
+      } catch (_) {
+        ftsHealthy = false;
+      }
+    }
     if (ftsHealthy) {
       try {
         // `songs_fts` is an external-content FTS5 table, so COUNT(*) is
@@ -408,7 +421,8 @@ class DatabaseMigrationValidator {
       }
     }
 
-    final isValid = currentVersion == _db.schemaVersion &&
+    final isValid = !_db.migrationFailed &&
+        currentVersion == _db.schemaVersion &&
         missingTables.isEmpty &&
         missingColumns.isEmpty &&
         missingIndexes.isEmpty;

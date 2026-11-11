@@ -130,7 +130,11 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
             return;
           }
           final tag = PulsrAudioHandler._songToMediaItem(song);
-          final src = AudioSource.uri(Uri.parse(resolved.url), tag: tag);
+          final src = _buildResolvingYoutubeSource(
+            song: song,
+            tag: tag,
+            initialResolved: resolved,
+          );
           await _activePlayer.setAudioSource(src, initialPosition: pos);
           if (wasPlaying) unawaited(_activePlayer.play());
         } catch (_) {
@@ -275,6 +279,13 @@ mixin PulsrAudioPlaybackExtras on BaseAudioHandler {
 
   Future<({String url, String? userAgent, String? cookies, String quality})>
       _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false});
+
+  YtmResolvingSource _buildResolvingYoutubeSource({
+    required SongsTableData song,
+    required MediaItem tag,
+    ({String url, String? userAgent, String? cookies, String quality})?
+        initialResolved,
+  });
 
   StreamResolutionPipeline get _streamResolutionPipeline;
 

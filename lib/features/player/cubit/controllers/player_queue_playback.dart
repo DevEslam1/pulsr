@@ -79,6 +79,9 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         );
         final match = matchRes.fold((_) => null, (s) => s);
         if (match != null) {
+          if (song.isAutoplay) {
+            match.isAutoplay = true;
+          }
           effectiveSong = match;
         }
       } catch (_) {}
@@ -121,15 +124,20 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     if (queueIndex != null &&
         queueIndex >= 0 &&
         queueIndex < rawQueue.length &&
-        _isSameTrack(rawQueue[queueIndex], effectiveSong)) {
+        (_isSameTrack(rawQueue[queueIndex], effectiveSong) ||
+            _isSameTrack(rawQueue[queueIndex], song))) {
       targetIndex = queueIndex;
     } else {
-      targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, effectiveSong));
+      targetIndex = rawQueue.indexWhere(
+          (s) => _isSameTrack(s, effectiveSong) || _isSameTrack(s, song));
     }
     if (targetIndex == -1) {
       targetIndex = 0;
       rawQueue.insert(0, effectiveSong);
     } else if (rawQueue[targetIndex].id != effectiveSong.id) {
+      if (rawQueue[targetIndex].isAutoplay) {
+        effectiveSong.isAutoplay = true;
+      }
       rawQueue[targetIndex] = effectiveSong;
     }
 
@@ -163,7 +171,8 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       effectiveIndex = targetIndex;
     }
 
-    final isSameSong = _isSameTrack(state.currentSong, song);
+    final isSameSong = _isSameTrack(state.currentSong, effectiveSong) ||
+        _isSameTrack(state.currentSong, song);
     // When the same track keeps playing but its queue is being replaced (e.g.
     // Shuffle), preserve the current position instead of restarting from zero.
     final startPos = initialPosition ??
@@ -246,6 +255,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       lyricsSlice: state.lyricsSlice.copyWith(
         lyrics: isSameSong ? state.lyrics : const [],
         lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
+        isLoadingLyrics: isSameSong ? state.isLoadingLyrics : true,
       ),
     ));
 
@@ -261,8 +271,13 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         // while the player is paused.
         autoPlay: preservePlaybackState ? state.isPlaying : true,
       );
+      _invalidateQueueSyncResolution();
       if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-        _loadLyrics(effectiveSong);
+        if (_onTrackChangedSideEffects != null) {
+          _onTrackChangedSideEffects!(effectiveSong);
+        } else {
+          _loadLyrics(effectiveSong);
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Load queue failed for song ${song.id}',
@@ -282,8 +297,10 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         // that landed during the failed load must not be reverted to the
         // pre-call snapshot (which also restores an old currentSong/position).
         final current = _getState();
-        final superseded = !_isSameTrack(current.currentSong, song);
+        final superseded = !_isSameTrack(current.currentSong, effectiveSong) &&
+            !_isSameTrack(current.currentSong, song);
         if (!superseded) {
+          _onResetTrackChangeSideEffects?.call(prevSong);
           if (prevSlot != null) {
             _queueSlots[state.activeQueueSlot] = prevSlot;
           } else {
@@ -310,6 +327,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
             lyricsSlice: current.lyricsSlice.copyWith(
               lyrics: prevLyrics,
               lyricsSource: prevLyricsSource,
+              isLoadingLyrics: false,
             ),
           ));
         } else {
@@ -329,6 +347,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
               initialPosition: prevPosition,
               autoPlay: false,
             );
+            _invalidateQueueSyncResolution();
           }
         } catch (rollbackError, rollbackSt) {
           // C-03: The rollback itself failed. Previously this was swallowed,
@@ -346,8 +365,10 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
           try {
             await _audioHandler.clearQueue();
           } catch (_) {}
+          _invalidateQueueSyncResolution();
           try {
             if (!_isClosed()) {
+              _onResetTrackChangeSideEffects?.call(null);
               final broken = _getState();
               _emit(broken.copyWith(
                 queueSlice: broken.queueSlice
@@ -376,12 +397,12 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     // speed/pitch/volume/EQ. Fire-and-forget: it re-checks the current song
     // before applying so a fast skip cannot clobber the new track.
     if (initialPosition != null && !_isClosed()) {
-      _onResumePerSongMemory?.call(song);
+      _onResumePerSongMemory?.call(effectiveSong);
     }
 
     if (_mediaItemResolutionGuard.isValid(capturedGen) && !_isClosed()) {
-      _findNextLocalMatch(
-          song, effectiveQueue, effectiveIndex, capturedSwapGen, capturedGen);
+      _findNextLocalMatch(effectiveSong, effectiveQueue, effectiveIndex,
+          capturedSwapGen, capturedGen);
     }
   }
 }

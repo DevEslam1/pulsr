@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/theme/aura_theme.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -190,7 +191,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         final bgColor = isCleanOverlay
             ? (isAmoled
                 ? Colors.black
-                : (isDark ? const Color(0xFF0D0E15) : baseBgColor))
+                : (isDark ? context.palette.deepShade : baseBgColor))
             : baseBgColor;
 
         final props = PlayerThemeProps(
@@ -535,7 +536,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
                                   ),
                                   const SizedBox(height: 8),
                                   AnimatedContainer(
-                                    duration: const Duration(milliseconds: 150),
+                                    duration: context.motion(PulsrMotion.tap),
                                     width: _crossedThreshold ? 48 : 36,
                                     height: 4.5,
                                     decoration: BoxDecoration(

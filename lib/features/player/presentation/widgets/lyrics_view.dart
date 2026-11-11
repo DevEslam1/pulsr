@@ -224,6 +224,24 @@ class _LyricsViewState extends State<LyricsView> {
     });
   }
 
+  void _commitManualOffset(int next) {
+    if (mounted) {
+      setState(() => _manualOffsetMs = next);
+      Duration? pos = widget.currentPosition;
+      if (pos == null) {
+        try {
+          pos = context.read<PlayerCubit>().state.position;
+        } catch (e, st) {
+          ErrorLogger.log('PlayerCubit unavailable for manual offset position',
+              error: e, stackTrace: st, category: 'Lyrics');
+        }
+      }
+      if (pos != null) _updateProgress(pos);
+    } else {
+      _manualOffsetMs = next;
+    }
+  }
+
   Future<void> _adjustManualOffset(int deltaMs) async {
     final path = _offsetSongPath;
     if (path == null || path.isEmpty) return;
@@ -232,24 +250,15 @@ class _LyricsViewState extends State<LyricsView> {
     // Commit synchronously (this runs from a button handler, not build) so
     // rapid consecutive taps accumulate instead of all reading the same stale
     // value while _applyManualOffset's post-frame commit is still pending.
-    if (mounted) {
-      setState(() => _manualOffsetMs = next);
-      Duration? pos = widget.currentPosition;
-      if (pos == null) {
-        try {
-          pos = context.read<PlayerCubit>().state.position;
-        } catch (_) {}
-      }
-      if (pos != null) _updateProgress(pos);
-    } else {
-      _manualOffsetMs = next;
-    }
+    _commitManualOffset(next);
     await _offsetStore.setOffsetMs(path, next);
   }
 
   Future<void> _resetManualOffset() async {
     final path = _offsetSongPath;
-    _applyManualOffset(0);
+    if (_manualOffsetMs != 0) {
+      _commitManualOffset(0);
+    }
     if (path != null && path.isNotEmpty) {
       await _offsetStore.clearOffset(path);
     }
@@ -294,16 +303,18 @@ class _LyricsViewState extends State<LyricsView> {
                   children: [
                     OutlinedButton(
                       onPressed: () async {
-                        await _adjustManualOffset(-50);
+                        final save = _adjustManualOffset(-50);
                         setSheet(() {});
+                        await save;
                       },
                       child: Text(context.l10n.offsetMinus50Ms),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     OutlinedButton(
                       onPressed: () async {
-                        await _adjustManualOffset(50);
+                        final save = _adjustManualOffset(50);
                         setSheet(() {});
+                        await save;
                       },
                       child: Text(context.l10n.offsetPlus50Ms),
                     ),
@@ -312,8 +323,9 @@ class _LyricsViewState extends State<LyricsView> {
                 const SizedBox(height: AppSpacing.xs),
                 TextButton.icon(
                   onPressed: () async {
-                    await _resetManualOffset();
+                    final clear = _resetManualOffset();
                     setSheet(() {});
+                    await clear;
                   },
                   icon: const Icon(Icons.restart_alt_rounded, size: 18),
                   label: Text(l10n.reset),

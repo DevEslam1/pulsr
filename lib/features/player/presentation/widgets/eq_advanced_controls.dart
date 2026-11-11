@@ -1,6 +1,27 @@
 part of 'equalizer_sheet.dart';
 
 extension _EqAdvancedControls on _EqualizerSheetState {
+  void _triggerCrossfeedAudition(
+      BuildContext context, PlayerCubit cubit, PlayerState state) {
+    _crossfeedPreAuditionEnabled ??= state.isCrossfeedEnabled;
+    _crossfeedAuditionTimer?.cancel();
+    final targetEnabled = !state.isCrossfeedEnabled;
+    cubit.setCrossfeed(targetEnabled);
+    PulsrToast.show(
+      context,
+      message: context.l10n.eqAuditioningCrossfeed,
+      icon: Icons.headphones_rounded,
+    );
+    _crossfeedAuditionTimer = Timer(const Duration(seconds: 5), () {
+      final restore = _crossfeedPreAuditionEnabled;
+      _crossfeedPreAuditionEnabled = null;
+      _crossfeedAuditionTimer = null;
+      if (mounted && restore != null) {
+        cubit.setCrossfeed(restore);
+      }
+    });
+  }
+
   // 3. Spatial & Dynamics Tab
   Widget _buildSpatialDynamicsTab(
     BuildContext context,
@@ -601,7 +622,12 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       onChanged:
                           dspBlocked != null || !_nativePcmEffectsAvailable
                               ? null
-                              : (val) => cubit.setCrossfeed(val),
+                              : (val) {
+                                  _crossfeedAuditionTimer?.cancel();
+                                  _crossfeedAuditionTimer = null;
+                                  _crossfeedPreAuditionEnabled = null;
+                                  cubit.setCrossfeed(val);
+                                },
                     ),
                   ],
                 ),
@@ -613,6 +639,25 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               color: p.error,
                               fontSize: AppFontSize.tiny,
                               fontWeight: FontWeight.w600))),
+                if (dspBlocked == null &&
+                    _nativePcmEffectsAvailable &&
+                    !state.isCrossfeedEnabled) ...[
+                  const SizedBox(height: AppSpacing.s10),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.headphones_rounded, size: 14),
+                      label: Text(context.l10n.eqAuditionFiveSeconds),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.xs),
+                      ),
+                      onPressed: () =>
+                          _triggerCrossfeedAudition(context, cubit, state),
+                    ),
+                  ),
+                ],
                 if (dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
                     state.isCrossfeedEnabled) ...[
@@ -742,26 +787,14 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                           TextButton.icon(
                             icon:
                                 const Icon(Icons.headphones_rounded, size: 14),
-                            label: Text(context.l10n.gotIt.isNotEmpty
-                                ? context.l10n.eqAuditionFiveSeconds
-                                : ''),
+                            label: Text(context.l10n.eqAuditionFiveSeconds),
                             style: TextButton.styleFrom(
                               visualDensity: VisualDensity.compact,
                               padding: const EdgeInsets.symmetric(
                                   horizontal: AppSpacing.xs),
                             ),
-                            onPressed: () {
-                              final wasEnabled = state.isCrossfeedEnabled;
-                              cubit.setCrossfeed(true);
-                              PulsrToast.show(
-                                context,
-                                message: context.l10n.eqAuditioningCrossfeed,
-                                icon: Icons.headphones_rounded,
-                              );
-                              Timer(const Duration(seconds: 5), () {
-                                if (!wasEnabled) cubit.setCrossfeed(false);
-                              });
-                            },
+                            onPressed: () =>
+                                _triggerCrossfeedAudition(context, cubit, state),
                           ),
                         ],
                       ),

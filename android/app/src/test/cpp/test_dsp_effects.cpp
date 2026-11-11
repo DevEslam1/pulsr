@@ -12,7 +12,9 @@
 #include "../../main/cpp/ArbitraryResponseEq.h"
 #include "../../main/cpp/ViperDdc.h"
 #include "../../main/cpp/LiveProg.h"
+#include "../../main/cpp/LoudnessContour.h"
 #include "../../main/cpp/AudioDspEngine.h"
+#include <limits>
 #include <cassert>
 #include <iostream>
 #include <vector>
@@ -742,6 +744,256 @@ static void testDvcBitPerfectTransitions() {
     std::cout << "PASS: DVC and Bit-Perfect transitions verified smooth & bit-transparent." << std::endl;
 }
 
+static void testParametricEqSweepContinuity() {
+    std::cout << "Testing ParametricEQ large-block sweep continuity (sub-block smoothing)..." << std::endl;
+    ParametricEQ eq;
+    eq.setSampleRate(48000.0);
+    EqParamSet params;
+    params.enabled = true;
+    params.bandCount = 1;
+    params.preampDb = 0.0;
+    params.bands[0].frequency = 400.0;
+    params.bands[0].gainDb = 0.0;
+    params.bands[0].q = 1.0;
+    params.bands[0].enabled = true;
+    eq.applyParams(params);
+    eq.reset();
+
+    const int blockSize = 2048;
+    const int channels = 2;
+    std::vector<float> prevBlock;
+    int frameCursor = 0;
+    for (int b = 0; b < 2; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.4f, frameCursor);
+        eq.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, 0.12f, "ParametricEQ Warm");
+        prevBlock = block;
+        frameCursor += blockSize;
+    }
+
+    // Abrupt target move without reset(): 400->4000 Hz, 0->+9 dB, Q 1->6 across 2048-frame blocks
+    params.preampDb = -3.0;
+    params.bands[0].frequency = 4000.0;
+    params.bands[0].gainDb = 9.0;
+    params.bands[0].q = 6.0;
+    eq.applyParams(params);
+
+    for (int b = 0; b < 4; ++b) {
+        auto block = generateSineWave(blockSize, channels, 440.0f, 48000.0f, 0.4f, frameCursor);
+        eq.processInterleaved(block.data(), blockSize, channels);
+        checkSignalContinuity(prevBlock, block, channels, 0.12f, "ParametricEQ Sweep");
+        prevBlock = block;
+        frameCursor += blockSize;
+    }
+    std::cout << "PASS: ParametricEQ large-block sweep continuity verified." << std::endl;
+}
+
+static void testLoudnessContourSimdNanGuard() {
+    std::cout << "Testing LoudnessContour SIMD NaN/Inf isolation..." << std::endl;
+    LoudnessContour poisoned, ref;
+    poisoned.setSampleRate(48000.0);
+    ref.setSampleRate(48000.0);
+    poisoned.setEnabled(true);
+    ref.setEnabled(true);
+    poisoned.configure(1.0, 0.2);
+    ref.configure(1.0, 0.2);
+    poisoned.reset();
+    ref.reset();
+
+    auto blockA = generateSineWave(512, 2, 200.0f, 48000.0f, 0.5f, 0);
+    auto blockRef = blockA;
+    blockA[20] = std::numeric_limits<float>::quiet_NaN();
+    blockA[22] = std::numeric_limits<float>::infinity();
+    blockA[24] = -std::numeric_limits<float>::infinity();
+
+    poisoned.processInterleaved(blockA.data(), 512, 2);
+    ref.processInterleaved(blockRef.data(), 512, 2);
+
+    for (int f = 0; f < 512; ++f) {
+        if (!std::isfinite(blockA[f * 2]) || !std::isfinite(blockA[f * 2 + 1])) {
+            std::cerr << "FAIL: LoudnessContour SIMD emitted NaN/Inf at frame " << f << std::endl;
+            std::exit(1);
+        }
+        if (std::abs(blockA[f * 2 + 1] - blockRef[f * 2 + 1]) > 1e-6f) {
+            std::cerr << "FAIL: LoudnessContour L NaN corrupted clean R channel at frame " << f << std::endl;
+            std::exit(1);
+        }
+    }
+
+    auto cleanNext = generateSineWave(512, 2, 200.0f, 48000.0f, 0.5f, 512);
+    poisoned.processInterleaved(cleanNext.data(), 512, 2);
+    for (float s : cleanNext) {
+        if (!std::isfinite(s)) {
+            std::cerr << "FAIL: LoudnessContour retained NaN state into next block" << std::endl;
+            std::exit(1);
+        }
+    }
+    std::cout << "PASS: LoudnessContour SIMD NaN/Inf lane isolation verified." << std::endl;
+}
+
+static void testMultibandCompressorSurroundAndNan() {
+    std::cout << "Testing MultibandCompressor 6ch surround parity & NaN guard..." << std::endl;
+    MultibandCompressor mbc;
+    mbc.setSampleRate(48000.0);
+    MultibandCompressorParamSet mbcParams;
+    mbcParams.enabled = true;
+    for (int b = 0; b < 4; ++b) {
+        mbcParams.bands[b].thresholdDb = -20.0;
+        mbcParams.bands[b].ratio = 4.0;
+        mbcParams.bands[b].attackMs = 5.0;
+        mbcParams.bands[b].releaseMs = 50.0;
+    }
+    mbc.applyParams(mbcParams);
+    mbc.reset();
+
+    const int frames = 4800;
+    const int chCount = 6;
+    auto buf = generateSineWave(frames, chCount, 500.0f, 48000.0f, 1.0f, 0);
+    mbc.processInterleaved(buf.data(), frames, chCount);
+
+    float peakCh0 = 0.0f;
+    for (int f = frames - 480; f < frames; ++f) {
+        peakCh0 = std::max(peakCh0, std::abs(buf[f * chCount]));
+        for (int ch = 1; ch < chCount; ++ch) {
+            if (std::abs(buf[f * chCount + ch] - buf[f * chCount]) > 1e-5f) {
+                std::cerr << "FAIL: MultibandCompressor channel " << ch
+                          << " diverged from ch0 on 5.1 input" << std::endl;
+                std::exit(1);
+            }
+        }
+    }
+    if (peakCh0 >= 0.5f || peakCh0 <= 0.05f) {
+        std::cerr << "FAIL: MultibandCompressor 5.1 did not compress cleanly: " << peakCh0 << std::endl;
+        std::exit(1);
+    }
+
+    buf[10 * chCount + 3] = std::numeric_limits<float>::quiet_NaN();
+    mbc.processInterleaved(buf.data(), 512, chCount);
+    for (int i = 0; i < 512 * chCount; ++i) {
+        if (!std::isfinite(buf[i])) {
+            std::cerr << "FAIL: MultibandCompressor leaked NaN in 5.1 mode" << std::endl;
+            std::exit(1);
+        }
+    }
+    std::cout << "PASS: MultibandCompressor 6ch surround parity & NaN guard verified." << std::endl;
+}
+
+static void testHarmonicSaturationDcClearAndNan() {
+    std::cout << "Testing HarmonicSaturation Tube->Tape DC cleanup & NaN resilience..." << std::endl;
+    HarmonicSaturation sat;
+    sat.setSampleRate(48000.0);
+    sat.setEnabled(true);
+    sat.configure(1.2, 1.0, 0.0, 1);
+    sat.reset();
+
+    auto tubeAudio = generateSineWave(4800, 2, 1000.0f, 48000.0f, 0.8f, 0);
+    sat.processInterleaved(tubeAudio.data(), 4800, 2);
+
+    sat.configure(0.8, 1.0, 0.0, 0);
+    auto tapeAudio = generateSineWave(4800, 2, 1000.0f, 48000.0f, 0.5f, 4800);
+    sat.processInterleaved(tapeAudio.data(), 4800, 2);
+
+    std::vector<float> silence(512 * 2, 0.0f);
+    silence[16] = std::numeric_limits<float>::quiet_NaN();
+    silence[17] = -std::numeric_limits<float>::infinity();
+    sat.processInterleaved(silence.data(), 512, 2);
+    for (int f = 64; f < 512; ++f) {
+        if (!std::isfinite(silence[f * 2]) || !std::isfinite(silence[f * 2 + 1]) ||
+            std::abs(silence[f * 2]) > 1e-4f || std::abs(silence[f * 2 + 1]) > 1e-4f) {
+            std::cerr << "FAIL: HarmonicSaturation residual DC/NaN at frame " << f
+                      << " L=" << silence[f * 2] << " R=" << silence[f * 2 + 1] << std::endl;
+            std::exit(1);
+        }
+    }
+    std::cout << "PASS: HarmonicSaturation Tube->Tape DC cleanup & NaN guard verified." << std::endl;
+}
+
+void testDynamicBassNanGuard() {
+    DynamicBass db;
+    db.prepare(48000.0);
+    db.setParams(true, 1.0, 40, 120, 0, 12, 1.0, 1.25, 0);
+
+    constexpr int frames = 256;
+    std::vector<float> buf(frames * 2, 0.0f);
+    buf[0] = std::numeric_limits<float>::quiet_NaN();
+    buf[1] = -std::numeric_limits<float>::infinity();
+    buf[2] = std::numeric_limits<float>::infinity();
+    buf[3] = std::numeric_limits<float>::quiet_NaN();
+    for (int i = 2; i < frames; ++i) {
+        const float v = 0.25f * std::sin(2.0f * 3.14159265f * 60.0f * i / 48000.0f);
+        buf[i * 2] = v;
+        buf[i * 2 + 1] = -0.5f * v;
+    }
+
+    db.processInterleaved(buf.data(), frames, 2);
+
+    float tailMaxAbs = 0.0f;
+    for (int i = 0; i < frames * 2; ++i) {
+        assert(std::isfinite(buf[i]) && "DynamicBass must sanitize NaN/Inf input before MS decomposition");
+        if (i >= (frames - 32) * 2) {
+            tailMaxAbs = std::max(tailMaxAbs, std::abs(buf[i]));
+        }
+    }
+    assert(tailMaxAbs > 0.01f && "DynamicBass must recover cleanly with valid output after NaN/Inf");
+    std::cout << "PASS: DynamicBass NaN/Inf sanitization & recovery verified." << std::endl;
+}
+
+void testSubCrossoverNanGuard() {
+    SubCrossover sub;
+    sub.setSampleRate(48000.0);
+    sub.configure(80.0, 24.0, 6.0, true, false);
+    sub.setEnabled(true);
+
+    constexpr int frames = 256;
+    std::vector<float> l(frames, 0.0f);
+    std::vector<float> r(frames, 0.0f);
+    l[0] = std::numeric_limits<float>::quiet_NaN();
+    r[0] = std::numeric_limits<float>::infinity();
+    l[1] = -std::numeric_limits<float>::infinity();
+    r[1] = std::numeric_limits<float>::quiet_NaN();
+    for (int i = 2; i < frames; ++i) {
+        const float v = 0.25f * std::sin(2.0f * 3.14159265f * 50.0f * i / 48000.0f);
+        l[i] = v;
+        r[i] = 0.5f * v;
+    }
+
+    sub.process(l.data(), r.data(), frames);
+    float tailMaxPlanar = 0.0f;
+    for (int i = 0; i < frames; ++i) {
+        assert(std::isfinite(l[i]) && std::isfinite(r[i]) &&
+               "SubCrossover::process must sanitize NaN/Inf before side/mono filtering");
+        if (i >= frames - 32) {
+            tailMaxPlanar = std::max(tailMaxPlanar, std::max(std::abs(l[i]), std::abs(r[i])));
+        }
+    }
+    assert(tailMaxPlanar > 0.01f && "SubCrossover::process must recover after NaN/Inf");
+
+    sub.reset();
+    sub.setEnabled(true);
+    std::vector<float> interleaved(frames * 2, 0.0f);
+    interleaved[0] = std::numeric_limits<float>::quiet_NaN();
+    interleaved[1] = -std::numeric_limits<float>::infinity();
+    interleaved[2] = std::numeric_limits<float>::infinity();
+    interleaved[3] = std::numeric_limits<float>::quiet_NaN();
+    for (int i = 2; i < frames; ++i) {
+        const float v = 0.25f * std::sin(2.0f * 3.14159265f * 50.0f * i / 48000.0f);
+        interleaved[i * 2] = v;
+        interleaved[i * 2 + 1] = -0.25f * v;
+    }
+
+    sub.processInterleaved(interleaved.data(), frames, 2);
+    float tailMaxInterleaved = 0.0f;
+    for (int i = 0; i < frames * 2; ++i) {
+        assert(std::isfinite(interleaved[i]) &&
+               "SubCrossover::processInterleaved must sanitize NaN/Inf before side/mono filtering");
+        if (i >= (frames - 32) * 2) {
+            tailMaxInterleaved = std::max(tailMaxInterleaved, std::abs(interleaved[i]));
+        }
+    }
+    assert(tailMaxInterleaved > 0.01f && "SubCrossover::processInterleaved must recover after NaN/Inf");
+    std::cout << "PASS: SubCrossover NaN/Inf sanitization & recovery verified." << std::endl;
+}
+
 int main() {
     std::cout << "Running DSP effects C++ unit tests..." << std::endl;
     testConvolutionReverbUnityGain();
@@ -757,6 +1009,12 @@ int main() {
     testViperDdcTransitions();
     testLiveProgTransitions();
     testDvcBitPerfectTransitions();
+    testParametricEqSweepContinuity();
+    testLoudnessContourSimdNanGuard();
+    testMultibandCompressorSurroundAndNan();
+    testHarmonicSaturationDcClearAndNan();
+    testDynamicBassNanGuard();
+    testSubCrossoverNanGuard();
     std::cout << "All DSP effects C++ tests passed successfully!" << std::endl;
     return 0;
 }

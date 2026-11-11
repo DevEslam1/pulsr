@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
@@ -78,7 +79,7 @@ class SmartPlaylistCard extends StatelessWidget {
           onLongPress: onLongPress,
           borderRadius: AppRadii.r18All,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
+            duration: context.motion(PulsrMotion.state),
             width: 244,
             padding: const EdgeInsets.all(AppSpacing.s14),
             decoration: BoxDecoration(

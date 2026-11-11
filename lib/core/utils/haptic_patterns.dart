@@ -1,21 +1,14 @@
-import 'package:flutter/services.dart';
+// lib/core/utils/haptic_patterns.dart
+import 'pulsr_haptics.dart';
 
-/// Centralized haptic feedback patterns ensuring tactile consistency across Pulsr.
+/// Legacy facade forwarding to [PulsrHaptics] so all tactile feedback honours
+/// the single global [PulsrHaptics.enabled] switch.
 class HapticPatterns {
   const HapticPatterns._();
 
-  /// Subtle light impact for standard button taps, item selections, and tabs.
-  static void tap() => HapticFeedback.lightImpact();
-
-  /// Medium impact for confirmations, toggles, and saving changes.
-  static void confirm() => HapticFeedback.mediumImpact();
-
-  /// Heavy impact for destructive actions (deletions, clears, resets).
-  static void destructive() => HapticFeedback.heavyImpact();
-
-  /// Selection click for scrubbers, sliders, and picker wheels.
-  static void selection() => HapticFeedback.selectionClick();
-
-  /// General alert vibration for errors or timeouts.
-  static void vibrate() => HapticFeedback.vibrate();
+  static void tap() => PulsrHaptics.light();
+  static void confirm() => PulsrHaptics.confirm();
+  static void destructive() => PulsrHaptics.destructive();
+  static void selection() => PulsrHaptics.selection();
+  static void vibrate() => PulsrHaptics.vibrate();
 }

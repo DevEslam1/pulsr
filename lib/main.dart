@@ -25,6 +25,7 @@ import 'core/services/artwork_cache_manager.dart';
 import 'core/services/settings_cache.dart';
 import 'core/services/sound_feedback_service.dart';
 import 'core/services/automation_trigger_service.dart';
+import 'core/constants/app_colors.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/widgets/cached_artwork.dart';
@@ -132,7 +133,7 @@ Future<void> main() async {
       builder: (context) => Material(
         // Theme may not be reachable when a build error happens high in the
         // tree; a fixed dark surface keeps the fallback readable in both modes.
-        color: const Color(0xFF17191F),
+        color: AppColors.card,
         child: Center(
           child: Text(
             AppLocalizations.of(context)?.somethingWentWrong ?? 'Error',

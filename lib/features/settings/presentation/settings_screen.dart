@@ -141,6 +141,7 @@ class SettingsScreenState extends State<SettingsScreen>
           current.errorMessage != null &&
           current.errorMessage != previous.errorMessage,
       listener: (context, state) {
+        if (ModalRoute.of(context)?.isCurrent == false) return;
         final message = state.errorMessage;
         if (message == null) return;
         ScaffoldMessenger.of(context)

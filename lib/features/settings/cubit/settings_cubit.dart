@@ -1148,9 +1148,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               integer32DirectUsbEligible: _integer32DirectUsbEligible,
               requireConfirmedCodec: loadedState.strictBitPerfect && song != null,
             );
+            final effectiveRate = effectiveSourceSampleRate(
+              tagged: song?.sampleRate ?? 0,
+              decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
+            );
             final unknownRate = loadedState.strictBitPerfect && song != null &&
-                ((song.sampleRate ?? 0) <= 0 ||
-                    !HiResAudioService.validTargetSampleRates.contains(song.sampleRate));
+                (effectiveRate <= 0 ||
+                    !HiResAudioService.validTargetSampleRates.contains(effectiveRate));
             if (sourceBlock != null || unknownRate) {
               await _rollbackBitPerfectEnable(
                   sourceBlock ?? 'Source sample rate is unconfirmed.');

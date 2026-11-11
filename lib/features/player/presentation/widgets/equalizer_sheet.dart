@@ -12,6 +12,7 @@ import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/audio_effects_config.dart';
@@ -188,6 +189,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   bool _isLoadingProfiles = true;
   bool _isAbComparing = false;
   Timer? _abCompareTimer;
+  Timer? _crossfeedAuditionTimer;
+  bool? _crossfeedPreAuditionEnabled;
+  ComparisonSlot _activeComparisonSlot = ComparisonSlot.slotA;
   bool? _isStudioModeOverride;
   Timer? _preampDebounce;
   double? _preampPreview;
@@ -214,6 +218,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       _cachedEqualizerManager = null;
     }
     _tabController = TabController(length: 3, vsync: this);
+    try {
+      _activeComparisonSlot = _cachedEqualizerManager?.activeComparisonSlot ??
+          ComparisonSlot.slotA;
+    } catch (e, st) {
+      _activeComparisonSlot = ComparisonSlot.slotA;
+      ErrorLogger.log('Failed to read active EQ comparison slot',
+          error: e, stackTrace: st, category: 'EqualizerSheet');
+    }
     _loadHeadphoneProfiles();
     _listenForDspAutoDegrade();
   }
@@ -232,6 +244,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
     _abCompareTimer?.cancel();
     _abCompareTimer = null;
+    _crossfeedAuditionTimer?.cancel();
+    _crossfeedAuditionTimer = null;
+    _crossfeedPreAuditionEnabled = null;
     _preampDebounce?.cancel();
     _preampDebounce = null;
     _degradedSessionSub?.cancel();

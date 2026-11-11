@@ -44,14 +44,18 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         if (!state.bitPerfectOutput) return false;
         final depth = effectiveSourceBitDepth(tagged: song.bitDepth ?? 0,
             decoded: state.currentOutputDevice?.decodedBitDepth ?? 0);
+        final rate = effectiveSourceSampleRate(
+          tagged: song.sampleRate ?? 0,
+          decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
+        );
         final reason = AudioConflicts.bitPerfectSourceBlockedReason(
           path: song.path, codec: song.codec, bitDepth: depth,
           isRadio: song.source == SongSource.radio,
           integer32DirectUsbEligible: _integer32DirectUsbEligible,
           requireConfirmedCodec: state.strictBitPerfect || _bitPerfectViaDirectStream,
         );
-        final unknownRate = (song.sampleRate ?? 0) <= 0 ||
-            !HiResAudioService.validTargetSampleRates.contains(song.sampleRate);
+        final unknownRate = rate <= 0 ||
+            !HiResAudioService.validTargetSampleRates.contains(rate);
         if (reason == null && !unknownRate) return true;
         final message = reason ?? 'Source sample rate is unconfirmed.';
         if (state.strictBitPerfect) {
@@ -63,6 +67,16 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         }
         return false;
       });
+
+  /// Shared wording for a refused DSP-bypass push. The platform reason is
+  /// appended when the channel captured one: without it the toast said only
+  /// "failed", which is not actionable for an owned stage that refused.
+  String _bypassUpdateFailedMessage() {
+    final base = L10nHolder.current?.dspBypassUpdateFailed ??
+        'Failed to update the native DSP bypass.';
+    final reason = AudioEffectsChannel.lastBypassRejectionReason;
+    return reason == null || reason.isEmpty ? base : '$base $reason';
+  }
 
   Future<void> _pushBitPerfectBypass(bool enabled) async {
     if (getIt.isRegistered<PulsrAudioHandler>()) {
@@ -125,7 +139,13 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       // A track whose format is unknown (0, "not read") is not a format: asking
       // for 0 Hz would be refused with "format_unsupported" and look like a
       // broken DAC rather than unreadable metadata.
-      final trackRate = _usableRate(sampleRate ?? song?.sampleRate);
+      final trackRate = _usableRate(
+        sampleRate ??
+            effectiveSourceSampleRate(
+              tagged: song?.sampleRate ?? 0,
+              decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
+            ),
+      );
       final sourceDepth = effectiveSourceBitDepth(
         tagged: math.max(song?.bitDepth ?? 0, bitDepth ?? 0),
         decoded: state.currentOutputDevice?.decodedBitDepth ?? 0,
@@ -595,19 +615,25 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           (state.bypassDspOnBitPerfect || state.strictBitPerfect));
       if (enabled) await _forceCrossfadeOffForBitPerfect();
     } catch (e, st) {
+      ErrorLogger.log('Bit-perfect DSP transition failed',
+          error: e, stackTrace: st, category: 'SettingsAudioActions');
+      final refusal = _bypassUpdateFailedMessage();
       if (enabled) {
-        await _rollbackBitPerfectEnable('Failed to configure Bit-Perfect processing.', restoreBypass: prevBypass, restoreFollowRate: prevFollowRate);
+        // The rollback emits its own message (including a failed teardown);
+        // passing the refusal wording in keeps that detail and the platform
+        // reason, instead of overwriting both with a generic line afterwards.
+        await _rollbackBitPerfectEnable(refusal, restoreBypass: prevBypass, restoreFollowRate: prevFollowRate);
       } else {
         // The transport is already down; do not resurrect it after a failed
         // DSP restore. Keep the UI truthful and allow a subsequent retry.
         await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
         await prefs.setBool(PrefsKeys.strictBitPerfect, false);
-        safeEmit(state.copyWith(bitPerfectOutput: false, strictBitPerfect: false));
+        safeEmit(state.copyWith(
+          bitPerfectOutput: false,
+          strictBitPerfect: false,
+          errorMessage: refusal,
+        ));
       }
-      ErrorLogger.log('Bit-perfect DSP transition failed',
-          error: e, stackTrace: st, category: 'SettingsAudioActions');
-      safeEmit(state.copyWith(
-          errorMessage: L10nHolder.current?.dspBypassUpdateFailed ?? 'Failed to update the native DSP bypass.'));
       await refreshOutputDevice();
       return;
     }
@@ -663,8 +689,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       try {
         await _pushBitPerfectBypass(enabled);
       } catch (_) {
-        safeEmit(state.copyWith(
-            errorMessage: L10nHolder.current?.dspBypassUpdateFailed ?? 'Failed to update the native DSP bypass.'));
+        safeEmit(state.copyWith(errorMessage: _bypassUpdateFailedMessage()));
         return;
       }
     }
@@ -766,8 +791,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         integer32DirectUsbEligible: _integer32DirectUsbEligible,
         requireConfirmedCodec: song != null,
       );
-      final unknownRate = song != null && ((song.sampleRate ?? 0) <= 0 ||
-          !HiResAudioService.validTargetSampleRates.contains(song.sampleRate));
+      final effectiveRate = effectiveSourceSampleRate(
+        tagged: song?.sampleRate ?? 0,
+        decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
+      );
+      final unknownRate = song != null && (effectiveRate <= 0 ||
+          !HiResAudioService.validTargetSampleRates.contains(effectiveRate));
       if (sourceBlock != null || unknownRate) {
         safeEmit(state.copyWith(errorMessage:
             sourceBlock ?? 'Source sample rate is unconfirmed.'));

@@ -382,13 +382,18 @@ GoRouter createRouter(MediaScannerService scannerService,
       GoRoute(
         path: '/splash',
         name: 'splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const SplashScreen(),
+        ),
       ),
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) =>
-            OnboardingScreen(scannerService: scannerService),
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: OnboardingScreen(scannerService: scannerService),
+        ),
       ),
       StatefulShellRoute(
         // Branch container is built here (instead of .indexedStack) so hidden

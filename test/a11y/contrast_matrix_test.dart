@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 
 /// WCAG 2.1 relative-luminance contrast ratio.
@@ -133,5 +134,44 @@ void main() {
         reason: 'dark mode text must be light');
     expect(light.isDark, isFalse);
     expect(dark.isDark, isTrue);
+  });
+
+  group('all customAccents × brightness/AMOLED/high-contrast meet WCAG AA/AAA',
+      () {
+    for (var i = 0; i < AppColors.customAccents.length; i++) {
+      final seed = AppColors.customAccents[i];
+      for (final mode in ['light', 'dark', 'amoled', 'hc-light', 'hc-dark']) {
+        test('accent[$i] ($mode) meets contrast requirements', () {
+          final isDark = mode != 'light' && mode != 'hc-light';
+          final isAmoled = mode == 'amoled' || mode == 'hc-dark';
+          final isHc = mode.startsWith('hc-');
+          final theme = AuraTheme.customTheme(
+            seed,
+            brightness: isDark ? Brightness.dark : Brightness.light,
+            isAmoled: isAmoled,
+            isHighContrast: isHc,
+          );
+          final p = theme.extension<PulsrPalette>()!;
+          final minAccentRatio = isHc ? 7.0 : 4.5;
+          expect(
+            _ratio(p.accent, p.surface),
+            greaterThanOrEqualTo(minAccentRatio),
+            reason: 'accent[$i] ($mode) on surface failed contrast',
+          );
+          expect(
+            _ratio(p.onAccent, p.accent),
+            greaterThanOrEqualTo(4.5),
+            reason: 'accent[$i] ($mode) onAccent failed contrast',
+          );
+          final blendedContainer =
+              Color.alphaBlend(p.accentContainer, p.surface);
+          expect(
+            _ratio(p.accent, blendedContainer),
+            greaterThanOrEqualTo(4.5),
+            reason: 'accent[$i] ($mode) on accentContainer failed contrast',
+          );
+        });
+      }
+    }
   });
 }

@@ -224,21 +224,25 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       final ext = dot >= 0 ? cleanPath.substring(dot + 1).toLowerCase() : '';
       if (ext == 'dsf' || ext == 'dff') {
         // T4: honor the user's DSD output mode, but only after the native probe
-        // confirms a DoP-capable USB DAC. Default is PCM; DoP is never implied
-        // by the file format or by an absent/failed probe.
+        // confirms a DoP/Native-capable USB DAC. Default is PCM; DoP/Native is
+        // never implied by the file format or by an absent/failed probe.
         final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
-        final wantDop =
-            (prefs.getString(PrefsKeys.dsdOutputMode) ?? 'dop') == 'dop';
+        final dsdMode = prefs.getString(PrefsKeys.dsdOutputMode) ?? 'dop';
+        final wantDop = dsdMode == 'dop';
+        final wantNative = dsdMode == 'native';
         DsdDacCapabilities? caps;
-        if (wantDop) {
+        if (wantDop || wantNative) {
           caps = await DsdDecoderHelper.probeDopCapabilities();
         }
-        final forceDop = wantDop && (caps?.canUseDop ?? false);
+        final forceNativeDsd = wantNative && (caps?.canUseNativeDsd ?? false);
+        final forceDop =
+            !forceNativeDsd && wantDop && (caps?.canUseDop ?? false);
         final containerBits = prefs.getInt(PrefsKeys.dopContainerBits) ?? 24;
         return DsdDecoderHelper.decodeDsdFile(
           song,
           tag,
           forceDop: forceDop,
+          forceNativeDsd: forceNativeDsd,
           dopCapabilities: caps,
           dopContainerBits: containerBits == 32 ? 32 : 24,
         );
@@ -299,11 +303,31 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // the source instantly (no blocking await on stream resolution) and start
     // buffering as soon as bytes arrive. If the background warm populated the
     // URL cache, the lazy resolve completes near-instantly.
+    return _buildResolvingYoutubeSource(song: song, tag: tag);
+  }
+
+  YtmResolvingSource _buildResolvingYoutubeSource({
+    required SongsTableData song,
+    required MediaItem tag,
+    ({String url, String? userAgent, String? cookies, String quality})?
+        initialResolved,
+  }) {
+    var seedResolved = initialResolved;
     late final YtmResolvingSource source;
     source = YtmResolvingSource.withRefresh(
       videoId: song.remoteId ?? '',
-      quality: _currentStreamingQuality(),
+      userAgent: initialResolved?.userAgent,
+      cookies: initialResolved?.cookies,
+      quality: initialResolved?.quality ?? _currentStreamingQuality(),
       resolve: ({bool forceRefresh = false}) async {
+        final seeded = seedResolved;
+        seedResolved = null;
+        if (seeded != null && !forceRefresh) {
+          source.userAgent = seeded.userAgent;
+          source.cookies = seeded.cookies;
+          source.quality = seeded.quality;
+          return seeded.url;
+        }
         final resolved =
             await _resolveStreamUrl(song, forceRefresh: forceRefresh);
         source.userAgent = resolved.userAgent;

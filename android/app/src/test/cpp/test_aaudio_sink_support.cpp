@@ -120,6 +120,20 @@ int main() {
         check(decodeI24(&doubled[0]) == 0x7FFFFF, "I24 +max saturates at +max");
         check(decodeI24(&doubled[3]) == -0x800000, "I24 -max saturates at -max");
         check(decodeI24(&doubled[6]) == 16384, "I24 +8192 * 2");
+
+        std::vector<int32_t> s32 = {
+            0x40000000, 0x40000001, 0x7FFFFFFF, static_cast<int32_t>(0x80000000u)
+        };
+        auto half32 = s32;
+        pulsr::ApplyI32Volume(half32.data(), static_cast<int32_t>(half32.size()), 0.5f, dither);
+        check(half32[0] == 0x20000000, "I32 even * 0.5 stays exact");
+        check(half32[1] == 0x20000000 || half32[1] == 0x20000001,
+              "I32 odd * 0.5 stays within 1 LSB of midpoint");
+        auto doubled32 = s32;
+        pulsr::ApplyI32Volume(doubled32.data(), static_cast<int32_t>(doubled32.size()), 2.0f, dither);
+        check(doubled32[2] == 0x7FFFFFFF, "I32 +max saturates at +max");
+        check(doubled32[3] == static_cast<int32_t>(0x80000000u),
+              "I32 -max saturates at -max");
     }
 
     if (gFailures != 0) {

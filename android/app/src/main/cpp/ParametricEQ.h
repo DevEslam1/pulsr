@@ -54,6 +54,8 @@ public:
     void processInterleaved(float* buffer, int frames, int channels);
 
 private:
+    void processSubBlock(float* buffer, int frames, int channels, int stride,
+                         double autoHeadroomDb, bool hasSolo);
     void computeCoeffs(EQBandState& band, double gainDb);
     // Off->on transition: clear stale filter memory and restart preamp/band
     // gains from flat so the smoother fades the EQ in instead of clicking.

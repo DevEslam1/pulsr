@@ -1750,7 +1750,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         const double invScale = 1.0 / scale;
         const double maxQuant = scale - 1.0;
         const double minQuant = -scale;
-        const bool useShaping = (sampleRate_ <= 48000.0);
         const int maxShapedChannels = std::min(channels, ChannelManager::MAX_CHANNELS);
         for (int f = 0; f < frames; ++f) {
             for (int ch = 0; ch < channels; ++ch) {

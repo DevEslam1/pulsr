@@ -155,7 +155,7 @@ class _PlaylistCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadii.r20All,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
+          duration: context.motion(PulsrMotion.state),
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: AppRadii.r20All,

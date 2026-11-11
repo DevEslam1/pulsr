@@ -182,6 +182,11 @@ class DownloadService {
             'writeTags unverified on $filePath: ${result['verifiedFields']}',
             category: 'DownloadService',
           );
+          if (attempt == 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+            continue;
+          }
+          return false;
         }
         return true;
       } on PlatformException catch (e) {

@@ -69,6 +69,7 @@ class ListenTogetherService {
   WebSocketChannel? _channel;
   StreamSubscription? _channelSub;
   Timer? _pingTimer;
+  Timer? _pingBurstTimer;
   Timer? _reconcileTimer;
 
   String? _activeCode;
@@ -377,6 +378,7 @@ class ListenTogetherService {
         },
       );
 
+      if (_playerStateSub == null) _bindPlayerCubitEvents();
       _startPingLoop();
       _startReconciliationTicker();
       connectionState.value = PartyConnectionState.live;
@@ -388,6 +390,8 @@ class ListenTogetherService {
   }
 
   void _disconnectWebSocket() {
+    _pingBurstTimer?.cancel();
+    _pingBurstTimer = null;
     _pingTimer?.cancel();
     _pingTimer = null;
     _reconcileTimer?.cancel();
@@ -429,10 +433,16 @@ class ListenTogetherService {
   }
 
   void _startPingLoop() {
+    _pingBurstTimer?.cancel();
+    _pingBurstTimer = null;
     _pingTimer?.cancel();
     // Burst 4 pings initially for instant accurate clock sync
     var burstCount = 0;
-    Timer.periodic(const Duration(milliseconds: 300), (timer) {
+    _pingBurstTimer = Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      if (_channel == null) {
+        timer.cancel();
+        return;
+      }
       if (burstCount >= 4 || _channel == null) {
         timer.cancel();
         // Regular heartbeat ping every 10s
@@ -824,17 +834,12 @@ class ListenTogetherService {
     SongsTableData? match;
     try {
       final repo = getIt<IMusicRepository>();
-      final localSongsResult = await repo.getAllSongs();
-      final localSongs =
-          localSongsResult.fold((_) => <SongsTableData>[], (s) => s);
-      match = localSongs.where((s) => s.remoteId == track.videoId).firstOrNull;
-      if (match == null && track.title.isNotEmpty) {
-        match = localSongs
-            .where((s) =>
-                s.title.toLowerCase() == track.title.toLowerCase() &&
-                s.artist.toLowerCase() == track.artist.toLowerCase())
-            .firstOrNull;
-      }
+      final matchedRes = await repo.findMatchingLocalSong(
+        remoteId: track.videoId,
+        title: track.title,
+        artist: track.artist,
+      );
+      match = matchedRes.fold((_) => null, (s) => s);
     } catch (e, st) {
       ErrorLogger.log('Failed to match local party track',
           error: e, stackTrace: st, category: 'PARTY');
@@ -883,5 +888,14 @@ class ListenTogetherService {
 
   void sendPrevious() {
     _sendFrame({'type': 'control', 'action': 'previous'});
+  }
+
+  void dispose() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _disconnectWebSocket();
+    _playerStateSub?.cancel();
+    _playerStateSub = null;
+    _httpClient.close();
   }
 }

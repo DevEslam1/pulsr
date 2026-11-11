@@ -159,6 +159,12 @@ class PlayerMetadataController {
           !_isClosed() &&
           _isSameTrack(_getState().currentSong, updated)) {
         final state = _getState();
+        final preserveAutoplay = song.isAutoplay ||
+            (state.currentSong?.isAutoplay ?? false) ||
+            state.queue.any((s) => _isSameTrack(s, updated) && s.isAutoplay);
+        if (preserveAutoplay) {
+          updated.isAutoplay = true;
+        }
         final updatedQueue = state.queue
             .map((s) => _isSameTrack(s, updated) ? updated : s)
             .toList();

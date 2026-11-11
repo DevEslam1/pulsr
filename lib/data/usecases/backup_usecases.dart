@@ -197,7 +197,29 @@ class ExportBackupUseCase {
       ErrorLogger.log('Failed reading v2 profile blobs',
           error: e, stackTrace: st, category: 'Backup');
     }
-    // 8. Downloaded Tracks Metadata
+    // 8. Downloaded & Online Tracks Metadata (so fresh installs can restore YTM favorites/playlists)
+    final onlineReferencedSongs = <int, SongsTableData>{
+      for (final s in favoritesSongs)
+        if (s.source != SongSource.local || s.path.startsWith('ytmusic://'))
+          s.id: s,
+    };
+    for (final s in allSongs) {
+      if (s.source != SongSource.local || s.path.startsWith('ytmusic://')) {
+        onlineReferencedSongs[s.id] = s;
+      }
+    }
+    final onlineTracks = onlineReferencedSongs.values
+        .map((s) => {
+              'title': s.title,
+              'artist': s.artist,
+              'album': s.album,
+              'path': _songRef(s),
+              'remoteId': s.remoteId,
+              'remoteArtworkUrl': s.remoteArtworkUrl,
+              'durationMs': s.durationMs,
+            })
+        .toList();
+
     final downloadedTracks = allSongs
         .where((s) => s.isDownloaded)
         .map((s) => {
@@ -323,6 +345,7 @@ class ExportBackupUseCase {
       if (deviceRegistryRaw != null) 'deviceRegistry': deviceRegistryRaw,
       if (settingsProfilesRaw != null) 'settingsProfiles': settingsProfilesRaw,
       if (downloadedTracks.isNotEmpty) 'downloads': downloadedTracks,
+      if (onlineTracks.isNotEmpty) 'onlineTracks': onlineTracks,
       if (ratingsData != null) 'ratings': ratingsData,
       if (bpmData != null) 'bpmOverrides': bpmData,
       if (perSongEqData != null) 'perSongEq': perSongEqData,
@@ -426,6 +449,74 @@ class ImportBackupUseCase {
       if (song.remoteId != null && song.remoteId!.isNotEmpty) {
         remoteIdMap[song.remoteId!] = song;
       }
+    }
+
+    // Seed any missing online/YTM tracks from `onlineTracks` or `downloads` before matching
+    // favorites, playlists, and play history on a fresh install.
+    final onlineSeedList = <Map<String, dynamic>>[
+      if (data['onlineTracks'] is List)
+        ...(data['onlineTracks'] as List).whereType<Map<String, dynamic>>(),
+      if (data['downloads'] is List)
+        ...(data['downloads'] as List).whereType<Map<String, dynamic>>(),
+    ];
+    if (onlineSeedList.isNotEmpty) {
+      await _db.transaction(() async {
+        for (final meta in onlineSeedList) {
+          final rawRemoteId = meta['remoteId'];
+          final remoteId = rawRemoteId is String ? rawRemoteId.trim() : null;
+          final rawPathVal = meta['path'];
+          final rawPath = rawPathVal is String ? rawPathVal.trim() : '';
+          final videoId = (remoteId != null && remoteId.isNotEmpty)
+              ? remoteId
+              : (rawPath.startsWith('ytmusic://')
+                  ? rawPath.replaceFirst('ytmusic://', '').split('?').first
+                  : '');
+          if (videoId.isEmpty || remoteIdMap.containsKey(videoId)) continue;
+          final ytPath = 'ytmusic://$videoId';
+          if (pathMap.containsKey(ytPath)) continue;
+          final rawTitle = meta['title'];
+          final title = rawTitle is String ? rawTitle.trim() : null;
+          final rawArtist = meta['artist'];
+          final artist = rawArtist is String ? rawArtist.trim() : null;
+          final rawAlbum = meta['album'];
+          final album = rawAlbum is String ? rawAlbum.trim() : null;
+          final rawArtworkUrl = meta['remoteArtworkUrl'];
+          final artworkUrl =
+              rawArtworkUrl is String ? rawArtworkUrl.trim() : null;
+          final rawDurationMs = meta['durationMs'];
+          final durationMs = rawDurationMs is num ? rawDurationMs.toInt() : 0;
+          final insertedId = await _db.into(_db.songsTable).insert(
+                SongsTableCompanion.insert(
+                  title: (title != null && title.isNotEmpty)
+                      ? title
+                      : 'Unknown Track',
+                  artist: Value((artist != null && artist.isNotEmpty)
+                      ? artist
+                      : 'Unknown Artist'),
+                  album: album != null && album.isNotEmpty
+                      ? Value(album)
+                      : const Value.absent(),
+                  durationMs: Value(durationMs),
+                  path: ytPath,
+                  source: const Value(SongSource.youtube),
+                  remoteId: Value(videoId),
+                  remoteArtworkUrl: Value(artworkUrl),
+                ),
+                mode: InsertMode.insertOrIgnore,
+              );
+          if (insertedId > 0) {
+            final row = await (_db.select(_db.songsTable)
+                  ..where((t) => t.id.equals(insertedId)))
+                .getSingleOrNull();
+            if (row != null) {
+              allSongs.add(row);
+              pathMap[row.path] = row;
+              pathMap[row.path.toLowerCase()] = row;
+              remoteIdMap[videoId] = row;
+            }
+          }
+        }
+      });
     }
 
     Map<String, SongsTableData>? lazyParentFilenameMap;
@@ -778,6 +869,26 @@ class ImportBackupUseCase {
                       lastPlayed: Value(mergedLastPlayed),
                     ),
                   );
+                  if (mergedLastPlayed != null && mergedLastPlayed > 0) {
+                    final existingHist = await (_db.select(_db.playHistoryTable)
+                          ..where((h) => h.songId.equals(matched.id))
+                          ..limit(1))
+                        .getSingleOrNull();
+                    if (existingHist == null) {
+                      await _db.into(_db.playHistoryTable).insert(
+                            PlayHistoryTableCompanion.insert(
+                              songId: matched.id,
+                              playedAt: Value(
+                                DateTime.fromMillisecondsSinceEpoch(
+                                  mergedLastPlayed < 10000000000
+                                      ? mergedLastPlayed * 1000
+                                      : mergedLastPlayed,
+                                ),
+                              ),
+                            ),
+                          );
+                    }
+                  }
                   restoredHistoryCount++;
                 } else {
                   unmatchedPaths.add(path);

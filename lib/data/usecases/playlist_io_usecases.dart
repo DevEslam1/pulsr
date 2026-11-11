@@ -66,6 +66,14 @@ class PlaylistExportUseCase {
       final title =
           song.title.trim().isNotEmpty ? song.title.trim() : 'Unknown Track';
       buffer.writeln('#EXTINF:$durationSec,$artist - $title');
+      if (song.cueStartMs != null && song.cueStartMs! > 0) {
+        buffer.writeln(
+            '#EXTVLCOPT:start-time=${(song.cueStartMs! / 1000.0).toStringAsFixed(3)}');
+      }
+      if (song.cueEndMs != null && song.cueEndMs! > 0) {
+        buffer.writeln(
+            '#EXTVLCOPT:stop-time=${(song.cueEndMs! / 1000.0).toStringAsFixed(3)}');
+      }
       buffer.writeln(song.path);
     }
     return buffer.toString();
@@ -76,8 +84,12 @@ class PlaylistExportUseCase {
     final buffer = StringBuffer();
     buffer.writeln('[playlist]');
     var index = 0;
+    final seenCueContainerPaths = <String>{};
     for (final song in songs) {
       if (song.source != SongSource.local) continue;
+      if (song.cueStartMs != null && !seenCueContainerPaths.add(song.path)) {
+        continue;
+      }
       index++;
       final artist =
           song.artist.trim().isNotEmpty ? song.artist.trim() : 'Unknown Artist';
@@ -98,8 +110,12 @@ class PlaylistExportUseCase {
     buffer.writeln('<smil>');
     buffer.writeln('  <body>');
     buffer.writeln('    <seq>');
+    final seenWplCuePaths = <String>{};
     for (final song in songs) {
       if (song.source != SongSource.local) continue;
+      if (song.cueStartMs != null && !seenWplCuePaths.add(song.path)) {
+        continue;
+      }
       buffer.writeln('      <media src="${_escapeXml(song.path)}"/>');
     }
     buffer.writeln('    </seq>');
@@ -213,6 +229,44 @@ class PlaylistImportUseCase {
     return paths;
   }
 
+  List<String> _parseJsonContent(String content) {
+    try {
+      final decoded = jsonDecode(content);
+      final paths = <String>[];
+      void collectFromList(List<dynamic> list) {
+        for (final item in list) {
+          if (item is String && item.trim().isNotEmpty) {
+            paths.add(item.trim());
+          } else if (item is Map) {
+            final p = item['path'] ?? item['file'] ?? item['uri'];
+            if (p is String && p.trim().isNotEmpty) {
+              paths.add(p.trim());
+            }
+          }
+        }
+      }
+
+      if (decoded is List) {
+        collectFromList(decoded);
+      } else if (decoded is Map) {
+        final raw =
+            decoded['songPaths'] ?? decoded['paths'] ?? decoded['tracks'];
+        if (raw is List) {
+          collectFromList(raw);
+        } else if (decoded['playlists'] is List) {
+          for (final pl in decoded['playlists'] as List) {
+            if (pl is Map && pl['songPaths'] is List) {
+              collectFromList(pl['songPaths'] as List);
+            }
+          }
+        }
+      }
+      return paths;
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
   List<String> _parseByContent(String content, String filePath) {
     final dotIndex = filePath.lastIndexOf('.');
     final extension = dotIndex >= 0 && dotIndex < filePath.length - 1
@@ -220,6 +274,7 @@ class PlaylistImportUseCase {
         : '';
 
     if (extension == 'pls') return parsePlsContent(content);
+    if (extension == 'json') return _parseJsonContent(content);
     if (extension == 'wpl') return parseWplContent(content);
     if (extension == 'm3u' || extension == 'm3u8') {
       return parseM3uContent(content);
@@ -282,6 +337,8 @@ class PlaylistImportUseCase {
       const knownExts = {'m3u', 'm3u8', 'pls', 'wpl', 'json'};
 
       final lower = content.toLowerCase();
+      final hasJsonContent = content.trimLeft().startsWith('{') ||
+          content.trimLeft().startsWith('[');
       final hasPlaylistHeader = lower.contains('[playlist]');
       final hasSmilOrMedia = lower.contains('<smil') ||
           lower.contains('<media') ||
@@ -290,6 +347,7 @@ class PlaylistImportUseCase {
           lower.contains('#extm3u') || lower.contains('#extinf');
 
       if (!knownExts.contains(ext) &&
+          !hasJsonContent &&
           !hasPlaylistHeader &&
           !hasSmilOrMedia &&
           !hasM3uHeader) {
@@ -308,6 +366,7 @@ class PlaylistImportUseCase {
       final filenameCounts = <String, int>{};
 
       for (final song in allSongs) {
+        if (song.cueFile != null && song.cueStartMs == null) continue;
         exactMap[song.path] = song;
         final normPath = song.path.replaceAll('\\', '/').toLowerCase();
         normalizedMap[normPath] = song;

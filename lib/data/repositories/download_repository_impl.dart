@@ -5,8 +5,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:drift/drift.dart' show BooleanExpressionOperators;
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart'
+    show BooleanExpressionOperators, StringExpressionOperators, Value;
 import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
@@ -32,6 +32,7 @@ import '../services/library_maintenance_service.dart';
 class DownloadRepositoryImpl implements IDownloadRepository {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const String _prefKey = 'pulsr_download_tasks_v2';
+  static const String _autoPausedPrefKey = 'pulsr_download_auto_paused_v1';
   static final _random = Random();
 
   final YtDownloadService _ytDownloadService;
@@ -550,6 +551,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             .where((t) => t.status == DownloadStatus.complete)
             .toList();
         final db = _effectiveDb;
+        var mutated = false;
 
         final sizes = await Future.wait(completedTasks.map((t) async {
           // 1. Direct fileSize if present and non-zero. Trust the recorded size:
@@ -565,8 +567,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               final f = File(t.filePath!);
               if (await f.exists()) {
                 final len = await f.length();
-                if (t.fileSize != len) {
-                  _tasks[t.videoId] = t.copyWith(fileSize: len);
+                final current = _tasks[t.videoId];
+                if (current != null &&
+                    current.status == DownloadStatus.complete &&
+                    current.fileSize != len) {
+                  _tasks[t.videoId] = current.copyWith(fileSize: len);
+                  mutated = true;
                 }
                 return len;
               }
@@ -576,27 +582,50 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             }
           }
 
-          // 3. Fallback to localSongId query in database
-          if (t.localSongId != null && db != null) {
+          // 3. Fallback to localSongId (or remoteId) query in database
+          if (db != null) {
             try {
-              final song = await (db.select(db.songsTable)
-                    ..where((s) => s.id.equals(t.localSongId!)))
+              SongsTableData? song;
+              if (t.localSongId != null) {
+                song = await (db.select(db.songsTable)
+                      ..where((s) => s.id.equals(t.localSongId!)))
+                    .getSingleOrNull();
+              }
+              song ??= await (db.select(db.songsTable)
+                    ..where((s) =>
+                        s.remoteId.equals(t.videoId) &
+                        (s.source.equals(SongSource.local) |
+                            s.isDownloaded.equals(true)) &
+                        s.isMissing.equals(false))
+                    ..limit(1))
                   .getSingleOrNull();
               if (song != null) {
                 if (song.fileSize != null && song.fileSize! > 0) {
-                  _tasks[t.videoId] = t.copyWith(
-                    filePath: song.path,
-                    fileSize: song.fileSize,
-                  );
+                  final current = _tasks[t.videoId];
+                  if (current != null &&
+                      current.status == DownloadStatus.complete) {
+                    _tasks[t.videoId] = current.copyWith(
+                      localSongId: song.id,
+                      filePath: song.path,
+                      fileSize: song.fileSize,
+                    );
+                    mutated = true;
+                  }
                   return song.fileSize!;
                 }
                 final f = File(song.path);
                 if (await f.exists()) {
                   final len = await f.length();
-                  _tasks[t.videoId] = t.copyWith(
-                    filePath: song.path,
-                    fileSize: len,
-                  );
+                  final current = _tasks[t.videoId];
+                  if (current != null &&
+                      current.status == DownloadStatus.complete) {
+                    _tasks[t.videoId] = current.copyWith(
+                      localSongId: song.id,
+                      filePath: song.path,
+                      fileSize: len,
+                    );
+                    mutated = true;
+                  }
                   return len;
                 }
               }
@@ -608,6 +637,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
           return 0;
         }));
+
+        if (mutated) {
+          _schedulePersist();
+        }
 
         totalUsedBytes = sizes.fold(0, (a, b) => a + b);
         completedCount = sizes.where((s) => s > 0).length;
@@ -655,8 +688,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     await _reloadSettings();
     try {
       final prefs = await SharedPreferences.getInstance();
+      final savedAutoPaused = prefs.getStringList(_autoPausedPrefKey);
+      if (savedAutoPaused != null) {
+        _autoPausedVideoIds.addAll(savedAutoPaused);
+      }
       final rawJson = prefs.getString(_prefKey);
       final interruptedSaves = <String>{};
+      var bootMutated = false;
       if (rawJson != null && rawJson.isNotEmpty) {
         final list = jsonDecode(rawJson) as List<dynamic>;
         for (final item in list) {
@@ -670,8 +708,18 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               // would produce a duplicate MediaStore entry.
               interruptedSaves.add(task.videoId);
             }
-            _tasks[task.videoId] = task.copyWith(status: DownloadStatus.paused);
+            _pausedVideoIds.add(task.videoId);
+            _autoPausedVideoIds.add(task.videoId);
+            _tasks[task.videoId] = task.copyWith(
+              status: DownloadStatus.paused,
+              clearSpeedKbps: true,
+              clearEtaSeconds: true,
+            );
+            bootMutated = true;
           } else {
+            if (task.status == DownloadStatus.paused) {
+              _pausedVideoIds.add(task.videoId);
+            }
             _tasks[task.videoId] = task;
           }
         }
@@ -680,6 +728,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       // chunks (no main-thread existsSync/lengthSync blocking).
       await _reconcileCompletedFiles();
       await _reconcileInterruptedSaves(interruptedSaves);
+      _pausedVideoIds.removeWhere(
+          (id) => _tasks[id]?.status != DownloadStatus.paused);
+      _autoPausedVideoIds.removeWhere(
+          (id) => _tasks[id]?.status != DownloadStatus.paused);
+      if (bootMutated) {
+        _schedulePersist(immediateOnTerminal: true);
+      }
       // Keep the partials of everything we still track, so a download paused
       // across a restart can resume from its bytes instead of from zero. Named
       // by video id: the on-disk names carry the container extension
@@ -822,7 +877,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         }
       }
 
-      else if (db != null) {
+      if (song == null && db != null) {
         song = await (db.select(db.songsTable)
               ..where((s) =>
                   s.remoteId.equals(task.videoId) &
@@ -833,7 +888,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             .getSingleOrNull();
         if (song == null && filePath != null && filePath.isNotEmpty) {
           song = await (db.select(db.songsTable)
-                ..where((s) => s.path.equals(filePath!))
+                ..where((s) => s.path.lower().equals(filePath!.toLowerCase()))
                 ..limit(1))
               .getSingleOrNull();
         }
@@ -1090,6 +1145,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         ErrorLogger.log('Download queue persistence was rejected by prefs',
             category: 'Download');
       }
+      final validAutoPaused = _autoPausedVideoIds
+          .where((id) => _tasks[id]?.status == DownloadStatus.paused)
+          .toList(growable: false);
+      await prefs.setStringList(_autoPausedPrefKey, validAutoPaused);
     } catch (e, st) {
       // Swallowing this used to make a failed write indistinguishable from a
       // successful one, so the next boot silently lost every active task.

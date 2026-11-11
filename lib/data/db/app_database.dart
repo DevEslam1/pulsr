@@ -244,34 +244,34 @@ class AppDatabase extends _$AppDatabase {
       // child rows to the surviving id first so no membership/history is lost.
       await executeSql(
         "UPDATE playlist_entries SET song_id = (SELECT MIN(s2.id) FROM songs s2 "
-        "WHERE s2.source = 'local' AND s2.path != '' "
+        "WHERE s2.source = 'local' "
         "AND lower(s2.path) = lower((SELECT s.path FROM songs s WHERE s.id = playlist_entries.song_id)) "
         "AND ifnull(s2.cue_start_ms, -1) = ifnull((SELECT s.cue_start_ms FROM songs s WHERE s.id = playlist_entries.song_id), -1)) "
-        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local' AND path != '') "
-        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local') "
+        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' "
         "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
       );
       await executeSql(
         "UPDATE queue_items SET song_id = (SELECT MIN(s2.id) FROM songs s2 "
-        "WHERE s2.source = 'local' AND s2.path != '' "
+        "WHERE s2.source = 'local' "
         "AND lower(s2.path) = lower((SELECT s.path FROM songs s WHERE s.id = queue_items.song_id)) "
         "AND ifnull(s2.cue_start_ms, -1) = ifnull((SELECT s.cue_start_ms FROM songs s WHERE s.id = queue_items.song_id), -1)) "
-        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local' AND path != '') "
-        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local') "
+        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' "
         "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
       );
       await executeSql(
         "UPDATE play_history SET song_id = (SELECT MIN(s2.id) FROM songs s2 "
-        "WHERE s2.source = 'local' AND s2.path != '' "
+        "WHERE s2.source = 'local' "
         "AND lower(s2.path) = lower((SELECT s.path FROM songs s WHERE s.id = play_history.song_id)) "
         "AND ifnull(s2.cue_start_ms, -1) = ifnull((SELECT s.cue_start_ms FROM songs s WHERE s.id = play_history.song_id), -1)) "
-        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local' AND path != '') "
-        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "WHERE song_id IN (SELECT id FROM songs WHERE source = 'local') "
+        "AND song_id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' "
         "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
       );
       await executeSql(
-        "DELETE FROM songs WHERE source = 'local' AND path != '' "
-        "AND id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' AND path != '' "
+        "DELETE FROM songs WHERE source = 'local' "
+        "AND id NOT IN (SELECT MIN(id) FROM songs WHERE source = 'local' "
         "GROUP BY lower(path), ifnull(cue_start_ms, -1));",
       );
       // Duplicate memberships are the pre-v11 read-then-insert race; keep the
@@ -471,6 +471,21 @@ class AppDatabase extends _$AppDatabase {
           // database. Every statement is IF NOT EXISTS, so re-running is free.
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
+          await _createTrigramFtsTable(customStatement);
+          if (ftsTrigramSupported) {
+            try {
+              await customStatement(
+                  "INSERT INTO songs_fts_trigram(songs_fts_trigram) VALUES('rebuild');");
+            } catch (e, st) {
+              ftsTrigramSupported = false;
+              ErrorLogger.log(
+                'songs_fts_trigram rebuild failed during upgrade',
+                error: e,
+                stackTrace: st,
+                category: 'Database',
+              );
+            }
+          }
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON;');

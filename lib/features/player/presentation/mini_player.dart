@@ -1055,7 +1055,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                               top: 4.5,
                               child: IgnorePointer(
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
+                                  duration: context.motion(PulsrMotion.state),
                                   width: _swipeInFlight ? 34 : 28,
                                   height: 3.0,
                                   decoration: BoxDecoration(

@@ -12,6 +12,7 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:share_plus/share_plus.dart';
 

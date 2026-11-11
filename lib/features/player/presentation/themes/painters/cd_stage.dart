@@ -192,7 +192,7 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                           colors: [
                             Colors.grey.shade300,
                             Colors.grey.shade600,
-                            const Color(0xFF141720),
+                            PlayerMaterialColors.cdPivotLow,
                           ],
                           stops: const [0.0, 0.55, 1.0],
                         ),
@@ -214,7 +214,7 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: const Color(0xFF0C0D11),
+                            color: PlayerMaterialColors.recordBase,
                             border: Border.all(
                               color: Colors.white24,
                               width: 0.6,
@@ -493,8 +493,8 @@ class _CdOpticalDisplayHud extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF141824).withValues(alpha: 0.92),
-            const Color(0xFF0B0E15).withValues(alpha: 0.90),
+            PlayerMaterialColors.cdTrayGradStart.withValues(alpha: 0.92),
+            PlayerMaterialColors.cdTrayGradEnd.withValues(alpha: 0.90),
           ],
         ),
         borderRadius: AppRadii.r8All,

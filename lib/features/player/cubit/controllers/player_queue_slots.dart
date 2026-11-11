@@ -177,6 +177,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
                 ),
               ));
               if (_audioHandler.queue.valueOrNull?.isEmpty ?? true) {
+                _invalidateQueueSyncResolution();
                 try {
                   await _audioHandler.setSpeed(slotData.speed);
                   await _audioHandler.loadQueue(
@@ -185,12 +186,27 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
                     initialPosition: slotData.position,
                     autoPlay: false,
                   );
+                  _invalidateQueueSyncResolution();
+                  if (!_isClosed()) {
+                    if (_onTrackChangedSideEffects != null) {
+                      _onTrackChangedSideEffects!(song);
+                    } else {
+                      _loadLyrics(song);
+                    }
+                  }
                 } catch (e, st) {
+                  _invalidateQueueSyncResolution();
                   ErrorLogger.log(
                       'Failed to load restored queue into audioHandler',
                       error: e,
                       stackTrace: st,
                       category: 'PlayerQueueController');
+                }
+              } else if (!_isClosed()) {
+                if (_onTrackChangedSideEffects != null) {
+                  _onTrackChangedSideEffects!(song);
+                } else {
+                  _loadLyrics(song);
                 }
               }
             } else {
@@ -219,6 +235,9 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
   Future<void> _clearQueueLocked() async {
     final state = _getState();
     final current = state.currentSong;
+    if (current == null) {
+      _onResetTrackChangeSideEffects?.call(null);
+    }
     final retained = current != null ? [current] : <SongsTableData>[];
     final retainedTiers = <int, QueueTier>{
       if (current != null && state.trackTiers.containsKey(current.id))
@@ -240,11 +259,14 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         trackTiers: retainedTiers,
       ),
     ));
+    _invalidateQueueSyncResolution();
     try {
       await _audioHandler.clearQueue();
     } catch (e, st) {
       ErrorLogger.log('Failed to clear queue in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
+    } finally {
+      _invalidateQueueSyncResolution();
     }
   }
 
@@ -288,6 +310,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       initialPosition: restorePosition,
       autoPlay: state.isPlaying,
     )
+        .whenComplete(_invalidateQueueSyncResolution)
         .catchError((Object e, StackTrace st) {
       ErrorLogger.log('Failed to restore queue in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
@@ -347,6 +370,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
     try {
       await _audioHandler.reorderQueue(oldIndex, targetIndex);
+      _invalidateQueueSyncResolution();
     } catch (e, st) {
       // H-08: Roll back queue and slot state if audio handler reorder throws
       ErrorLogger.log('Failed to reorder queue in audio handler',
@@ -370,6 +394,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           errorMessage: 'Failed to reorder queue',
         ),
       ));
+      _invalidateQueueSyncResolution();
     }
   }
 
@@ -380,6 +405,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final state = _getState();
     if (index < 0 || index >= state.queue.length) return;
     if (state.queue.length <= 1) {
+      _onResetTrackChangeSideEffects?.call(null);
       setQueueSlot(
         state.activeQueueSlot,
         songs: const [],
@@ -412,6 +438,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       } catch (e, st) {
         ErrorLogger.log('Failed to remove queue item in audio handler',
             error: e, stackTrace: st, category: 'PlayerQueueController');
+      } finally {
+        _invalidateQueueSyncResolution();
       }
       return;
     }
@@ -458,12 +486,28 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         trackTiers: updatedTiers,
       ),
       playback: playback,
+      lyricsSlice: removingCurrent
+          ? state.lyricsSlice.copyWith(
+              lyrics: const [],
+              lyricsSource: LyricsSource.none,
+              isLoadingLyrics: nextSong != null,
+            )
+          : state.lyricsSlice,
     ));
     _invalidateQueueSyncResolution();
 
     try {
       await _audioHandler.removeQueueItemAt(index);
+      _invalidateQueueSyncResolution();
+      if (removingCurrent && nextSong != null && !_isClosed()) {
+        if (_onTrackChangedSideEffects != null) {
+          _onTrackChangedSideEffects!(nextSong);
+        } else {
+          _loadLyrics(nextSong);
+        }
+      }
     } catch (e, st) {
+      _invalidateQueueSyncResolution();
       ErrorLogger.log('Failed to remove queue item in audio handler',
           error: e, stackTrace: st, category: 'PlayerQueueController');
       if (!_isClosed()) {
@@ -473,6 +517,9 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         final s = _getState();
         final stillOnOptimisticNext =
             removingCurrent && s.currentSong?.id == nextSong?.id;
+        if (stillOnOptimisticNext) {
+          _onResetTrackChangeSideEffects?.call(state.currentSong);
+        }
         _emit(s.copyWith(
           queueSlice: s.queueSlice.copyWith(
             queue: List<SongsTableData>.unmodifiable(state.queue),
@@ -480,6 +527,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
             trackTiers: state.trackTiers,
           ),
           playback: stillOnOptimisticNext ? state.playback : s.playback,
+          lyricsSlice: stillOnOptimisticNext ? state.lyricsSlice : s.lyricsSlice,
         ));
       }
     }
@@ -537,6 +585,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
       }
       final song = validSongs[safeIdx];
+      final isSameSong = _isSameTrack(state.currentSong, song);
       _emit(state.copyWith(
         queueSlice: state.queueSlice.copyWith(
           activeQueueSlot: slot,
@@ -549,6 +598,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           position: targetSlot.position,
           playbackSpeed: targetSlot.speed,
         ),
+        lyricsSlice: state.lyricsSlice.copyWith(
+          lyrics: isSameSong ? state.lyrics : const [],
+          lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
+          isLoadingLyrics: isSameSong ? state.isLoadingLyrics : true,
+        ),
       ));
       _invalidateQueueSyncResolution();
       try {
@@ -559,12 +613,20 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           initialPosition: targetSlot.position,
           autoPlay: wasPlaying,
         );
-        _loadLyrics(song);
-        _updateWidgetThrottled(force: true);
+        _invalidateQueueSyncResolution();
+        if (!_isClosed()) {
+          if (_onTrackChangedSideEffects != null) {
+            _onTrackChangedSideEffects!(song);
+          } else {
+            _loadLyrics(song);
+          }
+          _updateWidgetThrottled(force: true);
+        }
       } catch (e, st) {
         ErrorLogger.log('Failed to switch queue slot $slot',
             error: e, stackTrace: st, category: 'PlayerQueueController');
         if (!_isClosed()) {
+          _onResetTrackChangeSideEffects?.call(state.currentSong);
           _bumpQueueVersion();
           final s = _getState();
           _emit(s.copyWith(
@@ -576,6 +638,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
               playbackSpeed: state.playbackSpeed,
               errorMessage: 'Failed to switch queue slot',
             ),
+            lyricsSlice: state.lyricsSlice,
           ));
           _invalidateQueueSyncResolution();
           try {

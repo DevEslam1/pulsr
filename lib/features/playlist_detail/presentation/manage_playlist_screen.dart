@@ -11,6 +11,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
@@ -582,8 +583,8 @@ class _ManageSongRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        curve: Curves.easeOutCubic,
+        duration: context.motion(PulsrMotion.state),
+        curve: context.motionCurve(PulsrMotion.enter),
         decoration: BoxDecoration(
           borderRadius: AppRadii.cardRadius,
           color: bgColor,

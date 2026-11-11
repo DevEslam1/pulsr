@@ -669,7 +669,9 @@ class AudioQualitySheet extends StatelessWidget {
       // Neither an AAudio preference nor an attached USB DAC proves ownership.
       active: outputDevice?.isBluetooth != true &&
           (direct || outputDevice?.isBitPerfectActive == true),
-      sourceSampleRate: source.sampleRate ?? 0,
+      sourceSampleRate: effectiveSourceSampleRate(
+          tagged: source.sampleRate ?? 0,
+          decoded: outputDevice?.decodedSampleRate ?? 0),
       sourceBitDepth: effectiveSourceBitDepth(tagged: source.bitDepth ?? 0,
           decoded: outputDevice?.decodedBitDepth ?? 0),
       outputSampleRate: direct ? usb.streamingSampleRate : outputDevice?.sampleRate ?? 0,
@@ -1443,8 +1445,19 @@ class AudioQualitySheet extends StatelessWidget {
                         }
                         HapticFeedback.selectionClick();
                         if (cubit == null) return;
-                        final attempted =
-                            await requestBitPerfectOutput(context, val);
+                        String? capturedError;
+                        final sub = cubit.stream.listen((s) {
+                          if (s.errorMessage != null) {
+                            capturedError = s.errorMessage;
+                          }
+                        });
+                        bool attempted = false;
+                        try {
+                          attempted =
+                              await requestBitPerfectOutput(context, val);
+                        } finally {
+                          await sub.cancel();
+                        }
                         // The cubit's errorMessage is only surfaced by the
                         // Settings screen listener; from this sheet a refusal
                         // looked like a switch that silently snapped back.
@@ -1457,6 +1470,7 @@ class AudioQualitySheet extends StatelessWidget {
                           position: PulsrToastPosition.top,
                           maxLines: 6,
                           message: cubit.state.errorMessage ??
+                              capturedError ??
                               'Bit-Perfect output is not supported by the current output device.',
                         );
                       },

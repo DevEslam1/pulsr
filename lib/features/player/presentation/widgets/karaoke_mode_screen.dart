@@ -88,8 +88,12 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    if (state == AppLifecycleState.resumed && mounted) {
+      final isLandscape =
+          MediaQuery.orientationOf(context) == Orientation.landscape;
+      SystemChrome.setEnabledSystemUIMode(
+        isLandscape ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+      );
     }
   }
 

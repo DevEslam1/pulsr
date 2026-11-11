@@ -290,6 +290,22 @@ void main() {
       await service.getStatus();
       expect(await service.startStreaming(), UsbStreamResult.ok);
     });
+
+    test('accepts a wider wire bit depth in non-strict mode and requires exact in strict', () async {
+      _messenger.setMockMethodCallHandler(_method, (call) async {
+        if (call.method == 'startStreaming') return {'success': true};
+        return _statusMap(streaming: true, bitDepth: 24);
+      });
+      await service.getStatus();
+      expect(
+        await service.startStreaming(sampleRate: 48000, bitDepth: 16, strict: false),
+        UsbStreamResult.ok,
+      );
+      expect(
+        await service.startStreaming(sampleRate: 48000, bitDepth: 16, strict: true),
+        UsbStreamResult.unknown,
+      );
+    });
   });
 
   test('stop requires fresh confirmation that the stream is inactive', () async {

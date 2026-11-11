@@ -370,7 +370,7 @@ class CleanPlayerTheme extends StatelessWidget {
                     ? Icons.star_rounded
                     : Icons.star_outline_rounded,
                 iconColor: (song?.isFavorite == true)
-                    ? const Color(0xFFFFB800)
+                    ? AppColors.amberDeep
                     : Colors.white,
                 tooltip: (song?.isFavorite == true)
                     ? context.l10n.unlike
@@ -562,10 +562,10 @@ class CleanPlayerTheme extends StatelessWidget {
             ),
             RepaintBoundary(child: content),
             // Top bar affordance: Grab handle (center)
-            const Positioned(
+            const PositionedDirectional(
               top: 0,
-              left: 0,
-              right: 0,
+              start: 0,
+              end: 0,
               child: SafeArea(
                 top: true,
                 bottom: false,
@@ -653,6 +653,14 @@ class _CleanSeekBar extends StatefulWidget {
 class _CleanSeekBarState extends State<_CleanSeekBar> {
   double? _dragValue;
   bool _showRemainingTime = true;
+
+  @override
+  void didUpdateWidget(covariant _CleanSeekBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.song?.id != oldWidget.song?.id) {
+      _dragValue = null;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

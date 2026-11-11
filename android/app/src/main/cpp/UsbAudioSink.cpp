@@ -242,7 +242,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     // Power-of-two ring buffer capacity for mask-based indexing (at least 250ms slack).
     const size_t targetRingBytes = std::max(
         static_cast<size_t>(bytesPerUrb_) * 32,
-        static_cast<size_t>(sampleRate_ * channels_ * bytesPerSample_ / 4));
+        static_cast<size_t>(sampleRate_) * static_cast<size_t>(channels_) *
+            static_cast<size_t>(bytesPerSample_) / 4);
     size_t cap = 2048;
     while (cap < targetRingBytes) cap <<= 1;
     ring_.assign(cap, 0);
@@ -447,7 +448,7 @@ std::vector<uint8_t> UsbAudioSink::fetchConfigDescriptor(int fd) {
     ctrl.data = cfg.data();
     int res = ioctl(fd, USBDEVFS_CONTROL, &ctrl);
     if (res < 0) return {};
-    cfg.resize(static_cast<size_t>(res));
+    cfg.resize(std::min(static_cast<size_t>(res), cfg.size()));
     return cfg;
 #else
     (void)fd;
@@ -474,8 +475,12 @@ int UsbAudioSink::findFeedbackEndpoint(const uint8_t* cfg, size_t len,
         const uint8_t bType = cfg[i + 1];
         if (bType == 0x04) { // INTERFACE
             if (bLength < 9 || (selected && seenEndpoints != expectedEndpoints)) return -1;
+            const uint8_t ifClass = cfg[i + 5];
+            const uint8_t ifProtocol = cfg[i + 7];
+            const bool isAudioClass = ifClass == 0x01 ||
+                (ifClass == 0xFF && (ifProtocol == 0x00 || ifProtocol == 0x20));
             selected = cfg[i + 2] == interfaceNumber && cfg[i + 3] == altSetting &&
-                cfg[i + 5] == 0x01 && cfg[i + 6] == 0x02;
+                isAudioClass && cfg[i + 6] == 0x02;
             if (selected) {
                 if (foundInterface) return -1; // ambiguous duplicate interface/alt
                 foundInterface = true;
@@ -700,6 +705,11 @@ void UsbAudioSink::workerLoop() {
         size_t readPos = ringRead_.load(std::memory_order_relaxed);
         uint8_t* dst = buf;
         int urbTotalBytes = 0;
+        if (feedbackEndpoint_ == 0) {
+            const size_t wNow = ringWrite_.load(std::memory_order_acquire);
+            feedbackRatePerSec_ = SteerPacketRateForRingFill(
+                feedbackRatePerSec_, sampleRate_, wNow - readPos, ring_.size());
+        }
         const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
         int rawDepth = -1;
         uint64_t deliveryEpoch = deliveryEpoch_.load(std::memory_order_acquire);
@@ -888,10 +898,12 @@ double UsbAudioSink::GetBufferedMs() {
     if (!active_.load(std::memory_order_acquire)) return 0.0;
     const size_t w = ringWrite_.load(std::memory_order_acquire);
     const size_t r = ringRead_.load(std::memory_order_acquire);
-    const size_t count = (w >= r) ? (w - r) : 0;
+    const size_t count = w - r;
     const int frameBytes = channels_ * bytesPerSample_;
     const double ringMs = frameBytes > 0 && sampleRate_ > 0
-        ? static_cast<double>(count) * 1000.0 / (frameBytes * sampleRate_) : 0.0;
+        ? static_cast<double>(count) * 1000.0 /
+            (static_cast<double>(frameBytes) * static_cast<double>(sampleRate_))
+        : 0.0;
     const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_) * serviceIntervalUs_ / 1000.0;
     return ringMs + urbMs;
 }
@@ -1017,8 +1029,12 @@ UsbAudioSink::EndpointTiming UsbAudioSink::ParseEndpointTiming(
         const uint8_t type = desc[i + 1];
         if (type == 0x04) {
             if (length < 9) return {};
+            const uint8_t ifClass = desc[i + 5];
+            const uint8_t ifProtocol = desc[i + 7];
+            const bool isAudioClass = ifClass == 0x01 ||
+                (ifClass == 0xFF && (ifProtocol == 0x00 || ifProtocol == 0x20));
             selectedInterface = desc[i + 2] == interfaceNumber &&
-                desc[i + 3] == altSetting && desc[i + 5] == 0x01 && desc[i + 6] == 0x02;
+                desc[i + 3] == altSetting && isAudioClass && desc[i + 6] == 0x02;
         } else if (type == 0x05 && selectedInterface) {
             if (length < 7) return {};
             if (desc[i + 2] == endpointAddress) {
@@ -1059,6 +1075,34 @@ int UsbAudioSink::NextPacketFrames(uint64_t& accumulator, uint32_t ratePerSec,
     const uint64_t frames = accumulator / 1000000;
     accumulator %= 1000000;
     return static_cast<int>(std::min(frames, static_cast<uint64_t>(maxFramesPerPacket)));
+}
+
+int UsbAudioSink::SteerPacketRateForRingFill(int currentRatePerSec, int nominalRate,
+                                             size_t occupiedBytes, size_t capacityBytes) {
+    if (nominalRate <= 0) return currentRatePerSec;
+    const int deltaMax = std::max(1, nominalRate / 1000); // +/-0.1% clamp
+    const int minRate = std::max(1, nominalRate - deltaMax);
+    const int maxRate = nominalRate + deltaMax;
+    int rate = (currentRatePerSec > 0)
+        ? std::clamp(currentRatePerSec, minRate, maxRate)
+        : nominalRate;
+    if (capacityBytes == 0) return rate;
+    const size_t clampedOccupied = std::min(occupiedBytes, capacityBytes);
+    const int fillPermille = static_cast<int>(
+        (static_cast<uint64_t>(clampedOccupied) * 1000ULL) / capacityBytes);
+    const int step = std::max(1, deltaMax / 48);
+    if (fillPermille < 200) {
+        rate = std::max(minRate, rate - step);
+    } else if (fillPermille > 800) {
+        rate = std::min(maxRate, rate + step);
+    } else if (fillPermille >= 300 && fillPermille <= 700) {
+        if (rate < nominalRate) {
+            rate = std::min(nominalRate, rate + step);
+        } else if (rate > nominalRate) {
+            rate = std::max(nominalRate, rate - step);
+        }
+    }
+    return std::clamp(rate, minRate, maxRate);
 }
 
 std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(
@@ -1162,7 +1206,7 @@ std::vector<int> UsbAudioSink::QuerySupportedRates(int fd, int interfaceNumber) 
     if (res < 0) {
         return {};
     }
-    configDesc.resize(static_cast<size_t>(res));
+    configDesc.resize(std::min(static_cast<size_t>(res), configDesc.size()));
 
     std::vector<int> rates = ParseSupportedRatesFromDescriptors(
         configDesc.data(), configDesc.size(), interfaceNumber);
@@ -1198,10 +1242,13 @@ std::vector<int> UsbAudioSink::QuerySupportedRates(int fd, int interfaceNumber) 
         rangeCtrl.timeout = 1000;
         rangeCtrl.data = rangeBuf;
 
-        if (ioctl(fd, USBDEVFS_CONTROL, &rangeCtrl) >= 2) {
+        const int rangeLen = ioctl(fd, USBDEVFS_CONTROL, &rangeCtrl);
+        if (rangeLen >= 2) {
+            const size_t validBytes = std::min(
+                sizeof(rangeBuf), static_cast<size_t>(rangeLen));
             uint16_t numRanges = rangeBuf[0] | (rangeBuf[1] << 8);
             size_t offset = 2;
-            for (uint16_t r = 0; r < numRanges && offset + 12 <= sizeof(rangeBuf); ++r) {
+            for (uint16_t r = 0; r < numRanges && offset + 12 <= validBytes; ++r) {
                 uint32_t dMin = rangeBuf[offset] | (rangeBuf[offset + 1] << 8) |
                                 (rangeBuf[offset + 2] << 16) | (rangeBuf[offset + 3] << 24);
                 uint32_t dMax = rangeBuf[offset + 4] | (rangeBuf[offset + 5] << 8) |

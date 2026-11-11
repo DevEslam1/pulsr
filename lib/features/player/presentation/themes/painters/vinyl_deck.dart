@@ -125,7 +125,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFF0C0D11),
+                    color: PlayerMaterialColors.recordBase,
                     boxShadow: [
                       BoxShadow(
                         color: AppColors.scrimAt(0.5),
@@ -228,14 +228,14 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
-                          Color(0xFF1A1C26),
-                          Color(0xFF13141C),
-                          Color(0xFF0E0F15),
+                          PlayerMaterialColors.deckGradStart,
+                          PlayerMaterialColors.deckGradMid,
+                          PlayerMaterialColors.deckGradEnd,
                         ],
                       ),
                       borderRadius: AppRadii.r22All,
                       border: Border.all(
-                        color: const Color(0xFF323646),
+                        color: PlayerMaterialColors.cassetteShellBorder,
                         width: 1.5,
                       ),
                       boxShadow: [
@@ -487,12 +487,12 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                               decoration: BoxDecoration(
                                 color: state.isPlaying
                                     ? activeColor.withValues(alpha: 0.15)
-                                    : const Color(0xFF181A22),
+                                    : PlayerMaterialColors.recordSheenCenter,
                                 borderRadius: AppRadii.r6All,
                                 border: Border.all(
                                   color: state.isPlaying
                                       ? activeColor.withValues(alpha: 0.5)
-                                      : const Color(0xFF2B2E3C),
+                                      : PlayerMaterialColors.recordRim,
                                   width: 1,
                                 ),
                               ),

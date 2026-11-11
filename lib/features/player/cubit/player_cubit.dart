@@ -90,6 +90,13 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   final AsyncGuard _mediaItemGuard = AsyncGuard();
   final AsyncGuard _queueSyncGuard = AsyncGuard();
 
+  // BUG-01 FIX: Track the last song for which track-change side effects
+  // (enrichment, follow-sample-rate, playback options, autoplay check) and
+  // mediaItem side effects have run so optimistic currentSong pre-emissions in
+  // playSong / slot restoration / queue mutations never suppress them.
+  SongsTableData? _lastEnrichedTrack;
+  SongsTableData? _lastHandledMediaItemTrack;
+
   /// True once the engine has emitted a non-empty queue. Before that an empty
   /// queue is a cold-start artefact; afterwards it is an intentional clear and
   /// must be honoured.
@@ -207,6 +214,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           unawaited(playbackOptionsController.applyPerSongPlaybackMemory(song)),
       invalidateQueueSyncResolution: invalidateQueueSyncResolution,
       cancelPendingSeek: () => transportController.cancelPendingSeek(),
+      onTrackChangedSideEffects: _triggerTrackChangeSideEffects,
+      onResetTrackChangeSideEffects: _resetTrackChangeSideEffects,
     );
     transportController = PlayerTransportController(
       audioHandler: _audioHandler,
@@ -509,6 +518,31 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     widgetBridge.debouncedScrobble(song, position, isPlaying);
   }
 
+  /// Runs track-change side effects (parallel metadata enrichment, sample-rate
+  /// follow, per-track playback options, autoplay check, and widget sync)
+  /// exactly once per distinct track, regardless of whether `currentSong` was
+  /// pre-emitted optimistically or discovered reactively via handler streams.
+  void _triggerTrackChangeSideEffects(SongsTableData song) {
+    if (_isSameTrack(_lastEnrichedTrack, song)) return;
+    _lastEnrichedTrack = song;
+    _lastFailedSongId = null;
+    _consecutiveErrorCount = 0;
+    unawaited(metadataController.enrichTrackParallel(song));
+    unawaited(dspController.maybeFollowTrackSampleRate(song));
+    unawaited(playbackOptionsController.onCurrentSongChanged(song));
+    unawaited(checkAndTriggerAutoplay());
+    widgetBridge.updateWidgetThrottled(state,
+        queueVersion: _queueVersion, force: true);
+  }
+
+  /// Resets the deduplication trackers when a track load rolls back or the
+  /// queue is cleared/stopped so the previous or next track can re-trigger
+  /// side effects cleanly.
+  void _resetTrackChangeSideEffects([SongsTableData? fallbackTrack]) {
+    _lastEnrichedTrack = fallbackTrack;
+    _lastHandledMediaItemTrack = fallbackTrack;
+  }
+
   /// The engine's authoritative current queue index when known and in range for
   /// a queue of [length]; otherwise null so callers fall back to a by-identity
   /// search. Preferring the engine index disambiguates duplicate songs, where
@@ -527,6 +561,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       final songIndex = _engineQueueIndexWithin(state.queue.length) ??
           state.queue.indexWhere((s) => _isSameTrack(s, song));
       final isSameSong = _isSameTrack(state.currentSong, song);
+      final needsSideEffects = !_isSameTrack(_lastEnrichedTrack, song);
       final duration = _resolveTrackDuration(
         songDurationMs: song.durationMs,
         previousDuration: state.duration,
@@ -557,17 +592,13 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         lyricsSlice: state.lyricsSlice.copyWith(
           lyrics: isSameSong ? state.lyrics : const [],
           lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
-          isLoadingLyrics: !isSameSong,
+          isLoadingLyrics: (!isSameSong || needsSideEffects)
+              ? true
+              : state.isLoadingLyrics,
         ),
       ));
-      if (!isSameSong) {
-        _lastFailedSongId = null;
-        _consecutiveErrorCount = 0;
-        unawaited(metadataController.enrichTrackParallel(song));
-        unawaited(dspController.maybeFollowTrackSampleRate(song));
-        unawaited(playbackOptionsController.onCurrentSongChanged(song));
-        unawaited(checkAndTriggerAutoplay());
-        widgetBridge.updateWidgetThrottled(state, force: true);
+      if (!isSameSong || needsSideEffects) {
+        _triggerTrackChangeSideEffects(song);
       }
       _maybeScrobble(song, state.position, state.isPlaying);
     });
@@ -590,6 +621,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             return;
           }
           if (state.currentSong != null) {
+            _resetTrackChangeSideEffects(null);
             safeEmit(state.copyWith(
               playback: state.playback.copyWith(
                 currentSong: null,
@@ -646,6 +678,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         final song = resolvedSong!;
         if (!_mediaItemGuard.isValid(mediaGen) || isClosed) return;
         final isSameSong = _isSameTrack(state.currentSong, song);
+        final isNewMediaItemTrack =
+            !_isSameTrack(_lastHandledMediaItemTrack, song);
+        _lastHandledMediaItemTrack = song;
+        final needsSideEffects = !_isSameTrack(_lastEnrichedTrack, song);
         final duration = _resolveTrackDuration(
           engineDuration: item.duration,
           songDurationMs: song.durationMs,
@@ -658,6 +694,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
 
         final songChanged = !isSameSong ||
+            isNewMediaItemTrack ||
             state.currentSong?.isFavorite != song.isFavorite ||
             state.currentSong?.artworkUri != song.artworkUri ||
             state.currentSong?.remoteArtworkUrl != song.remoteArtworkUrl ||
@@ -687,20 +724,17 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           lyricsSlice: state.lyricsSlice.copyWith(
             lyrics: isSameSong ? state.lyrics : const [],
             lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
-            isLoadingLyrics: !isSameSong,
+            isLoadingLyrics: (!isSameSong || needsSideEffects)
+                ? true
+                : state.isLoadingLyrics,
           ),
         ));
 
-        if (!isSameSong) {
-          _lastFailedSongId = null;
-          _consecutiveErrorCount = 0;
-          unawaited(metadataController.enrichTrackParallel(song));
-          unawaited(dspController.maybeFollowTrackSampleRate(song));
-          unawaited(playbackOptionsController.onCurrentSongChanged(song));
-          unawaited(checkAndTriggerAutoplay());
-        }
-        if (songChanged) {
-          widgetBridge.updateWidgetThrottled(state, force: true);
+        if (!isSameSong || needsSideEffects) {
+          _triggerTrackChangeSideEffects(song);
+        } else if (songChanged) {
+          widgetBridge.updateWidgetThrottled(state,
+              queueVersion: _queueVersion, force: true);
         }
         _maybeScrobble(song, state.position, state.isPlaying);
       }
@@ -720,6 +754,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           return;
         }
         if (state.queue.isNotEmpty || state.currentSong != null) {
+          _resetTrackChangeSideEffects(null);
           safeEmit(state.copyWith(
             playback: state.playback.copyWith(
               currentSong: null,

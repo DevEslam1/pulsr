@@ -2,9 +2,9 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import '../constants/app_blur.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
-import '../performance/gpu_budget.dart';
 import '../services/settings_cache.dart';
 import '../theme/aura_theme.dart';
 
@@ -17,10 +17,10 @@ enum GlassTier {
 
 /// Standardized BackdropFilter sigma and opacity pairs for design-system glass surfaces.
 enum GlassPreset {
-  dock(blur: 24.0, opacity: 0.72),
-  sheet(blur: 20.0, opacity: 0.82),
-  dialog(blur: 16.0, opacity: 0.88),
-  chip(blur: 8.0, opacity: 0.60);
+  dock(blur: AppBlur.dock, opacity: 0.72),
+  sheet(blur: AppBlur.sheet, opacity: 0.82),
+  dialog(blur: AppBlur.dialog, opacity: 0.88),
+  chip(blur: AppBlur.chip, opacity: 0.60);
 
   final double blur;
   final double opacity;
@@ -126,13 +126,19 @@ class GlassContainer extends StatelessWidget {
     final effectiveRadius =
         borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
 
+    final canBlur = AppBlur.canBlur(context, enableBlur: enableBlur) && blur > 0;
+    final isHighContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
+
     // Apply the user's Liquid Glass Tint (0 = ultra clear, 1 = tinted) and
     // preset opacity so glass surfaces respond dynamically to user settings.
     final tint = (tintFactor ??
             SettingsCache()
                 .getDouble('setting_liquid_glass_tint', defaultValue: 0.8))
         .clamp(0.0, 1.0);
-    final tintAlpha = (opacity * (0.35 + 0.65 * tint)).clamp(0.0, 1.0);
+    final rawTintAlpha = (opacity * (0.35 + 0.65 * tint)).clamp(0.0, 1.0);
+    final tintAlpha = isHighContrast
+        ? math.max(rawTintAlpha, AppBlur.solidFallbackMinAlpha)
+        : rawTintAlpha;
     final base = color ?? (p.isDark ? p.surfaceContainer : p.surface);
     final baseColor =
         color == null ? base.withValues(alpha: base.a * tintAlpha) : base;
@@ -188,7 +194,7 @@ class GlassContainer extends StatelessWidget {
       child: paddedChild,
     );
 
-    if (!enableBlur || GpuBudget.isGpuSaverActive || blur <= 0) {
+    if (!canBlur) {
       if (shape != null) {
         return ClipPath(
           clipper: ShapeBorderClipper(shape: shape!),
@@ -201,7 +207,7 @@ class GlassContainer extends StatelessWidget {
       );
     }
 
-    final effectiveSigma = math.min(blur, 18.0);
+    final effectiveSigma = AppBlur.clampSigma(blur);
 
     Widget blurred;
     if (shape != null) {

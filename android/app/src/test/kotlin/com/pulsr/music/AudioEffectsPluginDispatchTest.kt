@@ -33,4 +33,30 @@ class AudioEffectsPluginDispatchTest {
         verify(enabledResult).success(true)
         verifyNoMoreInteractions(paramsResult, enabledResult)
     }
+
+    @Test
+    fun bitPerfectBypassIsNotVetoedByExternalSystemEffects() {
+        val plugin = AudioEffectsPlugin()
+
+        // No native engine and no vendor effect controller in this process: the
+        // only thing that could refuse is an app-owned HAL stage, and there is
+        // none. An external/unknown system-effect verdict must never turn a
+        // request the app itself applied into a failure (that was the bug: OEM
+        // phones and the "leave on" policy could never enable Bit-Perfect).
+        val enable = mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(
+            MethodCall("setBypassDspForBitPerfect", mapOf("bypass" to true)),
+            enable,
+        )
+        verify(enable).success(true)
+        verifyNoMoreInteractions(enable)
+
+        val disable = mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(
+            MethodCall("setBypassDspForBitPerfect", mapOf("bypass" to false)),
+            disable,
+        )
+        verify(disable).success(true)
+        verifyNoMoreInteractions(disable)
+    }
 }

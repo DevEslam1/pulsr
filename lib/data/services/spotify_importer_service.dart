@@ -404,6 +404,20 @@ class SpotifyImporterService {
     }
 
     // 3. Fallback to first search hit
+    // 3. Fallback to first search hit only when significant token overlap exists
+    final targetTokens = targetTitle
+        .split(RegExp(r'\s+'))
+        .where((t) => t.length >= 3)
+        .toSet();
+    if (targetTokens.isNotEmpty) {
+      for (final c in candidates) {
+        final cLower = '${c.title} ${c.artist}'.toLowerCase();
+        if (targetTokens.any(cLower.contains)) {
+          return c;
+        }
+      }
+      return null;
+    }
     return candidates.first;
   }
 
@@ -445,7 +459,8 @@ class SpotifyImporterService {
     final db = _effectiveDb;
     final songIds = <int>[];
 
-    for (final track in matchResult.resolved) {
+    await db.transaction(() async {
+      for (final track in matchResult.resolved) {
       final existing = await (db.select(db.songsTable)
             ..where((t) => t.remoteId.equals(track.videoId))
             ..limit(1))
@@ -471,11 +486,13 @@ class SpotifyImporterService {
                 isMissing: const Value(false),
                 dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
               ),
-              mode: InsertMode.insertOrReplace,
+              mode: InsertMode.insertOrIgnore,
             );
         songIds.add(id);
       }
     }
+
+    });
 
     // Add songs to the playlist
     if (songIds.isNotEmpty) {

@@ -1,4 +1,5 @@
 // lib/data/repositories/quran_repository_impl.dart
+import 'dart:async';
 import 'dart:convert';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +16,10 @@ class QuranRepositoryImpl implements QuranRepository {
 
   final SharedPreferences? _prefsOverride;
 
+  /// Serializes read-modify-write mutations on SharedPreferences JSON catalogs
+  /// so concurrent surah downloads or bookmark updates cannot clobber each other.
+  Future<void> _mutationChain = Future<void>.value();
+
   @factoryMethod
   QuranRepositoryImpl() : _prefsOverride = null;
 
@@ -24,10 +29,23 @@ class QuranRepositoryImpl implements QuranRepository {
     return _prefsOverride ?? await SharedPreferences.getInstance();
   }
 
+  Future<T> _synchronized<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _mutationChain = _mutationChain.whenComplete(() async {
+      try {
+        completer.complete(await action());
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
+
   @override
   Future<QuranMetadata?> getMetadataForTrack(String trackUri) async {
     if (trackUri.isEmpty) return null;
     try {
+      await _mutationChain;
       final prefs = await _getPrefs();
       final raw = prefs.getString(prefsMetadataKey);
       if (raw == null || raw.isEmpty) return null;
@@ -54,58 +72,65 @@ class QuranRepositoryImpl implements QuranRepository {
   Future<void> saveMetadataForTrack(
       String trackUri, QuranMetadata metadata) async {
     if (trackUri.isEmpty || !metadata.isValid) return;
-    try {
-      final prefs = await _getPrefs();
-      final raw = prefs.getString(prefsMetadataKey);
-      final catalog = <String, dynamic>{};
-      if (raw != null && raw.isNotEmpty) {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map) catalog.addAll(Map<String, dynamic>.from(decoded));
+    return _synchronized(() async {
+      try {
+        final prefs = await _getPrefs();
+        final raw = prefs.getString(prefsMetadataKey);
+        final catalog = <String, dynamic>{};
+        if (raw != null && raw.isNotEmpty) {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map) {
+            catalog.addAll(Map<String, dynamic>.from(decoded));
+          }
+        }
+        catalog[trackUri] = metadata.toMap();
+        if (!await prefs.setString(prefsMetadataKey, jsonEncode(catalog))) {
+          throw StateError('Quran metadata storage rejected the write');
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to save Quran metadata for track $trackUri',
+          error: e,
+          stackTrace: st,
+          category: 'QuranRepository',
+        );
+        rethrow;
       }
-      catalog[trackUri] = metadata.toMap();
-      if (!await prefs.setString(prefsMetadataKey, jsonEncode(catalog))) {
-        throw StateError('Quran metadata storage rejected the write');
-      }
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to save Quran metadata for track $trackUri',
-        error: e,
-        stackTrace: st,
-        category: 'QuranRepository',
-      );
-      rethrow;
-    }
+    });
   }
 
   @override
   Future<void> removeMetadataForTrack(String trackUri) async {
     if (trackUri.isEmpty) return;
-    try {
-      final prefs = await _getPrefs();
-      final raw = prefs.getString(prefsMetadataKey);
-      if (raw == null || raw.isEmpty) return;
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return;
-      final catalog = Map<String, dynamic>.from(decoded);
-      catalog.remove(trackUri);
-      if (!await prefs.setString(prefsMetadataKey, jsonEncode(catalog))) {
-        throw StateError('Quran metadata storage rejected the deletion');
+    return _synchronized(() async {
+      try {
+        final prefs = await _getPrefs();
+        final raw = prefs.getString(prefsMetadataKey);
+        if (raw == null || raw.isEmpty) return;
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map) return;
+        final catalog = Map<String, dynamic>.from(decoded);
+        catalog.remove(trackUri);
+        if (!await prefs.setString(prefsMetadataKey, jsonEncode(catalog))) {
+          throw StateError('Quran metadata storage rejected the deletion');
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to remove Quran metadata for track $trackUri',
+          error: e,
+          stackTrace: st,
+          category: 'QuranRepository',
+        );
+        rethrow;
       }
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to remove Quran metadata for track $trackUri',
-        error: e,
-        stackTrace: st,
-        category: 'QuranRepository',
-      );
-      rethrow;
-    }
+    });
   }
 
   @override
   Future<QuranBookmark?> getBookmark(String trackUri) async {
     if (trackUri.isEmpty) return null;
     try {
+      await _mutationChain;
       final prefs = await _getPrefs();
       final raw = prefs.getString(prefsBookmarksKey);
       if (raw == null || raw.isEmpty) return null;
@@ -131,59 +156,64 @@ class QuranRepositoryImpl implements QuranRepository {
   @override
   Future<void> saveBookmark(QuranBookmark bookmark) async {
     if (!bookmark.isValid) return;
-    try {
-      final prefs = await _getPrefs();
-      final raw = prefs.getString(prefsBookmarksKey);
-      final bookmarks = <String, dynamic>{};
-      if (raw != null && raw.isNotEmpty) {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map) {
-          bookmarks.addAll(Map<String, dynamic>.from(decoded));
+    return _synchronized(() async {
+      try {
+        final prefs = await _getPrefs();
+        final raw = prefs.getString(prefsBookmarksKey);
+        final bookmarks = <String, dynamic>{};
+        if (raw != null && raw.isNotEmpty) {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map) {
+            bookmarks.addAll(Map<String, dynamic>.from(decoded));
+          }
         }
+        bookmarks[bookmark.trackUri] = bookmark.toMap();
+        if (!await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks))) {
+          throw StateError('Quran bookmark storage rejected the write');
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to save Quran bookmark for track ${bookmark.trackUri}',
+          error: e,
+          stackTrace: st,
+          category: 'QuranRepository',
+        );
+        rethrow;
       }
-      bookmarks[bookmark.trackUri] = bookmark.toMap();
-      if (!await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks))) {
-        throw StateError('Quran bookmark storage rejected the write');
-      }
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to save Quran bookmark for track ${bookmark.trackUri}',
-        error: e,
-        stackTrace: st,
-        category: 'QuranRepository',
-      );
-      rethrow;
-    }
+    });
   }
 
   @override
   Future<void> clearBookmark(String trackUri) async {
     if (trackUri.isEmpty) return;
-    try {
-      final prefs = await _getPrefs();
-      final raw = prefs.getString(prefsBookmarksKey);
-      if (raw == null || raw.isEmpty) return;
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) return;
-      final bookmarks = Map<String, dynamic>.from(decoded);
-      bookmarks.remove(trackUri);
-      if (!await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks))) {
-        throw StateError('Quran bookmark storage rejected the deletion');
+    return _synchronized(() async {
+      try {
+        final prefs = await _getPrefs();
+        final raw = prefs.getString(prefsBookmarksKey);
+        if (raw == null || raw.isEmpty) return;
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map) return;
+        final bookmarks = Map<String, dynamic>.from(decoded);
+        bookmarks.remove(trackUri);
+        if (!await prefs.setString(prefsBookmarksKey, jsonEncode(bookmarks))) {
+          throw StateError('Quran bookmark storage rejected the deletion');
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Failed to clear Quran bookmark for track $trackUri',
+          error: e,
+          stackTrace: st,
+          category: 'QuranRepository',
+        );
+        rethrow;
       }
-    } catch (e, st) {
-      ErrorLogger.log(
-        'Failed to clear Quran bookmark for track $trackUri',
-        error: e,
-        stackTrace: st,
-        category: 'QuranRepository',
-      );
-      rethrow;
-    }
+    });
   }
 
   @override
   Future<List<QuranBookmark>> getAllBookmarks() async {
     try {
+      await _mutationChain;
       final prefs = await _getPrefs();
       final raw = prefs.getString(prefsBookmarksKey);
       if (raw == null || raw.isEmpty) return const [];

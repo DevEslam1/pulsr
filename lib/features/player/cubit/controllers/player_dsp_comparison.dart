@@ -49,6 +49,7 @@ extension PlayerDspComparisonExtension on PlayerDspController {
   }
 
   Future<void> switchComparisonSlot(ComparisonSlot slot) async {
+    if (!guardDsp('Equalizer Comparison Slot')) return;
     try {
       await _audioHandler.switchComparisonSlot(slot);
       final state = _getState();

@@ -108,6 +108,30 @@ class MusicRepository implements IMusicRepository {
     query.where((_) => _notInExcludedFolders(excludedFolders));
   }
 
+  void _applySongSort(
+    SimpleSelectStatement<$SongsTableTable, SongsTableData> query,
+    String sortBy,
+    bool ascending,
+  ) {
+    final mode = ascending ? OrderingMode.asc : OrderingMode.desc;
+    final OrderingTerm Function($SongsTableTable) primary = switch (sortBy) {
+      'artist' => (t) => OrderingTerm(expression: t.artist, mode: mode),
+      'dateAdded' => (t) => OrderingTerm(expression: t.dateAdded, mode: mode),
+      'duration' => (t) => OrderingTerm(expression: t.durationMs, mode: mode),
+      'album' => (t) => OrderingTerm(expression: t.album, mode: mode),
+      'playCount' => (t) => OrderingTerm(expression: t.playCount, mode: mode),
+      'lastPlayed' => (t) => OrderingTerm(expression: t.lastPlayed, mode: mode),
+      'fileSize' => (t) => OrderingTerm(expression: t.fileSize, mode: mode),
+      'year' => (t) => OrderingTerm(expression: t.year, mode: mode),
+      'sampleRate' => (t) => OrderingTerm(expression: t.sampleRate, mode: mode),
+      'title' || _ => (t) => OrderingTerm(expression: t.title, mode: mode),
+    };
+    query.orderBy([
+      primary,
+      (t) => OrderingTerm.asc(t.id),
+    ]);
+  }
+
   // --- SONGS ---
   @override
   Stream<Result<List<SongsTableData>>> watchAllSongs({
@@ -169,75 +193,7 @@ class MusicRepository implements IMusicRepository {
         _applyExcludedFolders(query, excludedFolders);
       }
 
-      if (sortBy == 'title') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.title,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'artist') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.artist,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'dateAdded') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.dateAdded,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'duration') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.durationMs,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'album') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.album,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'playCount') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.playCount,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'lastPlayed') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.lastPlayed,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'fileSize') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.fileSize,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'year') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.year,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'sampleRate') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.sampleRate,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else {
-        // FIX B4: unrecognized sortBy must still yield deterministic ordering;
-        // an unordered query breaks stable pagination for callers.
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.title,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      }
+      _applySongSort(query, sortBy, ascending);
 
       final effectiveLimit = limit ??
           (searchQuery != null && searchQuery.trim().isNotEmpty ? 200 : null);
@@ -342,14 +298,19 @@ class MusicRepository implements IMusicRepository {
         Variable.withString(ftsQuery),
         Variable.withString(SongSource.local),
       ];
-      for (final folder in excludedFolders.where((f) => f.trim().isNotEmpty)) {
-        buffer.write(r"AND s.path NOT LIKE ? ESCAPE '\' ");
-        final prefix = folder.endsWith(Platform.pathSeparator)
-            ? folder
-            : '$folder${Platform.pathSeparator}';
-        vars.add(Variable.withString('${_likeEscape(prefix)}%'));
+      for (final raw in excludedFolders) {
+        final base = raw.replaceAll(RegExp(r'[\\/]+$'), '').trim();
+        if (base.isEmpty) continue;
+        final slashPrefix = _likeEscape('$base/');
+        final backslashPrefix = _likeEscape('$base\\');
+        buffer.write(
+          r"AND s.path NOT LIKE ? ESCAPE '\' "
+          r"AND s.path NOT LIKE ? ESCAPE '\' ",
+        );
+        vars.add(Variable.withString('$slashPrefix%'));
+        vars.add(Variable.withString('$backslashPrefix%'));
       }
-      buffer.write('ORDER BY $orderCol $dir LIMIT ? ');
+      buffer.write('ORDER BY $orderCol $dir, s.id ASC LIMIT ? ');
       vars.add(Variable.withInt(limit));
       if (offset != null) {
         buffer.write('OFFSET ?');
@@ -395,67 +356,7 @@ class MusicRepository implements IMusicRepository {
             t.path.like('ytmusic://%').not() &
             (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
       _applyExcludedFolders(query, excludedFolders);
-      if (sortBy == 'title') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.title,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'artist') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.artist,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'dateAdded') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.dateAdded,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'duration') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.durationMs,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'album') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.album,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'playCount') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.playCount,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'lastPlayed') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.lastPlayed,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'fileSize') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.fileSize,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'year') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.year,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      } else if (sortBy == 'sampleRate') {
-        query.orderBy([
-          (t) => OrderingTerm(
-              expression: t.sampleRate,
-              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
-        ]);
-      }
+      _applySongSort(query, sortBy, ascending);
       if (limit != null) {
         query.limit(limit, offset: offset);
       }
@@ -667,10 +568,24 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids) async {
     if (ids.isEmpty) return const Right([]);
     try {
-      final songs = await (_db.select(_db.songsTable)
-            ..where((t) => t.id.isIn(ids)))
-          .get();
-      return Right(songs);
+      const chunkSize = 500;
+      final uniqueIds = ids.toSet().toList(growable: false);
+      final byId = <int, SongsTableData>{};
+      for (var i = 0; i < uniqueIds.length; i += chunkSize) {
+        final chunk = uniqueIds.sublist(
+            i, min(i + chunkSize, uniqueIds.length));
+        final rows = await (_db.select(_db.songsTable)
+              ..where((t) => t.id.isIn(chunk)))
+            .get();
+        for (final row in rows) {
+          byId[row.id] = row;
+        }
+      }
+      final ordered = <SongsTableData>[
+        for (final id in ids)
+          if (byId.containsKey(id)) byId[id]!,
+      ];
+      return Right(ordered);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch songs by ids', e));
     }
@@ -1252,6 +1167,7 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<AlbumsTableData>>> watchAlbums() {
     try {
       return (_db.select(_db.albumsTable)
+            ..where((t) => t.songCount.isBiggerThanValue(0))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
@@ -1430,7 +1346,9 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<AlbumsTableData>>> watchArtistAlbums(int artistId) {
     try {
       return (_db.select(_db.albumsTable)
-            ..where((t) => t.artistId.equals(artistId)))
+            ..where((t) =>
+                t.artistId.equals(artistId) & t.songCount.isBiggerThanValue(0))
+            ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
           .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
@@ -1727,8 +1645,12 @@ class MusicRepository implements IMusicRepository {
       final query = _db.select(_db.onlinePlaylistEntriesTable)
         ..where((t) => t.playlistId.equals(playlistId))
         ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]);
-      return query.watch().map((rows) => Right<AppFailure, List<YtmTrack>>(
-          rows.map(_toYtmTrack).toList(growable: false)));
+      return query
+          .watch()
+          .map((rows) => Right<AppFailure, List<YtmTrack>>(
+              rows.map(_toYtmTrack).toList(growable: false)))
+          .onResultError((e, st) => Left<AppFailure, List<YtmTrack>>(
+              DatabaseFailure('Failed to watch online playlist tracks', e)));
     } catch (e) {
       return Stream.value(
           Left(DatabaseFailure('Failed to watch online playlist tracks', e)));
@@ -2004,6 +1926,8 @@ class MusicRepository implements IMusicRepository {
       final query = _db.selectOnly(_db.songsTable)
         ..addColumns([countExp])
         ..where(_db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
+            _db.songsTable.path.like('ytmusic://%').not() &
             (_db.songsTable.cueFile.isNull() |
                 _db.songsTable.cueStartMs.isNotNull()) &
             _notInExcludedFolders(excludedFolders ?? const []));
@@ -2078,22 +2002,61 @@ class MusicRepository implements IMusicRepository {
       await _db.transaction(() async {
         await _db.delete(_db.queueItemsTable).go();
         if (songIds.isEmpty) return;
-        final existingRows = await (_db.selectOnly(_db.songsTable)
-              ..addColumns([_db.songsTable.id])
-              ..where(_db.songsTable.id.isIn(songIds)))
-            .get();
-        final existingIds =
-            existingRows.map((r) => r.read(_db.songsTable.id)!).toSet();
+        const chunkSize = 500;
+        final uniqueIds = songIds.toSet().toList(growable: false);
+        final existingIds = <int>{};
+        for (var i = 0; i < uniqueIds.length; i += chunkSize) {
+          final chunk = uniqueIds.sublist(
+              i, min(i + chunkSize, uniqueIds.length));
+          final existingRows = await (_db.selectOnly(_db.songsTable)
+                ..addColumns([_db.songsTable.id])
+                ..where(_db.songsTable.id.isIn(chunk)))
+              .get();
+          for (final r in existingRows) {
+            final id = r.read(_db.songsTable.id);
+            if (id != null) existingIds.add(id);
+          }
+        }
+        if (existingIds.isEmpty) return;
+
+        // If the song at currentIndex is not yet persisted in songsTable (e.g.
+        // an ephemeral online track), assign isCurrent to the nearest persisted
+        // queue entry so cold-resume does not lose the current queue marker.
+        int? effectiveCurrentIndex;
+        if (currentIndex >= 0 &&
+            currentIndex < songIds.length &&
+            existingIds.contains(songIds[currentIndex])) {
+          effectiveCurrentIndex = currentIndex;
+        } else {
+          final int clampedTarget =
+              currentIndex.clamp(0, max(0, songIds.length - 1)).toInt();
+          for (var i = clampedTarget; i < songIds.length; i++) {
+            if (existingIds.contains(songIds[i])) {
+              effectiveCurrentIndex = i;
+              break;
+            }
+          }
+          if (effectiveCurrentIndex == null) {
+            for (var i = clampedTarget - 1; i >= 0; i--) {
+              if (existingIds.contains(songIds[i])) {
+                effectiveCurrentIndex = i;
+                break;
+              }
+            }
+          }
+        }
+
         await _db.batch((batch) {
           for (int i = 0; i < songIds.length; i++) {
             final id = songIds[i];
             if (!existingIds.contains(id)) continue;
+            final isCurr = i == effectiveCurrentIndex;
             batch.insert(
               _db.queueItemsTable,
               QueueItemsTableCompanion.insert(
                 songId: id,
                 orderIndex: i,
-                isCurrent: Value(i == currentIndex),
+                isCurrent: Value(isCurr),
                 positionMs: Value(i == currentIndex ? positionMs : 0),
               ),
             );
@@ -2874,63 +2837,9 @@ class MusicRepository implements IMusicRepository {
 
       final markedMissingCount = trulyMissingIds.length;
 
-      // Recalculate song counts using active (non-missing) local songs
-      final albumCounts = await (_db.selectOnly(_db.songsTable)
-            ..addColumns([_db.songsTable.albumId, _db.songsTable.id.count()])
-            ..where(_db.songsTable.albumId.isNotNull() &
-                _db.songsTable.isMissing.equals(false) &
-                _db.songsTable.source.equals(SongSource.local) &
-                _db.songsTable.path.like('ytmusic://%').not() &
-                (_db.songsTable.cueFile.isNull() |
-                    _db.songsTable.cueStartMs.isNotNull()))
-            ..groupBy([_db.songsTable.albumId]))
-          .get();
-
-      final artistCounts = await (_db.selectOnly(_db.songsTable)
-            ..addColumns([_db.songsTable.artistId, _db.songsTable.id.count()])
-            ..where(_db.songsTable.artistId.isNotNull() &
-                _db.songsTable.isMissing.equals(false) &
-                _db.songsTable.source.equals(SongSource.local) &
-                _db.songsTable.path.like('ytmusic://%').not() &
-                (_db.songsTable.cueFile.isNull() |
-                    _db.songsTable.cueStartMs.isNotNull()))
-            ..groupBy([_db.songsTable.artistId]))
-          .get();
-
-      await _db.batch((batch) {
-        for (final row in albumCounts) {
-          final albumId = row.read(_db.songsTable.albumId);
-          final count = row.read(_db.songsTable.id.count());
-          if (albumId != null && count != null) {
-            batch.update(
-              _db.albumsTable,
-              AlbumsTableCompanion(songCount: Value(count)),
-              where: (t) => t.id.equals(albumId),
-            );
-          }
-        }
-        for (final row in artistCounts) {
-          final artistId = row.read(_db.songsTable.artistId);
-          final count = row.read(_db.songsTable.id.count());
-          if (artistId != null && count != null) {
-            batch.update(
-              _db.artistsTable,
-              ArtistsTableCompanion(songCount: Value(count)),
-              where: (t) => t.id.equals(artistId),
-            );
-          }
-        }
-      });
-
-      // Albums/artists whose every song became missing are not updated by the
-      // group-by above (they have no active rows), so prune them here to match
-      // hardDeleteMissingSongs and avoid stale entries in watchAlbums.
-      await _db.customStatement(
-        'DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
-      );
-      await _db.customStatement(
-        'DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
-      );
+      // Recalculate song counts using active (non-missing) local non-CUE songs
+      // and prune albums/artists whose song_count dropped to 0.
+      await _recalculateAllAlbumAndArtistCounts();
 
       return Right(markedMissingCount);
     } catch (e) {
@@ -2946,20 +2855,7 @@ class MusicRepository implements IMusicRepository {
                 t.isMissing.equals(true) & t.source.equals(SongSource.local)))
           .go();
 
-      // Reconcile and cleanup orphaned albums and artists in single SQL queries
-      await _db.customStatement(
-        'DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
-      );
-      await _db.customStatement(
-        'DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
-      );
-      // Update songCount for surviving albums/artists that partially lost songs
-      await _db.customStatement(
-        'UPDATE albums SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
-      );
-      await _db.customStatement(
-        'UPDATE artists SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
-      );
+      await _recalculateAllAlbumAndArtistCounts();
 
       return Right(deletedCount);
     } catch (e) {
@@ -3039,18 +2935,7 @@ class MusicRepository implements IMusicRepository {
           await (_db.delete(_db.songsTable)..where((t) => t.id.isIn(chunk)))
               .go();
         }
-        await _db.customStatement(
-          'DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
-        );
-        await _db.customStatement(
-          'DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
-        );
-        await _db.customStatement(
-          'UPDATE albums SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
-        );
-        await _db.customStatement(
-          'UPDATE artists SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
-        );
+        await _recalculateAllAlbumAndArtistCounts();
       });
 
       for (final song in songs) {
@@ -3115,6 +3000,134 @@ class MusicRepository implements IMusicRepository {
   ) =>
       (downloaded != null && !isPlaceholder(downloaded)) ? downloaded : scanned;
 
+  static const String _activeLocalNonCueSongSqlPredicate =
+      "songs.is_missing = 0 AND songs.source = '${SongSource.local}' "
+      "AND songs.path NOT LIKE 'ytmusic://%' "
+      "AND (songs.cue_file IS NULL OR songs.cue_start_ms IS NOT NULL)";
+
+  Future<void> _recalculateAllAlbumAndArtistCounts() async {
+    await _db.customStatement(
+      'UPDATE albums SET song_count = ('
+      'SELECT COUNT(*) FROM songs '
+      'WHERE songs.album_id = albums.id AND $_activeLocalNonCueSongSqlPredicate'
+      ');',
+    );
+    await _db.customStatement(
+      'UPDATE artists SET song_count = ('
+      'SELECT COUNT(*) FROM songs '
+      'WHERE songs.artist_id = artists.id AND $_activeLocalNonCueSongSqlPredicate'
+      ');',
+    );
+    await _db.customStatement(
+      'DELETE FROM albums WHERE song_count <= 0;',
+    );
+    await _db.customStatement(
+      'DELETE FROM artists WHERE song_count <= 0;',
+    );
+  }
+
+  Future<void> _recalculateAlbumAndArtistCountsForIds({
+    Iterable<int?> albumIds = const [],
+    Iterable<int?> artistIds = const [],
+  }) async {
+    for (final albumId
+        in albumIds.whereType<int>().where((id) => id > 0).toSet()) {
+      await _db.customStatement(
+        'UPDATE albums SET song_count = ('
+        'SELECT COUNT(*) FROM songs '
+        'WHERE songs.album_id = albums.id AND $_activeLocalNonCueSongSqlPredicate'
+        ') WHERE id = ?;',
+        [albumId],
+      );
+      await _db.customStatement(
+        'DELETE FROM albums WHERE id = ? AND song_count <= 0;',
+        [albumId],
+      );
+    }
+    for (final artistId
+        in artistIds.whereType<int>().where((id) => id > 0).toSet()) {
+      await _db.customStatement(
+        'UPDATE artists SET song_count = ('
+        'SELECT COUNT(*) FROM songs '
+        'WHERE songs.artist_id = artists.id AND $_activeLocalNonCueSongSqlPredicate'
+        ') WHERE id = ?;',
+        [artistId],
+      );
+      await _db.customStatement(
+        'DELETE FROM artists WHERE id = ? AND song_count <= 0;',
+        [artistId],
+      );
+    }
+  }
+
+  Future<int?> _findOrCreateArtistId(String artistName) async {
+    final trimmed = artistName.trim();
+    if (trimmed.isEmpty) return null;
+    final existing = await (_db.select(_db.artistsTable)
+          ..where((t) => t.name.lower().equals(trimmed.toLowerCase()))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing != null) return existing.id;
+    return _db.into(_db.artistsTable).insert(
+          ArtistsTableCompanion.insert(
+            name: trimmed,
+            songCount: const Value(1),
+          ),
+        );
+  }
+
+  Future<int?> _findOrCreateAlbumId({
+    required String albumTitle,
+    required String artistName,
+    int? artistId,
+    String? artworkUri,
+  }) async {
+    final trimmedTitle = albumTitle.trim();
+    if (trimmedTitle.isEmpty) return null;
+    final trimmedArtist = artistName.trim();
+    final existing = await (_db.select(_db.albumsTable)
+          ..where((t) =>
+              t.title.lower().equals(trimmedTitle.toLowerCase()) &
+              t.artist.lower().equals(trimmedArtist.toLowerCase()))
+          ..limit(1))
+        .getSingleOrNull();
+    if (existing != null) return existing.id;
+    return _db.into(_db.albumsTable).insert(
+          AlbumsTableCompanion.insert(
+            title: trimmedTitle,
+            artist: Value(trimmedArtist),
+            artistId: Value(artistId),
+            artworkUri: Value(artworkUri),
+            songCount: const Value(1),
+          ),
+        );
+  }
+
+  Future<void> _migrateSongReferencesAndDelete({
+    required int fromId,
+    required int toId,
+  }) async {
+    if (fromId == toId) return;
+    await _db.customStatement(
+      'DELETE FROM playlist_entries WHERE song_id = ? AND playlist_id IN '
+      '(SELECT playlist_id FROM playlist_entries WHERE song_id = ?);',
+      [fromId, toId],
+    );
+    await _db.customStatement(
+      'UPDATE playlist_entries SET song_id = ? WHERE song_id = ?;',
+      [toId, fromId],
+    );
+    await _db.customStatement(
+      'UPDATE queue_items SET song_id = ? WHERE song_id = ?;',
+      [toId, fromId],
+    );
+    await _db.customStatement(
+      'UPDATE play_history SET song_id = ? WHERE song_id = ?;',
+      [toId, fromId],
+    );
+    await (_db.delete(_db.songsTable)..where((t) => t.id.equals(fromId))).go();
+  }
+
   @override
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
@@ -3129,9 +3142,9 @@ class MusicRepository implements IMusicRepository {
             ..where((t) => t.id.equals(oldId)))
           .getSingleOrNull();
 
-      // Find the row the scanner minted for the downloaded file.
+      // Find the row the scanner minted for the downloaded file (case-insensitive).
       var newRow = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.equals(newPath))
+            ..where((t) => t.path.lower().equals(newPath.toLowerCase()))
             ..orderBy([
               (t) =>
                   OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
@@ -3144,7 +3157,8 @@ class MusicRepository implements IMusicRepository {
       if (newRow == null && matchMetadata != null) {
         newRow = await (_db.select(_db.songsTable)
               ..where((t) =>
-                  (t.source.equals(SongSource.local) | t.isDownloaded.equals(true)) &
+                  (t.source.equals(SongSource.local) |
+                      t.isDownloaded.equals(true)) &
                   t.path.equals('').not() &
                   t.path.like('ytmusic://%').not() &
                   t.title.lower().equals(matchMetadata.title.toLowerCase()) &
@@ -3165,7 +3179,8 @@ class MusicRepository implements IMusicRepository {
         // A metadata match on a *different* path that still exists is an
         // unrelated same-title local track, not this download. Hijacking it
         // marked that file downloaded and orphaned the new one.
-        if (newRow != null && newRow.path != newPath) {
+        if (newRow != null &&
+            newRow.path.toLowerCase() != newPath.toLowerCase()) {
           var matchedPathExists = false;
           try {
             matchedPathExists =
@@ -3179,10 +3194,56 @@ class MusicRepository implements IMusicRepository {
 
       // Step 2: Write phase in focused transaction
       await _db.transaction(() async {
+        final affectedAlbumIds = <int?>{oldRow?.albumId, newRow?.albumId};
+        final affectedArtistIds = <int?>{oldRow?.artistId, newRow?.artistId};
+
         if (newRow == null) {
           if (fileExists) {
             final nowMs = DateTime.now().millisecondsSinceEpoch;
+            final pathDupes = await (_db.select(_db.songsTable)
+                  ..where((t) =>
+                      t.path.lower().equals(newPath.toLowerCase()) &
+                      t.id.equals(oldId).not()))
+                .get();
+            for (final d in pathDupes) {
+              affectedAlbumIds.add(d.albumId);
+              affectedArtistIds.add(d.artistId);
+            }
+
             if (oldRow != null) {
+              var mergedPlayCount = oldRow.playCount;
+              var mergedFavorite = oldRow.isFavorite;
+              var mergedLastPlayed = oldRow.lastPlayed;
+              var mergedLastPos = oldRow.lastPositionMs;
+              var mergedGenre = oldRow.genre;
+
+              // Migrate FKs and delete duplicate path rows BEFORE updating oldId's
+              // path to newPath so idx_songs_path_cue UNIQUE is never violated.
+              for (final d in pathDupes) {
+                mergedPlayCount += d.playCount;
+                mergedFavorite = mergedFavorite || d.isFavorite;
+                if (d.lastPlayed != null &&
+                    (mergedLastPlayed == null ||
+                        d.lastPlayed! > mergedLastPlayed)) {
+                  mergedLastPlayed = d.lastPlayed;
+                  mergedLastPos = d.lastPositionMs;
+                }
+                mergedGenre ??= d.genre;
+                try {
+                  await _migrateSongReferencesAndDelete(
+                    fromId: d.id,
+                    toId: oldId,
+                  );
+                } catch (e, st) {
+                  ErrorLogger.log(
+                    'Failed to merge duplicate song row ${d.id} into $oldId',
+                    error: e,
+                    stackTrace: st,
+                    category: 'MusicRepository',
+                  );
+                }
+              }
+
               final resolvedDateAdded = (oldRow.dateAdded ?? 0) > 0
                   ? (oldRow.dateAdded! < 10000000000
                       ? oldRow.dateAdded! * 1000
@@ -3197,6 +3258,17 @@ class MusicRepository implements IMusicRepository {
                   MetadataPlaceholders.isUnknownArtist);
               final bestAlbum = _bestMetadata(oldRow.album, fallbackSong?.album,
                   null, MetadataPlaceholders.isUnknownAlbum);
+
+              final resolvedArtistId = await _findOrCreateArtistId(bestArtist);
+              final resolvedAlbumId = await _findOrCreateAlbumId(
+                albumTitle: bestAlbum,
+                artistName: bestArtist,
+                artistId: resolvedArtistId,
+                artworkUri: oldRow.artworkUri,
+              );
+              affectedArtistIds.add(resolvedArtistId);
+              affectedAlbumIds.add(resolvedAlbumId);
+
               await (_db.update(_db.songsTable)
                     ..where((t) => t.id.equals(oldId)))
                   .write(
@@ -3205,12 +3277,13 @@ class MusicRepository implements IMusicRepository {
                   title: Value(bestTitle),
                   artist: Value(bestArtist),
                   album: Value(bestAlbum),
-                  artistId: bestArtist != oldRow.artist
-                      ? const Value(null)
-                      : const Value.absent(),
-                  albumId: bestAlbum != oldRow.album
-                      ? const Value(null)
-                      : const Value.absent(),
+                  artistId: Value(resolvedArtistId),
+                  albumId: Value(resolvedAlbumId),
+                  genre: Value(mergedGenre),
+                  isFavorite: Value(mergedFavorite),
+                  playCount: Value(mergedPlayCount),
+                  lastPlayed: Value(mergedLastPlayed),
+                  lastPositionMs: Value(mergedLastPos),
                   durationMs: oldRow.durationMs <= 0 &&
                           (fallbackSong?.durationMs ?? 0) > 0
                       ? Value(fallbackSong!.durationMs)
@@ -3246,37 +3319,43 @@ class MusicRepository implements IMusicRepository {
                 ),
               );
               survivingId = oldId;
-              // FIX: Clean any other row that already owns this path (scanner may have inserted it first)
-              try {
-                final dupes = await (_db.select(_db.songsTable)
-                      ..where((t) =>
-                          t.path.lower().equals(newPath.toLowerCase()) &
-                          t.id.equals(oldId).not()))
-                    .get();
-                for (final d in dupes) {
-                  await (_db.update(_db.playlistEntriesTable)
-                        ..where((t) => t.songId.equals(d.id)))
-                      .write(
-                          PlaylistEntriesTableCompanion(songId: Value(oldId)));
-                  await (_db.update(_db.queueItemsTable)
-                        ..where((t) => t.songId.equals(d.id)))
-                      .write(QueueItemsTableCompanion(songId: Value(oldId)));
-                  await (_db.delete(_db.songsTable)
-                        ..where((t) => t.id.equals(d.id)))
-                      .go();
-                }
-              } catch (_) {}
+              await _recalculateAlbumAndArtistCountsForIds(
+                albumIds: affectedAlbumIds,
+                artistIds: affectedArtistIds,
+              );
             } else if (fallbackSong != null) {
+              var mergedPlayCount = fallbackSong.playCount;
+              var mergedFavorite = fallbackSong.isFavorite;
+              var mergedLastPlayed = fallbackSong.lastPlayed;
+              var mergedLastPos = fallbackSong.lastPositionMs;
+              var mergedGenre = fallbackSong.genre;
+
+              final effectiveAlbum = fallbackSong.album.isNotEmpty
+                  ? fallbackSong.album
+                  : 'YouTube Music';
+              final resolvedArtistId =
+                  await _findOrCreateArtistId(fallbackSong.artist);
+              final resolvedAlbumId = await _findOrCreateAlbumId(
+                albumTitle: effectiveAlbum,
+                artistName: fallbackSong.artist,
+                artistId: resolvedArtistId,
+                artworkUri: fallbackSong.artworkUri,
+              );
+              affectedArtistIds.add(resolvedArtistId);
+              affectedAlbumIds.add(resolvedAlbumId);
+
+              // Insert with temporary empty path if pathDupes exist so oldId
+              // exists as FK target before migrating and deleting pathDupes.
               await _db.into(_db.songsTable).insert(
                     SongsTableCompanion(
                       id: Value(oldId),
                       title: Value(fallbackSong.title),
                       artist: Value(fallbackSong.artist),
-                      album: Value(fallbackSong.album.isNotEmpty
-                          ? fallbackSong.album
-                          : 'YouTube Music'),
+                      artistId: Value(resolvedArtistId),
+                      album: Value(effectiveAlbum),
+                      albumId: Value(resolvedAlbumId),
                       durationMs: Value(fallbackSong.durationMs),
-                      path: Value(newPath),
+                      path: Value(pathDupes.isEmpty ? newPath : ''),
                       source: const Value(SongSource.local),
                       isMissing: const Value(false),
                       isDownloaded: const Value(true),
@@ -3298,25 +3377,47 @@ class MusicRepository implements IMusicRepository {
                     ),
                     mode: InsertMode.insertOrReplace,
                   );
-              survivingId = oldId;
-              try {
-                final dupes2 = await (_db.select(_db.songsTable)
-                      ..where((t) =>
-                          t.path.lower().equals(newPath.toLowerCase()) &
-                          t.id.equals(oldId).not()))
-                    .get();
-                for (final d in dupes2) {
-                  await (_db.delete(_db.songsTable)
-                        ..where((t) => t.id.equals(d.id)))
-                      .go();
+              if (pathDupes.isNotEmpty) {
+                for (final d in pathDupes) {
+                  mergedPlayCount += d.playCount;
+                  mergedFavorite = mergedFavorite || d.isFavorite;
+                  if (d.lastPlayed != null &&
+                      (mergedLastPlayed == null ||
+                          d.lastPlayed! > mergedLastPlayed)) {
+                    mergedLastPlayed = d.lastPlayed;
+                    mergedLastPos = d.lastPositionMs;
+                  }
+                  mergedGenre ??= d.genre;
+                  try {
+                    await _migrateSongReferencesAndDelete(
+                      fromId: d.id,
+                      toId: oldId,
+                    );
+                  } catch (_) {}
                 }
-              } catch (_) {}
+                await (_db.update(_db.songsTable)
+                      ..where((t) => t.id.equals(oldId)))
+                    .write(SongsTableCompanion(
+                  path: Value(newPath),
+                  playCount: Value(mergedPlayCount),
+                  isFavorite: Value(mergedFavorite),
+                  lastPlayed: Value(mergedLastPlayed),
+                  lastPositionMs: Value(mergedLastPos),
+                  genre: Value(mergedGenre),
+                ));
+              }
+              survivingId = oldId;
+              await _recalculateAlbumAndArtistCountsForIds(
+                albumIds: affectedAlbumIds,
+                artistIds: affectedArtistIds,
+              );
             }
           }
           return;
         }
 
-        final targetId = newRow.id;
+        final newData = newRow;
+        final targetId = newData.id;
         survivingId = targetId;
 
         if (oldRow == null || oldRow.id == targetId) {
@@ -3325,39 +3426,79 @@ class MusicRepository implements IMusicRepository {
           // MediaStore, which falls back to "Unknown Artist" when the
           // container carries no readable tags (WebM/Opus) and otherwise
           // guesses the title from the file name.
-          final bestTitle = _downloadedMetadata(newRow.title,
+          final duplicateOthers = await (_db.select(_db.songsTable)
+                ..where((t) =>
+                    t.path.lower().equals(newPath.toLowerCase()) &
+                    t.id.equals(targetId).not()))
+              .get();
+          var mergedPlayCount = newData.playCount;
+          var mergedFavorite = newData.isFavorite;
+          var mergedLastPlayed = newData.lastPlayed;
+          var mergedLastPos = newData.lastPositionMs;
+          var mergedGenre = newData.genre;
+          for (final dupe in duplicateOthers) {
+            affectedAlbumIds.add(dupe.albumId);
+            affectedArtistIds.add(dupe.artistId);
+            mergedPlayCount += dupe.playCount;
+            mergedFavorite = mergedFavorite || dupe.isFavorite;
+            if (dupe.lastPlayed != null &&
+                (mergedLastPlayed == null ||
+                    dupe.lastPlayed! > mergedLastPlayed)) {
+              mergedLastPlayed = dupe.lastPlayed;
+              mergedLastPos = dupe.lastPositionMs;
+            }
+            mergedGenre ??= dupe.genre;
+            try {
+              await _migrateSongReferencesAndDelete(
+                fromId: dupe.id,
+                toId: targetId,
+              );
+            } catch (_) {}
+          }
+
+          final bestTitle = _downloadedMetadata(newData.title,
               fallbackSong?.title, MetadataPlaceholders.isUnknownTitle);
-          final bestArtist = _downloadedMetadata(newRow.artist,
+          final bestArtist = _downloadedMetadata(newData.artist,
               fallbackSong?.artist, MetadataPlaceholders.isUnknownArtist);
-          final bestAlbum = _downloadedMetadata(newRow.album,
+          final bestAlbum = _downloadedMetadata(newData.album,
               fallbackSong?.album, MetadataPlaceholders.isUnknownAlbum);
-          final bestDuration = newRow.durationMs > 0
-              ? newRow.durationMs
+          final bestDuration = newData.durationMs > 0
+              ? newData.durationMs
               : (fallbackSong?.durationMs ?? 0);
-          final bestRemoteId = (newRow.remoteId ?? '').trim().isNotEmpty
-              ? newRow.remoteId
+          final bestRemoteId = (newData.remoteId ?? '').trim().isNotEmpty
+              ? newData.remoteId
               : fallbackSong?.remoteId;
-          final bestArt = (newRow.remoteArtworkUrl ?? '').trim().isNotEmpty
-              ? newRow.remoteArtworkUrl
+          final bestArt = (newData.remoteArtworkUrl ?? '').trim().isNotEmpty
+              ? newData.remoteArtworkUrl
               : fallbackSong?.remoteArtworkUrl;
+
+          final resolvedArtistId = await _findOrCreateArtistId(bestArtist);
+          final resolvedAlbumId = await _findOrCreateAlbumId(
+            albumTitle: bestAlbum,
+            artistName: bestArtist,
+            artistId: resolvedArtistId,
+            artworkUri: newData.artworkUri,
+          );
+          affectedArtistIds.add(resolvedArtistId);
+          affectedAlbumIds.add(resolvedAlbumId);
+
           await (_db.update(_db.songsTable)
                 ..where((t) => t.id.equals(targetId)))
               .write(SongsTableCompanion(
             title: Value(bestTitle),
             artist: Value(bestArtist),
             album: Value(bestAlbum),
-            // A scanner id for the placeholder name would still take the song
-            // to an "Unknown Artist" page; drop it when the name was repaired.
-            artistId: bestArtist != newRow.artist
-                ? const Value(null)
-                : const Value.absent(),
-            albumId: bestAlbum != newRow.album
-                ? const Value(null)
-                : const Value.absent(),
+            artistId: Value(resolvedArtistId),
+            albumId: Value(resolvedAlbumId),
+            genre: Value(mergedGenre),
+            isFavorite: Value(mergedFavorite),
+            playCount: Value(mergedPlayCount),
+            lastPlayed: Value(mergedLastPlayed),
+            lastPositionMs: Value(mergedLastPos),
             durationMs:
                 bestDuration > 0 ? Value(bestDuration) : const Value.absent(),
             path:
-                newRow.path != newPath ? Value(newPath) : const Value.absent(),
+                newData.path != newPath ? Value(newPath) : const Value.absent(),
             source: const Value(SongSource.local),
             isMissing: const Value(false),
             isDownloaded: const Value(true),
@@ -3372,39 +3513,19 @@ class MusicRepository implements IMusicRepository {
                 ? Value(bestArt)
                 : const Value.absent(),
           ));
+          await _recalculateAlbumAndArtistCountsForIds(
+            albumIds: affectedAlbumIds,
+            artistIds: affectedArtistIds,
+          );
           return;
         }
         final oldData = oldRow;
-        final newData = newRow;
 
         try {
-          final duplicatePlaylists =
-              await (_db.selectOnly(_db.playlistEntriesTable, distinct: true)
-                    ..addColumns([_db.playlistEntriesTable.playlistId])
-                    ..where(_db.playlistEntriesTable.songId.equals(targetId)))
-                  .map((row) => row.read(_db.playlistEntriesTable.playlistId)!)
-                  .get();
-
-          if (duplicatePlaylists.isNotEmpty) {
-            await (_db.delete(_db.playlistEntriesTable)
-                  ..where((t) =>
-                      t.songId.equals(oldId) &
-                      t.playlistId.isIn(duplicatePlaylists)))
-                .go();
-          }
-          await (_db.update(_db.playlistEntriesTable)
-                ..where((t) => t.songId.equals(oldId)))
-              .write(PlaylistEntriesTableCompanion(songId: Value(targetId)));
-          await (_db.update(_db.queueItemsTable)
-                ..where((t) => t.songId.equals(oldId)))
-              .write(QueueItemsTableCompanion(songId: Value(targetId)));
-          await (_db.update(_db.playHistoryTable)
-                ..where((t) => t.songId.equals(oldId)))
-              .write(PlayHistoryTableCompanion(songId: Value(targetId)));
-
-          // Delete old row
-          await (_db.delete(_db.songsTable)..where((t) => t.id.equals(oldId)))
-              .go();
+          await _migrateSongReferencesAndDelete(
+            fromId: oldId,
+            toId: targetId,
+          );
         } catch (e, st) {
           ErrorLogger.log(
               'Constraint exception in reconcileDownloadedSong; marking row as missing',
@@ -3413,11 +3534,56 @@ class MusicRepository implements IMusicRepository {
               category: 'MusicRepository');
           try {
             await LibraryMaintenanceService.tombstoneSong(_db, oldId);
-          } catch (_) {}
+          } catch (tombstoneError, tombstoneSt) {
+            ErrorLogger.log(
+              'Failed to tombstone superseded song row $oldId',
+              error: tombstoneError,
+              stackTrace: tombstoneSt,
+              category: 'MusicRepository',
+            );
+          }
+        }
+
+        // Remove any other duplicate path rows BEFORE updating targetId's path
+        // to newPath so idx_songs_path_cue UNIQUE is never violated.
+        final duplicateOthers = await (_db.select(_db.songsTable)
+              ..where((t) =>
+                  t.path.lower().equals(newPath.toLowerCase()) &
+                  t.id.isNotIn([oldId, targetId])))
+            .get();
+        var extraPlayCount = 0;
+        var extraFavorite = false;
+        int? extraLastPlayed;
+        int? extraLastPos;
+        String? extraGenre;
+        for (final dupe in duplicateOthers) {
+          affectedAlbumIds.add(dupe.albumId);
+          affectedArtistIds.add(dupe.artistId);
+          extraPlayCount += dupe.playCount;
+          extraFavorite = extraFavorite || dupe.isFavorite;
+          if (dupe.lastPlayed != null &&
+              (extraLastPlayed == null || dupe.lastPlayed! > extraLastPlayed)) {
+            extraLastPlayed = dupe.lastPlayed;
+            extraLastPos = dupe.lastPositionMs;
+          }
+          extraGenre ??= dupe.genre;
+          try {
+            await _migrateSongReferencesAndDelete(
+              fromId: dupe.id,
+              toId: targetId,
+            );
+          } catch (e, st) {
+            ErrorLogger.log(
+              'Failed to merge duplicate song row ${dupe.id} into $targetId',
+              error: e,
+              stackTrace: st,
+              category: 'MusicRepository',
+            );
+          }
         }
 
         // Merge stats (don't clobber — the scanned row may predate the download).
-        final int? mergedLastPlayed;
+        int? mergedLastPlayed;
         if (oldData.lastPlayed != null && newData.lastPlayed != null) {
           mergedLastPlayed = oldData.lastPlayed! > newData.lastPlayed!
               ? oldData.lastPlayed
@@ -3427,6 +3593,14 @@ class MusicRepository implements IMusicRepository {
         }
         final keepOldPosition =
             (oldData.lastPlayed ?? 0) > (newData.lastPlayed ?? 0);
+        int mergedLastPos = keepOldPosition
+            ? oldData.lastPositionMs
+            : newData.lastPositionMs;
+        if (extraLastPlayed != null &&
+            (mergedLastPlayed == null || extraLastPlayed > mergedLastPlayed)) {
+          mergedLastPlayed = extraLastPlayed;
+          mergedLastPos = extraLastPos ?? mergedLastPos;
+        }
 
         final String effectiveTitle = _bestMetadata(
             oldData.title,
@@ -3456,25 +3630,31 @@ class MusicRepository implements IMusicRepository {
         ].firstWhere((v) => v != null && v.trim().isNotEmpty,
             orElse: () => null);
 
+        final resolvedArtistId = await _findOrCreateArtistId(effectiveArtist);
+        final resolvedAlbumId = await _findOrCreateAlbumId(
+          albumTitle: effectiveAlbum,
+          artistName: effectiveArtist,
+          artistId: resolvedArtistId,
+          artworkUri: newData.artworkUri ?? oldData.artworkUri,
+        );
+        affectedArtistIds.add(resolvedArtistId);
+        affectedAlbumIds.add(resolvedAlbumId);
+
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId)))
             .write(
           SongsTableCompanion(
             title: Value(effectiveTitle),
             artist: Value(effectiveArtist),
             album: Value(effectiveAlbum),
-            artistId: effectiveArtist != newData.artist
-                ? const Value(null)
-                : const Value.absent(),
-            albumId: effectiveAlbum != newData.album
-                ? const Value(null)
-                : const Value.absent(),
-            genre: Value(oldData.genre ?? newData.genre),
-            isFavorite: Value(oldData.isFavorite || newData.isFavorite),
-            playCount: Value(oldData.playCount + newData.playCount),
+            artistId: Value(resolvedArtistId),
+            albumId: Value(resolvedAlbumId),
+            genre: Value(oldData.genre ?? newData.genre ?? extraGenre),
+            isFavorite: Value(
+                oldData.isFavorite || newData.isFavorite || extraFavorite),
+            playCount: Value(
+                oldData.playCount + newData.playCount + extraPlayCount),
             lastPlayed: Value(mergedLastPlayed),
-            lastPositionMs: Value(keepOldPosition
-                ? oldData.lastPositionMs
-                : newData.lastPositionMs),
+            lastPositionMs: Value(mergedLastPos),
             // Carry the video id and online remoteArtworkUrl
             remoteId: Value(effectiveRemoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
@@ -3490,28 +3670,10 @@ class MusicRepository implements IMusicRepository {
           ),
         );
 
-        // FIX: Remove any other duplicate path rows that the scanner may have inserted in parallel
-        // This guarantees a single entry per file path after download, fixing "repeats twice on local"
-        final newRowPath = newPath;
-        final duplicateOthers = await (_db.select(_db.songsTable)
-              ..where((t) =>
-                  t.path.lower().equals(newRowPath.toLowerCase()) &
-                  t.id.isNotIn([oldId, targetId])))
-            .get();
-        for (final dupe in duplicateOthers) {
-          try {
-            // Move any playlist/queue/history refs to surviving target before deleting duplicate
-            await (_db.update(_db.playlistEntriesTable)
-                  ..where((t) => t.songId.equals(dupe.id)))
-                .write(PlaylistEntriesTableCompanion(songId: Value(targetId)));
-            await (_db.update(_db.queueItemsTable)
-                  ..where((t) => t.songId.equals(dupe.id)))
-                .write(QueueItemsTableCompanion(songId: Value(targetId)));
-            await (_db.delete(_db.songsTable)
-                  ..where((t) => t.id.equals(dupe.id)))
-                .go();
-          } catch (_) {}
-        }
+        await _recalculateAlbumAndArtistCountsForIds(
+          albumIds: affectedAlbumIds,
+          artistIds: affectedArtistIds,
+        );
       });
       return Right(survivingId);
     } catch (e) {
@@ -3553,35 +3715,106 @@ class MusicRepository implements IMusicRepository {
             ? existing.album
             : album;
         await _db.transaction(() async {
+          final oldAlbumId = existing.albumId;
+          final oldArtistId = existing.artistId;
+          final trimmedArtist = safeArtist.trim();
+          final trimmedAlbum = safeAlbum.trim();
+
+          // Rename single-owner artist/album rows in place so IDs stay stable,
+          // while splitting out shared rows or resolving existing target rows
+          // so other tracks and UNIQUE constraints are never corrupted.
+          int? newArtistId;
+          if (trimmedArtist.isNotEmpty) {
+            final existingArtist = await (_db.select(_db.artistsTable)
+                  ..where(
+                      (t) => t.name.lower().equals(trimmedArtist.toLowerCase()))
+                  ..limit(1))
+                .getSingleOrNull();
+            if (existingArtist != null) {
+              newArtistId = existingArtist.id;
+            } else if (oldArtistId != null) {
+              final otherWithArtist = await (_db.select(_db.songsTable)
+                    ..where((t) =>
+                        t.artistId.equals(oldArtistId) &
+                        t.id.equals(existing.id).not())
+                    ..limit(1))
+                  .getSingleOrNull();
+              if (otherWithArtist == null) {
+                await (_db.update(_db.artistsTable)
+                      ..where((t) => t.id.equals(oldArtistId)))
+                    .write(ArtistsTableCompanion(name: Value(trimmedArtist)));
+                newArtistId = oldArtistId;
+              } else {
+                newArtistId = await _findOrCreateArtistId(safeArtist);
+              }
+            } else {
+              newArtistId = await _findOrCreateArtistId(safeArtist);
+            }
+          }
+
+          int? newAlbumId;
+          if (trimmedAlbum.isNotEmpty) {
+            final existingAlbum = await (_db.select(_db.albumsTable)
+                  ..where((t) =>
+                      t.title.lower().equals(trimmedAlbum.toLowerCase()) &
+                      t.artist.lower().equals(trimmedArtist.toLowerCase()))
+                  ..limit(1))
+                .getSingleOrNull();
+            if (existingAlbum != null) {
+              newAlbumId = existingAlbum.id;
+            } else if (oldAlbumId != null) {
+              final otherWithAlbum = await (_db.select(_db.songsTable)
+                    ..where((t) =>
+                        t.albumId.equals(oldAlbumId) &
+                        t.id.equals(existing.id).not())
+                    ..limit(1))
+                  .getSingleOrNull();
+              if (otherWithAlbum == null) {
+                await (_db.update(_db.albumsTable)
+                      ..where((t) => t.id.equals(oldAlbumId)))
+                    .write(AlbumsTableCompanion(
+                  title: Value(trimmedAlbum),
+                  artist: Value(trimmedArtist),
+                  artistId: Value(newArtistId),
+                ));
+                newAlbumId = oldAlbumId;
+              } else {
+                newAlbumId = await _findOrCreateAlbumId(
+                  albumTitle: safeAlbum,
+                  artistName: safeArtist,
+                  artistId: newArtistId,
+                  artworkUri: existing.artworkUri,
+                );
+              }
+            } else {
+              newAlbumId = await _findOrCreateAlbumId(
+                albumTitle: safeAlbum,
+                artistName: safeArtist,
+                artistId: newArtistId,
+                artworkUri: existing.artworkUri,
+              );
+            }
+          }
+
           await (_db.update(_db.songsTable)
                 ..where((t) => t.id.equals(existing.id)))
               .write(
             SongsTableCompanion(
               title: Value(safeTitle),
               artist: Value(safeArtist),
+              artistId: Value(newArtistId),
               album: Value(safeAlbum),
+              albumId: Value(newAlbumId),
               genre: Value(genre),
               year: Value(year),
               trackNumber: Value(trackNumber),
             ),
           );
-          // Keep the denormalised album/artist rows in step: the library
-          // browse surfaces read titles/names from those tables, so a tag edit
-          // would otherwise leave a renamed album/artist showing stale text
-          // until the next full MediaStore scan.
-          if (existing.albumId != null && existing.albumId! > 0) {
-            await (_db.update(_db.albumsTable)
-                  ..where((t) => t.id.equals(existing.albumId!)))
-                .write(AlbumsTableCompanion(
-              title: Value(safeAlbum),
-              artist: Value(safeArtist),
-            ));
-          }
-          if (existing.artistId != null && existing.artistId! > 0) {
-            await (_db.update(_db.artistsTable)
-                  ..where((t) => t.id.equals(existing.artistId!)))
-                .write(ArtistsTableCompanion(name: Value(safeArtist)));
-          }
+
+          await _recalculateAlbumAndArtistCountsForIds(
+            albumIds: [oldAlbumId, newAlbumId],
+            artistIds: [oldArtistId, newArtistId],
+          );
         });
       }
       return const Right(null);
@@ -3680,6 +3913,7 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.genre.isNotNull() &
             _db.songsTable.genre.equals('').not() &
             _db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not() &
             (_db.songsTable.cueFile.isNull() |
                 _db.songsTable.cueStartMs.isNotNull()) &
@@ -3715,6 +3949,7 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.genre.isNotNull() &
             _db.songsTable.genre.equals('').not() &
             _db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not() &
             (_db.songsTable.cueFile.isNull() |
                 _db.songsTable.cueStartMs.isNotNull()) &
@@ -3738,15 +3973,24 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Stream<Result<List<SongsTableData>>> watchGenreSongs(String genre) {
+  Stream<Result<List<SongsTableData>>> watchGenreSongs(
+    String genre, {
+    List<String> excludedFolders = const [],
+  }) {
     try {
-      return (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.genre.equals(genre) &
-                t.isMissing.equals(false) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([(t) => OrderingTerm(expression: t.title)]))
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.genre.equals(genre) &
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) => OrderingTerm(expression: t.title),
+          (t) => OrderingTerm.asc(t.id),
+        ]);
+      _applyExcludedFolders(query, excludedFolders);
+      return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(
@@ -3758,16 +4002,24 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<List<SongsTableData>>> getGenreSongs(String genre) async {
+  Future<Result<List<SongsTableData>>> getGenreSongs(
+    String genre, {
+    List<String> excludedFolders = const [],
+  }) async {
     try {
-      final songs = await (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.genre.equals(genre) &
-                t.isMissing.equals(false) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([(t) => OrderingTerm(expression: t.title)]))
-          .get();
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.genre.equals(genre) &
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) => OrderingTerm(expression: t.title),
+          (t) => OrderingTerm.asc(t.id),
+        ]);
+      _applyExcludedFolders(query, excludedFolders);
+      final songs = await query.get();
       return Right(songs);
     } catch (e) {
       return Left(DatabaseFailure('Failed to get genre songs', e));
@@ -3786,6 +4038,7 @@ class MusicRepository implements IMusicRepository {
         ..where(_db.songsTable.year.isNotNull() &
             _db.songsTable.year.isBiggerThanValue(0) &
             _db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not() &
             (_db.songsTable.cueFile.isNull() |
                 _db.songsTable.cueStartMs.isNotNull()) &
@@ -3813,15 +4066,24 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Stream<Result<List<SongsTableData>>> watchYearSongs(int year) {
+  Stream<Result<List<SongsTableData>>> watchYearSongs(
+    int year, {
+    List<String> excludedFolders = const [],
+  }) {
     try {
-      return (_db.select(_db.songsTable)
-            ..where((t) =>
-                t.year.equals(year) &
-                t.isMissing.equals(false) &
-                t.path.like('ytmusic://%').not() &
-                (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
-            ..orderBy([(t) => OrderingTerm(expression: t.title)]))
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.year.equals(year) &
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not() &
+            (t.cueFile.isNull() | t.cueStartMs.isNotNull()))
+        ..orderBy([
+          (t) => OrderingTerm(expression: t.title),
+          (t) => OrderingTerm.asc(t.id),
+        ]);
+      _applyExcludedFolders(query, excludedFolders);
+      return query
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .onResultError((e, st) => Left<AppFailure, List<SongsTableData>>(

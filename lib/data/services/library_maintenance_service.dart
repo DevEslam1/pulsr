@@ -62,6 +62,19 @@ class LibraryMaintenanceService {
       }
     }
 
+    if (db != null && resolvedPath != null && resolvedPath.isNotEmpty) {
+      try {
+        await (db.update(db.songsTable)
+              ..where((t) => t.path.equals(resolvedPath!)))
+            .write(const SongsTableCompanion(
+          isMissing: Value(true),
+          isDownloaded: Value(false),
+        ));
+      } catch (e, st) {
+        ErrorLogger.log('Failed to tombstone deleted download row by path',
+            error: e, stackTrace: st, category: 'LibraryMaintenance');
+      }
+    }
     final hasContentUri = contentUri != null && contentUri.isNotEmpty;
     final path = resolvedPath;
     final hasPath = path != null && path.isNotEmpty;

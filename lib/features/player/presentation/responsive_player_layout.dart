@@ -2,6 +2,7 @@
 import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../core/constants/app_radii.dart';
@@ -370,14 +371,19 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                               children: [
                                 // Tab 0: Quran Mushaf View (when Quran track/mode) or Lyrics View
                                 if (isQuran)
-                                  QuranMushafView(
-                                    key: ValueKey(
-                                      'tablet_mushaf_${widget.state.currentSong?.uri ?? widget.state.currentSong?.path}_${_quranMetadata?.surahNumber}',
+                                  BlocSelector<PlayerCubit, PlayerState,
+                                      Duration>(
+                                    selector: (s) => s.position,
+                                    builder: (context, position) =>
+                                        QuranMushafView(
+                                      key: ValueKey(
+                                        'tablet_mushaf_${widget.state.currentSong?.uri ?? widget.state.currentSong?.path}_${_quranMetadata?.surahNumber}',
+                                      ),
+                                      metadata: _quranMetadata,
+                                      currentPosition: position,
+                                      onSeek: (pos) => widget.cubit.seek(pos),
+                                      isExpanded: true,
                                     ),
-                                    metadata: _quranMetadata,
-                                    currentPosition: widget.state.position,
-                                    onSeek: (pos) => widget.cubit.seek(pos),
-                                    isExpanded: true,
                                   )
                                 else
                                   LyricsView(

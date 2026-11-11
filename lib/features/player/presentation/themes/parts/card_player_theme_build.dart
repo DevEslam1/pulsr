@@ -235,7 +235,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                 decoration: BoxDecoration(
                   borderRadius: AppRadii.circular(
                       resolveCustomRadius(context, AppRadii.r28)),
-                  color: isDark ? const Color(0xFF141828) : p.surfaceContainer,
+                  color: p.playerCard,
                   border: Border.all(
                     color: p.hairline,
                     width: 1.0,

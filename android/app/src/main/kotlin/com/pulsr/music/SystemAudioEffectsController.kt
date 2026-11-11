@@ -108,20 +108,12 @@ class SystemAudioEffectsController(private val context: Context) {
                 }
             }
 
-            currentStatus = if (detectedBundles.isNotEmpty()) {
-                val disabledCount = managedEffects.count { !it.enabled }
-                when {
-                    disabledCount == 0 -> {
-                        if (managedEffects.isNotEmpty() && managedEffects.all { it.enabled }) Status.ACTIVE
-                        else if (currentStatus == Status.BYPASSED || currentStatus == Status.PARTIALLY_BYPASSED || currentStatus == Status.ACTIVE) currentStatus
-                        else Status.UNKNOWN
-                    }
-                    disabledCount < detectedBundles.size -> Status.PARTIALLY_BYPASSED
-                    else -> Status.BYPASSED
-                }
-            } else {
-                Status.UNSUPPORTED_DEVICE
-            }
+            // Detection only refreshes what exists on the device. The bypass
+            // verdict belongs to applyPolicy(), which knows whether every matched
+            // descriptor could actually be controlled; counting held effects
+            // against the deduped display list reported PARTIALLY_BYPASSED for a
+            // device we had silenced completely (and vice versa).
+            if (detectedBundles.isEmpty()) currentStatus = Status.UNSUPPORTED_DEVICE
         } catch (e: Exception) {
             Log.w(TAG, "AudioEffect.queryEffects failed gracefully: ${e.message}")
             currentStatus = Status.UNSUPPORTED_DEVICE
@@ -142,9 +134,10 @@ class SystemAudioEffectsController(private val context: Context) {
     fun applyPolicy(policyStr: String, isHiResOrBitPerfect: Boolean = false): Status {
         currentPolicy = Policy.fromString(policyStr)
 
-        if (detectedBundles.isEmpty()) {
-            detect()
-        }
+        // Always re-detect: a stale non-empty list outlived a reboot, a system
+        // update and an OEM effect being switched off, so the reported status
+        // (and the "unverified" flag derived from it) could never recover.
+        detect()
 
         if (detectedBundles.isEmpty()) {
             currentStatus = Status.UNSUPPORTED_DEVICE
@@ -174,7 +167,10 @@ class SystemAudioEffectsController(private val context: Context) {
         releaseManagedEffects()
         partiallyBypassedEffects.clear()
 
-        var disableSuccessCount = 0
+        // Count descriptors, not display bundles: detectedBundles is deduped by
+        // "name (implementor)", so the two lists are not comparable.
+        var matchedDescriptors = 0
+        var silencedDescriptors = 0
         try {
             val descriptors = AudioEffect.queryEffects() ?: emptyArray()
             for (desc in descriptors) {
@@ -189,27 +185,49 @@ class SystemAudioEffectsController(private val context: Context) {
                 }
 
                 if (isMatched && desc.type != null && desc.uuid != null) {
+                    matchedDescriptors++
                     val descriptorInfo = "$name ($implementor)"
                     try {
                         val effect = createEffectSafely(desc.type, desc.uuid, 0, 0)
                         if (effect != null && effect.hasControl()) {
                             effect.enabled = false
-                            managedEffects.add(effect)
-                            disableSuccessCount++
-                            if (!partiallyBypassedEffects.contains(descriptorInfo)) {
-                                partiallyBypassedEffects.add(descriptorInfo)
+                            if (!effect.enabled) {
+                                managedEffects.add(effect)
+                                silencedDescriptors++
+                            } else {
+                                // Still processing: this is the honest content of
+                                // the "partially bypassed" list.
+                                effect.release()
+                                if (!partiallyBypassedEffects.contains(descriptorInfo)) {
+                                    partiallyBypassedEffects.add(descriptorInfo)
+                                }
                             }
                         } else {
                             effect?.release()
+                            if (!partiallyBypassedEffects.contains(descriptorInfo)) {
+                                partiallyBypassedEffects.add(descriptorInfo)
+                            }
                         }
                     } catch (secEx: SecurityException) {
                         Log.w(TAG, "Lacking permission or OEM blocked session 0 access for ${desc.name}: ${secEx.message}")
+                        if (!partiallyBypassedEffects.contains(descriptorInfo)) {
+                            partiallyBypassedEffects.add(descriptorInfo)
+                        }
                     } catch (illEx: IllegalStateException) {
                         Log.w(TAG, "Illegal state modifying session 0 effect for ${desc.name}: ${illEx.message}")
+                        if (!partiallyBypassedEffects.contains(descriptorInfo)) {
+                            partiallyBypassedEffects.add(descriptorInfo)
+                        }
                     } catch (unsuppEx: UnsupportedOperationException) {
                         Log.w(TAG, "Unsupported effect attach on this hardware: ${unsuppEx.message}")
+                        if (!partiallyBypassedEffects.contains(descriptorInfo)) {
+                            partiallyBypassedEffects.add(descriptorInfo)
+                        }
                     } catch (e: Exception) {
                         Log.w(TAG, "AudioEffect attach caught exception gracefully: ${e.message}")
+                        if (!partiallyBypassedEffects.contains(descriptorInfo)) {
+                            partiallyBypassedEffects.add(descriptorInfo)
+                        }
                     }
                 }
             }
@@ -218,15 +236,12 @@ class SystemAudioEffectsController(private val context: Context) {
         }
 
         return when {
-            disableSuccessCount == 0 -> {
+            matchedDescriptors == 0 -> {
                 if (detectedBundles.isNotEmpty()) Status.ACTIVE else Status.UNSUPPORTED_DEVICE
             }
-            disableSuccessCount < detectedBundles.size -> {
-                Status.PARTIALLY_BYPASSED
-            }
-            else -> {
-                Status.BYPASSED
-            }
+            partiallyBypassedEffects.isEmpty() -> Status.BYPASSED
+            silencedDescriptors > 0 -> Status.PARTIALLY_BYPASSED
+            else -> Status.ACTIVE
         }
     }
 

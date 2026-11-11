@@ -22,10 +22,15 @@ extension PlayerDspFollowRate on PlayerDspController {
       final following = settings.strictBitPerfect ||
           (settings.outputFormatNegotiationEnabled &&
               settings.followTrackSampleRate);
+      final effectiveTrackRate = effectiveSourceSampleRate(
+        tagged: song.sampleRate ?? 0,
+        decoded: settings.currentOutputDevice?.decodedSampleRate ?? 0,
+      );
       final usbStatus = UsbExclusiveService().lastStatus;
       if (!following &&
           usbStatus.streamingActive &&
-          usbStatus.streamingSampleRate != song.sampleRate) {
+          effectiveTrackRate > 0 &&
+          usbStatus.streamingSampleRate != effectiveTrackRate) {
         await _settingsCubit!.suspendDirectBitPerfectForTrack(
             'Direct USB requires the source rate; follow-format is disabled.');
         _lastFollowedSampleRate = null;
@@ -89,7 +94,7 @@ extension PlayerDspFollowRate on PlayerDspController {
           '|${song.codec}|${song.path.split('?').first.split('#').first.split('.').last}'
           '|${device?.decodedPcmEncoding}|$trackChannels';
       final rate = HiResAudioService.followTrackRateToApply(
-        trackSampleRate: song.sampleRate,
+        trackSampleRate: effectiveTrackRate > 0 ? effectiveTrackRate : song.sampleRate,
         lastRequestedSampleRate:
             depth == _lastFollowedBitDepth && route == _lastFollowedRoute
                 ? _lastFollowedSampleRate

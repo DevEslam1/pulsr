@@ -373,15 +373,12 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // leak gain while the stage is off. While a disable fade-out is still in
     // flight (fadeOutActive_) we keep processing so the gains can ramp to unity.
     if (!enabled_ && !fadeOutActive_) return;
+    if (!buffer || frames <= 0) return;
 
     // Keep the real interleave stride; clamp only how many channels we process.
     // Clamping the stride itself garbles any stream wider than MAX_CHANNELS.
     const int stride = channels > 0 ? channels : 1;
     channels = std::clamp(channels, 1, MAX_CHANNELS);
-
-    // One-pole smoother coefficient for ~20ms time constant (tau = 0.020s)
-    const double tau = 0.020;
-    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * tau));
 
     // During a disable fade-out every gain/preamp target is unity (0 dB) so the
     // EQ smoothly approaches dry before it hard-bypasses (see fade countdown
@@ -408,6 +405,53 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             autoHeadroomDb = -std::clamp((effectiveBoost - 1.5) * 0.55, 0.0, 6.0);
         }
     }
+
+    // Check if any band is soloed
+    bool hasSolo = false;
+    for (int b = 0; b < bandCount_; ++b) {
+        if (bands_[b].solo) {
+            hasSolo = true;
+            break;
+        }
+    }
+
+    const double preampTarget = fadeOutActive_ ? 0.0 : (targetPreampDb_ + autoHeadroomDb);
+    const double preampLinearTarget = std::pow(10.0, preampTarget / 20.0);
+    bool needsSubBlockSmoothing = fadeOutActive_ ||
+        std::abs(smoothedPreampDb_ - preampTarget) > 1e-4 ||
+        std::abs(preampLinear_ - preampLinearTarget) > 1e-4;
+    if (!needsSubBlockSmoothing) {
+        for (int b = 0; b < bandCount_; ++b) {
+            const auto& band = bands_[b];
+            if ((hasSolo && !band.solo) || !band.enabled || band.mute) continue;
+            if (std::abs(band.smoothedGainDb - band.targetGainDb) > 1e-4 ||
+                std::abs(band.smoothedFrequency - band.frequency) > 1e-3 ||
+                std::abs(band.smoothedQ - band.q) > 1e-6) {
+                needsSubBlockSmoothing = true;
+                break;
+            }
+        }
+    }
+
+    // Sub-block smoothing (<= 64 frames, <= 1.3 ms @ 48 kHz) keeps live
+    // freq/Q/gain/preamp automation zipper-free even on large 2048/4096 HAL buffers;
+    // settled steady-state blocks still run in a single full-block pass.
+    constexpr int kMaxSmoothSubBlockFrames = 64;
+    const int chunkLimit = needsSubBlockSmoothing ? kMaxSmoothSubBlockFrames : frames;
+    int offset = 0;
+    while (offset < frames && (enabled_ || fadeOutActive_)) {
+        const int subFrames = std::min(chunkLimit, frames - offset);
+        processSubBlock(buffer + offset * stride, subFrames, channels, stride, autoHeadroomDb, hasSolo);
+        offset += subFrames;
+    }
+}
+
+void ParametricEQ::processSubBlock(float* buffer, int frames, int channels, int stride,
+                                   double autoHeadroomDb, bool hasSolo) {
+    // One-pole smoother coefficient for ~20ms time constant (tau = 0.020s)
+    const double tau = 0.020;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * tau));
+
     const double preampTarget = fadeOutActive_ ? 0.0 : (targetPreampDb_ + autoHeadroomDb);
     const double initialPreampLinear = preampLinear_;
 
@@ -432,15 +476,6 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                 buffer[f * stride + ch] *= curP;
             }
             curP += pStep;
-        }
-    }
-
-    // Check if any band is soloed
-    bool hasSolo = false;
-    for (int b = 0; b < bandCount_; ++b) {
-        if (bands_[b].solo) {
-            hasSolo = true;
-            break;
         }
     }
 

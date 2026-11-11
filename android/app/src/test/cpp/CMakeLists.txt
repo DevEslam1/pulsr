@@ -18,7 +18,7 @@ if(WIN32)
 endif()
 
 # Fast float32 recurrence and SIMD for biquad stages (ParametricEQ, DynamicEQ, LoudnessContour, ViperDdc)
-option(PULSR_F32_BIQUADS "Enable float32 fast path for biquad filter stages" ON)
+option(PULSR_F32_BIQUADS "Enable float32 fast path for biquad filter stages" OFF)
 if(PULSR_F32_BIQUADS)
     add_compile_definitions(PULSR_F32_BIQUADS=1)
 endif()

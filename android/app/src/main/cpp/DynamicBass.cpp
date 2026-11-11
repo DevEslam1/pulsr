@@ -142,8 +142,10 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
 
     for (int i = 0; i < frames; ++i) {
         const int idx = i * channels;
-        const double L = buffer[idx];
-        const double R = (channels > 1) ? buffer[idx + 1] : L;
+        double L = buffer[idx];
+        double R = (channels > 1) ? buffer[idx + 1] : L;
+        if (!std::isfinite(L)) L = 0.0;
+        if (!std::isfinite(R)) R = 0.0;
 
         // 1. Mid-Side decomposition
         const double M = 0.5 * (L + R);

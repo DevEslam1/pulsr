@@ -7,6 +7,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/errors/error_message_resolver.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
@@ -239,9 +240,9 @@ class YtmDownloadButton extends StatelessWidget {
         }
 
         return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
+          duration: context.motion(PulsrMotion.state),
+          switchInCurve: context.motionCurve(PulsrMotion.enter),
+          switchOutCurve: context.motionCurve(PulsrMotion.exit),
           child: child,
         );
       },

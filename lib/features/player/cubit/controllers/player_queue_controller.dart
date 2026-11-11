@@ -95,6 +95,17 @@ class PlayerQueueController {
   /// cannot land a pending seek from the previous track. No-op when not wired.
   final void Function() _cancelPendingSeek;
 
+  /// BUG-01: Invoked when a programmatic queue mutation transitions to a new
+  /// track so track-change side effects run even when `state.currentSong` was
+  /// pre-emitted optimistically before the engine emitted `onTrackChanged` /
+  /// `mediaItem`.
+  final void Function(SongsTableData song)? _onTrackChangedSideEffects;
+
+  /// BUG-01: Resets the cubit's track-change side-effect deduplication trackers
+  /// when a load fails and rolls back or when the queue is cleared/emptied.
+  final void Function([SongsTableData? fallbackTrack])?
+      _onResetTrackChangeSideEffects;
+
   Timer? _persistQueueDebounce;
 
   // Async guards for coordination
@@ -135,6 +146,9 @@ class PlayerQueueController {
     void Function(SongsTableData song)? onResumePerSongMemory,
     void Function()? invalidateQueueSyncResolution,
     void Function()? cancelPendingSeek,
+    void Function(SongsTableData song)? onTrackChangedSideEffects,
+    void Function([SongsTableData? fallbackTrack])?
+        onResetTrackChangeSideEffects,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _getState = getState,
@@ -154,7 +168,9 @@ class PlayerQueueController {
         _onResumePerSongMemory = onResumePerSongMemory,
         _invalidateQueueSyncResolution =
             invalidateQueueSyncResolution ?? (() {}),
-        _cancelPendingSeek = cancelPendingSeek ?? (() {});
+        _cancelPendingSeek = cancelPendingSeek ?? (() {}),
+        _onTrackChangedSideEffects = onTrackChangedSideEffects,
+        _onResetTrackChangeSideEffects = onResetTrackChangeSideEffects;
 
   void dispose() {
     if (_persistQueueDebounce != null) {

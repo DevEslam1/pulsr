@@ -27,25 +27,55 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   List<SmartRule> validateRules(SmartCriteria criteria) {
     final invalid = <SmartRule>[];
     for (final rule in criteria.rules) {
+      final valStr = rule.value.trim();
       if (_isDartRule(rule.field)) {
         if (rule.field == SmartRuleField.rating) {
-          final r = double.tryParse(rule.value.trim());
-          if (r == null || r < 0 || r > 5) invalid.add(rule);
+          if (rule.operator == SmartOperator.between) {
+            final b = _parseDoubleBetween(valStr);
+            if (b == null || b.$1 < 0 || b.$2 > 5) invalid.add(rule);
+          } else {
+            final r = double.tryParse(valStr);
+            if (r == null || r < 0 || r > 5) invalid.add(rule);
+          }
         } else if (rule.field == SmartRuleField.bpm) {
-          final b = double.tryParse(rule.value.trim());
-          if (b == null || b <= 0) invalid.add(rule);
+          if (rule.operator == SmartOperator.between) {
+            final b = _parseDoubleBetween(valStr);
+            if (b == null || b.$1 <= 0) invalid.add(rule);
+          } else {
+            final b = double.tryParse(valStr);
+            if (b == null || b <= 0) invalid.add(rule);
+          }
         }
         continue;
       }
-      final valStr = rule.value.trim();
       switch (rule.field) {
         case SmartRuleField.playCount:
         case SmartRuleField.decade:
         case SmartRuleField.year:
-        case SmartRuleField.dateAdded:
+        case SmartRuleField.durationMs:
+        case SmartRuleField.bitrate:
           if (rule.operator == SmartOperator.between) {
             if (_parseIntBetween(valStr) == null) invalid.add(rule);
           } else if (int.tryParse(valStr) == null) {
+            invalid.add(rule);
+          }
+          break;
+        case SmartRuleField.dateAdded:
+        case SmartRuleField.lastPlayed:
+          if (rule.operator == SmartOperator.withinDays) {
+            if (valStr.isNotEmpty && int.tryParse(valStr) == null) {
+              invalid.add(rule);
+            }
+          } else if (rule.operator == SmartOperator.between) {
+            if (_parseIntBetween(valStr) == null) invalid.add(rule);
+          } else if (int.tryParse(valStr) == null) {
+            invalid.add(rule);
+          }
+          break;
+        case SmartRuleField.loudnessRange:
+          if (rule.operator == SmartOperator.between) {
+            if (_parseDoubleBetween(valStr) == null) invalid.add(rule);
+          } else if (double.tryParse(valStr) == null) {
             invalid.add(rule);
           }
           break;
@@ -56,6 +86,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           if (valStr.isEmpty) invalid.add(rule);
           break;
         case SmartRuleField.isLossless:
+        case SmartRuleField.isFavorite:
           break;
         default:
           break;
@@ -72,7 +103,8 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       ..where((t) =>
           t.isMissing.equals(false) &
           t.source.equals(SongSource.local) &
-          t.path.like('ytmusic://%').not());
+          t.path.like('ytmusic://%').not() &
+          (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
 
     if (allowedIds != null) {
       if (allowedIds.isEmpty) {
@@ -453,6 +485,12 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           case SmartOperator.lessThan:
             return t.loudnessRange.isNotNull() &
                 t.loudnessRange.isSmallerThanValue(valDouble);
+          case SmartOperator.greaterThanOrEqual:
+            return t.loudnessRange.isNotNull() &
+                t.loudnessRange.isBiggerOrEqualValue(valDouble);
+          case SmartOperator.lessThanOrEqual:
+            return t.loudnessRange.isNotNull() &
+                t.loudnessRange.isSmallerOrEqualValue(valDouble);
           default:
             return t.loudnessRange.isNotNull() &
                 t.loudnessRange.equals(valDouble);
@@ -474,6 +512,12 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
           case SmartOperator.lessThan:
             return t.bitrateKbps.isNotNull() &
                 t.bitrateKbps.isSmallerThanValue(valInt);
+          case SmartOperator.greaterThanOrEqual:
+            return t.bitrateKbps.isNotNull() &
+                t.bitrateKbps.isBiggerOrEqualValue(valInt);
+          case SmartOperator.lessThanOrEqual:
+            return t.bitrateKbps.isNotNull() &
+                t.bitrateKbps.isSmallerOrEqualValue(valInt);
           default:
             return t.bitrateKbps.isNotNull() & t.bitrateKbps.equals(valInt);
         }

@@ -800,17 +800,29 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Platform reason for the last refused bit-perfect bypass request, or null
+  /// when that request was accepted. Cleared on every push so a stale reason is
+  /// never attached to a later failure.
+  static String? lastBypassRejectionReason;
+
   /// Unified bypass for all DSP stages when bit-perfect is active.
   /// [isDop] mirrors the DoP lock into the native snapshot when known.
   Future<void> setBypassDspForBitPerfect(bool bypass, {bool? isDop}) async {
     if (!_isAndroid) return;
+    lastBypassRejectionReason = null;
     try {
       final result = await _channel.invokeMethod('setBypassDspForBitPerfect', {
         'bypass': bypass,
         if (isDop != null) 'isDop': isDop,
       }).timeout(const Duration(seconds: 5));
       if (result == false || (result is Map && result['applied'] == false)) {
-        throw StateError('Native DSP rejected the bit-perfect bypass change');
+        // The plugin reports which owned stage refused; that is the only
+        // actionable part of this error and it used to be dropped here.
+        final reason = result is Map ? result['reason']?.toString() : null;
+        lastBypassRejectionReason = reason;
+        throw StateError(reason == null
+            ? 'Native DSP rejected the bit-perfect bypass change'
+            : 'Native DSP rejected the bit-perfect bypass change: $reason');
       }
       lastPushedBypassDspForBitPerfect = bypass;
     } catch (e, st) {

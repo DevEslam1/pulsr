@@ -1,5 +1,6 @@
 package com.ryanheise.just_audio;
 
+import android.os.Build;
 import android.util.Log;
 import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
@@ -81,10 +82,16 @@ public final class AAudioAudioSink implements AudioSink {
     };
 
     private Bridge bridge = NATIVE_BRIDGE;
+    private int deviceApiLevelForTest = -1;
 
     /** Test seam; production always uses NATIVE_BRIDGE. */
     void setBridgeForTest(Bridge bridge) {
         this.bridge = bridge;
+    }
+
+    /** Test seam to exercise pre-API-31 behavior under Robolectric SDK 33. */
+    void setDeviceApiLevelForTest(int apiLevel) {
+        this.deviceApiLevelForTest = apiLevel;
     }
 
     private Listener listener;
@@ -96,8 +103,15 @@ public final class AAudioAudioSink implements AudioSink {
     private int sampleRate;
     private int channelCount;
     // Tracks the PCM encoding of the currently-open stream so handleBuffer
-    // can convert 32-bit int samples to float32 before writing.
+    // knows whether 32-bit int samples pass through raw (API 31+ exclusive)
+    // or must be transcoded to float32 before writing.
     private int pcmEncoding = C.ENCODING_PCM_FLOAT;
+    private boolean transcodingPcm32 = false;
+
+    private boolean useNativeInt32() {
+        final int sdk = deviceApiLevelForTest >= 0 ? deviceApiLevelForTest : Build.VERSION.SDK_INT;
+        return preferExclusive && sdk >= 31;
+    }
     // Reusable scratch buffer for 32-bit → float32 conversion. Allocated
     // lazily in handleBuffer and grown on demand; never shrunk.
     private ByteBuffer pcm32ScratchBuffer;
@@ -174,9 +188,13 @@ public final class AAudioAudioSink implements AudioSink {
             case C.ENCODING_PCM_24BIT:
                 return SINK_FORMAT_SUPPORTED_DIRECTLY;
             case C.ENCODING_PCM_32BIT:
-                // int32 -> float32 keeps only 24 significant bits. Exclusive mode
-                // exists to deliver untouched samples, so it must decline rather
-                // than silently transcode; shared mode plays it and says so.
+                if (useNativeInt32()) {
+                    return SINK_FORMAT_SUPPORTED_DIRECTLY;
+                }
+                // Below API 31 (no AAUDIO_FORMAT_PCM_I32) or in shared mode,
+                // int32 -> float32 keeps only 24 significant bits. Exclusive
+                // mode declines rather than silently transcode; shared mode
+                // plays it and says so.
                 return preferExclusive ? SINK_FORMAT_UNSUPPORTED
                         : SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
             default:
@@ -223,15 +241,16 @@ public final class AAudioAudioSink implements AudioSink {
             throw new ConfigurationException(
                 "Unsupported PCM format for AAudio sink", inputFormat);
         }
+        final boolean useNative32 = useNativeInt32();
         int encoding;
         if (inputFormat.pcmEncoding == C.ENCODING_PCM_16BIT) {
             encoding = AaudioNativeBridge.ENCODING_PCM_I16;
         } else if (inputFormat.pcmEncoding == C.ENCODING_PCM_FLOAT) {
             encoding = AaudioNativeBridge.ENCODING_PCM_FLOAT;
         } else if (inputFormat.pcmEncoding == C.ENCODING_PCM_32BIT) {
-            // 32-bit integer → float32: AAudio natively accepts float; we
-            // convert in handleBuffer so the stream opens as float.
-            encoding = AaudioNativeBridge.ENCODING_PCM_FLOAT;
+            encoding = useNative32
+                    ? AaudioNativeBridge.ENCODING_PCM_I32
+                    : AaudioNativeBridge.ENCODING_PCM_FLOAT;
         } else {
             encoding = AaudioNativeBridge.ENCODING_PCM_I24_PACKED;
         }
@@ -268,11 +287,14 @@ public final class AAudioAudioSink implements AudioSink {
                 encoding == AaudioNativeBridge.ENCODING_PCM_I16 ? AudioFormat.ENCODING_PCM_16BIT
                     : encoding == AaudioNativeBridge.ENCODING_PCM_I24_PACKED
                         ? AudioFormat.ENCODING_PCM_24BIT_PACKED
-                        : AudioFormat.ENCODING_PCM_FLOAT};
+                        : encoding == AaudioNativeBridge.ENCODING_PCM_I32
+                            ? AudioFormat.ENCODING_PCM_32BIT
+                            : AudioFormat.ENCODING_PCM_FLOAT};
         configuredFormat = inputFormat;
         sampleRate = inputFormat.sampleRate;
         channelCount = inputFormat.channelCount;
         pcmEncoding = inputFormat.pcmEncoding;
+        transcodingPcm32 = (inputFormat.pcmEncoding == C.ENCODING_PCM_32BIT && !useNative32);
         eosWritten = false;
         handledEndOfStream = false;
         pendingBasePosition = true;
@@ -339,7 +361,7 @@ public final class AAudioAudioSink implements AudioSink {
         if (pendingEditedOutput != null || (frameEditor != null && frameEditor.edits())) {
             if (pendingEditedOutput == null) {
                 ByteBuffer edited = frameEditor.prepare(buffer);
-                pendingEditedOutput = pcmEncoding == C.ENCODING_PCM_32BIT
+                pendingEditedOutput = transcodingPcm32
                         ? convert32BitToFloat(edited) : edited;
                 pendingEditedInput = buffer;
                 pendingEditedEnd = buffer.limit();
@@ -364,10 +386,9 @@ public final class AAudioAudioSink implements AudioSink {
             return true;
         }
 
-        // 32-bit int PCM → float32 conversion path.
-        // The stream was opened as ENCODING_PCM_FLOAT; convert before writing.
+        // 32-bit int PCM → float32 conversion path when native I32 is unavailable/shared.
         final ByteBuffer writeBuffer;
-        if (pcmEncoding == C.ENCODING_PCM_32BIT) {
+        if (transcodingPcm32) {
             writeBuffer = convert32BitToFloat(buffer);
             remaining = writeBuffer.remaining();
         } else {
@@ -393,7 +414,7 @@ public final class AAudioAudioSink implements AudioSink {
                         /* isRecoverable= */ true);
             }
             updateMeasuredRoute();
-            if (pcmEncoding == C.ENCODING_PCM_32BIT) {
+            if (transcodingPcm32) {
                 // int32 -> float is 1:1 in samples (4 bytes in, 4 bytes out),
                 // so a partial native write must advance the source by the
                 // same byte count; jumping to the limit would drop the tail.
@@ -412,7 +433,7 @@ public final class AAudioAudioSink implements AudioSink {
                     /* isRecoverable= */ true);
         }
         updateMeasuredRoute();
-        if (pcmEncoding == C.ENCODING_PCM_32BIT) {
+        if (transcodingPcm32) {
             buffer.position(Math.min(buffer.limit(),
                     buffer.position() + written));
         } else {
@@ -447,7 +468,7 @@ public final class AAudioAudioSink implements AudioSink {
 
     void transferPendingTo(FloatDspAudioSink target) {
         target.acceptPreparedPcm(pendingEditedOutput,
-                pcmEncoding == C.ENCODING_PCM_32BIT ? C.ENCODING_PCM_FLOAT : pcmEncoding,
+                transcodingPcm32 ? C.ENCODING_PCM_FLOAT : pcmEncoding,
                 pendingEditedInput, pendingEditedEnd, pendingEditedTimeUs, pendingEditedUnits, frameEditor);
         pendingEditedOutput = null;
         pendingEditedInput = null;
@@ -596,6 +617,7 @@ public final class AAudioAudioSink implements AudioSink {
         pcm32ScratchBuffer = null;
         nonDirectScratchBuffer = null;
         pcmEncoding = C.ENCODING_PCM_FLOAT;
+        transcodingPcm32 = false;
     }
 
     @Override

@@ -9,6 +9,8 @@
 #endif
 #if defined(__aarch64__) || defined(_M_ARM64) || defined(__ARM_NEON)
 #include <arm_neon.h>
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__SSE2__)
+#include <emmintrin.h>
 #endif
 
 SincResampler::SincResampler() {
@@ -268,6 +270,45 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
             float32x2_t vSum2 = vadd_f32(vSumLow, vSumHigh);
             sum = vget_lane_f32(vpadd_f32(vSum2, vSum2), 0);
 #endif
+            for (; tap < endTap; ++tap) {
+                const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
+                int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
+                if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
+                if (readOffset <= availableFrames_ + historyFrames_) {
+                    sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+                }
+            }
+#elif defined(__x86_64__) || defined(_M_X64) || defined(__SSE2__)
+            __m128 vSum = _mm_setzero_ps();
+            int tap = startTap;
+            for (; tap <= endTap - 4; tap += 4) {
+                const int ro0 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 0));
+                int ri0 = (writePos_ - ro0) % FIFO_CAPACITY;
+                if (ri0 < 0) ri0 += FIFO_CAPACITY;
+
+                const int ro1 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 1));
+                int ri1 = (writePos_ - ro1) % FIFO_CAPACITY;
+                if (ri1 < 0) ri1 += FIFO_CAPACITY;
+
+                const int ro2 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 2));
+                int ri2 = (writePos_ - ro2) % FIFO_CAPACITY;
+                if (ri2 < 0) ri2 += FIFO_CAPACITY;
+
+                const int ro3 = availableFrames_ - baseInt + (HALF_TAPS - (tap + 3));
+                int ri3 = (writePos_ - ro3) % FIFO_CAPACITY;
+                if (ri3 < 0) ri3 += FIFO_CAPACITY;
+
+                const float s0 = ro0 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri0] : 0.0f;
+                const float s1 = ro1 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri1] : 0.0f;
+                const float s2 = ro2 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri2] : 0.0f;
+                const float s3 = ro3 <= availableFrames_ + historyFrames_ ? ringBuf_[ch][ri3] : 0.0f;
+                const __m128 vSamp = _mm_set_ps(s3, s2, s1, s0);
+                const __m128 vCoeff = _mm_loadu_ps(&coeffs[tap]);
+                vSum = _mm_add_ps(vSum, _mm_mul_ps(vSamp, vCoeff));
+            }
+            alignas(16) float sumArr[4];
+            _mm_store_ps(sumArr, vSum);
+            sum = sumArr[0] + sumArr[1] + sumArr[2] + sumArr[3];
             for (; tap < endTap; ++tap) {
                 const int readOffset = availableFrames_ - baseInt + (HALF_TAPS - tap);
                 int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;

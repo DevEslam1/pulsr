@@ -8,6 +8,7 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
+import '../motion/pulsr_motion.dart';
 import '../performance/gpu_budget.dart';
 import '../responsive/breakpoints.dart';
 import '../responsive/pulsr_responsive_tokens.dart';
@@ -397,15 +398,13 @@ class PulsrAdaptiveSheet extends StatelessWidget {
     final effectiveMaxHeight = maxHeight == null
         ? availableHeight
         : math.min(maxHeight!, availableHeight);
-    final insetDuration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 180);
+    final insetDuration = context.motion(PulsrMotion.state);
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: AnimatedPadding(
         duration: insetDuration,
-        curve: Curves.easeOutCubic,
+        curve: context.motionCurve(PulsrMotion.enter),
         padding: EdgeInsets.only(bottom: keyboardInset),
         child: ConstrainedBox(
           constraints: BoxConstraints(
