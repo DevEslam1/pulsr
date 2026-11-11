@@ -63,6 +63,15 @@ class EqCurveVisualizer extends StatefulWidget {
 
 class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
   int? _activeDraggingBand;
+  List<double>? _prevGains;
+
+  @override
+  void didUpdateWidget(EqCurveVisualizer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.gains, widget.gains)) {
+      _prevGains = oldWidget.gains;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,11 +82,17 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
         label: context.l10n.equalizer,
         value: '${widget.gains.length} ${context.l10n.bandsLabel}',
         child: TweenAnimationBuilder<List<double>>(
-          tween: _ListDoubleTween(begin: widget.gains, end: widget.gains),
+          tween: _ListDoubleTween(
+            begin: _prevGains ?? widget.gains,
+            end: widget.gains,
+          ),
           duration: _activeDraggingBand != null
               ? Duration.zero
               : context.motionMs(240),
           curve: Curves.easeOutCubic,
+          onEnd: () {
+            _prevGains = widget.gains;
+          },
           builder: (context, animatedGains, _) => CustomPaint(
             size: Size(double.infinity, widget.height),
             painter: _CatmullRomEqPainter(

@@ -466,8 +466,15 @@ class _KaraokeWordView extends StatelessWidget {
     Widget child = Text(word.word, style: style);
 
     if (isSinging) {
-      // Sub-pixel softened syllable sweep gradient fill (0.08 feather window)
-      child = ShaderMask(
+      if (GpuBudget.isGpuSaverActive) {
+        // Fallback: solid highlight text under GPU budget saving
+        child = Text(
+          word.word,
+          style: style.copyWith(color: activeColor),
+        );
+      } else {
+        // Sub-pixel softened syllable sweep gradient fill (0.08 feather window)
+        child = ShaderMask(
         blendMode: BlendMode.srcIn,
         shaderCallback: (bounds) {
           final clampedProgress = progress.clamp(0.0, 1.0);
@@ -493,6 +500,7 @@ class _KaraokeWordView extends StatelessWidget {
           style: style.copyWith(color: Colors.white),
         ),
       );
+      }
     }
 
     final double scale =

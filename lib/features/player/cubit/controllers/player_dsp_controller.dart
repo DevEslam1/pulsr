@@ -1,3 +1,4 @@
+import '../../../../core/di/injection.dart';
 // lib/features/player/cubit/controllers/player_dsp_controller.dart
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
@@ -139,7 +140,7 @@ class PlayerDspController {
         _hiResAudioService = hiResAudioService,
         _smartAudioService = smartAudioService,
         _headphoneProfilesRepo =
-            headphoneProfilesRepo ?? HeadphoneProfilesRepository(),
+            headphoneProfilesRepo ?? (getIt.isRegistered<HeadphoneProfilesRepository>() ? getIt<HeadphoneProfilesRepository>() : HeadphoneProfilesRepository()),
         _getState = getState,
         _emit = emit,
         _syncAudioEffects = syncAudioEffects,

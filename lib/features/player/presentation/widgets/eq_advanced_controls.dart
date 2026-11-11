@@ -347,7 +347,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                         child: Semantics(
                           slider: true,
                           label: context.l10n.width,
-                          child: Slider(
+                          child: ThrottledSlider(
                             value: state.virtualizerStrength.clamp(0.0, 1.0),
                             min: 0.0,
                             max: 1.0,
@@ -857,7 +857,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Semantics(
                         slider: true,
                         label: context.l10n.delayTime,
-                        child: Slider(
+                        child: ThrottledSlider(
                           value: state.crossfeedDelayUs.clamp(200.0, 700.0),
                           min: 200.0,
                           max: 700.0,
@@ -922,7 +922,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Semantics(
                         slider: true,
                         label: context.l10n.oppositeEarBleed,
-                        child: Slider(
+                        child: ThrottledSlider(
                           value: state.crossfeedFeedDb.clamp(-15.0, -6.0),
                           min: -15.0,
                           max: -6.0,
@@ -1076,7 +1076,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     child: Semantics(
                       slider: true,
                       label: context.l10n.ceilingThreshold,
-                      child: Slider(
+                      child: ThrottledSlider(
                         value: state.limiterThresholdDb.clamp(-6.0, 0.0),
                         min: -6.0,
                         max: 0.0,
@@ -1139,7 +1139,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     child: Semantics(
                       slider: true,
                       label: context.l10n.releaseTime,
-                      child: Slider(
+                      child: ThrottledSlider(
                         value: state.limiterReleaseMs.clamp(10.0, 200.0),
                         min: 10.0,
                         max: 200.0,
@@ -1351,7 +1351,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       thumbColor:
                           dspBlocked != null ? p.textTertiary : p.accent,
                     ),
-                    child: Slider(
+                    child: ThrottledSlider(
                       value: state.stereoBalance.clamp(-1.0, 1.0),
                       min: -1.0,
                       max: 1.0,
@@ -1528,7 +1528,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     child: Semantics(
                       slider: true,
                       label: context.l10n.wetDryMix,
-                      child: Slider(
+                      child: ThrottledSlider(
                         value: state.reverbWetDry.clamp(0.0, 1.0),
                         min: 0.0,
                         max: 1.0,
@@ -1703,7 +1703,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
             slider: true,
             label: label,
             value: valueText,
-            child: Slider(
+            child: ThrottledSlider(
               value: value.clamp(min, max),
               min: min,
               max: max,

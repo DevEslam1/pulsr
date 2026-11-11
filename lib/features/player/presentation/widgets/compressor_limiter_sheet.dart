@@ -1,3 +1,4 @@
+import '../../../../core/widgets/throttled_slider.dart';
 // lib/features/player/presentation/widgets/compressor_limiter_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -85,28 +86,56 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   }
 
   Future<void> _applyMbc() async {
-    await context.read<PlayerCubit>().setMultibandCompressor(
-      _mbcEnabled,
-      f0: _mbcF0,
-      f1: _mbcF1,
-      f2: _mbcF2,
-    );
+    widget.equalizerManager.isMultibandCompressorEnabled = _mbcEnabled;
+    widget.equalizerManager.multibandCompressorF0 = _mbcF0;
+    widget.equalizerManager.multibandCompressorF1 = _mbcF1;
+    widget.equalizerManager.multibandCompressorF2 = _mbcF2;
+    final cubit = context.read<PlayerCubit?>();
+    if (cubit != null) {
+      await cubit.setMultibandCompressor(
+        _mbcEnabled,
+        f0: _mbcF0,
+        f1: _mbcF1,
+        f2: _mbcF2,
+      );
+    }
   }
 
   Future<void> _applyMbcBand(
       int index, MultibandCompressorBandConfig band) async {
     setState(() => _mbcBands[index] = band);
-    await context.read<PlayerCubit>().setMultibandCompressorBand(index, band);
+    widget.equalizerManager.setMultibandCompressorBand(index, band);
+    final cubit = context.read<PlayerCubit?>();
+    if (cubit != null) {
+      await cubit.setMultibandCompressorBand(index, band);
+    }
   }
 
   void _applyParams() {
-    context.read<PlayerCubit>().setCompressorParams(
+    widget.equalizerManager.limiterThresholdDb = _thresholdDb;
+    widget.equalizerManager.limiterReleaseMs = _releaseMs;
+    widget.equalizerManager.setCompressorParams(
       thresholdDb: _thresholdDb,
       ratio: _ratio,
       attackMs: _attackMs,
       releaseMs: _releaseMs,
       makeupGainDb: _makeupGainDb,
     );
+    final cubit = context.read<PlayerCubit?>();
+    if (cubit != null) {
+      cubit.setLookaheadLimiter(
+        _limiterEnabled,
+        thresholdDb: _thresholdDb,
+        releaseMs: _releaseMs,
+      );
+      cubit.setCompressorParams(
+        thresholdDb: _thresholdDb,
+        ratio: _ratio,
+        attackMs: _attackMs,
+        releaseMs: _releaseMs,
+        makeupGainDb: _makeupGainDb,
+      );
+    }
   }
 
   @override
@@ -170,8 +199,12 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     activeThumbColor: p.primary,
                     onChanged: (val) async {
                       setState(() => _limiterEnabled = val);
-                      await context.read<PlayerCubit>().setLookaheadLimiter(val,
-                          thresholdDb: _thresholdDb, releaseMs: _releaseMs);
+                      widget.equalizerManager.isLimiterEnabled = val;
+                      final cubit = context.read<PlayerCubit?>();
+                      if (cubit != null) {
+                        await cubit.setLookaheadLimiter(val,
+                            thresholdDb: _thresholdDb, releaseMs: _releaseMs);
+                      }
                     },
                   ),
                 ],
@@ -621,7 +654,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               thumbColor: p.primary,
               trackHeight: 4,
             ),
-            child: Slider(
+            child: ThrottledSlider(
               value: value.clamp(min, max),
               min: min,
               max: max,

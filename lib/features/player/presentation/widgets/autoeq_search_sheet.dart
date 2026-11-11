@@ -1,3 +1,4 @@
+import '../../../../core/di/injection.dart';
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,14 +19,15 @@ import 'package:flutter/services.dart';
 /// sheet surfaces the filter count to distinguish PEQ-fidelity profiles from
 /// legacy flat-curve ones.
 class AutoEqSearchSheet extends StatefulWidget {
-  const AutoEqSearchSheet({super.key});
+  final HeadphoneProfilesRepository? repo;
+  const AutoEqSearchSheet({super.key, this.repo});
 
   @override
   State<AutoEqSearchSheet> createState() => _AutoEqSearchSheetState();
 }
 
 class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
-  final HeadphoneProfilesRepository _repo = HeadphoneProfilesRepository();
+  late final HeadphoneProfilesRepository _repo;
   final TextEditingController _searchController = TextEditingController();
   List<HeadphoneProfile> _results = [];
   String _category = 'All';
@@ -35,6 +37,10 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
   @override
   void initState() {
     super.initState();
+    _repo = widget.repo ??
+        (getIt.isRegistered<HeadphoneProfilesRepository>()
+            ? getIt<HeadphoneProfilesRepository>()
+            : HeadphoneProfilesRepository());
     _load();
   }
 
@@ -63,8 +69,9 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
     final p = context.palette;
     // Selection is driven by cubit state, updated immediately when a profile
     // is applied (no waiting for the next engine resync).
-    final selectedProfileId =
-        context.watch<PlayerCubit>().state.selectedHeadphoneProfile?.id;
+    final selectedProfileId = context.select<PlayerCubit, String?>(
+      (c) => c.state.selectedHeadphoneProfile?.id,
+    );
 
     return SafeArea(
       top: false,

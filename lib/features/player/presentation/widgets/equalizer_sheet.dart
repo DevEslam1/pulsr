@@ -1,3 +1,4 @@
+import '../../../../core/widgets/throttled_slider.dart';
 // lib/features/player/presentation/widgets/equalizer_sheet.dart
 import 'dart:io';
 import 'dart:math' as math;
@@ -148,13 +149,15 @@ bool _eqPresetRebuildEquals(EqPreset x, EqPreset y) {
   if (identical(x, y)) return true;
   return x.name == y.name &&
       x.bassBoost == y.bassBoost &&
+      listEquals(x.gains, y.gains) &&
       listEquals(x.customFrequencies, y.customFrequencies) &&
       listEquals(x.qFactors, y.qFactors) &&
       mapEquals(x.bandsMap, y.bandsMap);
 }
 
 class EqualizerSheet extends StatefulWidget {
-  const EqualizerSheet({super.key});
+  final HeadphoneProfilesRepository? headphoneRepo;
+  const EqualizerSheet({super.key, this.headphoneRepo});
 
   /// Test-only override for the host gate. `Platform.isAndroid` cannot be
   /// injected in a widget test; setting this to `true` mounts the real Android
@@ -178,8 +181,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
-  final HeadphoneProfilesRepository _headphoneRepo =
-      HeadphoneProfilesRepository();
+  late final HeadphoneProfilesRepository _headphoneRepo;
 
   StreamSubscription<int>? _degradedSessionSub;
   bool _degradeSnackQueued = false;
@@ -210,6 +212,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   @override
   void initState() {
     super.initState();
+    _headphoneRepo = widget.headphoneRepo ??
+        (getIt.isRegistered<HeadphoneProfilesRepository>()
+            ? getIt<HeadphoneProfilesRepository>()
+            : HeadphoneProfilesRepository());
     try {
       _cachedEqualizerManager = getIt.isRegistered<EqualizerManager>()
           ? getIt<EqualizerManager>()

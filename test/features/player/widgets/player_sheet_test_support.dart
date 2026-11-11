@@ -1,3 +1,4 @@
+import 'package:pulsr/domain/models/audio_effects_config.dart';
 // Shared harness for Player widget/sheet tests.
 //
 // Not a test file (no `_test` suffix): provides mocktail mocks, a canonical
@@ -61,15 +62,40 @@ const SongsTableData ytSong = SongsTableData(
 );
 
 /// Builds a [MockPlayerCubit] with the minimum stubs every sheet touches.
+class _FakeMbcBandConfig extends Fake implements MultibandCompressorBandConfig {}
+bool _fallbacksRegistered = false;
+void _ensureFallbacks() {
+  if (!_fallbacksRegistered) {
+    _fallbacksRegistered = true;
+    registerFallbackValue(_FakeMbcBandConfig());
+  }
+}
 MockPlayerCubit stubPlayerCubit({
   PlayerState? state,
   Stream<Duration>? positionStream,
 }) {
+  _ensureFallbacks();
   final cubit = MockPlayerCubit();
   when(() => cubit.state).thenReturn(state ?? const PlayerState());
   when(() => cubit.stream).thenAnswer((_) => const Stream<PlayerState>.empty());
   when(() => cubit.rawPositionStream)
       .thenAnswer((_) => positionStream ?? const Stream<Duration>.empty());
+  when(() => cubit.setLookaheadLimiter(any(),
+          thresholdDb: any(named: 'thresholdDb'),
+          releaseMs: any(named: 'releaseMs')))
+      .thenAnswer((_) async => true);
+  when(() => cubit.setCompressorParams(
+          thresholdDb: any(named: 'thresholdDb'),
+          ratio: any(named: 'ratio'),
+          attackMs: any(named: 'attackMs'),
+          releaseMs: any(named: 'releaseMs'),
+          makeupGainDb: any(named: 'makeupGainDb')))
+      .thenAnswer((_) async => true);
+  when(() => cubit.setMultibandCompressor(any(),
+          f0: any(named: 'f0'), f1: any(named: 'f1'), f2: any(named: 'f2')))
+      .thenAnswer((_) async => true);
+  when(() => cubit.setMultibandCompressorBand(any(), any()))
+      .thenAnswer((_) async => true);
   return cubit;
 }
 

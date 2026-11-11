@@ -696,7 +696,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                       child: Text(
-                        context.l10n.visualizerCpuFallbackBadge,
+                        context.l10n.visualizerSimulationNotice,
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: AppFontSize.tiny,

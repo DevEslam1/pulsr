@@ -101,6 +101,7 @@ void main() {
         slider.onChanged!(slider.min);
       }
       await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 400));
 
       expect(manager.limiterThresholdDb, -30.0);
     });

@@ -50,6 +50,7 @@ import 'package:pulsr/core/telemetry/clock.dart' as _i622;
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart' as _i626;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
+import 'package:pulsr/data/audio/headphone_profiles_repository.dart' as _i780;
 import 'package:pulsr/data/audio/per_song_eq_store.dart' as _i1054;
 import 'package:pulsr/data/audio/per_song_volume_store.dart' as _i866;
 import 'package:pulsr/data/audio/song_rating_store.dart' as _i227;
@@ -179,6 +180,8 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i626.PlaybackLatencyTracker(),
       dispose: (i) => i.dispose(),
     );
+    gh.lazySingleton<_i780.HeadphoneProfilesRepository>(
+        () => _i780.HeadphoneProfilesRepository());
     gh.lazySingleton<_i58.ListenTogetherService>(
         () => _i58.ListenTogetherService());
     gh.lazySingleton<_i818.DeviceProfileService>(

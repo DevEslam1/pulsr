@@ -1,3 +1,4 @@
+import '../../../../core/utils/list_content_diff.dart';
 // lib/features/player/presentation/widgets/now_playing_queue_view.dart
 import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
@@ -164,7 +165,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
         _scrollToActiveIndex(state.currentIndex);
       },
       buildWhen: (prev, curr) =>
-          prev.queue != curr.queue ||
+          listContentDiffers(prev.queue, curr.queue) ||
           prev.currentIndex != curr.currentIndex ||
           prev.activeQueueSlot != curr.activeQueueSlot ||
           prev.currentSong?.id != curr.currentSong?.id ||

@@ -1,3 +1,4 @@
+import 'package:injectable/injectable.dart';
 // lib/data/audio/headphone_profiles_repository.dart
 import 'dart:convert';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/headphone_profile.dart';
 
+@lazySingleton
 class HeadphoneProfilesRepository {
   static final HeadphoneProfilesRepository _instance =
       HeadphoneProfilesRepository._internal();

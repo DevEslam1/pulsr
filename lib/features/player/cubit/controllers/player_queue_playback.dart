@@ -280,6 +280,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         }
       }
     } catch (e, st) {
+      _latencyTracker?.finishWithError(e, stage: PlaybackStage.sourceSet);
       ErrorLogger.log('Load queue failed for song ${song.id}',
           error: e, stackTrace: st, category: 'PlayerQueueController');
 

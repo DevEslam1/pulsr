@@ -1,3 +1,4 @@
+import 'package:pulsr/data/audio/headphone_profiles_repository.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -44,6 +45,10 @@ Future<void> configureDependencies({bool warmUpAsync = true}) async {
     }
     if (!getIt.isRegistered<QuranRepository>()) {
       getIt.registerLazySingleton<QuranRepository>(() => QuranRepositoryImpl());
+    }
+    if (!getIt.isRegistered<HeadphoneProfilesRepository>()) {
+      getIt.registerLazySingleton<HeadphoneProfilesRepository>(
+          () => HeadphoneProfilesRepository());
     }
     if (!warmUpAsync) {
       // The root widget is already on screen and its bootstrap gate awaits
