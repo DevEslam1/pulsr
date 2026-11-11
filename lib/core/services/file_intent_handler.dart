@@ -236,7 +236,7 @@ class FileIntentHandler {
         if (voiceUri.host == 'favorites') {
           final navCtx = rootNavigatorKey.currentContext;
           if (navCtx != null && navCtx.mounted) {
-            navCtx.go('/library');
+            navCtx.go('/favorites');
           }
           return;
         }

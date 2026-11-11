@@ -125,6 +125,8 @@ class PlaybackLatencyTracker {
   final bool _enableDebugPrint;
 
   _Session? _active;
+  bool _disposed = false;
+  bool get isDisposed => _disposed;
   final List<PlaybackLatencyReport> _history = [];
   final StreamController<PlaybackLatencyReport> _reportController =
       StreamController<PlaybackLatencyReport>.broadcast();
@@ -148,6 +150,7 @@ class PlaybackLatencyTracker {
   /// Starts a new playback measurement. Any previous unfinished session is
   /// force-finished (failure) so every play produces a breakdown.
   String start({required String videoId, String? quality}) {
+    if (_disposed) return '';
     final now = _clock.now();
     // Close previous if dangling
     if (_active != null && !_active!.closed) {
@@ -182,7 +185,7 @@ class PlaybackLatencyTracker {
 
   /// Marks a stage as reached. Returns elapsed from tap, or null if no active session.
   Duration? markStage(PlaybackStage stage, {Map<String, dynamic>? data}) {
-    if (_active == null || _active!.closed) return null;
+    if (_disposed || _active == null || _active!.closed) return null;
     final now = _clock.now();
     return _markInternal(stage, at: now, data: data);
   }
@@ -190,7 +193,7 @@ class PlaybackLatencyTracker {
   /// Marks a stage at explicit timestamp (used for native-reported times).
   Duration? markStageAt(PlaybackStage stage, DateTime timestamp,
       {Map<String, dynamic>? data}) {
-    if (_active == null || _active!.closed) return null;
+    if (_disposed || _active == null || _active!.closed) return null;
     return _markInternal(stage, at: timestamp, data: data);
   }
 
@@ -282,7 +285,7 @@ class PlaybackLatencyTracker {
 
   /// Finishes the current playback session explicitly (e.g., on error).
   PlaybackLatencyReport? finish({bool success = true, String? failureStage}) {
-    if (_active == null || _active!.closed) return null;
+    if (_disposed || _active == null || _active!.closed) return null;
     final now = _clock.now();
     return _finishInternal(
         success: success, failureStage: failureStage, endTime: now);
@@ -290,7 +293,7 @@ class PlaybackLatencyTracker {
 
   /// Finishes with failure at a given stage.
   PlaybackLatencyReport? finishWithError(Object error, {PlaybackStage? stage}) {
-    if (_active == null || _active!.closed) return null;
+    if (_disposed || _active == null || _active!.closed) return null;
     final now = _clock.now();
     final stageName = stage?.name ?? error.toString();
     return _finishInternal(
@@ -381,7 +384,9 @@ class PlaybackLatencyTracker {
     _emitSummary(report);
     _history.add(report);
     if (_history.length > 100) _history.removeAt(0);
-    _reportController.add(report);
+    if (!_reportController.isClosed) {
+      _reportController.add(report);
+    }
     // Clear active so next start creates new
     _active = null;
     return report;
@@ -464,6 +469,10 @@ class PlaybackLatencyTracker {
 
   @disposeMethod
   void dispose() {
-    _reportController.close();
+    _disposed = true;
+    _active = null;
+    if (!_reportController.isClosed) {
+      _reportController.close();
+    }
   }
 }

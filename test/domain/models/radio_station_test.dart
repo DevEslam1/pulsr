@@ -6,6 +6,7 @@ import 'package:pulsr/domain/models/radio_station.dart';
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    RadioStationStore.resetForTesting();
   });
 
   group('RadioStation', () {

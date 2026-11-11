@@ -31,6 +31,9 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
     private var captureThread: Thread? = null
     private val capturing = AtomicBoolean(false)
     private var currentSampleRate: Int = 0
+    private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "PulsrRoomCorrection-bg").apply { isDaemon = true }
+    }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
@@ -197,19 +200,24 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
         currentSampleRate = 0
         val record = audioRecord
         audioRecord = null
-        try {
-            record?.stop()
-        } catch (_: Throwable) {}
-        try {
-            record?.release()
-        } catch (_: Throwable) {}
 
         val thread = captureThread
         captureThread = null
         try {
             thread?.interrupt()
-            thread?.join(500)
         } catch (_: Throwable) {}
+
+        backgroundExecutor.execute {
+            try {
+                record?.stop()
+            } catch (_: Throwable) {}
+            try {
+                record?.release()
+            } catch (_: Throwable) {}
+            try {
+                thread?.join(500)
+            } catch (_: Throwable) {}
+        }
     }
 
     override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {
@@ -237,6 +245,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
         eventSink = null
         if (::methodChannel.isInitialized) methodChannel.setMethodCallHandler(null)
         if (::eventChannel.isInitialized) eventChannel.setStreamHandler(null)
+        runCatching { backgroundExecutor.shutdown() }
     }
 
     companion object {

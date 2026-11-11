@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- Explicitly disallow cleartext for all known first-party & third-party API endpoints -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">youtube.com</domain>
+        <domain includeSubdomains="true">googlevideo.com</domain>
+        <domain includeSubdomains="true">lrclib.net</domain>
+        <domain includeSubdomains="true">last.fm</domain>
+        <domain includeSubdomains="true">listenbrainz.org</domain>
+        <domain includeSubdomains="true">sponsor.ajay.app</domain>
+    </domain-config>
+
     <!-- Allow cleartext traffic ONLY to localhost / 127.0.0.1 for just_audio LockCachingAudioSource proxy -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">127.0.0.1</domain>
@@ -8,7 +19,8 @@
 
     <!-- Internet radio (Icecast/Shoutcast) is often HTTP-only. Keep the
          system trust anchors for TLS and allow cleartext so user-added stream
-         URLs actually play; all first-party APIs remain HTTPS. -->
+         URLs actually play; all first-party and known third-party APIs above
+         have cleartext strictly disabled. -->
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />

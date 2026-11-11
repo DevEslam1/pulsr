@@ -2,6 +2,7 @@
 
 > **Target Audience:** AI Models (Claude, Gemini, Cursor, Copilot) & Human Engineers  
 > **Repository:** `pulsr` — Premium Offline-First Audiophile Music Player  
+> **Package Metadata:** Root package `pulsr` (`pubspec.yaml`, version `1.0.0+1`, Dart SDK `>=3.0.0 <4.0.0`, Flutter `>=3.41.0`). Note: Root package takes precedence over vendored packages such as `third_party/just_audio`.  
 > **Frameworks & Languages:** Flutter 3.41+ (Dart >=3.0 <4.0), C++20 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
 
 ---
@@ -305,6 +306,8 @@ pulsr/
 - **`AudioDspEngine.cpp / .h`**: Central DSP graph manager. Receives raw decoded PCM buffers from ExoPlayer or file streams and runs them through the active DSP chain.
 - **`AAudioSink.cpp / .h`**: High-performance, low-latency audio output stream using the Android AAudio native API with `AAUDIO_PERFORMANCE_MODE_LOW_LATENCY`.
 - **`UsbAudioSink.cpp / .h`**: Direct USB Audio Class 2.0 driver handling bit-perfect output directly to connected external DACs.
+- **`CustodyVerifier.cpp / .h`**: Cryptographic hash verification and bit-perfect custody tracking, ensuring bitstream integrity between disk and audio sink.
+- **`DacVoicing.cpp / .h`**: Emulates distinctive hardware voicing profiles (e.g. vintage R2R ladder DAC, warm tube output stage) via custom filter responses.
 - **`ParametricEQ.cpp / .h` & `ArbitraryResponseEq.cpp / .h`**: Biquad IIR filter arrays providing parametric and arbitrary graphic EQ adjustments.
 - **`Crossfeed.cpp / .h`**: Bauer-style headphone crossfeed filter reducing extreme stereo channel separation fatigue.
 - **`HarmonicSaturation.cpp / .h`**: Soft-clipping even/odd harmonic generator adding analog tape/tube warmth.

@@ -23,6 +23,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.Process
 import android.support.v4.media.MediaBrowserCompat
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.SizeF
@@ -158,37 +159,35 @@ class NowPlayingWidget : AppWidgetProvider() {
                 }
             }
             ACTION_REWIND -> {
-                val newPos = (currentPosition - 10000L).coerceAtLeast(0L)
-                // C-2: prefs are written only once the transport call was actually
-                // dispatched; a dropped action must not repaint an assumed state.
+                // Live controller position prevents stale seek (B3)
                 performMediaAction(
                     context,
-                    fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_REWIND,
-                    onDispatched = { prefs.edit().putLong("positionMs", newPos).apply() }
-                ) { controls, _, _, _ ->
+                    fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_REWIND
+                ) { controls, _, livePos, _ ->
+                    val newPos = (livePos - 10000L).coerceAtLeast(0L)
                     controls.seekTo(newPos)
+                    prefs.edit().putLong("positionMs", newPos).apply()
                 }
             }
             ACTION_FORWARD -> {
-                val maxDur = if (currentDuration > 0) currentDuration else currentPosition + 10000L
-                val newPos = (currentPosition + 10000L).coerceAtMost(maxDur)
+                // Live controller position & duration prevents stale seek (B3)
                 performMediaAction(
                     context,
-                    fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
-                    onDispatched = { prefs.edit().putLong("positionMs", newPos).apply() }
-                ) { controls, _, _, _ ->
+                    fallbackKeyCode = KeyEvent.KEYCODE_MEDIA_FAST_FORWARD
+                ) { controls, _, livePos, liveDur ->
+                    val maxDur = if (liveDur > 0) liveDur else livePos + 10000L
+                    val newPos = (livePos + 10000L).coerceAtMost(maxDur)
                     controls.seekTo(newPos)
+                    prefs.edit().putLong("positionMs", newPos).apply()
                 }
             }
             ACTION_SEEK_RATIO -> {
                 val ratio = intent.getFloatExtra(EXTRA_RATIO, 0.5f).coerceIn(0f, 1f)
-                if (currentDuration > 0) {
-                    val seekPos = (currentDuration * ratio).toLong().coerceIn(0L, currentDuration)
-                    performMediaAction(
-                        context,
-                        onDispatched = { prefs.edit().putLong("positionMs", seekPos).apply() }
-                    ) { controls, _, _, _ ->
+                performMediaAction(context) { controls, _, _, liveDur ->
+                    if (liveDur > 0) {
+                        val seekPos = (liveDur * ratio).toLong().coerceIn(0L, liveDur)
                         controls.seekTo(seekPos)
+                        prefs.edit().putLong("positionMs", seekPos).apply()
                     }
                 }
             }
@@ -427,8 +426,10 @@ class NowPlayingWidget : AppWidgetProvider() {
                 synchronized(mediaBrowserLock) {
                     val controller = cachedMediaController
                     if (controller != null && cachedMediaBrowser?.isConnected == true) {
-                        // Live state, so play/pause can never invert (C-3).
-                        action(controller.transportControls, liveIsPlaying(controller), position, duration)
+                        // Live state, so play/pause can never invert (C-3), and seeks use real playback position (B3)
+                        val livePos = controller.playbackState?.position ?: position
+                        val liveDur = controller.metadata?.getLong(MediaMetadataCompat.METADATA_KEY_DURATION)?.takeIf { it > 0 } ?: duration
+                        action(controller.transportControls, liveIsPlaying(controller), livePos, liveDur)
                         onDispatched?.invoke()
                         return
                     }
@@ -457,11 +458,14 @@ class NowPlayingWidget : AppWidgetProvider() {
                                     val newController = MediaControllerCompat(appContext, token)
                                     cachedMediaController = newController
                                     cachedMediaBrowser = localBrowser
+                                    val livePos = newController.playbackState?.position ?: getSafeLong(latestData, "positionMs", 0L)
+                                    val liveDur = newController.metadata?.getLong(MediaMetadataCompat.METADATA_KEY_DURATION)?.takeIf { it > 0 }
+                                        ?: getSafeLong(latestData, "durationMs", 0L)
                                     action(
                                         newController.transportControls,
                                         liveIsPlaying(newController),
-                                        getSafeLong(latestData, "positionMs", 0L),
-                                        getSafeLong(latestData, "durationMs", 0L)
+                                        livePos,
+                                        liveDur
                                     )
                                     onDispatched?.invoke()
                                 } else {

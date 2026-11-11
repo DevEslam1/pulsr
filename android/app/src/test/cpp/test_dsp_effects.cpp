@@ -662,6 +662,52 @@ static void testLiveProgTransitions() {
     std::cout << "PASS: LiveProg transitions verified smooth & bounded." << std::endl;
 }
 
+static void testLiveProgRandVariance() {
+    std::cout << "Testing LiveProg rand() builtin variance and distribution (B9)..." << std::endl;
+    LiveProg prog;
+    prog.setSampleRate(48000.0);
+
+    std::string randCode = "@sample\nspl0 = rand();\nspl1 = rand();\n";
+    prog.loadCode(randCode);
+    prog.setEnabled(true);
+
+    // Warm up across enable crossfade (25ms tau) so test measures steady-state rand()
+    std::vector<float> warmup(4800 * 2, 0.0f);
+    prog.processInterleaved(warmup.data(), 4800, 2);
+
+    const int numSamples = 10000;
+    std::vector<float> buffer(numSamples * 2, 0.0f);
+    prog.processInterleaved(buffer.data(), numSamples, 2);
+
+    double sum = 0.0;
+    double minVal = 1.0;
+    double maxVal = 0.0;
+    for (int i = 0; i < numSamples; ++i) {
+        float val = buffer[i * 2];
+        assert(val >= 0.0f && val <= 1.0f);
+        sum += val;
+        if (val < minVal) minVal = val;
+        if (val > maxVal) maxVal = val;
+    }
+    double mean = sum / numSamples;
+    double varianceSum = 0.0;
+    for (int i = 0; i < numSamples; ++i) {
+        float val = buffer[i * 2];
+        double diff = val - mean;
+        varianceSum += diff * diff;
+    }
+    double variance = varianceSum / numSamples;
+
+    // Uniform [0, 1) has theoretical mean 0.5 and variance 1/12 ≈ 0.0833
+    std::cout << "LiveProg rand() stats: mean=" << mean << " variance=" << variance
+              << " min=" << minVal << " max=" << maxVal << std::endl;
+
+    assert(mean > 0.45 && mean < 0.55);
+    assert(variance > 0.06); // Non-zero, healthy variance proving it does not stick to 0 or any constant
+    assert(minVal < 0.05 && maxVal > 0.95);
+    std::cout << "PASS: LiveProg rand() variance verified." << std::endl;
+}
+
 static void testDvcBitPerfectTransitions() {
     std::cout << "Testing DVC / Direct Volume smooth ramping and Bit-Perfect..." << std::endl;
     auto engine = std::make_unique<AudioDspEngine>();
@@ -1008,6 +1054,7 @@ int main() {
     testArbitraryEqTransitions();
     testViperDdcTransitions();
     testLiveProgTransitions();
+    testLiveProgRandVariance();
     testDvcBitPerfectTransitions();
     testParametricEqSweepContinuity();
     testLoudnessContourSimdNanGuard();

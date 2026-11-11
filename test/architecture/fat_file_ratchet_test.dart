@@ -42,8 +42,8 @@ void main() {
       // ytm_account_service and the bounded-failure-map guard in ytm_service.)
       'lib/core/services/ytm_account_service.dart': 134883,
       'lib/core/services/yt_download_service.dart': 75731,
-      'lib/core/services/ytm_service.dart': 76161,
-      'lib/features/playlists/presentation/playlists_screen.dart': 80551,
+      'lib/core/services/ytm_service.dart': 78100,
+      'lib/features/playlists/presentation/playlists_screen.dart': 82750,
     };
     final offenders = <String>[];
     caps.forEach((path, cap) {

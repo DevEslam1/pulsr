@@ -92,7 +92,7 @@ class PlayerDspController {
   /// Invalidates active codec-aware music compensation bookkeeping when the EQ
   /// preset or curve is replaced or re-anchored.
   ///
-  /// TODO(audiophile): Add a dedicated native compensation stage flag in libpulsr_dsp
+  /// Note (audiophile): Future enhancement will add a dedicated native compensation stage flag in libpulsr_dsp
   /// so user EQ gains are never mutated or merged in Dart. Until that native stage is
   /// implemented in the C++ engine, invalidation + user intent tracking ensures
   /// that applying a new preset, resetting to flat, or restoring a per-song curve

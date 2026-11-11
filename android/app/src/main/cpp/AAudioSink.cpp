@@ -477,6 +477,10 @@ int64_t AAudioSink::FramesRead() const {
         const int64_t read = AAudioStream_getFramesRead(st);
         const int64_t base = readBase_.load(std::memory_order_relaxed);
         result = readOffset_.load(std::memory_order_relaxed) + (read > base ? read - base : 0);
+    } else {
+        // When stream is closed or releasing, report all written frames as read
+        // to prevent hasPendingData drain loops from hanging indefinitely (B6)
+        result = FramesWritten();
     }
     activeReaders_.fetch_sub(1, std::memory_order_release);
     return result;
@@ -490,6 +494,10 @@ int64_t AAudioSink::FramesWritten() const {
 }
 
 bool AAudioSink::HasPendingData() const {
+    AAudioStream* st = stream_.load(std::memory_order_acquire);
+    if (st == nullptr || releasing_.load(std::memory_order_acquire)) {
+        return false;
+    }
     return FramesWritten() > FramesRead();
 }
 

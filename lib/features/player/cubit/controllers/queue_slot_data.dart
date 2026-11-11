@@ -1,9 +1,9 @@
 // lib/features/player/cubit/controllers/queue_slot_data.dart
-export '../../../../core/utils/playlist_reorder_utils.dart'
-    show calculateReorderedIndex, calculateRemovedIndex;
-
 import '../../../../data/db/app_database.dart';
 import '../player_state.dart';
+
+export '../../../../core/utils/playlist_reorder_utils.dart'
+    show calculateReorderedIndex, calculateRemovedIndex;
 
 /// Upper bound on the slot lookup cache.
 const int maxSlotLookupCacheEntries = 4096;

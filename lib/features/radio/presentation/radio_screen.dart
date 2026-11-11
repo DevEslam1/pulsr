@@ -70,7 +70,7 @@ class _RadioScreenState extends State<RadioScreen> {
   }
 
   Future<void> _reload() async {
-    await _store.load();
+    await _store.ready;
     if (!mounted) return;
     setState(() {
       _stations = _store.list;

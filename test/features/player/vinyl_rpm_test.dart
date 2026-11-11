@@ -112,7 +112,7 @@ void main() {
       );
       expect(
         find.descendant(
-          of: badgeContainer,
+          of: badgeContainer.first,
           matching: find.byIcon(Icons.speed_rounded),
         ),
         findsOneWidget,

@@ -110,15 +110,24 @@ internal class YtmCookieStore private constructor(context: Context) {
                 val c = cm.getCookie(domain) ?: continue
                 parseInto(googleOnly, c)
             }
-            // Clear existing cookies before refresh so stale/expired session entries don't linger (Y-H11)
-            cookies.clear()
+            val newCookies = mutableMapOf<String, String>()
             for (domain in YOUTUBE_DOMAINS) {
                 val c = cm.getCookie(domain) ?: continue
-                parseAndPut(c)
+                parseInto(newCookies, c)
             }
             for ((name, value) in googleOnly) {
-                cookies.putIfAbsent(name, value)
+                newCookies.putIfAbsent(name, value)
             }
+            // If CookieManager returned nothing (e.g. WebView not yet primed, data wiped, or sandboxed)
+            // but we already have an active valid session, do NOT wipe the store!
+            if (newCookies.isEmpty()) {
+                if (isSessionValid()) {
+                    return getMergedCookieHeader()
+                }
+                return null
+            }
+            cookies.clear()
+            cookies.putAll(newCookies)
             saveToPrefs()
             return getMergedCookieHeader()
         }

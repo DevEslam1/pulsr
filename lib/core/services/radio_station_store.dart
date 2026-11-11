@@ -676,20 +676,26 @@ class RadioStationStore {
   /// their list from the same snapshot and the later persist would drop the
   /// earlier station. The constructor's initial [load] takes the same lock, so
   /// a mutation queued before the disk read finishes can never be erased by it.
-  final Mutex _writeMutex = Mutex();
+  static final Mutex _writeMutex = Mutex();
 
-  late final Future<void> ready;
-  bool _loadFailed = false;
+  static RadioStationStore? _instance;
+  static Future<void>? _sharedReady;
+  static bool _loadFailed = false;
+
+  factory RadioStationStore() => _instance ??= RadioStationStore._internal();
+
+  RadioStationStore._internal();
+
+  Future<void> get ready => _sharedReady ??= load();
   bool get loadFailed => _loadFailed;
 
   @visibleForTesting
   static void resetForTesting() {
     _stations.clear();
     heroCardsVisible.value = true;
-  }
-
-  RadioStationStore() {
-    ready = load();
+    _instance = null;
+    _sharedReady = null;
+    _loadFailed = false;
   }
 
   /// Stations in display order: Quran stations ALWAYS first, then other stations.

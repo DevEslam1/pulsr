@@ -823,6 +823,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         return mapOf(
+            "isHeuristic" to true,
             "dspActive" to dspActive,
             "activeStagesCount" to activeCount,
             "rollingRtf" to rtf,
@@ -937,6 +938,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    @Volatile
     private var activeDspStages: Int = 0
 
     fun recalculateActiveStages() {

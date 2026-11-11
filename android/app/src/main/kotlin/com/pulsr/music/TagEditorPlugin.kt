@@ -26,7 +26,7 @@ import java.util.logging.Logger
 
 class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
-    private var context: Context? = null
+    internal var context: Context? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
 
     companion object {
@@ -363,8 +363,8 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         // Atomic safety net (defect 24-01): backup the original so an
                         // interrupted write is recoverable instead of corrupting the
                         // user's only copy.
-                        backupFile = null
                         if (!isContentUri) {
+                            backupFile = null
                             try {
                                 val src = File(path)
                                 val bak = java.io.File(src.parent, ".${src.name.take(200)}.pulsr.bak")

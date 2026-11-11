@@ -16,6 +16,13 @@ class PlaylistSuggestion {
   });
 }
 
+typedef RawSuggestionBuckets = ({
+  List<SongsTableData> heavyRotation,
+  List<SongsTableData> forgotten,
+  List<SongsTableData> audiophile,
+  List<SongsTableData> upbeat,
+});
+
 @lazySingleton
 class PlaylistSuggestionsService {
   List<PlaylistSuggestion>? _cachedSuggestions;
@@ -46,12 +53,13 @@ class PlaylistSuggestionsService {
       return _cachedSuggestions!;
     }
 
-    List<PlaylistSuggestion> suggestions;
+    RawSuggestionBuckets buckets;
     if (allSongs.length > 500) {
-      suggestions = await compute(generateSuggestionsRaw, allSongs);
+      buckets = await compute(computeRawSuggestionBuckets, allSongs);
     } else {
-      suggestions = generateSuggestionsRaw(allSongs);
+      buckets = computeRawSuggestionBuckets(allSongs);
     }
+    final suggestions = buildLocalizedSuggestions(buckets);
 
     _cachedSuggestions = suggestions;
     _lastGeneratedTime = now;
@@ -75,7 +83,8 @@ class PlaylistSuggestionsService {
       return _cachedSuggestions!;
     }
 
-    final suggestions = generateSuggestionsRaw(allSongs);
+    final buckets = computeRawSuggestionBuckets(allSongs);
+    final suggestions = buildLocalizedSuggestions(buckets);
     _cachedSuggestions = suggestions;
     _lastGeneratedTime = now;
     _lastSongCount = allSongs.length;
@@ -84,8 +93,19 @@ class PlaylistSuggestionsService {
   }
 
   static List<PlaylistSuggestion> generateSuggestionsRaw(
+          List<SongsTableData> allSongs) =>
+      buildLocalizedSuggestions(computeRawSuggestionBuckets(allSongs));
+
+  static RawSuggestionBuckets computeRawSuggestionBuckets(
       List<SongsTableData> allSongs) {
-    if (allSongs.isEmpty) return [];
+    if (allSongs.isEmpty) {
+      return (
+        heavyRotation: const <SongsTableData>[],
+        forgotten: const <SongsTableData>[],
+        audiophile: const <SongsTableData>[],
+        upbeat: const <SongsTableData>[],
+      );
+    }
 
     final heavyRotationCandidates = <SongsTableData>[];
     final forgotten = <SongsTableData>[];
@@ -117,38 +137,46 @@ class PlaylistSuggestionsService {
     heavyRotationCandidates.sort((a, b) => b.playCount.compareTo(a.playCount));
     final heavyRotation = heavyRotationCandidates.take(25).toList();
 
+    return (
+      heavyRotation: heavyRotation,
+      forgotten: forgotten,
+      audiophile: audiophile,
+      upbeat: upbeat,
+    );
+  }
+
+  static List<PlaylistSuggestion> buildLocalizedSuggestions(
+      RawSuggestionBuckets buckets) {
+    final l10n = L10nHolder.current;
     return <PlaylistSuggestion>[
-      if (heavyRotation.isNotEmpty)
+      if (buckets.heavyRotation.isNotEmpty)
         PlaylistSuggestion(
-          title: L10nHolder.current?.suggestionHeavyRotationTitle ??
-              'Heavy Rotation Mix',
-          description: L10nHolder.current?.suggestionHeavyRotationDesc ??
+          title: l10n?.suggestionHeavyRotationTitle ?? 'Heavy Rotation Mix',
+          description: l10n?.suggestionHeavyRotationDesc ??
               'Your most played tracks on repeat',
-          songs: heavyRotation,
+          songs: buckets.heavyRotation,
         ),
-      if (forgotten.isNotEmpty)
+      if (buckets.forgotten.isNotEmpty)
         PlaylistSuggestion(
-          title: L10nHolder.current?.suggestionForgottenFavoritesTitle ??
+          title: l10n?.suggestionForgottenFavoritesTitle ??
               'Forgotten Favorites',
-          description: L10nHolder.current?.suggestionForgottenFavoritesDesc ??
+          description: l10n?.suggestionForgottenFavoritesDesc ??
               'Starred gems you haven\'t heard in a while',
-          songs: forgotten,
+          songs: buckets.forgotten,
         ),
-      if (audiophile.isNotEmpty)
+      if (buckets.audiophile.isNotEmpty)
         PlaylistSuggestion(
-          title: L10nHolder.current?.suggestionHiResTitle ??
-              'Hi-Res Audiophile Showcase',
-          description: L10nHolder.current?.suggestionHiResDesc ??
+          title: l10n?.suggestionHiResTitle ?? 'Hi-Res Audiophile Showcase',
+          description: l10n?.suggestionHiResDesc ??
               'Studio master 24-bit lossless fidelity',
-          songs: audiophile,
+          songs: buckets.audiophile,
         ),
-      if (upbeat.isNotEmpty)
+      if (buckets.upbeat.isNotEmpty)
         PlaylistSuggestion(
-          title: L10nHolder.current?.suggestionEnergyBoostTitle ??
-              'Quick Energy Boost',
-          description: L10nHolder.current?.suggestionEnergyBoostDesc ??
+          title: l10n?.suggestionEnergyBoostTitle ?? 'Quick Energy Boost',
+          description: l10n?.suggestionEnergyBoostDesc ??
               'High-energy fast tracks to power your day',
-          songs: upbeat,
+          songs: buckets.upbeat,
         ),
     ];
   }

@@ -1240,7 +1240,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         if (audioManager == null) return false
         val usb = pickUsbOutputDevice(audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS))
             ?: return false
-        if (Build.VERSION.SDK_INT < 34) return true
+        if (Build.VERSION.SDK_INT < 34) {
+            return UsbExclusivePlugin.directStreamingSupported || UsbExclusivePlugin.directStreamingActive
+        }
         return try {
             val attrs = audioManager.getSupportedMixerAttributes(usb)
             attrs.isEmpty() || attrs.any { it.mixerBehavior == 1 }
@@ -1693,7 +1695,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // writes the PCM directly to the DAC while muting the HAL. It is the only
         // bit-perfect route on DACs/OS builds that do not advertise
         // MIXER_BEHAVIOR_BIT_PERFECT, so it counts as supported/active too.
-        val finalIsBitPerfectSupported = isUsb && !isBluetooth
+        val finalIsBitPerfectSupported = isUsb && !isBluetooth &&
+            (Build.VERSION.SDK_INT >= 34 || UsbExclusivePlugin.directStreamingSupported || UsbExclusivePlugin.directStreamingActive)
         val stream = com.ryanheise.just_audio.PulsrOutputRouting.snapshot()
         val decoded = com.ryanheise.just_audio.PulsrOutputRouting.decodedPcmSnapshot()
         val decodedDepth = encodingBitDepth(decoded[0])

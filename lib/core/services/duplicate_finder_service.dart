@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
 import '../../core/utils/l10n_holder.dart';
+import 'chain_of_custody_service.dart';
 
 class DuplicateGroup {
   final String key;
@@ -115,15 +116,39 @@ class DuplicateFinderService {
     return result;
   }
 
+  static final RegExp _promotionalNoise = RegExp(
+    r'(\(|\[)\s*(official\s+(audio|video|music\s+video)|lyric\s+video|audio|video|visualizer|hq|hd|4k)\s*(\)|\])',
+    caseSensitive: false,
+  );
+
+  static final RegExp _versionTagPattern = RegExp(
+    r'\b(remix|live|version|edit|acoustic|instrumental|deluxe|mix|extended|clean|explicit|remaster|remastered)\b',
+    caseSensitive: false,
+  );
+
+  static String _extractVersionTags(String str) {
+    final matches = _versionTagPattern.allMatches(str.toLowerCase());
+    return matches.map((m) => m.group(0)!).join(',');
+  }
+
   /// Two files inside a title+artist group are the same recording when their
   /// albums agree (an unknown/empty album is treated as compatible) and their
-  /// durations are within [_pass1DurationToleranceMs]. File sizes are
-  /// deliberately ignored so lossless and lossy encodes of one track cluster.
+  /// durations are within tolerance. When version tags differ, tolerance is tightened
+  /// from 5s to 2s.
   static bool _isSameRecording(SongsTableData a, SongsTableData b) {
     final albumA = _normalizeString(a.album);
     final albumB = _normalizeString(b.album);
     if (albumA.isNotEmpty && albumB.isNotEmpty && albumA != albumB) {
       return false;
+    }
+    final tagsA = _extractVersionTags(a.title);
+    final tagsB = _extractVersionTags(b.title);
+    if (tagsA != tagsB && (tagsA.isNotEmpty || tagsB.isNotEmpty)) {
+      if (tagsA.isNotEmpty && tagsB.isNotEmpty && tagsA != tagsB) {
+        return false;
+      }
+      if (a.durationMs <= 0 || b.durationMs <= 0) return true;
+      return (a.durationMs - b.durationMs).abs() <= 2000;
     }
     if (a.durationMs <= 0 || b.durationMs <= 0) return true;
     return (a.durationMs - b.durationMs).abs() <= _pass1DurationToleranceMs;
@@ -140,7 +165,25 @@ class DuplicateFinderService {
         byHash.putIfAbsent(hash, () => []).add(song);
       }
     }
-    return byHash.values.where((cluster) => cluster.length > 1).toList();
+    final verifiedClusters = <List<SongsTableData>>[];
+    for (final cluster in byHash.values.where((c) => c.length > 1)) {
+      // Confirm with full-file SHA-256 (reuse ChainOfCustodyService.hashFileContents, cap 512MB)
+      final byFullHash = <String, List<SongsTableData>>{};
+      for (final song in cluster) {
+        final file = File(song.path);
+        if (!await file.exists()) continue;
+        final size = await file.length();
+        if (size > 512 * 1024 * 1024) continue;
+        final fullHash = await ChainOfCustodyService.hashFileContents(song.path, size);
+        if (fullHash != null) {
+          byFullHash.putIfAbsent(fullHash, () => []).add(song);
+        }
+      }
+      for (final verified in byFullHash.values.where((c) => c.length > 1)) {
+        verifiedClusters.add(verified);
+      }
+    }
+    return verifiedClusters;
   }
 
   /// Computes a fast, collision-resistant audio fingerprint for local files
@@ -165,11 +208,7 @@ class DuplicateFinderService {
   }
 
   static String _normalizeString(String str) {
-    var s = str
-        .toLowerCase()
-        .replaceAll(RegExp(r'\([^)]*\)'),
-            '') // remove parenthesized info like (Official Video)
-        .replaceAll(RegExp(r'\[[^\]]*\]'), ''); // remove bracketed info
+    var s = str.replaceAll(_promotionalNoise, '').trim().toLowerCase();
 
     // Strip Arabic Tashkeel
     s = s.replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '');

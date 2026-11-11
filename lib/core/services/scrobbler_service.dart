@@ -132,6 +132,8 @@ class ScrobblerService {
   final Map<String, DateTime> _lastScrobblePerService = {};
   static const int _maxScrobbleEntries = 10;
   bool _isFlushing = false;
+  int _lastPosPersistEpochMs = 0;
+  bool _lastWasPlaying = false;
 
   /// Serializes scrobble submissions (see [_submitScrobbleDirect]).
   final AsyncMutex _submitMutex = AsyncMutex();
@@ -217,6 +219,8 @@ class ScrobblerService {
       await prefs.remove(_keyLastScrobbleTrack);
       await prefs.remove(_keyLastScrobbleAlbum);
       await prefs.remove(_keyLastScrobbleDuration);
+      _lastPosPersistEpochMs = 0;
+      _lastWasPlaying = false;
 
       await flushOfflineQueue();
     } catch (e, st) {
@@ -268,7 +272,7 @@ class ScrobblerService {
 
         // Persist session state for crash / kill recovery
         try {
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = await _getPrefs();
           await prefs.setInt(_keyLastScrobbleSong, id);
           await prefs.setInt(
               _keyLastScrobbleTime, DateTime.now().millisecondsSinceEpoch);
@@ -277,6 +281,7 @@ class ScrobblerService {
           await prefs.setString(_keyLastScrobbleArtist, artist);
           await prefs.setString(_keyLastScrobbleTrack, track);
           await prefs.setString(_keyLastScrobbleAlbum, album);
+          _lastPosPersistEpochMs = DateTime.now().millisecondsSinceEpoch;
         } catch (_) {
           ErrorLogger.addBreadcrumb('Scrobble session persist skipped',
               category: 'Scrobbler');
@@ -291,16 +296,21 @@ class ScrobblerService {
         );
       }
 
-      if (isPlaying) {
-        // Update last played position periodically
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      final shouldPersistPos = isPlaying
+          ? (nowMs - _lastPosPersistEpochMs >= 5000)
+          : _lastWasPlaying; // Always persist on pause
+      if (shouldPersistPos) {
+        _lastPosPersistEpochMs = nowMs;
         try {
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = await _getPrefs();
           await prefs.setInt(_keyLastScrobblePos, positionMs);
         } catch (_) {
           ErrorLogger.addBreadcrumb('Scrobble position persist skipped',
               category: 'Scrobbler');
         }
       }
+      _lastWasPlaying = isPlaying;
 
       // Check scrobble threshold (played >50% of duration or >4 minutes (240s))
       final playedSec = (positionMs / 1000).round();

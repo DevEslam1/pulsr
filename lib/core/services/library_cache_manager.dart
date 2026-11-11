@@ -112,7 +112,16 @@ class LibraryCacheManager {
         );
         _inMemorySnapshot = snapshot;
         final raw = json.encode(snapshot.toJson());
-        await _snapshotFile!.writeAsString(raw, flush: false);
+        final tmpFile = File('${_snapshotFile!.path}.tmp');
+        await tmpFile.writeAsString(raw, flush: true);
+        try {
+          await tmpFile.rename(_snapshotFile!.path);
+        } on FileSystemException {
+          await tmpFile.copy(_snapshotFile!.path);
+          try {
+            await tmpFile.delete();
+          } catch (_) {}
+        }
       } catch (e, st) {
         ErrorLogger.log('Failed to save library snapshot',
             error: e, stackTrace: st, category: 'LibraryCache');

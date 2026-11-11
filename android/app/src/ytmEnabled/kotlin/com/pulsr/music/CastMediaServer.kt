@@ -222,6 +222,11 @@ class CastMediaServer {
         if (rangeStart >= 0 && rangeStart < length) {
             start = rangeStart
             end = if (rangeEnd in start until length) rangeEnd else length - 1
+        } else if (rangeStart < 0 && rangeEnd > 0) {
+            // Suffix range: bytes=-N (last N bytes of file) (Part 2)
+            val suffix = rangeEnd.coerceAtMost(length)
+            start = length - suffix
+            end = length - 1
         } else {
             start = 0
             end = length - 1
@@ -274,12 +279,21 @@ class CastMediaServer {
 
     private fun localIpv4(): String? {
         return try {
-            val ifaces = NetworkInterface.getNetworkInterfaces()
-            while (ifaces.hasMoreElements()) {
-                val iface = ifaces.nextElement()
+            val ifaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: emptyList()
+            // Prefer Wi-Fi / Ethernet LAN interfaces over VPN/tun interfaces (Part 2)
+            val sorted = ifaces.sortedByDescending { iface ->
+                val name = iface.name.lowercase()
+                when {
+                    name.startsWith("wlan") || name.startsWith("wifi") -> 3
+                    name.startsWith("eth") || name.startsWith("en") -> 2
+                    name.startsWith("tun") || name.startsWith("tap") || name.startsWith("ppp") -> 0
+                    else -> 1
+                }
+            }
+            for (iface in sorted) {
                 if (!iface.isUp || iface.isLoopback) continue
                 for (addr in iface.inetAddresses) {
-                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
+                    if (!addr.isLoopbackAddress && addr is Inet4Address && !addr.isLinkLocalAddress) {
                         return addr.hostAddress
                     }
                 }

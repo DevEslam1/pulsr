@@ -360,11 +360,8 @@ class _SearchViewState extends State<_SearchView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AnimatedSize(
-                  duration: context.motion(PulsrMotion.state),
-                  curve: context.motionCurve(PulsrMotion.enter),
-                  alignment: Alignment.topCenter,
-                  child: compactHeader
+                if (!context.motionEnabled)
+                  (compactHeader
                       ? const SizedBox(height: AppSpacing.xs)
                       : PulsrArtworkHeader(
                           height: 92,
@@ -375,8 +372,25 @@ class _SearchViewState extends State<_SearchView> {
                                 if (song.albumId != null) song.albumId!,
                             ],
                           ),
-                        ),
-                ),
+                        ))
+                else
+                  AnimatedSize(
+                    duration: context.motion(PulsrMotion.state),
+                    curve: context.motionCurve(PulsrMotion.enter),
+                    alignment: Alignment.topCenter,
+                    child: compactHeader
+                        ? const SizedBox(height: AppSpacing.xs)
+                        : PulsrArtworkHeader(
+                            height: 92,
+                            title: context.l10n.search,
+                            albumIds: context.select<PlayerCubit, List<int>>(
+                              (c) => [
+                                for (final song in c.state.queueHistory.take(4))
+                                  if (song.albumId != null) song.albumId!,
+                              ],
+                            ),
+                          ),
+                  ),
                 const SizedBox(height: AppSpacing.xs),
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: pad),

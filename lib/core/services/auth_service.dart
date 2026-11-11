@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:injectable/injectable.dart';
 import '../config/app_config.dart';
@@ -12,6 +13,10 @@ import 'auth_failure.dart';
 class AuthService {
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
   bool _googleSignInInitialized = false;
+
+  /// Web OAuth client ID passed to Google Sign-In for ID token generation.
+  static const String serverClientId =
+      String.fromEnvironment('SERVER_CLIENT_ID');
 
   /// A sign-in that never resolves leaves the auth sheet spinning forever.
   /// Thirty seconds is long enough for a slow mobile network and short enough
@@ -59,7 +64,9 @@ class AuthService {
 
     if (!_googleSignInInitialized) {
       try {
-        await _googleSignIn.initialize().timeout(_operationTimeout);
+        await _googleSignIn.initialize(
+          serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
+        ).timeout(_operationTimeout);
         _googleSignInInitialized = true;
       } catch (e, st) {
         ErrorLogger.log('GoogleSignIn init failed',
@@ -77,7 +84,9 @@ class AuthService {
       }
 
       if (!_googleSignInInitialized) {
-        await _googleSignIn.initialize().timeout(_operationTimeout);
+        await _googleSignIn.initialize(
+          serverClientId: serverClientId.isNotEmpty ? serverClientId : null,
+        ).timeout(_operationTimeout);
         _googleSignInInitialized = true;
       }
 
@@ -107,6 +116,13 @@ class AuthService {
       }
 
       final idToken = googleAuth.idToken;
+      final isAndroid =
+          !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+      if (isAndroid && (idToken == null || idToken.isEmpty)) {
+        ErrorLogger.log('GoogleSignIn: idToken is null on Android',
+            category: 'AuthService');
+      }
+
       if ((idToken == null || idToken.isEmpty) &&
           (accessToken == null || accessToken.isEmpty)) {
         throw const AuthFailure(

@@ -2207,14 +2207,10 @@ class YtmAccountService {
             'ANDROID_TESTSUITE',
           ];
 
-    final clientChain = List<String>.from(rawChain)
-      ..sort((a, b) {
-        final aDemoted = _isSabrDemoted(a);
-        final bDemoted = _isSabrDemoted(b);
-        if (aDemoted && !bDemoted) return 1;
-        if (!aDemoted && bDemoted) return -1;
-        return 0;
-      });
+    final clientChain = [
+      ...rawChain.where((c) => !_isSabrDemoted(c)),
+      ...rawChain.where(_isSabrDemoted),
+    ];
 
     // Track consecutive IP-level blocks to short-circuit early (like the
     // native InnertubeClient chain). When 2+ clients return LOGIN_REQUIRED or

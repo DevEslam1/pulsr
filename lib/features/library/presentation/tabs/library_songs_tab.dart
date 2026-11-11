@@ -45,7 +45,11 @@ mixin LibrarySongsTab on State<LibraryScreen> {
           s,
     ];
     if (online.isEmpty) return;
-    playerCubit.warmStreams(online, count: 3);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        playerCubit.warmStreams(online, count: 3);
+      }
+    });
   }
 
   // ================= SONGS =================

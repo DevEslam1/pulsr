@@ -137,7 +137,11 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
               _warmedFirst = true;
               // Warm the top couple of a carousel (kept low: home renders several
               // carousels, so a larger count would burst resolves across them).
-              widget.playerCubit.warmStreams(songs, count: 2);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) {
+                  widget.playerCubit.warmStreams(songs, count: 2);
+                }
+              });
             }
             final ytmCubit = getIt.isRegistered<YtmDownloadCubit>()
                 ? getIt<YtmDownloadCubit>()

@@ -60,6 +60,8 @@ private class UnregisterOnDisconnectConnection(
     override fun getResponseMessage(): String? = delegate.responseMessage
     override fun getHeaderField(position: Int): String? = delegate.getHeaderField(position)
     override fun getHeaderField(name: String?): String? = delegate.getHeaderField(name)
+    override fun getHeaderFields(): MutableMap<String, MutableList<String>> = delegate.headerFields
+    override fun getHeaderFieldKey(n: Int): String? = delegate.getHeaderFieldKey(n)
     override fun getRequestMethod(): String = delegate.requestMethod
     override fun setRequestMethod(method: String) = delegate.setRequestMethod(method)
     override fun getContentLength(): Int = delegate.contentLength
@@ -88,6 +90,10 @@ private class UnregisterOnDisconnectConnection(
     override fun addRequestProperty(key: String?, value: String?) {
         delegate.addRequestProperty(key, value)
     }
+
+    override fun getRequestProperties(): MutableMap<String, MutableList<String>> = delegate.requestProperties
+
+    override fun getRequestProperty(key: String?): String? = delegate.getRequestProperty(key)
 }
 
 /**

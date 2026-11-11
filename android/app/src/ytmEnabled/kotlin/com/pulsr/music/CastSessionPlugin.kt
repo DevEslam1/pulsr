@@ -375,8 +375,34 @@ class CastSessionPlugin(
                 .setMetadata(metadata)
                 .build()
             try {
-                client.load(info, true)
-                result.success(mapOf("success" to true))
+                val pending = client.load(info, true)
+                val responded = java.util.concurrent.atomic.AtomicBoolean(false)
+                val handler = Handler(Looper.getMainLooper())
+                val timeoutRunnable = Runnable {
+                    if (responded.compareAndSet(false, true)) {
+                        lastError = "load timed out waiting for receiver"
+                        result.success(mapOf("success" to false, "error" to "load timed out waiting for receiver"))
+                    }
+                }
+                handler.postDelayed(timeoutRunnable, 10_000L)
+                pending.setResultCallback { channelResult ->
+                    handler.removeCallbacks(timeoutRunnable)
+                    if (responded.compareAndSet(false, true)) {
+                        val status = channelResult.status
+                        if (status.isSuccess) {
+                            result.success(mapOf("success" to true))
+                        } else {
+                            lastError = "load rejected by receiver: status ${status.statusCode}"
+                            result.success(
+                                mapOf(
+                                    "success" to false,
+                                    "error" to "load rejected by receiver",
+                                    "statusCode" to status.statusCode
+                                )
+                            )
+                        }
+                    }
+                }
             } catch (e: Exception) {
                 lastError = e.message
                 result.success(notConfigured("load failed: ${e.message}"))

@@ -63,6 +63,13 @@ class AppHttpOverrides extends HttpOverrides {
     _socks5BridgeStarting = completer.future;
     try {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      if (!_config.enabled ||
+          !_config.isValid ||
+          _config.type != AppProxyType.socks5) {
+        await server.close();
+        completer.complete(null);
+        return null;
+      }
       _socks5BridgeServer = server;
       server.listen(
         _handleSocks5BridgeClient,
@@ -647,6 +654,12 @@ class _SocketByteReader {
         if (target != null) {
           try {
             target.add(chunk);
+            _sub?.pause();
+            target.flush().then((_) {
+              _sub?.resume();
+            }).catchError((_) {
+              target.destroy();
+            });
           } catch (_) {
             target.destroy();
           }
@@ -774,6 +787,12 @@ class _SocketByteReader {
       _offset = 0;
       try {
         target.add(remaining);
+        _sub?.pause();
+        target.flush().then((_) {
+          _sub?.resume();
+        }).catchError((_) {
+          target.destroy();
+        });
       } catch (_) {
         target.destroy();
         return;

@@ -42,11 +42,17 @@ class LyricsTranslationService {
   static final RegExp _markerRegex = RegExp(r'\uE000[^\uE001]*\uE001');
 
   final http.Client _client;
+  final bool _ownsClient;
 
   LyricsTranslationService({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client(),
+        _ownsClient = client == null;
 
-  void dispose() => _client.close();
+  void dispose() {
+    if (_ownsClient) {
+      _client.close();
+    }
+  }
 
   /// Generates a deterministic cache key.
   static String _generateCacheKey({

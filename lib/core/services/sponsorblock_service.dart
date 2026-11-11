@@ -46,14 +46,18 @@ class SponsorBlockService {
   }
 
   final http.Client _client;
+  final bool _ownsClient;
   final LinkedHashMap<String, List<SponsorBlockSegment>> _cache =
       LinkedHashMap<String, List<SponsorBlockSegment>>();
 
   SponsorBlockService([http.Client? client])
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client(),
+        _ownsClient = client == null;
 
   void dispose() {
-    _client.close();
+    if (_ownsClient) {
+      _client.close();
+    }
   }
 
   /// Categories the service can request and skip. Order is used by the UI.

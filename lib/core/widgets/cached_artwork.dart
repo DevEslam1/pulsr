@@ -305,7 +305,27 @@ class _CachedArtworkState extends State<CachedArtwork> {
     super.dispose();
   }
 
+  static final Map<String, Future<Uint8List?>> _inFlightFetches = {};
+
   static Future<Uint8List?> _fetchRemote(String url,
+      {bool highQuality = false, bool lowQuality = false}) {
+    final fetchKey = '$url|hq=$highQuality|lq=$lowQuality';
+    final existing = _inFlightFetches[fetchKey];
+    if (existing != null) return existing;
+
+    final future = _fetchRemoteInternal(
+      url,
+      highQuality: highQuality,
+      lowQuality: lowQuality,
+    );
+    _inFlightFetches[fetchKey] = future;
+    future.whenComplete(() {
+      _inFlightFetches.remove(fetchKey);
+    });
+    return future;
+  }
+
+  static Future<Uint8List?> _fetchRemoteInternal(String url,
       {bool highQuality = false, bool lowQuality = false}) async {
     if (url.startsWith('assets/')) {
       try {

@@ -591,6 +591,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                         Expanded(
                           flex: 5,
                           child: Center(
+                            key: const ValueKey('track_controls_pane'),
                             child: SingleChildScrollView(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,

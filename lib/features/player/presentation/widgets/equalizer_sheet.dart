@@ -2,6 +2,7 @@ import '../../../../core/widgets/throttled_slider.dart';
 // lib/features/player/presentation/widgets/equalizer_sheet.dart
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -58,7 +59,8 @@ part 'eq_ab_compare_bar.dart';
 // Rebuild gate for the whole DSP sheet (F-01 / C-01 / H2).
 //
 // Table-driven DspSlice rebuild gate (one source of truth).
-// Position/tick changes are ignored, but any DSP change triggers rebuild.
+// Position/tick changes and eqPreset gains-only slider drag frames are ignored,
+// but any other DSP change triggers rebuild (F-10/B4).
 bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
   if (identical(a, b)) return false;
   if (a.errorMessage != b.errorMessage) return true;
@@ -67,11 +69,24 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
   final y = b.dsp;
   if (identical(x, y)) return false;
   for (final field in dspSliceFields) {
+    if (field.name == 'eqPreset') {
+      if (!_eqPresetRebuildEquals(x.eqPreset, y.eqPreset)) return true;
+      continue;
+    }
     if (!field.valuesEqual(x, y)) {
       return true;
     }
   }
   return false;
+}
+
+bool _eqPresetRebuildEquals(EqPreset x, EqPreset y) {
+  if (identical(x, y)) return true;
+  return x.name == y.name &&
+      x.bassBoost == y.bassBoost &&
+      listEquals(x.customFrequencies, y.customFrequencies) &&
+      listEquals(x.qFactors, y.qFactors) &&
+      mapEquals(x.bandsMap, y.bandsMap);
 }
 
 class EqualizerSheet extends StatefulWidget {

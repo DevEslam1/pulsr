@@ -326,6 +326,7 @@ class PlayerPlaybackOptionsController {
     final speed = _perSongPlaybackStore.getSpeed(key);
     final pitch = _perSongPlaybackStore.getPitch(key);
     final gainDb = _perSongVolumeStore.getGainDbForTrack(key);
+    final eqPreset = _perSongEqStore.getPresetForTrack(key);
     if (_isClosed() || gen != _playbackMemoryGen) return;
     if (_getState().currentSong?.id != song.id) return;
     if (_getState().isQuranModeEnabled) return;
@@ -372,6 +373,7 @@ class PlayerPlaybackOptionsController {
             : s.playbackSpeed,
         playbackPitch: pitchSucceeded ? _audioHandler.pitch : s.playbackPitch,
         currentSongVolumeOverrideDb: gainDb,
+        currentSongEqOverride: eqPreset,
       ),
     ));
   }

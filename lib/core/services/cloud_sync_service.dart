@@ -3,7 +3,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide Query;
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
@@ -34,6 +35,37 @@ class CloudSyncService {
   final IMusicRepository _repository;
   final AppDatabase _db;
   SharedPreferences? _prefs;
+
+  static final Map<String, int> _localModifiedFavorites = {};
+
+  static void recordLocalFavoriteModified(String stableOrRemoteId, [int? timestampMs]) {
+    _localModifiedFavorites[stableOrRemoteId] =
+        timestampMs ?? DateTime.now().millisecondsSinceEpoch;
+  }
+
+  @visibleForTesting
+  static void clearLocalModifiedFavoritesForTesting() {
+    _localModifiedFavorites.clear();
+  }
+
+  static int extractCloudTimestamp(Map<String, dynamic> data) {
+    final mod = data['modifiedAt'];
+    if (mod is Timestamp) return mod.millisecondsSinceEpoch;
+    if (mod is int) return mod;
+    if (mod is String) {
+      final parsed = DateTime.tryParse(mod);
+      if (parsed != null) return parsed.millisecondsSinceEpoch;
+    }
+    final dev = data['deviceTimestamp'];
+    if (dev is int) return dev;
+    if (dev is Timestamp) return dev.millisecondsSinceEpoch;
+    return 0;
+  }
+
+  static bool shouldCloudWin({required int cloudTimestamp, int? localTimestamp}) {
+    if (localTimestamp == null || localTimestamp == 0) return true;
+    return cloudTimestamp >= localTimestamp;
+  }
 
   CloudSyncService(
     this._authService,
@@ -578,7 +610,14 @@ class CloudSyncService {
   }) async {
     // 1. Merge Favorites
     if (syncFavorites) {
-      final favSnapshot = await userDoc.collection('favorites').get();
+      final lastSync = lastSyncTime;
+      Query<Map<String, dynamic>> favQuery = userDoc.collection('favorites');
+      if (lastSync != null) {
+        // Delta reads with 7-day tombstone window
+        final deltaThreshold = lastSync.subtract(const Duration(days: 7));
+        favQuery = favQuery.where('modifiedAt', isGreaterThan: Timestamp.fromDate(deltaThreshold));
+      }
+      final favSnapshot = await favQuery.get();
       final favItems = <Map<String, dynamic>>[];
       if (favSnapshot.docs.isNotEmpty) {
         for (final doc in favSnapshot.docs) {
@@ -597,13 +636,11 @@ class CloudSyncService {
 
       final allLocalSongs = await _db.select(_db.songsTable).get();
       final localByRemoteId = <String, SongsTableData>{};
-      final localByTitleArtist = <(String, String), SongsTableData>{};
       final localByStableId = <String, SongsTableData>{};
       for (final s in allLocalSongs) {
         if (s.remoteId != null && s.remoteId!.isNotEmpty) {
           localByRemoteId[s.remoteId!] = s;
         }
-        localByTitleArtist[(s.title.toLowerCase(), s.artist.toLowerCase())] = s;
         localByStableId[_stableSongId(s)] = s;
       }
 
@@ -621,8 +658,19 @@ class CloudSyncService {
 
           SongsTableData? match;
           if (docId != null) match = localByStableId[docId];
-          // A tombstone must remove the favorite, never resurrect it from a
-          // title/artist fallback.
+          if (remoteId != null && remoteId.isNotEmpty) {
+            match ??= localByRemoteId[remoteId];
+          }
+
+          // LWW check: never let stale cloud state override newer local change
+          final key = docId ?? remoteId ?? '';
+          final localModTime = _localModifiedFavorites[key];
+          final cloudTime = extractCloudTimestamp(item);
+          if (!shouldCloudWin(cloudTimestamp: cloudTime, localTimestamp: localModTime)) {
+            continue;
+          }
+
+          // A tombstone must remove the favorite
           if (isDeleted) {
             if (match != null && match.isFavorite) {
               await (_db.update(_db.songsTable)
@@ -631,11 +679,6 @@ class CloudSyncService {
             }
             continue;
           }
-          if (remoteId != null && remoteId.isNotEmpty) {
-            match ??= localByRemoteId[remoteId];
-          }
-          match ??=
-              localByTitleArtist[(title.toLowerCase(), artist.toLowerCase())];
 
           if (match != null) {
             if (!match.isFavorite) {

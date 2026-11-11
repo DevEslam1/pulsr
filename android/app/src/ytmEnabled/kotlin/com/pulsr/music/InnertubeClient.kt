@@ -439,7 +439,7 @@ internal class InnertubeClient(
                 actualRequestUa = fp.buildUserAgent(client)
 
                 Log.d(TAG, "[$traceId] Attempting player resolution for $videoId using client: ${client.name}")
-                val playerJson = requestPlayer(videoId, client, activeCalls)
+                val playerJson = requestPlayer(videoId, client, activeCalls, deadlineMs = resolveDeadlineMs)
                 if (Thread.currentThread().isInterrupted) return AttemptResult.Interrupted
 
                 val playability = playerJson.optJSONObject("playabilityStatus")
@@ -1260,7 +1260,8 @@ internal class InnertubeClient(
     fun requestPlayer(
         videoId: String,
         clientType: ClientType,
-        activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null
+        activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null,
+        deadlineMs: Long = Long.MAX_VALUE
     ): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
@@ -1270,6 +1271,7 @@ internal class InnertubeClient(
             endpoint, payload, clientType, RateLimiter.Bucket.PLAYER,
             maxAttempts = 2, activeCalls = activeCalls,
             client = YtmHttpClient.resolveOkHttpClient,
+            deadlineMs = deadlineMs
         )
     }
 
@@ -1449,12 +1451,17 @@ internal class InnertubeClient(
         maxAttempts: Int = 3,
         activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null,
         client: okhttp3.OkHttpClient = YtmHttpClient.okHttpClient,
+        deadlineMs: Long = Long.MAX_VALUE,
     ): JSONObject {
         var lastError: Exception? = null
         val traceId = UUID.randomUUID().toString()
         var sleepAfterAttemptMs = 0L
 
         for (attempt in 0 until maxAttempts) {
+            if (deadlineMs != Long.MAX_VALUE && android.os.SystemClock.elapsedRealtime() >= deadlineMs) {
+                lastError = java.util.concurrent.TimeoutException("Resolve deadline exceeded before attempt $attempt for ${clientType.name}")
+                break
+            }
             // FIX #6: Check interruption at the start of every attempt
             if (Thread.currentThread().isInterrupted) {
                 lastError = IOException("Innertube request interrupted before attempt $attempt for ${clientType.name}")
@@ -1462,8 +1469,14 @@ internal class InnertubeClient(
             }
 
             if (sleepAfterAttemptMs > 0) {
+                val budget = if (deadlineMs != Long.MAX_VALUE) maxOf(0L, deadlineMs - android.os.SystemClock.elapsedRealtime()) else sleepAfterAttemptMs
+                val actualSleep = minOf(sleepAfterAttemptMs, budget)
+                if (actualSleep <= 0 && deadlineMs != Long.MAX_VALUE) {
+                    lastError = java.util.concurrent.TimeoutException("Resolve deadline reached during retry backoff for ${clientType.name}")
+                    break
+                }
                 try {
-                    Thread.sleep(sleepAfterAttemptMs)
+                    Thread.sleep(actualSleep)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                     lastError = IOException("Sleep interrupted between attempts for ${clientType.name}")
@@ -1472,7 +1485,12 @@ internal class InnertubeClient(
                 sleepAfterAttemptMs = 0L
             }
 
-            when (rateLimiter.tryAcquirePermit(bucket)) {
+            val permitMaxWait = if (deadlineMs != Long.MAX_VALUE) {
+                minOf(10_000L, maxOf(0L, deadlineMs - android.os.SystemClock.elapsedRealtime()))
+            } else {
+                30_000L
+            }
+            when (rateLimiter.tryAcquirePermit(bucket, maxWaitMs = permitMaxWait)) {
                 RateLimiter.PermitResult.GRANTED -> {}
                 RateLimiter.PermitResult.INTERRUPTED -> {
                     lastError = IOException("Rate limiter wait interrupted for ${clientType.name}")
@@ -1581,6 +1599,10 @@ internal class InnertubeClient(
                     )
                     response.close()
                     sleepAfterAttemptMs = backoff
+                    if (deadlineMs != Long.MAX_VALUE && android.os.SystemClock.elapsedRealtime() + backoff > deadlineMs) {
+                        Log.w(TAG, "[$traceId] 429 backoff ($backoff ms) exceeds deadline, aborting retry")
+                        break
+                    }
                     continue
                 }
 

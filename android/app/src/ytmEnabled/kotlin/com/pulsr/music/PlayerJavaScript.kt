@@ -26,7 +26,29 @@ internal object PlayerJavaScript {
         "https://www.youtube.com/s/player/67288f35/player_ias.vflset/en_US/base.js"
 
     private const val DESKTOP_UA =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
+
+    private class BoundedRhinoContextFactory(
+        private val maxInstructions: Int = 100_000,
+        private val maxDurationMs: Long = 5000L
+    ) : org.mozilla.javascript.ContextFactory() {
+        private val startTimeMs = System.currentTimeMillis()
+
+        override fun makeContext(): org.mozilla.javascript.Context {
+            val cx = super.makeContext()
+            cx.instructionObserverThreshold = 10_000
+            return cx
+        }
+
+        override fun observeInstructionCount(cx: org.mozilla.javascript.Context, instructionCount: Int) {
+            if (instructionCount > maxInstructions) {
+                throw Error("JavaScript execution exceeded instruction cap ($maxInstructions)")
+            }
+            if (System.currentTimeMillis() - startTimeMs > maxDurationMs) {
+                throw Error("JavaScript execution exceeded wall-clock timeout (${maxDurationMs}ms)")
+            }
+        }
+    }
 
     private const val FETCH_RETRY_COOLDOWN_MS = 60_000L
 
@@ -260,7 +282,7 @@ internal object PlayerJavaScript {
             conn.readTimeout = 8000
             conn.setRequestProperty(
                 "User-Agent",
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+                DESKTOP_UA
             )
             conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
             val html = conn.getInputStream().bufferedReader().use { it.readText() }
@@ -588,7 +610,8 @@ internal object PlayerJavaScript {
         val funcName = match.groupValues[1]
         val patchedJs = js.replaceRange(match.range, "globalThis._solver=" + match.value)
 
-        val cx = RhinoContext.enter()
+        val factory = BoundedRhinoContextFactory()
+        val cx = factory.enterContext()
         try {
             cx.optimizationLevel = -1
             cx.languageVersion = RhinoContext.VERSION_ES6

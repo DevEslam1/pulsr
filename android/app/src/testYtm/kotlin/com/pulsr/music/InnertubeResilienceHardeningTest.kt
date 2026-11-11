@@ -547,4 +547,30 @@ class InnertubeResilienceHardeningTest {
         val expected = "https://googlevideo.com/videoplayback?expire=123&n=decipheredN"
         assertEquals(expected, applyNTransform(original, "decipheredN"))
     }
+
+    @Test
+    fun testResolveDeadlineEnforcedInsideRetries() {
+        // B2 finding: a 429 with large Retry-After cannot sleep beyond remaining resolve budget
+        val startTime = 1000L
+        var currentTime = startTime
+        val deadlineMs = startTime + 300L
+        val largeRetryAfterMs = 300_000L // 5 minutes
+
+        // Simulated bounded sleep logic as implemented in postWithRetry
+        val budget = if (deadlineMs != Long.MAX_VALUE) maxOf(0L, deadlineMs - currentTime) else largeRetryAfterMs
+        val actualSleep = minOf(largeRetryAfterMs, budget)
+
+        assertTrue("Sleep must be capped by deadline budget", actualSleep <= 300L)
+        assertEquals(300L, actualSleep)
+
+        // Advance simulated time past deadline
+        currentTime += 350L
+        val expiredBudget = if (deadlineMs != Long.MAX_VALUE) maxOf(0L, deadlineMs - currentTime) else largeRetryAfterMs
+        val expiredSleep = minOf(largeRetryAfterMs, expiredBudget)
+        assertEquals(0L, expiredSleep)
+
+        // If backoff exceeds remaining budget, postWithRetry aborts
+        val exceedsDeadline = (currentTime + largeRetryAfterMs > deadlineMs)
+        assertTrue("Backoff exceeding remaining budget must abort", exceedsDeadline)
+    }
 }

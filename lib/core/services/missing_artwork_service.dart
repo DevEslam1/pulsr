@@ -39,13 +39,17 @@ class _ArtworkRateLimiter {
 @lazySingleton
 class MissingArtworkService {
   final http.Client _client;
+  final bool _ownsClient;
   final _ArtworkRateLimiter _rateLimiter = _ArtworkRateLimiter(maxRequests: 5);
 
   MissingArtworkService([http.Client? client])
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client(),
+        _ownsClient = client == null;
 
   void dispose() {
-    _client.close();
+    if (_ownsClient) {
+      _client.close();
+    }
   }
 
   /// Scans albums and identifies those lacking artwork.
