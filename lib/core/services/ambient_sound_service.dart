@@ -8,6 +8,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../utils/error_logger.dart';
 
 /// All available ambient sound effects.
 enum AmbientSoundEffect {
@@ -128,8 +129,13 @@ enum AmbientSoundEffect {
 /// each effect's volume.
 class AmbientSoundService extends ChangeNotifier {
   static final AmbientSoundService _instance = AmbientSoundService._();
-  factory AmbientSoundService() => _instance;
+  static AmbientSoundService? _testInstance;
+  factory AmbientSoundService() => _testInstance ?? _instance;
   AmbientSoundService._();
+
+  @visibleForTesting
+  static set testInstance(AmbientSoundService? instance) =>
+      _testInstance = instance;
 
   // ─── Prefs keys ────────────────────────────────────────────────────────────
   static const _keyActiveEffects = 'ambient_active_effects';
@@ -583,8 +589,9 @@ class AmbientSoundService extends ChangeNotifier {
       for (final effect in List.of(_activeEffects)) {
         unawaited(_startEffectPlayer(effect));
       }
-    } catch (_) {
-      // Non-fatal: safely continue without ambient sound.
+    } catch (e, st) {
+      ErrorLogger.log('Failed to initialize ambient sound service',
+          error: e, stackTrace: st, category: 'AmbientSoundService');
     }
     if (!_disposed) notifyListeners();
   }
@@ -595,6 +602,7 @@ class AmbientSoundService extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _persistTimer?.cancel();
     unawaited(_interruptionSub?.cancel());
     _sleepTimer?.cancel();
     _sleepTicker?.cancel();
@@ -690,7 +698,20 @@ class AmbientSoundService extends ChangeNotifier {
     _loadingEffects.remove(effect);
   }
 
+  Timer? _persistTimer;
+
+  @visibleForTesting
+  void cancelPersistTimerForTesting() {
+    _persistTimer?.cancel();
+    _persistTimer = null;
+  }
+
   void _persist() {
+    _persistTimer?.cancel();
+    _persistTimer = Timer(const Duration(milliseconds: 400), _executePersist);
+  }
+
+  void _executePersist() {
     SharedPreferences.getInstance().then((prefs) {
       prefs.setDouble(_keyMaster, _masterVolume);
       prefs.setBool(_keyAllowQuran, _allowDuringQuran);

@@ -27,6 +27,7 @@ extension PlayerDspComparisonExtension on PlayerDspController {
   }
 
   Future<void> setBandMode(int count) async {
+    invalidateCodecCompensation(clearUserIntent: true);
     if (!guardDsp('Equalizer Band Mode')) return;
     try {
       if (count == 10 || count == 32) {
@@ -67,6 +68,7 @@ extension PlayerDspComparisonExtension on PlayerDspController {
   String exportPresetToJson() => _audioHandler.exportPresetToJson();
 
   Future<bool> importPresetFromJson(String jsonStr) async {
+    invalidateCodecCompensation(clearUserIntent: true);
     if (!guardDsp('Equalizer Preset')) return false;
     try {
       final ok = await _audioHandler.importPresetFromJson(jsonStr);

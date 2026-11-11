@@ -396,7 +396,7 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                                     ),
                                     const SizedBox(width: AppSpacing.xxs),
                                     Text(
-                                      's',
+                                      '${(_scrubTurns * 4000 / 1000) >= 0 ? '+' : ''}${(_scrubTurns * 4000 / 1000).toStringAsFixed(1)}s',
                                       style: const TextStyle(
                                         fontSize: AppFontSize.label,
                                         fontWeight: FontWeight.w800,

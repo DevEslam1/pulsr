@@ -383,6 +383,26 @@ void main() {
       ];
       expect(await controller.updateLyrics(lines), isFalse);
     });
+
+    test('0.4 expectedSongId mismatch returns false without mutating state', () async {
+      final handler = _MockAudioHandler();
+      var state = PlayerState(
+        playback: PlaybackSlice(currentSong: buildSong(10, path: '/test.mp3')),
+        lyricsSlice: const LyricsSlice(lyrics: []),
+      );
+      var emitted = false;
+      final controller = make(handler, getState: () => state, emit: (s) {
+        emitted = true;
+        state = s;
+      });
+      final lines = [
+        const LyricsLine(timestamp: Duration(seconds: 1), text: 'mismatch'),
+      ];
+      final result = await controller.updateLyrics(lines, expectedSongId: 999);
+      expect(result, isFalse);
+      expect(emitted, isFalse);
+      expect(state.lyrics, isEmpty);
+    });
   });
 
   group('refreshLyrics', () {

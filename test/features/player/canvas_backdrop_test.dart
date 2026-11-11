@@ -1,4 +1,5 @@
 // test/features/player/canvas_backdrop_test.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -141,6 +142,60 @@ void main() {
 
       verifyNever(() => repository.cached(any()));
       verifyNever(() => repository.canvasFor(any()));
+    });
+
+    testWidgets('0.9 toggling canvasEnabled to false stops and disposes controller and shows fallback', (tester) async {
+      final streamController = StreamController<SettingsState>.broadcast();
+      addTearDown(streamController.close);
+
+      var currentState = const SettingsState(canvasEnabled: true);
+      when(() => mockSettingsCubit.state).thenAnswer((_) => currentState);
+      when(() => mockSettingsCubit.stream).thenAnswer((_) => streamController.stream);
+
+      const fallbackKey = ValueKey('fallback_art');
+      const dummySong = SongsTableData(
+        id: 3,
+        title: 'Canvas Track',
+        artist: 'Artist',
+        album: 'Album',
+        path: '/storage/music/song.mp3',
+        source: 'local',
+        isDownloaded: false,
+        durationMs: 180000,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      final repository = MockCanvasRepository();
+      when(() => repository.cached(any())).thenReturn(null);
+      when(() => repository.canvasFor(any())).thenAnswer((_) async => null);
+
+      await tester.pumpWidget(
+        buildTestableWidget(
+          CanvasBackdrop(
+            song: dummySong,
+            isPlaying: true,
+            fallbackArtwork: Container(key: fallbackKey, color: Colors.blue),
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(fallbackKey), findsOneWidget);
+
+      // Toggle canvasEnabled to false during playback
+      currentState = const SettingsState(canvasEnabled: false);
+      streamController.add(currentState);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.byKey(fallbackKey), findsOneWidget);
+      final stateFinder = find.byType(CanvasBackdrop);
+      final backdropState = tester.state(stateFinder) as dynamic;
+      expect(backdropState.canvas, isNull);
     });
   });
 }

@@ -36,6 +36,7 @@ void main() {
     for (final e in List.of(service.activeEffects)) {
       service.toggleEffect(e);
     }
+    service.cancelPersistTimerForTesting();
   });
 
   group('AmbientSoundPanel', () {
@@ -116,6 +117,7 @@ void main() {
 
       expect(find.text('Paused'), findsOneWidget);
       expect(find.text('Paused with player'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
     });
 
     testWidgets('shows "1 ON" badge when one effect is active', (tester) async {
@@ -126,6 +128,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('1 ON'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
     });
 
     testWidgets('master switch toggles ambient sounds on and off in panel',

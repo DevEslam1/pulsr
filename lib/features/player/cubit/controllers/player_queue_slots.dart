@@ -340,16 +340,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final song = updatedQueue.removeAt(oldIndex);
     updatedQueue.insert(targetIndex, song);
 
-    int newCurrentIndex = state.currentIndex;
-    if (state.currentIndex == oldIndex) {
-      newCurrentIndex = targetIndex;
-    } else if (oldIndex < state.currentIndex &&
-        targetIndex >= state.currentIndex) {
-      newCurrentIndex = state.currentIndex - 1;
-    } else if (oldIndex > state.currentIndex &&
-        targetIndex <= state.currentIndex) {
-      newCurrentIndex = state.currentIndex + 1;
-    }
+    final int newCurrentIndex =
+        calculateReorderedIndex(oldIndex, targetIndex, state.currentIndex);
 
     setQueueSlot(
       state.activeQueueSlot,
@@ -729,23 +721,27 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
 
   Future<void> _addToQueueLocked(SongsTableData song) async {
     final state = _getState();
-    final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
-    if (existingIdx != -1) {
-      // Reordering an already-present song doesn't grow the queue, so handle it
-      // before the capacity check — which would otherwise wrongly block it at
-      // exactly-full.
-      if (existingIdx == state.currentIndex ||
-          existingIdx == state.queue.length - 1) {
-        final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
-        if (updatedTiers[song.id] != QueueTier.userQueue) {
-          updatedTiers[song.id] = QueueTier.userQueue;
-          _emit(state.copyWith(
-            queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
-          ));
-        }
-        return;
+    if (state.queue.isNotEmpty && _isSameTrack(state.queue.last, song)) {
+      final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
+      if (updatedTiers[song.id] != QueueTier.userQueue) {
+        updatedTiers[song.id] = QueueTier.userQueue;
+        _emit(state.copyWith(
+          queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
+        ));
       }
-      // Reorder existing song to end instead of enqueuing duplicate into audio handler
+      return;
+    }
+
+    int existingIdx = -1;
+    for (int i = 0; i < state.queue.length; i++) {
+      if (i != state.currentIndex && _isSameTrack(state.queue[i], song)) {
+        existingIdx = i;
+        break;
+      }
+    }
+
+    if (existingIdx != -1) {
+      // Reordering an already-present non-current song to the end doesn't grow the queue
       await _reorderQueueLocked(existingIdx, state.queue.length - 1);
       final s = _getState();
       final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
@@ -813,22 +809,28 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       await _addToQueueLocked(song);
       return;
     }
-    final existingIdx = state.queue.indexWhere((s) => _isSameTrack(s, song));
     final targetSlot = (state.currentIndex + 1).clamp(0, state.queue.length);
-    if (existingIdx != -1) {
-      // Reordering an already-present song doesn't grow the queue, so handle it
-      // before the capacity check — which would otherwise wrongly block it at
-      // exactly-full.
-      if (existingIdx == state.currentIndex || existingIdx == targetSlot) {
-        final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
-        if (updatedTiers[song.id] != QueueTier.userQueue) {
-          updatedTiers[song.id] = QueueTier.userQueue;
-          _emit(state.copyWith(
-            queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
-          ));
-        }
-        return;
+    if (targetSlot < state.queue.length &&
+        _isSameTrack(state.queue[targetSlot], song)) {
+      final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
+      if (updatedTiers[song.id] != QueueTier.userQueue) {
+        updatedTiers[song.id] = QueueTier.userQueue;
+        _emit(state.copyWith(
+          queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
+        ));
       }
+      return;
+    }
+
+    int existingIdx = -1;
+    for (int i = 0; i < state.queue.length; i++) {
+      if (i != state.currentIndex && _isSameTrack(state.queue[i], song)) {
+        existingIdx = i;
+        break;
+      }
+    }
+
+    if (existingIdx != -1) {
       final adjustedTarget =
           targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
       await _reorderQueueLocked(existingIdx, adjustedTarget);

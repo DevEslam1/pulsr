@@ -100,6 +100,12 @@ extension PlayerPlaybackOptionsLyricsExtension
       return false;
     }
     final s = _getState();
+    final song = s.currentSong;
+    if (song == null) return false;
+    // The sheet may stay open while playback advances; never write the previous
+    // track's edited lyrics into the new track's sidecar.
+    if (expectedSongId != null && song.id != expectedSongId) return false;
+
     const source = LyricsSource.externalLrc;
     _emit(s.copyWith(
       lyricsSlice: s.lyricsSlice.copyWith(
@@ -108,12 +114,6 @@ extension PlayerPlaybackOptionsLyricsExtension
         isLoadingLyrics: false,
       ),
     ));
-
-    final song = s.currentSong;
-    if (song == null) return false;
-    // The sheet may stay open while playback advances; never write the previous
-    // track's edited lyrics into the new track's sidecar.
-    if (expectedSongId != null && song.id != expectedSongId) return false;
 
     LrcParser.invalidateSong(songId: song.id, path: song.path);
 

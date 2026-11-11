@@ -1,6 +1,7 @@
 // lib/data/audio/playback_queue_state_machine.dart
 import 'dart:math' as math;
 import 'package:just_audio/just_audio.dart' show LoopMode;
+import '../../core/utils/playlist_reorder_utils.dart';
 import '../db/app_database.dart';
 
 /// Pure, testable state machine for playback queue navigation and state.
@@ -183,24 +184,12 @@ class PlaybackQueueStateMachine {
     final song = _songs.removeAt(oldIndex);
     _songs.insert(newIndex, song);
 
-    if (_currentIndex == oldIndex) {
-      _currentIndex = newIndex;
-    } else if (oldIndex < _currentIndex && newIndex >= _currentIndex) {
-      _currentIndex--;
-    } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
-      _currentIndex++;
-    }
+    _currentIndex = calculateReorderedIndex(oldIndex, newIndex, _currentIndex);
     // Remap shuffle history the same way the current index is remapped, per
     // entry, so "Previous" still points at the same songs after a reorder.
     for (int i = 0; i < _shuffleHistory.length; i++) {
-      final h = _shuffleHistory[i];
-      if (h == oldIndex) {
-        _shuffleHistory[i] = newIndex;
-      } else if (oldIndex < h && newIndex >= h) {
-        _shuffleHistory[i] = h - 1;
-      } else if (oldIndex > h && newIndex <= h) {
-        _shuffleHistory[i] = h + 1;
-      }
+      _shuffleHistory[i] =
+          calculateReorderedIndex(oldIndex, newIndex, _shuffleHistory[i]);
     }
     _pendingShuffleNext = null;
     _queueDirty = true;

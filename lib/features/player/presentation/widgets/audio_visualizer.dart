@@ -112,6 +112,9 @@ class AudioVisualizer extends StatefulWidget {
 
 class AudioVisualizerState extends State<AudioVisualizer>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  bool get _isAndroid =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+
   // The native visualizer tap is process-global. Ref-count claims so one
   // widget disposing (theme swap, navigation) cannot stop the stream another
   // instance is still rendering.
@@ -340,7 +343,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
   }
 
   Future<void> _initVisualizer() async {
-    if (!Platform.isAndroid || widget.style == VisualizerStyle.off) return;
+    if (!_isAndroid || widget.style == VisualizerStyle.off) return;
     try {
       _subscribeToStream();
     } catch (e, st) {
@@ -393,7 +396,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
   void _restartNativeStream() {
     _subscription?.cancel();
     _subscription = null;
-    if (Platform.isAndroid &&
+    if (_isAndroid &&
         !widget.preferSimulated &&
         widget.style != VisualizerStyle.off &&
         widget.isPlaying) {
@@ -408,7 +411,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
       _claimedNativeSession = false;
       _nativeSessionRefs = math.max(0, _nativeSessionRefs - 1);
       // Only the last claimant may tear down the process-global tap.
-      if (_nativeSessionRefs == 0 && Platform.isAndroid) {
+      if (_nativeSessionRefs == 0 && _isAndroid) {
         _methodChannel.invokeMethod('releaseVisualizer').catchError((_) {});
       }
     }
@@ -482,7 +485,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
 
       if (isStale && widget.style != VisualizerStyle.off) {
         if (!widget.preferSimulated &&
-            Platform.isAndroid &&
+            _isAndroid &&
             _lastNativeDataTime.millisecondsSinceEpoch > 0 &&
             staleMs > 1500) {
           // Native stream stopped delivering samples; decay to zero to avoid misleading synthetic animation
@@ -675,7 +678,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                   ),
                 ),
               if (widget.style != VisualizerStyle.off &&
-                  Platform.isAndroid &&
+                  _isAndroid &&
                   widget.isPlaying &&
                   !widget.preferSimulated &&
                   !_hasActiveSession &&

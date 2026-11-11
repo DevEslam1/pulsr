@@ -131,8 +131,9 @@ class PlayerMoreSheet extends StatelessWidget {
                     ? '${activeEffects.map((e) => e.emoji).join(' ')} • ${activeEffects.length} effect${activeEffects.length == 1 ? '' : 's'}${ambient.isAudioPlaying ? '' : ' (Paused)'}'
                     : l10n.ambientSoundsDesc;
                 // Icon: use icon of first active effect, or generic waves
-                final icon = isAmbientActive
-                    ? iconForEffect(activeEffects.first)
+                final firstEffect = activeEffects.firstOrNull;
+                final icon = (isAmbientActive && firstEffect != null)
+                    ? iconForEffect(firstEffect)
                     : Icons.waves_rounded;
                 return _MoreActionTile(
                   icon: icon,

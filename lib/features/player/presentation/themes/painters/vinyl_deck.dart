@@ -414,7 +414,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                       ),
                                       const SizedBox(width: AppSpacing.xxs),
                                       Text(
-                                        's',
+                                        '${(_scrubTurns * 1800 / 1000) >= 0 ? '+' : ''}${(_scrubTurns * 1800 / 1000).toStringAsFixed(1)}s',
                                         style: const TextStyle(
                                           fontSize: AppFontSize.label,
                                           fontWeight: FontWeight.w800,

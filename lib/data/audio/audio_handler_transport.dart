@@ -715,15 +715,18 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   Future<void> insertNextInQueue(SongsTableData song) async {
-    final existingIdx = _songs.indexWhere((s) => s.id == song.id);
+    final targetSlot = (_currentIndex + 1).clamp(0, _songs.length - 1);
+    if (targetSlot < _songs.length && _songs[targetSlot].id == song.id) {
+      return;
+    }
+    int existingIdx = -1;
+    for (int i = 0; i < _songs.length; i++) {
+      if (i != _currentIndex && _songs[i].id == song.id) {
+        existingIdx = i;
+        break;
+      }
+    }
     if (existingIdx != -1) {
-      if (existingIdx == _currentIndex) {
-        return;
-      }
-      final targetSlot = (_currentIndex + 1).clamp(0, _songs.length - 1);
-      if (existingIdx == targetSlot) {
-        return;
-      }
       await reorderQueue(
           existingIdx, targetSlot > existingIdx ? targetSlot - 1 : targetSlot);
       return;
@@ -755,14 +758,17 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   Future<void> addToQueueEnd(SongsTableData song) async {
-    final existingIdx = _songs.indexWhere((s) => s.id == song.id);
+    if (_songs.isNotEmpty && _songs.last.id == song.id) {
+      return;
+    }
+    int existingIdx = -1;
+    for (int i = 0; i < _songs.length; i++) {
+      if (i != _currentIndex && _songs[i].id == song.id) {
+        existingIdx = i;
+        break;
+      }
+    }
     if (existingIdx != -1) {
-      if (existingIdx == _currentIndex) {
-        return;
-      }
-      if (existingIdx == _songs.length - 1) {
-        return;
-      }
       await reorderQueue(existingIdx, _songs.length - 1);
       return;
     }

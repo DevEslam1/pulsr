@@ -86,6 +86,23 @@ class PlayerDspController {
   List<double>? _appliedMusicEqComp;
   bool _musicForcedEqEnabled = false;
   double _appliedMusicReverbScale = 1.0;
+
+  /// Invalidates active codec-aware music compensation bookkeeping when the EQ
+  /// preset or curve is replaced or re-anchored.
+  ///
+  /// TODO(audiophile): Add a dedicated native compensation stage flag in libpulsr_dsp
+  /// so user EQ gains are never mutated or merged in Dart. Until that native stage is
+  /// implemented in the C++ engine, invalidation + user intent tracking ensures
+  /// that applying a new preset, resetting to flat, or restoring a per-song curve
+  /// never inherits stale folded compensation deltas or clobbers user intent.
+  void invalidateCodecCompensation({bool clearUserIntent = false}) {
+    _appliedMusicEqComp = null;
+    _appliedMusicReverbScale = 1.0;
+    if (clearUserIntent) {
+      _musicForcedEqEnabled = false;
+    }
+  }
+
   EqPreset? globalEqBackup;
   HeadphoneProfile? globalHeadphoneProfileBackup;
   bool perSongOverrideActive = false;

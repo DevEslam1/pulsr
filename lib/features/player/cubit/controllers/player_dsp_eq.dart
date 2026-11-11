@@ -7,16 +7,20 @@ part of 'player_dsp_controller.dart';
 /// size budget. Lives in the same library (`part of`), so it can read the
 /// shared `_audioHandler` / `_getState` / `_emit` members directly.
 extension PlayerDspEqExtension on PlayerDspController {
-  Future<bool> setEqualizerEnabled(bool enabled) => applyDspEffect(
-        featureName: 'Equalizer',
-        guardCondition: enabled,
-        updateDsp: (dsp) => dsp.copyWith(isEqEnabled: enabled),
-        applyAudioHandler: () => _audioHandler.setEqualizerEnabled(enabled),
-      );
+  Future<bool> setEqualizerEnabled(bool enabled) {
+    _musicForcedEqEnabled = false;
+    return applyDspEffect(
+      featureName: 'Equalizer',
+      guardCondition: enabled,
+      updateDsp: (dsp) => dsp.copyWith(isEqEnabled: enabled),
+      applyAudioHandler: () => _audioHandler.setEqualizerEnabled(enabled),
+    );
+  }
 
   Future<bool> applyPreset(EqPreset preset,
       {bool isPerSongRestore = false}) async {
     markUserInteracting();
+    invalidateCodecCompensation(clearUserIntent: true);
     if (!guardDsp('Equalizer Preset')) return false;
     if (perSongOverrideActive && !isPerSongRestore) {
       globalEqBackup = preset;
@@ -231,6 +235,7 @@ extension PlayerDspEqExtension on PlayerDspController {
   Future<bool> applyHeadphoneProfile(HeadphoneProfile? profile,
       {bool isPerSongRestore = false, bool showErrorOnGuard = true}) async {
     markUserInteracting();
+    invalidateCodecCompensation(clearUserIntent: true);
     if (profile != null && !guardDsp('AutoEQ', showError: showErrorOnGuard)) {
       return false;
     }
@@ -373,6 +378,7 @@ extension PlayerDspEqExtension on PlayerDspController {
 
   Future<void> resetToFlat() async {
     markUserInteracting();
+    invalidateCodecCompensation(clearUserIntent: true);
     final state = _getState();
     final previousDsp = state.dsp;
     _emit(state.copyWith(

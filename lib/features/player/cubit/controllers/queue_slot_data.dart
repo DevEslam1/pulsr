@@ -1,4 +1,7 @@
 // lib/features/player/cubit/controllers/queue_slot_data.dart
+export '../../../../core/utils/playlist_reorder_utils.dart'
+    show calculateReorderedIndex, calculateRemovedIndex;
+
 import '../../../../data/db/app_database.dart';
 
 /// In-memory representation of a saved playback queue slot. The player keeps
@@ -27,27 +30,4 @@ class QueueSlotData {
   List<SongsTableData> songsFrom(Map<int, SongsTableData> lookup) {
     return songIds.map((id) => lookup[id]).whereType<SongsTableData>().toList();
   }
-}
-
-/// Computes the new active track index after a queue item reorder from [oldIndex] to [newIndex].
-int calculateReorderedIndex(int oldIndex, int newIndex, int currentIndex) {
-  if (currentIndex == oldIndex) return newIndex;
-  if (oldIndex < currentIndex && newIndex >= currentIndex) {
-    return currentIndex - 1;
-  }
-  if (oldIndex > currentIndex && newIndex <= currentIndex) {
-    return currentIndex + 1;
-  }
-  return currentIndex;
-}
-
-/// Computes the new active track index after removing an item at [removedIndex].
-int calculateRemovedIndex(
-    int removedIndex, int currentIndex, int newQueueLength) {
-  if (newQueueLength == 0) return 0;
-  if (removedIndex < currentIndex) return currentIndex - 1;
-  if (removedIndex == currentIndex) {
-    return currentIndex.clamp(0, newQueueLength - 1);
-  }
-  return currentIndex;
 }

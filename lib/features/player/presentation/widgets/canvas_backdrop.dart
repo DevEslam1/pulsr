@@ -15,6 +15,7 @@ import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../services/canvas/canvas_repository.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 
 /// Looped video backdrop for Spotify Canvas, Apple Music motion artwork,
 /// and Tidal video covers.
@@ -110,6 +111,7 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
   }
 
   void _stopCanvas() {
+    _canvasEnabled = false;
     _loadGeneration++;
     _resolvedSongId = widget.song?.id;
     _disposeController();
@@ -226,20 +228,44 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
 
   @override
   Widget build(BuildContext context) {
-    final canvasEnabled = context.select<SettingsCubit, bool>(
-      (c) => c.state.canvasEnabled,
-    );
+    bool canvasEnabled = true;
+    try {
+      canvasEnabled = context.select<SettingsCubit, bool>(
+        (c) => c.state.canvasEnabled,
+      );
+    } catch (_) {}
 
     final showVideo = canvasEnabled &&
         _controller != null &&
         _controller!.value.isInitialized &&
         _isRendered;
 
-    if (widget.isBackdropMode) {
-      return _buildFullScreenBackdrop(showVideo);
-    } else {
-      return _buildCardContent(showVideo);
+    final child = widget.isBackdropMode
+        ? _buildFullScreenBackdrop(showVideo)
+        : _buildCardContent(showVideo);
+
+    SettingsCubit? settingsCubit;
+    try {
+      settingsCubit = context.read<SettingsCubit>();
+    } catch (_) {}
+
+    if (settingsCubit == null) {
+      return child;
     }
+
+    return BlocListener<SettingsCubit, SettingsState>(
+      bloc: settingsCubit,
+      listenWhen: (prev, curr) => prev.canvasEnabled != curr.canvasEnabled,
+      listener: (context, state) {
+        _canvasEnabled = state.canvasEnabled;
+        if (!state.canvasEnabled) {
+          _stopCanvas();
+        } else {
+          _resolveAndLoad(widget.song);
+        }
+      },
+      child: child,
+    );
   }
 
   Widget _buildFullScreenBackdrop(bool showVideo) {

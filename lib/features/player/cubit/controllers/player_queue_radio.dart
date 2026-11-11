@@ -144,9 +144,7 @@ extension PlayerQueueRadio on PlayerQueueController {
 
     // Do not trigger online autoplay if the queue is a local/downloaded playback session
     final isLocalQueue = s.queue.every((track) =>
-        track.source == SongSource.local ||
-        track.isDownloaded == true ||
-        !track.path.startsWith('ytmusic://'));
+        track.source == SongSource.local || track.isDownloaded == true);
     if (isLocalQueue) return;
 
     final remaining = s.queue.length - 1 - s.currentIndex;
@@ -357,6 +355,11 @@ extension PlayerQueueRadio on PlayerQueueController {
       ...newUpcoming,
     ];
 
-    await playSong(currentSong, queue: newQueue, preservePlaybackState: true);
+    await playSong(
+      currentSong,
+      queue: newQueue,
+      queueIndex: currIdx,
+      preservePlaybackState: true,
+    );
   }
 }
