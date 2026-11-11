@@ -326,8 +326,6 @@ class PlayerPlaybackOptionsController {
     final speed = _perSongPlaybackStore.getSpeed(key);
     final pitch = _perSongPlaybackStore.getPitch(key);
     final gainDb = _perSongVolumeStore.getGainDbForTrack(key);
-    final eqPreset = await _perSongEqStore.getPresetForTrackWhenReady(key);
-
     if (_isClosed() || gen != _playbackMemoryGen) return;
     if (_getState().currentSong?.id != song.id) return;
     if (_getState().isQuranModeEnabled) return;
@@ -336,24 +334,23 @@ class PlayerPlaybackOptionsController {
     bool pitchSucceeded = false;
 
     try {
-      if (speed != null) {
-        if (_isClosed() ||
-            gen != _playbackMemoryGen ||
-            _getState().currentSong?.id != song.id) {
-          return;
-        }
-        await _audioHandler.setSpeed(speed);
-        speedSucceeded = true;
+      if (_isClosed() ||
+          gen != _playbackMemoryGen ||
+          _getState().currentSong?.id != song.id) {
+        return;
       }
-      if (pitch != null) {
-        if (_isClosed() ||
-            gen != _playbackMemoryGen ||
-            _getState().currentSong?.id != song.id) {
-          return;
-        }
-        await _audioHandler.setPitch(pitch);
-        pitchSucceeded = true;
+      final targetSpeed = speed ?? _audioHandler.userBaseSpeed;
+      await _audioHandler.setSpeed(targetSpeed);
+      speedSucceeded = true;
+
+      if (_isClosed() ||
+          gen != _playbackMemoryGen ||
+          _getState().currentSong?.id != song.id) {
+        return;
       }
+      final targetPitch = pitch ?? 1.0;
+      await _audioHandler.setPitch(targetPitch);
+      pitchSucceeded = true;
     } catch (e, st) {
       ErrorLogger.log('Failed to restore per-song playback memory',
           error: e,
@@ -375,14 +372,7 @@ class PlayerPlaybackOptionsController {
             : s.playbackSpeed,
         playbackPitch: pitchSucceeded ? _audioHandler.pitch : s.playbackPitch,
         currentSongVolumeOverrideDb: gainDb,
-        currentSongEqOverride: eqPreset,
       ),
     ));
-    // The track-change hook normally applies this; re-assert it here for
-    // resume paths where no mediaItem change fires.
-    final applyOverride = _onPerSongEqOverride;
-    if (applyOverride != null && eqPreset != null) {
-      unawaited(applyOverride(song, eqPreset));
-    }
   }
 }

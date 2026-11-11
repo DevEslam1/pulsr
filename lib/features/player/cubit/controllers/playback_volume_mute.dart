@@ -1,4 +1,6 @@
 // lib/features/player/cubit/controllers/playback_volume_mute.dart
+import 'package:mutex/mutex.dart';
+
 import '../../../../core/utils/error_logger.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../player_state.dart';
@@ -9,10 +11,10 @@ class PlaybackVolumeMute {
   final PulsrAudioHandler _audioHandler;
   final PlayerState Function() _getState;
   final void Function(PlayerState state) _emit;
+  final Mutex _fifo = Mutex();
 
   bool _muted = false;
   double _volumeBeforeMute = 1.0;
-  bool _isMuting = false;
 
   PlaybackVolumeMute({
     required PulsrAudioHandler audioHandler,
@@ -28,7 +30,7 @@ class PlaybackVolumeMute {
     if (v > 0.001) _volumeBeforeMute = v;
   }
 
-  Future<void> setVolume(double volume) async {
+  Future<void> setVolume(double volume) => _fifo.protect(() async {
     final clamped = volume.clamp(0.0, 1.0);
     _remember(clamped);
     try {
@@ -46,9 +48,9 @@ class PlaybackVolumeMute {
       _emit(s.copyWith(
           playback: s.playback.copyWith(errorMessage: 'Volume change failed')));
     }
-  }
+  });
 
-  Future<void> adjustVolume(double delta) async {
+  Future<void> adjustVolume(double delta) => _fifo.protect(() async {
     try {
       final current = _audioHandler.volume;
       final target = (current + delta).clamp(0.0, 1.0);
@@ -67,13 +69,11 @@ class PlaybackVolumeMute {
       _emit(s.copyWith(
           playback: s.playback.copyWith(errorMessage: 'Volume change failed')));
     }
-  }
+  });
 
   /// A-06: Toggle output mute, remembering the pre-mute volume so unmuting
   /// restores it. Exposed for the global keyboard-shortcut layer.
-  Future<void> toggleMute() async {
-    if (_isMuting) return;
-    _isMuting = true;
+  Future<void> toggleMute() => _fifo.protect(() async {
     try {
       if (_muted) {
         final targetVol = _volumeBeforeMute > 0.0 ? _volumeBeforeMute : 1.0;
@@ -93,8 +93,9 @@ class PlaybackVolumeMute {
           error: e,
           stackTrace: st,
           category: 'PlayerPlaybackOptionsController');
-    } finally {
-      _isMuting = false;
+      final s = _getState();
+      _emit(s.copyWith(
+          playback: s.playback.copyWith(errorMessage: 'Toggle mute failed')));
     }
-  }
+  });
 }

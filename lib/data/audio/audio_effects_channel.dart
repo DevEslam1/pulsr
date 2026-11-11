@@ -2368,6 +2368,8 @@ class AudioEffectsChannel {
   }
 
   /// Calculates real-time DSP battery drain estimate (mAh/hr with DSP active vs off).
+  /// Note: Values returned are heuristic model estimates based on active stage count and RTF,
+  /// not direct hardware coulomb-counter measurements (indicated by 'isHeuristic': true).
   Future<Map<String, dynamic>> getDspBatteryDrainEstimate() async {
     if (!_isAndroid) return const {};
     try {

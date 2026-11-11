@@ -31,8 +31,13 @@ extension PlayerDspFollowRate on PlayerDspController {
           usbStatus.streamingActive &&
           effectiveTrackRate > 0 &&
           usbStatus.streamingSampleRate != effectiveTrackRate) {
-        await _settingsCubit!.suspendDirectBitPerfectForTrack(
-            'Direct USB requires the source rate; follow-format is disabled.');
+        final notice = L10nHolder.current?.directUsbFollowFormatSuspendedNotice ??
+            'Direct USB requires the source rate; follow-format is disabled.';
+        await _settingsCubit!.suspendDirectBitPerfectForTrack(notice);
+        final s = _getState();
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(errorMessage: notice),
+        ));
         _lastFollowedSampleRate = null;
         return;
       }
@@ -155,7 +160,13 @@ extension PlayerDspFollowRate on PlayerDspController {
             'Strict bit-perfect refused: output cannot carry $rate Hz/$depth-bit '
             '(negotiated ${decision.sampleRate} Hz/${decision.bitDepth}-bit)',
             category: 'PlayerDspController');
+        final notice = L10nHolder.current?.strictBitPerfectRefusedNotice(rate, depth) ??
+            'Strict bit-perfect disabled: device cannot carry $rate Hz/$depth-bit without resampling.';
         await _settingsCubit!.setBitPerfectOutput(false);
+        final s = _getState();
+        _emit(s.copyWith(
+          playback: s.playback.copyWith(errorMessage: notice),
+        ));
         return;
       }
       try {
@@ -172,8 +183,13 @@ extension PlayerDspFollowRate on PlayerDspController {
               'USB DAC lacks track rate $rate Hz (negotiated '
               '${decision.sampleRate} Hz); suspending direct USB streaming',
               category: 'PlayerDspController');
-          await _settingsCubit!.suspendDirectBitPerfectForTrack(
-              'This track\'s $rate Hz is not supported by the USB DAC.');
+          final notice = L10nHolder.current?.directUsbUnsupportedRateNotice(rate) ??
+              'This track\'s $rate Hz is not supported by the USB DAC.';
+          await _settingsCubit!.suspendDirectBitPerfectForTrack(notice);
+          final s = _getState();
+          _emit(s.copyWith(
+            playback: s.playback.copyWith(errorMessage: notice),
+          ));
           return;
         }
         // One owner applies the format and tears the mode down coherently if

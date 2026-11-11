@@ -5,6 +5,10 @@ import '../../../domain/models/headphone_profile.dart';
 /// Captures the DSP settings that Quran Mode overrides so they can be restored
 /// verbatim when the mode is switched off.
 class QuranRestoreSnapshot {
+  static const int currentSchemaVersion = 2;
+
+  final int schemaVersion;
+
   /// Null for a legacy/corrupt snapshot missing the EQ payload: a default
   /// [EqPreset.fromJson] on an empty map would look like a real "Custom" preset,
   /// so absence must stay distinguishable from an actual captured preset.
@@ -21,10 +25,12 @@ class QuranRestoreSnapshot {
   final double saturationMix;
   final double saturationTilt;
   final double playbackSpeed;
+  final double playbackPitch;
   final bool isShuffle;
   final double preampDb;
 
   const QuranRestoreSnapshot({
+    this.schemaVersion = currentSchemaVersion,
     required this.eqPreset,
     required this.isEqEnabled,
     required this.headphoneProfile,
@@ -38,11 +44,13 @@ class QuranRestoreSnapshot {
     required this.saturationMix,
     required this.saturationTilt,
     required this.playbackSpeed,
+    this.playbackPitch = 1.0,
     required this.isShuffle,
     required this.preampDb,
   });
 
   Map<String, dynamic> toJson() => {
+        'schemaVersion': schemaVersion,
         if (eqPreset != null) 'eqPreset': eqPreset!.toJson(),
         'isEqEnabled': isEqEnabled,
         'headphoneProfile': headphoneProfile?.toJson(),
@@ -56,6 +64,7 @@ class QuranRestoreSnapshot {
         'saturationMix': saturationMix,
         'saturationTilt': saturationTilt,
         'playbackSpeed': playbackSpeed,
+        'playbackPitch': playbackPitch,
         'isShuffle': isShuffle,
         'preampDb': preampDb,
       };
@@ -63,7 +72,12 @@ class QuranRestoreSnapshot {
   factory QuranRestoreSnapshot.fromJson(Map<String, dynamic> json) {
     final rawEq = json['eqPreset'];
     final rawProfile = json['headphoneProfile'];
+    final version = (json['schemaVersion'] as num?)?.toInt() ?? 1;
+    final pitch = version < 2
+        ? 1.0
+        : ((json['playbackPitch'] as num?)?.toDouble() ?? 1.0);
     return QuranRestoreSnapshot(
+      schemaVersion: version,
       eqPreset: rawEq is Map
           ? EqPreset.fromJson(Map<String, dynamic>.from(rawEq))
           : null,
@@ -83,6 +97,7 @@ class QuranRestoreSnapshot {
       saturationMix: (json['saturationMix'] as num?)?.toDouble() ?? 0.5,
       saturationTilt: (json['saturationTilt'] as num?)?.toDouble() ?? 0.3,
       playbackSpeed: (json['playbackSpeed'] as num?)?.toDouble() ?? 1.0,
+      playbackPitch: pitch,
       isShuffle: json['isShuffle'] as bool? ?? false,
       preampDb: (json['preampDb'] as num?)?.toDouble() ?? 0.0,
     );

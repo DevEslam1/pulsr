@@ -11,11 +11,12 @@ import '../../../../data/services/hires_audio_service.dart';
 import '../../../../data/services/room_correction_service.dart';
 import '../../../../core/services/smart_audio_service.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/l10n_holder.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/audio_handler.dart';
+import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../data/audio/bluetooth_quality_policy.dart';
-import '../../../../data/audio/comparison_slot.dart';
 import '../../../../data/audio/dsp_param_ranges.dart';
 import '../../../../data/audio/gain_staging_budget.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
@@ -162,6 +163,7 @@ class PlayerDspController {
   }
 
   final Mutex _followSampleRateMutex = Mutex();
+  final Mutex _dspEffectsToggleMutex = Mutex();
   int? _lastFollowedSampleRate;
   int? _lastFollowedBitDepth;
   String? _lastFollowedRoute;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -24,12 +25,19 @@ class ViperDdcSheet extends StatefulWidget {
 
 class _ViperDdcSheetState extends State<ViperDdcSheet> {
   AudioPlayer? _tonePlayer;
+  StreamSubscription<dynamic>? _toneSubscription;
   bool _isPlayingTone = false;
   bool _abBypassed = false;
 
   @override
   void dispose() {
+    _toneSubscription?.cancel();
     _tonePlayer?.dispose();
+    if (_abBypassed) {
+      try {
+        context.read<PlayerCubit>().setViperDdcEnabled(true);
+      } catch (_) {}
+    }
     super.dispose();
   }
 
@@ -196,7 +204,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
       await file.writeAsBytes(bytes);
       await _tonePlayer!.setFilePath(file.path);
       await _tonePlayer!.play();
-      _tonePlayer!.playerStateStream.listen((ps) {
+      _toneSubscription?.cancel();
+      _toneSubscription = _tonePlayer!.playerStateStream.listen((ps) {
         if (ps.processingState == ProcessingState.completed) {
           if (mounted) setState(() => _isPlayingTone = false);
         }
@@ -494,31 +503,34 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                       Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _toggleTestTone,
-                              icon: Icon(
-                                _isPlayingTone
-                                    ? Icons.stop_rounded
-                                    : Icons.volume_up_rounded,
-                                size: 16,
-                                color: _isPlayingTone
-                                    ? Colors.redAccent
-                                    : p.primary,
-                              ),
-                              label: Text(
-                                _isPlayingTone
-                                    ? 'Stop Sweep'
-                                    : 'Test Tone (1k+Sweep)',
-                                style: TextStyle(fontSize: AppFontSize.tiny),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
+                            child: Tooltip(
+                              message: context.l10n.testToneBypassesDspNotice,
+                              child: OutlinedButton.icon(
+                                onPressed: _toggleTestTone,
+                                icon: Icon(
+                                  _isPlayingTone
+                                      ? Icons.stop_rounded
+                                      : Icons.volume_up_rounded,
+                                  size: 16,
                                   color: _isPlayingTone
                                       ? Colors.redAccent
-                                      : p.hairline,
+                                      : p.primary,
                                 ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: AppRadii.r12All,
+                                label: Text(
+                                  _isPlayingTone
+                                      ? 'Stop Sweep'
+                                      : 'Test Tone (1k+Sweep)',
+                                  style: TextStyle(fontSize: AppFontSize.tiny),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: _isPlayingTone
+                                        ? Colors.redAccent
+                                        : p.hairline,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: AppRadii.r12All,
+                                  ),
                                 ),
                               ),
                             ),

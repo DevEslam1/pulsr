@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/cubit/queue_slot_codec.dart';
 
 SongsTableData song(
@@ -27,7 +28,7 @@ SongsTableData song(
 
 void main() {
   group('QueueSlotCodec', () {
-    test('encodeDocument preserves slot structure and active slot', () {
+    test('encodeDocument preserves slot structure, active slot, and track tiers', () {
       final doc = QueueSlotCodec.encodeDocument(
         {
           0: (
@@ -35,28 +36,33 @@ void main() {
             currentIndex: 1,
             position: const Duration(seconds: 30),
             speed: 1.25,
+            trackTiers: {1: QueueTier.context, 2: QueueTier.userQueue},
           ),
           1: (
             songs: [song(-5, source: SongSource.youtube, title: 'Y')],
             currentIndex: 0,
             position: Duration.zero,
             speed: 1.0,
+            trackTiers: {-5: QueueTier.autoplay},
           ),
         },
         1,
       );
 
+      expect(doc['schemaVersion'], 2);
       expect(doc['activeSlot'], 1);
       final s0 = doc['0'] as Map<String, dynamic>;
       expect(s0['songIds'], [1, 2]);
       expect(s0['currentIndex'], 1);
       expect(s0['positionMs'], 30000);
       expect(s0['speed'], 1.25);
+      expect(s0['trackTiers'], {'1': 'context', '2': 'userQueue'});
       // Local songs are not duplicated into onlineSongs.
       expect((s0['onlineSongs'] as List), isEmpty);
 
       final s1 = doc['1'] as Map<String, dynamic>;
       expect(s1['songIds'], [-5]);
+      expect(s1['trackTiers'], {'-5': 'autoplay'});
       final online = s1['onlineSongs'] as List;
       expect(online.length, 1);
       expect((online.first as Map<String, dynamic>)['title'], 'Y -5');
@@ -72,7 +78,7 @@ void main() {
           '1': 1,
           '2': 1,
           'activeSlot': 1,
-          'schemaVersion': 1,
+          'schemaVersion': 2,
           'extra': 1
         }),
         isNull,
@@ -83,7 +89,7 @@ void main() {
         isNull,
       );
       expect(
-        QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 2}),
+        QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 3}),
         isNull,
       );
       expect(
@@ -107,10 +113,15 @@ void main() {
       expect(docNoV, isNotNull);
       expect(docNoV!['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
 
-      // Accepts valid schemaVersion
+      // Migrates valid schemaVersion 1
       final docV1 = QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 1});
       expect(docV1, isNotNull);
-      expect(docV1!['schemaVersion'], 1);
+      expect(docV1!['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
+
+      // Accepts current schemaVersion 2
+      final docV2 = QueueSlotCodec.decodeDocument({'0': 1, 'schemaVersion': 2});
+      expect(docV2, isNotNull);
+      expect(docV2!['schemaVersion'], 2);
     });
 
     test(
@@ -121,11 +132,23 @@ void main() {
         throwsArgumentError,
       );
       expect(
+        () => QueueSlotCodec.migrateDocument({'schemaVersion': 3}),
+        throwsArgumentError,
+      );
+      expect(
         () => QueueSlotCodec.migrateDocument({'schemaVersion': -1}),
         throwsArgumentError,
       );
       final migrated0 = QueueSlotCodec.migrateDocument({'schemaVersion': 0});
       expect(migrated0['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
+
+      final migrated1 = QueueSlotCodec.migrateDocument({
+        'schemaVersion': 1,
+        '0': {'songIds': [10, 20]},
+      });
+      expect(migrated1['schemaVersion'], QueueSlotCodec.currentSchemaVersion);
+      final s0 = migrated1['0'] as Map<String, dynamic>;
+      expect(s0['trackTiers'], {'10': 'context', '20': 'context'});
     });
 
     test('slotIndexForKey accepts only 0..2', () {
@@ -156,6 +179,23 @@ void main() {
           }, 500),
           isNull);
       expect(QueueSlotCodec.decodeSlot({}, 500), isNull);
+    });
+
+    test('decodeSlot restores track tiers and defaults missing tiers to context', () {
+      final decodedWithTiers = QueueSlotCodec.decodeSlot({
+        'songIds': [1, 2],
+        'trackTiers': {'1': 'context', '2': 'userQueue'},
+      }, 500);
+      expect(decodedWithTiers, isNotNull);
+      expect(decodedWithTiers!.trackTiers[1], QueueTier.context);
+      expect(decodedWithTiers.trackTiers[2], QueueTier.userQueue);
+
+      final decodedV1 = QueueSlotCodec.decodeSlot({
+        'songIds': [3, 4],
+      }, 500);
+      expect(decodedV1, isNotNull);
+      expect(decodedV1!.trackTiers[3], QueueTier.context);
+      expect(decodedV1.trackTiers[4], QueueTier.context);
     });
 
     test(

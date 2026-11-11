@@ -170,6 +170,8 @@ abstract class DspSlice with _$DspSlice {
     @Default(false) bool isSpatializerSupported,
     @Default(false) bool isSpatializerEnabled,
     @Default(0.0) double volumeBoost,
+    @Default(0.0) double effectiveVolumeBoost,
+    @Default(0.0) double effectiveBassBoost,
     @Default(0.0) double preampDb,
     @Default(false) bool isVolumeBoostSupported,
     @Default(false) bool isBassBoostSupported,
@@ -180,6 +182,9 @@ abstract class DspSlice with _$DspSlice {
     @Default(false) bool isLimiterEnabled,
     @Default(-0.2) double limiterThresholdDb,
     @Default(50.0) double limiterReleaseMs,
+    @Default(1.0) double compressorRatio,
+    @Default(2.0) double compressorAttackMs,
+    @Default(0.0) double compressorMakeupGainDb,
     @Default(false) bool isReverbEnabled,
     @Default(0) int reverbPreset,
     @Default(0.20) double reverbWetDry,
@@ -213,6 +218,8 @@ abstract class DspSlice with _$DspSlice {
     @Default(160.0) double multibandCompressorF0,
     @Default(1000.0) double multibandCompressorF1,
     @Default(5000.0) double multibandCompressorF2,
+    @Default(<MultibandCompressorBandConfig>[])
+    List<MultibandCompressorBandConfig> multibandCompressorBands,
     @Default(false) bool isDynamicEqEnabled,
     @Default([]) List<DynamicEqBandConfig> dynamicEqBands,
     @Default(false) bool isViperDdcEnabled,
@@ -381,6 +388,8 @@ abstract class PlayerState with _$PlayerState {
   bool get isSpatializerSupported => dsp.isSpatializerSupported;
   bool get isSpatializerEnabled => dsp.isSpatializerEnabled;
   double get volumeBoost => dsp.volumeBoost;
+  double get effectiveVolumeBoost => dsp.effectiveVolumeBoost;
+  double get effectiveBassBoost => dsp.effectiveBassBoost;
   double get preampDb => dsp.preampDb;
   bool get isVolumeBoostSupported => dsp.isVolumeBoostSupported;
   bool get isBassBoostSupported => dsp.isBassBoostSupported;
@@ -391,6 +400,9 @@ abstract class PlayerState with _$PlayerState {
   bool get isLimiterEnabled => dsp.isLimiterEnabled;
   double get limiterThresholdDb => dsp.limiterThresholdDb;
   double get limiterReleaseMs => dsp.limiterReleaseMs;
+  double get compressorRatio => dsp.compressorRatio;
+  double get compressorAttackMs => dsp.compressorAttackMs;
+  double get compressorMakeupGainDb => dsp.compressorMakeupGainDb;
   bool get isReverbEnabled => dsp.isReverbEnabled;
   int get reverbPreset => dsp.reverbPreset;
   double get reverbWetDry => dsp.reverbWetDry;
@@ -424,6 +436,8 @@ abstract class PlayerState with _$PlayerState {
   double get multibandCompressorF0 => dsp.multibandCompressorF0;
   double get multibandCompressorF1 => dsp.multibandCompressorF1;
   double get multibandCompressorF2 => dsp.multibandCompressorF2;
+  List<MultibandCompressorBandConfig> get multibandCompressorBands =>
+      dsp.multibandCompressorBands;
   bool get isDynamicEqEnabled => dsp.isDynamicEqEnabled;
   List<DynamicEqBandConfig> get dynamicEqBands => dsp.dynamicEqBands;
   bool get isViperDdcEnabled => dsp.isViperDdcEnabled;

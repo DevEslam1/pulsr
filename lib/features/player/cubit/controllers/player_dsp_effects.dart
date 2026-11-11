@@ -101,6 +101,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         eqPreset: dsp.eqPreset.copyWith(
           bassBoost: requested,
         ),
+        effectiveBassBoost: clamped,
       ),
       applyAudioHandler: () => _audioHandler.setBassBoost(clamped),
     );
@@ -161,48 +162,51 @@ extension PlayerDspEffectsExtension on PlayerDspController {
   }
 
   Future<void> setDspEffectsEnabled(bool enabled) async {
-    if (enabled && !guardDsp('DSP Engine')) return;
-    final state = _getState();
-    try {
-      if (!enabled) {
-        // Only capture a snapshot while effects are actually active. A second
-        // disable (already inactive) must NOT null it out, or the next enable
-        // would have nothing to restore.
-        if (state.isDspEffectsActive) {
-          _dspSnapshot = state.dsp;
-        }
-        // MBC is owned by the manager (not part of DspSlice), so capture it
-        // separately; leave an existing restore flag alone on a repeat disable.
-        // The manager is unavailable in partial handler fakes, so never let
-        // this best-effort capture abort the master bypass.
-        try {
-          if (_audioHandler.equalizerManager.isMultibandCompressorEnabled) {
-            _multibandCompressorRestore = true;
+    return _dspEffectsToggleMutex.protect(() async {
+      if (enabled && !guardDsp('DSP Engine')) return;
+      final state = _getState();
+      try {
+        if (!enabled) {
+          // Only capture a snapshot while effects are actually active. A second
+          // disable (already inactive) must NOT null it out, or the next enable
+          // would have nothing to restore.
+          if (state.isDspEffectsActive) {
+            _dspSnapshot = state.dsp;
           }
-        } catch (_) {}
-        _emit(state.copyWith(
-          dsp: state.dsp.copyWith(
-            isSpatializerEnabled: false,
-            isVirtualizerEnabled: false,
-            isDynamicsEnabled: false,
-            isCrossfeedEnabled: false,
-            isLimiterEnabled: false,
-            isReverbEnabled: false,
-            isSaturationEnabled: false,
-            isStereoWidthEnabled: false,
-            isLoudnessContourEnabled: false,
-            isSubCrossoverEnabled: false,
-            isDynamicEqEnabled: false,
-            isViperDdcEnabled: false,
-            isArbitraryEqEnabled: false,
-            isLiveProgEnabled: false,
-            isDynamicBassEnabled: false,
-            // MBC is also forced off by the manager below; mirror it in the
-            // slice so the UI cannot keep showing an enabled compressor.
-            isMultibandCompressorEnabled: false,
-            volumeBoost: 0.0,
-          ),
-        ));
+          // MBC is owned by the manager (not part of DspSlice), so capture it
+          // separately; leave an existing restore flag alone on a repeat disable.
+          // The manager is unavailable in partial handler fakes, so never let
+          // this best-effort capture abort the master bypass.
+          try {
+            if (_audioHandler.equalizerManager.isMultibandCompressorEnabled) {
+              _multibandCompressorRestore = true;
+            }
+          } catch (_) {}
+          _emit(state.copyWith(
+            dsp: state.dsp.copyWith(
+              isSpatializerEnabled: false,
+              isVirtualizerEnabled: false,
+              isDynamicsEnabled: false,
+              isCrossfeedEnabled: false,
+              isLimiterEnabled: false,
+              isReverbEnabled: false,
+              isSaturationEnabled: false,
+              isStereoWidthEnabled: false,
+              isLoudnessContourEnabled: false,
+              isSubCrossoverEnabled: false,
+              isDynamicEqEnabled: false,
+              isViperDdcEnabled: false,
+              isArbitraryEqEnabled: false,
+              isLiveProgEnabled: false,
+              isDynamicBassEnabled: false,
+              // MBC is also forced off by the manager below; mirror it in the
+              // slice so the UI cannot keep showing an enabled compressor.
+              isMultibandCompressorEnabled: false,
+              volumeBoost: 0.0,
+              effectiveVolumeBoost: 0.0,
+              effectiveBassBoost: 0.0,
+            ),
+          ));
         await _audioHandler.setSpatializerEnabled(false);
         await _audioHandler.setVirtualizerEnabled(false);
         await _audioHandler.setDynamicsPreset(DynamicsPreset.off,
@@ -277,6 +281,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
             dynamicBassStrength: snap.dynamicBassStrength,
             dynamicBassPreset: snap.dynamicBassPreset,
             volumeBoost: snap.volumeBoost,
+            effectiveVolumeBoost: snap.effectiveVolumeBoost,
+            effectiveBassBoost: snap.effectiveBassBoost,
           );
           _emit(state.copyWith(dsp: restoredDsp));
           if (snap.isSpatializerEnabled) {
@@ -364,7 +370,15 @@ extension PlayerDspEffectsExtension on PlayerDspController {
             );
           }
           if (snap.volumeBoost > 0.0) {
-            await setVolumeBoost(snap.volumeBoost);
+            final allowedDb = GainStagingBudget.clampBoostDb(
+              requestedBoostDb:
+                  snap.volumeBoost * GainStagingBudget.maxVolumeBoostDb,
+              committedStages: _activeGainStages(excludeVolumeBoost: true),
+            );
+            final safeValue = (allowedDb / GainStagingBudget.maxVolumeBoostDb)
+                .clamp(0.0, 1.0)
+                .toDouble();
+            await _audioHandler.setVolumeBoost(safeValue);
           }
         } else {
           final enableSpatial = state.isSpatializerSupported;
@@ -412,6 +426,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
           playback: s.playback
               .copyWith(errorMessage: 'Failed to update DSP effects: $e')));
     }
+    });
   }
 
   Future<void> rebalanceVolumeBoostIfNeeded() async {
@@ -424,7 +439,10 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     final safeValue = (allowedDb / GainStagingBudget.maxVolumeBoostDb)
         .clamp(0.0, 1.0)
         .toDouble();
-    if (safeValue < s.volumeBoost) {
+    if ((safeValue - s.dsp.effectiveVolumeBoost).abs() > 0.001) {
+      _emit(s.copyWith(
+        dsp: s.dsp.copyWith(effectiveVolumeBoost: safeValue),
+      ));
       await _audioHandler.setVolumeBoost(safeValue);
     }
   }
@@ -459,8 +477,97 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       // State mirrors the user's requested boost (the slider stays put); the
       // engine receives the headroom-staged value so stacked effects can't
       // over-drive the signal into the final output clamp.
-      updateDsp: (dsp) => dsp.copyWith(volumeBoost: requested),
+      updateDsp: (dsp) => dsp.copyWith(
+        volumeBoost: requested,
+        effectiveVolumeBoost: safeValue,
+      ),
       applyAudioHandler: () => _audioHandler.setVolumeBoost(safeValue),
+    );
+  }
+
+  Future<bool> setCompressorParams({
+    double? thresholdDb,
+    double? ratio,
+    double? attackMs,
+    double? releaseMs,
+    double? makeupGainDb,
+  }) {
+    return applyDspEffect(
+      featureName: 'Compressor',
+      updateDsp: (dsp) => dsp.copyWith(
+        limiterThresholdDb: thresholdDb != null
+            ? DspParamRanges.limiterThresholdDb.clamp(thresholdDb)
+            : dsp.limiterThresholdDb,
+        compressorRatio: ratio != null
+            ? DspParamRanges.compressorRatio.clamp(ratio)
+            : dsp.compressorRatio,
+        compressorAttackMs: attackMs != null
+            ? DspParamRanges.compressorAttackMs.clamp(attackMs)
+            : dsp.compressorAttackMs,
+        limiterReleaseMs: releaseMs != null
+            ? DspParamRanges.limiterReleaseMs.clamp(releaseMs)
+            : dsp.limiterReleaseMs,
+        compressorMakeupGainDb: makeupGainDb != null
+            ? DspParamRanges.compressorMakeupGainDb.clamp(makeupGainDb)
+            : dsp.compressorMakeupGainDb,
+      ),
+      applyAudioHandler: () =>
+          _audioHandler.equalizerManager.setCompressorParams(
+        thresholdDb: thresholdDb,
+        ratio: ratio,
+        attackMs: attackMs,
+        releaseMs: releaseMs,
+        makeupGainDb: makeupGainDb,
+      ),
+    );
+  }
+
+  Future<bool> setMultibandCompressor(
+    bool enabled, {
+    double? f0,
+    double? f1,
+    double? f2,
+  }) {
+    return applyDspEffect(
+      featureName: 'Multiband Compressor',
+      guardCondition: enabled,
+      updateDsp: (dsp) => dsp.copyWith(
+        isMultibandCompressorEnabled: enabled,
+        multibandCompressorF0: f0 ?? dsp.multibandCompressorF0,
+        multibandCompressorF1: f1 ?? dsp.multibandCompressorF1,
+        multibandCompressorF2: f2 ?? dsp.multibandCompressorF2,
+      ),
+      applyAudioHandler: () =>
+          _audioHandler.equalizerManager.setMultibandCompressor(
+        enabled,
+        f0: f0,
+        f1: f1,
+        f2: f2,
+      ),
+    );
+  }
+
+  Future<bool> setMultibandCompressorBand(
+    int index,
+    MultibandCompressorBandConfig band,
+  ) {
+    return applyDspEffect(
+      featureName: 'Multiband Compressor Band',
+      updateDsp: (dsp) {
+        final currentBands = List<MultibandCompressorBandConfig>.from(
+          dsp.multibandCompressorBands.isNotEmpty
+              ? dsp.multibandCompressorBands
+              : _audioHandler.equalizerManager.multibandCompressorBands,
+        );
+        if (index >= 0 && index < currentBands.length) {
+          currentBands[index] = band;
+        }
+        return dsp.copyWith(
+          multibandCompressorBands: List.unmodifiable(currentBands),
+        );
+      },
+      applyAudioHandler: () => _audioHandler.equalizerManager
+          .setMultibandCompressorBand(index, band),
     );
   }
 

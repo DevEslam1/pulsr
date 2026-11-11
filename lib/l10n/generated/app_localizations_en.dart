@@ -9697,4 +9697,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bpSourceCodecUnconfirmed => 'Source codec not confirmed';
+
+  @override
+  String get dspLimitedForHeadroom => 'Limited for headroom';
+
+  @override
+  String strictBitPerfectRefusedNotice(int sampleRate, int bitDepth) {
+    return 'Strict bit-perfect disabled: output cannot carry $sampleRate Hz / $bitDepth-bit.';
+  }
+
+  @override
+  String get directUsbFollowFormatSuspendedNotice =>
+      'Direct USB suspended: track format requires follow-track sample rate.';
+
+  @override
+  String directUsbUnsupportedRateNotice(int sampleRate) {
+    return 'Direct USB suspended: $sampleRate Hz is not supported by the USB DAC.';
+  }
+
+  @override
+  String get testToneBypassesDspNotice => 'Direct audition (bypasses DSP)';
 }

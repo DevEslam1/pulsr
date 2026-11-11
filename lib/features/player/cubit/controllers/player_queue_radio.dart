@@ -67,6 +67,7 @@ extension PlayerQueueRadio on PlayerQueueController {
     required int currentIndex,
     required Duration position,
     required double speed,
+    Map<int, QueueTier>? trackTiers,
   }) {
     _cacheSlotSongs(_slotLookupCache, songs);
     _queueSlots[slot] = QueueSlotData(
@@ -74,6 +75,7 @@ extension PlayerQueueRadio on PlayerQueueController {
       currentIndex: currentIndex,
       position: position,
       speed: speed,
+      trackTiers: trackTiers ?? _getState().trackTiers,
     );
   }
 

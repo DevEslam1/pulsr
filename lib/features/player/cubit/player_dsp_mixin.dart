@@ -91,6 +91,35 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
           releaseMs: releaseMs,
           lookaheadMs: lookaheadMs);
 
+  Future<bool> setCompressorParams({
+    double? thresholdDb,
+    double? ratio,
+    double? attackMs,
+    double? releaseMs,
+    double? makeupGainDb,
+  }) =>
+      dspController.setCompressorParams(
+        thresholdDb: thresholdDb,
+        ratio: ratio,
+        attackMs: attackMs,
+        releaseMs: releaseMs,
+        makeupGainDb: makeupGainDb,
+      );
+
+  Future<bool> setMultibandCompressor(
+    bool enabled, {
+    double? f0,
+    double? f1,
+    double? f2,
+  }) =>
+      dspController.setMultibandCompressor(enabled, f0: f0, f1: f1, f2: f2);
+
+  Future<bool> setMultibandCompressorBand(
+    int index,
+    MultibandCompressorBandConfig band,
+  ) =>
+      dspController.setMultibandCompressorBand(index, band);
+
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) =>
       dspController.setReverb(enabled, preset: preset, wetDry: wetDry);
 

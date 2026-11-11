@@ -734,6 +734,7 @@ class EqualizerManager {
     // The active slot otherwise kept the OLD band count's gains, so switching
     // away and back restored a wrong-length curve.
     comparisonSlots[activeComparisonSlot] = currentPreset;
+    selectedHeadphoneProfile = null;
 
     if (PlatformCapabilities.isAndroid) {
       // Single bulk JNI hop (was 32 hops, 150-300ms jank) + fallback for legacy 10-band path.

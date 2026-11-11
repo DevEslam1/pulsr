@@ -19,41 +19,25 @@ extension PlayerDspEqExtension on PlayerDspController {
 
   Future<bool> applyPreset(EqPreset preset,
       {bool isPerSongRestore = false}) async {
-    markUserInteracting();
     invalidateCodecCompensation(clearUserIntent: true);
-    if (!guardDsp('Equalizer Preset')) return false;
     if (perSongOverrideActive && !isPerSongRestore) {
       globalEqBackup = preset;
       globalHeadphoneProfileBackup = null;
     }
-    final state = _getState();
-    final previousDsp = state.dsp;
-    final hadHeadphoneProfile = state.dsp.selectedHeadphoneProfile != null;
-    _emit(state.copyWith(
-      dsp: state.dsp.copyWith(
+    return applyDspEffect(
+      featureName: 'Equalizer Preset',
+      updateDsp: (dsp) => dsp.copyWith(
         isEqEnabled: true,
         eqPreset: preset,
         selectedHeadphoneProfile: null,
-        preampDb: hadHeadphoneProfile ? 0.0 : state.dsp.preampDb,
+        preampDb: dsp.selectedHeadphoneProfile != null ? 0.0 : dsp.preampDb,
       ),
-      playback: state.playback.copyWith(errorMessage: null),
-    ));
-    try {
-      if (!previousDsp.isEqEnabled) {
+      applyAudioHandler: () async {
         await _audioHandler.setEqualizerEnabled(true);
-      }
-      await _audioHandler.applyPreset(preset);
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to apply preset',
-          error: e, stackTrace: st, category: 'PlayerDspController');
-      final s = _getState();
-      _emit(s.copyWith(
-          dsp: previousDsp,
-          playback:
-              s.playback.copyWith(errorMessage: 'Failed to apply preset: $e')));
-      return false;
-    }
+        await _audioHandler.applyPreset(preset);
+      },
+      failureMessage: 'Failed to apply preset',
+    );
   }
 
   Future<bool> resetEqualizer() => applyPreset(EqPreset.defaultPresets.first);
@@ -234,13 +218,7 @@ extension PlayerDspEqExtension on PlayerDspController {
 
   Future<bool> applyHeadphoneProfile(HeadphoneProfile? profile,
       {bool isPerSongRestore = false, bool showErrorOnGuard = true}) async {
-    markUserInteracting();
     invalidateCodecCompensation(clearUserIntent: true);
-    if (profile != null && !guardDsp('AutoEQ', showError: showErrorOnGuard)) {
-      return false;
-    }
-    final state = _getState();
-    final previousDsp = state.dsp;
     if (profile != null) {
       final isParametric = profile.hasParametricFilters;
       List<double> targetFreqs = EqPreset.centerFrequencies;
@@ -261,144 +239,95 @@ extension PlayerDspEqExtension on PlayerDspController {
       final resolvedPreamp =
           isParametric ? profile.computeSafePreamp() : profile.preampGain;
       if (perSongOverrideActive && !isPerSongRestore) {
-        globalEqBackup = state.eqPreset.copyWith(
+        final s = _getState();
+        globalEqBackup = s.eqPreset.copyWith(
           name: profile.name,
           gains: resolvedGains,
           bassBoost: profile.bassBoost,
         );
         globalHeadphoneProfileBackup = profile;
       }
-      _emit(state.copyWith(
-        dsp: state.dsp.copyWith(
+      return applyDspEffect(
+        featureName: 'AutoEQ',
+        showErrorOnGuard: showErrorOnGuard,
+        updateDsp: (dsp) => dsp.copyWith(
           isEqEnabled: true,
           selectedHeadphoneProfile: profile,
           preampDb: resolvedPreamp,
-          eqPreset: state.eqPreset.copyWith(
+          eqPreset: dsp.eqPreset.copyWith(
             name: profile.name,
             gains: resolvedGains,
             bassBoost: profile.bassBoost,
           ),
         ),
-        playback: state.playback.copyWith(errorMessage: null),
-      ));
-      try {
-        await _audioHandler.setEqualizerEnabled(true);
-        await _audioHandler.applyHeadphoneProfile(profile);
-        return true;
-      } catch (e, st) {
-        ErrorLogger.log('Failed to apply AutoEQ profile',
-            error: e, stackTrace: st, category: 'PlayerDspController');
-        final s = _getState();
-        _emit(s.copyWith(
-          dsp: previousDsp,
-          playback: s.playback.copyWith(
-            errorMessage: 'Failed to apply AutoEQ profile: $e',
-          ),
-        ));
-        return false;
-      }
+        applyAudioHandler: () async {
+          await _audioHandler.setEqualizerEnabled(true);
+          await _audioHandler.applyHeadphoneProfile(profile);
+        },
+        failureMessage: 'Failed to apply AutoEQ profile',
+      );
     } else {
-      final hadProfile = state.dsp.selectedHeadphoneProfile != null;
-      if (!hadProfile) {
-        try {
-          await _audioHandler.applyHeadphoneProfile(null);
-          return true;
-        } catch (e, st) {
-          ErrorLogger.log('Failed to reset headphone profile',
-              error: e, stackTrace: st, category: 'PlayerDspController');
-          return false;
-        }
-      }
       List<double> targetFreqs = EqPreset.centerFrequencies;
       try {
         targetFreqs = _audioHandler.activeFrequencies;
       } catch (_) {}
-      _emit(state.copyWith(
-        dsp: state.dsp.copyWith(
-          selectedHeadphoneProfile: null,
-          preampDb: 0.0,
-          eqPreset: EqPreset(
-            name: 'Flat',
-            gains: List<double>.filled(targetFreqs.length, 0.0),
-            bassBoost: 0.0,
-          ),
-        ),
-      ));
-      try {
-        await _audioHandler.applyHeadphoneProfile(null);
-        return true;
-      } catch (e, st) {
-        ErrorLogger.log('Failed to reset headphone profile',
-            error: e, stackTrace: st, category: 'PlayerDspController');
-        final s = _getState();
-        _emit(s.copyWith(
-          dsp: previousDsp,
-          playback: s.playback.copyWith(
-            errorMessage: 'Failed to reset headphone profile: $e',
-          ),
-        ));
-        return false;
-      }
+      return applyDspEffect(
+        featureName: 'Headphone Profile',
+        requiresGuard: false,
+        updateDsp: (dsp) {
+          if (dsp.selectedHeadphoneProfile == null) return dsp;
+          return dsp.copyWith(
+            selectedHeadphoneProfile: null,
+            preampDb: 0.0,
+            eqPreset: EqPreset(
+              name: 'Flat',
+              gains: List<double>.filled(targetFreqs.length, 0.0),
+              bassBoost: 0.0,
+            ),
+          );
+        },
+        applyAudioHandler: () => _audioHandler.applyHeadphoneProfile(null),
+        failureMessage: 'Failed to reset headphone profile',
+      );
     }
   }
 
   Future<bool> resetHeadphoneProfile() => applyHeadphoneProfile(null);
 
   Future<void> setBandGain(int bandIndex, double gain) async {
-    markUserInteracting();
-    if (!guardDsp('Band Gain', showError: false)) return;
     if (!gain.isFinite) return;
     final clamped = DspParamRanges.eqBandGainDb.clamp(gain);
-    final state = _getState();
-    final currentGains = List<double>.from(state.eqPreset.gains);
-    if (bandIndex < 0 || bandIndex >= currentGains.length) return;
-    final previousDsp = state.dsp;
-    currentGains[bandIndex] = clamped;
-    _emit(state.copyWith(
-      dsp: state.dsp.copyWith(
-        eqPreset: state.eqPreset.copyWith(
-          name: 'Custom',
-          gains: List<double>.unmodifiable(currentGains),
-        ),
-        selectedHeadphoneProfile: null,
-      ),
-    ));
-    try {
-      await _audioHandler.setBandGain(bandIndex, clamped);
-    } catch (e, st) {
-      ErrorLogger.log('Failed to set band gain',
-          error: e, stackTrace: st, category: 'PlayerDspController');
-      final s = _getState();
-      _emit(s.copyWith(
-          dsp: previousDsp,
-          playback: s.playback
-              .copyWith(errorMessage: 'Failed to set band gain: $e')));
-    }
+    await applyDspEffect(
+      featureName: 'Band Gain',
+      showErrorOnGuard: false,
+      updateDsp: (dsp) {
+        final currentGains = List<double>.from(dsp.eqPreset.gains);
+        if (bandIndex < 0 || bandIndex >= currentGains.length) return dsp;
+        currentGains[bandIndex] = clamped;
+        return dsp.copyWith(
+          eqPreset: dsp.eqPreset.copyWith(
+            name: 'Custom',
+            gains: List<double>.unmodifiable(currentGains),
+          ),
+          selectedHeadphoneProfile: null,
+        );
+      },
+      applyAudioHandler: () => _audioHandler.setBandGain(bandIndex, clamped),
+      failureMessage: 'Failed to set band gain',
+    );
   }
 
   Future<void> resetToFlat() async {
-    markUserInteracting();
     invalidateCodecCompensation(clearUserIntent: true);
-    final state = _getState();
-    final previousDsp = state.dsp;
-    _emit(state.copyWith(
-      dsp: state.dsp.copyWith(
+    await applyDspEffect(
+      featureName: 'Equalizer',
+      updateDsp: (dsp) => dsp.copyWith(
         eqPreset: EqPreset.defaultPresets.first,
         selectedHeadphoneProfile: null,
         preampDb: 0.0,
       ),
-    ));
-    try {
-      await _audioHandler.resetToFlat();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to reset equalizer',
-          error: e, stackTrace: st, category: 'PlayerDspController');
-      final s = _getState();
-      _emit(s.copyWith(
-        dsp: previousDsp,
-        playback:
-            s.playback.copyWith(errorMessage: 'Failed to reset equalizer: $e'),
-      ));
-    }
+      applyAudioHandler: () => _audioHandler.resetToFlat(),
+      failureMessage: 'Failed to reset equalizer',
+    );
   }
 }

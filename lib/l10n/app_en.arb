@@ -7377,5 +7377,38 @@
   "bpSourceCodecUnconfirmed": "Source codec not confirmed",
   "@bpSourceCodecUnconfirmed": {
     "description": "Verdict reason when the audio source container is ambiguous and the decoder codec is unconfirmed"
+  },
+  "dspLimitedForHeadroom": "Limited for headroom",
+  "@dspLimitedForHeadroom": {
+    "description": "Hint displayed when boost is clamped by the headroom budget"
+  },
+  "strictBitPerfectRefusedNotice": "Strict bit-perfect disabled: output cannot carry {sampleRate} Hz / {bitDepth}-bit.",
+  "@strictBitPerfectRefusedNotice": {
+    "description": "Notice when strict bit-perfect is refused and disabled due to output capability mismatch",
+    "placeholders": {
+      "sampleRate": {
+        "type": "int"
+      },
+      "bitDepth": {
+        "type": "int"
+      }
+    }
+  },
+  "directUsbFollowFormatSuspendedNotice": "Direct USB suspended: track format requires follow-track sample rate.",
+  "@directUsbFollowFormatSuspendedNotice": {
+    "description": "Notice when direct USB is suspended because follow-rate is off"
+  },
+  "directUsbUnsupportedRateNotice": "Direct USB suspended: {sampleRate} Hz is not supported by the USB DAC.",
+  "@directUsbUnsupportedRateNotice": {
+    "description": "Notice when direct USB is suspended because the DAC lacks the track sample rate",
+    "placeholders": {
+      "sampleRate": {
+        "type": "int"
+      }
+    }
+  },
+  "testToneBypassesDspNotice": "Direct audition (bypasses DSP)",
+  "@testToneBypassesDspNotice": {
+    "description": "Notice that test sweep tone bypasses DSP pipeline"
   }
 }

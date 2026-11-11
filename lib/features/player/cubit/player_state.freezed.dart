@@ -1983,6 +1983,8 @@ mixin _$DspSlice {
   bool get isSpatializerSupported;
   bool get isSpatializerEnabled;
   double get volumeBoost;
+  double get effectiveVolumeBoost;
+  double get effectiveBassBoost;
   double get preampDb;
   bool get isVolumeBoostSupported;
   bool get isBassBoostSupported;
@@ -1993,6 +1995,9 @@ mixin _$DspSlice {
   bool get isLimiterEnabled;
   double get limiterThresholdDb;
   double get limiterReleaseMs;
+  double get compressorRatio;
+  double get compressorAttackMs;
+  double get compressorMakeupGainDb;
   bool get isReverbEnabled;
   int get reverbPreset;
   double get reverbWetDry;
@@ -2026,6 +2031,7 @@ mixin _$DspSlice {
   double get multibandCompressorF0;
   double get multibandCompressorF1;
   double get multibandCompressorF2;
+  List<MultibandCompressorBandConfig> get multibandCompressorBands;
   bool get isDynamicEqEnabled;
   List<DynamicEqBandConfig> get dynamicEqBands;
   bool get isViperDdcEnabled;
@@ -2082,6 +2088,10 @@ mixin _$DspSlice {
                 other.isSpatializerEnabled == _this.isSpatializerEnabled) &&
             (identical(other.volumeBoost, _this.volumeBoost) ||
                 other.volumeBoost == _this.volumeBoost) &&
+            (identical(other.effectiveVolumeBoost, _this.effectiveVolumeBoost) ||
+                other.effectiveVolumeBoost == _this.effectiveVolumeBoost) &&
+            (identical(other.effectiveBassBoost, _this.effectiveBassBoost) ||
+                other.effectiveBassBoost == _this.effectiveBassBoost) &&
             (identical(other.preampDb, _this.preampDb) ||
                 other.preampDb == _this.preampDb) &&
             (identical(other.isVolumeBoostSupported, _this.isVolumeBoostSupported) ||
@@ -2100,10 +2110,11 @@ mixin _$DspSlice {
                 other.isLimiterEnabled == _this.isLimiterEnabled) &&
             (identical(other.limiterThresholdDb, _this.limiterThresholdDb) ||
                 other.limiterThresholdDb == _this.limiterThresholdDb) &&
-            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) ||
-                other.limiterReleaseMs == _this.limiterReleaseMs) &&
-            (identical(other.isReverbEnabled, _this.isReverbEnabled) ||
-                other.isReverbEnabled == _this.isReverbEnabled) &&
+            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) || other.limiterReleaseMs == _this.limiterReleaseMs) &&
+            (identical(other.compressorRatio, _this.compressorRatio) || other.compressorRatio == _this.compressorRatio) &&
+            (identical(other.compressorAttackMs, _this.compressorAttackMs) || other.compressorAttackMs == _this.compressorAttackMs) &&
+            (identical(other.compressorMakeupGainDb, _this.compressorMakeupGainDb) || other.compressorMakeupGainDb == _this.compressorMakeupGainDb) &&
+            (identical(other.isReverbEnabled, _this.isReverbEnabled) || other.isReverbEnabled == _this.isReverbEnabled) &&
             (identical(other.reverbPreset, _this.reverbPreset) || other.reverbPreset == _this.reverbPreset) &&
             (identical(other.reverbWetDry, _this.reverbWetDry) || other.reverbWetDry == _this.reverbWetDry) &&
             (identical(other.stereoBalance, _this.stereoBalance) || other.stereoBalance == _this.stereoBalance) &&
@@ -2136,6 +2147,7 @@ mixin _$DspSlice {
             (identical(other.multibandCompressorF0, _this.multibandCompressorF0) || other.multibandCompressorF0 == _this.multibandCompressorF0) &&
             (identical(other.multibandCompressorF1, _this.multibandCompressorF1) || other.multibandCompressorF1 == _this.multibandCompressorF1) &&
             (identical(other.multibandCompressorF2, _this.multibandCompressorF2) || other.multibandCompressorF2 == _this.multibandCompressorF2) &&
+            const DeepCollectionEquality().equals(other.multibandCompressorBands, _this.multibandCompressorBands) &&
             (identical(other.isDynamicEqEnabled, _this.isDynamicEqEnabled) || other.isDynamicEqEnabled == _this.isDynamicEqEnabled) &&
             const DeepCollectionEquality().equals(other.dynamicEqBands, _this.dynamicEqBands) &&
             (identical(other.isViperDdcEnabled, _this.isViperDdcEnabled) || other.isViperDdcEnabled == _this.isViperDdcEnabled) &&
@@ -2172,6 +2184,8 @@ mixin _$DspSlice {
       _this.isSpatializerSupported,
       _this.isSpatializerEnabled,
       _this.volumeBoost,
+      _this.effectiveVolumeBoost,
+      _this.effectiveBassBoost,
       _this.preampDb,
       _this.isVolumeBoostSupported,
       _this.isBassBoostSupported,
@@ -2182,6 +2196,9 @@ mixin _$DspSlice {
       _this.isLimiterEnabled,
       _this.limiterThresholdDb,
       _this.limiterReleaseMs,
+      _this.compressorRatio,
+      _this.compressorAttackMs,
+      _this.compressorMakeupGainDb,
       _this.isReverbEnabled,
       _this.reverbPreset,
       _this.reverbWetDry,
@@ -2215,6 +2232,7 @@ mixin _$DspSlice {
       _this.multibandCompressorF0,
       _this.multibandCompressorF1,
       _this.multibandCompressorF2,
+      const DeepCollectionEquality().hash(_this.multibandCompressorBands),
       _this.isDynamicEqEnabled,
       const DeepCollectionEquality().hash(_this.dynamicEqBands),
       _this.isViperDdcEnabled,
@@ -2238,7 +2256,7 @@ mixin _$DspSlice {
   @override
   String toString() {
     final _this = this as DspSlice;
-    return 'DspSlice(eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, preampDb: ${_this.preampDb}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, isMultibandCompressorEnabled: ${_this.isMultibandCompressorEnabled}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqLinearPhase: ${_this.arbitraryEqLinearPhase}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
+    return 'DspSlice(eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isVirtualizerSupported: ${_this.isVirtualizerSupported}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, isDynamicsSupported: ${_this.isDynamicsSupported}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, effectiveVolumeBoost: ${_this.effectiveVolumeBoost}, effectiveBassBoost: ${_this.effectiveBassBoost}, preampDb: ${_this.preampDb}, isVolumeBoostSupported: ${_this.isVolumeBoostSupported}, isBassBoostSupported: ${_this.isBassBoostSupported}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, crossfeedMode: ${_this.crossfeedMode}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, compressorRatio: ${_this.compressorRatio}, compressorAttackMs: ${_this.compressorAttackMs}, compressorMakeupGainDb: ${_this.compressorMakeupGainDb}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, isDitherEnabled: ${_this.isDitherEnabled}, ditherTargetBitDepth: ${_this.ditherTargetBitDepth}, isSaturationEnabled: ${_this.isSaturationEnabled}, saturationDrive: ${_this.saturationDrive}, saturationMix: ${_this.saturationMix}, saturationTilt: ${_this.saturationTilt}, saturationMultiband: ${_this.saturationMultiband}, isStereoWidthEnabled: ${_this.isStereoWidthEnabled}, stereoWidth: ${_this.stereoWidth}, isLoudnessContourEnabled: ${_this.isLoudnessContourEnabled}, loudnessContourIntensity: ${_this.loudnessContourIntensity}, isSubCrossoverEnabled: ${_this.isSubCrossoverEnabled}, subCrossoverCornerHz: ${_this.subCrossoverCornerHz}, subCrossoverSlopeDbPerOct: ${_this.subCrossoverSlopeDbPerOct}, subCrossoverGain: ${_this.subCrossoverGain}, subCrossoverBassMono: ${_this.subCrossoverBassMono}, subCrossoverAntiPop: ${_this.subCrossoverAntiPop}, stereoWidthMultiband: ${_this.stereoWidthMultiband}, stereoWidthLow: ${_this.stereoWidthLow}, stereoWidthMid: ${_this.stereoWidthMid}, stereoWidthHigh: ${_this.stereoWidthHigh}, stereoWidthLowCrossoverHz: ${_this.stereoWidthLowCrossoverHz}, stereoWidthHighCrossoverHz: ${_this.stereoWidthHighCrossoverHz}, isMultibandCompressorEnabled: ${_this.isMultibandCompressorEnabled}, multibandCompressorF0: ${_this.multibandCompressorF0}, multibandCompressorF1: ${_this.multibandCompressorF1}, multibandCompressorF2: ${_this.multibandCompressorF2}, multibandCompressorBands: ${_this.multibandCompressorBands}, isDynamicEqEnabled: ${_this.isDynamicEqEnabled}, dynamicEqBands: ${_this.dynamicEqBands}, isViperDdcEnabled: ${_this.isViperDdcEnabled}, viperDdcProfileName: ${_this.viperDdcProfileName}, isArbitraryEqEnabled: ${_this.isArbitraryEqEnabled}, arbitraryEqLinearPhase: ${_this.arbitraryEqLinearPhase}, arbitraryEqString: ${_this.arbitraryEqString}, isLiveProgEnabled: ${_this.isLiveProgEnabled}, liveProgCode: ${_this.liveProgCode}, liveProgStatus: ${_this.liveProgStatus}, isDynamicBassEnabled: ${_this.isDynamicBassEnabled}, dynamicBassStrength: ${_this.dynamicBassStrength}, dynamicBassPreset: ${_this.dynamicBassPreset}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, isQuranModeEnabled: ${_this.isQuranModeEnabled}, quranReciterStyle: ${_this.quranReciterStyle})';
   }
 }
 
@@ -2260,6 +2278,8 @@ abstract mixin class $DspSliceCopyWith<$Res> {
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      double effectiveVolumeBoost,
+      double effectiveBassBoost,
       double preampDb,
       bool isVolumeBoostSupported,
       bool isBassBoostSupported,
@@ -2270,6 +2290,9 @@ abstract mixin class $DspSliceCopyWith<$Res> {
       bool isLimiterEnabled,
       double limiterThresholdDb,
       double limiterReleaseMs,
+      double compressorRatio,
+      double compressorAttackMs,
+      double compressorMakeupGainDb,
       bool isReverbEnabled,
       int reverbPreset,
       double reverbWetDry,
@@ -2303,6 +2326,7 @@ abstract mixin class $DspSliceCopyWith<$Res> {
       double multibandCompressorF0,
       double multibandCompressorF1,
       double multibandCompressorF2,
+      List<MultibandCompressorBandConfig> multibandCompressorBands,
       bool isDynamicEqEnabled,
       List<DynamicEqBandConfig> dynamicEqBands,
       bool isViperDdcEnabled,
@@ -2346,6 +2370,8 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? effectiveVolumeBoost = null,
+    Object? effectiveBassBoost = null,
     Object? preampDb = null,
     Object? isVolumeBoostSupported = null,
     Object? isBassBoostSupported = null,
@@ -2356,6 +2382,9 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
     Object? isLimiterEnabled = null,
     Object? limiterThresholdDb = null,
     Object? limiterReleaseMs = null,
+    Object? compressorRatio = null,
+    Object? compressorAttackMs = null,
+    Object? compressorMakeupGainDb = null,
     Object? isReverbEnabled = null,
     Object? reverbPreset = null,
     Object? reverbWetDry = null,
@@ -2389,6 +2418,7 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
     Object? multibandCompressorF0 = null,
     Object? multibandCompressorF1 = null,
     Object? multibandCompressorF2 = null,
+    Object? multibandCompressorBands = null,
     Object? isDynamicEqEnabled = null,
     Object? dynamicEqBands = null,
     Object? isViperDdcEnabled = null,
@@ -2456,6 +2486,14 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
               as double,
+      effectiveVolumeBoost: null == effectiveVolumeBoost
+          ? _self.effectiveVolumeBoost
+          : effectiveVolumeBoost // ignore: cast_nullable_to_non_nullable
+              as double,
+      effectiveBassBoost: null == effectiveBassBoost
+          ? _self.effectiveBassBoost
+          : effectiveBassBoost // ignore: cast_nullable_to_non_nullable
+              as double,
       preampDb: null == preampDb
           ? _self.preampDb
           : preampDb // ignore: cast_nullable_to_non_nullable
@@ -2495,6 +2533,18 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
       limiterReleaseMs: null == limiterReleaseMs
           ? _self.limiterReleaseMs
           : limiterReleaseMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      compressorRatio: null == compressorRatio
+          ? _self.compressorRatio
+          : compressorRatio // ignore: cast_nullable_to_non_nullable
+              as double,
+      compressorAttackMs: null == compressorAttackMs
+          ? _self.compressorAttackMs
+          : compressorAttackMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      compressorMakeupGainDb: null == compressorMakeupGainDb
+          ? _self.compressorMakeupGainDb
+          : compressorMakeupGainDb // ignore: cast_nullable_to_non_nullable
               as double,
       isReverbEnabled: null == isReverbEnabled
           ? _self.isReverbEnabled
@@ -2628,6 +2678,10 @@ class _$DspSliceCopyWithImpl<$Res> implements $DspSliceCopyWith<$Res> {
           ? _self.multibandCompressorF2
           : multibandCompressorF2 // ignore: cast_nullable_to_non_nullable
               as double,
+      multibandCompressorBands: null == multibandCompressorBands
+          ? _self.multibandCompressorBands
+          : multibandCompressorBands // ignore: cast_nullable_to_non_nullable
+              as List<MultibandCompressorBandConfig>,
       isDynamicEqEnabled: null == isDynamicEqEnabled
           ? _self.isDynamicEqEnabled
           : isDynamicEqEnabled // ignore: cast_nullable_to_non_nullable
@@ -2806,6 +2860,8 @@ extension DspSlicePatterns on DspSlice {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            double effectiveVolumeBoost,
+            double effectiveBassBoost,
             double preampDb,
             bool isVolumeBoostSupported,
             bool isBassBoostSupported,
@@ -2816,6 +2872,9 @@ extension DspSlicePatterns on DspSlice {
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
+            double compressorRatio,
+            double compressorAttackMs,
+            double compressorMakeupGainDb,
             bool isReverbEnabled,
             int reverbPreset,
             double reverbWetDry,
@@ -2849,6 +2908,7 @@ extension DspSlicePatterns on DspSlice {
             double multibandCompressorF0,
             double multibandCompressorF1,
             double multibandCompressorF2,
+            List<MultibandCompressorBandConfig> multibandCompressorBands,
             bool isDynamicEqEnabled,
             List<DynamicEqBandConfig> dynamicEqBands,
             bool isViperDdcEnabled,
@@ -2885,6 +2945,8 @@ extension DspSlicePatterns on DspSlice {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.effectiveVolumeBoost,
+            _that.effectiveBassBoost,
             _that.preampDb,
             _that.isVolumeBoostSupported,
             _that.isBassBoostSupported,
@@ -2895,6 +2957,9 @@ extension DspSlicePatterns on DspSlice {
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
+            _that.compressorRatio,
+            _that.compressorAttackMs,
+            _that.compressorMakeupGainDb,
             _that.isReverbEnabled,
             _that.reverbPreset,
             _that.reverbWetDry,
@@ -2928,6 +2993,7 @@ extension DspSlicePatterns on DspSlice {
             _that.multibandCompressorF0,
             _that.multibandCompressorF1,
             _that.multibandCompressorF2,
+            _that.multibandCompressorBands,
             _that.isDynamicEqEnabled,
             _that.dynamicEqBands,
             _that.isViperDdcEnabled,
@@ -2978,6 +3044,8 @@ extension DspSlicePatterns on DspSlice {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            double effectiveVolumeBoost,
+            double effectiveBassBoost,
             double preampDb,
             bool isVolumeBoostSupported,
             bool isBassBoostSupported,
@@ -2988,6 +3056,9 @@ extension DspSlicePatterns on DspSlice {
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
+            double compressorRatio,
+            double compressorAttackMs,
+            double compressorMakeupGainDb,
             bool isReverbEnabled,
             int reverbPreset,
             double reverbWetDry,
@@ -3021,6 +3092,7 @@ extension DspSlicePatterns on DspSlice {
             double multibandCompressorF0,
             double multibandCompressorF1,
             double multibandCompressorF2,
+            List<MultibandCompressorBandConfig> multibandCompressorBands,
             bool isDynamicEqEnabled,
             List<DynamicEqBandConfig> dynamicEqBands,
             bool isViperDdcEnabled,
@@ -3056,6 +3128,8 @@ extension DspSlicePatterns on DspSlice {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.effectiveVolumeBoost,
+            _that.effectiveBassBoost,
             _that.preampDb,
             _that.isVolumeBoostSupported,
             _that.isBassBoostSupported,
@@ -3066,6 +3140,9 @@ extension DspSlicePatterns on DspSlice {
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
+            _that.compressorRatio,
+            _that.compressorAttackMs,
+            _that.compressorMakeupGainDb,
             _that.isReverbEnabled,
             _that.reverbPreset,
             _that.reverbWetDry,
@@ -3099,6 +3176,7 @@ extension DspSlicePatterns on DspSlice {
             _that.multibandCompressorF0,
             _that.multibandCompressorF1,
             _that.multibandCompressorF2,
+            _that.multibandCompressorBands,
             _that.isDynamicEqEnabled,
             _that.dynamicEqBands,
             _that.isViperDdcEnabled,
@@ -3148,6 +3226,8 @@ extension DspSlicePatterns on DspSlice {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            double effectiveVolumeBoost,
+            double effectiveBassBoost,
             double preampDb,
             bool isVolumeBoostSupported,
             bool isBassBoostSupported,
@@ -3158,6 +3238,9 @@ extension DspSlicePatterns on DspSlice {
             bool isLimiterEnabled,
             double limiterThresholdDb,
             double limiterReleaseMs,
+            double compressorRatio,
+            double compressorAttackMs,
+            double compressorMakeupGainDb,
             bool isReverbEnabled,
             int reverbPreset,
             double reverbWetDry,
@@ -3191,6 +3274,7 @@ extension DspSlicePatterns on DspSlice {
             double multibandCompressorF0,
             double multibandCompressorF1,
             double multibandCompressorF2,
+            List<MultibandCompressorBandConfig> multibandCompressorBands,
             bool isDynamicEqEnabled,
             List<DynamicEqBandConfig> dynamicEqBands,
             bool isViperDdcEnabled,
@@ -3226,6 +3310,8 @@ extension DspSlicePatterns on DspSlice {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.effectiveVolumeBoost,
+            _that.effectiveBassBoost,
             _that.preampDb,
             _that.isVolumeBoostSupported,
             _that.isBassBoostSupported,
@@ -3236,6 +3322,9 @@ extension DspSlicePatterns on DspSlice {
             _that.isLimiterEnabled,
             _that.limiterThresholdDb,
             _that.limiterReleaseMs,
+            _that.compressorRatio,
+            _that.compressorAttackMs,
+            _that.compressorMakeupGainDb,
             _that.isReverbEnabled,
             _that.reverbPreset,
             _that.reverbWetDry,
@@ -3269,6 +3358,7 @@ extension DspSlicePatterns on DspSlice {
             _that.multibandCompressorF0,
             _that.multibandCompressorF1,
             _that.multibandCompressorF2,
+            _that.multibandCompressorBands,
             _that.isDynamicEqEnabled,
             _that.dynamicEqBands,
             _that.isViperDdcEnabled,
@@ -3309,6 +3399,8 @@ class _DspSlice extends DspSlice {
       this.isSpatializerSupported = false,
       this.isSpatializerEnabled = false,
       this.volumeBoost = 0.0,
+      this.effectiveVolumeBoost = 0.0,
+      this.effectiveBassBoost = 0.0,
       this.preampDb = 0.0,
       this.isVolumeBoostSupported = false,
       this.isBassBoostSupported = false,
@@ -3319,6 +3411,9 @@ class _DspSlice extends DspSlice {
       this.isLimiterEnabled = false,
       this.limiterThresholdDb = -0.2,
       this.limiterReleaseMs = 50.0,
+      this.compressorRatio = 1.0,
+      this.compressorAttackMs = 2.0,
+      this.compressorMakeupGainDb = 0.0,
       this.isReverbEnabled = false,
       this.reverbPreset = 0,
       this.reverbWetDry = 0.20,
@@ -3352,6 +3447,8 @@ class _DspSlice extends DspSlice {
       this.multibandCompressorF0 = 160.0,
       this.multibandCompressorF1 = 1000.0,
       this.multibandCompressorF2 = 5000.0,
+      List<MultibandCompressorBandConfig> multibandCompressorBands =
+          const <MultibandCompressorBandConfig>[],
       this.isDynamicEqEnabled = false,
       List<DynamicEqBandConfig> dynamicEqBands = const [],
       this.isViperDdcEnabled = false,
@@ -3369,7 +3466,8 @@ class _DspSlice extends DspSlice {
       List<String> detectedOemEngines = const [],
       this.isQuranModeEnabled = false,
       this.quranReciterStyle = QuranReciterStyle.murattal})
-      : _dynamicEqBands = dynamicEqBands,
+      : _multibandCompressorBands = multibandCompressorBands,
+        _dynamicEqBands = dynamicEqBands,
         _detectedOemEngines = detectedOemEngines,
         super._();
 
@@ -3410,6 +3508,12 @@ class _DspSlice extends DspSlice {
   final double volumeBoost;
   @override
   @JsonKey()
+  final double effectiveVolumeBoost;
+  @override
+  @JsonKey()
+  final double effectiveBassBoost;
+  @override
+  @JsonKey()
   final double preampDb;
   @override
   @JsonKey()
@@ -3438,6 +3542,15 @@ class _DspSlice extends DspSlice {
   @override
   @JsonKey()
   final double limiterReleaseMs;
+  @override
+  @JsonKey()
+  final double compressorRatio;
+  @override
+  @JsonKey()
+  final double compressorAttackMs;
+  @override
+  @JsonKey()
+  final double compressorMakeupGainDb;
   @override
   @JsonKey()
   final bool isReverbEnabled;
@@ -3537,6 +3650,16 @@ class _DspSlice extends DspSlice {
   @override
   @JsonKey()
   final double multibandCompressorF2;
+  final List<MultibandCompressorBandConfig> _multibandCompressorBands;
+  @override
+  @JsonKey()
+  List<MultibandCompressorBandConfig> get multibandCompressorBands {
+    if (_multibandCompressorBands is EqualUnmodifiableListView)
+      return _multibandCompressorBands;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_multibandCompressorBands);
+  }
+
   @override
   @JsonKey()
   final bool isDynamicEqEnabled;
@@ -3639,6 +3762,10 @@ class _DspSlice extends DspSlice {
                 other.isSpatializerEnabled == isSpatializerEnabled) &&
             (identical(other.volumeBoost, volumeBoost) ||
                 other.volumeBoost == volumeBoost) &&
+            (identical(other.effectiveVolumeBoost, effectiveVolumeBoost) ||
+                other.effectiveVolumeBoost == effectiveVolumeBoost) &&
+            (identical(other.effectiveBassBoost, effectiveBassBoost) ||
+                other.effectiveBassBoost == effectiveBassBoost) &&
             (identical(other.preampDb, preampDb) ||
                 other.preampDb == preampDb) &&
             (identical(other.isVolumeBoostSupported, isVolumeBoostSupported) ||
@@ -3659,6 +3786,12 @@ class _DspSlice extends DspSlice {
                 other.limiterThresholdDb == limiterThresholdDb) &&
             (identical(other.limiterReleaseMs, limiterReleaseMs) ||
                 other.limiterReleaseMs == limiterReleaseMs) &&
+            (identical(other.compressorRatio, compressorRatio) ||
+                other.compressorRatio == compressorRatio) &&
+            (identical(other.compressorAttackMs, compressorAttackMs) ||
+                other.compressorAttackMs == compressorAttackMs) &&
+            (identical(other.compressorMakeupGainDb, compressorMakeupGainDb) ||
+                other.compressorMakeupGainDb == compressorMakeupGainDb) &&
             (identical(other.isReverbEnabled, isReverbEnabled) ||
                 other.isReverbEnabled == isReverbEnabled) &&
             (identical(other.reverbPreset, reverbPreset) ||
@@ -3674,16 +3807,11 @@ class _DspSlice extends DspSlice {
                 other.isDitherEnabled == isDitherEnabled) &&
             (identical(other.ditherTargetBitDepth, ditherTargetBitDepth) ||
                 other.ditherTargetBitDepth == ditherTargetBitDepth) &&
-            (identical(other.isSaturationEnabled, isSaturationEnabled) ||
-                other.isSaturationEnabled == isSaturationEnabled) &&
-            (identical(other.saturationDrive, saturationDrive) ||
-                other.saturationDrive == saturationDrive) &&
-            (identical(other.saturationMix, saturationMix) ||
-                other.saturationMix == saturationMix) &&
-            (identical(other.saturationTilt, saturationTilt) ||
-                other.saturationTilt == saturationTilt) &&
-            (identical(other.saturationMultiband, saturationMultiband) ||
-                other.saturationMultiband == saturationMultiband) &&
+            (identical(other.isSaturationEnabled, isSaturationEnabled) || other.isSaturationEnabled == isSaturationEnabled) &&
+            (identical(other.saturationDrive, saturationDrive) || other.saturationDrive == saturationDrive) &&
+            (identical(other.saturationMix, saturationMix) || other.saturationMix == saturationMix) &&
+            (identical(other.saturationTilt, saturationTilt) || other.saturationTilt == saturationTilt) &&
+            (identical(other.saturationMultiband, saturationMultiband) || other.saturationMultiband == saturationMultiband) &&
             (identical(other.isStereoWidthEnabled, isStereoWidthEnabled) || other.isStereoWidthEnabled == isStereoWidthEnabled) &&
             (identical(other.stereoWidth, stereoWidth) || other.stereoWidth == stereoWidth) &&
             (identical(other.isLoudnessContourEnabled, isLoudnessContourEnabled) || other.isLoudnessContourEnabled == isLoudnessContourEnabled) &&
@@ -3704,6 +3832,7 @@ class _DspSlice extends DspSlice {
             (identical(other.multibandCompressorF0, multibandCompressorF0) || other.multibandCompressorF0 == multibandCompressorF0) &&
             (identical(other.multibandCompressorF1, multibandCompressorF1) || other.multibandCompressorF1 == multibandCompressorF1) &&
             (identical(other.multibandCompressorF2, multibandCompressorF2) || other.multibandCompressorF2 == multibandCompressorF2) &&
+            const DeepCollectionEquality().equals(other.multibandCompressorBands, _multibandCompressorBands) &&
             (identical(other.isDynamicEqEnabled, isDynamicEqEnabled) || other.isDynamicEqEnabled == isDynamicEqEnabled) &&
             const DeepCollectionEquality().equals(other.dynamicEqBands, _dynamicEqBands) &&
             (identical(other.isViperDdcEnabled, isViperDdcEnabled) || other.isViperDdcEnabled == isViperDdcEnabled) &&
@@ -3739,6 +3868,8 @@ class _DspSlice extends DspSlice {
       isSpatializerSupported,
       isSpatializerEnabled,
       volumeBoost,
+      effectiveVolumeBoost,
+      effectiveBassBoost,
       preampDb,
       isVolumeBoostSupported,
       isBassBoostSupported,
@@ -3749,6 +3880,9 @@ class _DspSlice extends DspSlice {
       isLimiterEnabled,
       limiterThresholdDb,
       limiterReleaseMs,
+      compressorRatio,
+      compressorAttackMs,
+      compressorMakeupGainDb,
       isReverbEnabled,
       reverbPreset,
       reverbWetDry,
@@ -3782,6 +3916,7 @@ class _DspSlice extends DspSlice {
       multibandCompressorF0,
       multibandCompressorF1,
       multibandCompressorF2,
+      const DeepCollectionEquality().hash(_multibandCompressorBands),
       isDynamicEqEnabled,
       const DeepCollectionEquality().hash(_dynamicEqBands),
       isViperDdcEnabled,
@@ -3804,7 +3939,7 @@ class _DspSlice extends DspSlice {
 
   @override
   String toString() {
-    return 'DspSlice(eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, preampDb: $preampDb, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, isMultibandCompressorEnabled: $isMultibandCompressorEnabled, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqLinearPhase: $arbitraryEqLinearPhase, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
+    return 'DspSlice(eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isVirtualizerSupported: $isVirtualizerSupported, isDynamicsEnabled: $isDynamicsEnabled, isDynamicsSupported: $isDynamicsSupported, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, effectiveVolumeBoost: $effectiveVolumeBoost, effectiveBassBoost: $effectiveBassBoost, preampDb: $preampDb, isVolumeBoostSupported: $isVolumeBoostSupported, isBassBoostSupported: $isBassBoostSupported, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, crossfeedMode: $crossfeedMode, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, compressorRatio: $compressorRatio, compressorAttackMs: $compressorAttackMs, compressorMakeupGainDb: $compressorMakeupGainDb, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, isDitherEnabled: $isDitherEnabled, ditherTargetBitDepth: $ditherTargetBitDepth, isSaturationEnabled: $isSaturationEnabled, saturationDrive: $saturationDrive, saturationMix: $saturationMix, saturationTilt: $saturationTilt, saturationMultiband: $saturationMultiband, isStereoWidthEnabled: $isStereoWidthEnabled, stereoWidth: $stereoWidth, isLoudnessContourEnabled: $isLoudnessContourEnabled, loudnessContourIntensity: $loudnessContourIntensity, isSubCrossoverEnabled: $isSubCrossoverEnabled, subCrossoverCornerHz: $subCrossoverCornerHz, subCrossoverSlopeDbPerOct: $subCrossoverSlopeDbPerOct, subCrossoverGain: $subCrossoverGain, subCrossoverBassMono: $subCrossoverBassMono, subCrossoverAntiPop: $subCrossoverAntiPop, stereoWidthMultiband: $stereoWidthMultiband, stereoWidthLow: $stereoWidthLow, stereoWidthMid: $stereoWidthMid, stereoWidthHigh: $stereoWidthHigh, stereoWidthLowCrossoverHz: $stereoWidthLowCrossoverHz, stereoWidthHighCrossoverHz: $stereoWidthHighCrossoverHz, isMultibandCompressorEnabled: $isMultibandCompressorEnabled, multibandCompressorF0: $multibandCompressorF0, multibandCompressorF1: $multibandCompressorF1, multibandCompressorF2: $multibandCompressorF2, multibandCompressorBands: $multibandCompressorBands, isDynamicEqEnabled: $isDynamicEqEnabled, dynamicEqBands: $dynamicEqBands, isViperDdcEnabled: $isViperDdcEnabled, viperDdcProfileName: $viperDdcProfileName, isArbitraryEqEnabled: $isArbitraryEqEnabled, arbitraryEqLinearPhase: $arbitraryEqLinearPhase, arbitraryEqString: $arbitraryEqString, isLiveProgEnabled: $isLiveProgEnabled, liveProgCode: $liveProgCode, liveProgStatus: $liveProgStatus, isDynamicBassEnabled: $isDynamicBassEnabled, dynamicBassStrength: $dynamicBassStrength, dynamicBassPreset: $dynamicBassPreset, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, isQuranModeEnabled: $isQuranModeEnabled, quranReciterStyle: $quranReciterStyle)';
   }
 }
 
@@ -3828,6 +3963,8 @@ abstract mixin class _$DspSliceCopyWith<$Res>
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      double effectiveVolumeBoost,
+      double effectiveBassBoost,
       double preampDb,
       bool isVolumeBoostSupported,
       bool isBassBoostSupported,
@@ -3838,6 +3975,9 @@ abstract mixin class _$DspSliceCopyWith<$Res>
       bool isLimiterEnabled,
       double limiterThresholdDb,
       double limiterReleaseMs,
+      double compressorRatio,
+      double compressorAttackMs,
+      double compressorMakeupGainDb,
       bool isReverbEnabled,
       int reverbPreset,
       double reverbWetDry,
@@ -3871,6 +4011,7 @@ abstract mixin class _$DspSliceCopyWith<$Res>
       double multibandCompressorF0,
       double multibandCompressorF1,
       double multibandCompressorF2,
+      List<MultibandCompressorBandConfig> multibandCompressorBands,
       bool isDynamicEqEnabled,
       List<DynamicEqBandConfig> dynamicEqBands,
       bool isViperDdcEnabled,
@@ -3914,6 +4055,8 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? effectiveVolumeBoost = null,
+    Object? effectiveBassBoost = null,
     Object? preampDb = null,
     Object? isVolumeBoostSupported = null,
     Object? isBassBoostSupported = null,
@@ -3924,6 +4067,9 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
     Object? isLimiterEnabled = null,
     Object? limiterThresholdDb = null,
     Object? limiterReleaseMs = null,
+    Object? compressorRatio = null,
+    Object? compressorAttackMs = null,
+    Object? compressorMakeupGainDb = null,
     Object? isReverbEnabled = null,
     Object? reverbPreset = null,
     Object? reverbWetDry = null,
@@ -3957,6 +4103,7 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
     Object? multibandCompressorF0 = null,
     Object? multibandCompressorF1 = null,
     Object? multibandCompressorF2 = null,
+    Object? multibandCompressorBands = null,
     Object? isDynamicEqEnabled = null,
     Object? dynamicEqBands = null,
     Object? isViperDdcEnabled = null,
@@ -4024,6 +4171,14 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
               as double,
+      effectiveVolumeBoost: null == effectiveVolumeBoost
+          ? _self.effectiveVolumeBoost
+          : effectiveVolumeBoost // ignore: cast_nullable_to_non_nullable
+              as double,
+      effectiveBassBoost: null == effectiveBassBoost
+          ? _self.effectiveBassBoost
+          : effectiveBassBoost // ignore: cast_nullable_to_non_nullable
+              as double,
       preampDb: null == preampDb
           ? _self.preampDb
           : preampDb // ignore: cast_nullable_to_non_nullable
@@ -4063,6 +4218,18 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
       limiterReleaseMs: null == limiterReleaseMs
           ? _self.limiterReleaseMs
           : limiterReleaseMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      compressorRatio: null == compressorRatio
+          ? _self.compressorRatio
+          : compressorRatio // ignore: cast_nullable_to_non_nullable
+              as double,
+      compressorAttackMs: null == compressorAttackMs
+          ? _self.compressorAttackMs
+          : compressorAttackMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      compressorMakeupGainDb: null == compressorMakeupGainDb
+          ? _self.compressorMakeupGainDb
+          : compressorMakeupGainDb // ignore: cast_nullable_to_non_nullable
               as double,
       isReverbEnabled: null == isReverbEnabled
           ? _self.isReverbEnabled
@@ -4196,6 +4363,10 @@ class __$DspSliceCopyWithImpl<$Res> implements _$DspSliceCopyWith<$Res> {
           ? _self.multibandCompressorF2
           : multibandCompressorF2 // ignore: cast_nullable_to_non_nullable
               as double,
+      multibandCompressorBands: null == multibandCompressorBands
+          ? _self._multibandCompressorBands
+          : multibandCompressorBands // ignore: cast_nullable_to_non_nullable
+              as List<MultibandCompressorBandConfig>,
       isDynamicEqEnabled: null == isDynamicEqEnabled
           ? _self.isDynamicEqEnabled
           : isDynamicEqEnabled // ignore: cast_nullable_to_non_nullable

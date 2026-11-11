@@ -1,5 +1,6 @@
 // lib/features/player/cubit/queue_slot_codec.dart
 import '../../../data/db/app_database.dart';
+import 'player_state.dart';
 
 /// Read-only view of a queue slot for encoding. Lets the codec stay
 /// independent of PlayerCubit's private slot type.
@@ -8,6 +9,7 @@ typedef SlotView = ({
   int currentIndex,
   Duration position,
   double speed,
+  Map<int, QueueTier>? trackTiers,
 });
 
 /// Validated, decoded slot payload. Local song rows still need a repository
@@ -19,6 +21,7 @@ class DecodedSlot {
   final int currentIndex;
   final int positionMs;
   final double speed;
+  final Map<int, QueueTier> trackTiers;
 
   const DecodedSlot({
     required this.songIds,
@@ -26,6 +29,7 @@ class DecodedSlot {
     required this.currentIndex,
     required this.positionMs,
     required this.speed,
+    this.trackTiers = const {},
   });
 }
 
@@ -34,7 +38,7 @@ class DecodedSlot {
 /// state emission; all JSON mapping, validation and clamping lives here and is
 /// unit tested. Semantics mirror the previous inline implementation exactly.
 class QueueSlotCodec {
-  static const int currentSchemaVersion = 1;
+  static const int currentSchemaVersion = 2;
   static const int maxSlotIndex = 2;
   static const int maxDocumentKeys =
       (maxSlotIndex + 1) + 2; // slots + activeSlot + schemaVersion
@@ -50,6 +54,7 @@ class QueueSlotCodec {
     };
     for (final entry in slots.entries) {
       final songs = entry.value.songs;
+      final tiers = entry.value.trackTiers ?? const <int, QueueTier>{};
       data['${entry.key}'] = {
         'songIds': songs.map((s) => s.id).toList(),
         // Serialize rows not resolvable via getSongsByIds on restore: YouTube
@@ -76,6 +81,9 @@ class QueueSlotCodec {
         'positionMs': entry.value.position.inMilliseconds,
         // jsonEncode throws on NaN/Infinity, which would abort the whole save.
         'speed': entry.value.speed.isFinite ? entry.value.speed : 1.0,
+        'trackTiers': {
+          for (final t in tiers.entries) '${t.key}': t.value.name,
+        },
       };
     }
     // Which slot is active is part of the session: without it a restart
@@ -98,7 +106,7 @@ class QueueSlotCodec {
         (version is! int || version > currentSchemaVersion || version < 0)) {
       return null;
     }
-    if (version == null || version == 0) {
+    if (version == null || version < currentSchemaVersion) {
       return migrateDocument(map);
     }
     return map;
@@ -115,7 +123,25 @@ class QueueSlotCodec {
     if (version < 0 || version > currentSchemaVersion) {
       throw ArgumentError('Unsupported queue-slot schemaVersion: $version');
     }
-    if (version == 0) {
+    if (version < 2) {
+      for (int i = 0; i <= maxSlotIndex; i++) {
+        final slotKey = '$i';
+        final rawSlot = doc[slotKey];
+        if (rawSlot is Map) {
+          final slotMap = Map<String, dynamic>.from(rawSlot);
+          if (!slotMap.containsKey('trackTiers')) {
+            final rawIds = slotMap['songIds'];
+            final tiers = <String, String>{};
+            if (rawIds is List) {
+              for (final id in rawIds) {
+                tiers['$id'] = QueueTier.context.name;
+              }
+            }
+            slotMap['trackTiers'] = tiers;
+            doc[slotKey] = slotMap;
+          }
+        }
+      }
       doc['schemaVersion'] = currentSchemaVersion;
     }
     return doc;
@@ -177,12 +203,34 @@ class QueueSlotCodec {
         ? rawSpeed.toDouble().clamp(minSpeed, maxSpeed)
         : 1.0;
 
+    final rawTiers = slotData['trackTiers'];
+    final trackTiers = <int, QueueTier>{};
+    if (rawTiers is Map) {
+      for (final entry in rawTiers.entries) {
+        final id = int.tryParse(entry.key.toString());
+        if (id != null) {
+          final tierName = entry.value?.toString();
+          final tier = QueueTier.values.firstWhere(
+            (e) => e.name == tierName,
+            orElse: () => QueueTier.context,
+          );
+          trackTiers[id] = tier;
+        }
+      }
+    } else {
+      // Schema version 1 migration: default tiers to QueueTier.context
+      for (final id in songIds) {
+        trackTiers[id] = QueueTier.context;
+      }
+    }
+
     return DecodedSlot(
       songIds: songIds,
       onlineSongsById: onlineSongsById,
       currentIndex: currentIndex,
       positionMs: positionMs,
       speed: speed,
+      trackTiers: trackTiers,
     );
   }
 

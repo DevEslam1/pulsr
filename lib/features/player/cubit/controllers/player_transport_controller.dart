@@ -7,6 +7,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../player_state.dart';
 import 'player_seek_throttle.dart';
+import 'queue_slot_data.dart';
 
 /// Owns audio transport controls: play, pause, seek, track skipping, shuffle, repeat, and favorite toggle.
 class PlayerTransportController {
@@ -190,6 +191,9 @@ class PlayerTransportController {
         if (!_isClosed()) {
           final s = _getState();
           _emit(s.copyWith(
+              queueSlice: s.queueSlice.copyWith(
+                queueHistory: state.queueHistory,
+              ),
               playback: s.playback
                   .copyWith(errorMessage: 'Skip to previous failed')));
         }
@@ -326,8 +330,10 @@ class PlayerTransportController {
           if (_slotLookupCache != null) {
             final cached = _slotLookupCache![songId];
             if (cached != null) {
-              _slotLookupCache![songId] = cached.copyWith(isFavorite: isFav)
-                ..isAutoplay = cached.isAutoplay;
+              cacheSlotSongs(_slotLookupCache!, [
+                cached.copyWith(isFavorite: isFav)
+                  ..isAutoplay = cached.isAutoplay,
+              ]);
             }
           }
           _debouncedPersistQueueSlots?.call();

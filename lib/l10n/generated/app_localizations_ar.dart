@@ -9636,4 +9636,24 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bpSourceCodecUnconfirmed => 'ترميز المصدر غير مؤكد';
+
+  @override
+  String get dspLimitedForHeadroom => 'تم الحد للحفاظ على المدى الديناميكي';
+
+  @override
+  String strictBitPerfectRefusedNotice(int sampleRate, int bitDepth) {
+    return 'تم تعطيل Bit-Perfect الصارم: المخرج لا يدعم $sampleRate هرتز / $bitDepth بت.';
+  }
+
+  @override
+  String get directUsbFollowFormatSuspendedNotice =>
+      'تم تعليق USB المباشر: صيغة المسار تتطلب تتبع معدل العينات.';
+
+  @override
+  String directUsbUnsupportedRateNotice(int sampleRate) {
+    return 'تم تعليق USB المباشر: $sampleRate هرتز غير مدعوم بواسطة محول USB DAC.';
+  }
+
+  @override
+  String get testToneBypassesDspNotice => 'معاينة مباشرة (تتجاوز معالجة DSP)';
 }

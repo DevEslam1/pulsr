@@ -5671,5 +5671,10 @@
   },
   "conflictSource32BitFloatNotBitPerfect": "El audio de punto flotante de 32 bits requiere una conversión con pérdidas y no se puede reproducir en Bit-Perfect.",
   "bpSourceCodecUnconfirmed": "Códec de origen no confirmado",
-  "bpDigitalVolumeAttenuation": "Volumen digital por debajo del 100%: bit-perfect requiere ganancia unitaria"
+  "bpDigitalVolumeAttenuation": "Volumen digital por debajo del 100%: bit-perfect requiere ganancia unitaria",
+  "dspLimitedForHeadroom": "Limitado por margen dinámico",
+  "strictBitPerfectRefusedNotice": "Strict Bit-Perfect desactivado: la salida no soporta {sampleRate} Hz / {bitDepth} bits.",
+  "directUsbFollowFormatSuspendedNotice": "USB directo suspendido: el formato de pista requiere seguir la frecuencia de muestreo.",
+  "directUsbUnsupportedRateNotice": "USB directo suspendido: {sampleRate} Hz no es compatible con el DAC USB.",
+  "testToneBypassesDspNotice": "Audición directa (omite DSP)"
 }

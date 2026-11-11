@@ -2803,6 +2803,25 @@ extension _EqSheetShell on _EqualizerSheetState {
                     ),
                   ),
                 ),
+                if (preset.bassBoost - state.effectiveBassBoost > 0.01)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                        top: AppSpacing.s2, start: AppSpacing.xxs),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded,
+                            color: p.textTertiary, size: 12),
+                        const SizedBox(width: AppSpacing.s4),
+                        Text(
+                          context.l10n.dspLimitedForHeadroom,
+                          style: TextStyle(
+                            color: p.textTertiary,
+                            fontSize: AppFontSize.tiny,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 _effectNotAppliedNotice('bassBoost', p),
               ],
             ),
@@ -3003,6 +3022,25 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 color: p.error,
                                 fontSize: AppFontSize.tiny,
                                 fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (state.volumeBoost - state.effectiveVolumeBoost > 0.01)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(
+                        top: AppSpacing.s2, start: AppSpacing.xxs),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded,
+                            color: p.textTertiary, size: 12),
+                        const SizedBox(width: AppSpacing.s4),
+                        Text(
+                          context.l10n.dspLimitedForHeadroom,
+                          style: TextStyle(
+                            color: p.textTertiary,
+                            fontSize: AppFontSize.tiny,
                           ),
                         ),
                       ],

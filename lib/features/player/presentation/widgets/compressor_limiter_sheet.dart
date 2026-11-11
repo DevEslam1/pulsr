@@ -85,7 +85,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   }
 
   Future<void> _applyMbc() async {
-    await widget.equalizerManager.setMultibandCompressor(
+    await context.read<PlayerCubit>().setMultibandCompressor(
       _mbcEnabled,
       f0: _mbcF0,
       f1: _mbcF1,
@@ -96,11 +96,11 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   Future<void> _applyMbcBand(
       int index, MultibandCompressorBandConfig band) async {
     setState(() => _mbcBands[index] = band);
-    await widget.equalizerManager.setMultibandCompressorBand(index, band);
+    await context.read<PlayerCubit>().setMultibandCompressorBand(index, band);
   }
 
   void _applyParams() {
-    widget.equalizerManager.setCompressorParams(
+    context.read<PlayerCubit>().setCompressorParams(
       thresholdDb: _thresholdDb,
       ratio: _ratio,
       attackMs: _attackMs,
@@ -170,7 +170,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     activeThumbColor: p.primary,
                     onChanged: (val) async {
                       setState(() => _limiterEnabled = val);
-                      await widget.equalizerManager.setLookaheadLimiter(val,
+                      await context.read<PlayerCubit>().setLookaheadLimiter(val,
                           thresholdDb: _thresholdDb, releaseMs: _releaseMs);
                     },
                   ),

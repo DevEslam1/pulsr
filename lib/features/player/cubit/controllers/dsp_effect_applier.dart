@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:mutex/mutex.dart';
 
 import '../../../../core/utils/error_logger.dart';
 import '../player_state.dart';
@@ -216,6 +217,30 @@ class DspRollbackPolicy {
       volumeBoost: attempted.volumeBoost != previous.volumeBoost
           ? previous.volumeBoost
           : current.volumeBoost,
+      effectiveVolumeBoost:
+          attempted.effectiveVolumeBoost != previous.effectiveVolumeBoost
+              ? previous.effectiveVolumeBoost
+              : current.effectiveVolumeBoost,
+      effectiveBassBoost:
+          attempted.effectiveBassBoost != previous.effectiveBassBoost
+              ? previous.effectiveBassBoost
+              : current.effectiveBassBoost,
+      compressorRatio:
+          attempted.compressorRatio != previous.compressorRatio
+              ? previous.compressorRatio
+              : current.compressorRatio,
+      compressorAttackMs:
+          attempted.compressorAttackMs != previous.compressorAttackMs
+              ? previous.compressorAttackMs
+              : current.compressorAttackMs,
+      compressorMakeupGainDb:
+          attempted.compressorMakeupGainDb != previous.compressorMakeupGainDb
+              ? previous.compressorMakeupGainDb
+              : current.compressorMakeupGainDb,
+      multibandCompressorBands:
+          attempted.multibandCompressorBands != previous.multibandCompressorBands
+              ? previous.multibandCompressorBands
+              : current.multibandCompressorBands,
       stereoBalance: attempted.stereoBalance != previous.stereoBalance
           ? previous.stereoBalance
           : current.stereoBalance,
@@ -244,6 +269,7 @@ class DspEffectApplier {
   final void Function() _markUserInteracting;
   final bool Function(String feature, {bool showError}) _guardDsp;
   final Future<void> Function() _rebalanceVolumeBoost;
+  final Mutex _mutex = Mutex();
 
   DspEffectApplier({
     required PlayerState Function() getState,
@@ -273,41 +299,43 @@ class DspEffectApplier {
         !_guardDsp(featureName, showError: showErrorOnGuard)) {
       return false;
     }
-    final state = _getState();
-    final previousDsp = state.dsp;
-    final attemptedDsp = updateDsp(previousDsp);
-    _emit(state.copyWith(
-      dsp: attemptedDsp,
-      playback: state.playback.copyWith(errorMessage: null),
-    ));
-    try {
-      await applyAudioHandler();
-      if (rebalanceVolumeBoost) {
-        // Rebalancing is best-effort. The bare unawaited() call turned a
-        // native failure into an unhandled zone error after the setter had
-        // already succeeded, which could crash debug builds/tests.
-        unawaited(_rebalanceVolumeBoost().catchError(
-          (Object e, StackTrace st) {
-            ErrorLogger.log('Failed to rebalance volume boost',
-                error: e, stackTrace: st, category: 'PlayerDspController');
-          },
-        ));
-      }
-      return true;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to set $featureName',
-          error: e, stackTrace: st, category: 'PlayerDspController');
-      final s = _getState();
-      final rolledBackDsp =
-          DspRollbackPolicy.merge(s.dsp, previousDsp, attemptedDsp);
-      _emit(s.copyWith(
-        dsp: rolledBackDsp,
-        playback: s.playback.copyWith(
-          errorMessage: failureMessage ??
-              'Failed to set ${featureName.toLowerCase()}: $e',
-        ),
+    return _mutex.protect(() async {
+      final state = _getState();
+      final previousDsp = state.dsp;
+      final attemptedDsp = updateDsp(previousDsp);
+      _emit(state.copyWith(
+        dsp: attemptedDsp,
+        playback: state.playback.copyWith(errorMessage: null),
       ));
-      return false;
-    }
+      try {
+        await applyAudioHandler();
+        if (rebalanceVolumeBoost) {
+          // Rebalancing is best-effort. The bare unawaited() call turned a
+          // native failure into an unhandled zone error after the setter had
+          // already succeeded, which could crash debug builds/tests.
+          unawaited(_rebalanceVolumeBoost().catchError(
+            (Object e, StackTrace st) {
+              ErrorLogger.log('Failed to rebalance volume boost',
+                  error: e, stackTrace: st, category: 'PlayerDspController');
+            },
+          ));
+        }
+        return true;
+      } catch (e, st) {
+        ErrorLogger.log('Failed to set $featureName',
+            error: e, stackTrace: st, category: 'PlayerDspController');
+        final s = _getState();
+        final rolledBackDsp =
+            DspRollbackPolicy.merge(s.dsp, previousDsp, attemptedDsp);
+        _emit(s.copyWith(
+          dsp: rolledBackDsp,
+          playback: s.playback.copyWith(
+            errorMessage: failureMessage ??
+                'Failed to set ${featureName.toLowerCase()}: $e',
+          ),
+        ));
+        return false;
+      }
+    });
   }
 }

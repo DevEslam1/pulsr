@@ -154,6 +154,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         isQuran ? await _resolveSavedEqEnabled(s) : s.isEqEnabled;
 
     return QuranRestoreSnapshot(
+      schemaVersion: QuranRestoreSnapshot.currentSchemaVersion,
       eqPreset: eqPreset,
       isEqEnabled: isEqEnabled,
       headphoneProfile: s.selectedHeadphoneProfile,
@@ -167,6 +168,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       saturationMix: s.saturationMix,
       saturationTilt: s.saturationTilt,
       playbackSpeed: s.playbackSpeed,
+      playbackPitch: s.playbackPitch,
       isShuffle: s.isShuffle,
       preampDb: s.preampDb,
     );
@@ -612,6 +614,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       ),
       playback: s.playback.copyWith(
         playbackSpeed: snapshot.playbackSpeed,
+        playbackPitch: snapshot.playbackPitch,
         isShuffle: snapshot.isShuffle,
       ),
     ));
@@ -642,6 +645,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           enabled: snapshot.isDynamicsEnabled,
         );
         await _audioHandler.setSpeed(snapshot.playbackSpeed);
+        await _audioHandler.setPitch(snapshot.playbackPitch);
         if (s.isShuffle != snapshot.isShuffle) {
           await _audioHandler.setShuffleMode(
             snapshot.isShuffle
@@ -691,6 +695,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       ),
       playback: s.playback.copyWith(
         playbackSpeed: 1.0,
+        playbackPitch: 1.0,
       ),
     ));
 
@@ -708,6 +713,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         await _audioHandler.setSaturation(false);
         await _audioHandler.setDynamicsPreset(s.dynamicsPreset, enabled: false);
         await _audioHandler.setSpeed(1.0);
+        await _audioHandler.setPitch(1.0);
       });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setDouble(PrefsKeys.playbackSpeed, 1.0);
@@ -774,6 +780,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       ),
       playback: s.playback.copyWith(
         playbackSpeed: tunedProfile.playbackSpeed,
+        playbackPitch: 1.0,
       ),
     ));
 
@@ -809,6 +816,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         );
         await _audioHandler
             .setSpeedWithoutPersisting(tunedProfile.playbackSpeed);
+        await _audioHandler.setPitch(1.0);
       });
       if (!isClosed &&
           (expectedGen == null || expectedGen == _quranToggleGen) &&

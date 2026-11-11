@@ -1,4 +1,5 @@
 // lib/features/player/presentation/widgets/live_prog_sheet.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -115,8 +116,24 @@ spl1 = spl1 + lp1 * amount;''',
     } catch (_) {}
   }
 
+  Timer? _persistDebounce;
+
+  void _debouncedPersistSliders() {
+    _persistDebounce?.cancel();
+    _persistDebounce = Timer(const Duration(milliseconds: 300), () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          PrefsKeys.liveProgSliders,
+          encodeLiveProgSliders(_sliderValues),
+        );
+      } catch (_) {}
+    });
+  }
+
   @override
   void dispose() {
+    _persistDebounce?.cancel();
     _codeController.dispose();
     super.dispose();
   }
@@ -319,6 +336,7 @@ spl1 = spl1 + lp1 * amount;''',
                     onChanged: (val) {
                       setState(() => _sliderValues[i] = val);
                       cubit.setLiveProgSlider(i, val);
+                      _debouncedPersistSliders();
                     },
                     p: p,
                   ),

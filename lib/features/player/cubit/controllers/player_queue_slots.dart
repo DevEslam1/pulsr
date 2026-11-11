@@ -1,30 +1,13 @@
 // lib/features/player/cubit/controllers/player_queue_slots.dart
 part of 'player_queue_controller.dart';
 
-/// Upper bound on the slot lookup cache. Three slots of
-/// [PlayerQueueController.maxQueueSize] plus reconciled replacements fit
-/// comfortably; the cap only guards against unbounded growth from long
-/// sessions, evicting the least-recently-written songs first.
-const int _maxSlotLookupCacheEntries = 4096;
-
 /// Caches [songs] for slot hydration, marking each as the most recently written
 /// entry (LRU-ish) and evicting the oldest beyond [_maxSlotLookupCacheEntries].
 void _cacheSlotSongs(
   Map<int, SongsTableData> cache,
   List<SongsTableData> songs,
-) {
-  for (final s in songs) {
-    cache.remove(s.id);
-    cache[s.id] = s;
-  }
-  final excess = cache.length - _maxSlotLookupCacheEntries;
-  if (excess > 0) {
-    final oldest = cache.keys.take(excess).toList(growable: false);
-    for (final key in oldest) {
-      cache.remove(key);
-    }
-  }
-}
+) =>
+    cacheSlotSongs(cache, songs);
 
 extension PlayerQueueSlotsExtension on PlayerQueueController {
   void debouncedPersistQueueSlots() {
@@ -50,6 +33,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           currentIndex: liveState.currentIndex,
           position: liveState.position,
           speed: liveState.playbackSpeed,
+          trackTiers: liveState.trackTiers,
         );
       }
       final prefs = await SharedPreferences.getInstance();
@@ -61,6 +45,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
               currentIndex: entry.value.currentIndex,
               position: entry.value.position,
               speed: entry.value.speed,
+              trackTiers: entry.value.trackTiers,
             ),
         },
         _getState().activeQueueSlot,
@@ -130,6 +115,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
             currentIndex: restoredIndex,
             position: QueueSlotCodec.clampPosition(decoded.positionMs),
             speed: QueueSlotCodec.clampSpeed(decoded.speed),
+            trackTiers: decoded.trackTiers,
           );
         } catch (e, st) {
           ErrorLogger.log('Failed to restore queue slot $slotIndex',
@@ -167,6 +153,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
                   activeQueueSlot: restoredSlot,
                   queue: List<SongsTableData>.unmodifiable(validSongs),
                   currentIndex: safeIdx,
+                  trackTiers: slotData.trackTiers,
                 ),
                 playback: s.playback.copyWith(
                   currentSong: song,
@@ -543,13 +530,15 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         currentIndex: state.currentIndex,
         position: state.position,
         speed: state.playbackSpeed,
+        trackTiers: state.trackTiers,
       );
       final targetSlot = _queueSlots[slot] ??
           const QueueSlotData(
               songIds: [],
               currentIndex: 0,
               position: Duration.zero,
-              speed: 1.0);
+              speed: 1.0,
+              trackTiers: {});
       final targetSongs = targetSlot.songsFrom(_slotLookupCache);
       final targetOriginalSong = (targetSlot.currentIndex >= 0 &&
               targetSlot.currentIndex < targetSongs.length)
@@ -583,6 +572,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           activeQueueSlot: slot,
           queue: List<SongsTableData>.unmodifiable(validSongs),
           currentIndex: safeIdx,
+          trackTiers: targetSlot.trackTiers,
         ),
         playback: state.playback.copyWith(
           currentSong: song,
@@ -666,7 +656,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         shouldProceed = false;
         return;
       }
-      _slotLookupCache[safeNewSong.id] = safeNewSong;
+      _cacheSlotSongs(_slotLookupCache, [safeNewSong]);
       _slotLookupCache.remove(oldId);
       _queueSlots.updateAll((slot, data) {
         if (!data.songIds.contains(oldId)) return data;
@@ -749,6 +739,14 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _emit(s.copyWith(
         queueSlice: s.queueSlice.copyWith(trackTiers: updatedTiers),
       ));
+      return;
+    }
+
+    final isCurrent = (state.currentSong != null && _isSameTrack(state.currentSong, song)) ||
+        (state.currentIndex >= 0 &&
+            state.currentIndex < state.queue.length &&
+            _isSameTrack(state.queue[state.currentIndex], song));
+    if (isCurrent) {
       return;
     }
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {

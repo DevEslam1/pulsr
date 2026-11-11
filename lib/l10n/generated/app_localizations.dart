@@ -17166,6 +17166,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Source codec not confirmed'**
   String get bpSourceCodecUnconfirmed;
+
+  /// Hint displayed when boost is clamped by the headroom budget
+  ///
+  /// In en, this message translates to:
+  /// **'Limited for headroom'**
+  String get dspLimitedForHeadroom;
+
+  /// Notice when strict bit-perfect is refused and disabled due to output capability mismatch
+  ///
+  /// In en, this message translates to:
+  /// **'Strict bit-perfect disabled: output cannot carry {sampleRate} Hz / {bitDepth}-bit.'**
+  String strictBitPerfectRefusedNotice(int sampleRate, int bitDepth);
+
+  /// Notice when direct USB is suspended because follow-rate is off
+  ///
+  /// In en, this message translates to:
+  /// **'Direct USB suspended: track format requires follow-track sample rate.'**
+  String get directUsbFollowFormatSuspendedNotice;
+
+  /// Notice when direct USB is suspended because the DAC lacks the track sample rate
+  ///
+  /// In en, this message translates to:
+  /// **'Direct USB suspended: {sampleRate} Hz is not supported by the USB DAC.'**
+  String directUsbUnsupportedRateNotice(int sampleRate);
+
+  /// Notice that test sweep tone bypasses DSP pipeline
+  ///
+  /// In en, this message translates to:
+  /// **'Direct audition (bypasses DSP)'**
+  String get testToneBypassesDspNotice;
 }
 
 class _AppLocalizationsDelegate

@@ -5671,5 +5671,10 @@
   },
   "conflictSource32BitFloatNotBitPerfect": "يتطلب الصوت ذو الفاصلة العائمة 32 بت تحويلاً غير متطابق ولا يمكن تشغيله بدقة Bit-Perfect.",
   "bpSourceCodecUnconfirmed": "ترميز المصدر غير مؤكد",
-  "bpDigitalVolumeAttenuation": "مستوى الصوت الرقمي أقل من 100% — تتطلب الدقة البتية الكاملة وحدة الكسب"
+  "bpDigitalVolumeAttenuation": "مستوى الصوت الرقمي أقل من 100% — تتطلب الدقة البتية الكاملة وحدة الكسب",
+  "dspLimitedForHeadroom": "تم الحد للحفاظ على المدى الديناميكي",
+  "strictBitPerfectRefusedNotice": "تم تعطيل Bit-Perfect الصارم: المخرج لا يدعم {sampleRate} هرتز / {bitDepth} بت.",
+  "directUsbFollowFormatSuspendedNotice": "تم تعليق USB المباشر: صيغة المسار تتطلب تتبع معدل العينات.",
+  "directUsbUnsupportedRateNotice": "تم تعليق USB المباشر: {sampleRate} هرتز غير مدعوم بواسطة محول USB DAC.",
+  "testToneBypassesDspNotice": "معاينة مباشرة (تتجاوز معالجة DSP)"
 }
