@@ -314,18 +314,30 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                             minWidth: AppSpacing.minTouchTarget,
                             minHeight: AppSpacing.minTouchTarget),
                         tooltip: context.l10n.dspCopyJsonReport,
-                        icon:
-                            Icon(Icons.copy_rounded, color: p.accent, size: 20),
-                        onPressed: () => _copyReportToClipboard(context),
+                        icon: Icon(
+                          Icons.copy_rounded,
+                          color: _report == null
+                              ? p.textSecondary.withValues(alpha: 0.38)
+                              : p.accent,
+                          size: 20,
+                        ),
+                        onPressed: _report == null
+                            ? null
+                            : () => _copyReportToClipboard(context),
                       ),
                       IconButton(
                         constraints: const BoxConstraints(
                             minWidth: AppSpacing.minTouchTarget,
                             minHeight: AppSpacing.minTouchTarget),
                         tooltip: context.l10n.share,
-                        icon: Icon(Icons.share_rounded,
-                            color: p.accent, size: 20),
-                        onPressed: () => _shareReport(),
+                        icon: Icon(
+                          Icons.share_rounded,
+                          color: _report == null
+                              ? p.textSecondary.withValues(alpha: 0.38)
+                              : p.accent,
+                          size: 20,
+                        ),
+                        onPressed: _report == null ? null : () => _shareReport(),
                       ),
                       IconButton(
                         constraints: const BoxConstraints(

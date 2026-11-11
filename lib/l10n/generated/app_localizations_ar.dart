@@ -9656,4 +9656,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get testToneBypassesDspNotice => 'معاينة مباشرة (تتجاوز معالجة DSP)';
+
+  @override
+  String get simulatedPitchBadge => 'محاكاة';
 }

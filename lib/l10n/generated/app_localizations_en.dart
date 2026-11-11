@@ -9717,4 +9717,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get testToneBypassesDspNotice => 'Direct audition (bypasses DSP)';
+
+  @override
+  String get simulatedPitchBadge => 'SIM';
 }

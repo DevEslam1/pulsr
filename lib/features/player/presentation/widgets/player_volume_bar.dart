@@ -7,7 +7,6 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
-import '../../../../data/audio/audio_handler.dart';
 import '../../cubit/player_cubit.dart';
 
 class PlayerVolumeBar extends StatefulWidget {
@@ -31,8 +30,13 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final handler = context.watch<PulsrAudioHandler?>();
-    final currentVolume = handler?.volume.clamp(0.0, 1.0) ?? 0.5;
+    final currentVolume = () {
+      try {
+        return context.select<PlayerCubit, double>((c) => c.state.volume).clamp(0.0, 1.0);
+      } catch (_) {
+        return widget.cubit.state.volume.clamp(0.0, 1.0);
+      }
+    }();
     final effectiveVolume = _dragVolume ?? currentVolume;
     final isMuted = effectiveVolume <= 0.01;
 

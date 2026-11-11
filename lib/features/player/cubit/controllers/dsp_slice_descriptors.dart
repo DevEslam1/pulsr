@@ -65,7 +65,11 @@ class DspField<T> implements DspFieldDescriptor {
   @override
   DspSlice syncFromHandler(DspSlice target, PulsrAudioHandler handler) {
     if (getHandler == null) return target;
-    return withValue(target, getHandler!(handler));
+    try {
+      return withValue(target, getHandler!(handler));
+    } catch (_) {
+      return target;
+    }
   }
 }
 

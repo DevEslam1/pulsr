@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/app_config.dart';
 import '../../core/constants/channels.dart';
@@ -635,6 +636,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// the visualizer attach to this real session instead of the global mix.
   int? get currentAudioSessionId => _currentAudioSessionId;
   Stream<int?> get audioSessionIdStream => _audioSessionIdSubject.stream;
+
+  final BehaviorSubject<double> _volumeSubject =
+      BehaviorSubject<double>.seeded(1.0);
+
+  /// Reactive master volume stream reflecting software volume and hardware key updates.
+  Stream<double> get volumeStream => _volumeSubject.stream;
   @override
   SongsTableData? get currentSong => _queueStateMachine.currentSong;
 
@@ -1491,6 +1498,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> setVolume(double volume) async {
     // NaN.clamp() returns NaN, which would poison every composed gain after it.
     _volume = volume.isFinite ? volume.clamp(0.0, 1.0) : _volume;
+    if (!_volumeSubject.isClosed) {
+      _volumeSubject.add(_volume);
+    }
     if (!_effectsReadyCompleter.isCompleted) {
       await _effectsReadyCompleter.future;
     }
@@ -2783,7 +2793,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     _subscriptions.add(
       AudioEffectsChannel().onSystemVolumeChanged.listen((ratio) {
         if (ratio.isFinite && ratio >= 0.0) {
-          _lastSystemVolumeRatio = ratio.clamp(0.0, 1.0);
+          final clamped = ratio.clamp(0.0, 1.0);
+          _lastSystemVolumeRatio = clamped;
+          _volume = clamped;
+          if (!_volumeSubject.isClosed) {
+            _volumeSubject.add(_volume);
+          }
         }
         if (_equalizerManager.isLoudnessContourEnabled) {
           unawaited(_feedLoudnessContourVolume());
@@ -3322,6 +3337,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (!_audioSessionIdSubject.isClosed) _audioSessionIdSubject.close();
     if (!_errorSubject.isClosed) _errorSubject.close();
     if (!_onTrackChangedSubject.isClosed) _onTrackChangedSubject.close();
+    if (!_volumeSubject.isClosed) _volumeSubject.close();
     try {
       _equalizerManager.dispose();
     } catch (_) {}

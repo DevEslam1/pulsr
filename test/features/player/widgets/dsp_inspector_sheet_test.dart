@@ -269,5 +269,40 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
     });
+
+    testWidgets('copy and share buttons are disabled when report is null',
+        (tester) async {
+      mockChannel(status: null);
+      final player = stubPlayerCubit(state: attachedState());
+      final settings = stubSettingsCubit();
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: player,
+        settingsCubit: settings,
+        child: const DspInspectorSheet(),
+      ));
+      // First frame before async status loads
+      await tester.pump();
+
+      final copyButton = tester.widget<IconButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.copy_rounded),
+          matching: find.byType(IconButton),
+        ),
+      );
+      final shareButton = tester.widget<IconButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.share_rounded),
+          matching: find.byType(IconButton),
+        ),
+      );
+
+      expect(copyButton.onPressed, isNull);
+      expect(shareButton.onPressed, isNull);
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
   });
 }

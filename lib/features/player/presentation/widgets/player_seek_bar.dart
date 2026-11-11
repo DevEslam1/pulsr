@@ -474,6 +474,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     alignment: Alignment.center,
                     children: [
                       Semantics(
+                        slider: true,
                         // The child PulsrSlider publishes its own slider node
                         // with a percentage value; without this exclusion the
                         // same control appeared twice (time and percent) and

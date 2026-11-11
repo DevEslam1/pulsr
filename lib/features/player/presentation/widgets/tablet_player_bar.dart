@@ -9,7 +9,6 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
-import '../../../../data/audio/audio_handler.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
@@ -156,11 +155,6 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
 
               final cubit = context.read<PlayerCubit>();
               final activeColor = p.accent;
-              // A-3: the handler owns the master volume (no PlayerState.volume by
-              // design). Read it as the single source of truth, keeping the local
-              // drag override only while the user is scrubbing.
-              final handlerVolume =
-                  context.read<PulsrAudioHandler>().volume.clamp(0.0, 1.0);
               final l10n = context.l10n;
 
               return LayoutBuilder(
@@ -1013,17 +1007,23 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                   children: [
                                                     if (!isShortHeight) ...[
                                                       // Volume Mute / Slider
-                                                      ValueListenableBuilder<
-                                                          double?>(
-                                                        valueListenable:
-                                                            _dragVolumeNotifier,
+                                                      BlocSelector<PlayerCubit,
+                                                          PlayerState, double>(
+                                                        selector: (s) =>
+                                                            s.volume,
                                                         builder: (context,
-                                                            dragVolume, _) {
-                                                          final effectiveVolume =
-                                                              (dragVolume ??
-                                                                      handlerVolume)
-                                                                  .clamp(
-                                                                      0.0, 1.0);
+                                                            cubitVolume) {
+                                                          return ValueListenableBuilder<
+                                                              double?>(
+                                                            valueListenable:
+                                                                _dragVolumeNotifier,
+                                                            builder: (context,
+                                                                dragVolume, _) {
+                                                              final effectiveVolume =
+                                                                  (dragVolume ??
+                                                                          cubitVolume)
+                                                                      .clamp(
+                                                                          0.0, 1.0);
                                                           final isMuted = cubit
                                                                   .isMuted ||
                                                               effectiveVolume <=
@@ -1110,6 +1110,8 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                 ),
                                                               ),
                                                             ],
+                                                          );
+                                                        },
                                                           );
                                                         },
                                                       ),

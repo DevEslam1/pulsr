@@ -9803,4 +9803,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get testToneBypassesDspNotice => 'Audición directa (omite DSP)';
+
+  @override
+  String get simulatedPitchBadge => 'SIM';
 }

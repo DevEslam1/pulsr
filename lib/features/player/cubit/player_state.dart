@@ -76,6 +76,7 @@ abstract class PlaybackSlice with _$PlaybackSlice {
     String? currentSongEqOverride,
     @Default(0.0) double currentSongVolumeOverrideDb,
     @Default(false) bool isMuted,
+    @Default(1.0) double volume,
   }) = _PlaybackSlice;
 
   /// True when every field other than [position] is equal to [other]'s.
@@ -107,7 +108,8 @@ abstract class PlaybackSlice with _$PlaybackSlice {
         currentSongRating != other.currentSongRating ||
         currentSongEqOverride != other.currentSongEqOverride ||
         currentSongVolumeOverrideDb != other.currentSongVolumeOverrideDb ||
-        isMuted != other.isMuted;
+        isMuted != other.isMuted ||
+        volume != other.volume;
   }
 }
 
@@ -350,6 +352,7 @@ abstract class PlayerState with _$PlayerState {
   double get currentSongVolumeOverrideDb =>
       playback.currentSongVolumeOverrideDb;
   bool get isMuted => playback.isMuted;
+  double get volume => playback.volume;
 
   // ──────────────────────────────────────────────
   // Forwarded Queue Getters

@@ -381,5 +381,17 @@ void main() {
       expect(find.byType(QuranModeSheet), findsOneWidget);
       expect(find.byType(QuranModePanel), findsOneWidget);
     });
+
+    testWidgets('shows custom speed chip when playback speed is outside {0.5, 0.75, 1.0}',
+        (tester) async {
+      final cubit = quranCubit(quranState(enabled: true, speed: 0.85));
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const SingleChildScrollView(child: QuranModePanel()),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('0.85x'), findsOneWidget);
+    });
   });
 }

@@ -38,7 +38,7 @@ class PlaybackVolumeMute {
       _muted = clamped <= 0.001;
       final s = _getState();
       _emit(s.copyWith(
-          playback: s.playback.copyWith(isMuted: _muted)));
+          playback: s.playback.copyWith(volume: clamped, isMuted: _muted)));
     } catch (e, st) {
       ErrorLogger.log('Set volume failed',
           error: e,
@@ -59,7 +59,7 @@ class PlaybackVolumeMute {
       _muted = target <= 0.001;
       final s = _getState();
       _emit(s.copyWith(
-          playback: s.playback.copyWith(isMuted: _muted)));
+          playback: s.playback.copyWith(volume: target, isMuted: _muted)));
     } catch (e, st) {
       ErrorLogger.log('Adjust volume failed',
           error: e,
@@ -79,15 +79,18 @@ class PlaybackVolumeMute {
         final targetVol = _volumeBeforeMute > 0.0 ? _volumeBeforeMute : 1.0;
         await _audioHandler.setVolume(targetVol);
         _muted = false;
+        final s = _getState();
+        _emit(s.copyWith(
+            playback: s.playback.copyWith(volume: targetVol, isMuted: false)));
       } else {
         final currentVol = _audioHandler.volume;
         _remember(currentVol);
         await _audioHandler.setVolume(0.0);
         _muted = true;
+        final s = _getState();
+        _emit(s.copyWith(
+            playback: s.playback.copyWith(volume: 0.0, isMuted: true)));
       }
-      final s = _getState();
-      _emit(s.copyWith(
-          playback: s.playback.copyWith(isMuted: _muted)));
     } catch (e, st) {
       ErrorLogger.log('Toggle mute failed',
           error: e,

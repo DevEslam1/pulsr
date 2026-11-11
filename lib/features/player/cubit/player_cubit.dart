@@ -1023,6 +1023,22 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       safeEmit(state.copyWith(
           playback: state.playback.copyWith(audioSessionId: id)));
     });
+
+    try {
+      autoSub(_audioHandler.volumeStream.distinct(), (vol) {
+        if ((state.volume - vol).abs() > 0.001) {
+          safeEmit(state.copyWith(
+            playback: state.playback.copyWith(
+              volume: vol,
+              isMuted: vol <= 0.001,
+            ),
+          ));
+        }
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Volume stream attachment failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   /// Whether a twice-failed track can be abandoned for the next queue item.

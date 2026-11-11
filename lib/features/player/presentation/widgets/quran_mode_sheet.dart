@@ -446,33 +446,52 @@ class _QuranModePanelState extends State<QuranModePanel> {
               ),
             ),
             const SizedBox(height: AppSpacing.xs),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
-              child: SegmentedButton<double>(
-                segments: const [
-                  ButtonSegment(value: 0.5, label: Text('0.5x')),
-                  ButtonSegment(value: 0.75, label: Text('0.75x')),
-                  ButtonSegment(value: 1.0, label: Text('1.0x')),
-                ],
-                selected: {
-                  [0.5, 0.75, 1.0].reduce((a, b) =>
-                      (a - state.playbackSpeed).abs() <
-                              (b - state.playbackSpeed).abs()
-                          ? a
-                          : b)
-                },
-                onSelectionChanged: enabled
-                    ? (v) => unawaited(
-                          _runQuranAction(
-                            cubit.setQuranPlaybackSpeed(v.first),
-                          ),
-                        )
-                    : null,
-                style: ButtonStyle(
-                  foregroundColor: WidgetStatePropertyAll(p.textPrimary),
-                  side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
-                ),
-              ),
+            Builder(
+              builder: (context) {
+                final isStandardSpeed = [0.5, 0.75, 1.0].any(
+                  (s) => (s - state.playbackSpeed).abs() < 0.01,
+                );
+                final speedSegments = <ButtonSegment<double>>[
+                  const ButtonSegment(value: 0.5, label: Text('0.5x')),
+                  const ButtonSegment(value: 0.75, label: Text('0.75x')),
+                  const ButtonSegment(value: 1.0, label: Text('1.0x')),
+                  if (!isStandardSpeed)
+                    ButtonSegment(
+                      value: state.playbackSpeed,
+                      label: Text(
+                        '${state.playbackSpeed.toStringAsFixed(2).replaceAll(RegExp(r"\.?0+$"), "")}x',
+                      ),
+                    ),
+                ];
+                final selectedSpeed = isStandardSpeed
+                    ? [0.5, 0.75, 1.0].reduce((a, b) =>
+                        (a - state.playbackSpeed).abs() <
+                                (b - state.playbackSpeed).abs()
+                            ? a
+                            : b)
+                    : state.playbackSpeed;
+
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+                  child: SegmentedButton<double>(
+                    segments: speedSegments,
+                    selected: {selectedSpeed},
+                    onSelectionChanged: enabled
+                        ? (v) => unawaited(
+                              _runQuranAction(
+                                cubit.setQuranPlaybackSpeed(v.first),
+                              ),
+                            )
+                        : null,
+                    style: ButtonStyle(
+                      foregroundColor: WidgetStatePropertyAll(p.textPrimary),
+                      side:
+                          WidgetStatePropertyAll(BorderSide(color: p.hairline)),
+                    ),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.s18),
 

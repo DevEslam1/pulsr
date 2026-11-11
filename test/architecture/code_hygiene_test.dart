@@ -211,5 +211,30 @@ void main() {
       expect(slot.currentIndex, equals(1));
       expect(slot.position, equals(const Duration(seconds: 45)));
     });
+
+    test('lib/ contains zero watch<PlayerCubit> calls (rebuild prevention)', () {
+      final watchPlayer = RegExp(r'\bwatch<PlayerCubit\b');
+      final offenders = <String>[];
+
+      for (final file in dartFilesUnderLib()) {
+        final lines = file.readAsLinesSync();
+        for (var i = 0; i < lines.length; i++) {
+          final line = lines[i];
+          final trimmed = line.trimLeft();
+          if (trimmed.startsWith('//')) continue;
+          if (watchPlayer.hasMatch(line)) {
+            offenders.add('${file.path}:${i + 1}: $trimmed');
+          }
+        }
+      }
+
+      expect(
+        offenders,
+        isEmpty,
+        reason: 'Components must use context.select<PlayerCubit, T>() rather '
+            'than watching PlayerCubit directly, which causes rebuild storms on position ticks.\n'
+            '${offenders.join('\n')}',
+      );
+    });
   });
 }

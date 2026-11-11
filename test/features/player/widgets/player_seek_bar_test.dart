@@ -314,4 +314,22 @@ void main() {
     // 75s formatted into the timestamp row.
     expect(find.textContaining('1:15'), findsOneWidget);
   });
+
+  testWidgets('standard seek bar provides Semantics with slider: true',
+      (tester) async {
+    await tester.pumpWidget(host(
+      playerState: stateWith(currentId: 1),
+      settingsState: const SettingsState(waveformSeekBarEnabled: false),
+      position: const Duration(seconds: 30),
+    ));
+    await tester.pump();
+
+    final semanticsFinder = find.byWidgetPredicate(
+      (w) =>
+          w is Semantics &&
+          w.properties.slider == true &&
+          w.excludeSemantics == true,
+    );
+    expect(semanticsFinder, findsOneWidget);
+  });
 }

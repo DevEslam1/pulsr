@@ -1,3 +1,4 @@
+import '../../../../core/utils/l10n_extensions.dart';
 // lib/features/player/presentation/widgets/karaoke_pitch_highway.dart
 import 'dart:io';
 import 'dart:math' as math;
@@ -248,6 +249,36 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
               ),
             ),
           ),
+          // Simulated Pitch Indicator Badge ("SIM")
+          if (widget.audioBuffer == null || widget.audioBuffer!.isEmpty)
+            PositionedDirectional(
+              top: AppSpacing.xxs,
+              start: AppSpacing.xs,
+              child: Container(
+                key: const ValueKey('simulated_pitch_badge'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 5,
+                  vertical: 2,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.18),
+                  borderRadius: AppRadii.r4All,
+                  border: Border.all(
+                    color: Colors.amber.withValues(alpha: 0.45),
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  context.l10n.simulatedPitchBadge,
+                  style: const TextStyle(
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.8,
+                    color: Colors.amber,
+                  ),
+                ),
+              ),
+            ),
           // Pitch & Note Readout Chip
           if (_lastSmoothed.isVoiced)
             PositionedDirectional(

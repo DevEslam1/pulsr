@@ -5676,5 +5676,6 @@
   "strictBitPerfectRefusedNotice": "Strict Bit-Perfect desactivado: la salida no soporta {sampleRate} Hz / {bitDepth} bits.",
   "directUsbFollowFormatSuspendedNotice": "USB directo suspendido: el formato de pista requiere seguir la frecuencia de muestreo.",
   "directUsbUnsupportedRateNotice": "USB directo suspendido: {sampleRate} Hz no es compatible con el DAC USB.",
-  "testToneBypassesDspNotice": "Audición directa (omite DSP)"
+  "testToneBypassesDspNotice": "Audición directa (omite DSP)",
+  "simulatedPitchBadge": "SIM"
 }

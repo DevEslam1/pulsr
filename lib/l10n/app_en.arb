@@ -7410,5 +7410,9 @@
   "testToneBypassesDspNotice": "Direct audition (bypasses DSP)",
   "@testToneBypassesDspNotice": {
     "description": "Notice that test sweep tone bypasses DSP pipeline"
+  },
+  "simulatedPitchBadge": "SIM",
+  "@simulatedPitchBadge": {
+    "description": "Badge label indicating simulated vocal pitch tracking"
   }
 }

@@ -5676,5 +5676,6 @@
   "strictBitPerfectRefusedNotice": "تم تعطيل Bit-Perfect الصارم: المخرج لا يدعم {sampleRate} هرتز / {bitDepth} بت.",
   "directUsbFollowFormatSuspendedNotice": "تم تعليق USB المباشر: صيغة المسار تتطلب تتبع معدل العينات.",
   "directUsbUnsupportedRateNotice": "تم تعليق USB المباشر: {sampleRate} هرتز غير مدعوم بواسطة محول USB DAC.",
-  "testToneBypassesDspNotice": "معاينة مباشرة (تتجاوز معالجة DSP)"
+  "testToneBypassesDspNotice": "معاينة مباشرة (تتجاوز معالجة DSP)",
+  "simulatedPitchBadge": "محاكاة"
 }

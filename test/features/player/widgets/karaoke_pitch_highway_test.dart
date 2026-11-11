@@ -80,4 +80,23 @@ void main() {
 
     expect(find.byType(KaraokePitchHighway), findsOneWidget);
   });
+
+  testWidgets('displays SIM badge when using simulated pitch (audioBuffer null/empty)',
+      (tester) async {
+    // When audioBuffer is null, simulated pitch is active -> "SIM" badge visible
+    await tester.pumpWidget(buildHighway(isPlaying: true, audioBuffer: null));
+    await tester.pumpAndSettle();
+    expect(find.text('SIM'), findsOneWidget);
+
+    // When audioBuffer is empty list -> "SIM" badge visible
+    await tester.pumpWidget(buildHighway(isPlaying: true, audioBuffer: []));
+    await tester.pumpAndSettle();
+    expect(find.text('SIM'), findsOneWidget);
+
+    // When real audioBuffer is provided -> "SIM" badge hidden
+    final buffer = List<double>.generate(1024, (i) => 0.5 * (i % 32 < 16 ? 1.0 : -1.0));
+    await tester.pumpWidget(buildHighway(isPlaying: true, audioBuffer: buffer));
+    await tester.pumpAndSettle();
+    expect(find.text('SIM'), findsNothing);
+  });
 }

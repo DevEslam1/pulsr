@@ -17196,6 +17196,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Direct audition (bypasses DSP)'**
   String get testToneBypassesDspNotice;
+
+  /// Badge label indicating simulated vocal pitch tracking
+  ///
+  /// In en, this message translates to:
+  /// **'SIM'**
+  String get simulatedPitchBadge;
 }
 
 class _AppLocalizationsDelegate
