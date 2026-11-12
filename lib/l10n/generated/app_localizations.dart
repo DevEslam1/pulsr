@@ -8735,6 +8735,18 @@ abstract class AppLocalizations {
   /// **'Snap animations instead of tweening them'**
   String get settingsReduceMotionSubtitle;
 
+  /// No description provided for @settingsHapticsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Haptic Feedback'**
+  String get settingsHapticsTitle;
+
+  /// No description provided for @settingsHapticsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vibrate on touch and gestures across the app'**
+  String get settingsHapticsSubtitle;
+
   /// No description provided for @settingsLiquidGlassTitle.
   ///
   /// In en, this message translates to:
@@ -13433,16 +13445,16 @@ abstract class AppLocalizations {
   /// **'Downloads match stream'**
   String get downloadsMatchStream;
 
-  /// No description provided for @sleepTimerEndOfQueue.
+  /// Tooltip when sleep timer is set to end of queue
   ///
   /// In en, this message translates to:
   /// **'Sleep Timer: End of Queue'**
   String get sleepTimerEndOfQueue;
 
-  /// No description provided for @sleepTimerTracksRemaining.
+  /// Tooltip showing tracks remaining until sleep timer stops playback
   ///
   /// In en, this message translates to:
-  /// **'Sleep Timer: {count} tracks remaining'**
+  /// **'{count, plural, =1{Sleep Timer: 1 track remaining} other{Sleep Timer: {count} tracks remaining}}'**
   String sleepTimerTracksRemaining(int count);
 
   /// No description provided for @sleepTimerMinutesRemaining.
@@ -17202,6 +17214,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'SIM'**
   String get simulatedPitchBadge;
+
+  /// Automatic audio bit-depth option
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get audioQualityAuto;
+
+  /// Subtitle for automatic bit-depth managed by Android
+  ///
+  /// In en, this message translates to:
+  /// **'System managed'**
+  String get audioQualitySystemManaged;
+
+  /// LDAC adaptive quality mode
+  ///
+  /// In en, this message translates to:
+  /// **'Best Effort'**
+  String get audioQualityBestEffort;
+
+  /// LDAC adaptive bitrate label
+  ///
+  /// In en, this message translates to:
+  /// **'Auto kbps'**
+  String get audioQualityAutoKbps;
+
+  /// LDAC 330 kbps mobile connection mode
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get audioQualityMobile;
+
+  /// Standard audio quality mode
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get audioQualityStandard;
+
+  /// LDAC 990 kbps maximum quality mode
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum'**
+  String get audioQualityMaximum;
+
+  /// Fallback label for a connected USB DAC
+  ///
+  /// In en, this message translates to:
+  /// **'USB Hi-Res DAC'**
+  String get outputDeviceUsbHiResDac;
+
+  /// Fallback label for the device's internal DAC
+  ///
+  /// In en, this message translates to:
+  /// **'Internal DAC'**
+  String get outputDeviceInternalDac;
+
+  /// Tooltip showing formatted time remaining on sleep timer
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep Timer: {remaining} remaining'**
+  String sleepTimerTimeRemaining(String remaining);
+
+  /// Tooltip for download action button
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get downloadLabel;
+
+  /// Lossless audio quality badge label
+  ///
+  /// In en, this message translates to:
+  /// **'Lossless'**
+  String get badgeLossless;
+
+  /// Hi-Res Lossless audio quality badge label
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-Res Lossless'**
+  String get badgeHiResLossless;
+
+  /// Button label to stop test tone sweep
+  ///
+  /// In en, this message translates to:
+  /// **'Stop Sweep'**
+  String get viperStopSweep;
+
+  /// Button label to play 1kHz + frequency sweep test tone
+  ///
+  /// In en, this message translates to:
+  /// **'Test Tone (1k+Sweep)'**
+  String get viperTestTone;
+
+  /// Snackbar text when ViPER-DDC A/B bypass is active
+  ///
+  /// In en, this message translates to:
+  /// **'A/B: Bypassed (level matched {gainDb} dB)'**
+  String viperAbBypassed(String gainDb);
+
+  /// Snackbar text when ViPER-DDC A/B is active
+  ///
+  /// In en, this message translates to:
+  /// **'A/B: ViPER-DDC Active'**
+  String get viperAbActive;
+
+  /// Short button label when ViPER-DDC A/B is bypassed
+  ///
+  /// In en, this message translates to:
+  /// **'Bypassed (Matched)'**
+  String get viperAbBypassedShort;
+
+  /// Button label to toggle ViPER-DDC A/B comparison
+  ///
+  /// In en, this message translates to:
+  /// **'A/B Compare'**
+  String get viperAbCompare;
+
+  /// Prefix showing formatted loop point A timestamp
+  ///
+  /// In en, this message translates to:
+  /// **'Point A: {time}'**
+  String loopPointALabel(String time);
+
+  /// Prefix showing formatted loop point B timestamp
+  ///
+  /// In en, this message translates to:
+  /// **'Point B: {time}'**
+  String loopPointBLabel(String time);
+
+  /// Active ambient sound effects count
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 effect} other{{count} effects}}'**
+  String dspEffectsCount(int count);
+
+  /// Suffix shown when ambient effects are paused
+  ///
+  /// In en, this message translates to:
+  /// **'(Paused)'**
+  String get dspEffectsPausedSuffix;
+
+  /// Tooltip when Auto Preamp clipping protection is disabled
+  ///
+  /// In en, this message translates to:
+  /// **'Auto Preamp: Off (Tap to protect against clipping)'**
+  String get autoPreampOffHint;
+
+  /// Subtitle showing AutoEQ suggested preamp gain when manually overridden
+  ///
+  /// In en, this message translates to:
+  /// **'Manual override (AutoEQ suggests {gainDb} dB)'**
+  String autoPreampManualOverride(String gainDb);
+
+  /// Subtitle explaining preamp output gain
+  ///
+  /// In en, this message translates to:
+  /// **'Output gain applied before the EQ'**
+  String get preampOutputGainHint;
+
+  /// One-time gesture hint for tablet split-view inspector
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the inspector button on the player bar to open split-view queue & lyrics'**
+  String get tabletSplitViewHint;
+
+  /// Tooltip to set A-B loop start point
+  ///
+  /// In en, this message translates to:
+  /// **'Set loop point A'**
+  String get setLoopPointAHint;
+
+  /// Tooltip to set A-B loop end point
+  ///
+  /// In en, this message translates to:
+  /// **'Set loop point B'**
+  String get setLoopPointBHint;
 }
 
 class _AppLocalizationsDelegate

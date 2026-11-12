@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -20,6 +19,7 @@ import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Data descriptor for a Quran radio station presented in the hero card carousel.
 class QuranHeroItem {
   final RadioStation station;
@@ -326,7 +326,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
 
   void _onPlayStation(QuranHeroItem item, bool isCurrent) {
     final playerCubit = _resolvePlayerCubit(context);
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     if (isCurrent) {
       playerCubit.togglePlayPause();
     } else {
@@ -357,7 +357,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
             itemCount: total,
             onPageChanged: (index) {
               if (index != _currentPage) {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 setState(() => _currentPage = index);
               }
             },
@@ -420,7 +420,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   final isActive = i == _currentPage;
                   return GestureDetector(
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       final dur = context.motion(PulsrMotion.page);
                       if (dur == Duration.zero) {
                         _pageController.jumpToPage(i);
@@ -480,7 +480,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                         borderRadius: radius,
                         onTap: widget.onMoreStations ??
                             () {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               context.push('/radio');
                             },
                         child: Container(
@@ -710,7 +710,7 @@ class _QuranHeroCard extends StatelessWidget {
               borderRadius: AppRadii.r24All,
               onTap: onTap,
               onLongPress: () {
-                HapticFeedback.heavyImpact();
+                PulsrHaptics.heavyImpact();
                 _showHideOptionSheet(context);
               },
               child: Container(

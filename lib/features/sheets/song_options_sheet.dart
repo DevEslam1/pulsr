@@ -33,6 +33,7 @@ import '../ytm_search/cubit/ytm_download_cubit.dart';
 import 'add_to_playlist_sheet.dart';
 import 'song_info_sheet.dart';
 
+import '../../core/utils/pulsr_haptics.dart';
 /// Modern track options bottom sheet.
 ///
 /// Features:
@@ -701,7 +702,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              HapticFeedback.lightImpact();
+              PulsrHaptics.lightImpact();
               onTap();
             },
             borderRadius: AppRadii.r16All,
@@ -774,7 +775,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
       label: title,
       child: InkWell(
         onTap: () {
-          HapticFeedback.lightImpact();
+          PulsrHaptics.lightImpact();
           Navigator.of(context).pop();
           onTap();
         },

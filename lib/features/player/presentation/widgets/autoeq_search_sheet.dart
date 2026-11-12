@@ -11,8 +11,8 @@ import '../../cubit/player_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:flutter/services.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// AutoEQ profile browser backed by the bundled real-AutoEQ dataset
 /// (`headphone_profiles.json`). Profiles carry genuine parametric filters
 /// (freq/Q/gain/type) that drive the native 64-band parametric EQ, so the
@@ -181,7 +181,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                     side: BorderSide(color: p.hairline),
                     showCheckmark: false,
                     onSelected: (_) {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       setState(() {
                         _category = cat;
                         _applyFilter();

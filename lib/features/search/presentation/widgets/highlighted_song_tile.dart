@@ -1,6 +1,5 @@
 // lib/features/search/presentation/widgets/highlighted_song_tile.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
@@ -17,6 +16,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Search result row that highlights every occurrence of the active [query]
 /// in the title and subtitle. Mirrors the standard song row layout (artwork,
 /// title, subtitle, duration, trailing actions) with audiophile active-state
@@ -105,12 +105,12 @@ class HighlightedSongTile extends StatelessWidget {
                 child: InkWell(
                   borderRadius: AppRadii.r16All,
                   onTap: () {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     onTap();
                   },
                   onLongPress: effectiveLongPress != null
                       ? () {
-                          HapticFeedback.mediumImpact();
+                          PulsrHaptics.mediumImpact();
                           effectiveLongPress();
                         }
                       : null,

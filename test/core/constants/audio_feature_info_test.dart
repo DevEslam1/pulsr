@@ -892,5 +892,107 @@ void main() {
         isNot(contains('Clipping risk')),
       );
     });
+
+    group('classifySourceCodec & classifySourceSampleFormat regression suite',
+        () {
+      test('content:// URIs bypass extension matching', () {
+        // Raw content URI without codec or mime is unknown
+        expect(
+          AudioConflicts.classifySourceCodec(
+              path: 'content://media/external/audio/media/12345'),
+          AudioSourceCodecState.unknown,
+        );
+        // Even if a content URI ends with an extension-like token, content scheme skips extension matching
+        expect(
+          AudioConflicts.classifySourceCodec(
+              path: 'content://media/external/audio/media/12345.mp3'),
+          AudioSourceCodecState.unknown,
+        );
+        // Content URI with explicit lossless codec
+        expect(
+          AudioConflicts.classifySourceCodec(
+            path: 'content://media/external/audio/media/12345',
+            codec: 'flac',
+          ),
+          AudioSourceCodecState.lossless,
+        );
+        // Content URI with explicit lossy codec
+        expect(
+          AudioConflicts.classifySourceCodec(
+            path: 'content://media/external/audio/media/12345',
+            codec: 'mp3',
+          ),
+          AudioSourceCodecState.lossy,
+        );
+      });
+
+      test('ambiguous containers (.m4a, .mka, .ogg, .webm) return unknown', () {
+        expect(
+          AudioConflicts.classifySourceCodec(path: '/storage/music/song.m4a'),
+          AudioSourceCodecState.unknown,
+        );
+        expect(
+          AudioConflicts.classifySourceCodec(path: '/storage/music/track.mka'),
+          AudioSourceCodecState.unknown,
+        );
+        expect(
+          AudioConflicts.classifySourceCodec(path: '/storage/music/audio.ogg'),
+          AudioSourceCodecState.unknown,
+        );
+        expect(
+          AudioConflicts.classifySourceCodec(path: '/storage/music/file.webm'),
+          AudioSourceCodecState.unknown,
+        );
+      });
+
+      test('pcm_alaw and pcm_mulaw are classified as lossy', () {
+        expect(
+          AudioConflicts.classifySourceCodec(codec: 'pcm_alaw'),
+          AudioSourceCodecState.lossy,
+        );
+        expect(
+          AudioConflicts.classifySourceCodec(codec: 'pcm_mulaw'),
+          AudioSourceCodecState.lossy,
+        );
+      });
+
+      test('32-bit float vs integer formats are truthfully distinguished', () {
+        // Float codecs
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'pcm_f32le'),
+          AudioSourceSampleFormat.float,
+        );
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'pcm_f32be'),
+          AudioSourceSampleFormat.float,
+        );
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'float'),
+          AudioSourceSampleFormat.float,
+        );
+
+        // Integer codecs
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'pcm_s32le'),
+          AudioSourceSampleFormat.integer,
+        );
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'pcm_s24le'),
+          AudioSourceSampleFormat.integer,
+        );
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'pcm_s16le'),
+          AudioSourceSampleFormat.integer,
+        );
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'flac'),
+          AudioSourceSampleFormat.integer,
+        );
+        expect(
+          AudioConflicts.classifySourceSampleFormat(codec: 'alac'),
+          AudioSourceSampleFormat.integer,
+        );
+      });
+    });
   });
 }

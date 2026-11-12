@@ -195,5 +195,67 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
     });
+
+    testWidgets(
+        'editing a line with word timestamps + translation preserves all rich fields on save',
+        (tester) async {
+      final cubit = stubPlayerCubit();
+      List<LyricsLine>? saved;
+
+      const richLine = LyricsLine(
+        timestamp: Duration(seconds: 4),
+        text: 'Original Text',
+        source: LyricsSource.lrclib,
+        words: [
+          WordTimestamp(word: 'Original', startMs: 4000, endMs: 4500),
+          WordTimestamp(word: 'Text', startMs: 4500, endMs: 5000),
+        ],
+        translation: 'Translated Text',
+        romanization: 'Romanized Text',
+        isVocal: true,
+        isBackground: false,
+        alignment: LyricAlignment.start,
+      );
+
+      await tester.pumpWidget(lyricsHost(
+        cubit: cubit,
+        sheetBuilder: (_) => LyricsEditorSheet(
+          song: testSong,
+          currentPosition: const Duration(seconds: 7),
+          initialLyrics: const [richLine],
+          onSave: (lines) => saved = lines,
+        ),
+      ));
+      await tester.pump();
+
+      // 1. Edit the text field
+      await tester.enterText(find.byType(TextFormField).first, 'Edited Text');
+      await tester.pump();
+
+      // 2. Adjust offset (+250ms)
+      tester
+          .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.add_rounded).last)
+          .onPressed!();
+      await tester.pump();
+
+      // 3. Save
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed!();
+      await tester.pumpAndSettle();
+
+      expect(saved, isNotNull);
+      expect(saved!.length, 1);
+      final line = saved!.first;
+      expect(line.text, 'Edited Text');
+      expect(line.timestamp, const Duration(milliseconds: 4250));
+      expect(line.source, LyricsSource.lrclib);
+      expect(line.translation, 'Translated Text');
+      expect(line.romanization, 'Romanized Text');
+      expect(line.words.length, 2);
+      expect(line.words.first.word, 'Original');
+      expect(line.isVocal, isTrue);
+      expect(line.isBackground, isFalse);
+      expect(line.alignment, LyricAlignment.start);
+    });
   });
 }

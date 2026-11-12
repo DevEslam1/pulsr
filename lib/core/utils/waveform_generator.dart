@@ -56,6 +56,95 @@ List<double> _computeDeterministicWaveformTask(_WaveformParams params) {
   }).toList();
 }
 
+/// Validates RIFF/WAVE header and fmt chunk. Returns data chunk offset and length
+/// only if the file is valid uncompressed 16-bit PCM. Otherwise returns null.
+({int dataOffset, int dataLength})? _validateRiffWavePcm16(
+  RandomAccessFile raf,
+  int fileLength,
+) {
+  if (fileLength < 44) return null;
+
+  raf.setPositionSync(0);
+  final header = Uint8List(12);
+  if (raf.readIntoSync(header, 0, 12) < 12) return null;
+
+  // 'RIFF' = 0x52, 0x49, 0x46, 0x46
+  if (header[0] != 0x52 ||
+      header[1] != 0x49 ||
+      header[2] != 0x46 ||
+      header[3] != 0x46) {
+    return null;
+  }
+  // 'WAVE' = 0x57, 0x41, 0x56, 0x45
+  if (header[8] != 0x57 ||
+      header[9] != 0x41 ||
+      header[10] != 0x56 ||
+      header[11] != 0x45) {
+    return null;
+  }
+
+  int pos = 12;
+  bool fmtValid = false;
+  int? dataOffset;
+  int? dataLength;
+
+  final chunkHeader = Uint8List(8);
+
+  while (pos + 8 <= fileLength) {
+    raf.setPositionSync(pos);
+    if (raf.readIntoSync(chunkHeader, 0, 8) < 8) break;
+
+    final id = String.fromCharCodes(chunkHeader.sublist(0, 4));
+    final chunkSize = chunkHeader[4] |
+        (chunkHeader[5] << 8) |
+        (chunkHeader[6] << 16) |
+        (chunkHeader[7] << 24);
+
+    if (chunkSize < 0 || pos + 8 + chunkSize > fileLength + 1) {
+      break;
+    }
+
+    if (id == 'fmt ') {
+      if (chunkSize < 16) return null;
+      final fmtBytes = Uint8List(16);
+      if (raf.readIntoSync(fmtBytes, 0, 16) < 16) return null;
+
+      final audioFormat = fmtBytes[0] | (fmtBytes[1] << 8);
+      final numChannels = fmtBytes[2] | (fmtBytes[3] << 8);
+      final sampleRate = fmtBytes[4] |
+          (fmtBytes[5] << 8) |
+          (fmtBytes[6] << 16) |
+          (fmtBytes[7] << 24);
+      final bitsPerSample = fmtBytes[14] | (fmtBytes[15] << 8);
+
+      // Must be PCM (format 1), 16-bit depth, valid channels and sample rate
+      if (audioFormat == 1 &&
+          bitsPerSample == 16 &&
+          numChannels > 0 &&
+          sampleRate > 0) {
+        fmtValid = true;
+      } else {
+        return null;
+      }
+    } else if (id == 'data') {
+      dataOffset = pos + 8;
+      dataLength = math.min(chunkSize, fileLength - dataOffset);
+      if (fmtValid) {
+        break;
+      }
+    }
+
+    // RIFF chunks are word-aligned
+    final paddedChunkSize = chunkSize + (chunkSize % 2);
+    pos += 8 + paddedChunkSize;
+  }
+
+  if (fmtValid && dataOffset != null && dataLength != null && dataLength > 0) {
+    return (dataOffset: dataOffset, dataLength: dataLength);
+  }
+  return null;
+}
+
 /// Background isolate task extracting actual PCM peak and RMS energy from audio files.
 List<double> _extractPcmPeaksTask(_WaveformParams params) {
   if (params.filePath == null || params.filePath!.isEmpty) {
@@ -71,15 +160,21 @@ List<double> _extractPcmPeaksTask(_WaveformParams params) {
       return _computeDeterministicWaveformTask(params);
     }
 
-    final count = params.count;
-    final samples = <double>[];
     final raf = file.openSync(mode: FileMode.read);
     try {
-      final headerOffset = length > 44 ? 44 : 0;
-      final dataLength = length - headerOffset;
+      final pcmInfo = _validateRiffWavePcm16(raf, length);
+      if (pcmInfo == null) {
+        // Not a valid 16-bit PCM RIFF/WAVE: do NOT interpret compressed bits as PCM
+        return _computeDeterministicWaveformTask(params);
+      }
+
+      final count = params.count;
+      final headerOffset = pcmInfo.dataOffset;
+      final dataLength = pcmInfo.dataLength;
       final bucketSize = (dataLength / count).floor();
       final bufferSize = math.min(bucketSize, 4096);
       final buffer = Uint8List(bufferSize);
+      final samples = <double>[];
 
       for (int b = 0; b < count; b++) {
         final pos = headerOffset + b * bucketSize;
@@ -105,22 +200,22 @@ List<double> _extractPcmPeaksTask(_WaveformParams params) {
         final composite = (maxSample * 0.7 + rms * 0.3).clamp(0.0, 1.0);
         samples.add(composite);
       }
+
+      if (samples.isEmpty) return _computeDeterministicWaveformTask(params);
+
+      final minVal = samples.reduce(math.min);
+      final maxVal = samples.reduce(math.max);
+      final range = maxVal - minVal;
+      if (range < 0.01) {
+        return List.filled(samples.length, 0.4);
+      }
+      return samples.map((v) {
+        final norm = (v - minVal) / range;
+        return (0.08 + norm * 0.92).clamp(0.08, 1.0);
+      }).toList();
     } finally {
       raf.closeSync();
     }
-
-    if (samples.isEmpty) return _computeDeterministicWaveformTask(params);
-
-    final minVal = samples.reduce(math.min);
-    final maxVal = samples.reduce(math.max);
-    final range = maxVal - minVal;
-    if (range < 0.01) {
-      return List.filled(samples.length, 0.4);
-    }
-    return samples.map((v) {
-      final norm = (v - minVal) / range;
-      return (0.08 + norm * 0.92).clamp(0.08, 1.0);
-    }).toList();
   } catch (_) {
     return _computeDeterministicWaveformTask(params);
   }

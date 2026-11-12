@@ -54,6 +54,7 @@ import 'widgets/folder_browser_tab.dart';
 import 'widgets/folder_tree_browser_tab.dart';
 import 'widgets/genre_hierarchy_view.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 part 'tabs/library_songs_tab.dart';
 part 'tabs/library_collections_tabs.dart';
 part 'tabs/library_favorites_tab.dart';
@@ -402,7 +403,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     final isPresent = _activeTabs.contains(tab);
     if (isPresent) {
       if (_activeTabs.length <= 1) {
-        HapticFeedback.heavyImpact();
+        PulsrHaptics.heavyImpact();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(context.l10n.libraryAtLeastOneTab),
@@ -411,7 +412,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         );
         return;
       }
-      HapticFeedback.lightImpact();
+      PulsrHaptics.lightImpact();
       setState(() {
         _activeTabs.remove(tab);
         int newIndex = 0;
@@ -427,7 +428,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         _rebuildTabController(initialIndex: newIndex);
       });
     } else {
-      HapticFeedback.mediumImpact();
+      PulsrHaptics.mediumImpact();
       setState(() {
         _activeTabs.add(tab);
 
@@ -445,7 +446,7 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   void _onReorderTabs(int oldIndex, int newIndex) {
     if (oldIndex == newIndex) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final currentTabItem =
         (_tabController.index >= 0 && _tabController.index < _activeTabs.length)
             ? _activeTabs[_tabController.index]
@@ -492,7 +493,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   void _resetDefaultTabs() {
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     setState(() {
       _activeTabs = List.from(LibraryTabItem.defaultTabs);
       _rebuildTabController(initialIndex: 0);
@@ -1019,7 +1020,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onLongPress: () {
-            HapticFeedback.mediumImpact();
+            PulsrHaptics.mediumImpact();
             _showManageTabsSheet(context, state);
           },
           child: Padding(
@@ -1679,7 +1680,7 @@ class _LayoutToggleButton extends StatelessWidget {
       selected: selected,
       child: AnimatedContainer(
         duration: context.motionMs(200),
-        curve: Curves.easeOutCubic,
+        curve: context.motionCurve(PulsrMotion.enter),
         decoration: BoxDecoration(
           color: selected ? p.accent : Colors.transparent,
           borderRadius: AppRadii.r10All,
@@ -1698,7 +1699,7 @@ class _LayoutToggleButton extends StatelessWidget {
           child: InkWell(
             borderRadius: AppRadii.r10All,
             onTap: () {
-              HapticFeedback.selectionClick();
+              PulsrHaptics.selectionClick();
               onTap();
             },
             child: Padding(

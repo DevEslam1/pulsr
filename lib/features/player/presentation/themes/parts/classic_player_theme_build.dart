@@ -8,8 +8,6 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
     final song = state.currentSong;
 
     final (
-      :nowPlayingDoubleTap,
-      :nowPlayingArtworkSwipe,
       :visualizerStyle,
       :waveformSeekBarEnabled,
       :playerSliderStyle,
@@ -18,16 +16,12 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
     ) = context.select<
         SettingsCubit,
         ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
           VisualizerStyle visualizerStyle,
           bool waveformSeekBarEnabled,
           PlayerSliderStyle playerSliderStyle,
           bool canvasEnabled,
           bool canvasAsBackdrop,
         })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           visualizerStyle: c.state.visualizerStyle,
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
           playerSliderStyle: c.state.playerSliderStyle,
@@ -71,32 +65,8 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
       props: props,
       trackIcon: Icons.music_note_rounded,
       dockIconStyle: PlayerDockIconStyle.classic,
-      stage: (context, metrics) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      stage: (context, metrics) => PlayerGestureScope(
         onTap: () => cubit.toggleLyricsVisibility(),
-        onDoubleTap: () {
-          switch (nowPlayingDoubleTap) {
-            case NowPlayingDoubleTapAction.toggleFavorite:
-              if (song != null) cubit.toggleFavorite(song.id);
-              break;
-            case NowPlayingDoubleTapAction.toggleLyrics:
-              cubit.toggleLyricsVisibility();
-              break;
-            case NowPlayingDoubleTapAction.none:
-              break;
-          }
-        },
-        onHorizontalDragEnd: (details) {
-          if (nowPlayingArtworkSwipe ==
-                  NowPlayingArtworkSwipeAction.nextPrev &&
-              details.primaryVelocity != null) {
-            if (details.primaryVelocity! < -200) {
-              cubit.next();
-            } else if (details.primaryVelocity! > 200) {
-              cubit.previous();
-            }
-          }
-        },
         child: LayoutBuilder(
           builder: (context, artConstraints) {
             final double dynamicArtSize = PlayerThemeMetrics.safeArtworkSize(

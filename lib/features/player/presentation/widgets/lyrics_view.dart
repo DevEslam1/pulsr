@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_lyric/flutter_lyric.dart' hide LrcParser;
 import 'package:go_router/go_router.dart';
@@ -28,6 +27,7 @@ import 'lyrics_share_card.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class LyricsView extends StatefulWidget {
   /// Playback position used to highlight the active line.
   ///
@@ -115,7 +115,7 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _onTapLine(Duration position) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     if (!mounted) return;
     final target =
         position + _audibleOffset + Duration(milliseconds: _manualOffsetMs);
@@ -674,7 +674,7 @@ class _LyricsViewState extends State<LyricsView> {
   void _handleLyricLongPressStart(LongPressStartDetails details) {
     final width = context.size?.width ?? 0;
     if (width <= 0) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     unawaited(
         _adjustManualOffset(details.localPosition.dx < width / 2 ? -100 : 100));
   }

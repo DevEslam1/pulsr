@@ -21,8 +21,8 @@ import 'quran_mushaf_view.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:flutter/services.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Bottom sheet entry point for Quran Mode.
 class QuranModeSheet extends StatelessWidget {
   const QuranModeSheet({super.key});
@@ -145,11 +145,11 @@ class _QuranModePanelState extends State<QuranModePanel> {
     }
   }
 
-  Future<void> _runQuranAction(Future<void> action) async {
+  Future<void> _runQuranAction(Future<void> Function() action) async {
     if (_isApplying) return;
     setState(() => _isApplying = true);
     try {
-      await action;
+      await action();
     } finally {
       if (mounted) setState(() => _isApplying = false);
     }
@@ -239,7 +239,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       onChanged: _isApplying
                           ? null
                           : (v) => unawaited(
-                                _runQuranAction(cubit.setQuranModeEnabled(v)),
+                                _runQuranAction(() => cubit.setQuranModeEnabled(v)),
                               ),
                     ),
                   ),
@@ -256,7 +256,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   onPressed: _isApplying
                       ? null
                       : () => unawaited(
-                            _runQuranAction(cubit.resetQuranAutoMode()),
+                            _runQuranAction(() => cubit.resetQuranAutoMode()),
                           ),
                   icon: const Icon(Icons.auto_mode_rounded, size: 18),
                   label: Text(context.l10n.quranAutoDetectRecitations),
@@ -301,9 +301,9 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       onSelected: _isApplying
                           ? null
                           : (_) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               unawaited(_runQuranAction(
-                                  cubit.setQuranReciterStyle(s)));
+                                  () => cubit.setQuranReciterStyle(s)));
                             },
                       label: Text(s.label),
                       labelStyle: TextStyle(
@@ -347,7 +347,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   message: state.errorMessage!,
                   onRetry: !_isApplying
                       ? () => unawaited(
-                            _runQuranAction(cubit.reapplyQuranProfile()),
+                            _runQuranAction(() => cubit.reapplyQuranProfile()),
                           )
                       : null,
                 ),
@@ -369,7 +369,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ? '${(state.reverbWetDry * 100).round()}%'
                   : '0%',
               onChanged: (value) => unawaited(
-                _runQuranAction(cubit.setQuranAmbience(value)),
+                cubit.setQuranAmbience(value),
               ),
               applyOnRelease: true,
             ),
@@ -385,7 +385,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   child: TextButton.icon(
                     onPressed: enabled
                         ? () => unawaited(
-                              _runQuranAction(cubit.setQuranAmbience(0)),
+                              _runQuranAction(() => cubit.setQuranAmbience(0)),
                             )
                         : null,
                     icon: const Icon(Icons.volume_off_rounded, size: 18),
@@ -406,7 +406,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                   ? '${(state.saturationMix * 100).round()}%'
                   : '0%',
               onChanged: (value) => unawaited(
-                _runQuranAction(cubit.setQuranWarmth(value)),
+                cubit.setQuranWarmth(value),
               ),
               applyOnRelease: true,
             ),
@@ -480,7 +480,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     onSelectionChanged: enabled
                         ? (v) => unawaited(
                               _runQuranAction(
-                                cubit.setQuranPlaybackSpeed(v.first),
+                                () => cubit.setQuranPlaybackSpeed(v.first),
                               ),
                             )
                         : null,
@@ -604,7 +604,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       onPressed: enabled
                           ? () => unawaited(
                                 _runQuranAction(
-                                  cubit.resetQuranProfile(),
+                                  () => cubit.resetQuranProfile(),
                                 ),
                               )
                           : null,

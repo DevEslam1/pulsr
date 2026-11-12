@@ -2,8 +2,8 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/services/system_ui_controller.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -19,6 +19,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/error_logger.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class KaraokeModeScreen extends StatefulWidget {
   const KaraokeModeScreen({super.key});
 
@@ -56,7 +57,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   }
 
   void _recordTapTiming(Duration currentPos, Duration targetTime) {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final diffMs =
         (currentPos.inMilliseconds - targetTime.inMilliseconds).abs();
     // Timing precision: 0ms diff = 100%, 150ms diff = 90%, 500ms diff = 66%
@@ -79,11 +80,10 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
           error: e, stackTrace: st, category: 'Karaoke');
     }
     final orientation = MediaQuery.orientationOf(context);
-    if (orientation == Orientation.landscape) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    }
+    SystemUiController.instance.syncMode(
+      owner: 'karaoke',
+      immersive: orientation == Orientation.landscape,
+    );
   }
 
   @override
@@ -91,8 +91,9 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     if (state == AppLifecycleState.resumed && mounted) {
       final isLandscape =
           MediaQuery.orientationOf(context) == Orientation.landscape;
-      SystemChrome.setEnabledSystemUIMode(
-        isLandscape ? SystemUiMode.immersiveSticky : SystemUiMode.edgeToEdge,
+      SystemUiController.instance.syncMode(
+        owner: 'karaoke',
+        immersive: isLandscape,
       );
     }
   }
@@ -100,8 +101,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Restore the app's edge-to-edge chrome cleanly when leaving karaoke mode
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    // Restore the app's system UI cleanly when leaving karaoke mode
+    SystemUiController.instance.releaseImmersive('karaoke');
     final initialPitch = _initialPitch;
     final cubit = _playerCubit;
     if (initialPitch != null && cubit != null) {
@@ -312,7 +313,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                               horizontal: AppSpacing.xl),
                           child: InkWell(
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               context
                                   .read<PlayerCubit>()
                                   .seek(activeLine.timestamp);
@@ -417,7 +418,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           padding: const EdgeInsets.symmetric(horizontal: 36),
                           child: InkWell(
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               context
                                   .read<PlayerCubit>()
                                   .seek(nextLine.timestamp);
@@ -728,7 +729,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     } catch (e, st) {
       ErrorLogger.log('KaraokeModeScreen build failed',
           error: e, stackTrace: st, category: 'Karaoke');
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemUiController.instance.releaseImmersive('karaoke');
       rethrow;
     }
   }

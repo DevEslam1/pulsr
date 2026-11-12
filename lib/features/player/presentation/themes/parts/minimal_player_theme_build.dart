@@ -7,22 +7,16 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
     final activeColor = props.activeColor;
     final song = state.currentSong;
     final (
-      :nowPlayingDoubleTap,
-      :nowPlayingArtworkSwipe,
       :visualizerStyle,
       :waveformSeekBarEnabled,
       :playerSliderStyle,
     ) = context.select<
         SettingsCubit,
         ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
           VisualizerStyle visualizerStyle,
           bool waveformSeekBarEnabled,
           PlayerSliderStyle playerSliderStyle,
         })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           visualizerStyle: c.state.visualizerStyle,
           waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
           playerSliderStyle: c.state.playerSliderStyle,
@@ -53,32 +47,8 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
           ),
         ),
       ),
-      stage: (context, metrics) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      stage: (context, metrics) => PlayerGestureScope(
         onTap: () => cubit.toggleLyricsVisibility(),
-        onDoubleTap: () {
-          switch (nowPlayingDoubleTap) {
-            case NowPlayingDoubleTapAction.toggleFavorite:
-              if (song != null) cubit.toggleFavorite(song.id);
-              break;
-            case NowPlayingDoubleTapAction.toggleLyrics:
-              cubit.toggleLyricsVisibility();
-              break;
-            case NowPlayingDoubleTapAction.none:
-              break;
-          }
-        },
-        onHorizontalDragEnd: (details) {
-          if (nowPlayingArtworkSwipe ==
-                  NowPlayingArtworkSwipeAction.nextPrev &&
-              details.primaryVelocity != null) {
-            if (details.primaryVelocity! < -200) {
-              cubit.next();
-            } else if (details.primaryVelocity! > 200) {
-              cubit.previous();
-            }
-          }
-        },
         child: LayoutBuilder(
           builder: (context, artConstraints) {
             final visualizerSpace = showVisualizer

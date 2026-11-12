@@ -2,7 +2,6 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:video_player/video_player.dart';
 
@@ -17,6 +16,7 @@ import '../../../../services/canvas/canvas_repository.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Looped video backdrop for Spotify Canvas, Apple Music motion artwork,
 /// and Tidal video covers.
 ///
@@ -403,7 +403,7 @@ class CanvasToggleChip extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           final next = !isCanvasEnabled;
           context.read<SettingsCubit>().toggleCanvasEnabled(next);
           PulsrToast.show(

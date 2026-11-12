@@ -71,7 +71,7 @@ mixin TabletLayoutSection
                       return PulsrPressable(
                         pressedScale: 0.985,
                         onTap: () {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           _selectCategory(cat.id);
                           if (_searchQuery.isNotEmpty) {
                             _searchController.clear();
@@ -80,7 +80,7 @@ mixin TabletLayoutSection
                         },
                         child: AnimatedContainer(
                           duration: context.motionMs(180),
-                          curve: Curves.easeOutCubic,
+                          curve: context.motionCurve(PulsrMotion.enter),
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
                               vertical: AppSpacing.xs),

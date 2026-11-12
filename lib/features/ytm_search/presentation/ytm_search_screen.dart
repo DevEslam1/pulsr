@@ -2,7 +2,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -34,6 +33,7 @@ import '../cubit/ytm_search_cubit.dart';
 import '../cubit/ytm_search_state.dart';
 import 'widgets/ytm_download_button.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class YtmSearchScreen extends StatelessWidget {
   const YtmSearchScreen({super.key});
 
@@ -116,7 +116,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
   }
 
   void _applyHistoryQuery(String query, {bool keepFocus = false}) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final text = keepFocus ? '$query ' : query;
     _searchController.value = TextEditingValue(
       text: text,
@@ -284,7 +284,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               onPressed: () async {
-                HapticFeedback.lightImpact();
+                PulsrHaptics.lightImpact();
                 await cubit.clearHistory();
                 if (mounted) _refreshHistory();
               },
@@ -363,7 +363,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                               color: p.textTertiary,
                             ),
                             onPressed: () {
-                              HapticFeedback.lightImpact();
+                              PulsrHaptics.lightImpact();
                               cubit.removeHistoryQuery(_history[i]);
                               _refreshHistory();
                             },

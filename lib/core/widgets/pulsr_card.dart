@@ -147,24 +147,11 @@ class _PulsrCardState extends State<PulsrCard> {
     final radius = AppRadii.circular(widget.borderRadius);
     final shadows = _resolveShadows(p);
 
-    Widget content = widget.padding != null
+    final Widget content = widget.padding != null
         ? Padding(padding: widget.padding!, child: widget.child)
         : widget.child;
 
     final isTappable = widget.onTap != null || widget.onLongPress != null;
-
-    if (isTappable) {
-      content = Material(
-        color: Colors.transparent,
-        borderRadius: radius,
-        child: InkWell(
-          onTap: widget.onTap,
-          onLongPress: widget.onLongPress,
-          borderRadius: radius,
-          child: content,
-        ),
-      );
-    }
 
     Widget card = AnimatedContainer(
       duration: context.motionMs(180),

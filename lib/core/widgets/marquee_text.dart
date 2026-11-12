@@ -1,11 +1,11 @@
 // lib/core/widgets/marquee_text.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../motion/pulsr_motion.dart';
 import '../utils/l10n_extensions.dart';
 import 'pulsr_scroll_edge_fade.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// A widget that displays text normally when it fits within the parent bounds,
 /// and smoothly scrolls it horizontally (marquee) when it overflows.
@@ -201,7 +201,7 @@ class _MarqueeTextState extends State<MarqueeText> {
   void _toggleUserPause() {
     if (!widget.allowUserPause || !mounted) return;
     setState(() => _userPaused = !_userPaused);
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     if (_userPaused) {
       _stopScrolling();
       if (_scrollController.hasClients) {

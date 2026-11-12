@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -61,6 +60,7 @@ import '../../../core/widgets/highlighted_text.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 part 'sections/settings_screen_models.dart';
 part 'sections/category_metadata.dart';
 part 'sections/settings_section_primitives.dart';

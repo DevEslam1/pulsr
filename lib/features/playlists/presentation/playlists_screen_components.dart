@@ -128,7 +128,7 @@ class _PlaylistCard extends StatelessWidget {
   void _openContextMenu(BuildContext context, Offset globalPosition) {
     final items = menuItems?.call(context);
     if (items == null || items.isEmpty) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) return;

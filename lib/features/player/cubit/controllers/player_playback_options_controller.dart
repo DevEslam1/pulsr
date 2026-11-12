@@ -3,7 +3,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/services/earbud_optimization_service.dart';
@@ -31,6 +30,7 @@ import '../quran_restore_snapshot.dart';
 import 'playback_sleep_timer.dart';
 import 'playback_volume_mute.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 part 'player_playback_options_lyrics.dart';
 part 'player_playback_options_quran.dart';
 part 'player_playback_options_rate_guard.dart';

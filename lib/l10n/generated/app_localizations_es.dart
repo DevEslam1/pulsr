@@ -4859,6 +4859,13 @@ class AppLocalizationsEs extends AppLocalizations {
       'Aplica animaciones instantáneas en lugar de transiciones';
 
   @override
+  String get settingsHapticsTitle => 'Respuesta háptica';
+
+  @override
+  String get settingsHapticsSubtitle =>
+      'Vibrar al tocar y realizar gestos en toda la app';
+
+  @override
   String get settingsLiquidGlassTitle => 'Tinte de vidrio líquido';
 
   @override
@@ -7531,7 +7538,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String sleepTimerTracksRemaining(int count) {
-    return 'Temporizador: $count pistas restantes';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Temporizador: $count pistas restantes',
+      one: 'Temporizador: 1 pista restante',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -9806,4 +9819,112 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get simulatedPitchBadge => 'SIM';
+
+  @override
+  String get audioQualityAuto => 'Automático';
+
+  @override
+  String get audioQualitySystemManaged => 'Gestionado por el sistema';
+
+  @override
+  String get audioQualityBestEffort => 'Mejor esfuerzo';
+
+  @override
+  String get audioQualityAutoKbps => 'kbps auto';
+
+  @override
+  String get audioQualityMobile => 'Móvil';
+
+  @override
+  String get audioQualityStandard => 'Estándar';
+
+  @override
+  String get audioQualityMaximum => 'Máximo';
+
+  @override
+  String get outputDeviceUsbHiResDac => 'DAC USB Hi-Res';
+
+  @override
+  String get outputDeviceInternalDac => 'DAC interno';
+
+  @override
+  String sleepTimerTimeRemaining(String remaining) {
+    return 'Temporizador: quedan $remaining';
+  }
+
+  @override
+  String get downloadLabel => 'Descargar';
+
+  @override
+  String get badgeLossless => 'Sin pérdida';
+
+  @override
+  String get badgeHiResLossless => 'Hi-Res sin pérdida';
+
+  @override
+  String get viperStopSweep => 'Detener barrido';
+
+  @override
+  String get viperTestTone => 'Tono de prueba (1k+barrido)';
+
+  @override
+  String viperAbBypassed(String gainDb) {
+    return 'A/B: Omitido (nivel igualado $gainDb dB)';
+  }
+
+  @override
+  String get viperAbActive => 'A/B: ViPER-DDC activo';
+
+  @override
+  String get viperAbBypassedShort => 'Omitido (Igualado)';
+
+  @override
+  String get viperAbCompare => 'Comparar A/B';
+
+  @override
+  String loopPointALabel(String time) {
+    return 'Punto A: $time';
+  }
+
+  @override
+  String loopPointBLabel(String time) {
+    return 'Punto B: $time';
+  }
+
+  @override
+  String dspEffectsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count efectos',
+      one: '1 efecto',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dspEffectsPausedSuffix => '(En pausa)';
+
+  @override
+  String get autoPreampOffHint =>
+      'Preamplificador auto: Desactivado (Toca para evitar saturación)';
+
+  @override
+  String autoPreampManualOverride(String gainDb) {
+    return 'Anulación manual (AutoEQ sugiere $gainDb dB)';
+  }
+
+  @override
+  String get preampOutputGainHint =>
+      'Ganancia de salida aplicada antes del ecualizador';
+
+  @override
+  String get tabletSplitViewHint =>
+      'Toca el botón del inspector en la barra del reproductor para abrir la vista dividida';
+
+  @override
+  String get setLoopPointAHint => 'Fijar punto de bucle A';
+
+  @override
+  String get setLoopPointBHint => 'Fijar punto de bucle B';
 }

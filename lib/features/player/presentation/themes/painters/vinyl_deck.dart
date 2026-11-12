@@ -86,15 +86,6 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
     final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
-        SettingsCubit,
-        ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-        })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-        ));
 
     return Center(
       child: ConstrainedBox(
@@ -196,32 +187,9 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                 button: true,
                 label: state.isPlaying ? context.l10n.pause : context.l10n.play,
                 excludeSemantics: true,
-                child: GestureDetector(
+                child: PlayerGestureScope(
+                  behavior: HitTestBehavior.deferToChild,
                   onTap: () => cubit.togglePlayPause(),
-                  onDoubleTap: () {
-                    switch (nowPlayingDoubleTap) {
-                      case NowPlayingDoubleTapAction.toggleFavorite:
-                        final s = state.currentSong;
-                        if (s != null) cubit.toggleFavorite(s.id);
-                        break;
-                      case NowPlayingDoubleTapAction.toggleLyrics:
-                        cubit.toggleLyricsVisibility();
-                        break;
-                      case NowPlayingDoubleTapAction.none:
-                        break;
-                    }
-                  },
-                  onHorizontalDragEnd: (details) {
-                    if (nowPlayingArtworkSwipe ==
-                            NowPlayingArtworkSwipeAction.nextPrev &&
-                        details.primaryVelocity != null) {
-                      if (details.primaryVelocity! < -200) {
-                        cubit.next();
-                      } else if (details.primaryVelocity! > 200) {
-                        cubit.previous();
-                      }
-                    }
-                  },
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
@@ -477,7 +445,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           start: 14,
                           child: GestureDetector(
                             onTap: () {
-                              HapticFeedback.lightImpact();
+                              PulsrHaptics.lightImpact();
                               SpeedPickerSheet.show(context);
                             },
                             child: Container(

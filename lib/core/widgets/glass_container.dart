@@ -2,9 +2,12 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../features/settings/cubit/settings_cubit.dart';
 import '../constants/app_blur.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
+import '../constants/prefs_keys.dart';
 import '../services/settings_cache.dart';
 import '../theme/aura_theme.dart';
 
@@ -120,23 +123,37 @@ class GlassContainer extends StatelessWidget {
         opacity = preset.opacity,
         isLiquid = preset == GlassPreset.dock;
 
+  static double? _watchGlassIntensity(BuildContext context) {
+    try {
+      return context.select<SettingsCubit, double>(
+        (c) => c.state.liquidGlassTint,
+      );
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final effectiveRadius =
         borderRadius ?? (shape == null ? AppRadii.cardRadius : null);
 
-    final canBlur = AppBlur.canBlur(context, enableBlur: enableBlur) && blur > 0;
     final isHighContrast = MediaQuery.maybeOf(context)?.highContrast ?? false;
 
-    // Apply the user's Liquid Glass Tint (0 = ultra clear, 1 = tinted) and
-    // preset opacity so glass surfaces respond dynamically to user settings.
+    // Apply the user's Glass Intensity (0 = solid, 1 = full glass) and
+    // preset opacity so glass surfaces respond live to user settings.
+    final liveIntensity = _watchGlassIntensity(context);
     final tint = (tintFactor ??
+            liveIntensity ??
             SettingsCache()
-                .getDouble('setting_liquid_glass_tint', defaultValue: 0.8))
+                .getDouble(PrefsKeys.liquidGlassTint, defaultValue: 0.8))
         .clamp(0.0, 1.0);
+    final canBlur = AppBlur.canBlur(context, enableBlur: enableBlur) &&
+        blur > 0 &&
+        tint > 0.0;
     final rawTintAlpha = (opacity * (0.35 + 0.65 * tint)).clamp(0.0, 1.0);
-    final tintAlpha = isHighContrast
+    final tintAlpha = (isHighContrast || !canBlur)
         ? math.max(rawTintAlpha, AppBlur.solidFallbackMinAlpha)
         : rawTintAlpha;
     final base = color ?? (p.isDark ? p.surfaceContainer : p.surface);

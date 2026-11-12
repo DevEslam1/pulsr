@@ -15,6 +15,7 @@ import '../../../core/widgets/pulsr_toast.dart';
 import '../../../data/party/listen_together_service.dart';
 import '../../../data/party/party_models.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class PartySheet extends StatefulWidget {
   const PartySheet({super.key});
 
@@ -123,7 +124,7 @@ class _PartySheetState extends State<PartySheet> {
   }
 
   Future<void> _copyInvite(String code) async {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final base = await _partyService.getServerUrl();
     final link = '$base/invite/$code';
     await Clipboard.setData(ClipboardData(text: link));
@@ -132,7 +133,7 @@ class _PartySheetState extends State<PartySheet> {
   }
 
   Future<void> _shareInvite(String code) async {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final loc = context.l10n;
     final base = await _partyService.getServerUrl();
     final link = '$base/invite/$code';

@@ -11,6 +11,7 @@ import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
+import '../../../../domain/models/audio_output_info.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'audio_quality_badge.dart';
@@ -23,6 +24,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class TabletPlayerBar extends StatefulWidget {
   final VoidCallback onOpenNowPlaying;
   final VoidCallback? onToggleSideInspector;
@@ -114,7 +116,10 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final settingsState = context.watch<SettingsCubit>().state;
+    final (playerSliderStyle, currentOutputDevice) =
+        context.select<SettingsCubit, (PlayerSliderStyle, AudioOutputInfo?)>(
+      (c) => (c.state.playerSliderStyle, c.state.currentOutputDevice),
+    );
     final mq = MediaQuery.of(context);
     final bottomInset = mq.padding.bottom;
     final isShortHeight =
@@ -733,7 +738,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                           InkWell(
                                                                         onTap: state.hasNextNeighbour
                                                                             ? () {
-                                                                                HapticFeedback.lightImpact();
+                                                                                PulsrHaptics.lightImpact();
                                                                                 cubit.next();
                                                                               }
                                                                             : null,
@@ -928,14 +933,14 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               semanticLabel: context.l10n.seekLabel,
                                                                               activeColor: activeColor,
                                                                               inactiveColor: Theme.of(context).brightness == Brightness.dark
-                                                                                  ? (settingsState.playerSliderStyle == PlayerSliderStyle.capsule
+                                                                                  ? (playerSliderStyle == PlayerSliderStyle.capsule
                                                                                       ? Colors.white.withValues(alpha: 0.22)
                                                                                       : AppColors.specularStrong)
-                                                                                  : (settingsState.playerSliderStyle == PlayerSliderStyle.capsule
+                                                                                  : (playerSliderStyle == PlayerSliderStyle.capsule
                                                                                       ? Colors.black.withValues(alpha: 0.15)
                                                                                       : p.hairline.withValues(alpha: 0.8)),
-                                                                              sliderStyle: settingsState.playerSliderStyle,
-                                                                              isWavy: settingsState.playerSliderStyle == PlayerSliderStyle.wavy,
+                                                                              sliderStyle: playerSliderStyle,
+                                                                              isWavy: playerSliderStyle == PlayerSliderStyle.wavy,
                                                                               animateWave: state.isPlaying,
                                                                               onChangeStart: (val) {
                                                                                 _dragSeekNotifier.value = val;
@@ -1133,8 +1138,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                           Icons
                                                               .settings_input_component_rounded,
                                                           size: 19,
-                                                          color: settingsState
-                                                                      .currentOutputDevice
+                                                          color: currentOutputDevice
                                                                       ?.isUsbDac ==
                                                                   true
                                                               ? AppColors

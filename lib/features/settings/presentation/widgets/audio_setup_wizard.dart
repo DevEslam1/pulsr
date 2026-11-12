@@ -1,6 +1,5 @@
 // lib/features/settings/presentation/widgets/audio_setup_wizard.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/app_radii.dart';
@@ -13,6 +12,7 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
 import '../../cubit/settings_cubit.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 enum AudioWizardOutputType { usbDac, bluetooth, speaker, headphones }
 
 enum AudioWizardPriority { fidelity, balanced, dataSaver }
@@ -242,7 +242,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                             borderRadius: AppRadii.r12All),
                       ),
                       onPressed: () {
-                        HapticFeedback.selectionClick();
+                        PulsrHaptics.selectionClick();
                         setState(() => _currentStep--);
                       },
                       child: Text(
@@ -270,7 +270,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                     onPressed: _isApplying
                         ? null
                         : () {
-                            HapticFeedback.mediumImpact();
+                            PulsrHaptics.mediumImpact();
                             if (_currentStep < 2) {
                               setState(() => _currentStep++);
                             } else {
@@ -506,7 +506,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
       child: PulsrPressable(
         pressedScale: 0.985,
         onTap: () {
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           onTap();
         },
         child: AnimatedContainer(

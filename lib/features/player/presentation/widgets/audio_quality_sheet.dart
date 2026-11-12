@@ -3,7 +3,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -33,6 +32,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class AudioQualitySheet extends StatelessWidget {
   final SongsTableData song;
   final Color activeColor;
@@ -48,7 +48,7 @@ class AudioQualitySheet extends StatelessWidget {
     SongsTableData song,
     Color activeColor,
   ) {
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
@@ -807,7 +807,7 @@ class AudioQualitySheet extends StatelessWidget {
                 child: InkWell(
                   borderRadius: AppRadii.r14All,
                   onTap: () async {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     final applied =
                         await cubit?.selectOutputDevice(dev.id) ?? false;
                     if (!applied && context.mounted) {
@@ -895,7 +895,7 @@ class AudioQualitySheet extends StatelessWidget {
           alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
             onPressed: () {
-              HapticFeedback.selectionClick();
+              PulsrHaptics.selectionClick();
               cubit?.openOutputSwitcher();
             },
             icon: const Icon(Icons.open_in_new_rounded, size: 15),
@@ -961,7 +961,7 @@ class AudioQualitySheet extends StatelessWidget {
               child: InkWell(
                 borderRadius: AppRadii.r12All,
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   cubit?.setStreamingQuality(opt.quality);
                 },
                 child: Padding(
@@ -1159,7 +1159,7 @@ class AudioQualitySheet extends StatelessWidget {
                     activeColor: activeColor,
                     palette: p,
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       cubit?.setTargetOutputSampleRate(opt.$1);
                     },
                   ),
@@ -1188,8 +1188,8 @@ class AudioQualitySheet extends StatelessWidget {
         isBitPerfectActive ? 0 : (outputDevice?.targetBitDepth ?? 0);
 
     final bitDepthOptions = [
-      (0, 'Auto', 'System managed'),
-      (16, '16-bit', 'Standard'),
+      (0, context.l10n.audioQualityAuto, context.l10n.audioQualitySystemManaged),
+      (16, '16-bit', context.l10n.audioQualityStandard),
       (24, '24-bit', 'Hi-Res HD'),
       (32, '32-bit', 'PCM'),
     ];
@@ -1252,7 +1252,7 @@ class AudioQualitySheet extends StatelessWidget {
                     activeColor: activeColor,
                     palette: p,
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       cubit?.setTargetOutputBitDepth(opt.$1);
                     },
                   ),
@@ -1443,7 +1443,7 @@ class AudioQualitySheet extends StatelessWidget {
                           );
                           return;
                         }
-                        HapticFeedback.selectionClick();
+                        PulsrHaptics.selectionClick();
                         if (cubit == null) return;
                         String? capturedError;
                         final sub = cubit.stream.listen((s) {
@@ -1669,7 +1669,9 @@ class AudioQualitySheet extends StatelessWidget {
             ? 'AAudio • ${_outputStreamDescription(outputDevice)}'
             : 'Media3 AudioTrack • ${_outputStreamDescription(outputDevice)}');
     final dacLabel = outputDevice?.deviceName ??
-        (outputDevice?.isUsbDac == true ? 'USB Hi-Res DAC' : 'Internal DAC');
+        (outputDevice?.isUsbDac == true
+            ? context.l10n.outputDeviceUsbHiResDac
+            : context.l10n.outputDeviceInternalDac);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.s14),
@@ -2135,11 +2137,11 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     final visibleCodecs =
         visibleBtCodecsForRoute(repoCodecs: repoCodecs, isLeAudio: isLeRoute);
 
-    const ldacModes = [
-      (0, 'Best Effort', 'Auto kbps'),
-      (1, 'Mobile', '330 kbps'),
-      (2, 'Standard', '660 kbps'),
-      (3, 'Maximum', '990 kbps'),
+    final ldacModes = [
+      (0, context.l10n.audioQualityBestEffort, context.l10n.audioQualityAutoKbps),
+      (1, context.l10n.audioQualityMobile, '330 kbps'),
+      (2, context.l10n.audioQualityStandard, '660 kbps'),
+      (3, context.l10n.audioQualityMaximum, '990 kbps'),
     ];
 
     // ── State: permission required ───────────────────────────────────────
@@ -2184,7 +2186,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             // Refresh button
             GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 cubit?.refreshOutputDevice();
               },
               child: Icon(
@@ -2333,7 +2335,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                               !selectableCodecs.contains(c)
                           ? null
                           : () async {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               final ok =
                                   await cubit?.setBluetoothCodec(c) ?? false;
                               if (!ok && context.mounted) {
@@ -2621,7 +2623,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                           onTap: !canConfigure
                               ? null
                               : () async {
-                                  HapticFeedback.selectionClick();
+                                  PulsrHaptics.selectionClick();
                                   final ok =
                                       await cubit?.setBluetoothLdacQuality(i) ??
                                           false;
@@ -2655,7 +2657,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           const SizedBox(height: AppSpacing.md),
           GestureDetector(
             onTap: () async {
-              unawaited(HapticFeedback.mediumImpact());
+              unawaited(PulsrHaptics.mediumImpact());
               await cubit?.openBluetoothDevOptions();
             },
             child: Container(
@@ -2796,7 +2798,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
       },
     );
     if (selected == null || selected == current || !context.mounted) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final ok = await onPick(selected);
     if (!ok && context.mounted) _showBtRefused(context, cubit);
   }
@@ -2857,7 +2859,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           const SizedBox(height: AppSpacing.sm),
           GestureDetector(
             onTap: () async {
-              unawaited(HapticFeedback.mediumImpact());
+              unawaited(PulsrHaptics.mediumImpact());
               await _requestBluetoothPermission(context, cubit);
             },
             child: Container(
@@ -2919,7 +2921,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
             const Spacer(),
             GestureDetector(
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 cubit?.refreshOutputDevice();
               },
               child:
@@ -3009,7 +3011,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           ),
           GestureDetector(
             onTap: () {
-              HapticFeedback.selectionClick();
+              PulsrHaptics.selectionClick();
               cubit?.refreshOutputDevice();
             },
             child: Text(

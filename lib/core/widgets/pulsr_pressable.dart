@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
+import '../utils/pulsr_haptics.dart';
 
 /// {@category DesignSystem}
 enum PulsrHapticStyle {
@@ -116,16 +117,16 @@ class _PulsrPressableState extends State<PulsrPressable>
     if (widget.enableHaptics) {
       switch (widget.hapticStyle) {
         case PulsrHapticStyle.light:
-          HapticFeedback.lightImpact();
+          PulsrHaptics.light();
           break;
         case PulsrHapticStyle.medium:
-          HapticFeedback.mediumImpact();
+          PulsrHaptics.confirm();
           break;
         case PulsrHapticStyle.selection:
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selection();
           break;
         case PulsrHapticStyle.heavy:
-          HapticFeedback.heavyImpact();
+          PulsrHaptics.destructive();
           break;
       }
     }
@@ -215,10 +216,10 @@ class _PulsrPressableState extends State<PulsrPressable>
                   if (widget.enableHaptics) {
                     switch (widget.hapticStyle) {
                       case PulsrHapticStyle.heavy:
-                        HapticFeedback.heavyImpact();
+                        PulsrHaptics.destructive();
                         break;
                       default:
-                        HapticFeedback.mediumImpact();
+                        PulsrHaptics.confirm();
                         break;
                     }
                   }

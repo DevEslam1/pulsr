@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -313,7 +312,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           cubit.toggleQueueVisibility();
         },
         child: Container(
@@ -493,7 +492,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                             : null,
                         child: AnimatedContainer(
                           duration: context.motionMs(200),
-                          curve: Curves.easeOutCubic,
+                          curve: context.motionCurve(PulsrMotion.enter),
                           height: isDragging ? 43.2 : 32.0,
                           child: RepaintBoundary(
                             child: PulsrSlider(
@@ -518,7 +517,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               animateWave: isPlaying && enabled,
                               onChangeStart: enabled
                                   ? (val) {
-                                      HapticFeedback.selectionClick();
+                                      PulsrHaptics.selectionClick();
                                       _tapSeekPending = true;
                                       _tapSeekRatio = val.clamp(
                                           0.0, maxDuration.toDouble());
@@ -540,7 +539,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                       if (_lastHapticCheckMs != null) {
                                         if ((clampedVal == 0.0 && _lastHapticCheckMs! > 0.0) ||
                                             (clampedVal == maxDuration && _lastHapticCheckMs! < maxDuration)) {
-                                          HapticFeedback.selectionClick();
+                                          PulsrHaptics.selectionClick();
                                         }
                                         _checkHapticBoundaries(
                                             _lastHapticCheckMs!,

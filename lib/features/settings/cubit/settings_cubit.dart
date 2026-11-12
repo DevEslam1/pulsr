@@ -13,6 +13,8 @@ import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/channels.dart';
 import '../../../core/errors/app_error.dart';
 import '../../../core/constants/prefs_keys.dart';
+import '../../../core/services/settings_cache.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 import '../../../data/audio/mqa_decoder_helper.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
@@ -68,7 +70,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   static const String _keyAutoThemeByTime = 'setting_auto_theme_by_time';
   static const String _keyHighContrast = 'setting_high_contrast';
   static const String _keyDimWhitePoint = 'setting_dim_white_point';
-  static const String _keyLiquidGlassTint = 'setting_liquid_glass_tint';
+  static const String _keyLiquidGlassTint = PrefsKeys.liquidGlassTint;
   static const String _keyLanguageCode = PrefsKeys.languageCode;
   static const String _keyCustomAccent = 'setting_custom_accent';
   static const String _keyCustomThemeRadius = 'setting_custom_theme_radius';
@@ -394,6 +396,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       dimWhitePoint: prefs.getBool(_keyDimWhitePoint) ?? current.dimWhitePoint,
       reduceMotion:
           prefs.getBool('setting_reduce_motion') ?? current.reduceMotion,
+      hapticsEnabled:
+          prefs.getBool(PrefsKeys.hapticsEnabled) ?? current.hapticsEnabled,
       liquidGlassTint:
           prefs.getDouble(_keyLiquidGlassTint) ?? current.liquidGlassTint,
       languageCode: prefs.getString(_keyLanguageCode) ?? current.languageCode,
@@ -894,6 +898,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           loadedState =
               loadedState.copyWith(reduceMotion: previous.reduceMotion);
         }
+        if (reconciledDirty.contains('hapticsEnabled')) {
+          loadedState =
+              loadedState.copyWith(hapticsEnabled: previous.hapticsEnabled);
+        }
         if (reconciledDirty.contains('liquidGlassTint')) {
           loadedState =
               loadedState.copyWith(liquidGlassTint: previous.liquidGlassTint);
@@ -1098,6 +1106,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           return;
         }
         safeEmit(loadedState);
+        PulsrHaptics.setEnabled(loadedState.hapticsEnabled);
         _dirtyFields.removeAll(reconciledDirty);
 
         if (getIt.isRegistered<EqualizerManager>()) {
@@ -1441,8 +1450,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     markDirty('liquidGlassTint');
     final clamped = value.clamp(0.0, 1.0);
     safeEmit(state.copyWith(liquidGlassTint: clamped));
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyLiquidGlassTint, clamped);
+    await SettingsCache().setDouble(_keyLiquidGlassTint, clamped);
   }
 
   /// Keeps the Android status/nav bars in sync with the app theme so a

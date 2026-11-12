@@ -1,7 +1,6 @@
 // lib/core/widgets/pulsr_search_field.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
@@ -11,6 +10,7 @@ import '../responsive/pulsr_layout_metrics.dart';
 import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 class PulsrSearchField extends StatefulWidget {
   final TextEditingController? controller;
@@ -165,7 +165,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
   }
 
   void _handleClear() {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     _debounceTimer?.cancel();
     _controller.clear();
     widget.onClear?.call();

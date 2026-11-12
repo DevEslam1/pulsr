@@ -106,7 +106,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     ErrorLogger.addBreadcrumb('Playback seek to ${position.inSeconds}s',
         category: 'player');
     try {
-      unawaited(HapticFeedback.selectionClick());
+      unawaited(PulsrHaptics.selectionClick());
     } catch (_) {
       // Haptics are best-effort across platforms
     }
@@ -167,7 +167,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   Future<void> skipToNext() async {
     ErrorLogger.addBreadcrumb('Playback skipToNext', category: 'player');
     try {
-      unawaited(HapticFeedback.lightImpact());
+      unawaited(PulsrHaptics.lightImpact());
     } catch (_) {
       // Haptics are best-effort across platforms
     }
@@ -306,7 +306,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   Future<void> _skipToPreviousImpl() async {
     ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
     try {
-      unawaited(HapticFeedback.lightImpact());
+      unawaited(PulsrHaptics.lightImpact());
     } catch (_) {
       // Haptics are best-effort across platforms
     }

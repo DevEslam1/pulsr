@@ -24,6 +24,8 @@ class PrefsKeys {
   static const String resumeAfterInterruption =
       'setting_resume_after_interruption';
   static const String soundFeedbackEnabled = 'setting_sound_feedback_enabled';
+  static const String hapticsEnabled = 'setting_haptics_enabled';
+  static const String liquidGlassTint = 'setting_liquid_glass_tint';
   static const String headphoneSafetyEnabled =
       'setting_headphone_safety_enabled';
   // Weekly sound-dose budget as a fraction of the EN 62368-1 reference
@@ -43,6 +45,10 @@ class PrefsKeys {
   static const String appButtonStyle = 'setting_app_button_style';
   // Mini-player dock stacking style (DockStackMode.name). See StackedBottomDock.
   static const String dockStackMode = 'setting_dock_stack_mode';
+  static String tabletInspectorWidthKey(String deviceClassName) =>
+      'tablet_inspector_width_$deviceClassName';
+  static String sidebarExtendedKey(String deviceClassName) =>
+      'sidebar_extended_$deviceClassName';
   static const String playbackSpeed = 'setting_playback_speed';
   static const String playbackPitch = 'setting_playback_pitch';
   static const String advancedPlaybackSpeed = 'setting_advanced_playback_speed';

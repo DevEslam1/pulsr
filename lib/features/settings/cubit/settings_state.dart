@@ -96,6 +96,7 @@ abstract class SettingsState with _$SettingsState {
     // "Remove animations" setting is still honoured — this toggle only ever
     // adds reduction, never removes it.
     @Default(false) bool reduceMotion,
+    @Default(true) bool hapticsEnabled,
     @Default(0.80) double liquidGlassTint,
     @Default('system') String languageCode,
     @Default(0xFF9B9EF5) int customAccentColorValue,

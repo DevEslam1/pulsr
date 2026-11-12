@@ -1,7 +1,6 @@
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -389,7 +388,7 @@ class QueueScreen extends StatelessWidget {
                   ).copyWith(bottom: PulsrLayoutMetrics.scrollBottom(context)),
                   itemCount: queue.length,
                   onReorderStart: (index) {
-                    HapticFeedback.mediumImpact();
+                    PulsrHaptics.mediumImpact();
                   },
                   proxyDecorator: (child, index, animation) {
                     return AnimatedBuilder(

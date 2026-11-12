@@ -34,6 +34,7 @@ import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../sheets/song_options_sheet.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 enum _FolderSortMode {
   natural,
   title,
@@ -127,7 +128,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   }
 
   void _cycleSortMode() {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       const values = _FolderSortMode.values;
       final nextIndex = (_sortMode.index + 1) % values.length;
@@ -136,7 +137,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   }
 
   void _toggleSortDirection() {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() => _sortAscending = !_sortAscending);
   }
 
@@ -235,7 +236,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   Future<void> _toggleFavoriteFolder(List<SongsTableData> songs) async {
     if (songs.isEmpty || _favoriteAllBusy) return;
     _favoriteAllBusy = true;
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     try {
       LibraryCubit? libraryCubit;
       try {
@@ -278,7 +279,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   }
 
   void _copyFolderPath() {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     Clipboard.setData(ClipboardData(text: widget.folder.path));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -292,7 +293,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
     List<SongsTableData> songs,
     PulsrPalette p,
   ) {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     PulsrSheetHelper.showPulsrSheet(
       context: context,
       builder: (ctx) => PulsrBottomSheet(
@@ -385,7 +386,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             onPressed: songs.isEmpty
                 ? null
                 : () {
-                    HapticFeedback.mediumImpact();
+                    PulsrHaptics.mediumImpact();
                     context
                         .read<PlayerCubit>()
                         .playSong(songs.first, queue: songs);
@@ -414,7 +415,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             onPressed: songs.isEmpty
                 ? null
                 : () {
-                    HapticFeedback.mediumImpact();
+                    PulsrHaptics.mediumImpact();
                     final shuffled = List<SongsTableData>.from(songs)
                       ..shuffle();
                     context
@@ -778,7 +779,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         child: InkWell(
           borderRadius: AppRadii.r16All,
           onTap: () {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             context.read<PlayerCubit>().playSong(featuredSong, queue: songs);
           },
           child: Padding(
@@ -939,7 +940,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         onTap: isLast
                             ? null
                             : () {
-                                HapticFeedback.selectionClick();
+                                PulsrHaptics.selectionClick();
                                 context.push(
                                   '/folder',
                                   extra: FolderItem(
@@ -1118,11 +1119,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               child: InkWell(
                 borderRadius: AppRadii.r14All,
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   context.read<PlayerCubit>().playSong(song, queue: songs);
                 },
                 onLongPress: () {
-                  HapticFeedback.mediumImpact();
+                  PulsrHaptics.mediumImpact();
                   SongOptionsSheet.show(context, song: song);
                 },
                 child: Padding(
@@ -1229,7 +1230,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           color: isActive ? p.accent : p.textTertiary,
                         ),
                         onPressed: () {
-                          HapticFeedback.lightImpact();
+                          PulsrHaptics.lightImpact();
                           SongOptionsSheet.show(context, song: song);
                         },
                       ),
@@ -1433,7 +1434,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                     size: 28,
                                   ),
                                   onPressed: () {
-                                    HapticFeedback.mediumImpact();
+                                    PulsrHaptics.mediumImpact();
                                     context
                                         .read<PlayerCubit>()
                                         .playSong(songs.first, queue: songs);

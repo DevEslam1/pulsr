@@ -1,6 +1,5 @@
 // lib/features/player/presentation/widgets/player_volume_bar.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/motion/pulsr_motion.dart';
@@ -9,6 +8,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import '../../cubit/player_cubit.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class PlayerVolumeBar extends StatefulWidget {
   final PlayerCubit cubit;
   final Color activeColor;
@@ -67,7 +67,7 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
           Expanded(
             child: AnimatedContainer(
               duration: context.motionMs(150),
-              curve: Curves.easeOutCubic,
+              curve: context.motionCurve(PulsrMotion.enter),
               height: _isDragging ? 36.0 : 30.0,
               alignment: Alignment.center,
               child: PulsrSlider(
@@ -78,7 +78,7 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
                 semanticFormatterCallback: (v) => '${(v * 100).round()}%',
                 activeColor: widget.activeColor,
                 onChangeStart: (v) {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   setState(() {
                     _isDragging = true;
                     _dragVolume = v;
@@ -87,7 +87,7 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
                 onChanged: (v) {
                   final prev = _dragVolume ?? currentVolume;
                   if ((prev > 0.02 && v <= 0.02) || (prev < 0.98 && v >= 0.98)) {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                   }
                   setState(() => _dragVolume = v);
                   widget.cubit.setVolume(v);

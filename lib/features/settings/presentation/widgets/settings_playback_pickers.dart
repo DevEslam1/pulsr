@@ -1,6 +1,5 @@
 // lib/features/settings/presentation/widgets/settings_picker_sheets.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/settings_cubit.dart';
@@ -10,6 +9,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 void showMiniPlayerSwipePickerSheet(
   BuildContext context,
   SettingsCubit cubit, {
@@ -550,7 +550,7 @@ void showDspPreferencePickerSheet(
                     child: InkWell(
                       borderRadius: AppRadii.r16All,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         cubit.setDspPreference(opt.key);
                         Navigator.pop(ctx);
                       },

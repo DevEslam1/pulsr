@@ -1,6 +1,5 @@
 // lib/features/playlists/presentation/widgets/smart_playlist_card.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
@@ -10,6 +9,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// A smart playlist card matching the [PlaylistSuggestionCard] aesthetic for the
 /// horizontal rail on [PlaylistsScreen].
 class SmartPlaylistCard extends StatelessWidget {
@@ -73,7 +73,7 @@ class SmartPlaylistCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             onTap();
           },
           onLongPress: onLongPress,

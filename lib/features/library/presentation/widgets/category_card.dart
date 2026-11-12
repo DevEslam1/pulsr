@@ -40,7 +40,7 @@ class CategoryCard extends StatelessWidget {
         borderRadius: AppRadii.r18All,
         child: AnimatedContainer(
           duration: context.motionMs(180),
-          curve: Curves.easeOutCubic,
+          curve: context.motionCurve(PulsrMotion.enter),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s14),
           decoration: BoxDecoration(
             color:

@@ -1,12 +1,12 @@
 // lib/features/player/presentation/now_playing_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/services/system_ui_controller.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
@@ -21,6 +21,7 @@ import 'themes/player_theme.dart';
 import 'themes/theme_registry.dart';
 import 'widgets/canvas_backdrop.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
 
@@ -52,20 +53,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   }
 
   void _syncSystemUiForOrientation(Orientation orientation) {
-    if (orientation == Orientation.landscape) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      SystemChrome.setSystemUIOverlayStyle(
-        const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarDividerColor: Colors.transparent,
-          systemNavigationBarContrastEnforced: false,
-          systemStatusBarContrastEnforced: false,
-        ),
-      );
-    }
+    final isLandscape = orientation == Orientation.landscape;
+    SystemUiController.instance
+        .syncMode(owner: 'now_playing', immersive: isLandscape);
   }
 
   @override
@@ -81,18 +71,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     if (_isPopping) {
       _playerCubit.resetOverlayViews();
     }
-    // Leaving Now Playing must always hand the system chrome back to the app.
-    // Otherwise a landscape dwell leaves the app stuck in immersiveSticky.
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarDividerColor: Colors.transparent,
-        systemNavigationBarContrastEnforced: false,
-        systemStatusBarContrastEnforced: false,
-      ),
-    );
+    SystemUiController.instance.releaseImmersive('now_playing');
     super.dispose();
   }
 
@@ -399,7 +378,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
         final nowCrossed = newOffset > _dismissThreshold;
         if (nowCrossed != _crossedThreshold) {
           _crossedThreshold = nowCrossed;
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
         }
         setState(() {
           _dragOffset = newOffset;
@@ -421,7 +400,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     _isDragging = false;
     final velocity = details.primaryVelocity ?? 0;
     if (_dragOffset > _dismissThreshold || velocity > _dismissVelocity) {
-      HapticFeedback.lightImpact();
+      PulsrHaptics.lightImpact();
       widget.onDismiss();
     } else {
       _snapBack();

@@ -9,7 +9,6 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -37,6 +36,7 @@ import 'widgets/quick_discovery_header.dart';
 import 'widgets/recently_added_section.dart';
 import 'widgets/recently_played_section.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 export 'widgets/quick_actions_row.dart';
 export 'widgets/quick_card.dart';
 export 'widgets/quran_radio_hero_carousel.dart';
@@ -236,8 +236,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
   void _onLoginStateChanged() {
     if (!mounted) return;
+    context.read<HomeCubit>().clearCache();
     setState(() {
-      context.read<HomeCubit>().clearCache();
       final isLoggedIn = _ytmAccountService.isLoggedIn;
       _selectedOnlineCategory =
           isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
@@ -328,9 +328,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     );
                   }
                 } else {
-                  setState(() {
-                    context.read<HomeCubit>().clearCache();
-                  });
+                  context.read<HomeCubit>().clearCache();
                 }
               },
               child: ValueListenableBuilder<double>(
@@ -938,7 +936,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     label: Text(_categoryLabel(context, cat)),
                     selected: _selectedOnlineCategory == cat,
                     onSelected: (selected) {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       if (selected) {
                         setState(() => _selectedOnlineCategory = cat);
                       }

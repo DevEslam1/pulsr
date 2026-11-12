@@ -1,10 +1,14 @@
 // lib/features/settings/presentation/widgets/settings_picker_sheets.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/visualizer/milkdrop_preset_store.dart';
 import '../../../../data/visualizer/visualizer_preset_store.dart';
 import '../../../../l10n/generated/app_localizations.dart';
+import '../../../player/cubit/player_cubit.dart';
+import '../../../player/presentation/themes/player_theme.dart';
+import '../../../player/presentation/themes/theme_registry.dart';
 import '../../../player/presentation/widgets/audio_visualizer.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
@@ -363,6 +367,26 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
     super.dispose();
   }
 
+  Widget? _buildLivePreview(
+    BuildContext context,
+    PlayerThemeMode mode,
+    double scale,
+  ) {
+    try {
+      final playerCubit = context.read<PlayerCubit>();
+      final p = context.palette;
+      final props = PlayerThemeProps(
+        state: playerCubit.state,
+        cubit: playerCubit,
+        activeColor: widget.primaryColor,
+        bgColor: p.bg,
+      );
+      return ThemeRegistry.preview(mode, props, scale: scale);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -415,13 +439,81 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                           setState(() => _selectedMode = t.mode);
                           widget.cubit.setPlayerThemeMode(t.mode);
                         },
-                        child: _ThemeMockupCard(
-                          mode: t.mode,
-                          title: t.title,
-                          isSelected: isSelected,
-                          primaryColor: widget.primaryColor,
-                          cardColor: widget.cardColor,
-                          textPrimary: widget.textPrimary,
+                        child: Builder(
+                          builder: (context) {
+                            final live =
+                                _buildLivePreview(context, t.mode, 0.19);
+                            if (live == null) {
+                              return _ThemeMockupCard(
+                                mode: t.mode,
+                                title: t.title,
+                                isSelected: isSelected,
+                                primaryColor: widget.primaryColor,
+                                cardColor: widget.cardColor,
+                                textPrimary: widget.textPrimary,
+                              );
+                            }
+                            return Container(
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs,
+                              ),
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? widget.primaryColor
+                                        .withValues(alpha: 0.14)
+                                    : widget.cardColor,
+                                borderRadius: AppRadii.r16All,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? widget.primaryColor
+                                      : widget.outlineColor,
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: AppRadii.r10All,
+                                    child: live,
+                                  ),
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          t.title,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w800,
+                                            fontSize: AppFontSize.body,
+                                            color: isSelected
+                                                ? widget.primaryColor
+                                                : widget.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: AppSpacing.xxs),
+                                        Text(
+                                          t.subtitle,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: AppFontSize.label,
+                                            color: widget.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ),
@@ -459,10 +551,33 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                         ),
                       ),
                       child: ListTile(
-                        leading: _ThemePreviewThumbnail(
-                          mode: t.mode,
-                          isSelected: isSelected,
-                          primaryColor: widget.primaryColor,
+                        leading: Builder(
+                          builder: (context) {
+                            final live =
+                                _buildLivePreview(context, t.mode, 0.08);
+                            if (live == null) {
+                              return _ThemePreviewThumbnail(
+                                mode: t.mode,
+                                isSelected: isSelected,
+                                primaryColor: widget.primaryColor,
+                              );
+                            }
+                            return Container(
+                              decoration: BoxDecoration(
+                                borderRadius: AppRadii.r8All,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? widget.primaryColor
+                                      : widget.outlineColor,
+                                  width: isSelected ? 1.5 : 1.0,
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: AppRadii.r6All,
+                                child: live,
+                              ),
+                            );
+                          },
                         ),
                         title: Text(
                           t.title,

@@ -204,8 +204,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                     tooltip: widget.abPointA != null && widget.abPointB != null
                         ? l10n.repeat
                         : widget.abPointA != null
-                            ? 'Point A: ${Formatters.formatDuration(widget.abPointA!)} (${l10n.clearAbLoop})'
-                            : 'Set loop point A',
+                            ? '${l10n.loopPointALabel(Formatters.formatDuration(widget.abPointA!))} (${l10n.clearAbLoop})'
+                            : l10n.setLoopPointAHint,
                     buttonSize: abButtonSize,
                   ),
                 ),
@@ -505,8 +505,8 @@ class _PlayerControlsState extends State<PlayerControls> {
                     tooltip: widget.abPointA != null && widget.abPointB != null
                         ? l10n.repeat
                         : widget.abPointB != null
-                            ? 'Point B: ${Formatters.formatDuration(widget.abPointB!)} (${l10n.clearAbLoop})'
-                            : 'Set loop point B',
+                            ? '${l10n.loopPointBLabel(Formatters.formatDuration(widget.abPointB!))} (${l10n.clearAbLoop})'
+                            : l10n.setLoopPointBHint,
                     buttonSize: abButtonSize,
                   ),
                 ),

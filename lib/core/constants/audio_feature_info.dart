@@ -879,7 +879,9 @@ class AudioConflicts {
     }
 
     // 3. Extension matching
-    if (lowerPath.isNotEmpty && !lowerPath.startsWith('content://')) {
+    final isContentUri =
+        lowerPath.startsWith('content://') || lowerPath.startsWith('content:');
+    if (lowerPath.isNotEmpty && !isContentUri) {
       if (_losslessExtensions.any((ext) => lowerPath.endsWith(ext))) {
         return AudioSourceCodecState.lossless;
       }

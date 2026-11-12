@@ -6,12 +6,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/constants/prefs_keys.dart';
 import '../../../core/errors/error_message_resolver.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/responsive/layout_delegate.dart';
 import '../../../core/responsive/pulsr_hinge_gap.dart';
+import '../../../core/responsive/pulsr_responsive_tokens.dart';
 import '../../../core/router/app_router.dart';
 import '../../../core/router/safe_navigation.dart';
+import '../../../core/services/settings_cache.dart';
+import '../../../core/services/system_ui_controller.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -29,6 +33,7 @@ import 'widgets/player_shortcut_scope.dart';
 import 'widgets/stacked_bottom_dock.dart';
 import 'widgets/tablet_side_inspector.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class AppShell extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
   const AppShell({super.key, required this.navigationShell});
@@ -40,6 +45,7 @@ class AppShell extends StatefulWidget {
 class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   bool _isSideInspectorOpen = false;
   bool? _isSidebarExtended;
+  String? _loadedSidebarDeviceClass;
   // FIX-H9: Cap tab history at 50 entries with O(1) ListQueue trimming
   static const int _maxTabHistory = 50;
   final ListQueue<int> _tabHistory = ListQueue<int>()..add(0);
@@ -50,8 +56,6 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
   @visibleForTesting
   Stopwatch get backPressStopwatch => _backPressStopwatch;
-
-  bool? _lastImmersiveApplied;
 
   void _onModalStateChanged() {
     if (mounted) {
@@ -82,6 +86,14 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final deviceClassName = PulsrViewport.fromContext(context).deviceClass.name;
+    if (_loadedSidebarDeviceClass != deviceClassName) {
+      _loadedSidebarDeviceClass = deviceClassName;
+      final key = PrefsKeys.sidebarExtendedKey(deviceClassName);
+      _isSidebarExtended = SettingsCache().containsKey(key)
+          ? SettingsCache().getBool(key)
+          : null;
+    }
     _syncSystemUiForOrientation();
   }
 
@@ -94,23 +106,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         !isKeyboardOpen &&
         !isModalOpen;
 
-    if (_lastImmersiveApplied == shouldBeImmersive) return;
-    _lastImmersiveApplied = shouldBeImmersive;
-
-    if (shouldBeImmersive) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      SystemChrome.setSystemUIOverlayStyle(
-        const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          systemNavigationBarColor: Colors.transparent,
-          systemNavigationBarDividerColor: Colors.transparent,
-          systemNavigationBarContrastEnforced: false,
-          systemStatusBarContrastEnforced: false,
-        ),
-      );
-    }
+    SystemUiController.instance
+        .syncMode(owner: 'app_shell', immersive: shouldBeImmersive);
   }
 
   @override
@@ -119,7 +116,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ..stop()
       ..reset();
     if (state == AppLifecycleState.resumed) {
-      _lastImmersiveApplied = null;
+      SystemUiController.instance.invalidate();
       _syncSystemUiForOrientation();
     }
   }
@@ -132,7 +129,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _downloadEffectsSub?.cancel();
     PulsrModalTracker.isModalOpen.removeListener(_onModalStateChanged);
     WidgetsBinding.instance.removeObserver(this);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemUiController.instance.releaseImmersive('app_shell');
     super.dispose();
   }
 
@@ -144,7 +141,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       ..stop()
       ..reset();
 
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final isSameTab = index == widget.navigationShell.currentIndex;
 
     if (!isSameTab && (_tabHistory.isEmpty || _tabHistory.last != index)) {
@@ -429,91 +426,130 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
 
     // ── Tablet Layout (side rail + docked player bar) ──────────────────
     return Scaffold(
-      body: Row(
-        children: [
-          // Left Custom Aura Navigation Sidebar
-          LandscapeSidebar(
-            currentIndex: widget.navigationShell.currentIndex,
-            onDestinationSelected: _onTapNav,
-            isExtended: extendedRail,
-            onToggleExtended: () =>
-                setState(() => _isSidebarExtended = !extendedRail),
-            onOpenNowPlaying: () => _openNowPlaying(context),
-            onToggleSideInspector: canShowInspector
-                ? () =>
-                    setState(() => _isSideInspectorOpen = !_isSideInspectorOpen)
-                : null,
-            isSideInspectorOpen: inspectorOpen,
-            showNowPlayingTile: false,
-          ),
-          const PulsrHingeGap.horizontal(),
-
-          // Main Content Area with Bottom Docked Player Bar
-          Expanded(
-            child: SafeArea(
-              top: false,
-              bottom: false,
-              left: false,
-              right: true,
-              child: Stack(
-                children: [
-                  // Upper Screen Row: Active Screen + Optional Side Inspector
-                  Positioned.fill(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: PulsrDockAware(
-                            heightIncludesSafeArea: true,
-                            child: widget.navigationShell,
-                          ),
-                        ),
-                        AnimatedSwitcher(
-                          duration: context.motionMs(240),
-                          switchInCurve:
-                              context.motionCurve(Curves.easeOutCubic),
-                          switchOutCurve:
-                              context.motionCurve(Curves.easeInCubic),
-                          child: inspectorOpen
-                              ? Row(
-                                  key: const ValueKey('tablet_side_inspector'),
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    VerticalDivider(
-                                      width: 1,
-                                      thickness: 1,
-                                      color: p.hairline,
-                                    ),
-                                    TabletSideInspector(
-                                      onClose: () => setState(
-                                          () => _isSideInspectorOpen = false),
-                                    ),
-                                  ],
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Bottom Docked Tablet Player Bar
-                  PositionedDirectional(
-                    start: 0,
-                    end: 0,
-                    bottom: 0,
-                    child: TabletPlayerBar(
-                      onOpenNowPlaying: () => _openNowPlaying(context),
-                      onToggleSideInspector: canShowInspector
-                          ? () => setState(() =>
-                              _isSideInspectorOpen = !_isSideInspectorOpen)
-                          : null,
-                      isInspectorOpen: inspectorOpen,
-                    ),
-                  ),
-                ],
+      body: FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(),
+        child: Row(
+          children: [
+            // Left Custom Aura Navigation Sidebar
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(1.0),
+              child: LandscapeSidebar(
+                currentIndex: widget.navigationShell.currentIndex,
+                onDestinationSelected: _onTapNav,
+                isExtended: extendedRail,
+                onToggleExtended: () {
+                  final next = !extendedRail;
+                  setState(() => _isSidebarExtended = next);
+                  final deviceClassName = _loadedSidebarDeviceClass ??
+                      PulsrViewport.fromContext(context).deviceClass.name;
+                  SettingsCache().setBool(
+                    PrefsKeys.sidebarExtendedKey(deviceClassName),
+                    next,
+                  );
+                },
+                onOpenNowPlaying: () => _openNowPlaying(context),
+                onToggleSideInspector: canShowInspector
+                    ? () => setState(
+                        () => _isSideInspectorOpen = !_isSideInspectorOpen)
+                    : null,
+                isSideInspectorOpen: inspectorOpen,
+                showNowPlayingTile: false,
               ),
             ),
-          ),
-        ],
+            const PulsrHingeGap.horizontal(),
+
+            // Main Content Area with Bottom Docked Player Bar
+            Expanded(
+              child: SafeArea(
+                top: false,
+                bottom: false,
+                left: false,
+                right: true,
+                child: Stack(
+                  children: [
+                    // Upper Screen Row: Active Screen + Optional Side Inspector
+                    Positioned.fill(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FocusTraversalOrder(
+                              order: const NumericFocusOrder(2.0),
+                              child: PulsrDockAware(
+                                heightIncludesSafeArea: true,
+                                child: widget.navigationShell,
+                              ),
+                            ),
+                          ),
+                          AnimatedSwitcher(
+                            duration: context.motionMs(240),
+                            switchInCurve:
+                                context.motionCurve(Curves.easeOutCubic),
+                            switchOutCurve:
+                                context.motionCurve(Curves.easeInCubic),
+                            child: inspectorOpen
+                                ? Row(
+                                    key: const ValueKey('tablet_side_inspector'),
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      VerticalDivider(
+                                        width: 1,
+                                        thickness: 1,
+                                        color: p.hairline,
+                                      ),
+                                      FocusTraversalOrder(
+                                        order: const NumericFocusOrder(3.0),
+                                        child: TabletSideInspector(
+                                          onClose: () => setState(() =>
+                                              _isSideInspectorOpen = false),
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Bottom Docked Tablet Player Bar
+                    PositionedDirectional(
+                      start: 0,
+                      end: 0,
+                      bottom: 0,
+                      child: FocusTraversalOrder(
+                        order: const NumericFocusOrder(4.0),
+                        child: TabletPlayerBar(
+                          onOpenNowPlaying: () => _openNowPlaying(context),
+                          onToggleSideInspector: canShowInspector
+                              ? () => setState(() =>
+                                  _isSideInspectorOpen = !_isSideInspectorOpen)
+                              : null,
+                          isInspectorOpen: inspectorOpen,
+                        ),
+                      ),
+                    ),
+                    if (canShowInspector)
+                      PositionedDirectional(
+                        start: 0,
+                        end: 0,
+                        bottom: 0,
+                        child: GestureHintOverlay(
+                          hintKey: 'tablet_split_view',
+                          message: context.l10n.tabletSplitViewHint,
+                          icon: Icons.view_sidebar_rounded,
+                          padding: const EdgeInsetsDirectional.only(
+                            bottom: 96,
+                            start: 16,
+                            end: 16,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

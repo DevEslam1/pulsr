@@ -17,8 +17,8 @@ import 'smart_playlist_builder_cubit.dart';
 import 'smart_playlist_builder_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:flutter/services.dart';
 
+import '../../core/utils/pulsr_haptics.dart';
 class SmartPlaylistBuilderScreen extends StatelessWidget {
   final PlaylistsTableData? initialPlaylist;
 
@@ -255,7 +255,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                   onSelected: (_) {
-                                    HapticFeedback.selectionClick();
+                                    PulsrHaptics.selectionClick();
                                     cubit.toggleMatchAll(true);
                                   },
                                 ),
@@ -275,7 +275,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                   onSelected: (_) {
-                                    HapticFeedback.selectionClick();
+                                    PulsrHaptics.selectionClick();
                                     cubit.toggleMatchAll(false);
                                   },
                                 ),

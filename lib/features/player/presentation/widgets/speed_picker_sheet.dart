@@ -11,10 +11,13 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_slider.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:flutter/services.dart';
 
-class SpeedPickerSheet extends StatelessWidget {
+import '../../../../core/utils/pulsr_haptics.dart';
+class SpeedPickerSheet extends StatefulWidget {
   const SpeedPickerSheet({super.key});
+
+  @override
+  State<SpeedPickerSheet> createState() => _SpeedPickerSheetState();
 
   static Future<void> show(BuildContext context) {
     PlayerCubit? playerCubit;
@@ -103,6 +106,10 @@ class SpeedPickerSheet extends StatelessWidget {
       math.pow(2.0, semitones / 12.0).toDouble();
 
   static String formatSpeed(double speed) => '${speed.toStringAsFixed(2)}x';
+}
+
+class _SpeedPickerSheetState extends State<SpeedPickerSheet> {
+  double? _previewPitch;
 
   @override
   Widget build(BuildContext context) {
@@ -114,9 +121,9 @@ class SpeedPickerSheet extends StatelessWidget {
       builder: (context, playback) {
         final cubit = context.read<PlayerCubit>();
         final currentSpeed = playback.speed;
-        final currentPitch = playback.pitch;
+        final currentPitch = _previewPitch ?? playback.pitch;
         final options =
-            speedOptionsFor(cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
+            SpeedPickerSheet.speedOptionsFor(cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
         final semitones = currentPitch == 1.0
             ? 0
             : (12.0 *
@@ -162,7 +169,7 @@ class SpeedPickerSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    context.l10n.currentSpeed(formatSpeed(currentSpeed)),
+                    context.l10n.currentSpeed(SpeedPickerSheet.formatSpeed(currentSpeed)),
                     style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.bodySmall),
@@ -178,7 +185,7 @@ class SpeedPickerSheet extends StatelessWidget {
                           padding: const EdgeInsetsDirectional.only(
                               end: AppSpacing.xs),
                           child: ChoiceChip(
-                            label: Text(formatSpeed(speed)),
+                            label: Text(SpeedPickerSheet.formatSpeed(speed)),
                             selected: isSelected,
                             selectedColor: p.accent.withValues(alpha: 0.2),
                             backgroundColor: p.surfaceContainer,
@@ -192,7 +199,7 @@ class SpeedPickerSheet extends StatelessWidget {
                               color: isSelected ? p.accent : p.hairline,
                             ),
                             onSelected: (selected) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               if (selected) {
                                 cubit.setPlaybackSpeed(speed);
                               }
@@ -250,6 +257,10 @@ class SpeedPickerSheet extends StatelessWidget {
                     semanticFormatterCallback: (val) =>
                         '${val.toStringAsFixed(2)}x',
                     onChanged: (value) {
+                      setState(() => _previewPitch = value);
+                    },
+                    onChangeEnd: (value) {
+                      setState(() => _previewPitch = null);
                       cubit.setPlaybackPitch(value);
                     },
                   ),
@@ -289,7 +300,7 @@ class SpeedPickerSheet extends StatelessWidget {
                               color: isSelected ? p.accent : p.hairline,
                             ),
                             onSelected: (selected) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               if (selected) {
                                 cubit.setPlaybackPitch(pitch);
                               }
@@ -336,7 +347,7 @@ class SpeedPickerSheet extends StatelessWidget {
                         value: automixEnabled,
                         activeTrackColor: p.accent,
                         onChanged: (val) {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           settingsCubit?.setAutomixEnabled(val);
                         },
                       );

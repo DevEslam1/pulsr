@@ -2,7 +2,6 @@ import '../../../../core/utils/list_content_diff.dart';
 // lib/features/player/presentation/widgets/now_playing_queue_view.dart
 import 'dart:ui' show lerpDouble;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -22,6 +21,7 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../party/presentation/party_sheet.dart';
 import '../themes/player_theme.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class NowPlayingQueueView extends StatefulWidget {
   const NowPlayingQueueView({super.key});
 
@@ -116,7 +116,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
     PlayerCubit cubit,
     SongsTableData song,
   ) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     PulsrAdaptiveSheet.show<void>(
       context: context,
       titleText: song.title,
@@ -280,7 +280,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                       tooltip: context.l10n.partyListenTogether,
                       visualDensity: VisualDensity.compact,
                       onPressed: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         PartySheet.show(context);
                       },
                     ),

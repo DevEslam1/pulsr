@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
@@ -15,6 +14,7 @@ import '../utils/adaptive.dart';
 import 'pulsr_dock_tracker.dart';
 import 'pulsr_modal_tracker.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 enum PulsrToastPosition {
   aboveDock,
@@ -106,13 +106,13 @@ class PulsrToast {
 
     try {
       if (isError) {
-        HapticFeedback.heavyImpact();
+        PulsrHaptics.heavyImpact();
         SoundFeedbackService.playError();
       } else if (isSuccess) {
-        HapticFeedback.mediumImpact();
+        PulsrHaptics.mediumImpact();
         SoundFeedbackService.playSuccess();
       } else {
-        HapticFeedback.lightImpact();
+        PulsrHaptics.lightImpact();
       }
     } catch (_) {}
 
@@ -463,13 +463,13 @@ class _ToastWidgetState extends State<_ToastWidget>
                         behavior: HitTestBehavior.opaque,
                         onVerticalDragEnd: (details) {
                           if ((details.primaryVelocity ?? 0) > 80) {
-                            HapticFeedback.lightImpact();
+                            PulsrHaptics.lightImpact();
                             dismiss();
                           }
                         },
                         onHorizontalDragEnd: (details) {
                           if ((details.primaryVelocity ?? 0).abs() > 80) {
-                            HapticFeedback.lightImpact();
+                            PulsrHaptics.lightImpact();
                             dismiss();
                           }
                         },
@@ -621,7 +621,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                           child: GestureDetector(
                                             behavior: HitTestBehavior.opaque,
                                             onTap: () {
-                                              HapticFeedback.lightImpact();
+                                              PulsrHaptics.lightImpact();
                                               widget.action!.onPressed();
                                               dismiss();
                                             },
@@ -694,7 +694,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                       child: GestureDetector(
                                         behavior: HitTestBehavior.opaque,
                                         onTap: () {
-                                          HapticFeedback.lightImpact();
+                                          PulsrHaptics.lightImpact();
                                           dismiss();
                                         },
                                         child: SizedBox(

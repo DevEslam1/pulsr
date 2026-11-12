@@ -1,6 +1,5 @@
 // lib/core/widgets/pulsr_chip.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
@@ -10,6 +9,7 @@ import '../theme/aura_theme.dart';
 import '../theme/pulsr_button_style.dart';
 import 'pulsr_pressable.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 enum PulsrChipVariant {
   /// Filter toggle chips (shows check/dot when selected).
@@ -112,7 +112,7 @@ class PulsrChip extends StatelessWidget {
             widthFactor: 1.0,
             child: AnimatedContainer(
               duration: context.motion(PulsrDurations.tap),
-              curve: Curves.easeOutCubic,
+              curve: context.motionCurve(PulsrMotion.enter),
               constraints: const BoxConstraints(minWidth: 44, minHeight: 36),
               padding: EdgeInsetsDirectional.only(
                 start: AppSpacing.sm,
@@ -216,7 +216,7 @@ class PulsrChip extends StatelessWidget {
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           onDeleted!();
                         },
                         child: Container(

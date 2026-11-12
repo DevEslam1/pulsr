@@ -8,6 +8,7 @@ import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// A premium, interactive custom-painted slider with an organic wavy track.
 class PulsrSlider extends StatefulWidget {
@@ -142,7 +143,7 @@ class _PulsrSliderState extends State<PulsrSlider>
     final quantizedStep = (ratio * widget.divisions!).round();
     if (_isDragging && quantizedStep != _lastDivisionTick) {
       _lastDivisionTick = quantizedStep;
-      HapticFeedback.selectionClick();
+      PulsrHaptics.selectionClick();
     }
     return (quantizedStep / widget.divisions!) * (widget.max - widget.min) +
         widget.min;
@@ -154,7 +155,7 @@ class _PulsrSliderState extends State<PulsrSlider>
   void _onDragStart(double dx, double width, TextDirection direction) {
     setState(() => _isDragging = true);
     _expandController.forward();
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final val = _calculateValue(dx, width, direction);
     widget.onChangeStart?.call(val);
     widget.onChanged(val);
@@ -193,7 +194,7 @@ class _PulsrSliderState extends State<PulsrSlider>
         : (range / 20.0);
     final target =
         (widget.value + (step * multiplier)).clamp(widget.min, widget.max);
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     widget.onChanged(target);
     widget.onChangeEnd?.call(target);
   }

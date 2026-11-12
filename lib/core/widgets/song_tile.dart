@@ -99,7 +99,7 @@ class _SongTileState extends State<SongTile> {
 
         final materialRow = AnimatedContainer(
           duration: context.motionMs(160),
-          curve: Curves.easeOutCubic,
+          curve: context.motionCurve(PulsrMotion.enter),
           decoration: BoxDecoration(
             color: resolvedBg,
             borderRadius: AppRadii.r16All,
@@ -123,13 +123,7 @@ class _SongTileState extends State<SongTile> {
                 : null,
           ),
           clipBehavior: Clip.antiAlias,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: AppRadii.r16All,
-              onTap: widget.onTap,
-              onLongPress: widget.onLongPress,
-              child: LayoutBuilder(
+          child: LayoutBuilder(
                 builder: (context, constraints) {
                   final availableWidth = constraints.maxWidth.isFinite
                       ? constraints.maxWidth
@@ -276,22 +270,21 @@ class _SongTileState extends State<SongTile> {
                             SizedBox(width: spacingArtwork),
                           ],
                           Expanded(
-                            // Dense list rows keep a bounded height (58dp,
-                            // 48dp on narrow tiles), so the global 200% text
-                            // scale cannot be honoured inside them without
-                            // overflowing the row. Clamp the two text lines the
-                            // way the dock and mini player do, and leave the
-                            // rest of the app on the full scale.
-                            child: MediaQuery.withClampedTextScaling(
-                              maxScaleFactor: 1.4,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    song.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                            child: LayoutBuilder(
+                              builder: (context, textConstraints) => FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: AlignmentDirectional.centerStart,
+                                child: SizedBox(
+                                  width: textConstraints.maxWidth,
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        song.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
                                       color:
                                           isActive ? p.accent : p.textPrimary,
@@ -333,7 +326,9 @@ class _SongTileState extends State<SongTile> {
                                       ),
                                     ],
                                   ),
-                                ],
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -379,8 +374,6 @@ class _SongTileState extends State<SongTile> {
                   );
                 },
               ),
-            ),
-          ),
         );
 
         final tile = Semantics(

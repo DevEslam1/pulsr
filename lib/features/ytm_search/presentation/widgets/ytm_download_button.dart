@@ -1,6 +1,5 @@
 // lib/features/ytm_search/presentation/widgets/ytm_download_button.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
@@ -16,6 +15,7 @@ import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../../downloads/presentation/widgets/download_quality_picker_sheet.dart';
 import '../../cubit/ytm_download_cubit.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Routes a picker-confirmed [quality] into the queued task, where the
 /// repository persists it and hands it to the transfer service. Extracted to
 /// the top level so the wiring is unit-testable without the YTM UI being
@@ -62,7 +62,7 @@ class YtmDownloadButton extends StatelessWidget {
     BuildContext context,
     YtmDownloadCubit cubit,
   ) async {
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     String? defaultQuality;
     try {
       defaultQuality = (await DownloadSettings.load()).quality;
@@ -208,7 +208,7 @@ class YtmDownloadButton extends StatelessWidget {
                     color: p.error,
                   ),
                   onPressed: () {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     cubit.retryDownload(song);
                   },
                   visualDensity: VisualDensity.compact,
@@ -229,7 +229,7 @@ class YtmDownloadButton extends StatelessWidget {
                     color: baseColor,
                   ),
                   onPressed: () {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     cubit.download(song);
                   },
                   visualDensity: VisualDensity.compact,

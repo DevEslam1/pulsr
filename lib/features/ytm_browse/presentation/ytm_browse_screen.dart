@@ -1,6 +1,5 @@
 // lib/features/ytm_browse/presentation/ytm_browse_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -32,6 +31,7 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../cubit/ytm_browse_cubit.dart';
 import '../cubit/ytm_browse_state.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class YtmBrowseScreen extends StatelessWidget {
   const YtmBrowseScreen({super.key});
 
@@ -152,7 +152,7 @@ class _YtmBrowseView extends StatelessWidget {
                     onPressed: busy
                         ? null
                         : () {
-                            HapticFeedback.lightImpact();
+                            PulsrHaptics.lightImpact();
                             cubit.load(force: true);
                           },
                   ),
@@ -294,7 +294,7 @@ class _YtmBrowseView extends StatelessWidget {
                                   iconColor: p.accent,
                                   palette: p,
                                   onPressed: () {
-                                    HapticFeedback.selectionClick();
+                                    PulsrHaptics.selectionClick();
                                     context.read<PlayerCubit>().playSong(
                                           queueSongs.first,
                                           queue: queueSongs,
@@ -322,7 +322,7 @@ class _YtmBrowseView extends StatelessWidget {
                                         onPressed: busy
                                             ? null
                                             : () {
-                                                HapticFeedback.lightImpact();
+                                                PulsrHaptics.lightImpact();
                                                 cubit.refreshSection(section);
                                               },
                                       ),
@@ -438,7 +438,7 @@ class _YtmBrowseView extends StatelessWidget {
     SongsTableData song,
     PulsrPalette p,
   ) {
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       builder: (sheetCtx) => PulsrBottomSheet(
@@ -648,7 +648,7 @@ class _BrowseTrackCard extends StatelessWidget {
               type: MaterialType.transparency,
               child: InkWell(
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   context.read<PlayerCubit>().playSong(song, queue: queueSongs);
                 },
                 onLongPress: onLongPress,

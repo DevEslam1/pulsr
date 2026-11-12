@@ -324,7 +324,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
-                                    minWidth: 20, minHeight: 20),
+                                    minWidth: 48, minHeight: 48),
                                 onPressed: !state.isVirtualizerSupported ||
                                         !state.isVirtualizerEnabled ||
                                         state.virtualizerStrength <= 0.001
@@ -693,7 +693,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               : p.textSecondary,
                         ),
                         onSelected: (_) {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           cubit.setCrossfeedMode(0);
                         },
                       ),
@@ -714,7 +714,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               : p.textSecondary,
                         ),
                         onSelected: (_) {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           cubit.setCrossfeedMode(1);
                         },
                       ),
@@ -735,7 +735,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               : p.textSecondary,
                         ),
                         onSelected: (_) {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           cubit.setCrossfeedMode(2);
                         },
                       ),
@@ -756,7 +756,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               : p.textSecondary,
                         ),
                         onSelected: (_) {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           cubit.setCrossfeedMode(3);
                         },
                       ),
@@ -834,7 +834,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
-                                  minWidth: 20, minHeight: 20),
+                                  minWidth: 48, minHeight: 48),
                               onPressed:
                                   (state.crossfeedDelayUs - 350.0).abs() < 1.0
                                       ? null
@@ -899,7 +899,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
-                                  minWidth: 20, minHeight: 20),
+                                  minWidth: 48, minHeight: 48),
                               onPressed:
                                   (state.crossfeedFeedDb - (-9.0)).abs() < 0.05
                                       ? null
@@ -1053,7 +1053,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                                minWidth: 20, minHeight: 20),
+                                minWidth: 48, minHeight: 48),
                             onPressed:
                                 (state.limiterThresholdDb - (-0.2)).abs() < 0.05
                                     ? null
@@ -1116,7 +1116,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                                minWidth: 20, minHeight: 20),
+                                minWidth: 48, minHeight: 48),
                             onPressed:
                                 (state.limiterReleaseMs - 50.0).abs() < 0.5
                                     ? null
@@ -1312,7 +1312,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
-                              const BoxConstraints(minWidth: 20, minHeight: 20),
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
                           onPressed: dspBlocked != null ||
                                   !_nativePcmEffectsAvailable ||
                                   state.stereoBalance.abs() < 0.01
@@ -1507,7 +1507,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                                minWidth: 20, minHeight: 20),
+                                minWidth: 48, minHeight: 48),
                             onPressed: (state.reverbWetDry - 0.20).abs() < 0.01
                                 ? null
                                 : () => cubit.setReverb(true, wetDry: 0.20),
@@ -1625,7 +1625,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
         fontSize: AppFontSize.caption,
       ),
       onSelected: (_) {
-        HapticFeedback.selectionClick();
+        PulsrHaptics.selectionClick();
         cubit.setReverb(true, preset: preset.wireValue);
       },
     );
@@ -1680,7 +1680,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints:
-                        const BoxConstraints(minWidth: 20, minHeight: 20),
+                        const BoxConstraints(minWidth: 48, minHeight: 48),
                     onPressed: !enabled || isDefault
                         ? null
                         : () => onChanged(defaultValue),
@@ -2753,7 +2753,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       fontSize: AppFontSize.caption,
                     ),
                     onSelected: (_) {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       cubit.setDither(true, targetBitDepth: bits);
                     },
                   ),
@@ -3441,7 +3441,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       fontSize: AppFontSize.caption,
                     ),
                     onSelected: (_) {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       cubit.setDynamicBass(
                         true,
                         preset: 0,
@@ -3468,7 +3468,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                         fontSize: AppFontSize.caption,
                       ),
                       onSelected: (_) {
-                        HapticFeedback.selectionClick();
+                        PulsrHaptics.selectionClick();
                         cubit.setDynamicBass(
                           true,
                           preset: item.id,

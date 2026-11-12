@@ -1,6 +1,5 @@
 // lib/features/artist_detail/presentation/artist_detail_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -26,6 +25,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class ArtistDetailScreen extends StatefulWidget {
   final ArtistsTableData artist;
   final GetArtistsUseCase? getArtistsUseCase;
@@ -213,7 +213,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       child: InkWell(
                         borderRadius: AppRadii.r16All,
                         onTap: () {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           setState(() => _bioExpanded = !_bioExpanded);
                         },
                         child: Padding(

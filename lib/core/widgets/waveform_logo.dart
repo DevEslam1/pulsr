@@ -36,7 +36,7 @@ class _WaveformLogoState extends State<WaveformLogo>
       _controller = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 800),
-      )..repeat(reverse: true);
+      );
     }
   }
 

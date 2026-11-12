@@ -82,6 +82,7 @@ import 'silence_skip_controller.dart';
 import 'track_delay_manager.dart';
 import 'audio_handler_lifecycle_observer.dart';
 import 'headset_control_config.dart';
+import '../../core/utils/pulsr_haptics.dart';
 part 'audio_handler_dsp_bridge.dart';
 part 'audio_handler_sleep_bridge.dart';
 part 'audio_handler_streaming.dart';

@@ -1,17 +1,21 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
+import 'package:pulsr/core/services/settings_cache.dart';
+import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import 'nav_destinations.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class PulsrBottomNavBar extends StatefulWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -141,6 +145,21 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                       borderRadius: navRadius,
                       child: Builder(
                         builder: (context) {
+                          double glassIntensity;
+                          try {
+                            glassIntensity =
+                                context.select<SettingsCubit, double>(
+                              (c) => c.state.liquidGlassTint,
+                            );
+                          } on ProviderNotFoundException {
+                            glassIntensity = SettingsCache().getDouble(
+                              PrefsKeys.liquidGlassTint,
+                              defaultValue: 0.8,
+                            );
+                          }
+                          final allowBlur = AppBlur.canBlur(context,
+                                  enableBlur: widget.enableBlur) &&
+                              glassIntensity > 0.0;
                           final navContainer = DecoratedBox(
                             decoration: BoxDecoration(
                               borderRadius: navRadius,
@@ -149,16 +168,10 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   p.surfaceContainerHigh.withValues(
-                                    alpha: AppBlur.canBlur(context,
-                                            enableBlur: widget.enableBlur)
-                                        ? 0.88
-                                        : 1.0,
+                                    alpha: allowBlur ? 0.88 : 1.0,
                                   ),
                                   p.surfaceContainer.withValues(
-                                    alpha: AppBlur.canBlur(context,
-                                            enableBlur: widget.enableBlur)
-                                        ? 0.84
-                                        : 1.0,
+                                    alpha: allowBlur ? 0.84 : 1.0,
                                   ),
                                 ],
                               ),
@@ -245,8 +258,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                             ),
                           );
 
-                          if (!AppBlur.canBlur(context,
-                              enableBlur: widget.enableBlur)) {
+                          if (!allowBlur) {
                             return navContainer;
                           }
                           return BackdropFilter(
@@ -307,7 +319,7 @@ class _NavTabItem extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              HapticFeedback.selectionClick();
+              PulsrHaptics.selectionClick();
               onTap();
             },
             borderRadius: itemRadius,
@@ -315,7 +327,7 @@ class _NavTabItem extends StatelessWidget {
             highlightColor: Colors.transparent,
             child: AnimatedContainer(
               duration: context.motionMs(220),
-              curve: Curves.easeOutCubic,
+              curve: context.motionCurve(PulsrMotion.enter),
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               padding: EdgeInsets.symmetric(
                 horizontal: isTablet ? 10 : 6,
@@ -386,13 +398,10 @@ class _NavTabItem extends StatelessWidget {
                         ),
                       ],
                     )
-                  : MediaQuery.withClampedTextScaling(
-                      minScaleFactor: 0.8,
-                      maxScaleFactor: 1.4,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
                           // Selection LED capsule: grows and lights up when active.
                           AnimatedContainer(
                             duration: context.motionMs(220),
@@ -456,7 +465,6 @@ class _NavTabItem extends StatelessWidget {
                           ),
                         ],
                       ),
-                    ),
             ),
           ),
         ),

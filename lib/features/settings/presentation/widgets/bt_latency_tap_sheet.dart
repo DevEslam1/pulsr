@@ -16,6 +16,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class _BeepSource extends StreamAudioSource {
   final Uint8List bytes;
   _BeepSource(this.bytes);
@@ -170,7 +171,7 @@ class BtLatencyTapSheetState extends State<BtLatencyTapSheet> {
     final delta = DateTime.now().difference(_lastBeepAt!).inMilliseconds;
     if (delta < 0 || delta > 1500) return;
     _deltas.add(delta);
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     if (_deltas.length >= kTrials) {
       _finish();
     } else {

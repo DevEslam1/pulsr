@@ -318,6 +318,15 @@ mixin SettingsAppearanceSection
           onChanged: cubit.setReduceMotion,
         ),
         _divider(p),
+        _switchTile(
+          context,
+          Icons.vibration_rounded,
+          context.l10n.settingsHapticsTitle,
+          context.l10n.settingsHapticsSubtitle,
+          value: state.hapticsEnabled,
+          onChanged: cubit.setHapticsEnabled,
+        ),
+        _divider(p),
         ValueListenableBuilder<bool>(
           valueListenable: SoundFeedbackService.enabledNotifier,
           builder: (context, soundEnabled, _) {

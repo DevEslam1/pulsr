@@ -1,6 +1,5 @@
 // lib/features/settings/presentation/widgets/audio_sound_section.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -41,6 +40,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 part 'audio_sound_dop_selector.dart';
 part 'audio_sound_dac_voicing_selector.dart';
 part 'audio_output_section.dart';
@@ -158,7 +158,7 @@ class _AudioEffectsDspSectionState extends State<AudioEffectsDspSection> {
             child: InkWell(
               borderRadius: AppRadii.cardRadius,
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 showStudioExplainerSheet(context);
               },
               child: Padding(

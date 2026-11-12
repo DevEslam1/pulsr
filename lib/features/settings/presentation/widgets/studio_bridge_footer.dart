@@ -1,6 +1,5 @@
 // lib/features/settings/presentation/widgets/studio_bridge_footer.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/app_radii.dart';
@@ -12,6 +11,7 @@ import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// A subtle Normal-mode bridge that tells the user how many Professional
 /// ("Studio") controls are hidden in the current section, and offers a single
 /// discoverable path to unlock them. Renders nothing in Professional mode.
@@ -41,7 +41,7 @@ class StudioBridgeFooter extends StatelessWidget {
         child: InkWell(
           borderRadius: AppRadii.r12All,
           onTap: () {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             showStudioExplainerSheet(context);
           },
           child: Container(
@@ -146,7 +146,7 @@ Future<void> showStudioExplainerSheet(BuildContext context) {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: () {
-                  HapticFeedback.mediumImpact();
+                  PulsrHaptics.mediumImpact();
                   context
                       .read<SettingsCubit>()
                       .setExperienceMode(ExperienceMode.professional);

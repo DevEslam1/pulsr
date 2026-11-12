@@ -1,16 +1,6 @@
 part of 'equalizer_sheet.dart';
 
 extension _EqSheetShell on _EqualizerSheetState {
-  bool _isStudio(BuildContext context) {
-    if (_isStudioModeOverride != null) return _isStudioModeOverride!;
-    try {
-      final settings = context.watch<SettingsCubit>().state;
-      return settings.isProfessional;
-    } catch (_) {
-      return false;
-    }
-  }
-
   void _setStudioMode(BuildContext context, bool studio) {
     _setStateSafe(() => _isStudioModeOverride = studio);
     try {
@@ -1107,7 +1097,7 @@ extension _EqSheetShell on _EqualizerSheetState {
               onSelected: dspBlocked != null
                   ? null
                   : (_) {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       if (!state.isEqEnabled) {
                         cubit.setEqualizerEnabled(true);
                       }
@@ -1131,7 +1121,7 @@ extension _EqSheetShell on _EqualizerSheetState {
             label: Text(context.l10n.eqUnlockStudioConsole,
                 style: const TextStyle(fontSize: AppFontSize.label)),
             onPressed: () {
-              HapticFeedback.lightImpact();
+              PulsrHaptics.lightImpact();
               _setStudioMode(context, true);
             },
           ),
@@ -1239,7 +1229,7 @@ extension _EqSheetShell on _EqualizerSheetState {
             Expanded(
               child: GestureDetector(
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   _setStudioMode(context, false);
                 },
                 child: AnimatedContainer(
@@ -1289,7 +1279,7 @@ extension _EqSheetShell on _EqualizerSheetState {
             Expanded(
               child: GestureDetector(
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   _setStudioMode(context, true);
                 },
                 child: AnimatedContainer(
@@ -1438,7 +1428,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                 onSelected: dspBlocked != null
                     ? null
                     : (_) {
-                        HapticFeedback.selectionClick();
+                        PulsrHaptics.selectionClick();
                         if (!state.isEqEnabled) {
                           cubit.setEqualizerEnabled(true);
                         }
@@ -1469,7 +1459,7 @@ extension _EqSheetShell on _EqualizerSheetState {
               icon: const Icon(Icons.tune_rounded, size: 20),
               label: Text(context.l10n.eqUnlockStudioConsole),
               onPressed: () {
-                HapticFeedback.lightImpact();
+                PulsrHaptics.lightImpact();
                 _setStudioMode(context, true);
               },
             ),
@@ -1577,7 +1567,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   final step = ((v + 12.0) * 2).round();
                   if (step != _lastMacroHapticStep) {
                     _lastMacroHapticStep = step;
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                   }
                   onChanged(v);
                 },
@@ -1678,7 +1668,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                               onSelected: dspBlocked != null
                                   ? null
                                   : (_) {
-                                      HapticFeedback.selectionClick();
+                                      PulsrHaptics.selectionClick();
                                       if (!state.isEqEnabled) {
                                         cubit.setEqualizerEnabled(true);
                                       }
@@ -2216,13 +2206,13 @@ extension _EqSheetShell on _EqualizerSheetState {
                       Tooltip(
                         message: _autoPreampEnabled
                             ? context.l10n.autoPreampActiveClipping
-                            : 'Auto Preamp: Off (Tap to protect against clipping)',
+                            : context.l10n.autoPreampOffHint,
                         child: InkWell(
                           borderRadius: AppRadii.r8All,
                           onTap: dspBlocked != null
                               ? null
                               : () {
-                                  HapticFeedback.selectionClick();
+                                  PulsrHaptics.selectionClick();
                                   _setStateSafe(() {
                                     _autoPreampEnabled = !_autoPreampEnabled;
                                     if (_autoPreampEnabled) {
@@ -2290,7 +2280,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           onTap: dspBlocked != null
                               ? null
                               : () {
-                                  HapticFeedback.selectionClick();
+                                  PulsrHaptics.selectionClick();
                                   cubit.resetToFlat();
                                 },
                           child: Container(
@@ -2336,7 +2326,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           onTap: dspBlocked != null
                               ? null
                               : () {
-                                  HapticFeedback.lightImpact();
+                                  PulsrHaptics.lightImpact();
                                   _showCustomFrequencyEditor(cubit, state);
                                 },
                           child: Container(
@@ -2493,9 +2483,12 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 ),
                                 Text(
                                   state.selectedHeadphoneProfile != null
-                                      ? 'Manual override (AutoEQ suggests '
-                                          '${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB)'
-                                      : 'Output gain applied before the EQ',
+                                      ? context.l10n.autoPreampManualOverride(
+                                          state.selectedHeadphoneProfile!
+                                              .preampGain
+                                              .toStringAsFixed(1),
+                                        )
+                                      : context.l10n.preampOutputGainHint,
                                   style: TextStyle(
                                       fontSize: AppFontSize.caption,
                                       color: p.textTertiary),
@@ -2548,7 +2541,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                             visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
-                                minWidth: 24, minHeight: 24),
+                                minWidth: 48, minHeight: 48),
                             onPressed: currentPreamp.abs() <= 0.05 ||
                                     dspBlocked != null
                                 ? null
@@ -2764,7 +2757,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
-                              const BoxConstraints(minWidth: 24, minHeight: 24),
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
                           onPressed: preset.bassBoost <= 0.001 ||
                                   dspBlocked != null ||
                                   !state.isBassBoostSupported
@@ -2945,7 +2938,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
-                              const BoxConstraints(minWidth: 24, minHeight: 24),
+                              const BoxConstraints(minWidth: 48, minHeight: 48),
                           onPressed: state.volumeBoost <= 0.001 ||
                                   dspBlocked != null ||
                                   !state.isVolumeBoostSupported

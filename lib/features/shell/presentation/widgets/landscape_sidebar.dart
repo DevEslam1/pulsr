@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -17,6 +16,7 @@ import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../nav_destinations.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// The 4 navigation rail display modes based on screen width/posture.
 enum SidebarRailMode {
   hidden,
@@ -329,7 +329,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                             ? context.l10n.badgeOn
                                             : null,
                                         onTap: () {
-                                          HapticFeedback.selectionClick();
+                                          PulsrHaptics.selectionClick();
                                           widget.onToggleSideInspector!();
                                         },
                                       ),

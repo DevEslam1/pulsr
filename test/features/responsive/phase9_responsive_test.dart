@@ -49,7 +49,7 @@ void main() {
         MaterialApp(
           home: Builder(
             builder: (context) {
-              expect(Adaptive.windowOf(context), WindowClass.medium);
+              expect(Adaptive.windowOf(context), WindowClass.expanded);
               expect(Adaptive.isTablet(context), isTrue);
               expect(context.isLandscape, isTrue);
               expect(context.isTwoPane, isTrue);

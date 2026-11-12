@@ -1,13 +1,11 @@
 // lib/features/player/presentation/themes/cassette_player_theme.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
-import '../../../settings/cubit/settings_cubit.dart';
-import '../../../settings/cubit/settings_state.dart';
+import '../widgets/player_gesture_scope.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
@@ -32,6 +30,12 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
     with TickerProviderStateMixin {
   late final AnimationController _spoolController;
   late final AnimationController _spoolVelocityController;
+
+  @visibleForTesting
+  bool get isSpoolAnimating => _spoolController.isAnimating;
+
+  @visibleForTesting
+  AnimationController get spoolController => _spoolController;
 
   @override
   void initState() {
@@ -59,13 +63,17 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
   void _updateSpoolSpeed() {
     final speed = widget.props.state.playbackSpeed.clamp(0.25, 4.0);
     final baseDurationMs = (4000 / speed).round();
-    _spoolController.duration = context.motionMs(baseDurationMs);
+    _spoolController.duration =
+        Duration(milliseconds: math.max(1, baseDurationMs));
   }
 
-  void _syncSpool() {
-    final shouldAnimate = widget.props.state.isPlaying && context.motionEnabled;
+  void _syncSpool({bool restartIfAnimating = false}) {
+    final duration = _spoolController.duration;
+    final hasValidDuration = duration != null && duration > Duration.zero;
+    final shouldAnimate =
+        widget.props.state.isPlaying && context.motionEnabled && hasValidDuration;
     if (shouldAnimate) {
-      if (!_spoolController.isAnimating) {
+      if (!_spoolController.isAnimating || restartIfAnimating) {
         _spoolController.repeat();
       }
       _spoolVelocityController.animateTo(
@@ -74,7 +82,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
         curve: Curves.easeOutCubic,
       );
     } else {
-      if (!context.motionEnabled) {
+      if (!context.motionEnabled || !hasValidDuration) {
+        _spoolVelocityController.stop();
         _spoolVelocityController.value = 0.0;
         if (_spoolController.isAnimating) {
           _spoolController.stop();
@@ -87,7 +96,9 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
               curve: Curves.decelerate,
             )
             .whenComplete(() {
-              if (mounted && !widget.props.state.isPlaying && _spoolVelocityController.value == 0.0) {
+              if (mounted &&
+                  !widget.props.state.isPlaying &&
+                  _spoolVelocityController.value == 0.0) {
                 _spoolController.stop();
               }
             });
@@ -98,14 +109,12 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
   @override
   void didUpdateWidget(covariant CassettePlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.props.state.playbackSpeed !=
-        oldWidget.props.state.playbackSpeed) {
+    final speedChanged = widget.props.state.playbackSpeed !=
+        oldWidget.props.state.playbackSpeed;
+    if (speedChanged) {
       _updateSpoolSpeed();
-      if (_spoolController.isAnimating) {
-        _spoolController.repeat();
-      }
     }
-    _syncSpool();
+    _syncSpool(restartIfAnimating: speedChanged);
   }
 
   @override

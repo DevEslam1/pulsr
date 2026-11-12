@@ -147,7 +147,7 @@ mixin PhoneLayoutSection
             child: PulsrPressable(
               pressedScale: 0.985,
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 AudioSetupWizardSheet.show(context, cubit: cubit);
               },
               child: Container(
@@ -350,7 +350,7 @@ class _DashboardCategoryCard extends StatelessWidget {
             child: PulsrPressable(
               pressedScale: 0.985,
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 onTap();
               },
               child: Container(

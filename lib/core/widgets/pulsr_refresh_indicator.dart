@@ -1,6 +1,5 @@
 // lib/core/widgets/pulsr_refresh_indicator.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../theme/aura_theme.dart';
 import '../utils/pulsr_haptics.dart';
 
@@ -43,7 +42,7 @@ class PulsrRefreshIndicator extends StatelessWidget {
         try {
           await onRefresh();
         } finally {
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
         }
       },
       child: child,

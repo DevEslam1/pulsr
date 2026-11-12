@@ -23,7 +23,7 @@ extension _EqPresetCarousel on _EqualizerSheetState {
     await cubit.setViperDdcEnabled(false);
     await cubit.setArbitraryEqEnabled(false);
     await cubit.setLiveProgEnabled(false);
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     if (!context.mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(

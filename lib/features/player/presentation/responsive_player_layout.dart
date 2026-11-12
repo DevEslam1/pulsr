@@ -1,7 +1,6 @@
 // lib/features/player/presentation/responsive_player_layout.dart
 import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
@@ -32,6 +31,7 @@ import 'widgets/quran_mode_sheet.dart';
 import 'widgets/quran_mushaf_view.dart';
 import 'widgets/player_more_sheet.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 /// Responsive layout coordinator for the Now Playing screen.
 ///
 /// Automatically adapts between:
@@ -327,7 +327,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                             tabletHorizontalPadding: 0,
                             verticalPadding: AppSpacing.s2,
                             onDismiss: () {
-                              HapticFeedback.lightImpact();
+                              PulsrHaptics.lightImpact();
                               try {
                                 final router = GoRouter.of(context);
                                 if (router.canPop()) {
@@ -621,7 +621,7 @@ class _FoldableTabletopLayout extends StatelessWidget {
                             isActive: state.isLyricsVisible,
                             activeColor: activeColor,
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               cubit.toggleLyricsVisibility();
                             },
                           ),
@@ -631,7 +631,7 @@ class _FoldableTabletopLayout extends StatelessWidget {
                             isActive: state.isQueueVisible,
                             activeColor: activeColor,
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               cubit.toggleQueueVisibility();
                             },
                           ),
@@ -641,7 +641,7 @@ class _FoldableTabletopLayout extends StatelessWidget {
                             isActive: state.isEqEnabled,
                             activeColor: activeColor,
                             onTap: () {
-                              HapticFeedback.lightImpact();
+                              PulsrHaptics.lightImpact();
                               EqualizerSheet.show(context);
                             },
                           ),
@@ -762,7 +762,7 @@ class _QuickDspControls extends StatelessWidget {
             PulsrPressable(
               pressedScale: 0.95,
               onTap: () {
-                HapticFeedback.lightImpact();
+                PulsrHaptics.lightImpact();
                 EqualizerSheet.show(context);
               },
               child: Container(
@@ -826,7 +826,7 @@ class _QuickDspControls extends StatelessWidget {
             value: true,
             activeColor: AppColors.quranEmerald,
             onChanged: (v) {
-              HapticFeedback.selectionClick();
+              PulsrHaptics.selectionClick();
               QuranModeSheet.show(context);
             },
           ),
@@ -850,7 +850,7 @@ class _QuickDspControls extends StatelessWidget {
           value: state.isEqEnabled,
           activeColor: activeColor,
           onChanged: (v) {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             cubit.setEqualizerEnabled(v);
           },
         ),
@@ -862,7 +862,7 @@ class _QuickDspControls extends StatelessWidget {
           value: state.isLimiterEnabled,
           activeColor: activeColor,
           onChanged: (v) {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             cubit.setLookaheadLimiter(v);
           },
         ),
@@ -876,7 +876,7 @@ class _QuickDspControls extends StatelessWidget {
           value: state.isViperDdcEnabled,
           activeColor: activeColor,
           onChanged: (v) {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             cubit.setViperDdcEnabled(v);
           },
         ),
@@ -1244,7 +1244,7 @@ class _TabletLandscapeFloatingDock extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   onTap();
                 },
                 borderRadius: AppRadii.r16All,

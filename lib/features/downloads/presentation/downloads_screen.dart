@@ -29,6 +29,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 enum DownloadFilter { all, downloading, completed, failed }
 
 /// Returns the subset of [selected] that still maps to a live task. Extracted
@@ -127,7 +128,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
         borderRadius: AppRadii.r12All,
       ),
       onSelected: (_) {
-        HapticFeedback.selectionClick();
+        PulsrHaptics.selectionClick();
         setState(() {
           _filter = filter;
           // Prune selections that are not part of the newly filtered list, so

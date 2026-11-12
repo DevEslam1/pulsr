@@ -1,7 +1,6 @@
 // lib/core/widgets/pulsr_dialog.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -14,6 +13,7 @@ import '../utils/l10n_extensions.dart';
 import 'glass_container.dart';
 import 'pulsr_modal_tracker.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// Uniform dialog entry-points used across the entire app.
 ///
@@ -133,12 +133,12 @@ class PulsrDialogHelper {
             if (isDestructive) {
               if (confirm.toLowerCase().contains('delete') ||
                   title.toLowerCase().contains('delete')) {
-                HapticFeedback.heavyImpact();
+                PulsrHaptics.heavyImpact();
               } else {
-                HapticFeedback.mediumImpact();
+                PulsrHaptics.mediumImpact();
               }
             } else {
-              HapticFeedback.selectionClick();
+              PulsrHaptics.selectionClick();
             }
             Navigator.of(context, rootNavigator: true).pop(true);
           },
@@ -242,7 +242,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
   void _submit() {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
-      HapticFeedback.lightImpact();
+      PulsrHaptics.lightImpact();
       Navigator.of(context, rootNavigator: true).pop(text);
     }
   }
@@ -374,8 +374,8 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
 /// Features rounded corners (24px), subtle specular border, soft glow shadow,
 /// and frosted translucent backdrop.
 class PulsrDialog extends StatelessWidget {
-  final dynamic icon;
-  final dynamic title;
+  final Object? icon;
+  final Object? title;
   final Widget? content;
   final List<Widget>? actions;
 
@@ -385,30 +385,27 @@ class PulsrDialog extends StatelessWidget {
     this.title,
     this.content,
     this.actions,
-  });
+  })  : assert(icon == null || icon is Widget || icon is IconData,
+            'icon must be a Widget or IconData'),
+        assert(title == null || title is Widget || title is String,
+            'title must be a Widget or String');
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    Widget? iconWidget;
-    Color badgeColor = p.accent;
-    if (icon is Icon) {
-      final ic = icon as Icon;
-      iconWidget = ic;
-      if (ic.color != null) badgeColor = ic.color!;
-    } else if (icon is Widget) {
-      iconWidget = icon as Widget;
-    } else if (icon is IconData) {
-      iconWidget = Icon(icon as IconData, size: 26, color: p.accent);
-    }
+    final (Widget? iconWidget, Color badgeColor) = switch (icon) {
+      Icon ic => (ic, ic.color ?? p.accent),
+      Widget w => (w, p.accent),
+      IconData data => (Icon(data, size: 26, color: p.accent), p.accent),
+      _ => (null, p.accent),
+    };
 
-    Widget? titleWidget;
-    if (title is Widget) {
-      titleWidget = title as Widget;
-    } else if (title is String) {
-      titleWidget = Text(title as String);
-    }
+    final Widget? titleWidget = switch (title) {
+      final Widget w => w,
+      final String s => Text(s),
+      _ => null,
+    };
 
     return Dialog(
       backgroundColor: Colors.transparent,

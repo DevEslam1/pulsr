@@ -62,7 +62,7 @@ class _AdvancedDisclosureState extends State<_AdvancedDisclosure>
             child: InkWell(
               borderRadius: AppRadii.r12All,
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 setState(() {
                   _expanded = !_expanded;
                   if (_expanded) {
@@ -724,7 +724,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
             disabledReason: isAndroid ? null : unsupported,
             onTap: isAndroid
                 ? () {
-                    HapticFeedback.lightImpact();
+                    PulsrHaptics.lightImpact();
                     if (onShowDspPreference != null) {
                       onShowDspPreference!(context, cubit, state.dspPreference);
                     } else {

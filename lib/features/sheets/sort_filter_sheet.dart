@@ -1,6 +1,5 @@
 // lib/features/sheets/sort_filter_sheet.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../core/constants/app_radii.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/l10n_extensions.dart';
@@ -9,6 +8,7 @@ import '../../core/widgets/pulsr_pressable.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../core/utils/pulsr_haptics.dart';
 class _SortOptionSpec {
   final String key;
   final String label;
@@ -60,7 +60,7 @@ class SortFilterSheet extends StatelessWidget {
     };
     final isSelected = currentSort == key;
     final newAsc = isSelected ? !ascending : !descendingFirst.contains(key);
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     onApply(key, newAsc);
     Navigator.pop(context);
   }
@@ -120,7 +120,7 @@ class SortFilterSheet extends StatelessWidget {
       trailing: PulsrPressable(
         pressedScale: 0.95,
         onTap: () {
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           onApply(currentSort, !ascending);
           Navigator.pop(context);
         },

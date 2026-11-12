@@ -276,7 +276,7 @@ class _PulsrButtonState extends State<PulsrButton> {
 
     final visual = AnimatedContainer(
       duration: context.motionMs(150),
-      curve: Curves.easeOutCubic,
+      curve: context.motionCurve(PulsrMotion.enter),
       constraints: BoxConstraints(minHeight: _height),
       padding: _padding.add(
         const EdgeInsets.symmetric(vertical: AppSpacing.xs),

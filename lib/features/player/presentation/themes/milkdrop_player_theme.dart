@@ -10,6 +10,7 @@ import '../../../../core/widgets/cached_artwork.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../widgets/audio_visualizer.dart';
+import '../widgets/player_gesture_scope.dart';
 import 'player_shape.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
@@ -34,26 +35,12 @@ class MilkdropPlayerTheme extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = props.state;
-    final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    final (
-      :nowPlayingDoubleTap,
-      :nowPlayingArtworkSwipe,
-      :themeMode,
-    ) = context.select<
-        SettingsCubit,
-        ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-          AppThemeMode themeMode,
-        })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-          themeMode: c.state.themeMode,
-        ));
+    final themeMode =
+        context.select<SettingsCubit, AppThemeMode>((c) => c.state.themeMode);
 
     final artRadius = resolveCustomRadius(context, AppRadii.r28);
     final isAmoled = themeMode == AppThemeMode.amoled;
@@ -171,32 +158,7 @@ class MilkdropPlayerTheme extends StatelessWidget {
           ],
         ),
       ),
-      stage: (context, metrics) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => cubit.toggleLyricsVisibility(),
-        onDoubleTap: () {
-          switch (nowPlayingDoubleTap) {
-            case NowPlayingDoubleTapAction.toggleFavorite:
-              if (song != null) cubit.toggleFavorite(song.id);
-              break;
-            case NowPlayingDoubleTapAction.toggleLyrics:
-              cubit.toggleLyricsVisibility();
-              break;
-            case NowPlayingDoubleTapAction.none:
-              break;
-          }
-        },
-        onHorizontalDragEnd: (details) {
-          if (nowPlayingArtworkSwipe ==
-                  NowPlayingArtworkSwipeAction.nextPrev &&
-              details.primaryVelocity != null) {
-            if (details.primaryVelocity! < -200) {
-              cubit.next();
-            } else if (details.primaryVelocity! > 200) {
-              cubit.previous();
-            }
-          }
-        },
+      stage: (context, metrics) => PlayerGestureScope(
         child: Center(
           key: const ValueKey('artwork_view_milkdrop'),
           child: AnimatedScale(

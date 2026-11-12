@@ -1,13 +1,15 @@
 import 'dart:math' as math;
 import 'dart:ui' show DisplayFeature, DisplayFeatureType;
 import 'package:flutter/material.dart';
+import '../responsive/breakpoints.dart';
+import '../responsive/pulsr_responsive_tokens.dart';
 
 enum WindowClass { compact, medium, expanded }
 
 /// Adaptive layout engine: phone → bottom nav, tablet → side rail + grids.
 abstract class Adaptive {
   static const double compactBreakpoint = 600;
-  static const double tabletBreakpoint = 700;
+  static const double tabletBreakpoint = 600;
   static const double railExtendedBreakpoint = 1000;
   static const double maxContentWidth = 1160;
   static const double maxSheetWidth = 620;
@@ -63,17 +65,18 @@ abstract class Adaptive {
       MediaQuery.sizeOf(context).height;
 
   static WindowClass windowOf(BuildContext context) {
-    final w = widthOf(context);
-    if (w >= 1200) return WindowClass.expanded;
-    if (w >= tabletBreakpoint) return WindowClass.medium;
-    return WindowClass.compact;
+    final bp = PulsrBreakpoint.of(context);
+    return switch (bp) {
+      PulsrBreakpoint.compact => WindowClass.compact,
+      PulsrBreakpoint.medium => WindowClass.medium,
+      PulsrBreakpoint.expanded || PulsrBreakpoint.large => WindowClass.expanded,
+    };
   }
 
   static bool isTablet(BuildContext context) {
-    final w = widthOf(context);
-    final h = heightOf(context);
-    final smallestDim = math.min(w, h);
-    return smallestDim >= 600.0 || (w >= tabletBreakpoint && h >= 550.0);
+    final vp = PulsrViewport.of(context);
+    return vp.deviceClass == PulsrDeviceClass.tablet ||
+        vp.deviceClass == PulsrDeviceClass.desktop;
   }
 
   static bool isLandscape(BuildContext context) =>
@@ -139,13 +142,8 @@ abstract class Adaptive {
     return requested;
   }
 
-  static double pagePadding(BuildContext context) {
-    final w = widthOf(context);
-    if (w >= 1200) return 32;
-    if (w >= tabletBreakpoint) return 24;
-    if (w < 360) return 12;
-    return 16;
-  }
+  static double pagePadding(BuildContext context) =>
+      PulsrViewport.of(context).pagePadding;
 
   /// Center-rail constraint for readable ultra-wide layouts.
   static BoxConstraints contentConstraints(BuildContext context) =>

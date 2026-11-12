@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
@@ -57,6 +56,7 @@ import '../cubit/playlist_state.dart';
 import 'widgets/playlist_suggestion_card.dart';
 import 'widgets/smart_playlist_card.dart';
 import 'widgets/spotify_import_dialog.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 part 'playlists_screen_components.dart';
 
 enum _PlaylistTabMode { local, online }
@@ -109,7 +109,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     PlaylistSuggestion suggestion,
   ) async {
     if (!_creatingSuggestions.add(suggestion.title)) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final createFailedText = context.l10n.suggestCreateFailed;
     final loc = context.l10n;
     final useCases = getIt<PlaylistUseCases>();
@@ -151,7 +151,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   void _onSelectPlaylist(PlaylistsTableData pl) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     if (context.isTwoPanePlaylist) {
       setState(() => _selectedPlaylist = pl);
     } else {
@@ -578,7 +578,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: context.l10n.syncOnlineLibrary,
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    PulsrHaptics.lightImpact();
                     cubit.refreshOnlineLibrary();
                   },
                 ),
@@ -733,7 +733,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               icon: Icons.favorite_rounded,
               colors: [p.favorite, AppColors.roseDeep],
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 context.push('/favorites');
               },
             ),
@@ -751,7 +751,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               ),
               actionLabel: context.l10n.createSmartPlaylist,
               onAction: () async {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 await context.push('/smart-playlist-builder');
               },
             ),
@@ -842,7 +842,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
             child: PulsrSegmentedControl(
               selectedIndex: _selectedTab == _PlaylistTabMode.local ? 0 : 1,
               onChanged: (i) {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 final mode =
                     i == 0 ? _PlaylistTabMode.local : _PlaylistTabMode.online;
                 setState(() => _selectedTab = mode);
@@ -993,7 +993,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     BuildContext context,
     YtmAccountPlaylist playlist,
   ) async {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final l10n = context.l10n;
     final loadFailedText = l10n.playlistLoadFailed;
     if (context.mounted) {
@@ -1061,7 +1061,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       PulsrToast.show(context, message: context.l10n.emptyPlaylist);
       return;
     }
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final l10n = context.l10n;
     PulsrToast.show(
       context,
@@ -1110,7 +1110,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       PulsrToast.show(context, message: context.l10n.noLikedToDownload);
       return;
     }
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final songs = likedTracks.map((t) => t.toSongData()).toList();
     final downloadCubit = context.read<YtmDownloadCubit?>() ??
         (getIt.isRegistered<YtmDownloadCubit>()
@@ -1559,7 +1559,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                   ),
                   child: InkWell(
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       onAddPlaylist();
                     },
                     borderRadius: AppRadii.r18All,
@@ -1621,7 +1621,7 @@ class _AccountPlaylistCard extends StatelessWidget {
       label: playlist.title,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           onTap();
         },
         borderRadius: AppRadii.r20All,
@@ -1968,7 +1968,7 @@ class _OnlinePlaylistCard extends StatelessWidget {
       label: entry.title,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           onTap();
         },
         onLongPress: onRemove,

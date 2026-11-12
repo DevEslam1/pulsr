@@ -1,6 +1,5 @@
 // lib/features/library/presentation/widgets/alphabet_quick_scroll.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -8,6 +7,7 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Interactive vertical alphabet quick-scroll rail for Library lists.
 ///
 /// Features:
@@ -77,7 +77,7 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
     final selectedLetter = widget.availableLetters[index];
     if (selectedLetter != _draggedLetter) {
       if (context.motionEnabled) {
-        HapticFeedback.selectionClick();
+        PulsrHaptics.selectionClick();
       }
       setState(() {
         _draggedLetter = selectedLetter;

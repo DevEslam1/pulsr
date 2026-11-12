@@ -224,7 +224,7 @@ extension PlayerPlaybackOptionsLyricsExtension
   void toggleLyrics() => toggleLyricsVisibility();
 
   void toggleLyricsVisibility() {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final s = _getState();
     _emit(s.copyWith(
         lyricsSlice: s.lyricsSlice.copyWith(
@@ -234,7 +234,7 @@ extension PlayerPlaybackOptionsLyricsExtension
   void toggleQueue() => toggleQueueVisibility();
 
   void toggleQueueVisibility() {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final s = _getState();
     _emit(s.copyWith(
         lyricsSlice: s.lyricsSlice.copyWith(

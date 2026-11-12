@@ -1,6 +1,5 @@
 // lib/features/player/presentation/widgets/quran_mushaf_view.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -17,6 +16,7 @@ import '../../../../data/quran/quran_uthmani_text.dart';
 import 'quran_text_attribution.dart';
 import '../themes/player_theme.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Bundled Quran reader with timing-based highlighting, tap-to-seek,
 /// and Hifz (memorization) blind recall masking.
 class QuranMushafView extends StatefulWidget {
@@ -269,7 +269,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                   size: 22,
                 ),
                 onPressed: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   setState(() {
                     _blindRecallMode = !_blindRecallMode;
                     if (!_blindRecallMode) _revealedAyahs.clear();
@@ -346,7 +346,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
             child: GestureDetector(
               key: _ayahKeys[ayah.ayahNumber],
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 if (_blindRecallMode && !isRevealed) {
                   setState(() => _revealedAyahs.add(ayah.ayahNumber));
                 }
@@ -359,7 +359,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
               },
               child: AnimatedContainer(
                 duration: context.motionMs(250),
-                curve: Curves.easeOutCubic,
+                curve: context.motionCurve(PulsrMotion.enter),
                 padding: const EdgeInsets.all(AppSpacing.s12),
                 decoration: BoxDecoration(
                   color: isCurrent

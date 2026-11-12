@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -39,6 +38,7 @@ import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
 import 'widgets/highlighted_song_tile.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 const List<String> _onlineTags = [
   'Top Hits',
   'Trending',
@@ -242,7 +242,7 @@ class _SearchViewState extends State<_SearchView> {
   /// Populates the search box with [term] without unfocusing so the user can
   /// keep refining their query.
   void _fillQueryOnly(String term) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final next = '$term ';
     _controller.value = TextEditingValue(
       text: next,
@@ -255,7 +255,7 @@ class _SearchViewState extends State<_SearchView> {
 
   /// Runs [term] immediately. [commit] stores it in recent searches.
   void _applySearch(String term, {bool commit = true}) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     _controller.value = TextEditingValue(
       text: term,
       selection: TextSelection.collapsed(offset: term.length),
@@ -270,7 +270,7 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   void _applySavedSearch(String entry) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final d = SearchCubit.decodeSavedSearch(entry);
     _controller.value = TextEditingValue(
       text: d.query,
@@ -286,7 +286,7 @@ class _SearchViewState extends State<_SearchView> {
   }
 
   void _clear() {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     _controller.clear();
     _lastAppliedQueryParam = null;
     _hideSuggestions();
@@ -300,7 +300,7 @@ class _SearchViewState extends State<_SearchView> {
 
   void _onTabChanged(int index) {
     if (_tab == index) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() => _tab = index);
     _hideSuggestions();
     if (_text.trim().isNotEmpty) _dispatchQuery(_text, immediate: true);
@@ -497,7 +497,7 @@ class _SearchViewState extends State<_SearchView> {
                   icon: Icon(Icons.mic_rounded, color: p.textTertiary),
                   tooltip: context.l10n.voiceSearch,
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    PulsrHaptics.lightImpact();
                     PulsrToast.show(
                       context,
                       message: context.l10n.voiceSearchUnavailable,
@@ -580,7 +580,7 @@ class _SearchViewState extends State<_SearchView> {
                         label: context.l10n.saveSearch,
                         variant: PulsrChipVariant.action,
                         onTap: () {
-                          HapticFeedback.selectionClick();
+                          PulsrHaptics.selectionClick();
                           if (saved) {
                             cubit.removeSavedSearch(
                               SearchCubit.encodeSavedSearch(
@@ -611,7 +611,7 @@ class _SearchViewState extends State<_SearchView> {
       selected: selected,
       variant: PulsrChipVariant.filter,
       onTap: () {
-        HapticFeedback.selectionClick();
+        PulsrHaptics.selectionClick();
         context.read<SearchCubit>().setFilter(filter);
       },
     );
@@ -853,7 +853,7 @@ class _StartPage extends StatelessWidget {
                             palette: p,
                             onTap: () => onSaved(entry),
                             onDelete: () {
-                              HapticFeedback.lightImpact();
+                              PulsrHaptics.lightImpact();
                               local.removeSavedSearch(entry);
                             },
                           ),
@@ -880,7 +880,7 @@ class _StartPage extends StatelessWidget {
                       icon: Icons.history_toggle_off_rounded,
                       title: context.l10n.recentlyPlayed,
                       onClear: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         local.clearSearchPlayedSongs();
                       },
                       p: p,
@@ -907,7 +907,7 @@ class _StartPage extends StatelessWidget {
                               song: playedSongs[i],
                               isCurrent: currentSongId == playedSongs[i].id,
                               onTap: () {
-                                HapticFeedback.selectionClick();
+                                PulsrHaptics.selectionClick();
                                 local.recordPlayedSong(playedSongs[i]);
                                 player.playSong(
                                   playedSongs[i],
@@ -965,7 +965,7 @@ class _StartPage extends StatelessWidget {
         p: p,
         terms: history.take(6).toList(),
         onClear: () {
-          HapticFeedback.lightImpact();
+          PulsrHaptics.lightImpact();
           local.clearHistory();
         },
         onRemove: (term) => local.removeHistoryQuery(term),
@@ -1002,7 +1002,7 @@ class _StartPage extends StatelessWidget {
             p: p,
             terms: combined.take(6).toList(),
             onClear: () {
-              HapticFeedback.lightImpact();
+              PulsrHaptics.lightImpact();
               local.clearHistory();
               ytm.clearHistory();
             },
@@ -1018,7 +1018,7 @@ class _StartPage extends StatelessWidget {
             p: p,
             terms: history.take(6).toList(),
             onClear: () {
-              HapticFeedback.lightImpact();
+              PulsrHaptics.lightImpact();
               local.clearHistory();
             },
             onRemove: (term) => local.removeHistoryQuery(term),
@@ -1030,7 +1030,7 @@ class _StartPage extends StatelessWidget {
             p: p,
             terms: onlineHistory.take(6).toList(),
             onClear: () {
-              HapticFeedback.lightImpact();
+              PulsrHaptics.lightImpact();
               ytm.clearHistory();
             },
             onRemove: (term) => ytm.removeHistoryQuery(term),
@@ -1612,7 +1612,7 @@ class _EntityRail extends StatelessWidget {
             return InkWell(
               borderRadius: AppRadii.r16All,
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 onTap(item.name);
               },
               child: Container(
@@ -1972,7 +1972,7 @@ class _ShowMoreButton extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () {
-              HapticFeedback.selectionClick();
+              PulsrHaptics.selectionClick();
               onPressed();
             },
             child: Container(

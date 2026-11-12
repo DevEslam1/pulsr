@@ -421,10 +421,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                               ),
                               onConfirm: (direction) async {
                                 if (direction == DismissDirection.startToEnd) {
-                                  HapticFeedback.lightImpact();
+                                  PulsrHaptics.lightImpact();
                                   playerCubit.playNext(song);
                                 } else {
-                                  HapticFeedback.mediumImpact();
+                                  PulsrHaptics.mediumImpact();
                                   cubit.toggleFavorite(song.id);
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context)

@@ -14,6 +14,7 @@ import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../data/services/spotify_importer_service.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Modal dialog for importing a Spotify playlist into Pulsr.
 class SpotifyImportDialog extends StatefulWidget {
   final VoidCallback? onImportFinished;
@@ -52,7 +53,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
   }
 
   Future<void> _pasteFromClipboard() async {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     final text = data?.text?.trim();
     if (text != null && text.isNotEmpty && mounted) {
@@ -66,7 +67,7 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
   Future<void> _startImport() async {
     final input = _urlController.text.trim();
     if (input.isEmpty) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
 
     final id = SpotifyImporterService.extractPlaylistId(input);
     if (id == null) {

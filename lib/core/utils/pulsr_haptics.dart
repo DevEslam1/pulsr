@@ -11,6 +11,11 @@ abstract final class PulsrHaptics {
   /// Global master switch for haptic feedback (defaults to `true`).
   static final ValueNotifier<bool> enabled = ValueNotifier<bool>(true);
 
+  /// Updates the global master switch for haptic feedback.
+  static void setEnabled(bool value) {
+    enabled.value = value;
+  }
+
   /// Subtle tap feedback for selections, tabs, and chip toggles.
   static Future<void> tap() {
     if (!enabled.value) return Future<void>.value();
@@ -40,6 +45,12 @@ abstract final class PulsrHaptics {
     if (!enabled.value) return Future<void>.value();
     return HapticFeedback.selectionClick();
   }
+
+  /// Direct aliases to Flutter's HapticFeedback methods, routed through the enabled gate.
+  static Future<void> selectionClick() => selection();
+  static Future<void> lightImpact() => light();
+  static Future<void> mediumImpact() => confirm();
+  static Future<void> heavyImpact() => destructive();
 
   /// General alert vibration for errors or timeouts.
   static Future<void> vibrate() {

@@ -48,12 +48,12 @@ mixin CategoryFilterBarSection
               child: PulsrPressable(
                 pressedScale: 0.94,
                 onTap: () {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   _selectCategory(item.id);
                 },
                 child: AnimatedContainer(
                   duration: context.motionMs(180),
-                  curve: Curves.easeOutCubic,
+                  curve: context.motionCurve(PulsrMotion.enter),
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                   decoration: BoxDecoration(

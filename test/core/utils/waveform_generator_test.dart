@@ -6,6 +6,32 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/waveform_generator.dart';
 
+Uint8List _createValidWav({required int sampleCount, int sampleRate = 44100, int channels = 1}) {
+  final dataSize = sampleCount * 2 * channels;
+  final totalSize = 36 + dataSize;
+  final b = ByteData(44 + dataSize);
+
+  // 'RIFF'
+  b.setUint8(0, 0x52); b.setUint8(1, 0x49); b.setUint8(2, 0x46); b.setUint8(3, 0x46);
+  b.setUint32(4, totalSize, Endian.little);
+  // 'WAVE'
+  b.setUint8(8, 0x57); b.setUint8(9, 0x41); b.setUint8(10, 0x56); b.setUint8(11, 0x45);
+  // 'fmt '
+  b.setUint8(12, 0x66); b.setUint8(13, 0x6d); b.setUint8(14, 0x74); b.setUint8(15, 0x20);
+  b.setUint32(16, 16, Endian.little); // chunk size
+  b.setUint16(20, 1, Endian.little); // PCM format = 1
+  b.setUint16(22, channels, Endian.little);
+  b.setUint32(24, sampleRate, Endian.little);
+  b.setUint32(28, sampleRate * channels * 2, Endian.little); // byte rate
+  b.setUint16(32, channels * 2, Endian.little); // block align
+  b.setUint16(34, 16, Endian.little); // bits per sample
+  // 'data'
+  b.setUint8(36, 0x64); b.setUint8(37, 0x61); b.setUint8(38, 0x74); b.setUint8(39, 0x61);
+  b.setUint32(40, dataSize, Endian.little);
+
+  return b.buffer.asUint8List();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -188,7 +214,8 @@ void main() {
 
     test('silent PCM yields the flat 0.4 floor', () async {
       final file = File('${tempDir.path}${Platform.pathSeparator}silent.wav');
-      file.writeAsBytesSync(List<int>.filled(44100, 0));
+      final bytes = _createValidWav(sampleCount: 22050);
+      file.writeAsBytesSync(bytes);
       final samples = await WaveformGenerator()
           .generateWaveform(songId: 930005, filePath: file.path, count: 12);
       expect(samples, hasLength(12));
@@ -197,7 +224,7 @@ void main() {
 
     test('varying PCM is normalized to visible bar heights', () async {
       final file = File('${tempDir.path}${Platform.pathSeparator}varying.wav');
-      final bytes = Uint8List(44 + 2 * 4410);
+      final bytes = _createValidWav(sampleCount: 4410);
       for (int i = 0; i < 4410; i++) {
         // Ramp from quiet to loud 16-bit signed samples.
         final value = ((i / 4410) * 30000).round();
@@ -210,6 +237,29 @@ void main() {
       expect(samples, hasLength(10));
       expect(samples.every((v) => v >= 0.08 && v <= 1.0), isTrue);
       expect(samples.toSet().length, greaterThan(1));
+    });
+
+    test('compressed file without RIFF/WAVE header falls back to deterministic waveform', () async {
+      final file = File('${tempDir.path}${Platform.pathSeparator}compressed.mp3');
+      // Simulated MP3 sync frame + random compressed payload
+      final mp3Bytes = Uint8List(2048);
+      mp3Bytes[0] = 0xFF;
+      mp3Bytes[1] = 0xFB; // MPEG1 Layer 3
+      for (int i = 2; i < 2048; i++) {
+        mp3Bytes[i] = (i * 37) & 0xFF;
+      }
+      file.writeAsBytesSync(mp3Bytes);
+
+      final samples = await WaveformGenerator()
+          .generateWaveform(songId: 930010, filePath: file.path, count: 12);
+      final deterministic = WaveformGenerator().generateWaveformSync(
+        songId: 930010,
+        filePath: file.path,
+        count: 12,
+      );
+
+      // Must fall back to deterministic waveform, never interpreting compressed bytes as PCM
+      expect(samples, equals(deterministic));
     });
 
     test('a cached async result is reused without re-extraction', () async {
@@ -227,7 +277,8 @@ void main() {
 
     test('more bars than PCM bytes exercises the empty-read floor', () async {
       final file = File('${tempDir.path}${Platform.pathSeparator}sparse.wav');
-      file.writeAsBytesSync(List<int>.filled(1100, 0));
+      final bytes = _createValidWav(sampleCount: 500);
+      file.writeAsBytesSync(bytes);
       final samples = await WaveformGenerator()
           .generateWaveform(songId: 930008, filePath: file.path, count: 2000);
       expect(samples, hasLength(2000));
@@ -236,7 +287,7 @@ void main() {
 
     test('large PCM files cap the per-bar read buffer at 4096 bytes', () async {
       final file = File('${tempDir.path}${Platform.pathSeparator}large.wav');
-      final bytes = Uint8List(44 + 200000);
+      final bytes = _createValidWav(sampleCount: 100000);
       for (int i = 0; i < 100000; i++) {
         final value = (i % 30000).round();
         bytes[44 + i * 2] = value & 0xFF;

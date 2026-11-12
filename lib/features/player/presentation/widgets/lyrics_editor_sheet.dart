@@ -125,7 +125,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     final stamp = _livePosition.value;
     setState(() {
       final old = _lines[index];
-      _lines[index] = LyricsLine(timestamp: stamp, text: old.text);
+      _lines[index] = old.copyWith(timestamp: stamp);
     });
   }
 
@@ -134,8 +134,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     setState(() {
       final old = _lines[index];
       final newMs = (old.timestamp.inMilliseconds + deltaMs).clamp(0, 3600000);
-      _lines[index] =
-          LyricsLine(timestamp: Duration(milliseconds: newMs), text: old.text);
+      _lines[index] = old.copyWith(timestamp: Duration(milliseconds: newMs));
     });
   }
 
@@ -368,8 +367,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                               contentPadding: EdgeInsets.zero,
                             ),
                             onChanged: (val) {
-                              _lines[index] = LyricsLine(
-                                  timestamp: line.timestamp, text: val);
+                              _lines[index] = _lines[index].copyWith(text: val);
                             },
                           ),
                         ),

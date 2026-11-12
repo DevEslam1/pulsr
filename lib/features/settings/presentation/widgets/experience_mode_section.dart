@@ -1,6 +1,5 @@
 // lib/features/settings/presentation/widgets/experience_mode_section.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/aura_theme.dart';
@@ -14,6 +13,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Lets the user switch between the curated Normal experience and the full
 /// Professional control surface. This is the single switch that reveals or
 /// hides advanced settings across the app.
@@ -313,7 +313,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
             child: InkWell(
               borderRadius: AppRadii.r10All,
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 setState(() {
                   _expanded = !_expanded;
                   if (_expanded) {

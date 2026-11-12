@@ -1,6 +1,5 @@
 // lib/features/library/presentation/widgets/folder_browser_tab.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -25,6 +24,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 enum _FolderSort { name, count }
 
 class FolderBrowserTab extends StatefulWidget {
@@ -306,7 +306,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
             child: InkWell(
               borderRadius: AppRadii.r12All,
               onTap: () {
-                HapticFeedback.lightImpact();
+                PulsrHaptics.lightImpact();
                 _showSortOptionsSheet(context);
               },
               child: Padding(

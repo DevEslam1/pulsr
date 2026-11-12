@@ -4,7 +4,6 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -248,6 +247,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       );
     }
 
+    final isStudioSetting = _isStudioModeOverride ??
+        context.select<SettingsCubit, bool>((c) => c.state.isProfessional);
+
     return BlocListener<PlayerCubit, PlayerState>(
       listenWhen: (prev, curr) =>
           prev.errorMessage != curr.errorMessage && curr.errorMessage != null,
@@ -273,7 +275,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         builder: (context, state) {
           final cubit = context.read<PlayerCubit>();
           final dspBlockedGlobal = _dspBlockedReason(context);
-          final isStudio = _isStudio(context);
+          final isStudio = _isStudioModeOverride ?? isStudioSetting;
 
           // One snack per DSP auto-degrade session (re-arms after recovery).
           if (_degradeSnackQueued) {

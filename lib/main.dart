@@ -25,7 +25,10 @@ import 'core/services/artwork_cache_manager.dart';
 import 'core/services/settings_cache.dart';
 import 'core/services/sound_feedback_service.dart';
 import 'core/services/automation_trigger_service.dart';
+import 'core/bloc/pulsr_bloc_observer.dart';
 import 'core/constants/app_colors.dart';
+import 'core/constants/prefs_keys.dart';
+import 'core/utils/pulsr_haptics.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/widgets/cached_artwork.dart';
@@ -120,6 +123,7 @@ Future<void> main() async {
     debugPrint('[Pulsr.CrashReport][$category] $error\n$stackTrace');
   };
   ErrorLogger.initialize();
+  Bloc.observer = PulsrBlocObserver.instance;
 
   // FIX-A3: Global error boundary for widget build errors
   ErrorWidget.builder = (FlutterErrorDetails details) {
@@ -181,6 +185,7 @@ Future<void> main() async {
           error: e, stackTrace: st, category: 'Startup');
     }
     GpuBudget.setEnabled(prefs.getBool('setting_reduce_motion') ?? false);
+    PulsrHaptics.setEnabled(prefs.getBool(PrefsKeys.hapticsEnabled) ?? true);
   } catch (_) {}
   // Warm native audio capability cache (best-effort, never blocks).
   unawaited(PlatformCapabilities.ensureLoaded()

@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -230,7 +229,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         behavior: HitTestBehavior.opaque,
                         onDoubleTap: () {
                           if (_zoomScale > 1.0) {
-                            HapticFeedback.selectionClick();
+                            PulsrHaptics.selectionClick();
                             setState(() => _zoomScale = 1.0);
                           }
                         },
@@ -281,7 +280,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (!widget.enabled) return;
                           _dragStarted = true;
                           if (trackWidth > 0 && maxDuration > 0) {
-                            HapticFeedback.selectionClick();
+                            PulsrHaptics.selectionClick();
                             _dragFrozenWindow = _visibleWindow(totalCount);
                             final ratio = _ratioForDx(details.localPosition.dx,
                                 trackWidth, totalCount);
@@ -304,7 +303,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             if (_lastHapticCheckMs != null) {
                               if ((seekVal == 0.0 && _lastHapticCheckMs! > 0.0) ||
                                   (seekVal == maxDuration && _lastHapticCheckMs! < maxDuration)) {
-                                HapticFeedback.selectionClick();
+                                PulsrHaptics.selectionClick();
                               }
                               _checkHapticBoundaries(
                                   _lastHapticCheckMs!, seekVal, context);
@@ -319,7 +318,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (!widget.enabled) return;
                           _dragStarted = false;
                           if (_dragValue != null) {
-                            HapticFeedback.lightImpact();
+                            PulsrHaptics.lightImpact();
                             widget.onSeek(
                                 Duration(milliseconds: _dragValue!.round()));
                             setState(() {
@@ -350,7 +349,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           if (!widget.enabled) return;
                           if (_dragStarted) return;
                           if (trackWidth > 0 && maxDuration > 0) {
-                            HapticFeedback.selectionClick();
+                            PulsrHaptics.selectionClick();
                             final ratio = _ratioForDx(details.localPosition.dx,
                                 trackWidth, totalCount);
                             final seekMs = ratio * maxDuration;
@@ -360,7 +359,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                         },
                         child: AnimatedContainer(
                           duration: context.motionMs(200),
-                          curve: Curves.easeOutCubic,
+                          curve: context.motionCurve(PulsrMotion.enter),
                           height: _dragValue != null
                               ? widget.height * 1.35
                               : widget.height,
@@ -492,7 +491,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           label: context.l10n.resetWaveformZoom,
                           child: GestureDetector(
                             onTap: () {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               setState(() => _zoomScale = 1.0);
                             },
                             child: Container(

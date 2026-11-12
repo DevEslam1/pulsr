@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../constants/app_radii.dart';
@@ -17,6 +16,7 @@ import '../utils/l10n_extensions.dart';
 import 'pulsr_bottom_sheet.dart';
 import 'pulsr_dialog.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// Viewport-aware adaptive modal container and launcher.
 ///
@@ -216,7 +216,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
                   ),
                   tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    PulsrHaptics.lightImpact();
                     Navigator.of(context).maybePop();
                   },
                 ),

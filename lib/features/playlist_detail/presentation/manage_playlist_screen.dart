@@ -2,7 +2,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -31,6 +30,7 @@ import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class ManagePlaylistScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
 
@@ -128,7 +128,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   }
 
   void _toggleSong(int id) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       if (!_selectedSongIds.remove(id)) {
         _selectedSongIds.add(id);
@@ -137,7 +137,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
   }
 
   void _resetSelection() {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     setState(() {
       _selectedSongIds
         ..clear()
@@ -203,7 +203,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                       size: 20,
                     ),
                     onPressed: () {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       setState(() => _showSelectedOnly = !_showSelectedOnly);
                     },
                   ),
@@ -213,7 +213,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
                     onPressed: visibleSongs.isEmpty
                         ? null
                         : () {
-                            HapticFeedback.selectionClick();
+                            PulsrHaptics.selectionClick();
                             setState(() {
                               if (isAllSelected) {
                                 for (final s in visibleSongs) {
@@ -475,7 +475,7 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
 
   Future<void> _applyChanges() async {
     if (_isSaving) return;
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     setState(() => _isSaving = true);
 
     final toAdd = _selectedSongIds.difference(_initialSongIds).toList();

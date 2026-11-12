@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -121,15 +120,15 @@ class MiniPlayerState extends State<MiniPlayer> {
       // and freeze the carousel for the rest of the session.
       switch (action) {
         case MiniPlayerSwipeAction.next:
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           await cubit.next().timeout(_swipeLatchTimeout);
           break;
         case MiniPlayerSwipeAction.prev:
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           await cubit.previous().timeout(_swipeLatchTimeout);
           break;
         case MiniPlayerSwipeAction.volume:
-          HapticFeedback.selectionClick();
+          PulsrHaptics.selectionClick();
           await cubit
               .adjustVolume(swipedLeft ? -0.05 : 0.05)
               .timeout(_swipeLatchTimeout);
@@ -476,7 +475,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                       _verticalDragDy >= 0 &&
                       vy >= 0) {
                     _swipeInFlight = true;
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     widget.onSwipeDown?.call();
                     _verticalSwipeTimer?.cancel();
                     _verticalSwipeTimer =
@@ -487,7 +486,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                       _verticalDragDy <= 0 &&
                       vy <= 0) {
                     _swipeInFlight = true;
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     if (widget.onSwipeUp != null) {
                       widget.onSwipeUp!();
                     } else {
@@ -1007,7 +1006,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                   ),
                                           ),
                                           onPressed: () {
-                                            HapticFeedback.lightImpact();
+                                            PulsrHaptics.lightImpact();
                                             cubit.togglePlayPause();
                                           },
                                         ),
@@ -1029,7 +1028,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                         ),
                                         onPressed: state.hasNextNeighbour
                                             ? () {
-                                                HapticFeedback.selectionClick();
+                                                PulsrHaptics.selectionClick();
                                                 cubit.next();
                                               }
                                             : null,
@@ -1086,7 +1085,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                       return;
                                     }
                                     _lastRetryTime = now;
-                                    HapticFeedback.lightImpact();
+                                    PulsrHaptics.lightImpact();
                                     cubit.playSong(
                                       song,
                                       queue: queue,
@@ -1360,7 +1359,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                         : (details) {
                             if (trackWidth > 0 &&
                                 widget.duration.inMilliseconds > 0) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               final ratio =
                                   (details.localPosition.dx / trackWidth)
                                       .clamp(0.0, 1.0);
@@ -1376,7 +1375,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                         : (details) {
                             if (trackWidth > 0 &&
                                 widget.duration.inMilliseconds > 0) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               final ratio =
                                   (details.localPosition.dx / trackWidth)
                                       .clamp(0.0, 1.0);
@@ -1874,7 +1873,7 @@ class MiniPlayerHorizontal extends StatelessWidget {
                                 color: activeAccent,
                               ),
                         onPressed: () {
-                          HapticFeedback.lightImpact();
+                          PulsrHaptics.lightImpact();
                           cubit.togglePlayPause();
                         },
                       ),
@@ -1892,7 +1891,7 @@ class MiniPlayerHorizontal extends StatelessWidget {
                         ),
                         onPressed: state.hasNextNeighbour
                             ? () {
-                                HapticFeedback.selectionClick();
+                                PulsrHaptics.selectionClick();
                                 cubit.next();
                               }
                             : null,

@@ -2,7 +2,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -43,6 +42,7 @@ import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class OnlinePlaylistDetailArgs {
   final String playlistId;
   final String? title;
@@ -393,7 +393,7 @@ class _OnlinePlaylistDetailScreenState
 
   void _playAll({bool shuffle = false}) {
     if (_tracks.isEmpty) return;
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     final songs = _tracks.map((t) => t.toSongData()).toList();
     if (shuffle) {
       songs.shuffle();
@@ -403,7 +403,7 @@ class _OnlinePlaylistDetailScreenState
 
   Future<void> _downloadAll() async {
     if (_tracks.isEmpty || _isDownloading) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() => _isDownloading = true);
     try {
       final l10n = context.l10n;
@@ -454,7 +454,7 @@ class _OnlinePlaylistDetailScreenState
 
   Future<void> _saveToLocalPlaylists() async {
     if (_tracks.isEmpty || _isSaving) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() => _isSaving = true);
     final saveFailedText = context.l10n.saveFailed;
     final loc = context.l10n;
@@ -586,7 +586,7 @@ class _OnlinePlaylistDetailScreenState
 
   Future<void> _enterReorderMode() async {
     if (_tracks.isEmpty || _isReordering) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
 
     try {
       final cached = await _useCases.getOnlinePlaylistTracks(_cachePlaylistId);
@@ -622,7 +622,7 @@ class _OnlinePlaylistDetailScreenState
   }
 
   void _exitReorderMode() {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       _isReordering = false;
       _selectedVideoIds.clear();
@@ -630,7 +630,7 @@ class _OnlinePlaylistDetailScreenState
   }
 
   void _toggleReorderSelection(String videoId) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       if (!_selectedVideoIds.add(videoId)) {
         _selectedVideoIds.remove(videoId);
@@ -639,7 +639,7 @@ class _OnlinePlaylistDetailScreenState
   }
 
   void _selectAllForReorder(bool select) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       _selectedVideoIds.clear();
       if (select) {
@@ -667,7 +667,7 @@ class _OnlinePlaylistDetailScreenState
       isSelected: (track) => _selectedVideoIds.contains(track.videoId),
     );
     if (_sameTrackOrder(reordered, _tracks)) return;
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final previous = _tracks;
     setState(() => _tracks = reordered);
     _queueOrderSave(previous, reordered);
@@ -681,7 +681,7 @@ class _OnlinePlaylistDetailScreenState
       toTop: toTop,
     );
     if (_sameTrackOrder(reordered, _tracks)) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final previous = _tracks;
     setState(() => _tracks = reordered);
     _queueOrderSave(previous, reordered);
@@ -758,7 +758,7 @@ class _OnlinePlaylistDetailScreenState
       toTop: toTop,
     );
     if (_sameTrackOrder(reordered, _tracks)) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final previous = _tracks;
     setState(() => _tracks = reordered);
     _queueOrderSave(previous, reordered);

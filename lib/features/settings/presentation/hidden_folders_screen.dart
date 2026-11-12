@@ -18,8 +18,8 @@ import '../cubit/settings_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:flutter/services.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class HiddenFoldersScreen extends StatefulWidget {
   final FolderUseCases? folderUseCases;
   const HiddenFoldersScreen({super.key, this.folderUseCases});
@@ -455,7 +455,7 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 label: Text(label),
                                 selected: isSelected,
                                 onSelected: (_) async {
-                                  HapticFeedback.selectionClick();
+                                  PulsrHaptics.selectionClick();
                                   setState(() => _minFileSizeKb = kb);
                                   await cubit.setMinFileSizeKb(kb);
                                 },

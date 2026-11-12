@@ -204,4 +204,25 @@ void main() {
     expect(_page(tester), 1);
     expect(find.text('Song 12'), findsWidgets);
   });
+
+  testWidgets('rapid queue swap interleaved with swipe triggers no assertions',
+      (tester) async {
+    final q1 = [_song(1), _song(2), _song(3)];
+    final q2 = [_song(21), _song(22)];
+    final q3 = [_song(31), _song(32), _song(33), _song(34)];
+    final harness = _Harness(q1);
+    addTearDown(harness.dispose);
+    await _mount(tester, harness);
+
+    // Swipe forward while swapping queues rapidly before frames settle.
+    await tester.fling(find.byType(PageView), const Offset(-300, 0), 1200);
+    harness.emit(_stateAt(q2, 1));
+    await tester.pump();
+    harness.emit(_stateAt(q3, 3));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(_page(tester), 3);
+    expect(find.text('Song 34'), findsWidgets);
+  });
 }

@@ -40,7 +40,7 @@ class _PulsrLogoState extends State<PulsrLogo>
       _controller = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 2400),
-      )..repeat();
+      );
     }
   }
 

@@ -1,6 +1,5 @@
 // lib/features/library/presentation/artwork_grid_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -20,6 +19,7 @@ import '../../settings/cubit/settings_cubit.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 class ArtworkGridScreen extends StatefulWidget {
   const ArtworkGridScreen({super.key});
 
@@ -75,7 +75,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
     if (clamped == _columnCount) return;
     setState(() => _columnCount = clamped);
     if (clamped.round() != prevRounded) {
-      HapticFeedback.selectionClick();
+      PulsrHaptics.selectionClick();
     }
   }
 

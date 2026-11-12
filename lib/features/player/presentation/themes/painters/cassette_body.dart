@@ -598,12 +598,14 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
       if (!_vuController.isAnimating) {
         _vuController.repeat(reverse: true);
       }
-    } else if (_vuController.isAnimating) {
-      _vuController.stop();
-      if (context.motionEnabled) {
-        _vuController.animateTo(0.0, duration: context.motionMs(300));
-      } else {
+    } else {
+      if (_vuController.isAnimating) {
+        _vuController.stop();
+      }
+      if (!context.motionEnabled) {
         _vuController.value = 0.0;
+      } else if (_vuController.value > 0.0) {
+        _vuController.animateTo(0.0, duration: context.motionMs(300));
       }
     }
   }
@@ -611,9 +613,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
   @override
   void didUpdateWidget(covariant _CassetteStereoVuMeter oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.isPlaying != oldWidget.isPlaying) {
-      _syncVu();
-    }
+    _syncVu();
   }
 
   @override

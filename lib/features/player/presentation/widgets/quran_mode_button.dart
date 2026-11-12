@@ -1,6 +1,5 @@
 // lib/features/player/presentation/widgets/quran_mode_button.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
@@ -9,6 +8,7 @@ import '../../cubit/player_cubit.dart';
 import 'quran_mode_sheet.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Bottom-dock toggle for Quran Mode, styled to sit beside the existing
 /// equalizer / output / speed actions. Mirrors the private `_DockIconButton`
 /// that every player theme defines locally.
@@ -35,17 +35,17 @@ class QuranModeDockButton extends StatelessWidget {
       button: true,
       label: label,
       onTap: () {
-        HapticFeedback.lightImpact();
+        PulsrHaptics.lightImpact();
         QuranModeSheet.show(context);
       },
       excludeSemantics: true,
       child: InkWell(
         onTap: () {
-          HapticFeedback.lightImpact();
+          PulsrHaptics.lightImpact();
           QuranModeSheet.show(context);
         },
         onLongPress: () {
-          HapticFeedback.mediumImpact();
+          PulsrHaptics.mediumImpact();
           context.read<PlayerCubit>().setQuranModeEnabled(!isActive);
         },
         borderRadius: AppRadii.r20All,

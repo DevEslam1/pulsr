@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Compact horizontal shortcut tile (icon + two lines). Secondary to
 /// [HeroMixCard]; sits two-up beneath it (or stacked beside it on tablets).
 class QuickTile extends StatelessWidget {
@@ -40,7 +40,7 @@ class QuickTile extends StatelessWidget {
         child: InkWell(
           borderRadius: AppRadii.r18All,
           onTap: () {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             onTap();
           },
           child: Container(

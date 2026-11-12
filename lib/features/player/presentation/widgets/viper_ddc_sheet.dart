@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart' hide PlayerState;
@@ -28,15 +29,40 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
   StreamSubscription<dynamic>? _toneSubscription;
   bool _isPlayingTone = false;
   bool _abBypassed = false;
+  bool _pausedMainPlaybackForSweep = false;
+  PlayerCubit? _playerCubit;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    try {
+      _playerCubit = context.read<PlayerCubit>();
+    } catch (_) {
+      // Optional in isolated widget tests without PlayerCubit.
+    }
+  }
 
   @override
   void dispose() {
     _toneSubscription?.cancel();
-    _tonePlayer?.dispose();
+    _toneSubscription = null;
+    try {
+      _tonePlayer?.stop();
+      _tonePlayer?.dispose();
+    } catch (_) {
+      // Best-effort tone player cleanup.
+    }
+    _tonePlayer = null;
+    if (_pausedMainPlaybackForSweep) {
+      _pausedMainPlaybackForSweep = false;
+      _playerCubit?.play();
+    }
     if (_abBypassed) {
       try {
-        context.read<PlayerCubit>().setViperDdcEnabled(true);
-      } catch (_) {}
+        _playerCubit?.setViperDdcEnabled(true);
+      } catch (_) {
+        // Best-effort DDC restore on dispose.
+      }
     }
     super.dispose();
   }
@@ -191,15 +217,18 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
 
   Future<void> _toggleTestTone() async {
     if (_isPlayingTone) {
-      await _tonePlayer?.stop();
-      if (mounted) setState(() => _isPlayingTone = false);
+      await _stopTone();
       return;
     }
     if (mounted) setState(() => _isPlayingTone = true);
     try {
+      if (_playerCubit?.state.isPlaying == true) {
+        _pausedMainPlaybackForSweep = true;
+        await _playerCubit?.pause();
+      }
       _tonePlayer ??= AudioPlayer();
       final bytes = generateTestSweepWav();
-      final tempDir = Directory.systemTemp;
+      final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/ddc_test_sweep.wav');
       await file.writeAsBytes(bytes);
       await _tonePlayer!.setFilePath(file.path);
@@ -207,11 +236,26 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
       _toneSubscription?.cancel();
       _toneSubscription = _tonePlayer!.playerStateStream.listen((ps) {
         if (ps.processingState == ProcessingState.completed) {
-          if (mounted) setState(() => _isPlayingTone = false);
+          _stopTone();
         }
       });
     } catch (_) {
       if (mounted) setState(() => _isPlayingTone = false);
+    }
+  }
+
+  Future<void> _stopTone() async {
+    _toneSubscription?.cancel();
+    _toneSubscription = null;
+    try {
+      await _tonePlayer?.stop();
+    } catch (_) {
+      // Best-effort tone stop.
+    }
+    if (mounted) setState(() => _isPlayingTone = false);
+    if (_pausedMainPlaybackForSweep) {
+      _pausedMainPlaybackForSweep = false;
+      await _playerCubit?.play();
     }
   }
 
@@ -518,8 +562,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                 ),
                                 label: Text(
                                   _isPlayingTone
-                                      ? 'Stop Sweep'
-                                      : 'Test Tone (1k+Sweep)',
+                                      ? context.l10n.viperStopSweep
+                                      : context.l10n.viperTestTone,
                                   style: TextStyle(fontSize: AppFontSize.tiny),
                                 ),
                                 style: OutlinedButton.styleFrom(
@@ -543,29 +587,31 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                 setState(() => _abBypassed = nowBypassed);
                                 cubit.setViperDdcEnabled(!nowBypassed);
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    duration: const Duration(seconds: 1),
-                                    content: Text(
-                                      nowBypassed
-                                          ? 'A/B: Bypassed (level matched ${(-avgGain).toStringAsFixed(1)} dB)'
-                                          : 'A/B: ViPER-DDC Active',
+                                    SnackBar(
+                                      duration: const Duration(seconds: 1),
+                                      content: Text(
+                                        nowBypassed
+                                            ? context.l10n.viperAbBypassed(
+                                                (-avgGain).toStringAsFixed(1),
+                                              )
+                                            : context.l10n.viperAbActive,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                              icon: Icon(
-                                _abBypassed
-                                    ? Icons.compare_arrows_rounded
-                                    : Icons.check_circle_outline_rounded,
-                                size: 16,
-                                color: _abBypassed ? p.accent : p.primary,
-                              ),
-                              label: Text(
-                                _abBypassed
-                                    ? 'Bypassed (Matched)'
-                                    : 'A/B Compare',
-                                style: TextStyle(fontSize: AppFontSize.tiny),
-                              ),
+                                  );
+                                },
+                                icon: Icon(
+                                  _abBypassed
+                                      ? Icons.compare_arrows_rounded
+                                      : Icons.check_circle_outline_rounded,
+                                  size: 16,
+                                  color: _abBypassed ? p.accent : p.primary,
+                                ),
+                                label: Text(
+                                  _abBypassed
+                                      ? context.l10n.viperAbBypassedShort
+                                      : context.l10n.viperAbCompare,
+                                  style: TextStyle(fontSize: AppFontSize.tiny),
+                                ),
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(
                                   color: _abBypassed ? p.accent : p.hairline,

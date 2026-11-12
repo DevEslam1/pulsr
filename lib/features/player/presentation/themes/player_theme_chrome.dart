@@ -8,7 +8,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -668,7 +667,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                           isTablet: isTablet,
                           onTap: () {
                             if (!isTrack) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               cubit.resetOverlayViews();
                             }
                           },
@@ -683,7 +682,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                           isTablet: isTablet,
                           onTap: () {
                             if (!isLyrics) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               cubit.toggleLyricsVisibility();
                             }
                           },
@@ -699,7 +698,7 @@ class PlayerViewSwitcher extends StatelessWidget {
                           isTablet: isTablet,
                           onTap: () {
                             if (!isQueue) {
-                              HapticFeedback.selectionClick();
+                              PulsrHaptics.selectionClick();
                               cubit.toggleQueueVisibility();
                             }
                           },
@@ -865,7 +864,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       isTablet: isTablet,
                       style: dockIconStyle,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         EqualizerSheet.show(context);
                       },
                     ),
@@ -885,7 +884,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       style: dockIconStyle,
                       onTap: () {
                         if (song != null) {
-                          HapticFeedback.lightImpact();
+                          PulsrHaptics.lightImpact();
                           AudioQualitySheet.show(
                               context, song, props.activeColor);
                         }
@@ -906,7 +905,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       isTablet: isTablet,
                       style: dockIconStyle,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         SpeedPickerSheet.show(context);
                       },
                     ),
@@ -923,7 +922,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       isTablet: isTablet,
                       style: dockIconStyle,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         QuranModeSheet.show(context);
                       },
                     ),
@@ -945,7 +944,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                           isTablet: isTablet,
                           style: dockIconStyle,
                           onTap: () {
-                            HapticFeedback.lightImpact();
+                            PulsrHaptics.lightImpact();
                             AmbientSoundSheet.show(context);
                           },
                         );
@@ -958,11 +957,14 @@ class PlayerBottomActionDock extends StatelessWidget {
                     child: PlayerDockIconButton(
                       icon: Icons.timer_outlined,
                       tooltip: isEndQ
-                          ? 'Sleep Timer: End of Queue'
+                          ? l10n.sleepTimerEndOfQueue
                           : (remainingTracks != null
-                              ? 'Sleep Timer: $remainingTracks tracks remaining'
+                              ? l10n.sleepTimerTracksRemaining(remainingTracks)
                               : (props.state.sleepTimerRemaining != null
-                                  ? 'Sleep Timer: ${formatSleepTimerRemaining(props.state.sleepTimerRemaining!)} remaining'
+                                  ? l10n.sleepTimerTimeRemaining(
+                                      formatSleepTimerRemaining(
+                                          props.state.sleepTimerRemaining!),
+                                    )
                                   : l10n.sleepTimer)),
                       badgeText: hasTimer
                           ? (remainingTracks != null
@@ -980,7 +982,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                       isTablet: isTablet,
                       style: dockIconStyle,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         SleepTimerSheet.show(context);
                       },
                     ),
@@ -1024,7 +1026,7 @@ class _MoreDockButton extends StatelessWidget {
   });
 
   void _open(BuildContext context) {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     PlayerMoreSheet.show(context, song: song, activeColor: activeColor);
   }
 
@@ -1208,7 +1210,7 @@ class PlayerTopBar extends StatelessWidget {
               semanticLabel: context.l10n.close,
               iconSize: isTablet ? 26 : 24,
               onTap: () {
-                HapticFeedback.lightImpact();
+                PulsrHaptics.lightImpact();
                 if (onDismiss != null) {
                   onDismiss!();
                 } else if (context.canPop()) {
@@ -1308,7 +1310,7 @@ class PlayerTopBar extends StatelessWidget {
               semanticLabel: context.l10n.moreOptions,
               iconSize: isTablet ? 24 : 22,
               onTap: () {
-                HapticFeedback.lightImpact();
+                PulsrHaptics.lightImpact();
                 if (onMore != null) {
                   onMore!();
                 } else if (song != null) {
@@ -1444,7 +1446,7 @@ class PlayerTrackHeader extends StatelessWidget {
                         : InkWell(
                             onTap: () {
                               if (song != null) {
-                                HapticFeedback.lightImpact();
+                                PulsrHaptics.lightImpact();
                                 AddToPlaylistSheet.show(context, song: song);
                               }
                             },
@@ -1571,7 +1573,7 @@ class PlayerTrackHeader extends StatelessWidget {
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         PlayerMoreSheet.show(context,
                             song: song, activeColor: props.activeColor);
                       },
@@ -1698,7 +1700,7 @@ class PlayerBookmarkPromptBanner extends StatelessWidget {
                 ),
               ),
               onPressed: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 cubit.seekToBookmark();
               },
               child: Text(l10n.resume),
@@ -1710,7 +1712,7 @@ class PlayerBookmarkPromptBanner extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 tooltip: l10n.close,
                 onPressed: () {
-                  HapticFeedback.lightImpact();
+                  PulsrHaptics.lightImpact();
                   cubit.dismissBookmark();
                 },
                 icon: Icon(

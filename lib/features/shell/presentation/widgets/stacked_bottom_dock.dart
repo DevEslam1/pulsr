@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
@@ -18,6 +17,7 @@ import '../../../player/presentation/mini_player.dart';
 import '../bottom_nav_bar.dart';
 import 'dock_style_picker_sheet.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 enum DockStackMode {
   /// Default: MiniPlayer is placed above BottomNavBar in vertical order.
   defaultLayout,
@@ -274,7 +274,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
 
   void _setMode(DockStackMode nextMode) {
     if (widget.mode == nextMode) return;
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     widget.onModeChanged(nextMode);
   }
 
@@ -295,7 +295,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
   void _showDockStylePicker() {
     if (_pickerOpen) return;
     _pickerOpen = true;
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     DockStylePickerSheet.show(
       context,
       current: widget.mode,
@@ -706,7 +706,6 @@ class _AnimatedCardTransform extends ImplicitlyAnimatedWidget {
 class _AnimatedCardTransformState
     extends AnimatedWidgetBaseState<_AnimatedCardTransform> {
   Tween<double>? _scaleTween;
-  Tween<double>? _opacityTween;
 
   @override
   void forEachTween(TweenVisitor<dynamic> visitor) {
@@ -715,23 +714,18 @@ class _AnimatedCardTransformState
       widget.scale,
       (dynamic value) => Tween<double>(begin: value as double),
     ) as Tween<double>?;
-    _opacityTween = visitor(
-      _opacityTween,
-      widget.opacity,
-      (dynamic value) => Tween<double>(begin: value as double),
-    ) as Tween<double>?;
   }
 
   @override
   Widget build(BuildContext context) {
     final currentScale = _scaleTween?.evaluate(animation) ?? widget.scale;
-    final currentOpacity =
-        (_opacityTween?.evaluate(animation) ?? widget.opacity).clamp(0.0, 1.0);
     return Transform.scale(
       scale: currentScale,
       alignment: Alignment.bottomCenter,
-      child: Opacity(
-        opacity: currentOpacity,
+      child: AnimatedOpacity(
+        duration: context.motion(const Duration(milliseconds: 120)),
+        curve: context.motionCurve(PulsrMotion.enter),
+        opacity: widget.opacity.clamp(0.0, 1.0),
         child: widget.child,
       ),
     );

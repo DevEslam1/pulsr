@@ -1,6 +1,5 @@
 // lib/features/playlists/presentation/widgets/playlist_suggestion_card.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../../../core/constants/app_radii.dart';
@@ -11,6 +10,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// One AI/heuristic playlist suggestion shown in the horizontal rail.
 ///
 /// Extracted from `playlists_screen.dart` to keep that screen under the
@@ -37,7 +37,7 @@ class PlaylistSuggestionCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            HapticFeedback.selectionClick();
+            PulsrHaptics.selectionClick();
             onTap();
           },
           borderRadius: AppRadii.r18All,

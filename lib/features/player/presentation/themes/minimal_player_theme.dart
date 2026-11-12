@@ -9,6 +9,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../widgets/audio_visualizer.dart';
+import '../widgets/player_gesture_scope.dart';
 import 'player_shape.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';

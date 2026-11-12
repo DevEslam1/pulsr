@@ -11,6 +11,7 @@ import '../services/sound_feedback_service.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 enum PulsrSwitchSize {
   small,
@@ -117,7 +118,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
 
   void _toggle() {
     if (!isEnabled) return;
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     SoundFeedbackService.playToggle();
     widget.onChanged!(!widget.value);
   }
@@ -240,7 +241,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                           offset: Offset(direction * slideX, 0),
                           child: AnimatedContainer(
                             duration: context.motionMs(130),
-                            curve: Curves.easeOutCubic,
+                            curve: context.motionCurve(PulsrMotion.enter),
                             width: stretchWidth,
                             height: thumbDiameter,
                             decoration: BoxDecoration(
@@ -340,7 +341,7 @@ class PulsrSwitchListTile extends StatelessWidget {
                         const SizedBox(width: AppSpacing.s6),
                         GestureDetector(
                           onTap: () {
-                            HapticFeedback.selectionClick();
+                            PulsrHaptics.selectionClick();
                             onInfoTap!();
                           },
                           behavior: HitTestBehavior.opaque,

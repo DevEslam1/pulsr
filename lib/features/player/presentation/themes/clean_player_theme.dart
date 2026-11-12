@@ -1,6 +1,5 @@
 // lib/features/player/presentation/themes/clean_player_theme.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -33,6 +32,7 @@ import '../widgets/ambient_sound_sheet.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/canvas_backdrop.dart';
 import '../widgets/equalizer_sheet.dart';
+import '../widgets/player_gesture_scope.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_volume_bar.dart';
@@ -65,8 +65,6 @@ class CleanPlayerTheme extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final (
-      :nowPlayingDoubleTap,
-      :nowPlayingArtworkSwipe,
       :playerSliderStyle,
       :canvasEnabled,
       :canvasAsBackdrop,
@@ -75,16 +73,12 @@ class CleanPlayerTheme extends StatelessWidget {
     ) = context.select<
         SettingsCubit,
         ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
           PlayerSliderStyle playerSliderStyle,
           bool canvasEnabled,
           bool canvasAsBackdrop,
           AppThemeMode themeMode,
           ExperienceMode experienceMode,
         })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
           playerSliderStyle: c.state.playerSliderStyle,
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
@@ -203,32 +197,7 @@ class CleanPlayerTheme extends StatelessWidget {
 
           upperStage = KeyedSubtree(
             key: const ValueKey('art_stage'),
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => cubit.toggleLyricsVisibility(),
-              onDoubleTap: () {
-                switch (nowPlayingDoubleTap) {
-                  case NowPlayingDoubleTapAction.toggleFavorite:
-                    if (song != null) cubit.toggleFavorite(song.id);
-                    break;
-                  case NowPlayingDoubleTapAction.toggleLyrics:
-                    cubit.toggleLyricsVisibility();
-                    break;
-                  case NowPlayingDoubleTapAction.none:
-                    break;
-                }
-              },
-              onHorizontalDragEnd: (details) {
-                if (nowPlayingArtworkSwipe ==
-                        NowPlayingArtworkSwipeAction.nextPrev &&
-                    details.primaryVelocity != null) {
-                  if (details.primaryVelocity! < -200) {
-                    cubit.next();
-                  } else if (details.primaryVelocity! > 200) {
-                    cubit.previous();
-                  }
-                }
-              },
+            child: PlayerGestureScope(
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -345,7 +314,7 @@ class CleanPlayerTheme extends StatelessWidget {
               if (song != null) ...[
                 if (hasDownload)
                   _CleanActionCircleButton(
-                    tooltip: 'Download',
+                    tooltip: context.l10n.downloadLabel,
                     child: YtmDownloadButton(
                       song: song,
                       activeColor: activeColor,
@@ -359,7 +328,7 @@ class CleanPlayerTheme extends StatelessWidget {
                     iconColor: Colors.white,
                     tooltip: context.l10n.addToPlaylist,
                     onTap: () {
-                      HapticFeedback.lightImpact();
+                      PulsrHaptics.lightImpact();
                       AddToPlaylistSheet.show(context, song: song);
                     },
                   ),
@@ -389,7 +358,7 @@ class CleanPlayerTheme extends StatelessWidget {
                 tooltip: context.l10n.moreOptions,
                 onTap: () {
                   if (song != null) {
-                    HapticFeedback.lightImpact();
+                    PulsrHaptics.lightImpact();
                     SongOptionsSheet.show(context, song: song);
                   }
                 },
@@ -707,7 +676,7 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
               isWavy: effectiveStyle == PlayerSliderStyle.wavy,
               animateWave: isPlaying && !isBuffering,
               onChangeStart: (val) {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 setState(() => _dragValue = val);
               },
               onChanged: (val) {
@@ -793,9 +762,9 @@ class _CleanLosslessBadgePill extends StatelessWidget {
 
     final String label = (info.tier == AudioQualityTier.lossless ||
             info.shortBadgeLabel.toLowerCase().contains('lossless'))
-        ? 'Lossless'
+        ? context.l10n.badgeLossless
         : (info.tier == AudioQualityTier.hiResLossless
-            ? 'Hi-Res Lossless'
+            ? context.l10n.badgeHiResLossless
             : info.shortBadgeLabel);
 
     return Material(
@@ -1309,7 +1278,7 @@ class _CleanDownBar extends StatelessWidget {
                       activeColor: activeColor,
                       tooltip: context.l10n.equalizer,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         EqualizerSheet.show(context);
                       },
                     ),
@@ -1325,7 +1294,7 @@ class _CleanDownBar extends StatelessWidget {
                       activeColor: activeColor,
                       tooltip: context.l10n.playbackSpeed,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         SpeedPickerSheet.show(context);
                       },
                     ),
@@ -1343,7 +1312,7 @@ class _CleanDownBar extends StatelessWidget {
                           ? 'Google Cast'
                           : context.l10n.audioOutputAndDac,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         if (state.currentSong != null) {
                           AudioQualitySheet.show(
                               context, state.currentSong!, activeColor);
@@ -1359,7 +1328,7 @@ class _CleanDownBar extends StatelessWidget {
                       activeColor: AppColors.quranEmerald,
                       tooltip: context.l10n.quranMode,
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         QuranModeSheet.show(context);
                       },
                     ),
@@ -1377,7 +1346,7 @@ class _CleanDownBar extends StatelessWidget {
                           activeColor: activeColor,
                           tooltip: context.l10n.ambientSounds,
                           onTap: () {
-                            HapticFeedback.lightImpact();
+                            PulsrHaptics.lightImpact();
                             AmbientSoundSheet.show(context);
                           },
                         );
@@ -1408,7 +1377,7 @@ class _CleanDownBar extends StatelessWidget {
                                   ? 'Sleep Timer: ${formatSleepTimerRemaining(state.sleepTimerRemaining!)} remaining'
                                   : context.l10n.sleepTimer)),
                       onTap: () {
-                        HapticFeedback.lightImpact();
+                        PulsrHaptics.lightImpact();
                         SleepTimerSheet.show(context);
                       },
                     ),

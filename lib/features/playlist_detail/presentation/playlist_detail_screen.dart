@@ -2,7 +2,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart' show ArtworkType;
@@ -44,6 +43,7 @@ import '../../sheets/song_options_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
+import '../../../core/utils/pulsr_haptics.dart';
 /// Reactively-loaded playlist contents or the failure that prevented loading,
 /// so a DB error surfaces as a retryable state instead of an empty list.
 class _PlaylistSongsResult {
@@ -94,7 +94,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
 
   void _enterReorderMode(List<SongsTableData> songs) {
     if (playlist.isSmart || songs.isEmpty || _isReordering) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     _searchController.clear();
     setState(() {
       _searchQuery = '';
@@ -105,7 +105,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   void _exitReorderMode() {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       _isReordering = false;
       _selectedReorderIds.clear();
@@ -114,7 +114,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   void _toggleReorderSelection(int songId) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       if (!_selectedReorderIds.add(songId)) {
         _selectedReorderIds.remove(songId);
@@ -123,7 +123,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   }
 
   void _selectAllForReorder(bool select) {
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() {
       _selectedReorderIds.clear();
       if (select) {
@@ -148,7 +148,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       isSelected: (song) => _selectedReorderIds.contains(song.id),
     );
     if (_sameSongOrder(reordered, _reorderSongs)) return;
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     final previous = _reorderSongs;
     setState(() => _reorderSongs = reordered);
     _queueOrderSave(previous, reordered);
@@ -162,7 +162,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       toTop: toTop,
     );
     if (_sameSongOrder(reordered, _reorderSongs)) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final previous = _reorderSongs;
     setState(() => _reorderSongs = reordered);
     _queueOrderSave(previous, reordered);
@@ -239,7 +239,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       toTop: toTop,
     );
     if (_sameSongOrder(reordered, _reorderSongs)) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     final previous = _reorderSongs;
     setState(() => _reorderSongs = reordered);
     _queueOrderSave(previous, reordered);
@@ -689,7 +689,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                     ),
                   ),
                   onPressed: () {
-                    HapticFeedback.mediumImpact();
+                    PulsrHaptics.mediumImpact();
                     context
                         .read<PlayerCubit>()
                         .playSong(songs.first, queue: songs);
@@ -715,7 +715,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                     ),
                   ),
                   onPressed: () {
-                    HapticFeedback.mediumImpact();
+                    PulsrHaptics.mediumImpact();
                     final shuffled = List<SongsTableData>.from(songs)
                       ..shuffle();
                     context
@@ -737,7 +737,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                     minHeight: AppSpacing.minTouchTarget,
                   ),
                   onPressed: () {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     _downloadPlaylist(context, songs);
                   },
                   icon: const Icon(Icons.download_rounded, size: 20),
@@ -1451,7 +1451,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 size: 20,
                               ),
                               onPressed: () {
-                                HapticFeedback.selectionClick();
+                                PulsrHaptics.selectionClick();
                                 try {
                                   context
                                       .read<LibraryCubit>()

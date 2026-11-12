@@ -1,7 +1,6 @@
 // lib/core/widgets/gesture_hint_overlay.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
@@ -11,6 +10,7 @@ import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
 import '../utils/l10n_extensions.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// A shared, self-dismissing hint overlay/banner that shows once to educate
 /// users about gestures (D6: swipe down to dismiss, double-tap, mini player
@@ -84,7 +84,7 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
   void _dismiss({bool fromUserTap = false}) {
     if (!mounted || _dismissed) return;
     if (fromUserTap) {
-      HapticFeedback.selectionClick();
+      PulsrHaptics.selectionClick();
     }
     _autoHideTimer?.cancel();
     setState(() => _visible = false);

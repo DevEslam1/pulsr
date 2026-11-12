@@ -1,7 +1,6 @@
 // lib/features/player/presentation/widgets/pulsr_cast_sheet.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
@@ -15,11 +14,12 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class PulsrCastSheet extends StatefulWidget {
   const PulsrCastSheet({super.key});
 
   static Future<void> show(BuildContext context) {
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
@@ -125,7 +125,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   Future<void> _rescan() async {
     if (_busy) return;
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
     _ownsDiscovery = true;
     setState(() => _scanning = true);
     if (_sdk) {
@@ -183,7 +183,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   Future<void> _connect(CastRoute route) async {
     if (_busy) return;
-    HapticFeedback.selectionClick();
+    PulsrHaptics.selectionClick();
     setState(() => _busy = true);
     try {
       if (route.selected || _session.connected) {
@@ -203,7 +203,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   Future<void> _castCurrentQueue() async {
     if (_busy) return;
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     final l10n = context.l10n;
     final playerState = context.read<PlayerCubit>().state;
     final queue = playerState.queue;
@@ -258,7 +258,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   Future<void> _castCurrentSong() async {
     if (_busy) return;
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     final l10n = context.l10n;
     final song = context.read<PlayerCubit>().state.currentSong;
     if (song == null) {

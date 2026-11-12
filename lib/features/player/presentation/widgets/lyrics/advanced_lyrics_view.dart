@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -12,6 +11,7 @@ import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
 import '../../themes/player_theme.dart';
 
+import '../../../../../core/utils/pulsr_haptics.dart';
 /// Advanced word-level / syllable sweep karaoke lyrics renderer.
 ///
 /// Features:
@@ -188,7 +188,7 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
               replaceOriginalWithTranslation:
                   widget.replaceOriginalWithTranslation,
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 widget.onLineTapped?.call(line.timestamp);
               },
               onLongPress: () {

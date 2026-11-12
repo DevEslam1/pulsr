@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../constants/app_colors.dart';
@@ -13,6 +12,7 @@ import '../theme/aura_theme.dart';
 import '../theme/pulsr_button_style.dart';
 import 'pulsr_pressable.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// One option in a [PulsrSegmentedControl].
 class PulsrSegment {
@@ -165,7 +165,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                             behavior: HitTestBehavior.opaque,
                             onTap: () {
                               if (clampedIndex != i) {
-                                HapticFeedback.selectionClick();
+                                PulsrHaptics.selectionClick();
                                 onChanged(i);
                               }
                             },
@@ -257,7 +257,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                 isSelected: selectedIndex == i,
                 onTap: () {
                   if (selectedIndex != i) {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     onChanged(i);
                   }
                 },

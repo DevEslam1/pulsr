@@ -176,7 +176,7 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
         ],
         AnimatedContainer(
           duration: context.motionMs(180),
-          curve: Curves.easeOutCubic,
+          curve: context.motionCurve(PulsrMotion.enter),
           decoration: BoxDecoration(
             borderRadius: AppRadii.r14All,
             boxShadow: _isFocused

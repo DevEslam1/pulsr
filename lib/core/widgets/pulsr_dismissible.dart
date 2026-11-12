@@ -1,7 +1,6 @@
 // lib/core/widgets/pulsr_dismissible.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -10,6 +9,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
 import '../utils/l10n_extensions.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// Two-swipe confirmation wrapper for list tiles and cards.
 ///
@@ -298,7 +298,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
         ? widget.middleRatio
         : -widget.middleRatio;
 
-    HapticFeedback.lightImpact();
+    PulsrHaptics.lightImpact();
 
     final active = _activeOpenState;
     if (active != null && active != this) {
@@ -363,7 +363,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
       _activeOpenState = null;
     }
 
-    HapticFeedback.mediumImpact();
+    PulsrHaptics.mediumImpact();
     widget.swipeSound?.call();
 
     if (widget.showToast && mounted) {

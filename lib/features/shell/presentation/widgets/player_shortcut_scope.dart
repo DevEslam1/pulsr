@@ -6,6 +6,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import 'shortcut_help_sheet.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Global keyboard shortcuts for desktop/tablet.
 ///
 /// Bindings:
@@ -69,7 +70,7 @@ class PlayerShortcutScope extends StatelessWidget {
   }) {
     return () {
       if (isTextInputFocused()) return;
-      HapticFeedback.selectionClick();
+      PulsrHaptics.selectionClick();
       action();
       PulsrToast.show(
         context,
@@ -83,7 +84,7 @@ class PlayerShortcutScope extends StatelessWidget {
   VoidCallback _guardHelp(BuildContext context) {
     return () {
       if (isTextInputFocused()) return;
-      HapticFeedback.selectionClick();
+      PulsrHaptics.selectionClick();
       ShortcutHelpSheet.show(context);
     };
   }

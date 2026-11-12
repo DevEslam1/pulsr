@@ -1,6 +1,5 @@
 // lib/features/downloads/presentation/widgets/download_quality_picker_sheet.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
@@ -12,6 +11,7 @@ import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/ytm_audio_quality.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Modal bottom sheet allowing users to select download quality with live
 /// file size estimates before starting a download.
 class DownloadQualityPickerSheet extends StatefulWidget {
@@ -142,7 +142,7 @@ class _DownloadQualityPickerSheetState
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: AnimatedContainer(
                 duration: context.motionMs(180),
-                curve: Curves.easeOutCubic,
+                curve: context.motionCurve(PulsrMotion.enter),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? p.accent.withValues(alpha: 0.12)
@@ -159,7 +159,7 @@ class _DownloadQualityPickerSheetState
                   child: InkWell(
                     borderRadius: AppRadii.r16All,
                     onTap: () {
-                      HapticFeedback.selectionClick();
+                      PulsrHaptics.selectionClick();
                       setState(() => _selectedQuality = opt.quality);
                     },
                     child: Padding(

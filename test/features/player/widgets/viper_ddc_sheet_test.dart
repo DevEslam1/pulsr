@@ -202,5 +202,30 @@ void main() {
 
       await tester.pump(const Duration(seconds: 5));
     });
+
+    testWidgets(
+        'enabling A/B bypass and closing sheet restores DDC enabled state',
+        (tester) async {
+      final cubit = buildCubit(enabled: true);
+      when(() => cubit.setViperDdcEnabled(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const ViperDdcSheet(),
+      ));
+      await tester.pumpAndSettle();
+
+      // Tap A/B Compare -> toggles bypass (disables DDC)
+      await tester.tap(find.text('A/B Compare'));
+      await tester.pump();
+      verify(() => cubit.setViperDdcEnabled(false)).called(1);
+
+      // Close / unmount the sheet (triggers dispose)
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+
+      // DDC must be re-enabled via the captured PlayerCubit reference
+      verify(() => cubit.setViperDdcEnabled(true)).called(1);
+    });
   });
 }

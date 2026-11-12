@@ -128,7 +128,7 @@ class PlayerMoreSheet extends StatelessWidget {
                 final activeEffects = ambient.activeEffects;
                 // Build subtitle: list active effect emojis + paused state
                 final subtitle = isAmbientActive
-                    ? '${activeEffects.map((e) => e.emoji).join(' ')} • ${activeEffects.length} effect${activeEffects.length == 1 ? '' : 's'}${ambient.isAudioPlaying ? '' : ' (Paused)'}'
+                    ? '${activeEffects.map((e) => e.emoji).join(' ')} • ${l10n.dspEffectsCount(activeEffects.length)}${ambient.isAudioPlaying ? '' : ' ${l10n.dspEffectsPausedSuffix}'}'
                     : l10n.ambientSoundsDesc;
                 // Icon: use icon of first active effect, or generic waves
                 final firstEffect = activeEffects.firstOrNull;

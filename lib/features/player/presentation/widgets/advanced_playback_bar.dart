@@ -1,6 +1,5 @@
 // F1/F2/F11 controls: AB loop, per-track delay, bookmark resume.
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
@@ -16,6 +15,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// AB-loop / bookmark labels need a placeholder for an unset point; the
 /// duration itself is formatted with the shared [Formatters.formatDuration] so
 /// it can never disagree with the seek bar (A-12).
@@ -149,7 +149,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                     ? resolvedActiveColor
                                     : null,
                                 onPressed: () {
-                                  HapticFeedback.lightImpact();
+                                  PulsrHaptics.lightImpact();
                                   cubit.setAbPointA();
                                 },
                                 icon: _buildPointPill(
@@ -171,7 +171,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                     ? resolvedActiveColor
                                     : null,
                                 onPressed: () {
-                                  HapticFeedback.lightImpact();
+                                  PulsrHaptics.lightImpact();
                                   cubit.setAbPointB();
                                 },
                                 icon: _buildPointPill(
@@ -196,7 +196,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                 onPressed: (state.abPointA != null &&
                                         state.abPointB != null)
                                     ? () {
-                                        HapticFeedback.lightImpact();
+                                        PulsrHaptics.lightImpact();
                                         cubit.toggleAbLoop();
                                       }
                                     : null,
@@ -241,7 +241,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                       minHeight: AppSpacing.minTouchTarget),
                                   tooltip: l10n.clearAbLoop,
                                   onPressed: () {
-                                    HapticFeedback.lightImpact();
+                                    PulsrHaptics.lightImpact();
                                     cubit.clearAbLoop();
                                   },
                                   icon: Container(
@@ -311,7 +311,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                 tooltip:
                                     l10n.audioDelayTooltip(state.trackDelayMs),
                                 onPressed: () {
-                                  HapticFeedback.lightImpact();
+                                  PulsrHaptics.lightImpact();
                                   _showDelaySheet(
                                       context, cubit, state.trackDelayMs);
                                 },

@@ -3881,6 +3881,8 @@
   "settingsDimWhitePointSubtitle": "Soften bright text for easier night listening",
   "settingsReduceMotionTitle": "Reduce Motion",
   "settingsReduceMotionSubtitle": "Snap animations instead of tweening them",
+  "settingsHapticsTitle": "Haptic Feedback",
+  "settingsHapticsSubtitle": "Vibrate on touch and gestures across the app",
   "settingsLiquidGlassTitle": "Liquid Glass Tint",
   "settingsLiquidGlassSubtitle": "Adjust refraction between Ultra Clear (0%) and Tinted (100%)",
   "settingsBadgeStyle": "STYLE",
@@ -5004,8 +5006,9 @@
   "castStreamHint": "Stream lossless/lossy audio over Wi-Fi",
   "downloadsMatchStream": "Downloads match stream",
   "sleepTimerEndOfQueue": "Sleep Timer: End of Queue",
-  "sleepTimerTracksRemaining": "Sleep Timer: {count} tracks remaining",
+  "sleepTimerTracksRemaining": "{count, plural, =1{Sleep Timer: 1 track remaining} other{Sleep Timer: {count} tracks remaining}}",
   "@sleepTimerTracksRemaining": {
+    "description": "Tooltip showing tracks remaining until sleep timer stops playback",
     "placeholders": {
       "count": {
         "type": "int"
@@ -7414,5 +7417,154 @@
   "simulatedPitchBadge": "SIM",
   "@simulatedPitchBadge": {
     "description": "Badge label indicating simulated vocal pitch tracking"
+  },
+  "audioQualityAuto": "Auto",
+  "@audioQualityAuto": {
+    "description": "Automatic audio bit-depth option"
+  },
+  "audioQualitySystemManaged": "System managed",
+  "@audioQualitySystemManaged": {
+    "description": "Subtitle for automatic bit-depth managed by Android"
+  },
+  "audioQualityBestEffort": "Best Effort",
+  "@audioQualityBestEffort": {
+    "description": "LDAC adaptive quality mode"
+  },
+  "audioQualityAutoKbps": "Auto kbps",
+  "@audioQualityAutoKbps": {
+    "description": "LDAC adaptive bitrate label"
+  },
+  "audioQualityMobile": "Mobile",
+  "@audioQualityMobile": {
+    "description": "LDAC 330 kbps mobile connection mode"
+  },
+  "audioQualityStandard": "Standard",
+  "@audioQualityStandard": {
+    "description": "Standard audio quality mode"
+  },
+  "audioQualityMaximum": "Maximum",
+  "@audioQualityMaximum": {
+    "description": "LDAC 990 kbps maximum quality mode"
+  },
+  "outputDeviceUsbHiResDac": "USB Hi-Res DAC",
+  "@outputDeviceUsbHiResDac": {
+    "description": "Fallback label for a connected USB DAC"
+  },
+  "outputDeviceInternalDac": "Internal DAC",
+  "@outputDeviceInternalDac": {
+    "description": "Fallback label for the device's internal DAC"
+  },
+  "@sleepTimerEndOfQueue": {
+    "description": "Tooltip when sleep timer is set to end of queue"
+  },
+  "sleepTimerTimeRemaining": "Sleep Timer: {remaining} remaining",
+  "@sleepTimerTimeRemaining": {
+    "description": "Tooltip showing formatted time remaining on sleep timer",
+    "placeholders": {
+      "remaining": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadLabel": "Download",
+  "@downloadLabel": {
+    "description": "Tooltip for download action button"
+  },
+  "badgeLossless": "Lossless",
+  "@badgeLossless": {
+    "description": "Lossless audio quality badge label"
+  },
+  "badgeHiResLossless": "Hi-Res Lossless",
+  "@badgeHiResLossless": {
+    "description": "Hi-Res Lossless audio quality badge label"
+  },
+  "viperStopSweep": "Stop Sweep",
+  "@viperStopSweep": {
+    "description": "Button label to stop test tone sweep"
+  },
+  "viperTestTone": "Test Tone (1k+Sweep)",
+  "@viperTestTone": {
+    "description": "Button label to play 1kHz + frequency sweep test tone"
+  },
+  "viperAbBypassed": "A/B: Bypassed (level matched {gainDb} dB)",
+  "@viperAbBypassed": {
+    "description": "Snackbar text when ViPER-DDC A/B bypass is active",
+    "placeholders": {
+      "gainDb": {
+        "type": "String"
+      }
+    }
+  },
+  "viperAbActive": "A/B: ViPER-DDC Active",
+  "@viperAbActive": {
+    "description": "Snackbar text when ViPER-DDC A/B is active"
+  },
+  "viperAbBypassedShort": "Bypassed (Matched)",
+  "@viperAbBypassedShort": {
+    "description": "Short button label when ViPER-DDC A/B is bypassed"
+  },
+  "viperAbCompare": "A/B Compare",
+  "@viperAbCompare": {
+    "description": "Button label to toggle ViPER-DDC A/B comparison"
+  },
+  "loopPointALabel": "Point A: {time}",
+  "@loopPointALabel": {
+    "description": "Prefix showing formatted loop point A timestamp",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "loopPointBLabel": "Point B: {time}",
+  "@loopPointBLabel": {
+    "description": "Prefix showing formatted loop point B timestamp",
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "dspEffectsCount": "{count, plural, =1{1 effect} other{{count} effects}}",
+  "@dspEffectsCount": {
+    "description": "Active ambient sound effects count",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dspEffectsPausedSuffix": "(Paused)",
+  "@dspEffectsPausedSuffix": {
+    "description": "Suffix shown when ambient effects are paused"
+  },
+  "autoPreampOffHint": "Auto Preamp: Off (Tap to protect against clipping)",
+  "@autoPreampOffHint": {
+    "description": "Tooltip when Auto Preamp clipping protection is disabled"
+  },
+  "autoPreampManualOverride": "Manual override (AutoEQ suggests {gainDb} dB)",
+  "@autoPreampManualOverride": {
+    "description": "Subtitle showing AutoEQ suggested preamp gain when manually overridden",
+    "placeholders": {
+      "gainDb": {
+        "type": "String"
+      }
+    }
+  },
+  "preampOutputGainHint": "Output gain applied before the EQ",
+  "@preampOutputGainHint": {
+    "description": "Subtitle explaining preamp output gain"
+  },
+  "tabletSplitViewHint": "Tap the inspector button on the player bar to open split-view queue & lyrics",
+  "@tabletSplitViewHint": {
+    "description": "One-time gesture hint for tablet split-view inspector"
+  },
+  "setLoopPointAHint": "Set loop point A",
+  "setLoopPointBHint": "Set loop point B",
+  "@setLoopPointAHint": {
+    "description": "Tooltip to set A-B loop start point"
+  },
+  "@setLoopPointBHint": {
+    "description": "Tooltip to set A-B loop end point"
   }
 }

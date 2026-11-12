@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -11,6 +10,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Icon for each ambient effect.
 IconData iconForEffect(AmbientSoundEffect effect) {
   switch (effect) {
@@ -210,7 +210,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                 child: PulsrSwitch(
                   value: _service.isEnabled,
                   onChanged: (v) {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     unawaited(_service.setEnabled(v));
                   },
                 ),
@@ -253,7 +253,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
               child: ChoiceChip(
                 selected: selected,
                 onSelected: (_) {
-                  HapticFeedback.selectionClick();
+                  PulsrHaptics.selectionClick();
                   unawaited(_service.toggleEffect(effect));
                 },
                 avatar: Text(
@@ -327,7 +327,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                       ? context.l10n.ambientSleepTimerOff
                       : context.l10n.ambientSleepTimerMinutes(minutes)),
                   onSelected: (_) {
-                    HapticFeedback.selectionClick();
+                    PulsrHaptics.selectionClick();
                     _service.setSleepTimer(
                         minutes == null ? null : Duration(minutes: minutes));
                   },

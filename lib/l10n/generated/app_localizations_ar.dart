@@ -4823,6 +4823,13 @@ class AppLocalizationsAr extends AppLocalizations {
       'تشغيل الحركات فورًا بدلًا من انتقالها التدريجي';
 
   @override
+  String get settingsHapticsTitle => 'الاستجابة اللمسية';
+
+  @override
+  String get settingsHapticsSubtitle =>
+      'الاهتزاز عند اللمس والإيماءات في جميع أنحاء التطبيق';
+
+  @override
   String get settingsLiquidGlassTitle => 'صبغة الزجاج السائل';
 
   @override
@@ -7427,11 +7434,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadsMatchStream => 'التنزيلات مطابقة للبث';
 
   @override
-  String get sleepTimerEndOfQueue => 'مؤقّت النوم: نهاية قائمة التشغيل';
+  String get sleepTimerEndOfQueue => 'مؤقت النوم: نهاية القائمة';
 
   @override
   String sleepTimerTracksRemaining(int count) {
-    return 'مؤقّت النوم: $count مقطوعات متبقية';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مؤقت النوم: $count مقطع متبقٍ',
+      many: 'مؤقت النوم: $count مقطعًا متبقيًا',
+      few: 'مؤقت النوم: $count مقاطع متبقية',
+      two: 'مؤقت النوم: مقطعان متبقيان',
+      one: 'مؤقت النوم: مقطع واحد متبقٍ',
+      zero: 'مؤقت النوم: لا توجد مقاطع متبقية',
+    );
+    return '$_temp0';
   }
 
   @override
@@ -9659,4 +9676,115 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get simulatedPitchBadge => 'محاكاة';
+
+  @override
+  String get audioQualityAuto => 'تلقائي';
+
+  @override
+  String get audioQualitySystemManaged => 'بإدارة النظام';
+
+  @override
+  String get audioQualityBestEffort => 'أفضل جهد';
+
+  @override
+  String get audioQualityAutoKbps => 'بت تلقائي';
+
+  @override
+  String get audioQualityMobile => 'متنقل';
+
+  @override
+  String get audioQualityStandard => 'قياسي';
+
+  @override
+  String get audioQualityMaximum => 'أقصى';
+
+  @override
+  String get outputDeviceUsbHiResDac => 'محول USB Hi-Res DAC';
+
+  @override
+  String get outputDeviceInternalDac => 'محول DAC داخلي';
+
+  @override
+  String sleepTimerTimeRemaining(String remaining) {
+    return 'مؤقت النوم: متبقٍ $remaining';
+  }
+
+  @override
+  String get downloadLabel => 'تنزيل';
+
+  @override
+  String get badgeLossless => 'بدون فقدان';
+
+  @override
+  String get badgeHiResLossless => 'Hi-Res بدون فقدان';
+
+  @override
+  String get viperStopSweep => 'إيقاف المسح';
+
+  @override
+  String get viperTestTone => 'نغمة اختبار (1k+مسح)';
+
+  @override
+  String viperAbBypassed(String gainDb) {
+    return 'A/B: تم التجاوز (مطابقة المستوى $gainDb ديسيبل)';
+  }
+
+  @override
+  String get viperAbActive => 'A/B: ViPER-DDC نشط';
+
+  @override
+  String get viperAbBypassedShort => 'تم التجاوز (مطابق)';
+
+  @override
+  String get viperAbCompare => 'مقارنة A/B';
+
+  @override
+  String loopPointALabel(String time) {
+    return 'النقطة A: $time';
+  }
+
+  @override
+  String loopPointBLabel(String time) {
+    return 'النقطة B: $time';
+  }
+
+  @override
+  String dspEffectsCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count مؤثر',
+      many: '$count مؤثرًا',
+      few: '$count مؤثرات',
+      two: 'مؤثران',
+      one: 'مؤثر واحد',
+      zero: '0 مؤثرات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get dspEffectsPausedSuffix => '(متوقف مؤقتًا)';
+
+  @override
+  String get autoPreampOffHint =>
+      'المضخم التلقائي: متوقف (انقر للحماية من التشويه)';
+
+  @override
+  String autoPreampManualOverride(String gainDb) {
+    return 'تجاوز يدوي (يقترح AutoEQ قيمة $gainDb ديسيبل)';
+  }
+
+  @override
+  String get preampOutputGainHint => 'كسب الخرج المطبق قبل المعادل';
+
+  @override
+  String get tabletSplitViewHint =>
+      'انقر على زر الفاحص في شريط المشغل لفتح العرض المقسم لقائمة الانتظار والكلمات';
+
+  @override
+  String get setLoopPointAHint => 'تعيين نقطة التكرار A';
+
+  @override
+  String get setLoopPointBHint => 'تعيين نقطة التكرار B';
 }

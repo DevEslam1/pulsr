@@ -2,7 +2,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -16,6 +15,7 @@ import '../utils/l10n_extensions.dart';
 import 'pulsr_dialog.dart';
 import 'pulsr_modal_tracker.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// Shared scope marker so nested sheet containers ([PulsrBottomSheetContainer]
 /// and `PulsrAdaptiveSheet`) never render duplicate outer chrome, borders, or
@@ -244,7 +244,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                   ),
                   tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                   onPressed: () {
-                    HapticFeedback.lightImpact();
+                    PulsrHaptics.lightImpact();
                     Navigator.of(context).maybePop();
                   },
                 ),

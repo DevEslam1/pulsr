@@ -18,7 +18,6 @@ import 'headset_controls_section.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
 import 'settings_tiles.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
@@ -27,6 +26,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Playback behavior: sleep timer, gapless, crossfade, resume, waveform seek.
 class PlaybackSection extends StatelessWidget {
   final SettingsState state;
@@ -828,12 +828,12 @@ class _PresetPill extends StatelessWidget {
     return PulsrPressable(
       pressedScale: 0.95,
       onTap: () {
-        HapticFeedback.selectionClick();
+        PulsrHaptics.selectionClick();
         onTap();
       },
       child: AnimatedContainer(
         duration: context.motionMs(180),
-        curve: Curves.easeOutCubic,
+        curve: context.motionCurve(PulsrMotion.enter),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.xs,
           vertical: AppSpacing.s10,

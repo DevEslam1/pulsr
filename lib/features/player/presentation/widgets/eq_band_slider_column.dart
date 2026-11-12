@@ -286,7 +286,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
     if ((oldGain < -0.1 && roundedGain >= 0.0) ||
         (oldGain > 0.1 && roundedGain <= 0.0) ||
         (oldGain != 0.0 && roundedGain == 0.0)) {
-      HapticFeedback.selectionClick();
+      PulsrHaptics.selectionClick();
     }
     setState(() {
       _dragGain = roundedGain;
@@ -319,7 +319,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
           fit: BoxFit.scaleDown,
           child: AnimatedContainer(
             duration: context.motionMs(150),
-            curve: Curves.easeOutCubic,
+            curve: context.motionCurve(PulsrMotion.enter),
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
             decoration: BoxDecoration(

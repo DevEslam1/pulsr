@@ -1,8 +1,10 @@
 // lib/features/settings/cubit/settings_accessibility_ext.dart
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/constants/prefs_keys.dart';
 import '../../../core/performance/gpu_budget.dart';
 import '../../../core/services/sound_feedback_service.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 import 'settings_cubit.dart';
 
 /// Accessibility-related settings mutations, split out of `SettingsCubit` so
@@ -22,12 +24,28 @@ extension SettingsAccessibilityX on SettingsCubit {
     await prefs.setBool(_keyReduceMotion, value);
   }
 
-  /// Rehydrates [GpuBudget] at startup so glass blur / visualizers respect
+  /// Sets whether tactile haptic feedback is enabled app-wide.
+  Future<void> setHapticsEnabled(bool value) async {
+    markDirty('hapticsEnabled');
+    safeEmit(state.copyWith(hapticsEnabled: value));
+    PulsrHaptics.setEnabled(value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.hapticsEnabled, value);
+  }
+
+  /// Rehydrates [GpuBudget] and [PulsrHaptics] at startup so settings respect
   /// the persisted toggle before first frame.
   static Future<void> restoreGpuBudget() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       GpuBudget.setEnabled(prefs.getBool(_keyReduceMotion) ?? false);
+    } catch (_) {}
+  }
+
+  static Future<void> restoreHaptics() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      PulsrHaptics.setEnabled(prefs.getBool(PrefsKeys.hapticsEnabled) ?? true);
     } catch (_) {}
   }
 

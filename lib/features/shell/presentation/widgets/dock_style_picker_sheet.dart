@@ -1,6 +1,5 @@
 // lib/features/shell/presentation/widgets/dock_style_picker_sheet.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
@@ -11,6 +10,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import 'stacked_bottom_dock.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Explicit picker for the mini-player dock stacking style.
 ///
 /// Features:
@@ -116,7 +116,7 @@ class _DockStylePickerSheetState extends State<DockStylePickerSheet> {
                 }
               },
               onTap: () {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 Navigator.of(context).pop();
                 widget.onSelected(mode);
               },

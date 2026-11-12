@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
+import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 /// A unified back button widget that safely navigates to the previous route,
 /// falling back to the Home page ('/') if no routes can be popped.
@@ -33,7 +33,7 @@ class PulsrBackButton extends StatelessWidget {
         size: size,
       ),
       onPressed: () {
-        HapticFeedback.lightImpact();
+        PulsrHaptics.lightImpact();
         if (onPressed != null) {
           onPressed!();
         } else if (context.canPop()) {

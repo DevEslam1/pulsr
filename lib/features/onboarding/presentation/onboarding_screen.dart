@@ -502,7 +502,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     ),
                                     child: AnimatedContainer(
                                       duration: context.motionMs(300),
-                                      curve: Curves.easeOutCubic,
+                                      curve: context.motionCurve(PulsrMotion.enter),
                                       height: isLandscape ? 6 : 8,
                                       width: isActive
                                           ? (isLandscape ? 22 : 28)

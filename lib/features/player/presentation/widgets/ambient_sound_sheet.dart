@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/services/ambient_sound_service.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -10,6 +9,7 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
 import 'ambient_sound_panel.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 /// Modal bottom sheet allowing users to enable, configure, and adjust volume for
 /// ambient background sounds (Rain, Fire, Forest, Ocean, etc.).
 class AmbientSoundSheet extends StatelessWidget {
@@ -69,7 +69,7 @@ class AmbientSoundSheet extends StatelessWidget {
             child: PulsrSwitch(
               value: service.isEnabled,
               onChanged: (v) {
-                HapticFeedback.selectionClick();
+                PulsrHaptics.selectionClick();
                 unawaited(service.setEnabled(v));
               },
             ),

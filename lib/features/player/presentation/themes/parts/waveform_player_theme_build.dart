@@ -8,15 +8,6 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
     final activeColor = widget.props.activeColor;
     final bgColor = widget.props.bgColor;
     final song = state.currentSong;
-    final (:nowPlayingDoubleTap, :nowPlayingArtworkSwipe) = context.select<
-        SettingsCubit,
-        ({
-          NowPlayingDoubleTapAction nowPlayingDoubleTap,
-          NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
-        })>((c) => (
-          nowPlayingDoubleTap: c.state.nowPlayingDoubleTap,
-          nowPlayingArtworkSwipe: c.state.nowPlayingArtworkSwipe,
-        ));
 
     final extraBadge = Container(
       padding: const EdgeInsets.symmetric(
@@ -61,32 +52,8 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
           ),
         ),
       ),
-      stage: (context, metrics) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      stage: (context, metrics) => PlayerGestureScope(
         onTap: () => cubit.toggleLyricsVisibility(),
-        onDoubleTap: () {
-          switch (nowPlayingDoubleTap) {
-            case NowPlayingDoubleTapAction.toggleFavorite:
-              if (song != null) cubit.toggleFavorite(song.id);
-              break;
-            case NowPlayingDoubleTapAction.toggleLyrics:
-              cubit.toggleLyricsVisibility();
-              break;
-            case NowPlayingDoubleTapAction.none:
-              break;
-          }
-        },
-        onHorizontalDragEnd: (details) {
-          if (nowPlayingArtworkSwipe ==
-                  NowPlayingArtworkSwipeAction.nextPrev &&
-              details.primaryVelocity != null) {
-            if (details.primaryVelocity! < -200) {
-              cubit.next();
-            } else if (details.primaryVelocity! > 200) {
-              cubit.previous();
-            }
-          }
-        },
         child: _WaveformHeroStage(
           key: const ValueKey('waveform_hero_stage'),
           song: song,

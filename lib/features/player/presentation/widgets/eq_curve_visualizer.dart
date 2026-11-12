@@ -3,11 +3,11 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 class _ListDoubleTween extends Tween<List<double>> {
   _ListDoubleTween({super.begin, super.end});
 
@@ -169,7 +169,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     final hitTolerance = math.max(stepX / 2, 32.0);
     if (minDistance <= hitTolerance) {
       widget.onBandSelected?.call(closestIndex);
-      HapticFeedback.mediumImpact();
+      PulsrHaptics.mediumImpact();
       widget.onGainChanged?.call(closestIndex, 0.0);
     }
   }
@@ -214,7 +214,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       setState(() => _activeDraggingBand = closestIndex);
       widget.onBandSelected?.call(closestIndex);
       if (context.motionEnabled) {
-        HapticFeedback.selectionClick();
+        PulsrHaptics.selectionClick();
       }
       _updateGainForPosition(closestIndex, localPos.dy, size.height);
     }

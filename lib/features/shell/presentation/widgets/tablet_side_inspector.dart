@@ -1,12 +1,14 @@
 // lib/features/shell/presentation/widgets/tablet_side_inspector.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
+import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/responsive/pulsr_responsive_tokens.dart';
+import '../../../../core/services/settings_cache.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -15,6 +17,7 @@ import '../../../player/cubit/player_state.dart';
 import '../../../player/presentation/widgets/lyrics_view.dart';
 import '../../../player/presentation/widgets/now_playing_queue_view.dart';
 
+import '../../../../core/utils/pulsr_haptics.dart';
 @immutable
 class _TabletLyricsData {
   final int? songId;
@@ -79,6 +82,10 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
   bool _isDragging = false;
   double? _lastScreenWidth;
   double _dragDeltaAccumulator = 0.0;
+  String? _loadedDeviceClass;
+  DateTime? _lastHandlePointerDownAt;
+  Offset? _lastHandlePointerDownPos;
+  DateTime? _lastHandleTapAt;
 
   @visibleForTesting
   double? get customWidth => _customWidth;
@@ -153,6 +160,18 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final deviceClassName = PulsrViewport.fromContext(context).deviceClass.name;
+    if (_loadedDeviceClass == null) {
+      _loadedDeviceClass = deviceClassName;
+      final key = PrefsKeys.tabletInspectorWidthKey(deviceClassName);
+      if (SettingsCache().containsKey(key)) {
+        _customWidth = SettingsCache()
+            .getDouble(key, defaultValue: TabletSideInspector.minWidth)
+            .clamp(TabletSideInspector.minWidth, TabletSideInspector.maxWidth);
+      }
+    } else {
+      _loadedDeviceClass = deviceClassName;
+    }
     final currentWidth = Adaptive.widthOf(context);
     if (_lastScreenWidth != null &&
         _lastScreenWidth != currentWidth &&
@@ -238,7 +257,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                       behavior: HitTestBehavior.opaque,
                                       onTap: () {
                                         if (_selectedTabIndex != i) {
-                                          HapticFeedback.selectionClick();
+                                          PulsrHaptics.selectionClick();
                                           setState(() => _selectedTabIndex = i);
                                         }
                                       },
@@ -348,7 +367,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                           ),
                           tooltip: context.l10n.close,
                           onPressed: () {
-                            HapticFeedback.selectionClick();
+                            PulsrHaptics.selectionClick();
                             widget.onClose();
                           },
                           constraints: const BoxConstraints(
@@ -376,18 +395,46 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
               ],
             ),
 
-            // Left edge drag-to-resize handle
+            // Left edge drag-to-resize handle (48dp hit target, 24px visual zone)
             PositionedDirectional(
               start: 0,
               top: 0,
               bottom: 0,
-              width: 14,
+              width: 48,
               child: MouseRegion(
                 cursor: SystemMouseCursors.resizeLeftRight,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragStart: (_) {
-                    HapticFeedback.selectionClick();
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: (event) {
+                    _lastHandlePointerDownAt = DateTime.now();
+                    _lastHandlePointerDownPos = event.position;
+                  },
+                  onPointerUp: (event) {
+                    final downAt = _lastHandlePointerDownAt;
+                    final downPos = _lastHandlePointerDownPos;
+                    if (downAt == null || downPos == null) return;
+                    final isTap = DateTime.now().difference(downAt).inMilliseconds < 250 &&
+                        (event.position - downPos).distance < 8.0;
+                    if (!isTap) return;
+                    final now = DateTime.now();
+                    if (_lastHandleTapAt != null &&
+                        now.difference(_lastHandleTapAt!).inMilliseconds < 320) {
+                      _lastHandleTapAt = null;
+                      PulsrHaptics.selectionClick();
+                      setState(() => _customWidth = null);
+                      final key = PrefsKeys.tabletInspectorWidthKey(
+                        _loadedDeviceClass ??
+                            PulsrViewport.fromContext(context).deviceClass.name,
+                      );
+                      SettingsCache().remove(key);
+                    } else {
+                      _lastHandleTapAt = now;
+                    }
+                  },
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragStart: (_) {
+                    PulsrHaptics.selectionClick();
                     _dragDeltaAccumulator = 0.0;
                     setState(() => _isDragging = true);
                   },
@@ -413,31 +460,45 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                   onHorizontalDragEnd: (_) {
                     _dragDeltaAccumulator = 0.0;
                     setState(() => _isDragging = false);
+                    if (_customWidth != null) {
+                      final key = PrefsKeys.tabletInspectorWidthKey(
+                        _loadedDeviceClass ??
+                            PulsrViewport.fromContext(context).deviceClass.name,
+                      );
+                      SettingsCache().setDouble(key, _customWidth!);
+                    }
                   },
                   onHorizontalDragCancel: () {
                     _dragDeltaAccumulator = 0.0;
                     setState(() => _isDragging = false);
                   },
-                  child: Center(
-                    child: AnimatedContainer(
-                      duration: context.motionMs(150),
-                      width: _isDragging ? 4.5 : 3.0,
-                      height: _isDragging ? 52.0 : 32.0,
-                      decoration: BoxDecoration(
-                        color: _isDragging
-                            ? p.accent
-                            : p.textTertiary.withValues(alpha: 0.32),
-                        borderRadius: AppRadii.r4All,
-                        boxShadow: _isDragging
-                            ? [
-                                BoxShadow(
-                                  color: p.accent.withValues(alpha: 0.45),
-                                  blurRadius: 8,
-                                ),
-                              ]
-                            : null,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: SizedBox(
+                      width: 24,
+                      child: Center(
+                        child: AnimatedContainer(
+                          duration: context.motionMs(150),
+                          width: _isDragging ? 4.5 : 3.0,
+                          height: _isDragging ? 52.0 : 32.0,
+                          decoration: BoxDecoration(
+                            color: _isDragging
+                                ? p.accent
+                                : p.textTertiary.withValues(alpha: 0.32),
+                            borderRadius: AppRadii.r4All,
+                            boxShadow: _isDragging
+                                ? [
+                                    BoxShadow(
+                                      color: p.accent.withValues(alpha: 0.45),
+                                      blurRadius: 8,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
                       ),
                     ),
+                  ),
                   ),
                 ),
               ),
