@@ -1914,6 +1914,91 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         recalculateActiveStages()
     }
 
+    /**
+     * Orchestrates bit-perfect / DoP bypass transitions atomically across native DSP,
+     * app-owned Android HAL effects, DVC runtime gain, and external/vendor system effects.
+     *
+     * @return `null` when applied (or reconciled) cleanly, or a human-readable failure reason
+     * after rolling back to the prior state.
+     */
+    private fun applyBitPerfectBypass(bypass: Boolean, isDop: Boolean): String? {
+        val targetDop = bypass && isDop
+        // Snapshot the truthful state first: a refused request must not
+        // leave the plugin (or the native chain) on the value the Dart
+        // layer is about to roll back, otherwise the retry with the same
+        // value silently skips the apply path and can never recover.
+        val previousBypass = isBitPerfectBypassActive
+        val previousDop = isDopActive
+        val previousDvcActive = dvcActive
+        var failure: String? = null
+        synchronized(stateLock) {
+            if (bypass != isBitPerfectBypassActive || targetDop != isDopActive) {
+                // Hearing-safety: fade down before changing raw PCM path or system stream volume
+                if (bypass && dvcEnabled) {
+                    applyDvcRuntimeState(false)
+                }
+                if (isNativeDspLoaded) {
+                    try {
+                        nativeSetBitPerfectParams(bypass, targetDop)
+                    } catch (e: Throwable) {
+                        failure = "Bit-perfect bypass failed: ${e.message}"
+                    }
+                }
+                if (failure == null) {
+                    isBitPerfectBypassActive = bypass
+                    isDopActive = targetDop
+                    if (bypass) {
+                        // Immediately disable virtualizer/loudness/bass + native stages
+                        try { virtualizer?.enabled = false } catch (_: Exception) {}
+                        try { loudnessEnhancer?.enabled = false } catch (_: Exception) {}
+                        try { bassBoost?.enabled = false } catch (_: Exception) {}
+                        try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
+                        recalculateActiveStages()
+                    } else {
+                        recalculateActiveStages()
+                        restoreAppOwnedStagesAfterBypass()
+                        restoreNativeStateAfterBypass()
+                        // Hearing-safety: re-establish DVC after leaving bit-perfect.
+                        applyDvcRuntimeState(true)
+                    }
+                } else if (bypass && previousDvcActive) {
+                    // Native param change failed after disabling DVC: restore DVC cleanly.
+                    applyDvcRuntimeState(true)
+                }
+            }
+            // App-owned HAL stages are the only ones allowed to veto:
+            // they run on our own session, so one left enabled would
+            // colour a stream we call bit-perfect. Put everything back
+            // when one refuses instead of failing half-applied.
+            if (failure == null && !reconcileAppOwnedHal(bypass)) {
+                if (isNativeDspLoaded) {
+                    try { nativeSetBitPerfectParams(previousBypass, previousDop) } catch (_: Throwable) {}
+                }
+                isBitPerfectBypassActive = previousBypass
+                isDopActive = previousDop
+                if (previousBypass) {
+                    recalculateActiveStages()
+                } else {
+                    restoreAppOwnedStagesAfterBypass()
+                    // Re-assert the native snapshot the bypass replaced.
+                    restoreNativeStateAfterBypass()
+                    if (previousDvcActive) {
+                        applyDvcRuntimeState(true)
+                    }
+                }
+                failure = "Bit-perfect HAL effect cleanup incomplete"
+            }
+        }
+        // Vendor/OEM effects and the platform Spatializer are recorded,
+        // never a veto: they belong to the system policy and the output
+        // route, and rejecting the request made Bit-Perfect unreachable
+        // on devices that refuse session-0 effect control. A refused
+        // request re-applies the previous state instead of the target.
+        val externalTarget = if (failure == null) bypass else previousBypass
+        recordSystemEffects(applyExternalSystemEffects(externalTarget), externalTarget)
+        return failure
+    }
+
     override fun onMethodCall(call: MethodCall, result: Result) {
         try {
             // Playback uses a fixed-frame processor; its in-place resampler
@@ -3810,80 +3895,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setBypassDspForBitPerfect" -> {
                     val bypass = call.argument<Boolean>("bypass") ?: false
                     val isDop = bypass && (call.argument<Boolean>("isDop") ?: isDopActive)
-                    // Snapshot the truthful state first: a refused request must not
-                    // leave the plugin (or the native chain) on the value the Dart
-                    // layer is about to roll back, otherwise the retry with the same
-                    // value silently skips the apply path and can never recover.
-                    val previousBypass = isBitPerfectBypassActive
-                    val previousDop = isDopActive
-                    val previousDvcActive = dvcActive
-                    var failure: String? = null
-                    synchronized(stateLock) {
-                        if (bypass != isBitPerfectBypassActive || isDop != isDopActive) {
-                            // Hearing-safety: fade down before changing raw PCM path or system stream volume
-                            if (bypass && dvcEnabled) {
-                                applyDvcRuntimeState(false)
-                            }
-                            if (isNativeDspLoaded) {
-                                try {
-                                    nativeSetBitPerfectParams(bypass, isDop)
-                                } catch (e: Throwable) {
-                                    failure = "Bit-perfect bypass failed: ${e.message}"
-                                }
-                            }
-                            if (failure == null) {
-                                isBitPerfectBypassActive = bypass
-                                isDopActive = isDop
-                                if (bypass) {
-                                    // Immediately disable virtualizer/loudness/bass + native stages
-                                    try { virtualizer?.enabled = false } catch (_: Exception) {}
-                                    try { loudnessEnhancer?.enabled = false } catch (_: Exception) {}
-                                    try { bassBoost?.enabled = false } catch (_: Exception) {}
-                                    try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
-                                    recalculateActiveStages()
-                                } else {
-                                    recalculateActiveStages()
-                                    restoreAppOwnedStagesAfterBypass()
-                                    restoreNativeStateAfterBypass()
-                                    // Hearing-safety: re-establish DVC after leaving bit-perfect.
-                                    applyDvcRuntimeState(true)
-                                }
-                            } else if (bypass && previousDvcActive) {
-                                // Native param change failed after disabling DVC: restore DVC cleanly.
-                                applyDvcRuntimeState(true)
-                            }
-                        }
-                        // App-owned HAL stages are the only ones allowed to veto:
-                        // they run on our own session, so one left enabled would
-                        // colour a stream we call bit-perfect. Put everything back
-                        // when one refuses instead of failing half-applied.
-                        if (failure == null && !reconcileAppOwnedHal(bypass)) {
-                            if (isNativeDspLoaded) {
-                                try { nativeSetBitPerfectParams(previousBypass, previousDop) } catch (_: Throwable) {}
-                            }
-                            isBitPerfectBypassActive = previousBypass
-                            isDopActive = previousDop
-                            if (previousBypass) {
-                                recalculateActiveStages()
-                            } else {
-                                restoreAppOwnedStagesAfterBypass()
-                                // Re-assert the native snapshot the bypass replaced.
-                                restoreNativeStateAfterBypass()
-                                if (previousDvcActive) {
-                                    applyDvcRuntimeState(true)
-                                }
-                            }
-                            failure = "Bit-perfect HAL effect cleanup incomplete"
-                        }
-                    }
-                    // Vendor/OEM effects and the platform Spatializer are recorded,
-                    // never a veto: they belong to the system policy and the output
-                    // route, and rejecting the request made Bit-Perfect unreachable
-                    // on devices that refuse session-0 effect control. A refused
-                    // request re-applies the previous state instead of the target.
-                    val externalTarget = if (failure == null) bypass else previousBypass
-                    recordSystemEffects(applyExternalSystemEffects(externalTarget), externalTarget)
-                    val reason = failure
+                    val reason = applyBitPerfectBypass(bypass, isDop)
                     result.success(if (reason == null) true else notAppliedResult(reason))
                 }
 
@@ -3914,12 +3926,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setBitPerfectParams" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
-                    val isDop = call.argument<Boolean>("isDop") ?: false
-                    isDopActive = isDop
-                    // Guard the JNI call: UnsatisfiedLinkError is a Throwable, not
-                    // an Exception, so it would crash when libpulsr_dsp is absent.
-                    if (isNativeDspLoaded) {
-                        try { nativeSetBitPerfectParams(enabled, isDop) } catch (e: Throwable) { Log.w(TAG, "nativeSetBitPerfectParams failed: ${e.message}") }
+                    val isDop = enabled && (call.argument<Boolean>("isDop") ?: false)
+                    val reason = applyBitPerfectBypass(enabled, isDop)
+                    if (reason != null) {
+                        Log.w(TAG, "setBitPerfectParams bypass reconciliation warning: $reason")
                     }
                     result.success(true)
                 }
