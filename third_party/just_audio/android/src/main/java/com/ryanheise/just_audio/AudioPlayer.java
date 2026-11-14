@@ -512,26 +512,89 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
      * package-private/overridable so JVM tests can exercise the mode-change
      * path without native code.
      */
-    boolean probeAaudioOutput(int sampleRate, int channels, int targetBufferMs,
-            boolean preferExclusive) {
+    int probeSingleAaudioEncoding(int sampleRate, int channels, int nativeEncoding,
+            int targetBufferMs, boolean preferExclusive) {
         long probe = 0L;
         try {
             probe = AaudioNativeBridge.nativeOpen(sampleRate, channels,
-                    AaudioNativeBridge.ENCODING_PCM_I16, preferExclusive, targetBufferMs);
-            if (probe == 0L) return false;
+                    nativeEncoding, preferExclusive, targetBufferMs);
+            if (probe == 0L) return 0;
             // If exclusive mode was requested, confirm the stream really is
             // exclusive; a device may silently grant shared mode instead.
             if (preferExclusive && !AaudioNativeBridge.nativeIsExclusive(probe)) {
-                Log.w(TAG, "AAudio probe opened in shared mode; exclusive not available");
-                return false;
+                Log.w(TAG, "AAudio probe opened in shared mode (encoding=" + nativeEncoding
+                        + "); exclusive not available");
+                return 0;
             }
-            return true;
+            return 1;
         } catch (LinkageError | RuntimeException refused) {
             Log.w(TAG, "AAudio output probe refused", refused);
-            return false;
+            return -1;
         } finally {
             if (probe != 0L) AaudioNativeBridge.nativeClose(probe);
         }
+    }
+
+    private static int toAaudioProbeEncoding(int pcmEncoding) {
+        if (pcmEncoding == C.ENCODING_PCM_24BIT) {
+            return AaudioNativeBridge.ENCODING_PCM_I24_PACKED;
+        }
+        if (pcmEncoding == C.ENCODING_PCM_32BIT) {
+            return Build.VERSION.SDK_INT >= 31
+                    ? AaudioNativeBridge.ENCODING_PCM_I32
+                    : AaudioNativeBridge.ENCODING_PCM_FLOAT;
+        }
+        if (pcmEncoding == C.ENCODING_PCM_FLOAT) {
+            return AaudioNativeBridge.ENCODING_PCM_FLOAT;
+        }
+        return AaudioNativeBridge.ENCODING_PCM_I16;
+    }
+
+    boolean probeAaudioOutput(int sampleRate, int channels, int targetBufferMs,
+            boolean preferExclusive) {
+        return probeAaudioOutput(sampleRate, channels, targetBufferMs, preferExclusive,
+                C.ENCODING_PCM_16BIT);
+    }
+
+    boolean probeAaudioOutput(int sampleRate, int channels, int targetBufferMs,
+            boolean preferExclusive, int pcmEncoding) {
+        final int primary = toAaudioProbeEncoding(pcmEncoding);
+        final int[] candidates = Build.VERSION.SDK_INT >= 31
+                ? new int[] {
+                    primary,
+                    AaudioNativeBridge.ENCODING_PCM_I16,
+                    AaudioNativeBridge.ENCODING_PCM_I24_PACKED,
+                    AaudioNativeBridge.ENCODING_PCM_I32,
+                }
+                : (preferExclusive
+                        ? new int[] {
+                            primary == AaudioNativeBridge.ENCODING_PCM_FLOAT
+                                    ? AaudioNativeBridge.ENCODING_PCM_I24_PACKED : primary,
+                            AaudioNativeBridge.ENCODING_PCM_I16,
+                            AaudioNativeBridge.ENCODING_PCM_I24_PACKED,
+                        }
+                        : new int[] {
+                            primary,
+                            AaudioNativeBridge.ENCODING_PCM_I16,
+                            AaudioNativeBridge.ENCODING_PCM_I24_PACKED,
+                            AaudioNativeBridge.ENCODING_PCM_FLOAT,
+                        });
+        for (int i = 0; i < candidates.length; i++) {
+            final int enc = candidates[i];
+            boolean seenBefore = false;
+            for (int j = 0; j < i; j++) {
+                if (candidates[j] == enc) {
+                    seenBefore = true;
+                    break;
+                }
+            }
+            if (seenBefore) continue;
+            final int status = probeSingleAaudioEncoding(
+                    sampleRate, channels, enc, targetBufferMs, preferExclusive);
+            if (status == 1) return true;
+            if (status < 0) return false;
+        }
+        return false;
     }
 
     private void completeSeek() {
@@ -609,8 +672,18 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 int channels = (requestedChannels != null && requestedChannels > 0)
                         ? requestedChannels
                         : (format != null && format.channelCount > 0 ? format.channelCount : 2);
-                effective = probeAaudioOutput(rate, channels,
-                        aaudioTargetBufferMs, aaudioPreferExclusive);
+                Integer requestedEncoding = call.argument("pcmEncoding");
+                int pcmEncoding = (requestedEncoding != null
+                        && requestedEncoding != androidx.media3.common.C.ENCODING_INVALID)
+                        ? requestedEncoding
+                        : (format != null ? format.pcmEncoding
+                                : androidx.media3.common.C.ENCODING_INVALID);
+                effective = (pcmEncoding == androidx.media3.common.C.ENCODING_INVALID
+                        || pcmEncoding == androidx.media3.common.C.ENCODING_PCM_16BIT)
+                        ? probeAaudioOutput(rate, channels,
+                                aaudioTargetBufferMs, aaudioPreferExclusive)
+                        : probeAaudioOutput(rate, channels,
+                                aaudioTargetBufferMs, aaudioPreferExclusive, pcmEncoding);
                 // A second hardware stream open at another rate used to run on
                 // this (main) thread after a successful probe. The first probe
                 // already proves the device can open the requested mode; the
@@ -1075,6 +1148,15 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         @Override
                         public void onFloatRejected(String reason, Exception cause) {
                             onFloatOutputRejected(reason, cause);
+                        }
+
+                        @Override
+                        public void onAaudioSuspended(String reason, boolean suspended) {
+                            // Do NOT clear aaudioOutputEnabled: that flag holds
+                            // the user's setting, unlike onAaudioOutputRejected.
+                            final boolean aaudioActive = !suspended && aaudioOutputEnabled;
+                            final boolean floatActive = !aaudioActive && floatOutputEnabled;
+                            notifyOutputModeToDart(reason, aaudioActive, floatActive);
                         }
                     });
             sinkWrapper = sink;

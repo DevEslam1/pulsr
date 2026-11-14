@@ -26,9 +26,10 @@ import java.nio.IntBuffer;
  * bit-perfect alternative path, not a DSP replacement.
  *
  * <p>v1 scope (documented limitations): PCM 16-bit / float / 24-bit packed,
- * 1-2 channels, speed &amp; pitch pinned to 1.0 (requests are ignored with a
- * log), no silence skipping, no tunneling/offload/aux effects. Any stream the
- * sink cannot honour must be declined via {@link #supportsFormat} so the
+ * 1-2 channels, speed &amp; pitch pinned to 1.0 (PulsrAudioSink suspends
+ * AAUDIO mode and swaps to the AudioTrack path when non-default speed/pitch or
+ * silence skipping is requested), no tunneling/offload/aux effects. Any stream
+ * the sink cannot honour must be declined via {@link #supportsFormat} so the
  * player keeps using the DefaultAudioSink path.
  */
 @androidx.media3.common.util.UnstableApi
@@ -507,6 +508,8 @@ public final class AAudioAudioSink implements AudioSink {
                         < bridge.getFramesWritten(handle));
     }
 
+    // PulsrAudioSink suspends AAUDIO and swaps to the AudioTrack path whenever
+    // non-default speed/pitch or skip-silence is active.
     @Override
     public void setPlaybackParameters(PlaybackParameters playbackParameters) {
         if (playbackParameters.speed != 1.0f
@@ -522,6 +525,7 @@ public final class AAudioAudioSink implements AudioSink {
         return playbackParameters;
     }
 
+    // PulsrAudioSink suspends AAUDIO and swaps to the AudioTrack path when enabled.
     @Override
     public void setSkipSilenceEnabled(boolean skipSilenceEnabled) {
         this.skipSilenceEnabled = false;

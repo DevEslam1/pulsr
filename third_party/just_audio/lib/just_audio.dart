@@ -1971,6 +1971,10 @@ class AudioPlayer {
             if (call.method == 'dspOutputModeEffect') {
               final args = call.arguments;
               if (args is Map) {
+                // Updates _aaudioOutputActive/_floatOutputActive for permanent
+                // rejections and temporary suspensions (e.g.
+                // 'speed_requires_audiotrack', 'skip_silence_requires_audiotrack')
+                // without clearing _aaudioOutputEnabled.
                 _applyOutputModeEffect(
                   aaudioActive: args['aaudioActive'] == true,
                   floatActive: args['floatActive'] == true,

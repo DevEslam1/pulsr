@@ -54,6 +54,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         void onAaudioRejected(String reason, Exception cause);
 
         void onFloatRejected(String reason, Exception cause);
+
+        default void onAaudioSuspended(String reason, boolean suspended) {}
     }
 
     interface InnerFactory {
@@ -110,6 +112,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     private boolean tapSrcFailed;
     private boolean pendingModeRequested;
     private boolean pendingForce;
+    private boolean aaudioSuspendedByParams;
+    private String lastSuspensionReason = "speed_requires_audiotrack";
     @Nullable private NativeDspAudioProcessor continuousState;
 
     private boolean hasStagedInput() {
@@ -156,8 +160,21 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         enableAudioTrackPlaybackParams = enabled;
     }
 
+    boolean aaudioBlockedByParams() {
+        return (playbackParameters != null && !PlaybackParameters.DEFAULT.equals(playbackParameters))
+                || skipSilenceEnabled;
+    }
+
+    private String suspensionReasonForParams() {
+        if (playbackParameters != null && !PlaybackParameters.DEFAULT.equals(playbackParameters)) {
+            return "speed_requires_audiotrack";
+        }
+        return "skip_silence_requires_audiotrack";
+    }
+
+    // VERIFY: speed toggle in bit-perfect mode on a physical device switches cleanly between AAudio and AudioTrack.
     private Mode desiredMode() {
-        if (aaudioEnabled.get()) return Mode.AAUDIO;
+        if (aaudioEnabled.get() && !aaudioBlockedByParams()) return Mode.AAUDIO;
         return floatEnabled.get() && !precisionFallback ? Mode.FLOAT : Mode.DEFAULT;
     }
 
@@ -185,6 +202,9 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     /** Runs on the playback thread; also directly callable from unit tests. */
     void applyPendingMode(boolean force) {
+        if (!aaudioEnabled.get()) {
+            aaudioSuspendedByParams = false;
+        }
         if (released || format == null || currentInner == null) return;
         if (hasStagedInput()) {
             pendingModeRequested = true;
@@ -357,8 +377,20 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     @Override
     public void setPlaybackParameters(PlaybackParameters playbackParameters) {
-        this.playbackParameters = playbackParameters;
-        if (inner != null) inner.setPlaybackParameters(playbackParameters);
+        PlaybackParameters resolved = playbackParameters == null
+                ? PlaybackParameters.DEFAULT : playbackParameters;
+        this.playbackParameters = resolved;
+        final AudioSink previousInner = inner;
+        if (desiredMode() != mode) {
+            applyPendingMode(false);
+        }
+        if (inner != null && inner == previousInner
+                && !(mode == Mode.AAUDIO && !PlaybackParameters.DEFAULT.equals(resolved))) {
+            inner.setPlaybackParameters(resolved);
+        }
+        if (aaudioSuspendedByParams && aaudioBlockedByParams()) {
+            lastSuspensionReason = suspensionReasonForParams();
+        }
     }
 
     @Override
@@ -369,7 +401,17 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     @Override
     public void setSkipSilenceEnabled(boolean skipSilenceEnabled) {
         this.skipSilenceEnabled = skipSilenceEnabled;
-        if (inner != null) inner.setSkipSilenceEnabled(skipSilenceEnabled);
+        final AudioSink previousInner = inner;
+        if (desiredMode() != mode) {
+            applyPendingMode(false);
+        }
+        if (inner != null && inner == previousInner
+                && !(mode == Mode.AAUDIO && skipSilenceEnabled)) {
+            inner.setSkipSilenceEnabled(skipSilenceEnabled);
+        }
+        if (aaudioSuspendedByParams && aaudioBlockedByParams()) {
+            lastSuspensionReason = suspensionReasonForParams();
+        }
     }
 
     @Override
@@ -490,6 +532,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         if (released) return;
         released = true;
         continuousState = null;
+        aaudioSuspendedByParams = false;
         decodedPcm = new int[] {0, 0, 0};
         PulsrOutputRouting.unobserveDecoded(this);
         if (currentInner != null) {
@@ -586,6 +629,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         }
         if (tapSrcFailed && candidate.processor != null) candidate.processor.setTapSrcTargetRate(0);
         if (old != null) releaseInner(old);
+        updateAaudioSuspensionNotification(appliedMode);
 
         if (playWhenReady) inner.play();
         if (endOfStreamQueued) {
@@ -652,6 +696,28 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         return inner != null;
     }
 
+    private void updateAaudioSuspensionNotification(Mode appliedMode) {
+        if (!aaudioEnabled.get()) {
+            aaudioSuspendedByParams = false;
+            return;
+        }
+        if (aaudioBlockedByParams() && appliedMode != Mode.AAUDIO) {
+            final String reason = suspensionReasonForParams();
+            lastSuspensionReason = reason;
+            if (!aaudioSuspendedByParams) {
+                aaudioSuspendedByParams = true;
+                if (fallbackListener != null) {
+                    fallbackListener.onAaudioSuspended(reason, true);
+                }
+            }
+        } else if (aaudioSuspendedByParams && appliedMode == Mode.AAUDIO) {
+            aaudioSuspendedByParams = false;
+            if (fallbackListener != null) {
+                fallbackListener.onAaudioSuspended(lastSuspensionReason, false);
+            }
+        }
+    }
+
     private void notifyAaudioRejected(String reason, Exception cause) {
         Log.w(TAG, "AAudio output rejected (" + reason + "); falling back", cause);
         if (fallbackListener != null) {
@@ -714,7 +780,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                 .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[0])
                 .build();
         PulsrOutputRouting.observe(defaultSink);
-        AudioSink outer = new FloatDspAudioSink(defaultSink, processor, true, requested == Mode.DEFAULT);
+        AudioSink outer = new FloatDspAudioSink(
+                defaultSink, processor, true, requested == Mode.DEFAULT, true);
         return new Inner(outer, defaultSink, null, processor);
     }
 

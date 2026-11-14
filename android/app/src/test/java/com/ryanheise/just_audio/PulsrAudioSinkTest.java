@@ -15,6 +15,7 @@ import static org.mockito.Mockito.when;
 import androidx.media3.common.C;
 import androidx.media3.common.Format;
 import androidx.media3.common.MimeTypes;
+import androidx.media3.common.PlaybackParameters;
 import androidx.media3.exoplayer.audio.AudioSink;
 
 import org.junit.Test;
@@ -59,6 +60,7 @@ public class PulsrAudioSinkTest {
         final Flag floatMode;
         int aaudioRejected;
         int floatRejected;
+        final List<String> suspendedEvents = new ArrayList<>();
 
         Fallbacks(Flag aaudio, Flag floatMode) {
             this.aaudio = aaudio;
@@ -73,6 +75,10 @@ public class PulsrAudioSinkTest {
         @Override public void onFloatRejected(String reason, Exception cause) {
             floatRejected++;
             floatMode.value = false;
+        }
+
+        @Override public void onAaudioSuspended(String reason, boolean suspended) {
+            suspendedEvents.add(reason + ":" + suspended);
         }
     }
 
@@ -601,5 +607,91 @@ public class PulsrAudioSinkTest {
         sink.release();
 
         verify(first, times(1)).release();
+    }
+
+    @Test
+    public void speedChangeSuspendsAaudioToAudioTrackAndRestoresAtUnity() throws Exception {
+        final Flag aaudio = new Flag(true);
+        final Flag floatMode = new Flag(true);
+        final Fallbacks fallbacks = new Fallbacks(aaudio, floatMode);
+        final Factory factory = new Factory();
+        final AudioSink aaudioFirst = mock(AudioSink.class);
+        final AudioSink floatTrack = mock(AudioSink.class);
+        final AudioSink aaudioSecond = mock(AudioSink.class);
+        when(floatTrack.getPlaybackParameters()).thenReturn(new PlaybackParameters(1.5f, 1.0f));
+        when(aaudioSecond.getPlaybackParameters()).thenReturn(PlaybackParameters.DEFAULT);
+        factory.queue.add(holder(aaudioFirst));
+        final PulsrAudioSink sink = newSink(aaudio, floatMode, fallbacks, factory);
+        sink.configure(FORMAT, 0, null);
+        assertFalse(sink.aaudioBlockedByParams());
+
+        final PlaybackParameters fast = new PlaybackParameters(1.5f, 1.0f);
+        factory.queue.add(holder(floatTrack));
+        sink.setPlaybackParameters(fast);
+
+        assertTrue(sink.aaudioBlockedByParams());
+        assertTrue(aaudio.value);
+        assertEquals(0, fallbacks.aaudioRejected);
+        verify(aaudioFirst).release();
+        verify(floatTrack).setPlaybackParameters(fast);
+        verify(floatTrack).configure(FORMAT, 0, null);
+        assertEquals(fast, sink.getPlaybackParameters());
+        assertEquals(java.util.Collections.singletonList("speed_requires_audiotrack:true"),
+                fallbacks.suspendedEvents);
+
+        factory.queue.add(holder(aaudioSecond));
+        sink.setPlaybackParameters(PlaybackParameters.DEFAULT);
+
+        assertFalse(sink.aaudioBlockedByParams());
+        verify(floatTrack).release();
+        verify(aaudioSecond).setPlaybackParameters(PlaybackParameters.DEFAULT);
+        verify(aaudioSecond).configure(FORMAT, 0, null);
+        assertEquals(PlaybackParameters.DEFAULT, sink.getPlaybackParameters());
+        assertEquals(java.util.Arrays.asList(
+                "speed_requires_audiotrack:true",
+                "speed_requires_audiotrack:false"),
+                fallbacks.suspendedEvents);
+        assertEquals(java.util.Arrays.asList(true, false, true), factory.requestedAaudio);
+        assertEquals(java.util.Arrays.asList(false, true, false), factory.requestedFloat);
+        sink.release();
+    }
+
+    @Test
+    public void skipSilenceSuspendsAaudioToAudioTrackAndRestoresWhenDisabled() throws Exception {
+        final Flag aaudio = new Flag(true);
+        final Flag floatMode = new Flag(false);
+        final Fallbacks fallbacks = new Fallbacks(aaudio, floatMode);
+        final Factory factory = new Factory();
+        final AudioSink aaudioFirst = mock(AudioSink.class);
+        final AudioSink defaultTrack = mock(AudioSink.class);
+        final AudioSink aaudioSecond = mock(AudioSink.class);
+        factory.queue.add(holder(aaudioFirst));
+        final PulsrAudioSink sink = newSink(aaudio, floatMode, fallbacks, factory);
+        sink.configure(FORMAT, 0, null);
+
+        factory.queue.add(holder(defaultTrack));
+        sink.setSkipSilenceEnabled(true);
+
+        assertTrue(sink.aaudioBlockedByParams());
+        assertTrue(aaudio.value);
+        verify(aaudioFirst).release();
+        verify(defaultTrack).setSkipSilenceEnabled(true);
+        verify(defaultTrack).configure(FORMAT, 0, null);
+        assertEquals(java.util.Collections.singletonList("skip_silence_requires_audiotrack:true"),
+                fallbacks.suspendedEvents);
+
+        factory.queue.add(holder(aaudioSecond));
+        sink.setSkipSilenceEnabled(false);
+
+        assertFalse(sink.aaudioBlockedByParams());
+        verify(defaultTrack).release();
+        verify(aaudioSecond).setSkipSilenceEnabled(false);
+        verify(aaudioSecond).configure(FORMAT, 0, null);
+        assertEquals(java.util.Arrays.asList(
+                "skip_silence_requires_audiotrack:true",
+                "skip_silence_requires_audiotrack:false"),
+                fallbacks.suspendedEvents);
+        assertEquals(java.util.Arrays.asList(true, false, true), factory.requestedAaudio);
+        sink.release();
     }
 }
