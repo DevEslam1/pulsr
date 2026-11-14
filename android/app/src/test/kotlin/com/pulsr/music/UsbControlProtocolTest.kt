@@ -492,6 +492,51 @@ class UsbControlProtocolTest {
         assertNull(selected)
     }
 
+    @Test fun selectFormatCovers24In32Uac1FixedRateAndChannelMismatch() {
+        val uac2In32 = UsbAudioControlParser.AltSettingFormat(
+            interfaceNumber = 1,
+            altSetting = 1,
+            endpointAddress = 0x01,
+            maxPacketSize = 1024,
+            subslotSize = 4,
+            bitResolution = 24,
+            channels = 2,
+            feedbackEndpointAddress = null,
+            supportedRates = emptyList(),
+        )
+        val uac2Parsed = UsbAudioControlParser.Result(
+            uacVersion = UsbAudioControlParser.UAC2,
+            volumeUnit = null,
+            streamingInterface = 1,
+            altSettingFormats = listOf(uac2In32),
+        )
+        assertEquals(uac2In32, UsbAudioProtocol.selectFormat(uac2Parsed, 96000, 24, 2))
+        assertNull(UsbAudioProtocol.selectFormat(uac2Parsed, 96000, 32, 2))
+        assertNull(UsbAudioProtocol.selectFormat(uac2Parsed, 96000, 24, 4))
+
+        val uac1Fixed = UsbAudioControlParser.AltSettingFormat(
+            interfaceNumber = 1,
+            altSetting = 1,
+            endpointAddress = 0x01,
+            maxPacketSize = 256,
+            subslotSize = 3,
+            bitResolution = 24,
+            channels = 2,
+            feedbackEndpointAddress = null,
+            supportedRates = listOf(44100, 48000),
+            sampleRateControlSupported = false,
+        )
+        val uac1Parsed = UsbAudioControlParser.Result(
+            uacVersion = UsbAudioControlParser.UAC1,
+            volumeUnit = null,
+            streamingInterface = 1,
+            altSettingFormats = listOf(uac1Fixed),
+        )
+        assertEquals(uac1Fixed, UsbAudioProtocol.selectFormat(uac1Parsed, 48000, 24, 2))
+        assertNull(UsbAudioProtocol.selectFormat(uac1Parsed, 96000, 24, 2))
+        assertNull(UsbAudioProtocol.selectFormat(uac1Parsed, 48000, 24, 1))
+    }
+
     @Test fun uac3SampleRateProgrammingIsRefused() {
         val dev = RateDevice(3, currentRate = 44100, allowReadback = true)
         val clock = UsbAudioControlParser.ClockSource(clockId = 4, controlInterface = 0, frequencyProgrammable = true)

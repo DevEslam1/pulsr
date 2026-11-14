@@ -123,10 +123,6 @@ class UsbExclusivePlugin(
         baseStatus(attached = false, permitted = false, device = null)
 
     // Raw UAC2 isochronous streaming, implemented in UsbAudioSink.cpp.
-    private external fun nativeUsbStreamStart(
-        fd: Int, endpoint: Int, interfaceNumber: Int, altSetting: Int,
-        sampleRate: Int, channels: Int,
-    ): Int
     private external fun nativeUsbStreamStartWithFormat(
         fd: Int, endpoint: Int, interfaceNumber: Int, altSetting: Int,
         sampleRate: Int, channels: Int, bytesPerSample: Int, validBitDepth: Int,
@@ -521,9 +517,12 @@ class UsbExclusivePlugin(
     }
 
     private fun buildStatus(): Map<String, Any?> {
-        if (openedDevice != null && usbManager?.deviceList?.values?.none {
+        if (openedDevice != null) {
+            val stillAttached = usbManager?.deviceList?.values?.any {
                 it.deviceId == openedDevice?.deviceId
-            } != false) closeLocked()
+            } == true
+            if (!stillAttached) closeLocked()
+        }
         val device = openedDevice ?: findAudioDevice()
         if (device == null) {
             return baseStatus(attached = false, permitted = false, device = null)
