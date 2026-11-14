@@ -16,6 +16,7 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
+import org.jaudiotagger.tag.Tag
 import org.jaudiotagger.tag.images.ArtworkFactory
 import org.jaudiotagger.tag.flac.FlacTag
 import org.jaudiotagger.tag.vorbiscomment.VorbisCommentTag
@@ -55,15 +56,105 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
             } catch (_: Exception) {}
         }
 
-        internal fun isAllFieldsVerified(verifiedFields: Map<String, Boolean>): Boolean =
-            verifiedFields.isNotEmpty() && verifiedFields.values.all { it }
+        internal data class TagVerificationOutcome(
+            val verified: Boolean,
+            val verifiedFields: Map<String, Boolean>,
+        )
 
-        internal fun isCoreMetadataVerified(verifiedFields: Map<String, Boolean>): Boolean =
-            verifiedFields.isNotEmpty() &&
-                verifiedFields.values.all { it } &&
-                (verifiedFields["title"] == true ||
-                    verifiedFields["artist"] == true ||
-                    verifiedFields["album"] == true)
+        private val TEXT_FIELD_KEYS: List<Pair<String, FieldKey>> = listOf(
+            "title" to FieldKey.TITLE,
+            "artist" to FieldKey.ARTIST,
+            "album" to FieldKey.ALBUM,
+            "albumArtist" to FieldKey.ALBUM_ARTIST,
+            "genre" to FieldKey.GENRE,
+            "year" to FieldKey.YEAR,
+            "trackNumber" to FieldKey.TRACK,
+            "discNumber" to FieldKey.DISC_NO,
+            "composer" to FieldKey.COMPOSER,
+        )
+
+        private val VORBIS_LYRICS_FALLBACK_KEYS = listOf(
+            "SYNCEDLYRICS",
+            "UNSYNCEDLYRICS",
+            "SYNCED LYRICS",
+            "UNSYNCED LYRICS",
+        )
+
+        private val VERIFIABLE_TEXT_FIELDS =
+            TEXT_FIELD_KEYS.map { it.first } + listOf("lyrics", "comment")
+
+        internal fun verifyWrittenTags(
+            requestedTags: Map<String, Any?>,
+            rereadTags: Map<String, Any?>?,
+        ): TagVerificationOutcome {
+            if (rereadTags == null) {
+                return TagVerificationOutcome(verified = false, verifiedFields = emptyMap())
+            }
+            val verifiedFields = mutableMapOf<String, Boolean>()
+            for (field in VERIFIABLE_TEXT_FIELDS) {
+                val provided = when (field) {
+                    "lyrics", "comment" -> requestedTags.containsKey(field)
+                    else -> requestedTags[field] != null
+                }
+                if (!provided) continue
+                val expected = requestedTags[field]?.toString() ?: ""
+                val actual = rereadTags[field]?.toString()
+                verifiedFields[field] = if (expected.isEmpty()) {
+                    actual.isNullOrBlank()
+                } else {
+                    actual == expected
+                }
+            }
+            val hasArtworkWrite =
+                ((requestedTags["artworkBytes"] as? ByteArray)?.isNotEmpty() == true) ||
+                    ((requestedTags["artworkPath"] as? String)?.isNotEmpty() == true)
+            val artworkPresent = (rereadTags["hasArtwork"] as? Boolean)
+                ?: (rereadTags["artwork"] as? Boolean)
+                ?: ((rereadTags["artworkBytes"] as? ByteArray)?.isNotEmpty() == true)
+            if (hasArtworkWrite) {
+                verifiedFields["artwork"] = artworkPresent
+            } else if (requestedTags["removeArtwork"] == true) {
+                verifiedFields["artwork"] = !artworkPresent
+            }
+            return TagVerificationOutcome(
+                verified = verifiedFields.values.all { it },
+                verifiedFields = verifiedFields,
+            )
+        }
+
+        private fun readLyricsFromTag(tag: Tag): String? {
+            var lyrics = runCatching { tag.getFirst(FieldKey.LYRICS) }.getOrNull()
+            if (lyrics.isNullOrBlank()) {
+                val vorbisTag: VorbisCommentTag? = when (tag) {
+                    is FlacTag -> tag.vorbisCommentTag
+                    is VorbisCommentTag -> tag
+                    else -> null
+                }
+                if (vorbisTag != null) {
+                    for (key in VORBIS_LYRICS_FALLBACK_KEYS) {
+                        val v = runCatching { vorbisTag.getFirst(key) }.getOrNull()
+                        if (!v.isNullOrBlank()) {
+                            lyrics = v
+                            break
+                        }
+                    }
+                }
+            }
+            return lyrics
+        }
+
+        private fun readCanonicalTagFields(tag: Tag): MutableMap<String, Any?> {
+            val map = mutableMapOf<String, Any?>()
+            for ((key, fieldKey) in TEXT_FIELD_KEYS) {
+                map[key] = runCatching { tag.getFirst(fieldKey) }.getOrNull()
+            }
+            map["lyrics"] = readLyricsFromTag(tag)
+            map["comment"] = runCatching { tag.getFirst(FieldKey.COMMENT) }.getOrNull()
+            val artwork = runCatching { tag.firstArtwork }.getOrNull()
+            map["hasArtwork"] =
+                artwork != null && artwork.binaryData != null && artwork.binaryData.isNotEmpty()
+            return map
+        }
     }
 
     private fun ensureExecutor(): java.util.concurrent.ExecutorService {
@@ -146,24 +237,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                                 tagMap["trackNumber"] = tag.getFirst(FieldKey.TRACK)
                                 tagMap["discNumber"] = tag.getFirst(FieldKey.DISC_NO)
                                 tagMap["composer"] = tag.getFirst(FieldKey.COMPOSER)
-                                var lyrics = tag.getFirst(FieldKey.LYRICS)
-                                if (lyrics.isNullOrBlank()) {
-                                    val vorbisTag: VorbisCommentTag? = when (tag) {
-                                        is FlacTag -> tag.vorbisCommentTag
-                                        is VorbisCommentTag -> tag
-                                        else -> null
-                                    }
-                                    if (vorbisTag != null) {
-                                        for (key in listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "SYNCED LYRICS", "UNSYNCED LYRICS")) {
-                                            val v = vorbisTag.getFirst(key)
-                                            if (!v.isNullOrBlank()) {
-                                                lyrics = v
-                                                break
-                                            }
-                                        }
-                                    }
-                                }
-                                tagMap["lyrics"] = lyrics
+                                tagMap["lyrics"] = readLyricsFromTag(tag)
                                 tagMap["comment"] = tag.getFirst(FieldKey.COMMENT)
 
                                 if (includeArtwork) {
@@ -245,8 +319,6 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     var tempFile: java.io.File? = null
                     var backupFile: java.io.File? = null
                     var verified = false
-                    @Suppress("UNUSED_VARIABLE")
-                    var coreMetadataVerified = false
                     var contentRestored = false
                     try {
                         val file = if (isContentUri) {
@@ -281,15 +353,15 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             audioFile.tag = tag
                         }
 
-                        tags["title"]?.let { tag.setField(FieldKey.TITLE, it.toString()) }
-                        tags["artist"]?.let { tag.setField(FieldKey.ARTIST, it.toString()) }
-                        tags["album"]?.let { tag.setField(FieldKey.ALBUM, it.toString()) }
-                        tags["albumArtist"]?.let { tag.setField(FieldKey.ALBUM_ARTIST, it.toString()) }
-                        tags["genre"]?.let { tag.setField(FieldKey.GENRE, it.toString()) }
-                        tags["year"]?.let { tag.setField(FieldKey.YEAR, it.toString()) }
-                        tags["trackNumber"]?.let { tag.setField(FieldKey.TRACK, it.toString()) }
-                        tags["discNumber"]?.let { tag.setField(FieldKey.DISC_NO, it.toString()) }
-                        tags["composer"]?.let { tag.setField(FieldKey.COMPOSER, it.toString()) }
+                        for ((key, fieldKey) in TEXT_FIELD_KEYS) {
+                            val raw = tags[key] ?: continue
+                            val str = raw.toString()
+                            if (str.isEmpty()) {
+                                runCatching { tag.deleteField(fieldKey) }
+                            } else {
+                                tag.setField(fieldKey, str)
+                            }
+                        }
                         if (tags.containsKey("lyrics")) {
                             val lyricsVal = tags["lyrics"]?.toString()
                             if (lyricsVal.isNullOrEmpty()) {
@@ -300,7 +372,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                                     else -> null
                                 }
                                 if (vorbisTag != null) {
-                                    for (k in listOf("SYNCEDLYRICS", "UNSYNCEDLYRICS", "SYNCED LYRICS", "UNSYNCED LYRICS")) {
+                                    for (k in VORBIS_LYRICS_FALLBACK_KEYS) {
                                         runCatching { vorbisTag.deleteField(k) }
                                     }
                                 }
@@ -395,17 +467,31 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
 
                         // Atomic safety net (defect 24-01): backup the original so an
                         // interrupted write is recoverable instead of corrupting the
-                        // user's only copy.
+                        // user's only copy. Abort before touching storage if backup fails.
                         if (!isContentUri) {
                             backupFile = null
+                            var pendingBackup: java.io.File? = null
                             try {
                                 val src = File(path)
                                 val bak = java.io.File(src.parent, ".${src.name.take(200)}.pulsr.bak")
+                                pendingBackup = bak
                                 runCatching { if (bak.exists()) bak.delete() }
                                 src.copyTo(bak, overwrite = true)
+                                if (!bak.exists() || bak.length() != src.length()) {
+                                    throw java.io.IOException("Backup integrity check failed for $path")
+                                }
                                 backupFile = bak
-                            } catch (_: Exception) {
+                            } catch (bakEx: Exception) {
+                                pendingBackup?.let { runCatching { it.delete() } }
                                 backupFile = null
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    result.error(
+                                        "BACKUP_FAILED",
+                                        bakEx.message ?: "Failed to create backup before tag write",
+                                        bakEx.stackTraceToString(),
+                                    )
+                                }
+                                return@execute
                             }
                         }
 
@@ -445,10 +531,10 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
 
-                        // Post-write verification: re-read and compare key fields.
+                        // Post-write verification: re-read and compare every provided field.
                         // Returns a map so Dart can distinguish written-but-unverified
                         // from fully verified (defect 24-03 scoped-storage honesty, B-05).
-                        val verifiedFields = mutableMapOf<String, Boolean>()
+                        var verifiedFields: Map<String, Boolean> = emptyMap()
                         verified = false
                         var verifyTempFile: File? = null
                         try {
@@ -467,36 +553,10 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
                             val reread = AudioFileIO.read(fileToVerify)
                             val rtag = reread.tag
-                            if (rtag != null) {
-                                val expTitle = tags["title"]?.toString()
-                                if (!expTitle.isNullOrEmpty()) {
-                                    val gotTitle = runCatching { rtag.getFirst(FieldKey.TITLE) }.getOrNull()
-                                    verifiedFields["title"] = (gotTitle == expTitle)
-                                }
-
-                                val expArtist = tags["artist"]?.toString()
-                                if (!expArtist.isNullOrEmpty()) {
-                                    val gotArtist = runCatching { rtag.getFirst(FieldKey.ARTIST) }.getOrNull()
-                                    verifiedFields["artist"] = (gotArtist == expArtist)
-                                }
-
-                                val expAlbum = tags["album"]?.toString()
-                                if (!expAlbum.isNullOrEmpty()) {
-                                    val gotAlbum = runCatching { rtag.getFirst(FieldKey.ALBUM) }.getOrNull()
-                                    verifiedFields["album"] = (gotAlbum == expAlbum)
-                                }
-
-                                if (tags.containsKey("artworkBytes") || tags.containsKey("artworkPath")) {
-                                    val gotArtwork = runCatching { rtag.firstArtwork }.getOrNull()
-                                    verifiedFields["artwork"] = (gotArtwork != null && gotArtwork.binaryData != null && gotArtwork.binaryData.isNotEmpty())
-                                } else if (tags["removeArtwork"] == true) {
-                                    val gotArtwork = runCatching { rtag.firstArtwork }.getOrNull()
-                                    verifiedFields["artwork"] = (gotArtwork == null || gotArtwork.binaryData == null || gotArtwork.binaryData.isEmpty())
-                                }
-
-                                verified = isAllFieldsVerified(verifiedFields)
-                                coreMetadataVerified = isCoreMetadataVerified(verifiedFields)
-                            }
+                            val rereadMap = rtag?.let { readCanonicalTagFields(it) }
+                            val outcome = verifyWrittenTags(tags, rereadMap)
+                            verifiedFields = outcome.verifiedFields
+                            verified = outcome.verified
                         } catch (_: Exception) {
                             verified = false
                         } finally {

@@ -164,25 +164,33 @@ class NativeHardeningRegressionTest {
     // ---- TagEditorPlugin verification rules ----
 
     @Test
-    fun tagEditorVerificationRequiresNonEmptyAllTrueAndCoreFieldForCoreRule() {
-        assertFalse(TagEditorPlugin.isAllFieldsVerified(emptyMap()))
-        assertFalse(TagEditorPlugin.isCoreMetadataVerified(emptyMap()))
+    fun tagEditorVerificationChecksAllProvidedFieldsAndEmptyTagsOnReread() {
+        val emptyOk = TagEditorPlugin.verifyWrittenTags(emptyMap(), emptyMap())
+        assertTrue(emptyOk.verified)
+        assertTrue(emptyOk.verifiedFields.isEmpty())
 
-        val artworkOnlyOk = mapOf("artwork" to true)
-        assertTrue(TagEditorPlugin.isAllFieldsVerified(artworkOnlyOk))
-        assertFalse(TagEditorPlugin.isCoreMetadataVerified(artworkOnlyOk))
+        val rereadMissing = TagEditorPlugin.verifyWrittenTags(mapOf("genre" to "Jazz"), null)
+        assertFalse(rereadMissing.verified)
 
-        val artworkOnlyFailed = mapOf("artwork" to false)
-        assertFalse(TagEditorPlugin.isAllFieldsVerified(artworkOnlyFailed))
-        assertFalse(TagEditorPlugin.isCoreMetadataVerified(artworkOnlyFailed))
+        val genreOk = TagEditorPlugin.verifyWrittenTags(
+            mapOf("genre" to "Jazz"),
+            mapOf("genre" to "Jazz"),
+        )
+        assertTrue(genreOk.verified)
+        assertEquals(mapOf("genre" to true), genreOk.verifiedFields)
 
-        val partialFailure = mapOf("title" to true, "artwork" to false)
-        assertFalse(TagEditorPlugin.isAllFieldsVerified(partialFailure))
-        assertFalse(TagEditorPlugin.isCoreMetadataVerified(partialFailure))
+        val partialFailure = TagEditorPlugin.verifyWrittenTags(
+            mapOf("title" to "Song", "genre" to "Jazz"),
+            mapOf("title" to "Song", "genre" to "Pop"),
+        )
+        assertFalse(partialFailure.verified)
+        assertEquals(false, partialFailure.verifiedFields["genre"])
 
-        val fullCoreVerified = mapOf("title" to true, "artist" to true, "artwork" to true)
-        assertTrue(TagEditorPlugin.isAllFieldsVerified(fullCoreVerified))
-        assertTrue(TagEditorPlugin.isCoreMetadataVerified(fullCoreVerified))
+        val clearedOk = TagEditorPlugin.verifyWrittenTags(
+            mapOf("genre" to "", "lyrics" to null),
+            mapOf("genre" to "", "lyrics" to null),
+        )
+        assertTrue(clearedOk.verified)
     }
 
     // ---- ProxyPool stableOrderedAlive with mixed ewma & latency ----
