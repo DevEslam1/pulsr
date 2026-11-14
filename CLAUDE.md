@@ -2,8 +2,8 @@
 
 > **Target Audience:** AI Models (Claude, Gemini, Cursor, Copilot) & Human Engineers  
 > **Repository:** `pulsr` — Premium Offline-First Audiophile Music Player  
-> **Package Metadata:** Root package `pulsr` (`pubspec.yaml`, version `1.0.0+1`, Dart SDK `>=3.0.0 <4.0.0`, Flutter `>=3.41.0`). Note: Root package takes precedence over vendored packages such as `third_party/just_audio`.  
-> **Frameworks & Languages:** Flutter 3.41+ (Dart >=3.0 <4.0), C++20 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
+> **Package Metadata:** Root package `pulsr` (`pubspec.yaml`, version `1.0.0+1`, Dart SDK `>=3.0.0 <4.0.0` — note vendored `third_party/just_audio` requires Dart `^3.6.0`, so the effective workspace Dart floor is `^3.6.0`, Flutter `>=3.41.0`). Note: Root package takes precedence over vendored packages such as `third_party/just_audio`.  
+> **Frameworks & Languages:** Flutter 3.41+ (Dart `^3.6.0` effective due to vendored `third_party/just_audio`), C++20 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
 
 ---
 
@@ -301,6 +301,26 @@ pulsr/
 ---
 
 ### 4.6 Native & Backend Subsystems
+
+#### Android sink architecture (`third_party/just_audio`)
+- **`PulsrAudioSink` (Mode State Machine):** Wraps Media3's `AudioSink` with three modes (`Mode.DEFAULT`, `Mode.FLOAT`, `Mode.AAUDIO`) selected by `desiredMode()`:
+  - Returns `Mode.AAUDIO` when `aaudioEnabled` is true AND `!aaudioBlockedByParams()` (`playbackParameters == DEFAULT && !skipSilenceEnabled`). Otherwise falls back to `Mode.FLOAT` (when `floatEnabled` or `precisionFallback`) or `Mode.DEFAULT`.
+  - **`swapTo()` Lifecycle:** When entering `Mode.AAUDIO` (unless `preferExclusive` is true) or swapping between `AudioTrack`-backed modes, creates and configures the replacement sink before releasing the old inner; releases the old inner first when leaving `Mode.AAUDIO` or entering exclusive `AAUDIO`. If all candidates fail when `internal=true`, runs a last-resort `Mode.DEFAULT` inner before throwing. `handleBuffer()` throws `AudioSink.InitializationException` when `inner == null` so ExoPlayer's error handler engages the fallback ladder.
+  - Pending mode swaps requested from `AudioPlayer` or param changes are deferred cleanly across `handleBuffer()`, `playToEndOfStream()`, `pause()`, and `flush()` via `processPendingModeIfReady()`.
+  - `getFormatSupport()` is mode-aware: in `Mode.AAUDIO`, mirrors `AAudioAudioSink.getFormatSupport()` so decoders preserve 16-bit, float, 24-bit, and API-31+ exclusive 32-bit PCM rather than forcing down-conversion.
+- **`FloatDspAudioSink`:** Wraps `DefaultAudioSink` when DSP/float mode is active (`Media3` omits processors on float streams). Uses `PcmFrameEditor` for sample-exact encoder delay/padding trimming (and optional channel remapping), `convertToFloat()` (16/24/32-bit -> direct `FloatBuffer` without intermediate heap copies), `NativeDspAudioProcessor` processing, and `boundaryOutput()` (`Pcm16Quantizer` TPDF dither with hoisted `ThreadLocalRandom`) when a 16-bit sink boundary is required. Allows integer bit-perfect bypass (`allowBitPerfectIntegerBypass`) for 16-bit PCM when no gain curve, tap SRC, or USB-exclusive path is engaged.
+- **`AAudioAudioSink`:** Direct native AAudio PCM output via `AaudioNativeBridge` JNI (`nativeOpenForDevice`, `nativeWrite`, `nativeClose`, etc.). Reuses the open stream handle on identical `(sampleRate, channelCount, encoding, preferredDeviceId, preferExclusive, targetBufferMs)` reconfigures (unless `routePending` forces a reopen) and drains queued frames with a `max(targetBufferMs * 2, 500)` ms timeout on format changes.
+- **`NativeDspAudioProcessor`:** Media3 `BaseAudioProcessor` bridging PCM buffers into `libpulsr_dsp` (`nativeProcessDirectFloatBuffer`), optional tap-side sample-rate conversion (`nativePrepareTapSrc` / `nativeResampleTap`), piecewise-linear gain curves (`setGainCurve` / `clearGainCurve`), and profile transition mutes (`setTransitionMuted`). Native engine lifetime is protected by a `ReentrantReadWriteLock` (`readLock` on playback calls, `writeLock` on `release()`, idempotent `AtomicLong` handle + API 33+ `Cleaner`). On `TapSrcException`, `PulsrAudioSink` remembers failure per track/reset and `AudioPlayer` forces rate `0` until cleared by a new target rate or disposal.
+- **`PulsrOutputRouting`:** Tracks `WeakReference<ExoPlayer>` decoder owners and output routing changes, applying `AudioDeviceInfo` preferred devices and extracting `AudioTrack` instances primarily via a `CapturingAudioOutputProvider` (wrapping `AudioTrackAudioOutputProvider`) with ProGuard-kept reflection fallback.
+- **Thread Ownership:**
+  - *Android Main Thread:* `MainMethodCallHandler`, `AudioPlayer` control (`dspSet*`/`dspGet*` wrapped in `try/catch` returning `dsp_error` / `plugin_error`), `PulsrOutputRouting`, and `probeExecutor` result callbacks (`handler.post`).
+  - *Single-Thread `probeExecutor`:* Off-main-thread AAudio stream probing (`probeAaudioOutput` using `nativeOpenForDevice`, cached by `(device, rate, channels, encoding, exclusive)` and invalidated on route/device changes).
+  - *ExoPlayer Playback Thread:* `PulsrAudioSink`, `FloatDspAudioSink` (`PcmFrameEditor`, `convertToFloat`, `boundaryOutput`), `AAudioAudioSink`, and `NativeDspAudioProcessor` (`onConfigure`, `onFlush`, `queueInput`). Buffer pre-sizing occurs in `configure()`/`onConfigure()` on this thread, never on the C++ RT thread.
+  - *C++ Real-Time Audio Thread:* AAudio data callback inside `libpulsr_dsp` (lock-free/allocation-free).
+- **Fallback Ladder & AAudio-Mode Limits:**
+  - *Fallback Ladder:* `AAUDIO` -> `FLOAT` -> `DEFAULT`. Render errors (`ConfigurationException`, `InitializationException`, `WriteException`) caught in `AudioPlayer.onPlayerError()` permanently clear `aaudioOutputEnabled`, notify Dart with `aaudio_rejected`, swap to the AudioTrack sink, and re-prepare if idle. `AAudioAudioSink` route-change restore failures report once cleanly without double-reporting.
+  - *Temporary Suspension:* Non-default `PlaybackParameters` (`speed != 1.0` or `pitch != 1.0`) or `skipSilenceEnabled` suspend `AAUDIO` temporarily to `FLOAT`/`DEFAULT` via `onAaudioSuspended(reason, true)` (`"speed_requires_audiotrack"`, `"skip_silence_requires_audiotrack"`) WITHOUT clearing `aaudioOutputEnabled`, and automatically restore `AAUDIO` (`suspended=false`) when parameters return to default/off.
+  - *AAudio-Mode Limits:* Maximum 2 channels (`channelCount > 2` unsupported on `AAudioAudioSink`), `speed`/`pitch`/`skipSilence` suspend AAudio to `AudioTrack`, no native `NativeDspAudioProcessor` gain-curve crossfade (`dspSetTransitionMuted` / `dspGetTransitionGain` return `false`/`null` while `aaudioOutputEnabled`), and Android `Equalizer` / `LoudnessEnhancer` (`AudioEffect` attached to `AudioTrack` audio session ID) do not affect AAudio output.
 
 #### `android/app/src/main/cpp/` (Native C++ DSP Engine)
 - **`AudioDspEngine.cpp / .h`**: Central DSP graph manager. Receives raw decoded PCM buffers from ExoPlayer or file streams and runs them through the active DSP chain.

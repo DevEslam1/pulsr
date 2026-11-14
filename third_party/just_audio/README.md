@@ -88,7 +88,6 @@ final playlist = <AudioSource>[
 ];
 // Load the playlist
 await player.setAudioSources(playlist, initialIndex: 0, initialPosition: Duration.zero,
-  useLazyPreparation: true,                    // Load each item just in time
   shuffleOrder: DefaultShuffleOrder(),         // Customise the shuffle algorithm
 );
 await player.seekToNext();                     // Skip to the next item

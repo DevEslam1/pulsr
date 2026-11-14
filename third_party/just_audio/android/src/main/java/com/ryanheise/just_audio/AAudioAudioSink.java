@@ -152,7 +152,6 @@ public final class AAudioAudioSink implements AudioSink {
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
     private AudioAttributes audioAttributes = AudioAttributes.DEFAULT;
     private boolean skipSilenceEnabled = false;
-    private int audioSessionId = C.AUDIO_SESSION_ID_UNSET;
 
     private volatile boolean playing = false;
     private volatile int[] measuredStream = new int[] {0, 0, 0};
@@ -666,7 +665,7 @@ public final class AAudioAudioSink implements AudioSink {
 
     @Override
     public void setAudioSessionId(int audioSessionId) {
-        this.audioSessionId = audioSessionId;
+        // Audio session IDs are not used on the native AAudio stream; no-op.
     }
 
     @Override

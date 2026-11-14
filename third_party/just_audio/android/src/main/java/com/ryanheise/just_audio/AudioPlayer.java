@@ -50,7 +50,6 @@ import androidx.media3.exoplayer.source.SilenceMediaSource; // Deprecated
 import androidx.media3.common.TrackGroup;
 import androidx.media3.exoplayer.dash.DashMediaSource; // Deprecated
 import androidx.media3.exoplayer.hls.HlsMediaSource; // Deprecated
-import androidx.media3.exoplayer.trackselection.TrackSelectionArray;
 import androidx.media3.datasource.DataSource;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -58,18 +57,15 @@ import androidx.media3.common.MimeTypes;
 import androidx.media3.common.util.Util;
 import io.flutter.Log;
 import io.flutter.plugin.common.BinaryMessenger;
-import io.flutter.plugin.common.EventChannel;
-import io.flutter.plugin.common.EventChannel.EventSink;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -691,16 +687,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             AaudioNativeBridge.ENCODING_PCM_I24_PACKED,
                             AaudioNativeBridge.ENCODING_PCM_FLOAT,
                         });
-        for (int i = 0; i < candidates.length; i++) {
-            final int enc = candidates[i];
-            boolean seenBefore = false;
-            for (int j = 0; j < i; j++) {
-                if (candidates[j] == enc) {
-                    seenBefore = true;
-                    break;
-                }
-            }
-            if (seenBefore) continue;
+        final LinkedHashSet<Integer> uniqueCandidates = new LinkedHashSet<>();
+        for (int enc : candidates) {
+            uniqueCandidates.add(enc);
+        }
+        for (int enc : uniqueCandidates) {
             final int status = probeSingleAaudioEncoding(
                     sampleRate, channels, enc, targetBufferMs, preferExclusive);
             if (status == 1) return true;
@@ -1581,16 +1572,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             prepareResult.error(String.valueOf(errorCode), errorMsg, details);
             prepareResult = null;
         }
-    }
-
-    private String getLowerCaseExtension(Uri uri) {
-        // Until ExoPlayer provides automatic detection of media source types, we
-        // rely on the file extension. When this is absent, as a temporary
-        // workaround we allow the app to supply a fake extension in the URL
-        // fragment. e.g.  https://somewhere.com/somestream?x=etc#.m3u8
-        String fragment = uri.getFragment();
-        String filename = fragment != null && fragment.contains(".") ? fragment : uri.getPath();
-        return filename.replaceAll("^.*\\.", "").toLowerCase();
     }
 
     public void play(Result result) {
