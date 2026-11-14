@@ -339,8 +339,8 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
      */
     internal fun deleteFromMusic(context: Context, path: String?, contentUri: String?): Boolean {
         var deleted = false
+        val resolver = context.contentResolver
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val resolver = context.contentResolver
             val collection = MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
             if (!contentUri.isNullOrEmpty()) {
                 try {
@@ -372,6 +372,26 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 val file = File(path)
                 if (file.exists()) deleted = file.delete() || deleted
             } catch (_: Exception) {
+            }
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            if (!contentUri.isNullOrEmpty()) {
+                try {
+                    deleted = resolver.delete(Uri.parse(contentUri), null, null) > 0 || deleted
+                } catch (_: Exception) {
+                }
+            }
+            if (!path.isNullOrEmpty()) {
+                try {
+                    @Suppress("DEPRECATION")
+                    val rows = resolver.delete(
+                        MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                        "${MediaStore.Audio.Media.DATA} = ?",
+                        arrayOf(path),
+                    )
+                    deleted = (rows > 0) || deleted
+                } catch (_: Exception) {
+                }
             }
         }
         return deleted
@@ -479,18 +499,29 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 success = true
 
                 var path: String? = null
-                resolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null, null)?.use { c ->
+                var resolvedName: String? = null
+                @Suppress("DEPRECATION")
+                resolver.query(
+                    uri,
+                    arrayOf(MediaStore.Audio.Media.DATA, MediaStore.Audio.Media.DISPLAY_NAME),
+                    null,
+                    null,
+                    null,
+                )?.use { c ->
                     if (c.moveToFirst()) {
-                        val idx = c.getColumnIndex(MediaStore.Audio.Media.DATA)
-                        if (idx >= 0) path = c.getString(idx)
+                        val dataIdx = c.getColumnIndex(MediaStore.Audio.Media.DATA)
+                        if (dataIdx >= 0) path = c.getString(dataIdx)
+                        val nameIdx = c.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+                        if (nameIdx >= 0) resolvedName = c.getString(nameIdx)?.takeIf { it.isNotBlank() }
                     }
                 }
                 if (path.isNullOrEmpty()) {
+                    @Suppress("DEPRECATION")
                     val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-                    path = File(musicDir, cleanDisplayName).absolutePath
+                    val fallbackName = sanitizeDisplayName(resolvedName ?: cleanDisplayName)
+                    path = File(musicDir, fallbackName).absolutePath
                 }
-                val finalPath = path
-                    ?: File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), cleanDisplayName).absolutePath
+                val finalPath = path!!
                 MediaScannerConnection.scanFile(context, arrayOf(finalPath), arrayOf(resolvedMimeType), null)
                 return SavedAudio(finalPath, uri.toString())
             } finally {
