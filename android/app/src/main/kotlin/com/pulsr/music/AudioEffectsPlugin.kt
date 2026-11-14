@@ -5700,11 +5700,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         // FIX C-4: hardware path succeeded — clear any fallback state
                         isSpatializerFallbackActive = false
                         return true
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         Log.w(TAG, "Spatializer reflection failed: ${e.message}")
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.w(TAG, "Spatializer hardware check failed, falling back: ${e.message}")
             }
         }

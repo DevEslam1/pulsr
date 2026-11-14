@@ -254,6 +254,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         } catch (e: SecurityException) {
             Log.w(TAG, "SecurityException checking Bluetooth codec control")
             false
+        } catch (t: Throwable) {
+            Log.w(TAG, "Bluetooth codec control unavailable: ${t.message}")
+            false
         }
     }
     private val bluetoothAdapter: BluetoothAdapter? =
@@ -934,7 +937,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                             .mapNotNull { flag -> codecBitsToDepth(flag) }
                     }.distinct()
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "getBluetoothCodecInfo failed: ${e.message}")
             mapOf("supported" to true, "connected" to true,
                 "reason" to "error_${e.message}")
@@ -1117,7 +1120,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 val pollRunnable = object : Runnable {
                     override fun run() {
                         if (disposed || replied.get()) return
-                        val matched = try { isConfigMatched() } catch (_: Exception) { false }
+                        val matched = try { isConfigMatched() } catch (_: Throwable) { false }
                         if (matched) {
                             try { notifyDeviceChange() } catch (_: Exception) {}
                             finish(true)
@@ -1136,7 +1139,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 if (!probeHandler.postDelayed(pollRunnable, 300L)) {
                     finish(false)
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 Log.w(TAG, "setBluetoothCodecPreference failed: ${e.message}")
                 finish(false)
             }
@@ -1400,7 +1403,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 cachedMixerBehaviorMethod = m
             }
             m.invoke(attr) as? Int
-        } catch (_: Exception) { null }
+        } catch (_: Throwable) { null }
     }
 
     private fun mixerAttrFormat(attr: Any): AudioFormat? = try {
@@ -1810,7 +1813,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                         }
                     }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
 
         val nativeSampleRate = getNativeSampleRate()
