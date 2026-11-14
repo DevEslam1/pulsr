@@ -76,12 +76,13 @@ object PlaybackTileState {
     }
 
     fun requestRefresh(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
         try {
             TileService.requestListeningState(
                 context,
                 ComponentName(context, PulsrPlaybackTileService::class.java)
             )
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
         }
     }
 }
