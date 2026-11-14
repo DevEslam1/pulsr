@@ -255,7 +255,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private val channelManagerChannelSnapshots = java.util.concurrent.ConcurrentHashMap<Int, ChannelManagerChannelSnapshot>()
 
     @Volatile private var dspPreference: String = "native" // "native", "oem", "auto"
-    @Volatile private var _oemWarningLogged = false
     @Volatile private var isBitPerfectBypassActive = false
     private var bitPerfectSpatializerOwned = false
     private var systemEffectsPolicy = "auto"
@@ -1266,12 +1265,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         @Volatile private var cachedSupportedEffects: Array<AudioEffect.Descriptor>? = null
         @Volatile private var effectsCacheTimestamp: Long = 0L
         private const val EFFECTS_CACHE_TTL_MS = 60_000L
+        @Volatile private var _oemWarningLogged = false
+
+        fun refreshEffectsCache(): Array<AudioEffect.Descriptor>? {
+            val effects = runCatching { AudioEffect.queryEffects() }.getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+            cachedSupportedEffects = effects
+            effectsCacheTimestamp = if (effects != null) System.currentTimeMillis() else 0L
+            return effects
+        }
 
         fun invalidateEffectsCache() {
             cachedSupportedEffects = null
             effectsCacheTimestamp = 0L
             cachedOemInfo = null
             oemInfoCacheTimestamp = 0L
+            _oemWarningLogged = false
         }
 
         @Volatile private var cachedOemInfo: Map<String, Any?>? = null
@@ -5750,7 +5759,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         bassBoost = null
         dynamicsProcessing = null
         legacyEqualizer = null
-        cachedSupportedEffects = runCatching { AudioEffect.queryEffects() }.getOrNull()
+        refreshEffectsCache()
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
             setVirtualizerState(isVirtualizerEnabled)
@@ -6006,12 +6015,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             val now = System.currentTimeMillis()
             val cached = cachedSupportedEffects
             val effects = if (cached == null || (now - effectsCacheTimestamp > EFFECTS_CACHE_TTL_MS)) {
-                AudioEffect.queryEffects()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.also {
-                        cachedSupportedEffects = it
-                        effectsCacheTimestamp = now
-                    }
+                refreshEffectsCache()
             } else {
                 cached
             } ?: return false
