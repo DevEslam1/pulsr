@@ -156,6 +156,59 @@ class DownloadService : Service() {
         val timeoutPausedIds: MutableSet<String> =
             java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
+        private const val TOMBSTONE_MAX_ENTRIES = 64
+        internal const val TOMBSTONE_TTL_MS = 30_000L
+        internal var tombstoneNowMs: () -> Long = { android.os.SystemClock.elapsedRealtime() }
+        private val tombstoneLock = Any()
+        private val tombstones = object : LinkedHashMap<String, Long>(TOMBSTONE_MAX_ENTRIES + 1, 0.75f, false) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean =
+                size > TOMBSTONE_MAX_ENTRIES
+        }
+
+        private fun pruneExpiredTombstonesLocked(now: Long) {
+            val iterator = tombstones.entries.iterator()
+            while (iterator.hasNext()) {
+                val recordedAt = iterator.next().value
+                if (now - recordedAt > TOMBSTONE_TTL_MS || now < recordedAt) {
+                    iterator.remove()
+                }
+            }
+        }
+
+        internal fun recordTombstone(videoId: String) {
+            val now = tombstoneNowMs()
+            synchronized(tombstoneLock) {
+                pruneExpiredTombstonesLocked(now)
+                tombstones.remove(videoId)
+                tombstones[videoId] = now
+            }
+        }
+
+        internal fun clearTombstone(videoId: String) {
+            synchronized(tombstoneLock) {
+                tombstones.remove(videoId)
+            }
+        }
+
+        internal fun isTombstoned(videoId: String): Boolean {
+            val now = tombstoneNowMs()
+            synchronized(tombstoneLock) {
+                pruneExpiredTombstonesLocked(now)
+                val recordedAt = tombstones[videoId] ?: return false
+                if (now - recordedAt > TOMBSTONE_TTL_MS || now < recordedAt) {
+                    tombstones.remove(videoId)
+                    return false
+                }
+                return true
+            }
+        }
+
+        internal fun clearTombstonesForTesting() {
+            synchronized(tombstoneLock) {
+                tombstones.clear()
+            }
+        }
+
         private fun notifyDegraded(context: Context, stage: String, cause: Throwable?) {
             android.util.Log.w(TAG, "Download continues without foreground protection ($stage)", cause)
             dispatchListener(onDownloadDegradedListener, degradedListeners, stage)
@@ -290,6 +343,7 @@ class DownloadService : Service() {
                 }
                 val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
                     ?: getString(R.string.download_notification_default_title)
+                clearTombstone(vid)
                 activeDownloads[vid] = 0
                 downloadTitles[vid] = title
                 speedStates.remove(vid)
@@ -299,6 +353,10 @@ class DownloadService : Service() {
             }
             ACTION_UPDATE -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
+                if (isTombstoned(vid)) {
+                    if (activeDownloads.isEmpty()) scheduleIdleStop()
+                    return START_NOT_STICKY
+                }
                 val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
                     ?: getString(R.string.download_notification_default_title)
                 val progress = intent.getIntExtra(EXTRA_PROGRESS, 0).coerceIn(0, 100)
@@ -329,6 +387,7 @@ class DownloadService : Service() {
                 }
                 // Remove completed ones
                 if (progress >= 100) {
+                    recordTombstone(vid)
                     try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
                     speedStates.remove(vid)
                     activeDownloads.remove(vid)
@@ -348,12 +407,14 @@ class DownloadService : Service() {
                     // Multi-job notification: one Cancel action cancels every
                     // active transfer and notifies the Dart engine per id.
                     val ids = activeDownloads.keys.toList()
+                    intent.getStringExtra(EXTRA_VIDEO_ID)?.let { recordTombstone(it) }
                     activeDownloads.clear()
                     downloadTitles.clear()
                     pausedDownloads.clear()
                     speedStates.clear()
                     timeoutPausedIds.removeAll(ids.toSet())
                     for (id in ids) {
+                        recordTombstone(id)
                         try { DownloadChunkStateStore.clearChunksForVideo(this, id) } catch (_: Exception) {}
                         dispatchListener(onDownloadCancelledListener, cancelledListeners, id)
                     }
@@ -361,6 +422,7 @@ class DownloadService : Service() {
                 } else {
                     val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                     if (vid != null) {
+                        recordTombstone(vid)
                         // Completed jobs are removed from activeDownloads but the
                         // notification can linger for a few seconds. Only forward a
                         // cancel that actually targeted a live job; otherwise a
@@ -384,7 +446,7 @@ class DownloadService : Service() {
             }
             ACTION_PAUSE -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
-                if (vid != null) {
+                if (vid != null && !isTombstoned(vid)) {
                     pausedDownloads.add(vid)
                     speedStates.remove(vid)
                     // Persist chunk offsets before the transfer goes dormant:
@@ -397,7 +459,7 @@ class DownloadService : Service() {
             }
             ACTION_RESUME -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
-                if (vid != null) {
+                if (vid != null && !isTombstoned(vid)) {
                     pausedDownloads.remove(vid)
                     timeoutPausedIds.remove(vid)
                     renderCurrentNotification(vid)
@@ -407,7 +469,7 @@ class DownloadService : Service() {
             ACTION_SET_PAUSED -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 val paused = intent.getBooleanExtra(EXTRA_PAUSED, false)
-                if (vid != null) {
+                if (vid != null && !isTombstoned(vid)) {
                     if (paused) {
                         pausedDownloads.add(vid)
                         speedStates.remove(vid)
@@ -421,6 +483,10 @@ class DownloadService : Service() {
             }
             ACTION_STOP -> {
                 cancelIdleStop()
+                intent.getStringExtra(EXTRA_VIDEO_ID)?.let { recordTombstone(it) }
+                for (id in activeDownloads.keys.toList()) {
+                    recordTombstone(id)
+                }
                 activeDownloads.clear()
                 downloadTitles.clear()
                 pausedDownloads.clear()
