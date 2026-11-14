@@ -26,17 +26,23 @@ public class AAudioAudioSinkTest {
         long framesWritten;
         long framesRead;
         int openedEncoding;
+        int lastSampleRate;
+        int openCount;
+        int closeCount;
+        int flushCount;
         byte[] writtenBytes;
 
         @Override public long openForDevice(int sampleRate, int channelCount, int encoding,
                 boolean preferExclusive, int targetBufferMs, int deviceId) {
             openedEncoding = encoding;
-            return 1L;
+            lastSampleRate = sampleRate;
+            openCount++;
+            return openCount;
         }
 
         @Override public int getDeviceId(long handle) { return 7; }
 
-        @Override public void close(long handle) {}
+        @Override public void close(long handle) { closeCount++; }
 
         @Override public int write(long handle, ByteBuffer buffer, int offset, int length) {
             writtenBytes = new byte[length];
@@ -50,7 +56,7 @@ public class AAudioAudioSinkTest {
 
         @Override public void pause(long handle) {}
 
-        @Override public void flush(long handle) {}
+        @Override public void flush(long handle) { flushCount++; }
 
         @Override public long getFramesRead(long handle) { return framesRead; }
 
@@ -285,5 +291,98 @@ public class AAudioAudioSinkTest {
         bridge.framesWritten = 900 + 480;
         bridge.framesRead = 900 + 480;
         assertEquals(6_010_000L, sink.getCurrentPositionUs(false));
+    }
+
+    @Test
+    public void sameFormatConsecutiveConfigureReusesHandleWithoutCloseOrFlush() throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 16;
+        bridge.framesWritten = 4;
+        bridge.framesRead = 4;
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16(), 0, null);
+        assertEquals(1, bridge.openCount);
+
+        final ByteBuffer first = ByteBuffer.allocateDirect(16);
+        assertTrue(sink.handleBuffer(first, 1_000_000L, 1));
+        sink.playToEndOfStream();
+        assertTrue(sink.isEnded());
+
+        sink.configure(pcm16().buildUpon().setEncoderDelay(0).build(), 0, null);
+        assertEquals(1, bridge.openCount);
+        assertEquals(0, bridge.closeCount);
+        assertEquals(0, bridge.flushCount);
+        assertFalse(sink.isEnded());
+        assertEquals(AudioSink.CURRENT_POSITION_NOT_SET, sink.getCurrentPositionUs(false));
+
+        final ByteBuffer second = ByteBuffer.allocateDirect(16);
+        assertTrue(sink.handleBuffer(second, 2_000_000L, 1));
+        assertEquals(2_000_000L, sink.getCurrentPositionUs(false));
+    }
+
+    @Test
+    public void rateChangeWithQueuedFramesDrainsBeforeClosingAndReopening() throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 16;
+        bridge.framesWritten = 100;
+        bridge.framesRead = 50;
+        final long[] nowMs = {1000L};
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.setClockForTest(() -> nowMs[0]);
+        sink.configure(pcm16().buildUpon().setSampleRate(44100).build(), 0, null);
+        assertEquals(1, bridge.openCount);
+        assertEquals(44100, bridge.lastSampleRate);
+
+        sink.configure(pcm16().buildUpon().setSampleRate(96000).build(), 0, null);
+        assertEquals(0, bridge.closeCount);
+        assertEquals(1, bridge.openCount);
+
+        final ByteBuffer next = ByteBuffer.allocateDirect(16);
+        assertFalse(sink.handleBuffer(next, 0L, 1));
+        assertEquals(0, bridge.closeCount);
+        assertEquals(0, next.position());
+
+        bridge.framesRead = 100;
+        assertTrue(sink.handleBuffer(next, 0L, 1));
+        assertEquals(1, bridge.closeCount);
+        assertEquals(2, bridge.openCount);
+        assertEquals(96000, bridge.lastSampleRate);
+    }
+
+    @Test
+    public void rateChangeDrainSafetyTimeoutForcesCloseAndReopen() throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 16;
+        bridge.framesWritten = 100;
+        bridge.framesRead = 50;
+        final long[] nowMs = {1000L};
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.setClockForTest(() -> nowMs[0]);
+        sink.configure(pcm16().buildUpon().setSampleRate(44100).build(), 0, null);
+
+        sink.configure(pcm16().buildUpon().setSampleRate(96000).build(), 0, null);
+        nowMs[0] = 1500L; // max(50 * 2, 500) == 500 ms safety timeout reached
+
+        final ByteBuffer next = ByteBuffer.allocateDirect(16);
+        assertTrue(sink.handleBuffer(next, 0L, 1));
+        assertEquals(1, bridge.closeCount);
+        assertEquals(2, bridge.openCount);
+        assertEquals(96000, bridge.lastSampleRate);
+    }
+
+    @Test
+    public void routePendingStillForcesReopenWhenFormatIsUnchanged() throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 16;
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16(), 0, null);
+        assertEquals(1, bridge.openCount);
+
+        sink.setPreferredDeviceId(42);
+
+        final ByteBuffer next = ByteBuffer.allocateDirect(16);
+        assertTrue(sink.handleBuffer(next, 0L, 1));
+        assertEquals(1, bridge.closeCount);
+        assertEquals(2, bridge.openCount);
     }
 }

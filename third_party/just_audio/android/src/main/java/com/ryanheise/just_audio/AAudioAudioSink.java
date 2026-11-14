@@ -1,6 +1,7 @@
 package com.ryanheise.just_audio;
 
 import android.os.Build;
+import android.os.SystemClock;
 import android.util.Log;
 import android.media.AudioDeviceInfo;
 import android.media.AudioFormat;
@@ -82,8 +83,13 @@ public final class AAudioAudioSink implements AudioSink {
         }
     };
 
+    interface ClockMs {
+        long elapsedRealtime();
+    }
+
     private Bridge bridge = NATIVE_BRIDGE;
     private int deviceApiLevelForTest = -1;
+    private ClockMs clockMs = SystemClock::elapsedRealtime;
 
     /** Test seam; production always uses NATIVE_BRIDGE. */
     void setBridgeForTest(Bridge bridge) {
@@ -93,6 +99,11 @@ public final class AAudioAudioSink implements AudioSink {
     /** Test seam to exercise pre-API-31 behavior under Robolectric SDK 33. */
     void setDeviceApiLevelForTest(int apiLevel) {
         this.deviceApiLevelForTest = apiLevel;
+    }
+
+    /** Test seam to advance elapsed time deterministically during drain tests. */
+    void setClockForTest(ClockMs clockMs) {
+        this.clockMs = clockMs != null ? clockMs : SystemClock::elapsedRealtime;
     }
 
     private Listener listener;
@@ -138,14 +149,24 @@ public final class AAudioAudioSink implements AudioSink {
     private volatile int[] measuredStream = new int[] {0, 0, 0};
     private int preferredDeviceId = 0;
     private int openedDeviceId = 0;
+    private int openedEncoding = 0;
+    private boolean openedPreferExclusive = false;
+    private int openedTargetBufferMs = 0;
     private boolean routePending = false;
+    private Format pendingConfigureFormat;
+    private int pendingConfigureBufferSize;
+    private int[] pendingConfigureOutputChannels;
+    private long drainDeadlineElapsedMs;
 
     int[] measuredStream() { return measuredStream; }
     boolean isPlaying() { return playing; }
 
     @Override
     public void setPreferredDevice(AudioDeviceInfo device) {
-        int id = device == null ? 0 : device.getId();
+        setPreferredDeviceId(device == null ? 0 : device.getId());
+    }
+
+    void setPreferredDeviceId(int id) {
         if (id == preferredDeviceId) return;
         preferredDeviceId = id;
         routePending = handle != 0L;
@@ -231,6 +252,13 @@ public final class AAudioAudioSink implements AudioSink {
         return positionUs;
     }
 
+    private boolean hasQueuedFrames() {
+        if (handle == 0L) return false;
+        long read = bridge.getFramesRead(handle);
+        long written = bridge.getFramesWritten(handle);
+        return read >= 0L && written > read;
+    }
+
     @Override
     public void configure(Format inputFormat, int specifiedBufferSizeSize,
             int[] outputChannels) throws ConfigurationException {
@@ -243,7 +271,7 @@ public final class AAudioAudioSink implements AudioSink {
                 "Unsupported PCM format for AAudio sink", inputFormat);
         }
         final boolean useNative32 = useNativeInt32();
-        int encoding;
+        final int encoding;
         if (inputFormat.pcmEncoding == C.ENCODING_PCM_16BIT) {
             encoding = AaudioNativeBridge.ENCODING_PCM_I16;
         } else if (inputFormat.pcmEncoding == C.ENCODING_PCM_FLOAT) {
@@ -256,14 +284,50 @@ public final class AAudioAudioSink implements AudioSink {
             encoding = AaudioNativeBridge.ENCODING_PCM_I24_PACKED;
         }
         // Trimming removes declared non-program frames without changing samples.
+        final FloatDspAudioSink.PcmFrameEditor nextEditor;
         try {
-            frameEditor = new FloatDspAudioSink.PcmFrameEditor(inputFormat, null);
+            nextEditor = new FloatDspAudioSink.PcmFrameEditor(inputFormat, null);
         } catch (IllegalArgumentException | ArithmeticException e) {
             throw new ConfigurationException(e, inputFormat);
         }
+        final boolean sameStreamParams = handle != 0L
+                && !routePending
+                && pendingConfigureFormat == null
+                && inputFormat.sampleRate == sampleRate
+                && inputFormat.channelCount == channelCount
+                && encoding == openedEncoding
+                && preferredDeviceId == openedDeviceId
+                && preferExclusive == openedPreferExclusive
+                && targetBufferMs == openedTargetBufferMs;
+        if (sameStreamParams) {
+            frameEditor = nextEditor;
+            configuredFormat = inputFormat;
+            pcmEncoding = inputFormat.pcmEncoding;
+            transcodingPcm32 = (inputFormat.pcmEncoding == C.ENCODING_PCM_32BIT && !useNative32);
+            pendingEditedInput = null;
+            pendingEditedOutput = null;
+            eosWritten = false;
+            handledEndOfStream = false;
+            pendingBasePosition = true;
+            return;
+        }
+        if (handle != 0L && !routePending && hasQueuedFrames()) {
+            pendingConfigureFormat = inputFormat;
+            pendingConfigureBufferSize = specifiedBufferSizeSize;
+            pendingConfigureOutputChannels = null;
+            drainDeadlineElapsedMs = clockMs.elapsedRealtime()
+                    + Math.max(targetBufferMs * 2L, 500L);
+            return;
+        }
+        pendingConfigureFormat = null;
+        pendingConfigureOutputChannels = null;
+        pendingConfigureBufferSize = 0;
+        drainDeadlineElapsedMs = 0L;
+        frameEditor = nextEditor;
         pendingEditedInput = null;
         pendingEditedOutput = null;
         // Close any stream from a previous configuration before reopening.
+        // VERIFY: nativeClose drain semantics and gapless 44.1->96 kHz album transition over USB DAC.
         closeHandle();
         long newHandle;
         try {
@@ -281,6 +345,9 @@ public final class AAudioAudioSink implements AudioSink {
         }
         handle = newHandle;
         openedDeviceId = preferredDeviceId;
+        openedEncoding = encoding;
+        openedPreferExclusive = preferExclusive;
+        openedTargetBufferMs = targetBufferMs;
         routePending = false;
         // Report what the stream was actually OPENED as, not what the decoder
         // handed us: an int32 input arriving here is a float stream.
@@ -301,7 +368,8 @@ public final class AAudioAudioSink implements AudioSink {
         pendingBasePosition = true;
         baseFramesWritten = 0L;
         bridge.setVolume(handle, volume);
-        if (!playing) bridge.pause(handle);
+        if (playing) bridge.play(handle);
+        else bridge.pause(handle);
         Log.i(TAG, "AAudio sink configured: " + sampleRate + "Hz/" + channelCount
                 + "ch pcm=" + inputFormat.pcmEncoding
                 + " exclusive=" + bridge.isExclusive(handle));
@@ -319,18 +387,44 @@ public final class AAudioAudioSink implements AudioSink {
         pendingBasePosition = true;
     }
 
+    private void applyPendingConfigure() throws ConfigurationException {
+        Format nextFormat = pendingConfigureFormat;
+        int nextBufferSize = pendingConfigureBufferSize;
+        int[] nextChannels = pendingConfigureOutputChannels;
+        pendingConfigureFormat = null;
+        pendingConfigureOutputChannels = null;
+        pendingConfigureBufferSize = 0;
+        drainDeadlineElapsedMs = 0L;
+        closeHandle();
+        configure(nextFormat, nextBufferSize, nextChannels);
+    }
+
     @Override
     public boolean handleBuffer(ByteBuffer buffer, long presentationStartUs,
             int encodedAccessUnitCount) throws InitializationException,
             WriteException {
+        if (pendingConfigureFormat != null) {
+            if (!routePending && hasQueuedFrames()
+                    && clockMs.elapsedRealtime() < drainDeadlineElapsedMs) {
+                return false;
+            }
+            Format targetFormat = pendingConfigureFormat;
+            try {
+                applyPendingConfigure();
+            } catch (ConfigurationException e) {
+                throw new InitializationException("Pending AAudio reconfigure failed", 0,
+                        targetFormat, false, e);
+            }
+        }
         if (routePending && configuredFormat != null && pendingEditedOutput == null) {
             FloatDspAudioSink.PcmFrameEditor previousEditor = frameEditor;
-            routePending = false;
             Format previousFormat = configuredFormat;
             int previousDevice = openedDeviceId;
             try {
+                // Keep routePending=true so configure() forces a close+reopen.
                 configure(previousFormat, 0, null);
             } catch (ConfigurationException refused) {
+                routePending = false;
                 preferredDeviceId = previousDevice;
                 try {
                     configure(previousFormat, 0, null);
@@ -597,6 +691,14 @@ public final class AAudioAudioSink implements AudioSink {
         handledEndOfStream = false;
         pendingBasePosition = true;
         baseFramesWritten = 0L;
+        if (pendingConfigureFormat != null) {
+            try {
+                applyPendingConfigure();
+            } catch (ConfigurationException e) {
+                if (listener != null) listener.onAudioSinkError(e);
+            }
+            return;
+        }
         if (handle != 0L) bridge.flush(handle);
         if (playing && handle != 0L) bridge.play(handle);
     }
@@ -605,6 +707,10 @@ public final class AAudioAudioSink implements AudioSink {
     public void reset() {
         pendingEditedInput = null;
         pendingEditedOutput = null;
+        pendingConfigureFormat = null;
+        pendingConfigureOutputChannels = null;
+        pendingConfigureBufferSize = 0;
+        drainDeadlineElapsedMs = 0L;
         frameEditor = null;
         closeHandle();
         eosWritten = false;
@@ -637,6 +743,10 @@ public final class AAudioAudioSink implements AudioSink {
 
     private void closeHandle() {
         measuredStream = new int[] {0, 0, 0};
+        openedDeviceId = 0;
+        openedEncoding = 0;
+        openedPreferExclusive = false;
+        openedTargetBufferMs = 0;
         if (handle != 0L) {
             long toClose = handle;
             handle = 0L;
