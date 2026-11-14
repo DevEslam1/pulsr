@@ -434,4 +434,52 @@ public class AudioPlayerLifecycleTest {
         // Must be a safe no-op when invoked after detach cleared methodCallHandler.
         listener.onPreEngineRestart();
     }
+
+    @Test
+    public void malformedDspArgumentsReportMethodChannelErrorWithoutThrowing() {
+        final AudioPlayer player = newPlayer();
+        for (final String method : new String[] {
+                "dspSetFloatOutput", "dspSetTapSrcRate", "dspSetAaudioOutput"}) {
+            final MethodChannel.Result res = mock(MethodChannel.Result.class);
+            final Map<String, Object> badArgs = new HashMap<>();
+            badArgs.put("enabled", "not-a-boolean");
+            badArgs.put("rate", "not-an-int");
+            badArgs.put("targetBufferMs", "not-an-int");
+            player.onMethodCall(new MethodCall(method, badArgs), res);
+            verify(res).error(org.mockito.ArgumentMatchers.eq("dsp_error"),
+                    org.mockito.ArgumentMatchers.nullable(String.class),
+                    org.mockito.ArgumentMatchers.isNull());
+        }
+    }
+
+    @Test
+    public void nullOffloadSchedulingEnabledDoesNotThrowInConstructor() throws Exception {
+        final AudioPlayer player = new AudioPlayer(
+                RuntimeEnvironment.getApplication(),
+                mock(BinaryMessenger.class),
+                "lifecycle-null-offload-" + (++nextId),
+                null,
+                null,
+                null,
+                null,
+                false);
+        final Field field = AudioPlayer.class.getDeclaredField("offloadSchedulingEnabled");
+        field.setAccessible(true);
+        assertEquals(false, field.getBoolean(player));
+        player.dispose();
+    }
+
+    @Test
+    public void mainMethodCallHandlerReportsPluginErrorOnMalformedArguments() {
+        final MainMethodCallHandler handler = new MainMethodCallHandler(
+                RuntimeEnvironment.getApplication(),
+                mock(BinaryMessenger.class));
+        final MethodChannel.Result res = mock(MethodChannel.Result.class);
+        final Map<String, Object> badArgs = new HashMap<>();
+        badArgs.put("id", 12345);
+        handler.onMethodCall(new MethodCall("init", badArgs), res);
+        verify(res).error(org.mockito.ArgumentMatchers.eq("plugin_error"),
+                org.mockito.ArgumentMatchers.nullable(String.class),
+                org.mockito.ArgumentMatchers.isNull());
+    }
 }

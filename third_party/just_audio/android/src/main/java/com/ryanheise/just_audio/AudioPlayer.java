@@ -224,12 +224,12 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 .setAudioOffloadMode((Integer)audioOffloadPreferences.get("audioOffloadMode"))
                 .build();
         } else {
-            final int offloadMode = offloadSchedulingEnabled
+            final int offloadMode = this.offloadSchedulingEnabled
                 ? AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
                 : AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED;
             this.audioOffloadPreferences = new AudioOffloadPreferences.Builder()
-                .setIsGaplessSupportRequired(!offloadSchedulingEnabled)
-                .setIsSpeedChangeSupportRequired(!offloadSchedulingEnabled)
+                .setIsGaplessSupportRequired(!this.offloadSchedulingEnabled)
+                .setIsSpeedChangeSupportRequired(!this.offloadSchedulingEnabled)
                 .setAudioOffloadMode(offloadMode)
                 .build();
         }
@@ -734,115 +734,120 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     @Override
     public void onMethodCall(final MethodCall call, final Result result) {
-        // Pulsr fork: the float-output preference must reach the player BEFORE
-        // the sink is built, so handle it without forcing initialization. Once
-        // the player exists the flag is stored and the stable sink wrapper
-        // swaps its inner backend on the playback thread (no player teardown).
-        if ("dspSetFloatOutput".equals(call.method)) {
-            Boolean requested = call.argument("enabled");
-            boolean enabled = requested != null && requested;
-            result.success(applyFloatOutput(enabled));
-            return;
-        }
-
-        // Pulsr fork: tap-side SRC target rate (device output rate). Handled
-        // before initialization like dspSetFloatOutput; 0 disables. Takes
-        // effect on the processor's next configure (rate changes mid-stream
-        // require a sink reconfigure, which the caller triggers via a route
-        // change or mode swap).
-        if ("dspSetTapSrcRate".equals(call.method)) {
-            Integer rate = call.argument("rate");
-            int r = rate == null ? 0 : rate;
-            int normalized = (r >= 8000 && r <= 768000) ? r : 0;
-            if (normalized != tapSrcTargetRate) {
-                tapSrcFailed = false;
-            }
-            tapSrcTargetRate = normalized;
-            if (dspAudioProcessor != null) {
-                dspAudioProcessor.setTapSrcTargetRate(tapSrcFailed ? 0 : tapSrcTargetRate);
-            }
-            result.success(true);
-            return;
-        }
-
-        // Pulsr fork: AAudio Direct output preference must reach the player
-        // BEFORE the sink is built, so handle it without forcing
-        // initialization (same pattern as dspSetFloatOutput).
-        if ("dspSetAaudioOutput".equals(call.method)) {
-            final int requestGeneration = ++aaudioRequestGeneration;
-            Boolean requested = call.argument("enabled");
-            Boolean exclusive = call.argument("preferExclusive");
-            Integer bufferMs = call.argument("targetBufferMs");
-            boolean enabled = requested != null && requested;
-            boolean changed = false;
-            if (exclusive != null) {
-                changed |= aaudioPreferExclusive != exclusive;
-                aaudioPreferExclusive = exclusive;
-            }
-            if (bufferMs != null) {
-                // 8 ms is the low-latency wired/USB target documented by the
-                // caller-side controller; anything outside 8..1000 is a bad
-                // request and keeps the previous value instead of silently
-                // pretending it was applied.
-                if (bufferMs >= 8 && bufferMs <= 1000) {
-                    changed |= aaudioTargetBufferMs != bufferMs;
-                    aaudioTargetBufferMs = bufferMs;
-                } else {
-                    Log.w(TAG, "Ignoring AAudio targetBufferMs=" + bufferMs
-                            + " outside 8..1000");
-                }
-            }
-            boolean effective = enabled && isAaudioOutputSupported();
-            if (effective && !aaudioOutputEnabled) {
-                // Library availability alone says nothing about whether this
-                // device grants the requested sharing mode. Probe a real stream
-                // on a dedicated single-thread executor before accepting.
-                androidx.media3.common.Format format = player == null ? null : player.getAudioFormat();
-                Integer requestedRate = call.argument("sampleRate");
-                int rate = (requestedRate != null && requestedRate > 0)
-                        ? requestedRate
-                        : (format != null && format.sampleRate > 0 ? format.sampleRate : 48000);
-                Integer requestedChannels = call.argument("channelCount");
-                int channels = (requestedChannels != null && requestedChannels > 0)
-                        ? requestedChannels
-                        : (format != null && format.channelCount > 0 ? format.channelCount : 2);
-                Integer requestedEncoding = call.argument("pcmEncoding");
-                int pcmEncoding = (requestedEncoding != null
-                        && requestedEncoding != androidx.media3.common.C.ENCODING_INVALID)
-                        ? requestedEncoding
-                        : (format != null ? format.pcmEncoding
-                                : androidx.media3.common.C.ENCODING_INVALID);
-                final int probeEncoding = (pcmEncoding == androidx.media3.common.C.ENCODING_INVALID)
-                        ? androidx.media3.common.C.ENCODING_PCM_16BIT
-                        : pcmEncoding;
-                final int deviceId = PulsrOutputRouting.preferredDeviceId();
-                final boolean preferExclusiveSnapshot = aaudioPreferExclusive;
-                final int targetBufferSnapshot = aaudioTargetBufferMs;
-                final String cacheKey = deviceId + ":" + rate + ":" + channels + ":"
-                        + probeEncoding + ":" + preferExclusiveSnapshot;
-                final Boolean cached = AAUDIO_PROBE_CACHE.get(cacheKey);
-                if (cached != null) {
-                    finishAaudioProbe(requestGeneration, enabled, changed, cached, result);
-                    return;
-                }
-                final int cacheGeneration = AAUDIO_PROBE_CACHE_GENERATION.get();
-                final boolean changedSnapshot = changed;
-                probeExecutor.execute(() -> {
-                    final boolean probeOk = (probeEncoding == androidx.media3.common.C.ENCODING_PCM_16BIT)
-                            ? probeAaudioOutput(rate, channels,
-                                    targetBufferSnapshot, preferExclusiveSnapshot)
-                            : probeAaudioOutput(rate, channels,
-                                    targetBufferSnapshot, preferExclusiveSnapshot, probeEncoding);
-                    if (AAUDIO_PROBE_CACHE_GENERATION.get() == cacheGeneration
-                            && PulsrOutputRouting.preferredDeviceId() == deviceId) {
-                        AAUDIO_PROBE_CACHE.put(cacheKey, probeOk);
-                    }
-                    handler.post(() -> finishAaudioProbe(
-                            requestGeneration, enabled, changedSnapshot, probeOk, result));
-                });
+        try {
+            // Pulsr fork: the float-output preference must reach the player BEFORE
+            // the sink is built, so handle it without forcing initialization. Once
+            // the player exists the flag is stored and the stable sink wrapper
+            // swaps its inner backend on the playback thread (no player teardown).
+            if ("dspSetFloatOutput".equals(call.method)) {
+                Boolean requested = call.argument("enabled");
+                boolean enabled = requested != null && requested;
+                result.success(applyFloatOutput(enabled));
                 return;
             }
-            finishAaudioProbe(requestGeneration, enabled, changed, effective, result);
+
+            // Pulsr fork: tap-side SRC target rate (device output rate). Handled
+            // before initialization like dspSetFloatOutput; 0 disables. Takes
+            // effect on the processor's next configure (rate changes mid-stream
+            // require a sink reconfigure, which the caller triggers via a route
+            // change or mode swap).
+            if ("dspSetTapSrcRate".equals(call.method)) {
+                Integer rate = call.argument("rate");
+                int r = rate == null ? 0 : rate;
+                int normalized = (r >= 8000 && r <= 768000) ? r : 0;
+                if (normalized != tapSrcTargetRate) {
+                    tapSrcFailed = false;
+                }
+                tapSrcTargetRate = normalized;
+                if (dspAudioProcessor != null) {
+                    dspAudioProcessor.setTapSrcTargetRate(tapSrcFailed ? 0 : tapSrcTargetRate);
+                }
+                result.success(true);
+                return;
+            }
+
+            // Pulsr fork: AAudio Direct output preference must reach the player
+            // BEFORE the sink is built, so handle it without forcing
+            // initialization (same pattern as dspSetFloatOutput).
+            if ("dspSetAaudioOutput".equals(call.method)) {
+                final int requestGeneration = ++aaudioRequestGeneration;
+                Boolean requested = call.argument("enabled");
+                Boolean exclusive = call.argument("preferExclusive");
+                Integer bufferMs = call.argument("targetBufferMs");
+                boolean enabled = requested != null && requested;
+                boolean changed = false;
+                if (exclusive != null) {
+                    changed |= aaudioPreferExclusive != exclusive;
+                    aaudioPreferExclusive = exclusive;
+                }
+                if (bufferMs != null) {
+                    // 8 ms is the low-latency wired/USB target documented by the
+                    // caller-side controller; anything outside 8..1000 is a bad
+                    // request and keeps the previous value instead of silently
+                    // pretending it was applied.
+                    if (bufferMs >= 8 && bufferMs <= 1000) {
+                        changed |= aaudioTargetBufferMs != bufferMs;
+                        aaudioTargetBufferMs = bufferMs;
+                    } else {
+                        Log.w(TAG, "Ignoring AAudio targetBufferMs=" + bufferMs
+                                + " outside 8..1000");
+                    }
+                }
+                boolean effective = enabled && isAaudioOutputSupported();
+                if (effective && !aaudioOutputEnabled) {
+                    // Library availability alone says nothing about whether this
+                    // device grants the requested sharing mode. Probe a real stream
+                    // on a dedicated single-thread executor before accepting.
+                    androidx.media3.common.Format format = player == null ? null : player.getAudioFormat();
+                    Integer requestedRate = call.argument("sampleRate");
+                    int rate = (requestedRate != null && requestedRate > 0)
+                            ? requestedRate
+                            : (format != null && format.sampleRate > 0 ? format.sampleRate : 48000);
+                    Integer requestedChannels = call.argument("channelCount");
+                    int channels = (requestedChannels != null && requestedChannels > 0)
+                            ? requestedChannels
+                            : (format != null && format.channelCount > 0 ? format.channelCount : 2);
+                    Integer requestedEncoding = call.argument("pcmEncoding");
+                    int pcmEncoding = (requestedEncoding != null
+                            && requestedEncoding != androidx.media3.common.C.ENCODING_INVALID)
+                            ? requestedEncoding
+                            : (format != null ? format.pcmEncoding
+                                    : androidx.media3.common.C.ENCODING_INVALID);
+                    final int probeEncoding = (pcmEncoding == androidx.media3.common.C.ENCODING_INVALID)
+                            ? androidx.media3.common.C.ENCODING_PCM_16BIT
+                            : pcmEncoding;
+                    final int deviceId = PulsrOutputRouting.preferredDeviceId();
+                    final boolean preferExclusiveSnapshot = aaudioPreferExclusive;
+                    final int targetBufferSnapshot = aaudioTargetBufferMs;
+                    final String cacheKey = deviceId + ":" + rate + ":" + channels + ":"
+                            + probeEncoding + ":" + preferExclusiveSnapshot;
+                    final Boolean cached = AAUDIO_PROBE_CACHE.get(cacheKey);
+                    if (cached != null) {
+                        finishAaudioProbe(requestGeneration, enabled, changed, cached, result);
+                        return;
+                    }
+                    final int cacheGeneration = AAUDIO_PROBE_CACHE_GENERATION.get();
+                    final boolean changedSnapshot = changed;
+                    probeExecutor.execute(() -> {
+                        final boolean probeOk = (probeEncoding == androidx.media3.common.C.ENCODING_PCM_16BIT)
+                                ? probeAaudioOutput(rate, channels,
+                                        targetBufferSnapshot, preferExclusiveSnapshot)
+                                : probeAaudioOutput(rate, channels,
+                                        targetBufferSnapshot, preferExclusiveSnapshot, probeEncoding);
+                        if (AAUDIO_PROBE_CACHE_GENERATION.get() == cacheGeneration
+                                && PulsrOutputRouting.preferredDeviceId() == deviceId) {
+                            AAUDIO_PROBE_CACHE.put(cacheKey, probeOk);
+                        }
+                        handler.post(() -> finishAaudioProbe(
+                                requestGeneration, enabled, changedSnapshot, probeOk, result));
+                    });
+                    return;
+                }
+                finishAaudioProbe(requestGeneration, enabled, changed, effective, result);
+                return;
+            }
+        } catch (RuntimeException e) {
+            result.error("dsp_error", e.getMessage(), null);
             return;
         }
 
@@ -1121,6 +1126,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     .createMediaSource(new MediaItem.Builder()
                             .setUri(Uri.parse((String)map.get("uri")))
                             .setMimeType(MimeTypes.APPLICATION_M3U8)
+                            .setTag(id)
                             .build());
         case "silence":
             return new SilenceMediaSource.Factory()
@@ -1169,6 +1175,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         return mediaSources;
     }
 
+    // Android AudioEffects (Equalizer, LoudnessEnhancer) attach to the
+    // AudioTrack audioSessionId and therefore do not affect AAudioAudioSink
+    // direct output.
     private AudioEffect decodeAudioEffect(final Object json, int audioSessionId) {
         Map<?, ?> map = (Map<?, ?>)json;
         String type = (String)map.get("type");
