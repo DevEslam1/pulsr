@@ -60,6 +60,7 @@ public class PulsrAudioSinkTest {
         final Flag floatMode;
         int aaudioRejected;
         int floatRejected;
+        int tapSrcFailedCount;
         final List<String> suspendedEvents = new ArrayList<>();
 
         Fallbacks(Flag aaudio, Flag floatMode) {
@@ -79,6 +80,10 @@ public class PulsrAudioSinkTest {
 
         @Override public void onAaudioSuspended(String reason, boolean suspended) {
             suspendedEvents.add(reason + ":" + suspended);
+        }
+
+        @Override public void onTapSrcFailed(Exception cause) {
+            tapSrcFailedCount++;
         }
     }
 
@@ -800,6 +805,46 @@ public class PulsrAudioSinkTest {
         } catch (AudioSink.InitializationException expected) {
             assertTrue(expected.getMessage().contains("configure()"));
         }
+        sink.release();
+    }
+
+    @Test
+    public void tapSrcFailureNotifiesListenerAndResetClearsFlag() throws Exception {
+        final Flag aaudio = new Flag(false);
+        final Flag floatMode = new Flag(true);
+        final Fallbacks fallbacks = new Fallbacks(aaudio, floatMode);
+        final Factory factory = new Factory();
+        final AudioSink firstSink = mock(AudioSink.class);
+        final NativeDspAudioProcessor firstProc = new NativeDspAudioProcessor();
+        firstProc.setTapSrcTargetRate(96000);
+        doThrow(new NativeDspAudioProcessor.TapSrcException("tap src failed", null))
+                .when(firstSink).handleBuffer(any(), anyLong(), anyInt());
+        final AudioSink retrySink = mock(AudioSink.class);
+        final List<Integer> retryRates = new ArrayList<>();
+        final NativeDspAudioProcessor retryProc = new NativeDspAudioProcessor() {
+            @Override
+            public void setTapSrcTargetRate(int rate) {
+                super.setTapSrcTargetRate(rate);
+                retryRates.add(rate);
+            }
+        };
+        retryProc.setTapSrcTargetRate(96000);
+        retryRates.clear();
+        when(retrySink.handleBuffer(any(), anyLong(), anyInt())).thenReturn(true);
+        factory.queue.add(new PulsrAudioSink.Inner(firstSink, null, null, firstProc));
+        factory.queue.add(new PulsrAudioSink.Inner(retrySink, null, null, retryProc));
+
+        final PulsrAudioSink sink = newSink(aaudio, floatMode, fallbacks, factory);
+        sink.configure(FORMAT, 0, null);
+
+        assertTrue(sink.handleBuffer(ByteBuffer.allocateDirect(16), 0L, 1));
+        assertTrue(sink.isTapSrcFailed());
+        assertEquals(1, fallbacks.tapSrcFailedCount);
+        assertEquals(0, retryProc.getTapSrcTargetRate());
+        assertTrue(retryRates.contains(0));
+
+        sink.reset();
+        assertFalse(sink.isTapSrcFailed());
         sink.release();
     }
 }

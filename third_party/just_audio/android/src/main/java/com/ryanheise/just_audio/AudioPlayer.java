@@ -129,6 +129,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     // its output and converts ahead of the DSP chain with the native 64-tap
     // polyphase resampler.
     private volatile int tapSrcTargetRate = 0;
+    private volatile boolean tapSrcFailed = false;
     // Pulsr fork: stable sink that swaps its inner backend on output-mode
     // changes instead of releasing/re-preparing the whole ExoPlayer.
     private volatile OutputSinkControl sinkWrapper;
@@ -624,9 +625,13 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         if ("dspSetTapSrcRate".equals(call.method)) {
             Integer rate = call.argument("rate");
             int r = rate == null ? 0 : rate;
-            tapSrcTargetRate = (r >= 8000 && r <= 768000) ? r : 0;
+            int normalized = (r >= 8000 && r <= 768000) ? r : 0;
+            if (normalized != tapSrcTargetRate) {
+                tapSrcFailed = false;
+            }
+            tapSrcTargetRate = normalized;
             if (dspAudioProcessor != null) {
-                dspAudioProcessor.setTapSrcTargetRate(tapSrcTargetRate);
+                dspAudioProcessor.setTapSrcTargetRate(tapSrcFailed ? 0 : tapSrcTargetRate);
             }
             result.success(true);
             return;
@@ -1158,6 +1163,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             final boolean floatActive = !aaudioActive && floatOutputEnabled;
                             notifyOutputModeToDart(reason, aaudioActive, floatActive);
                         }
+
+                        @Override
+                        public void onTapSrcFailed(Exception cause) {
+                            AudioPlayer.this.onTapSrcFailed(cause);
+                        }
                     });
             sinkWrapper = sink;
             DefaultRenderersFactory renderersFactoryImpl = new DefaultRenderersFactory(context) {
@@ -1208,10 +1218,19 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     /** Called by the sink wrapper whenever its active DSP processor changes. */
-    private void onActiveDspProcessorChanged(NativeDspAudioProcessor processor) {
+    void onActiveDspProcessorChanged(NativeDspAudioProcessor processor) {
         dspAudioProcessor = processor;
         if (processor != null) {
-            processor.setTapSrcTargetRate(tapSrcTargetRate);
+            processor.setTapSrcTargetRate(tapSrcFailed ? 0 : tapSrcTargetRate);
+        }
+    }
+
+    /** Latches tap-SRC failure so subsequent processors keep source rate until reset. */
+    void onTapSrcFailed(Exception cause) {
+        tapSrcFailed = true;
+        final NativeDspAudioProcessor processor = dspAudioProcessor;
+        if (processor != null) {
+            processor.setTapSrcTargetRate(0);
         }
     }
 
@@ -1532,6 +1551,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         sinkWrapper = null;
         if (sink != null) sink.release();
         dspAudioProcessor = null;
+        tapSrcFailed = false;
         // bufferWatcher, ObserverRenderer and the fallback runnables all hold
         // this AudioPlayer; leaving them queued leaks the disposed player and
         // keeps polling a released ExoPlayer.

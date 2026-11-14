@@ -56,6 +56,12 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         void onFloatRejected(String reason, Exception cause);
 
         default void onAaudioSuspended(String reason, boolean suspended) {}
+
+        default void onTapSrcFailed(Exception cause) {}
+    }
+
+    boolean isTapSrcFailed() {
+        return tapSrcFailed;
     }
 
     interface InnerFactory {
@@ -332,6 +338,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             // No source or editor state was committed. Reconfigure at source
             // rate; never send wrong-rate passthrough bytes into the old track.
             tapSrcFailed = true;
+            if (fallbackListener != null) fallbackListener.onTapSrcFailed(e);
             notifySinkError(e);
             try {
                 swapTo(mode, false, true);
@@ -523,6 +530,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         continuousState = null;
         pendingModeRequested = false;
         pendingForce = false;
+        tapSrcFailed = false;
         decodedPcm = new int[] {0, 0, 0};
         if (currentInner != null && currentInner.processor != null)
             currentInner.processor.releaseUsbProducer();
