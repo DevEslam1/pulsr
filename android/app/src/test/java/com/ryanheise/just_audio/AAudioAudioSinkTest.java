@@ -21,8 +21,9 @@ import java.nio.ByteBuffer;
 @Config(sdk = 33)
 public class AAudioAudioSinkTest {
 
-    static final class FakeBridge implements AAudioAudioSink.Bridge {
+    static class FakeBridge implements AAudioAudioSink.Bridge {
         int writeResult;
+        int writeCount;
         long framesWritten;
         long framesRead;
         int openedEncoding;
@@ -45,6 +46,7 @@ public class AAudioAudioSinkTest {
         @Override public void close(long handle) { closeCount++; }
 
         @Override public int write(long handle, ByteBuffer buffer, int offset, int length) {
+            writeCount++;
             writtenBytes = new byte[length];
             ByteBuffer view = buffer.duplicate();
             view.position(offset);
@@ -384,5 +386,101 @@ public class AAudioAudioSinkTest {
         assertTrue(sink.handleBuffer(next, 0L, 1));
         assertEquals(1, bridge.closeCount);
         assertEquals(2, bridge.openCount);
+    }
+
+    @Test
+    public void closeHandleSwallowsRuntimeExceptionFromBridge() throws Exception {
+        final FakeBridge bridge = new FakeBridge() {
+            @Override
+            public void close(long handle) {
+                super.close(handle);
+                throw new RuntimeException("nativeClose threw");
+            }
+        };
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16(), 0, null);
+        sink.release();
+        assertEquals(1, bridge.closeCount);
+    }
+
+    @Test
+    public void routeChangeRestoreSuccessSkipsErrorAndFailureReportsOnce() throws Exception {
+        final boolean[] allowDeviceZero = {true};
+        final FakeBridge bridge = new FakeBridge() {
+            @Override
+            public long openForDevice(int sampleRate, int channelCount, int encoding,
+                    boolean preferExclusive, int targetBufferMs, int deviceId) {
+                if (deviceId == 99 || !allowDeviceZero[0]) {
+                    return 0L;
+                }
+                return super.openForDevice(sampleRate, channelCount, encoding,
+                        preferExclusive, targetBufferMs, deviceId);
+            }
+        };
+        bridge.writeResult = 16;
+        final AudioSink.Listener listener = org.mockito.Mockito.mock(AudioSink.Listener.class);
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.setListener(listener);
+        sink.configure(pcm16(), 0, null);
+
+        // New device fails, restore to device 0 succeeds: no sink error reported.
+        sink.setPreferredDeviceId(99);
+        assertTrue(sink.handleBuffer(ByteBuffer.allocateDirect(16), 0L, 1));
+        org.mockito.Mockito.verify(listener, org.mockito.Mockito.never())
+                .onAudioSinkError(org.mockito.ArgumentMatchers.any());
+
+        // New device fails AND restore fails: error reported once, not twice.
+        allowDeviceZero[0] = false;
+        sink.setPreferredDeviceId(99);
+        assertFalse(sink.handleBuffer(ByteBuffer.allocateDirect(16), 0L, 1));
+        org.mockito.Mockito.verify(listener, org.mockito.Mockito.times(1))
+                .onAudioSinkError(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    public void playToEndOfStreamRetriesPendingEditedInputWithPendingTimestamp() throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 4;
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16().buildUpon().setEncoderPadding(1).build(), 0, null);
+
+        // First buffer establishes basePositionUs = 100_000 us and stages padding.
+        assertTrue(sink.handleBuffer(ByteBuffer.allocateDirect(8), 100_000L, 1));
+        assertEquals(100_000L, sink.getCurrentPositionUs(false));
+
+        // Second buffer is partially written (4 of 8 edited bytes), caching 777_000 us.
+        assertFalse(sink.handleBuffer(ByteBuffer.allocateDirect(8), 777_000L, 5));
+
+        // Mark discontinuity before EOS so playToEndOfStream retry latches its timestamp.
+        sink.handleDiscontinuity();
+        bridge.writeResult = 4;
+        sink.playToEndOfStream();
+        assertTrue(sink.isEnded());
+        assertEquals(777_000L, sink.getCurrentPositionUs(false));
+    }
+
+    @Test
+    public void pcm32TranscodeConsumesTrailingSubSampleBytesWithoutStalling() throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm32(), 0, null);
+
+        // Direct buffer with 2 full samples (8 bytes) + 2 trailing bytes.
+        bridge.writeResult = 8;
+        final ByteBuffer direct = ByteBuffer.allocateDirect(10);
+        assertTrue(sink.handleBuffer(direct, 0L, 1));
+        assertEquals(10, direct.position());
+
+        // Non-direct buffer with 2 full samples (8 bytes) + 1 trailing byte.
+        final ByteBuffer heap = ByteBuffer.allocate(9);
+        assertTrue(sink.handleBuffer(heap, 0L, 1));
+        assertEquals(9, heap.position());
+
+        // Buffer shorter than one 32-bit sample completes immediately without writing 0 bytes.
+        final int writesBeforeShort = bridge.writeCount;
+        final ByteBuffer shortBuf = ByteBuffer.allocateDirect(3);
+        assertTrue(sink.handleBuffer(shortBuf, 0L, 1));
+        assertEquals(3, shortBuf.position());
+        assertEquals(writesBeforeShort, bridge.writeCount);
     }
 }

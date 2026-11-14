@@ -435,12 +435,17 @@ public final class AAudioAudioSink implements AudioSink {
             } catch (ConfigurationException refused) {
                 routePending = false;
                 preferredDeviceId = previousDevice;
+                boolean restored = false;
+                Exception errorToReport = refused;
                 try {
                     configure(previousFormat, 0, null);
+                    restored = (handle != 0L);
                 } catch (ConfigurationException restoreFailed) {
-                    if (listener != null) listener.onAudioSinkError(restoreFailed);
+                    errorToReport = restoreFailed;
                 }
-                if (listener != null) listener.onAudioSinkError(refused);
+                if (!restored && listener != null) {
+                    listener.onAudioSinkError(errorToReport);
+                }
                 if (handle == 0L) {
                     // Do not proceed to write into a dead stream handle
                     return false;
@@ -495,6 +500,10 @@ public final class AAudioAudioSink implements AudioSink {
         if (transcodingPcm32) {
             writeBuffer = convert32BitToFloat(buffer);
             remaining = writeBuffer.remaining();
+            if (remaining == 0) {
+                buffer.position(buffer.limit());
+                return true;
+            }
         } else {
             writeBuffer = buffer;
         }
@@ -518,15 +527,7 @@ public final class AAudioAudioSink implements AudioSink {
                         /* isRecoverable= */ true);
             }
             updateMeasuredRoute();
-            if (transcodingPcm32) {
-                // int32 -> float is 1:1 in samples (4 bytes in, 4 bytes out),
-                // so a partial native write must advance the source by the
-                // same byte count; jumping to the limit would drop the tail.
-                buffer.position(Math.min(buffer.limit(),
-                        buffer.position() + written));
-            } else {
-                buffer.position(buffer.position() + written);
-            }
+            advanceAfterPcmWrite(buffer, written);
             return !buffer.hasRemaining();
         }
         int offset = writeBuffer.position();
@@ -537,13 +538,24 @@ public final class AAudioAudioSink implements AudioSink {
                     /* isRecoverable= */ true);
         }
         updateMeasuredRoute();
-        if (transcodingPcm32) {
-            buffer.position(Math.min(buffer.limit(),
-                    buffer.position() + written));
-        } else {
-            buffer.position(offset + written);
-        }
+        advanceAfterPcmWrite(buffer, written);
         return !buffer.hasRemaining();
+    }
+
+    private void advanceAfterPcmWrite(ByteBuffer buffer, int written) {
+        if (transcodingPcm32) {
+            // int32 -> float is 1:1 in samples (4 bytes in, 4 bytes out),
+            // so a partial native write must advance the source by the
+            // same byte count; once fewer than 4 bytes remain, consume
+            // the incomplete trailing sample so handleBuffer cannot stall.
+            int nextPos = Math.min(buffer.limit(), buffer.position() + written);
+            if (buffer.limit() - nextPos < 4) {
+                nextPos = buffer.limit();
+            }
+            buffer.position(nextPos);
+        } else {
+            buffer.position(buffer.position() + written);
+        }
     }
 
     /**
@@ -585,7 +597,7 @@ public final class AAudioAudioSink implements AudioSink {
         }
         if (pendingEditedOutput != null && pendingEditedInput != null) {
             try {
-                if (!handleBuffer(pendingEditedInput, basePositionUs, 1)) return;
+                if (!handleBuffer(pendingEditedInput, pendingEditedTimeUs, pendingEditedUnits)) return;
             } catch (InitializationException e) {
                 WriteException failure = new WriteException(-1, configuredFormat, true);
                 failure.initCause(e);
@@ -761,7 +773,7 @@ public final class AAudioAudioSink implements AudioSink {
             handle = 0L;
             try {
                 bridge.close(toClose);
-            } catch (UnsatisfiedLinkError e) {
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
                 Log.w(TAG, "nativeClose failed: " + e.getMessage());
             }
         }
