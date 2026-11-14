@@ -59,7 +59,7 @@
 | Feature Domain | Capabilities & Implementation Details | Key Files |
 | :--- | :--- | :--- |
 | **Audiophile Playback** | Bit-perfect playback, gapless playback, crossfade state machine, ReplayGain (EBU R128), A/B loop, dynamic silence skip, sleep timer with gradual volume fade, DoP/DSD decoder (up to DSD512 / 768 kHz), multichannel Channel Manager (2–8 ch trim/delay), MQA helper, and CUE sheet parsing. | `lib/data/audio/` |
-| **Native C++ DSP Engine** | 10-band graphic & arbitrary frequency EQ, 128-band parametric EQ, multichannel Channel Manager (2–8 channels, per-channel trim and delay), DSD512 decoder (to 768 kHz PCM), convolution reverb (IR files), lookahead peak limiter, multiband compressor, dynamic bass boost, loudness contour, sinc resampler, spatial panner, stereo widener, ViPER-DDC presets, and LiveProg JSFX scripting. | `android/app/src/main/cpp/`, `lib/features/player/cubit/controllers/` |
+| **Native C++ DSP Engine** | 10-band graphic & arbitrary frequency EQ, 64-band parametric EQ (`MAX_NATIVE_EQ_BANDS`), multichannel Channel Manager (2–8 channels, per-channel trim and delay), DSD512 decoder (to 768 kHz PCM), convolution reverb (IR files), lookahead peak limiter, 4-band multiband compressor, dynamic bass boost, loudness contour, spatial panner, stereo widener, ViPER-DDC presets, and LiveProg JSFX scripting. *(Sinc resampler is delegated/unsupported in `AudioEffectsPlugin`: `hasSincResampler = false`, enabling returns `DSP_UNSUPPORTED`.)* | `android/app/src/main/cpp/`, `lib/features/player/cubit/controllers/` |
 | **Local Music Library** | Complete MediaStore & filesystem scanner, metadata enrichment, embedded ID3 tag editor with artwork extraction, album/artist/genre/folder/year indexer, duplicate audio finder, and library statistics. | `lib/data/scanner/`, `lib/features/library/`, `lib/features/tag_editor/` |
 | **YouTube Music Integration** | InnerTube catalog search, stream pre-resolution, modern Rhino JS signature transform (`solveSig`) + `n`-throttling solver (`solveN`), authenticated `WEB` client fallback for age-restricted (+18) tracks, chunked background audio downloader with resumable storage, rate limiting, circuit breaker, OAuth / WebView session login, and geo-block recovery. | `lib/core/services/ytm_*`, `lib/core/services/yt_download_*`, `lib/features/ytm_search/` |
 | **Player Themes** | 10 distinct Now Playing designs: Clean (modern borderless), Vinyl Deck (spinning disc), Cassette Tape (custom animated spools), CD Player (reflective surface), Circle, Classic, Minimal, Card, Waveform, and Lyrics-focused. Custom Theme Builder included. | `lib/features/player/presentation/themes/` |
@@ -337,13 +337,14 @@ pulsr/
 - **`MultibandCompressor.cpp / .h`**: 4-band audio compressor with independent threshold, ratio, attack, and release parameters.
 - **`DynamicBass.cpp / .h` & `DynamicEQ.cpp / .h`**: Psychoacoustic bass enhancer and dynamic EQ adjusting curve based on listening volume.
 - **`LoudnessContour.cpp / .h`**: ISO 226 equal-loudness contour compensation for low-volume listening.
-- **`SincResampler.cpp / .h`**: Bandlimited Kaiser-windowed sinc interpolation resampler for sample rate conversions.
+- **`SincResampler.cpp / .h`**: Legacy sinc interpolation resampler (delegated/unsupported in `AudioEffectsPlugin`: `hasSincResampler = false`, enable requests return `DSP_UNSUPPORTED`).
 - **`SpatialPanner.cpp / .h` & `StereoWidth.cpp / .h`**: Binaural spatial audio panner and M/S matrix stereo width expansion.
 - **`ViperDdc.cpp / .h`**: Parser and convolver for ViPER4Android `.vdc` Device Dynamic Correction files.
 - **`LiveProg.cpp / .h`**: Embedded JSFX-compatible dynamic audio scripting engine.
 - **`DsdDecoder.cpp / .h`**: Converts 1-bit DSD (DSD64/DSD128/DSD256/DSD512) bitstreams into 24-bit/32-bit linear PCM.
 - **`ChannelManager.cpp / .h`**: Per-channel trim and delay for 2–8 channel layouts, running before the brickwall limiter.
 - **`aaudio_jni_bridge.cpp` & `eq_jni_bridge.cpp`**: JNI bridges binding C++ methods to Kotlin and Dart method channels.
+- **Native DSP Hard Limits & Unsupported Surface:** Parametric EQ max = 64 bands (`MAX_NATIVE_EQ_BANDS`), Dynamic EQ max = 8 bands (`MAX_DYNAMIC_EQ_BANDS`), Multiband Compressor = 4 bands (`MultibandCompressor::NUM_BANDS`), Channel Manager = 2–8 channels (`ChannelManager::MAX_CHANNELS`), Convolution Reverb IR <= 2,000,000 samples (`MAX_IR_SAMPLES`), DSD decode buffer <= 8 MB (`MAX_DSD_BUFFER_BYTES`), and custody verification window <= 4096 frames (`CustodyVerifier::kMaxFrames`). Sinc resampler is delegated/unsupported (`hasSincResampler = false`, enabling returns `DSP_UNSUPPORTED`).
 
 #### `server/pulsr_party/` (Go Real-Time Group Listening Server)
 - **`main.go`**: Entrypoint initializing the HTTP server and WebSocket upgrade endpoints (`/ws`).
