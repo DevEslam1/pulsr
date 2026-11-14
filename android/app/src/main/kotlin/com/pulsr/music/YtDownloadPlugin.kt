@@ -288,20 +288,26 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 val totalChunks = call.argument<Int>("totalChunks") ?: 1
                 val downloadedBytes = call.argument<Number>("downloadedBytes")?.toLong() ?: 0L
                 val totalBytes = call.argument<Number>("totalBytes")?.toLong() ?: 0L
-                if (videoId.isNotEmpty()) {
+                if (videoId.isEmpty()) {
+                    result.success(false)
+                    return
+                }
+                dispatchChunkIo(result) {
                     DownloadChunkStateStore.saveChunkProgress(
                         currentContext, videoId, chunkIndex, totalChunks, downloadedBytes, totalBytes
                     )
-                    result.success(true)
-                } else {
-                    result.success(false)
+                    true
                 }
             }
             "getPersistedChunkProgress" -> {
                 val videoId = call.argument<String>("videoId") ?: ""
-                if (videoId.isNotEmpty()) {
+                if (videoId.isEmpty()) {
+                    result.success(emptyList<Map<String, Any>>())
+                    return
+                }
+                dispatchChunkIo(result) {
                     val chunks = DownloadChunkStateStore.getAllChunksForVideo(currentContext, videoId)
-                    val list = chunks.map {
+                    chunks.map {
                         mapOf(
                             "videoId" to it.videoId,
                             "chunkIndex" to it.chunkIndex,
@@ -311,21 +317,40 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                             "updatedAt" to it.updatedAt,
                         )
                     }
-                    result.success(list)
-                } else {
-                    result.success(emptyList<Map<String, Any>>())
                 }
             }
             "clearPersistedChunkProgress" -> {
                 val videoId = call.argument<String>("videoId") ?: ""
-                if (videoId.isNotEmpty()) {
-                    DownloadChunkStateStore.clearChunksForVideo(currentContext, videoId)
-                    result.success(true)
-                } else {
+                if (videoId.isEmpty()) {
                     result.success(false)
+                    return
+                }
+                dispatchChunkIo(result) {
+                    DownloadChunkStateStore.clearChunksForVideo(currentContext, videoId)
+                    true
                 }
             }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun <T> dispatchChunkIo(
+        result: MethodChannel.Result,
+        work: () -> T,
+    ) {
+        try {
+            ensureExecutor().execute {
+                try {
+                    val value = work()
+                    mainHandler.post { result.success(value) }
+                } catch (e: Exception) {
+                    mainHandler.post {
+                        result.error("CHUNK_IO_FAILED", e.localizedMessage ?: "Unknown error", null)
+                    }
+                }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            result.error("PLUGIN_DISPOSED", "Download plugin is shutting down", null)
         }
     }
 
