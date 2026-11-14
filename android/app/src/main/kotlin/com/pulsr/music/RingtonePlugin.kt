@@ -135,8 +135,12 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                             var sourceMime: String? = null
                             val file: File? = if (filePath.startsWith("content:")) {
                                 val uri = Uri.parse(filePath)
-                                displayName = AudioTempFiles.displayName(currentContext, uri)
-                                sourceMime = currentContext.contentResolver.getType(uri)
+                                displayName = runCatching {
+                                    AudioTempFiles.displayName(currentContext, uri)
+                                }.getOrNull()
+                                sourceMime = runCatching {
+                                    currentContext.contentResolver.getType(uri)
+                                }.getOrNull()
                                 tempFile = AudioTempFiles.copyToTempFile(currentContext, uri, "ringtone_")
                                 tempFile
                             } else {
@@ -154,35 +158,24 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                             )
                             val mime = normalizeMime(sourceMime, name)
 
-                            val contentUri = try {
-                                getAudioContentUri(currentContext, file, ringtoneType, name, mime)
-                            } catch (e: Exception) {
-                                mainHandler.post {
-                                    result.error(
-                                        "SET_RINGTONE_FAILED",
-                                        e.localizedMessage ?: "Unknown error",
-                                        e.stackTraceToString()
-                                    )
-                                }
-                                return@execute
-                            }
+                            val contentUri = getAudioContentUri(
+                                currentContext, file, ringtoneType, name, mime
+                            )
                             if (contentUri == null) {
                                 mainHandler.post {
                                     result.error("URI_ERROR", "Failed to resolve MediaStore Uri for file", null)
                                 }
                                 return@execute
                             }
-                            try {
-                                RingtoneManager.setActualDefaultRingtoneUri(currentContext, ringtoneType, contentUri)
-                                mainHandler.post { result.success(true) }
-                            } catch (e: Exception) {
-                                mainHandler.post {
-                                    result.error(
-                                        "SET_RINGTONE_FAILED",
-                                        e.localizedMessage ?: "Unknown error",
-                                        e.stackTraceToString()
-                                    )
-                                }
+                            RingtoneManager.setActualDefaultRingtoneUri(currentContext, ringtoneType, contentUri)
+                            mainHandler.post { result.success(true) }
+                        } catch (e: Exception) {
+                            mainHandler.post {
+                                result.error(
+                                    "SET_RINGTONE_FAILED",
+                                    e.localizedMessage ?: "Unknown error",
+                                    e.stackTraceToString()
+                                )
                             }
                         } finally {
                             tempFile?.let { runCatching { it.delete() } }
