@@ -694,4 +694,112 @@ public class PulsrAudioSinkTest {
         assertEquals(java.util.Arrays.asList(true, false, true), factory.requestedAaudio);
         sink.release();
     }
+
+    @Test
+    public void aaudioAndFloatConfigureFailuresFallBackToWorkingDefaultInner() throws Exception {
+        final Flag aaudio = new Flag(true);
+        final Flag floatMode = new Flag(true);
+        final Fallbacks fallbacks = new Fallbacks(aaudio, floatMode);
+        final Factory factory = new Factory();
+        final AudioSink aaudioSink = mock(AudioSink.class);
+        final AudioSink floatSink = mock(AudioSink.class);
+        final AudioSink defaultSink = mock(AudioSink.class);
+        doThrow(new AudioSink.ConfigurationException("aaudio refused", FORMAT))
+                .when(aaudioSink).configure(any(Format.class), anyInt(), any());
+        doThrow(new AudioSink.ConfigurationException("float refused", FORMAT))
+                .when(floatSink).configure(any(Format.class), anyInt(), any());
+        when(defaultSink.handleBuffer(any(), anyLong(), anyInt())).thenReturn(true);
+        factory.queue.add(holder(aaudioSink));
+        factory.queue.add(holder(floatSink));
+        factory.queue.add(holder(defaultSink));
+
+        final PulsrAudioSink sink = newSink(aaudio, floatMode, fallbacks, factory);
+        sink.configure(FORMAT, 0, null);
+
+        assertFalse(aaudio.value);
+        assertFalse(floatMode.value);
+        assertEquals(1, fallbacks.aaudioRejected);
+        assertEquals(1, fallbacks.floatRejected);
+        verify(aaudioSink).release();
+        verify(floatSink).release();
+        verify(defaultSink).configure(FORMAT, 0, null);
+        assertTrue(sink.handleBuffer(ByteBuffer.allocateDirect(16), 0L, 1));
+        sink.release();
+    }
+
+    @Test
+    public void enteringSharedAaudioKeepsOldInnerAliveUntilCandidateConfigured() throws Exception {
+        final Flag aaudio = new Flag(false);
+        final Flag floatMode = new Flag(false);
+        final Flag preferExclusive = new Flag(false);
+        final Fallbacks fallbacks = new Fallbacks(aaudio, floatMode);
+        final Factory factory = new Factory();
+        final AudioSink defaultSink = mock(AudioSink.class);
+        final AudioSink aaudioSink = mock(AudioSink.class);
+        factory.queue.add(holder(defaultSink));
+        final PulsrAudioSink sink = new PulsrAudioSink(
+                RuntimeEnvironment.getApplication(),
+                aaudio,
+                preferExclusive,
+                new IntValue(150),
+                floatMode,
+                () -> null,
+                processor -> {},
+                fallbacks,
+                factory);
+        sink.configure(FORMAT, 0, null);
+
+        aaudio.value = true;
+        factory.queue.add(holder(aaudioSink));
+        sink.applyPendingMode(false);
+
+        final org.mockito.InOrder order = org.mockito.Mockito.inOrder(aaudioSink, defaultSink);
+        order.verify(aaudioSink).configure(FORMAT, 0, null);
+        order.verify(defaultSink).release();
+        sink.release();
+    }
+
+    @Test
+    public void leavingAaudioWithInternalSwapRunsLastResortDefaultWhenEarlierAttemptsFail()
+            throws Exception {
+        final Flag aaudio = new Flag(true);
+        final Flag floatMode = new Flag(false);
+        final Fallbacks fallbacks = new Fallbacks(aaudio, floatMode);
+        final Factory factory = new Factory();
+        final AudioSink aaudioSink = mock(AudioSink.class);
+        final AudioSink failedDefault = mock(AudioSink.class);
+        final AudioSink lastResortDefault = mock(AudioSink.class);
+        doThrow(new AudioSink.ConfigurationException("first default failed", FORMAT))
+                .when(failedDefault).configure(any(Format.class), anyInt(), any());
+        when(lastResortDefault.handleBuffer(any(), anyLong(), anyInt())).thenReturn(true);
+        factory.queue.add(holder(aaudioSink));
+        final PulsrAudioSink sink = newSink(aaudio, floatMode, fallbacks, factory);
+        sink.configure(FORMAT, 0, null);
+
+        aaudio.value = false;
+        factory.queue.add(holder(failedDefault));
+        factory.queue.add(holder(lastResortDefault));
+        sink.applyPendingMode(false);
+
+        verify(aaudioSink).release();
+        verify(failedDefault).release();
+        verify(lastResortDefault).configure(FORMAT, 0, null);
+        assertTrue(sink.handleBuffer(ByteBuffer.allocateDirect(16), 0L, 1));
+        sink.release();
+    }
+
+    @Test
+    public void handleBufferBeforeConfigureThrowsInitializationException() throws Exception {
+        final Flag aaudio = new Flag(false);
+        final Flag floatMode = new Flag(false);
+        final PulsrAudioSink sink = newSink(aaudio, floatMode,
+                new Fallbacks(aaudio, floatMode), new Factory());
+        try {
+            sink.handleBuffer(ByteBuffer.allocateDirect(16), 0L, 1);
+            org.junit.Assert.fail("Expected AudioSink.InitializationException");
+        } catch (AudioSink.InitializationException expected) {
+            assertTrue(expected.getMessage().contains("configure()"));
+        }
+        sink.release();
+    }
 }

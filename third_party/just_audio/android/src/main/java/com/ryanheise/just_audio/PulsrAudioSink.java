@@ -315,7 +315,9 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     public boolean handleBuffer(ByteBuffer buffer, long presentationTimeUs,
             int encodedAccessUnitCount) throws InitializationException, WriteException {
         if (inner == null) {
-            throw new IllegalStateException("configure() has not been called");
+            final Format fmt = format != null ? format : new Format.Builder().build();
+            throw new InitializationException(
+                    "configure() has not been called", 0, fmt, false, null);
         }
         try {
             boolean consumed = inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
@@ -553,12 +555,13 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         final Inner continuing = sameStream ? previous : null;
         if (previous != null && previous.processor != null) continuousState = previous.processor;
         // An active exclusive AAudio stream blocks opening another one (and a
-        // shared AudioTrack while it runs). When either side of the transition
-        // is AAudio, stop the old backend first; the fallback chain below still
-        // guarantees a DefaultAudioSink if the new backend is refused. The
-        // Default <-> Float transition keeps the old sink alive until the new
-        // one is configured, so a failed swap can fall back without a gap.
-        if (currentInner != null && (mode == Mode.AAUDIO || desired == Mode.AAUDIO)) {
+        // shared AudioTrack while it runs). Release-first is only required when
+        // leaving AAUDIO or entering AAUDIO with preferExclusive; in shared mode
+        // or Default <-> Float transitions keep the old sink alive until the
+        // candidate is configured so a failed swap can fall back without a gap.
+        final boolean leavingAaudio = (mode == Mode.AAUDIO);
+        final boolean enteringAaudioExclusive = (desired == Mode.AAUDIO && preferExclusive.get());
+        if (currentInner != null && (leavingAaudio || enteringAaudioExclusive)) {
             final Inner old = currentInner;
             currentInner = null;
             inner = null;
@@ -567,10 +570,12 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             releaseInner(old);
         }
         Mode appliedMode = desired;
-        Inner candidate;
+        Inner candidate = null;
+        Exception lastFailure = null;
         try {
             candidate = createConfigured(appliedMode, continuing);
         } catch (ConfigurationException | RuntimeException first) {
+            lastFailure = first;
             if (desired == Mode.AAUDIO) {
                 // The fallback listener flips the player's AAudio preference;
                 // then honour the still-requested float/16-bit mode.
@@ -584,27 +589,35 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                 // sink instead of failing playback.
                 notifyFloatRejected("configure_failed", first);
                 appliedMode = Mode.DEFAULT;
-            } else {
-                failSwap(first, internal);
-                return;
             }
-            try {
-                candidate = createConfigured(appliedMode, continuing);
-            } catch (ConfigurationException | RuntimeException second) {
-                if (appliedMode == Mode.FLOAT) {
-                    notifyFloatRejected("configure_failed", second);
-                    appliedMode = Mode.DEFAULT;
-                    try {
-                        candidate = createConfigured(appliedMode, continuing);
-                    } catch (ConfigurationException | RuntimeException third) {
-                        failSwap(third, internal);
-                        return;
+            if (appliedMode != desired) {
+                try {
+                    candidate = createConfigured(appliedMode, continuing);
+                } catch (ConfigurationException | RuntimeException second) {
+                    lastFailure = second;
+                    if (appliedMode == Mode.FLOAT) {
+                        notifyFloatRejected("configure_failed", second);
+                        appliedMode = Mode.DEFAULT;
+                        try {
+                            candidate = createConfigured(appliedMode, continuing);
+                        } catch (ConfigurationException | RuntimeException third) {
+                            lastFailure = third;
+                        }
                     }
-                } else {
-                    failSwap(second, internal);
-                    return;
                 }
             }
+        }
+        if (candidate == null && internal && currentInner == null) {
+            try {
+                candidate = createConfigured(Mode.DEFAULT, null);
+                appliedMode = Mode.DEFAULT;
+            } catch (ConfigurationException | RuntimeException lastResortFailure) {
+                lastFailure = lastResortFailure;
+            }
+        }
+        if (candidate == null) {
+            failSwap(lastFailure, internal);
+            return;
         }
 
         final Inner old = currentInner;
