@@ -29,6 +29,7 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/ringtone"
+        private const val MAX_RINGTONE_BYTES = 100L * 1024 * 1024
 
         private fun newExecutor(): java.util.concurrent.ExecutorService =
             java.util.concurrent.Executors.newSingleThreadExecutor { r ->
@@ -141,7 +142,12 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                                 sourceMime = runCatching {
                                     currentContext.contentResolver.getType(uri)
                                 }.getOrNull()
-                                tempFile = AudioTempFiles.copyToTempFile(currentContext, uri, "ringtone_")
+                                tempFile = AudioTempFiles.copyToTempFile(
+                                    currentContext,
+                                    uri,
+                                    "ringtone_",
+                                    maxBytes = MAX_RINGTONE_BYTES,
+                                )
                                 tempFile
                             } else {
                                 File(filePath)
@@ -169,6 +175,14 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                             }
                             RingtoneManager.setActualDefaultRingtoneUri(currentContext, ringtoneType, contentUri)
                             mainHandler.post { result.success(true) }
+                        } catch (e: AudioTempFiles.TempFileSizeLimitException) {
+                            mainHandler.post {
+                                result.error(
+                                    "FILE_TOO_LARGE",
+                                    "Audio file exceeds maximum ringtone size (100 MB)",
+                                    null
+                                )
+                            }
                         } catch (e: Exception) {
                             mainHandler.post {
                                 result.error(

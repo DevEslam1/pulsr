@@ -14,6 +14,9 @@ import java.io.InputStream
  * provider's display name, its MIME type, or the bytes themselves.
  */
 object AudioTempFiles {
+    class TempFileSizeLimitException(val maxBytes: Long) :
+        IOException("Source exceeds maxBytes ($maxBytes)")
+
     private val MIME_TO_EXTENSION = mapOf(
         "audio/mpeg" to ".mp3",
         "audio/mp3" to ".mp3",
@@ -170,7 +173,7 @@ object AudioTempFiles {
             remaining -= n
         }
         if (throwOnOverflow && remaining == 0L && input.read() != -1) {
-            throw IOException("Source exceeds maxBytes ($maxBytes)")
+            throw TempFileSizeLimitException(maxBytes)
         }
     }
 }

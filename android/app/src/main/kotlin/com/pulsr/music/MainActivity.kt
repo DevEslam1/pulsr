@@ -380,10 +380,24 @@ class MainActivity : AudioServiceActivity() {
                             lyrics = readFrom(tempFile)
                             if (lyrics.isNullOrBlank() && truncated) {
                                 runCatching { tempFile.delete() }
-                                tempFile = AudioTempFiles.copyToTempFile(
-                                    applicationContext, uri, "lyrics_full_"
+                                val fallbackCap = 256L * 1024 * 1024
+                                val fullTemp = AudioTempFiles.copyToTempFile(
+                                    applicationContext,
+                                    uri,
+                                    "lyrics_full_",
+                                    maxBytes = fallbackCap,
+                                    throwOnOverflow = false,
                                 )
-                                lyrics = readFrom(tempFile)
+                                tempFile = fullTemp
+                                if (fullTemp.length() >= fallbackCap) {
+                                    Log.w(
+                                        "MainActivity",
+                                        "Skipping embedded lyrics fallback for oversized content URI (>= 256 MB)",
+                                    )
+                                    lyrics = null
+                                } else {
+                                    lyrics = readFrom(fullTemp)
+                                }
                             }
                         } else {
                             val file = File(filePath)
