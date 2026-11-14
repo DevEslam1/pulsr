@@ -16,12 +16,10 @@ object EgressSignals {
     @Volatile
     private var legacyListener: ((String) -> Unit)? = null
 
+    private val dispatchNotifier: (String) -> Unit = ::notify
+
     var onEgressChanged: ((String) -> Unit)?
-        get() = if (legacyListener != null || listeners.isNotEmpty()) {
-            { egressId: String -> notify(egressId) }
-        } else {
-            null
-        }
+        get() = if (legacyListener != null || listeners.isNotEmpty()) dispatchNotifier else null
         set(value) {
             legacyListener = value
         }

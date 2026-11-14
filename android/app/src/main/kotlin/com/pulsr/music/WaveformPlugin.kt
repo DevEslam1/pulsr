@@ -33,6 +33,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
 
     @Volatile
     private var backgroundExecutor: ExecutorService = newExecutor()
+    private val executorLock = Any()
 
     private val activeDecodes = java.util.concurrent.ConcurrentHashMap<String, AtomicBoolean>()
 
@@ -84,7 +85,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
     private fun ensureExecutor(): ExecutorService {
         val current = backgroundExecutor
         if (!current.isShutdown) return current
-        synchronized(this) {
+        synchronized(executorLock) {
             if (backgroundExecutor.isShutdown) {
                 backgroundExecutor = newExecutor()
             }

@@ -192,18 +192,22 @@ object CellularFailoverHelper {
         caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
     }.getOrDefault(false)
 
+    private data class AcquiredCellularConnection(
+        val connection: HttpURLConnection,
+        val unregister: () -> Unit,
+    )
+
     /**
-     * Executes an HTTP request strictly routed over the cellular network.
-     * Optionally accepts an [onCloseRef] to receive a callback that unregisters
-     * the network callback once the caller finishes streaming data.
+     * Shared cellular network request/await/callback acquisition used by both
+     * [openCellularConnection] and [withCellularConnection]. Returns null after
+     * unregistering on timeout, interruption, or connection open failure.
      */
-    @WorkerThread
-    fun openCellularConnection(
+    private fun acquireCellularConnection(
         context: Context,
         targetUrl: String,
-        timeoutMs: Int = 10000,
-        onCloseRef: AtomicReference<(() -> Unit)?>? = null
-    ): HttpURLConnection? {
+        timeoutMs: Int,
+        failureLogPrefix: String,
+    ): AcquiredCellularConnection? {
         val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return null
         val latch = CountDownLatch(1)
         val selectedNetwork = AtomicReference<Network?>(null)
@@ -224,49 +228,64 @@ object CellularFailoverHelper {
             }
         }
 
-        var unregisterNeeded = true
+        val isUnregistered = AtomicBoolean(false)
+        val unregisterAction: () -> Unit = {
+            if (isUnregistered.compareAndSet(false, true)) {
+                runCatching { cm.unregisterNetworkCallback(callback) }
+            }
+        }
+
         return try {
             cm.requestNetwork(request, callback, timeoutMs)
             try {
                 latch.await(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
+                unregisterAction()
                 return null
             }
-            val net = selectedNetwork.get()
-            if (net != null) {
-                val url = URL(targetUrl)
-                val conn = net.openConnection(url) as? HttpURLConnection
-                if (conn != null) {
-                    val isUnregistered = AtomicBoolean(false)
-                    val unregisterAction: () -> Unit = {
-                        if (isUnregistered.compareAndSet(false, true)) {
-                            runCatching { cm.unregisterNetworkCallback(callback) }
-                        }
-                    }
-                    unregisterNeeded = false
-                    if (onCloseRef != null) {
-                        onCloseRef.set(unregisterAction)
-                        conn
-                    } else {
-                        // No lifecycle ref: tie the callback release to the
-                        // connection itself. A 10 s timer could unregister
-                        // while a slow response body is still being read.
-                        UnregisterOnDisconnectConnection(conn, unregisterAction)
-                    }
-                } else {
-                    null
-                }
-            } else {
-                null
+            val net = selectedNetwork.get() ?: run {
+                unregisterAction()
+                return null
             }
+            val conn = net.openConnection(URL(targetUrl)) as? HttpURLConnection ?: run {
+                unregisterAction()
+                return null
+            }
+            AcquiredCellularConnection(conn, unregisterAction)
         } catch (e: Throwable) {
-            Log.w(TAG, "Cellular network request failed: ${e.message}")
+            unregisterAction()
+            Log.w(TAG, "$failureLogPrefix: ${e.message}")
             null
-        } finally {
-            if (unregisterNeeded) {
-                runCatching { cm.unregisterNetworkCallback(callback) }
-            }
+        }
+    }
+
+    /**
+     * Executes an HTTP request strictly routed over the cellular network.
+     * Optionally accepts an [onCloseRef] to receive a callback that unregisters
+     * the network callback once the caller finishes streaming data.
+     */
+    @WorkerThread
+    fun openCellularConnection(
+        context: Context,
+        targetUrl: String,
+        timeoutMs: Int = 10000,
+        onCloseRef: AtomicReference<(() -> Unit)?>? = null
+    ): HttpURLConnection? {
+        val acquired = acquireCellularConnection(
+            context = context,
+            targetUrl = targetUrl,
+            timeoutMs = timeoutMs,
+            failureLogPrefix = "Cellular network request failed",
+        ) ?: return null
+        return if (onCloseRef != null) {
+            onCloseRef.set(acquired.unregister)
+            acquired.connection
+        } else {
+            // No lifecycle ref: tie the callback release to the
+            // connection itself. A 10 s timer could unregister
+            // while a slow response body is still being read.
+            UnregisterOnDisconnectConnection(acquired.connection, acquired.unregister)
         }
     }
 
@@ -280,47 +299,20 @@ object CellularFailoverHelper {
         timeoutMs: Int = 10000,
         block: (HttpURLConnection) -> T
     ): T? {
-        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return null
-        val latch = CountDownLatch(1)
-        val selectedNetwork = AtomicReference<Network?>(null)
-
-        val request = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                selectedNetwork.set(network)
-                latch.countDown()
-            }
-
-            override fun onUnavailable() {
-                latch.countDown()
-            }
-        }
-
+        val acquired = acquireCellularConnection(
+            context = context,
+            targetUrl = targetUrl,
+            timeoutMs = timeoutMs,
+            failureLogPrefix = "Cellular scoped connection failed",
+        ) ?: return null
         return try {
-            cm.requestNetwork(request, callback, timeoutMs)
-            try {
-                latch.await(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                return null
-            }
-            val net = selectedNetwork.get() ?: return null
-            val url = URL(targetUrl)
-            val conn = net.openConnection(url) as? HttpURLConnection ?: return null
-            try {
-                block(conn)
-            } finally {
-                conn.disconnect()
-            }
+            block(acquired.connection)
         } catch (e: Throwable) {
             Log.w(TAG, "Cellular scoped connection failed: ${e.message}")
             null
         } finally {
-            runCatching { cm.unregisterNetworkCallback(callback) }
+            runCatching { acquired.connection.disconnect() }
+            acquired.unregister()
         }
     }
 }

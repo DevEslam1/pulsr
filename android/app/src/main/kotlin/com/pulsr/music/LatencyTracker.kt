@@ -76,12 +76,15 @@ object LatencyTracker {
      */
     fun getPercentile(percentile: Double): Long {
         synchronized(lock) {
-            if (samples.isEmpty()) return 0L
-            val sorted = samples.sorted()
-            val index = ceil((percentile / 100.0) * sorted.size).toInt() - 1
-            val clampedIndex = index.coerceIn(0, sorted.size - 1)
-            return sorted[clampedIndex]
+            return percentileFromSorted(samples.sorted(), percentile)
         }
+    }
+
+    private fun percentileFromSorted(sorted: List<Long>, percentile: Double): Long {
+        if (sorted.isEmpty()) return 0L
+        val index = ceil((percentile / 100.0) * sorted.size).toInt() - 1
+        val clampedIndex = index.coerceIn(0, sorted.size - 1)
+        return sorted[clampedIndex]
     }
 
     val sampleCount: Int
@@ -107,8 +110,8 @@ object LatencyTracker {
                 )
             }
             val sorted = samples.sorted()
-            val p50 = getP50()
-            val p95 = getP95()
+            val p50 = percentileFromSorted(sorted, 50.0)
+            val p95 = percentileFromSorted(sorted, 95.0)
             return mapOf(
                 "count" to count,
                 "p50Ms" to p50,

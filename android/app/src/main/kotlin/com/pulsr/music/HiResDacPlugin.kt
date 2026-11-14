@@ -1060,7 +1060,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 } else if (targetCodecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC) {
                     current.codecSpecific1.toLong()
                 } else {
-                    BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT.toLong()
+                    0L
                 }
 
                 val newConfig = BluetoothCodecConfig.Builder()

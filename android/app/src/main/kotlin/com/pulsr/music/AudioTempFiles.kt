@@ -150,6 +150,7 @@ object AudioTempFiles {
         if (ascii(0, 3) == "ID3") return ".mp3"
         if (len >= 2 && h[0] == 0xFF.toByte() &&
             (h[1].toInt() and 0xE0) == 0xE0 &&
+            (h[1].toInt() and 0x18) != 0x08 &&
             (h[1].toInt() and 0x06) != 0
         ) {
             return ".mp3"
