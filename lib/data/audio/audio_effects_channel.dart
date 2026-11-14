@@ -1,5 +1,6 @@
 // lib/data/audio/audio_effects_channel.dart
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
@@ -501,6 +502,29 @@ class AudioEffectsChannel {
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to set DVC gain ($gainLinear)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  /// Pushes linear attenuation [0.0..1.0] for the Direct USB software fallback
+  /// path when DAC hardware volume is unavailable or disabled. Unity (1.0)
+  /// keeps PCM/DoP bit-exact.
+  Future<bool> setDirectUsbVolume(double gainLinear) async {
+    if (!_isAndroid) return false;
+    if (!gainLinear.isFinite) return false;
+    try {
+      final bool? applied = await _channel.invokeMethod<bool>(
+        'setDirectUsbVolume',
+        {'gain': gainLinear.clamp(0.0, 1.0)},
+      ).timeout(const Duration(seconds: 3));
+      return applied ?? false;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set Direct USB volume ($gainLinear)',
         error: e,
         stackTrace: st,
         category: 'AudioEffectsChannel',
@@ -1129,10 +1153,13 @@ class AudioEffectsChannel {
       return false;
     }
     try {
+      final Float64List payload = irSamples is Float64List
+          ? irSamples
+          : Float64List.fromList(irSamples);
       final bool? result = await _channel.invokeMethod<bool>(
         'loadImpulseResponse',
         {
-          'irSamples': irSamples,
+          'irSamples': payload,
           'channels': 1, // FIX C-1: ir_file_parser.dart always outputs mono
         },
       ).timeout(const Duration(seconds: 10)); // large payload
@@ -1651,8 +1678,7 @@ class AudioEffectsChannel {
       const int maxChunkBytes =
           64 * 1024; // 64 KB chunking prevents UI thread stalls
       if (totalBytes <= maxChunkBytes) {
-        final List<dynamic>? res =
-            await _channel.invokeListMethod<dynamic>('decodeDsd', {
+        final dynamic res = await _channel.invokeMethod<dynamic>('decodeDsd', {
           'dsdL': dsdL,
           'dsdR': dsdR,
           'byteCount': totalBytes,
@@ -1660,14 +1686,19 @@ class AudioEffectsChannel {
           'targetSampleRate': targetSampleRate,
           'bitOrder': bitOrder,
         }).timeout(const Duration(seconds: 10));
-        if (res != null) {
+        if (res is Float32List) return res;
+        if (res is List) {
           return res.map((e) => (e as num).toDouble()).toList();
         }
         return null;
       }
 
-      // Chunked decoding
-      final List<double> resultPcm = <double>[];
+      // Chunked decoding — accumulate typed Float32List slices directly when
+      // native returns them, falling back to boxed doubles only for legacy
+      // mock handlers that return List<dynamic>.
+      final List<Float32List> typedChunks = <Float32List>[];
+      int totalTypedSamples = 0;
+      List<double>? legacyPcm;
       int offset = 0;
       while (offset < totalBytes) {
         final int chunkSize = (totalBytes - offset).clamp(0, maxChunkBytes);
@@ -1676,8 +1707,7 @@ class AudioEffectsChannel {
         final Uint8List chunkR =
             Uint8List.sublistView(dsdR, offset, offset + chunkSize);
 
-        final List<dynamic>? res =
-            await _channel.invokeListMethod<dynamic>('decodeDsd', {
+        final dynamic res = await _channel.invokeMethod<dynamic>('decodeDsd', {
           'dsdL': chunkL,
           'dsdR': chunkR,
           'byteCount': chunkSize,
@@ -1686,13 +1716,37 @@ class AudioEffectsChannel {
           'bitOrder': bitOrder,
         }).timeout(const Duration(seconds: 10));
 
-        if (res == null) return null;
-        for (final dynamic sample in res) {
-          resultPcm.add((sample as num).toDouble());
+        if (res is Float32List) {
+          if (legacyPcm != null) {
+            legacyPcm.addAll(res);
+          } else {
+            typedChunks.add(res);
+            totalTypedSamples += res.length;
+          }
+        } else if (res is List) {
+          if (legacyPcm == null) {
+            legacyPcm = <double>[];
+            for (final Float32List chunk in typedChunks) {
+              legacyPcm.addAll(chunk);
+            }
+            typedChunks.clear();
+          }
+          for (final dynamic sample in res) {
+            legacyPcm.add((sample as num).toDouble());
+          }
+        } else {
+          return null;
         }
         offset += chunkSize;
       }
-      return resultPcm;
+      if (legacyPcm != null) return legacyPcm;
+      final Float32List merged = Float32List(totalTypedSamples);
+      int writeOffset = 0;
+      for (final Float32List chunk in typedChunks) {
+        merged.setRange(writeOffset, writeOffset + chunk.length, chunk);
+        writeOffset += chunk.length;
+      }
+      return merged;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to decode DSD stream',

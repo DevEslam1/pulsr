@@ -38,6 +38,8 @@ class MainActivity : AudioServiceActivity() {
     }
     private var fileOpenerChannel: MethodChannel? = null
     private var lyricsChannel: MethodChannel? = null
+    private var purityChannel: MethodChannel? = null
+    private var batteryChannel: MethodChannel? = null
     private var updaterChannel: MethodChannel? = null
     private var playbackTileChannel: MethodChannel? = null
     @Volatile private var activityChannelsBound = false
@@ -181,7 +183,22 @@ class MainActivity : AudioServiceActivity() {
                     @Suppress("DEPRECATION")
                     intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
                 }
-                val list = rawList?.filter { isSafeUri(it) }
+                val list = rawList?.filter { u ->
+                    if (!isSafeUri(u)) return@filter false
+                    val mime = if (u.scheme?.equals("content", ignoreCase = true) == true) {
+                        runCatching { contentResolver.getType(u) }.getOrNull() ?: intent.type
+                    } else {
+                        intent.type
+                    }
+                    AudioIntentClassifier.isAudioIntentParts(
+                        action = intent.action,
+                        scheme = u.scheme,
+                        path = u.path,
+                        host = u.host,
+                        mimeType = mime,
+                        textExtra = null,
+                    )
+                }
                 if (!list.isNullOrEmpty()) {
                     if (fromColdStart || fileOpenerChannel == null) {
                         for (u in list) addPendingAudioUri(u.toString())
@@ -247,13 +264,22 @@ class MainActivity : AudioServiceActivity() {
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
         fileChannel.setMethodCallHandler { call, result ->
-            if (call.method == "getInitialAudioUri") {
-                val uri = synchronized(pendingAudioUris) {
-                    pendingAudioUris.removeFirstOrNull()
+            when (call.method) {
+                "getInitialAudioUri" -> {
+                    val uri = synchronized(pendingAudioUris) {
+                        pendingAudioUris.removeFirstOrNull()
+                    }
+                    result.success(uri)
                 }
-                result.success(uri)
-            } else {
-                result.notImplemented()
+                "getInitialAudioUris" -> {
+                    val uris = synchronized(pendingAudioUris) {
+                        val copy = pendingAudioUris.toList()
+                        pendingAudioUris.clear()
+                        copy
+                    }
+                    result.success(uris)
+                }
+                else -> result.notImplemented()
             }
         }
  
@@ -343,7 +369,11 @@ class MainActivity : AudioServiceActivity() {
                             // 16 MB is enough for almost every file. Only fall
                             // back to a full copy when parsing the head failed.
                             tempFile = AudioTempFiles.copyToTempFile(
-                                applicationContext, uri, "lyrics_", cap
+                                applicationContext,
+                                uri,
+                                "lyrics_",
+                                cap,
+                                throwOnOverflow = false,
                             )
                             val truncated = tempFile.length() >= cap
                             lyrics = readFrom(tempFile)
@@ -374,8 +404,9 @@ class MainActivity : AudioServiceActivity() {
         // Pulsr Pure runtime guarantee: report whether the merged manifest
         // actually carries the INTERNET permission, so the Dart layer can
         // detect a bad manifest merge that would silently add network access.
-        val purityChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/purity")
-        purityChannel.setMethodCallHandler { call, result ->
+        val purityChan = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/purity")
+        purityChannel = purityChan
+        purityChan.setMethodCallHandler { call, result ->
             when (call.method) {
                 "hasInternetPermission" -> {
                     val granted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -392,8 +423,9 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
-        val batteryChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/battery_optimization")
-        batteryChannel.setMethodCallHandler { call, result ->
+        val batteryChan = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/battery_optimization")
+        batteryChannel = batteryChan
+        batteryChan.setMethodCallHandler { call, result ->
             when (call.method) {
                 "isIgnoringBatteryOptimizations" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -558,6 +590,10 @@ class MainActivity : AudioServiceActivity() {
         updaterChannel = null
         playbackTileChannel?.setMethodCallHandler(null)
         playbackTileChannel = null
+        purityChannel?.setMethodCallHandler(null)
+        purityChannel = null
+        batteryChannel?.setMethodCallHandler(null)
+        batteryChannel = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)

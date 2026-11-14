@@ -22,25 +22,43 @@ import java.io.FileInputStream
 class RingtonePlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var context: Context? = null
-    private val executor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-        Thread(r, "PulsrRingtone")
-    }
+    @Volatile
+    private var executor: java.util.concurrent.ExecutorService = newExecutor()
+    private val executorLock = Any()
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/ringtone"
 
+        private fun newExecutor(): java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+                Thread(r, "PulsrRingtone").apply { isDaemon = true }
+            }
+
         fun registerWith(flutterEngine: FlutterEngine, context: Context): RingtonePlugin {
             val plugin = RingtonePlugin()
             plugin.context = context
+            plugin.ensureExecutor()
             plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel.setMethodCallHandler(plugin)
             return plugin
         }
     }
 
+    private fun ensureExecutor(): java.util.concurrent.ExecutorService {
+        val current = executor
+        if (!current.isShutdown) return current
+        synchronized(executorLock) {
+            if (executor.isShutdown) {
+                executor = newExecutor()
+            }
+            return executor
+        }
+    }
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
+        ensureExecutor()
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
     }
@@ -110,7 +128,7 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                 // Copy + MediaStore insert are full-file disk operations; they
                 // must not run on the platform thread.
                 try {
-                    executor.execute {
+                    ensureExecutor().execute {
                         var tempFile: File? = null
                         try {
                             var displayName: String? = null

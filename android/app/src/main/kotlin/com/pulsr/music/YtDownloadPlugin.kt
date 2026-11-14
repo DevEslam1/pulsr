@@ -29,7 +29,29 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
 
     private lateinit var channel: MethodChannel
     private var context: Context? = null
-    private val saveExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val executorLock = Any()
+    @Volatile
+    private var saveExecutor: java.util.concurrent.ExecutorService? = null
+
+    private val cancelledListener: (String) -> Unit = { videoId ->
+        invokeOnChannel("onDownloadCancelled", mapOf("videoId" to videoId))
+    }
+    private val pausedListener: (String) -> Unit = { videoId ->
+        invokeOnChannel("onDownloadPaused", mapOf("videoId" to videoId))
+    }
+    private val resumedListener: (String) -> Unit = { videoId ->
+        invokeOnChannel("onDownloadResumed", mapOf("videoId" to videoId))
+    }
+    private val completedListener: (String) -> Unit = { videoId ->
+        invokeOnChannel("onDownloadCompleted", mapOf("videoId" to videoId))
+    }
+    private val degradedListener: (String) -> Unit = { stage ->
+        invokeOnChannel("onDownloadServiceDegraded", mapOf("stage" to stage))
+    }
+
+    init {
+        installDownloadCallbacks()
+    }
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/yt_download"
@@ -41,18 +63,29 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             plugin.context = context
             plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel.setMethodCallHandler(plugin)
+            plugin.ensureExecutor()
             plugin.installDownloadCallbacks()
             return plugin
         }
     }
 
+    private fun ensureExecutor(): java.util.concurrent.ExecutorService = synchronized(executorLock) {
+        val current = saveExecutor
+        if (current != null && !current.isShutdown && !current.isTerminated) {
+            current
+        } else {
+            java.util.concurrent.Executors.newSingleThreadExecutor().also { saveExecutor = it }
+        }
+    }
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        // registerWith() already bound this plugin for the cached audio_service
-        // engine; a second registration would duplicate the channel handler.
-        if (::channel.isInitialized) return
+        if (::channel.isInitialized) {
+            channel.setMethodCallHandler(null)
+        }
         context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
+        ensureExecutor()
         installDownloadCallbacks()
     }
 
@@ -61,28 +94,15 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     /**
-     * Wires the DownloadService's process-global callbacks to this plugin's
-     * channel. Called on engine attach and again before every
-     * startDownloadForeground, because DownloadService.onDestroy clears these
-     * statics (C-8) and a later download would otherwise lose its notification
-     * controls.
+     * Registers this plugin's stable callbacks on [DownloadService]'s
+     * multi-listener registries (idempotent).
      */
     private fun installDownloadCallbacks() {
-        DownloadService.onDownloadCancelledListener = { videoId ->
-            invokeOnChannel("onDownloadCancelled", mapOf("videoId" to videoId))
-        }
-        DownloadService.onDownloadPausedListener = { videoId ->
-            invokeOnChannel("onDownloadPaused", mapOf("videoId" to videoId))
-        }
-        DownloadService.onDownloadResumedListener = { videoId ->
-            invokeOnChannel("onDownloadResumed", mapOf("videoId" to videoId))
-        }
-        DownloadService.onDownloadCompletedListener = { videoId ->
-            invokeOnChannel("onDownloadCompleted", mapOf("videoId" to videoId))
-        }
-        DownloadService.onDownloadDegradedListener = { stage ->
-            invokeOnChannel("onDownloadServiceDegraded", mapOf("stage" to stage))
-        }
+        DownloadService.addDownloadCancelledListener(cancelledListener)
+        DownloadService.addDownloadPausedListener(pausedListener)
+        DownloadService.addDownloadResumedListener(resumedListener)
+        DownloadService.addDownloadCompletedListener(completedListener)
+        DownloadService.addDownloadDegradedListener(degradedListener)
     }
 
     private fun invokeOnChannel(method: String, arguments: Map<String, Any?>) {
@@ -96,39 +116,24 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     fun cleanup() {
-        DownloadService.onDownloadCancelledListener = null
-        DownloadService.onDownloadPausedListener = null
-        DownloadService.onDownloadResumedListener = null
-        DownloadService.onDownloadCompletedListener = null
-        DownloadService.onDownloadDegradedListener = null
-        // The Dart engine that owns the transfers is going away with this
-        // plugin, so the foreground notification has no writer left. Without
-        // this, swiping the task away while a download is running left the
-        // process and its stale "downloading" notification alive indefinitely
-        // (the service is stopWithTask=false).
-        context?.let { ctx ->
-            try {
-                DownloadService.stop(ctx)
-            } catch (_: Exception) {
-            }
-            // ACTION_STOP can be refused when the app is in the background;
-            // stopService always tears the FGS down (and its notification) if
-            // it is still running.
-            try {
-                ctx.stopService(
-                    android.content.Intent(ctx, DownloadService::class.java)
-                )
-            } catch (_: Exception) {
-            }
-        }
+        DownloadService.removeDownloadCancelledListener(cancelledListener)
+        DownloadService.removeDownloadPausedListener(pausedListener)
+        DownloadService.removeDownloadResumedListener(resumedListener)
+        DownloadService.removeDownloadCompletedListener(completedListener)
+        DownloadService.removeDownloadDegradedListener(degradedListener)
         if (::channel.isInitialized) {
             channel.setMethodCallHandler(null)
         }
-        saveExecutor.shutdown()
-        try {
-            saveExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+        val exec = synchronized(executorLock) {
+            saveExecutor.also { saveExecutor = null }
+        }
+        exec?.let {
+            it.shutdown()
+            try {
+                it.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
         }
         context = null
     }
@@ -164,7 +169,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 // it moves to a worker and the outcome is delivered back on the
                 // platform thread — which is where `result` must be invoked.
                 try {
-                    saveExecutor.execute {
+                    ensureExecutor().execute {
                         try {
                             val saved = saveToMediaStore(currentContext, source, displayName, title, mimeType)
                             mainHandler.post {
@@ -195,7 +200,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
                 try {
-                    saveExecutor.execute {
+                    ensureExecutor().execute {
                         try {
                             val deleted = deleteFromMusic(currentContext, path, contentUri)
                             mainHandler.post { result.success(deleted) }

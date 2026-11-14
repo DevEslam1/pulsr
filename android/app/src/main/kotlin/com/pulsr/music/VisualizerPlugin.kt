@@ -21,17 +21,23 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     @Volatile private var eventSink: EventChannel.EventSink? = null
     private var appContext: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val fftExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
-        Thread(r, "PulsrVisualizerFFT")
-    }
+    @Volatile
+    private var fftExecutor: java.util.concurrent.ExecutorService = newExecutor()
+    private val executorLock = Any()
 
     companion object {
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
         const val EVENT_CHANNEL = "com.pulsr.music/visualizer_stream"
 
+        private fun newExecutor(): java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+                Thread(r, "PulsrVisualizerFFT").apply { isDaemon = true }
+            }
+
         fun registerWith(flutterEngine: FlutterEngine, context: Context? = null): VisualizerPlugin {
             val plugin = VisualizerPlugin()
             plugin.appContext = context?.applicationContext
+            plugin.ensureFftExecutor()
             plugin.methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             plugin.methodChannel.setMethodCallHandler(plugin)
 
@@ -41,8 +47,20 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         }
     }
 
+    private fun ensureFftExecutor(): java.util.concurrent.ExecutorService {
+        val current = fftExecutor
+        if (!current.isShutdown) return current
+        synchronized(executorLock) {
+            if (fftExecutor.isShutdown) {
+                fftExecutor = newExecutor()
+            }
+            return fftExecutor
+        }
+    }
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         appContext = binding.applicationContext
+        ensureFftExecutor()
         methodChannel = MethodChannel(binding.binaryMessenger, METHOD_CHANNEL)
         methodChannel.setMethodCallHandler(this)
 
@@ -62,13 +80,14 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         if (::eventChannel.isInitialized) {
             eventChannel.setStreamHandler(null)
         }
-        fftExecutor.shutdown()
+        val currentExecutor = fftExecutor
+        currentExecutor.shutdown()
         try {
-            if (!fftExecutor.awaitTermination(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                fftExecutor.shutdownNow()
+            if (!currentExecutor.awaitTermination(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                currentExecutor.shutdownNow()
             }
         } catch (_: InterruptedException) {
-            fftExecutor.shutdownNow()
+            currentExecutor.shutdownNow()
         }
     }
 
@@ -128,7 +147,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                     if (fft == null || fft.size < 4 || eventSink == null) return
                     val fftCopy = fft.copyOf()
                     try {
-                        fftExecutor.execute {
+                        ensureFftExecutor().execute {
                             try {
                                 val bandValues = processFftData(fftCopy)
                                 val normalizedList = bandValues.toList()

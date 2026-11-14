@@ -150,10 +150,15 @@ object ProxyPool {
 
     fun hasAliveProxy(): Boolean = proxies.any { it.isAlive }
 
-    /** Stable rotation order: quality first, then node id (never EWMA/index). */
-    private fun stableOrderedAlive(): List<ProxyNode> =
+    /** Stable rotation order: quality, EWMA success desc, latency asc (-1 last), id. */
+    internal fun stableOrderedAlive(): List<ProxyNode> =
         proxies.filter { it.isAlive }
-            .sortedWith(compareBy<ProxyNode> { it.quality.ordinal }.thenBy { it.id })
+            .sortedWith(
+                compareBy<ProxyNode> { it.quality.ordinal }
+                    .thenByDescending { it.ewmaSuccessRate }
+                    .thenBy { if (it.latencyMs < 0L) Long.MAX_VALUE else it.latencyMs }
+                    .thenBy { it.id }
+            )
 
     fun getActiveProxy(targetUrl: String? = null): Proxy? {
         var selected: ProxyNode? = null
@@ -239,6 +244,11 @@ object ProxyPool {
         synchronized(lock) {
             if (proxies.isEmpty()) return
 
+            // Capture rotation order before penalizing `failing` so a node's
+            // own EWMA drop never re-sorts it past untried peers and wraps
+            // rotation backwards onto an already-failed head.
+            val prePenaltyOrder = stableOrderedAlive()
+
             // Attribute failure directly to the failing node rather than arbitrary modulo
             val failing = if (failedHostOrId != null) {
                 proxies.firstOrNull { it.id == failedHostOrId || "${it.host}:${it.port}" == failedHostOrId || it.host == failedHostOrId }
@@ -266,11 +276,14 @@ object ProxyPool {
             if (autoRotateEnabled) {
                 val remainingAlive = stableOrderedAlive()
                 if (remainingAlive.isNotEmpty()) {
-                    // Rotate to the next alive node in the stable (quality,
-                    // id) order, not an index into a re-sorted EWMA list.
-                    val currentPos = remainingAlive.indexOfFirst { it.id == activeProxyId }
+                    val aliveIds = remainingAlive.map { it.id }.toSet()
+                    val currentPos = prePenaltyOrder.indexOfFirst { it.id == activeProxyId }
                     val newActive = if (currentPos >= 0) {
-                        remainingAlive[(currentPos + 1) % remainingAlive.size]
+                        (1..prePenaltyOrder.size)
+                            .asSequence()
+                            .map { offset -> prePenaltyOrder[(currentPos + offset) % prePenaltyOrder.size] }
+                            .firstOrNull { it.id in aliveIds }
+                            ?: remainingAlive.first()
                     } else {
                         remainingAlive.first()
                     }
@@ -339,23 +352,31 @@ object ProxyPool {
 
         probeExecutor.execute {
             val winnerRef = java.util.concurrent.atomic.AtomicReference<ProxyNode?>(null)
+            val decided = java.util.concurrent.atomic.AtomicBoolean(false)
             val completedCount = java.util.concurrent.atomic.AtomicInteger(0)
             val total = candidates.size.coerceAtMost(3)
             val latch = java.util.concurrent.CountDownLatch(1)
 
             for (i in 0 until total) {
-                if (winnerRef.get() != null) break
+                if (decided.get() || winnerRef.get() != null) break
                 val node = candidates[i]
                 probeExecutor.execute {
+                    if (decided.get()) {
+                        if (completedCount.incrementAndGet() >= total) {
+                            latch.countDown()
+                        }
+                        return@execute
+                    }
                     val success = testSingleProxy(node, probeUrl, timeoutMs)
-                    if (success && winnerRef.compareAndSet(null, node)) {
+                    if (success && decided.compareAndSet(false, true)) {
+                        winnerRef.compareAndSet(null, node)
                         latch.countDown()
                     }
                     if (completedCount.incrementAndGet() >= total) {
                         latch.countDown()
                     }
                 }
-                if (i < total - 1 && winnerRef.get() == null) {
+                if (i < total - 1 && !decided.get() && winnerRef.get() == null) {
                     try {
                         Thread.sleep(staggerMs)
                     } catch (_: InterruptedException) {
@@ -369,6 +390,7 @@ object ProxyPool {
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
             }
+            decided.set(true)
             val winner = winnerRef.get()
             if (winner != null) {
                 synchronized(lock) {

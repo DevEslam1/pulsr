@@ -44,9 +44,19 @@ object AudioIntentClassifier {
             h == "youtu.be" || h.endsWith(".youtu.be")
     }
 
+    private val HTTP_URL_TOKEN_REGEX = Regex("""https?://[^\s<>"'\])\}]+""", RegexOption.IGNORE_CASE)
+
     fun isYouTubeUrl(text: String): Boolean {
-        val lower = text.lowercase()
-        return lower.contains("youtu.be") || lower.contains("youtube.com")
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        val directUri = runCatching { Uri.parse(trimmed) }.getOrNull()
+        if (directUri != null && directUri.scheme?.lowercase() in setOf("http", "https")) {
+            return isYouTubeHost(directUri.host)
+        }
+        val token = HTTP_URL_TOKEN_REGEX.find(trimmed)?.value ?: return false
+        val tokenHost = runCatching { Uri.parse(token).host }.getOrNull()
+            ?: runCatching { java.net.URI(token.substringBefore('?').substringBefore('#')).host }.getOrNull()
+        return isYouTubeHost(tokenHost)
     }
 
     /**

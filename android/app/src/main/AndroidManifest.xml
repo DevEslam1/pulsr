@@ -236,6 +236,10 @@
         <intent>
             <action android:name="com.android.music.metachanged" />
         </intent>
+        <intent>
+            <action android:name="fm.last.android.metachanged" />
+        </intent>
+        <!-- Scrobbler packages -->
         <package android:name="com.adam.aslfms" />
         <package android:name="fm.last.android" />
         <package android:name="com.simplecity.amp_scrobbler" />
@@ -243,5 +247,29 @@
         <package android:name="com.softartstudio.scrobble" />
         <package android:name="com.arn.scrobble" />
         <package android:name="com.theodhi.scrobbler" />
+        <!-- OEM audio / DSP effect packages (queried by AudioEffectsPlugin) -->
+        <package android:name="com.dolby.daxservice" />
+        <package android:name="com.dolby.daxappui" />
+        <package android:name="com.dolby" />
+        <package android:name="com.atmos.daxservice" />
+        <package android:name="com.motorola.dolby.dolbyui" />
+        <package android:name="com.lenovo.dolby" />
+        <package android:name="com.miui.soundfx" />
+        <package android:name="com.xiaomi.misound" />
+        <package android:name="com.miui.audioeffect" />
+        <package android:name="com.realme.soundfx" />
+        <package android:name="com.oplus.soundfx" />
+        <package android:name="com.oneplus.soundfx" />
+        <package android:name="com.sec.android.app.soundalive" />
+        <package android:name="com.samsung.android.soundalive" />
+        <package android:name="com.dirac.audio" />
+        <package android:name="com.dirac.soundfx" />
+        <package android:name="com.dirac.acs" />
+        <package android:name="com.dts.dtsxultra" />
+        <package android:name="com.dts.freeform" />
+        <package android:name="com.dts.audio" />
+        <package android:name="com.sonyericsson.soundenhancement" />
+        <package android:name="com.sonymobile.soundenhancement" />
+        <package android:name="com.asus.audiowizard" />
     </queries>
 </manifest>

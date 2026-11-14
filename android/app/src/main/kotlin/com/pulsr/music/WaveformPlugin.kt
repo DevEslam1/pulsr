@@ -43,7 +43,8 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             size > WAVEFORM_CACHE_ENTRIES
     }
 
-    private fun cacheKey(path: String, count: Int): String {
+    private fun cacheKey(path: String, count: Int): String? {
+        if (path.startsWith("content:", ignoreCase = true)) return null
         val stamp = runCatching { File(path).lastModified() }.getOrDefault(0L)
         return "$path:$stamp:$count"
     }
@@ -131,7 +132,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                 activeDecodes.put(decodeId, cancellationFlag)?.set(true)
 
                 val key = cacheKey(path, count)
-                val cached = lookupCache(key)
+                val cached = if (key != null) lookupCache(key) else null
                 if (cached != null) {
                     activeDecodes.remove(decodeId, cancellationFlag)
                     result.success(cached.toList())
@@ -148,7 +149,9 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                         }
                         try {
                             val buckets = decodeToBuckets(path, count, timeoutMs, cancellationFlag)
-                            storeCache(key, buckets)
+                            if (key != null) {
+                                storeCache(key, buckets)
+                            }
                             postSuccess(result, buckets.toList())
                         } catch (e: java.util.concurrent.CancellationException) {
                             postError(result, "CANCELLED", "Waveform decode cancelled for $path")

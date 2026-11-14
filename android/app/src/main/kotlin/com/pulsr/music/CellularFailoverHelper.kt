@@ -94,6 +94,66 @@ private class UnregisterOnDisconnectConnection(
     override fun getRequestProperties(): MutableMap<String, MutableList<String>> = delegate.requestProperties
 
     override fun getRequestProperty(key: String?): String? = delegate.getRequestProperty(key)
+
+    override fun setInstanceFollowRedirects(followRedirects: Boolean) {
+        delegate.instanceFollowRedirects = followRedirects
+    }
+
+    override fun getInstanceFollowRedirects(): Boolean = delegate.instanceFollowRedirects
+
+    override fun setDoInput(doinput: Boolean) {
+        delegate.doInput = doinput
+    }
+
+    override fun getDoInput(): Boolean = delegate.doInput
+
+    override fun setDoOutput(dooutput: Boolean) {
+        delegate.doOutput = dooutput
+    }
+
+    override fun getDoOutput(): Boolean = delegate.doOutput
+
+    override fun setUseCaches(usecaches: Boolean) {
+        delegate.useCaches = usecaches
+    }
+
+    override fun getUseCaches(): Boolean = delegate.useCaches
+
+    override fun setIfModifiedSince(ifmodifiedsince: Long) {
+        delegate.ifModifiedSince = ifmodifiedsince
+    }
+
+    override fun getIfModifiedSince(): Long = delegate.ifModifiedSince
+
+    override fun setChunkedStreamingMode(chunklen: Int) {
+        delegate.setChunkedStreamingMode(chunklen)
+    }
+
+    override fun setFixedLengthStreamingMode(contentLength: Int) {
+        delegate.setFixedLengthStreamingMode(contentLength)
+    }
+
+    override fun setFixedLengthStreamingMode(contentLength: Long) {
+        delegate.setFixedLengthStreamingMode(contentLength)
+    }
+
+    override fun getURL(): URL = delegate.url
+
+    override fun getPermission(): java.security.Permission = delegate.permission
+
+    override fun getHeaderFieldInt(name: String?, Default: Int): Int = delegate.getHeaderFieldInt(name, Default)
+
+    override fun getHeaderFieldLong(name: String?, Default: Long): Long = delegate.getHeaderFieldLong(name, Default)
+
+    override fun getHeaderFieldDate(name: String?, Default: Long): Long = delegate.getHeaderFieldDate(name, Default)
+
+    override fun getContentEncoding(): String? = delegate.contentEncoding
+
+    override fun getLastModified(): Long = delegate.lastModified
+
+    override fun getExpiration(): Long = delegate.expiration
+
+    override fun getDate(): Long = delegate.date
 }
 
 /**

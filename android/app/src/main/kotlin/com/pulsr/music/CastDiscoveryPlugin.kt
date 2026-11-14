@@ -33,6 +33,7 @@ class CastDiscoveryPlugin(
         const val EVENT_CHANNEL = "com.pulsr.music/cast_events"
         private const val CAST_SERVICE_TYPE = "_googlecast._tcp."
         private val CAST_ATTR_KEYS = listOf("fn", "md", "id", "ve")
+        private const val MAX_RESOLVE_QUEUE = 64
     }
 
     private val appContext = context.applicationContext
@@ -45,7 +46,9 @@ class CastDiscoveryPlugin(
     private var eventSink: EventChannel.EventSink? = null
 
     private val devices = ConcurrentHashMap<String, Map<String, Any?>>()
+    @Volatile
     private var discoveryListener: NsdManager.DiscoveryListener? = null
+    @Volatile
     private var discovering = false
     private var lastError: String? = null
     private val resolveQueue = ArrayDeque<NsdServiceInfo>()
@@ -130,7 +133,7 @@ class CastDiscoveryPlugin(
             emitError("nsd_unavailable")
             return
         }
-        if (discovering) return
+        if (discovering || discoveryListener != null) return
         val listener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String?) {
                 discovering = true
@@ -153,16 +156,19 @@ class CastDiscoveryPlugin(
 
             override fun onDiscoveryStopped(serviceType: String?) {
                 discovering = false
+                discoveryListener = null
             }
 
             override fun onStartDiscoveryFailed(serviceType: String?, errorCode: Int) {
                 discovering = false
+                discoveryListener = null
                 lastError = "start_failed_$errorCode"
                 emitError(lastError!!)
             }
 
             override fun onStopDiscoveryFailed(serviceType: String?, errorCode: Int) {
                 discovering = false
+                discoveryListener = null
             }
         }
         discoveryListener = listener
@@ -175,13 +181,21 @@ class CastDiscoveryPlugin(
         } catch (e: Exception) {
             Log.w(TAG, "discoverServices failed: ${e.message}")
             discovering = false
+            discoveryListener = null
             emitError("discovery_exception")
         }
     }
 
     @Suppress("DEPRECATION")
     private fun resolve(nsd: NsdManager, serviceInfo: NsdServiceInfo) {
+        val serviceName = serviceInfo.serviceName
         synchronized(resolveLock) {
+            if (!serviceName.isNullOrEmpty() && resolveQueue.any { it.serviceName == serviceName }) {
+                return
+            }
+            if (resolveQueue.size >= MAX_RESOLVE_QUEUE) {
+                return
+            }
             resolveQueue.add(serviceInfo)
             if (!isResolving) {
                 isResolving = true
@@ -244,16 +258,26 @@ class CastDiscoveryPlugin(
     }
 
     private fun stopDiscovery() {
+        devices.clear()
+        emitDevices()
         val listener = discoveryListener ?: return
-        discoveryListener = null
         discovering = false
         synchronized(resolveLock) {
             resolveQueue.clear()
             isResolving = false
         }
+        // Keep discoveryListener until onDiscoveryStopped / onStopDiscoveryFailed
+        // so startDiscovery cannot double-register while teardown is in flight.
+        val nsd = nsdManager
+        if (nsd == null) {
+            discoveryListener = null
+            return
+        }
         try {
-            nsdManager?.stopServiceDiscovery(listener)
-        } catch (_: Exception) {}
+            nsd.stopServiceDiscovery(listener)
+        } catch (_: Exception) {
+            discoveryListener = null
+        }
     }
 
     private fun emitDevices() {

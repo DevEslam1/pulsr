@@ -27,14 +27,22 @@ import java.util.logging.Logger
 class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     internal var context: Context? = null
-    private val backgroundExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
+    @Volatile
+    private var backgroundExecutor: java.util.concurrent.ExecutorService = newExecutor()
+    private val executorLock = Any()
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/tag_editor"
 
+        private fun newExecutor(): java.util.concurrent.ExecutorService =
+            java.util.concurrent.Executors.newFixedThreadPool(2) { r ->
+                Thread(r, "PulsrTagEditor").apply { isDaemon = true }
+            }
+
         fun registerWith(flutterEngine: FlutterEngine, context: Context): TagEditorPlugin {
             val plugin = TagEditorPlugin()
             plugin.context = context
+            plugin.ensureExecutor()
             plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel.setMethodCallHandler(plugin)
             disableLogger()
@@ -46,10 +54,32 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                 Logger.getLogger("org.jaudiotagger").level = Level.OFF
             } catch (_: Exception) {}
         }
+
+        internal fun isAllFieldsVerified(verifiedFields: Map<String, Boolean>): Boolean =
+            verifiedFields.isNotEmpty() && verifiedFields.values.all { it }
+
+        internal fun isCoreMetadataVerified(verifiedFields: Map<String, Boolean>): Boolean =
+            verifiedFields.isNotEmpty() &&
+                verifiedFields.values.all { it } &&
+                (verifiedFields["title"] == true ||
+                    verifiedFields["artist"] == true ||
+                    verifiedFields["album"] == true)
+    }
+
+    private fun ensureExecutor(): java.util.concurrent.ExecutorService {
+        val current = backgroundExecutor
+        if (!current.isShutdown) return current
+        synchronized(executorLock) {
+            if (backgroundExecutor.isShutdown) {
+                backgroundExecutor = newExecutor()
+            }
+            return backgroundExecutor
+        }
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
+        ensureExecutor()
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
         disableLogger()
@@ -63,9 +93,10 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
         if (::channel.isInitialized) {
             channel.setMethodCallHandler(null)
         }
-        backgroundExecutor.shutdown()
+        val currentExecutor = backgroundExecutor
+        currentExecutor.shutdown()
         try {
-            backgroundExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+            currentExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }
@@ -81,7 +112,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     result.error("INVALID_ARGUMENT", "File path is required", null)
                     return
                 }
-                backgroundExecutor.execute {
+                ensureExecutor().execute {
                     var tempFile: java.io.File? = null
                     try {
                         val file = if (path.startsWith("content:")) {
@@ -209,12 +240,14 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
 
-                backgroundExecutor.execute {
+                ensureExecutor().execute {
                     val isContentUri = path.startsWith("content:")
                     var tempFile: java.io.File? = null
                     var backupFile: java.io.File? = null
                     var verified = false
+                    @Suppress("UNUSED_VARIABLE")
                     var coreMetadataVerified = false
+                    var contentRestored = false
                     try {
                         val file = if (isContentUri) {
                             val uri = android.net.Uri.parse(path)
@@ -461,17 +494,8 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                                     verifiedFields["artwork"] = (gotArtwork == null || gotArtwork.binaryData == null || gotArtwork.binaryData.isEmpty())
                                 }
 
-                                verified = verifiedFields.values.all { it }
-                                // Artwork read-back can fail on some containers
-                                // while title/artist/album were written fine.
-                                // Never roll the whole tag write back for that:
-                                // it silently leaves the download untagged and
-                                // MediaStore reports "Unknown Artist".
-                                coreMetadataVerified =
-                                    listOf("title", "artist", "album").all { key ->
-                                        !verifiedFields.containsKey(key) ||
-                                            verifiedFields[key] == true
-                                    }
+                                verified = isAllFieldsVerified(verifiedFields)
+                                coreMetadataVerified = isCoreMetadataVerified(verifiedFields)
                             }
                         } catch (_: Exception) {
                             verified = false
@@ -502,6 +526,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     } catch (e: Exception) {
                         if (isContentUri) {
                             restoreContentUri(android.net.Uri.parse(path), backupFile)
+                            contentRestored = true
                         }
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             result.error("WRITE_TAGS_ERROR", e.message, e.stackTraceToString())
@@ -509,12 +534,18 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     } finally {
                         tempFile?.let { runCatching { it.delete() } }
                         backupFile?.let { backup ->
-                            if (verified || coreMetadataVerified) {
+                            if (verified) {
                                 runCatching { backup.delete() }
                             } else {
                                 try {
-                                    if (!isContentUri && backup.exists()) {
-                                        backup.copyTo(File(path), overwrite = true)
+                                    if (backup.exists()) {
+                                        if (isContentUri) {
+                                            if (!contentRestored) {
+                                                restoreContentUri(android.net.Uri.parse(path), backup)
+                                            }
+                                        } else {
+                                            backup.copyTo(File(path), overwrite = true)
+                                        }
                                     }
                                     backup.delete()
                                 } catch (_: Exception) {}
@@ -531,12 +562,24 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     private fun restoreContentUri(uri: android.net.Uri, backup: File?) {
         val ctx = context ?: return
         if (backup == null || !backup.exists()) return
-        runCatching {
-            ctx.contentResolver.openOutputStream(uri, "rwt")?.use { out ->
-                backup.inputStream().use { input -> input.copyTo(out) }
+        for (mode in listOf("rwt", "rw")) {
+            val attempt = runCatching {
+                val out = ctx.contentResolver.openOutputStream(uri, mode)
+                    ?: throw java.io.IOException("openOutputStream($uri, $mode) returned null")
+                out.use { stream ->
+                    backup.inputStream().use { input -> input.copyTo(stream) }
+                }
             }
-        }.onFailure {
-            android.util.Log.w("TagEditorPlugin", "Failed to restore $uri from backup: ${it.message}")
+            if (attempt.isSuccess) {
+                if (mode != "rwt") {
+                    android.util.Log.i("TagEditorPlugin", "Restored $uri from backup using fallback mode '$mode'")
+                }
+                return
+            }
+            android.util.Log.w(
+                "TagEditorPlugin",
+                "Failed to restore $uri from backup (mode='$mode'): ${attempt.exceptionOrNull()?.message}",
+            )
         }
     }
 

@@ -73,17 +73,77 @@ class DownloadService : Service() {
          */
         private const val IDLE_STOP_GRACE_MS = 5000L
 
-        var onDownloadCancelledListener: ((String) -> Unit)? = null
-        var onDownloadPausedListener: ((String) -> Unit)? = null
-        var onDownloadResumedListener: ((String) -> Unit)? = null
-        var onDownloadCompletedListener: ((String) -> Unit)? = null
+        private val cancelledListeners = java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>()
+        private val pausedListeners = java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>()
+        private val resumedListeners = java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>()
+        private val completedListeners = java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>()
+        private val degradedListeners = java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>()
+
+        // Legacy single-listener slots preserved alongside multi-listener registries.
+        @Volatile var onDownloadCancelledListener: ((String) -> Unit)? = null
+        @Volatile var onDownloadPausedListener: ((String) -> Unit)? = null
+        @Volatile var onDownloadResumedListener: ((String) -> Unit)? = null
+        @Volatile var onDownloadCompletedListener: ((String) -> Unit)? = null
 
         /**
          * C-9: raised when foreground coverage could not be obtained or kept, so
          * the transfer continues without FGS protection. Forwarded by
          * YtDownloadPlugin to Dart, which surfaces it to the user.
          */
-        var onDownloadDegradedListener: ((String) -> Unit)? = null
+        @Volatile var onDownloadDegradedListener: ((String) -> Unit)? = null
+
+        fun addDownloadCancelledListener(listener: (String) -> Unit) {
+            cancelledListeners.addIfAbsent(listener)
+        }
+
+        fun removeDownloadCancelledListener(listener: (String) -> Unit) {
+            cancelledListeners.remove(listener)
+        }
+
+        fun addDownloadPausedListener(listener: (String) -> Unit) {
+            pausedListeners.addIfAbsent(listener)
+        }
+
+        fun removeDownloadPausedListener(listener: (String) -> Unit) {
+            pausedListeners.remove(listener)
+        }
+
+        fun addDownloadResumedListener(listener: (String) -> Unit) {
+            resumedListeners.addIfAbsent(listener)
+        }
+
+        fun removeDownloadResumedListener(listener: (String) -> Unit) {
+            resumedListeners.remove(listener)
+        }
+
+        fun addDownloadCompletedListener(listener: (String) -> Unit) {
+            completedListeners.addIfAbsent(listener)
+        }
+
+        fun removeDownloadCompletedListener(listener: (String) -> Unit) {
+            completedListeners.remove(listener)
+        }
+
+        fun addDownloadDegradedListener(listener: (String) -> Unit) {
+            degradedListeners.addIfAbsent(listener)
+        }
+
+        fun removeDownloadDegradedListener(listener: (String) -> Unit) {
+            degradedListeners.remove(listener)
+        }
+
+        private fun dispatchListener(
+            legacy: ((String) -> Unit)?,
+            registry: java.util.concurrent.CopyOnWriteArrayList<(String) -> Unit>,
+            payload: String,
+        ) {
+            legacy?.let {
+                try { it(payload) } catch (_: Exception) {}
+            }
+            for (listener in registry) {
+                try { listener(payload) } catch (_: Exception) {}
+            }
+        }
 
         /**
          * Timeout-paused ids that survive [stopForegroundAndSelf]/[onDestroy].
@@ -98,9 +158,7 @@ class DownloadService : Service() {
 
         private fun notifyDegraded(context: Context, stage: String, cause: Throwable?) {
             android.util.Log.w(TAG, "Download continues without foreground protection ($stage)", cause)
-            try {
-                onDownloadDegradedListener?.invoke(stage)
-            } catch (_: Exception) {}
+            dispatchListener(onDownloadDegradedListener, degradedListeners, stage)
         }
 
         fun start(context: Context, videoId: String, title: String) {
@@ -277,7 +335,7 @@ class DownloadService : Service() {
                     downloadTitles.remove(vid)
                     pausedDownloads.remove(vid)
                     timeoutPausedIds.remove(vid)
-                    try { onDownloadCompletedListener?.invoke(vid) } catch (_: Exception) {}
+                    dispatchListener(onDownloadCompletedListener, completedListeners, vid)
                 }
                 if (activeDownloads.isEmpty()) {
                     scheduleIdleStop()
@@ -297,7 +355,7 @@ class DownloadService : Service() {
                     timeoutPausedIds.removeAll(ids.toSet())
                     for (id in ids) {
                         try { DownloadChunkStateStore.clearChunksForVideo(this, id) } catch (_: Exception) {}
-                        try { onDownloadCancelledListener?.invoke(id) } catch (_: Exception) {}
+                        dispatchListener(onDownloadCancelledListener, cancelledListeners, id)
                     }
                     stopForegroundAndSelf()
                 } else {
@@ -314,7 +372,7 @@ class DownloadService : Service() {
                         timeoutPausedIds.remove(vid)
                         try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
                         if (wasActive) {
-                            try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
+                            dispatchListener(onDownloadCancelledListener, cancelledListeners, vid)
                         }
                     }
                     if (activeDownloads.isEmpty()) {
@@ -334,7 +392,7 @@ class DownloadService : Service() {
                     runCatching { DownloadChunkStateStore.flushPending(this) }
                     renderCurrentNotification(vid)
                     // C-7: the Dart engine owns the transfer; it performs the pause.
-                    try { onDownloadPausedListener?.invoke(vid) } catch (_: Exception) {}
+                    dispatchListener(onDownloadPausedListener, pausedListeners, vid)
                 }
             }
             ACTION_RESUME -> {
@@ -343,7 +401,7 @@ class DownloadService : Service() {
                     pausedDownloads.remove(vid)
                     timeoutPausedIds.remove(vid)
                     renderCurrentNotification(vid)
-                    try { onDownloadResumedListener?.invoke(vid) } catch (_: Exception) {}
+                    dispatchListener(onDownloadResumedListener, resumedListeners, vid)
                 }
             }
             ACTION_SET_PAUSED -> {
@@ -612,6 +670,20 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     /**
+     * API 31-33 single-arg timeout callback; delegates to the API 34+ handler
+     * with [FOREGROUND_SERVICE_TYPE_DATA_SYNC].
+     */
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun onTimeout(startId: Int) {
+        val fgsType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        } else {
+            1
+        }
+        onTimeout(startId, fgsType)
+    }
+
+    /**
      * B-6: Android 15 (API 35+) applies a cumulative dataSync foreground-time cap
      * and then calls this. An app that does not stop the service inside the grace
      * window is ANR'd or killed, which is how a long download queue used to end on
@@ -635,7 +707,7 @@ class DownloadService : Service() {
         for (target in snapshotIds) {
             pausedDownloads.add(target)
             timeoutPausedIds.add(target)
-            try { onDownloadPausedListener?.invoke(target) } catch (_: Exception) {}
+            dispatchListener(onDownloadPausedListener, pausedListeners, target)
         }
         degraded = true
         notifyDegraded(this, "timeout", null)

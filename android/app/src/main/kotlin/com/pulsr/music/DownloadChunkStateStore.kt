@@ -157,12 +157,12 @@ object DownloadChunkStateStore {
         val prefs = getPrefs(context)
         val prefix = "$KEY_PREFIX_CHUNK${videoId}_"
         val merged = LinkedHashMap<Int, ChunkState>()
-        for ((key, value) in prefs.all) {
-            if (key.startsWith(prefix) && value is String) {
-                ChunkState.fromJson(value)?.let { merged[it.chunkIndex] = it }
-            }
-        }
         synchronized(lock) {
+            for ((key, value) in prefs.all) {
+                if (key.startsWith(prefix) && value is String) {
+                    ChunkState.fromJson(value)?.let { merged[it.chunkIndex] = it }
+                }
+            }
             for ((key, state) in pending) {
                 if (key.startsWith(prefix)) merged[state.chunkIndex] = state
             }
@@ -199,18 +199,38 @@ object DownloadChunkStateStore {
     /** Drops entries that have not been touched for [maxAgeMs] (default 30 days). */
     fun purgeExpired(context: Context, maxAgeMs: Long = MAX_AGE_MS): Int {
         val cutoff = System.currentTimeMillis() - maxAgeMs
-        val prefs = getPrefs(context)
-        val editor = prefs.edit()
         var removed = 0
-        for ((key, value) in prefs.all) {
-            if (!key.startsWith(KEY_PREFIX_CHUNK) || value !is String) continue
-            val state = ChunkState.fromJson(value) ?: continue
-            if (state.updatedAt < cutoff) {
-                editor.remove(key)
-                removed++
+        synchronized(lock) {
+            val expiredPendingKeys = HashSet<String>()
+            val pendingIter = pending.entries.iterator()
+            while (pendingIter.hasNext()) {
+                val entry = pendingIter.next()
+                if (entry.value.updatedAt < cutoff) {
+                    expiredPendingKeys.add(entry.key)
+                    pendingIter.remove()
+                    removed++
+                }
             }
+            val prefs = getPrefs(context)
+            val editor = prefs.edit()
+            var prefsChanged = false
+            for ((key, value) in prefs.all) {
+                if (!key.startsWith(KEY_PREFIX_CHUNK) || value !is String) continue
+                if (key in pending) continue
+                if (key in expiredPendingKeys) {
+                    editor.remove(key)
+                    prefsChanged = true
+                    continue
+                }
+                val state = ChunkState.fromJson(value) ?: continue
+                if (state.updatedAt < cutoff) {
+                    editor.remove(key)
+                    prefsChanged = true
+                    removed++
+                }
+            }
+            if (prefsChanged) editor.apply()
         }
-        if (removed > 0) editor.apply()
         return removed
     }
 }

@@ -160,6 +160,12 @@ class UsbExclusivePlugin(
     private fun safeResetChannelMismatchFrames() { if (nativeLoaded) try { nativeUsbStreamResetChannelMismatchFrames() } catch (_: Throwable) {} }
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var permissionReceiver: BroadcastReceiver? = null
+    private var pendingPermissionTimeout: Runnable? = null
+
+    private fun cancelPermissionTimeout() {
+        pendingPermissionTimeout?.let { mainHandler.removeCallbacks(it) }
+        pendingPermissionTimeout = null
+    }
 
     private val deviceReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context?, intent: Intent?) {
@@ -229,6 +235,9 @@ class UsbExclusivePlugin(
                 "setHardwareVolume" -> {
                     val db = call.argument<Double>("db") ?: 0.0
                     runAsync(call.method, result) { setHardwareVolumeInternal(db) }
+                }
+                "resetHardwareVolume" -> {
+                    runAsync(call.method, result) { resetHardwareVolumeInternal() }
                 }
                 "startStreaming" -> {
                     val sampleRate = call.argument<Int>("sampleRate") ?: 48000
@@ -336,6 +345,7 @@ class UsbExclusivePlugin(
         // A permission prompt the user never answered still has to be answered:
         // the Dart caller awaits requestPermission(), and tearing the plugin
         // down underneath it would leave that future pending forever.
+        cancelPermissionTimeout()
         val pending = pendingPermissionResult
         pendingPermissionResult = null
         try {
@@ -726,10 +736,20 @@ class UsbExclusivePlugin(
             Intent(ACTION_USB_PERMISSION).setPackage(context.packageName),
             flags,
         )
+        val timeout = Runnable {
+            pendingPermissionTimeout = null
+            if (pendingPermissionResult != null) {
+                Log.w(TAG, "USB permission request timed out after 60s")
+                finishPermission(false)
+            }
+        }
+        pendingPermissionTimeout = timeout
+        mainHandler.postDelayed(timeout, 60_000L)
         usbManager?.requestPermission(device, pi)
     }
 
     private fun finishPermission(granted: Boolean) {
+        cancelPermissionTimeout()
         val r = pendingPermissionResult
         pendingPermissionResult = null
         permissionReceiver?.let {
@@ -786,20 +806,34 @@ class UsbExclusivePlugin(
         conn.controlTransfer(type, request, value, index, data, data.size, CTRL_TIMEOUT_MS)
     }
 
-    private fun setHardwareVolumeInternal(db: Double): Map<String, Any?> {
+    private fun applyHardwareVolumeDb(rawTargetDb: Double): Map<String, Any?> {
         hardwareVolume?.invalidate()
         val device = openedDevice ?: findAudioDevice() ?: return failure("no_usb_device")
         if (usbManager?.hasPermission(device) != true) return failure("permission_required")
         ensureConnection(device) ?: return failure("open_failed")
         val volume = hardwareVolume ?: return failure("no_usable_volume_control")
-        val offset = getVolumeCalibrationOffset(device.vendorId, device.productId)
-        val ok = volume.setDb(db + offset)
+        val ok = volume.setDb(rawTargetDb)
         val status = buildStatus()
         emitState()
         return status + mapOf(
             "success" to (ok && volume.applied),
             "error" to if (ok && volume.applied) null else "volume_not_verified",
         )
+    }
+
+    private fun setHardwareVolumeInternal(db: Double): Map<String, Any?> {
+        val device = openedDevice ?: findAudioDevice() ?: return failure("no_usb_device")
+        val offset = getVolumeCalibrationOffset(device.vendorId, device.productId)
+        return applyHardwareVolumeDb(db + offset)
+    }
+
+    private fun resetHardwareVolumeInternal(): Map<String, Any?> {
+        val device = openedDevice ?: findAudioDevice() ?: return failure("no_usb_device")
+        if (usbManager?.hasPermission(device) != true) return failure("permission_required")
+        ensureConnection(device) ?: return failure("open_failed")
+        val volume = hardwareVolume ?: return failure("no_usable_volume_control")
+        val unityDb = 0.0.coerceIn(volume.minDb, volume.maxDb)
+        return applyHardwareVolumeDb(unityDb)
     }
 
     private fun failure(reason: String): Map<String, Any?> =
@@ -821,6 +855,12 @@ class UsbExclusivePlugin(
     // ---- raw UAC2 isochronous streaming ----
 
     private fun startStreamingInternal(sampleRate: Int, channels: Int, bitDepth: Int = 16, strict: Boolean = false): Map<String, Any?> {
+        val owner = directOwner
+        if (owner != null && owner !== this) {
+            lastStreamResultCode = -1
+            Log.w(TAG, "Step owner: direct streaming is owned by another plugin instance")
+            return failure("direct_owner_busy")
+        }
         if (streaming && streamFormat?.matches(sampleRate, bitDepth, channels, isNativeActive()) == true) {
             if (strict && !lastRateVerified) {
                 lastStreamResultCode = 3

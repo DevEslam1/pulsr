@@ -40,9 +40,9 @@ class PulsrEnginePlugins private constructor(
     fun cleanup() {
         if (!cleanedUp.compareAndSet(false, true)) return
         remove(engine)
-        // The listener is intentionally left registered: cleanup only runs
-        // from onEngineWillDestroy, and mutating the listener set while the
-        // engine is iterating it can throw.
+        try {
+            engine.removeEngineLifecycleListener(lifecycleListener)
+        } catch (_: Exception) {}
         val steps: List<Pair<String, () -> Unit>> = listOf(
             "AudioEffects" to { audioEffects.cleanup() },
             "TagEditor" to { tagEditor.cleanup() },
@@ -79,26 +79,67 @@ class PulsrEnginePlugins private constructor(
                 byEngine[engine]?.let { return it }
                 val appContext = context.applicationContext
                 val messenger = engine.dartExecutor.binaryMessenger
-                val plugins = PulsrEnginePlugins(
-                    engine = engine,
-                    audioEffects = AudioEffectsPlugin.registerWith(engine, appContext),
-                    tagEditor = TagEditorPlugin.registerWith(engine, appContext),
-                    visualizer = VisualizerPlugin.registerWith(engine, appContext),
-                    ringtone = RingtonePlugin.registerWith(engine, appContext),
-                    scrobbler = ScrobblerPlugin.registerWith(engine, appContext),
-                    ytmExtractor = YtmExtractorPlugin.registerWith(engine, appContext),
-                    ytDownload = YtDownloadPlugin.registerWith(engine, appContext),
-                    waveform = WaveformPlugin.registerWith(engine, appContext),
-                    proxy = ProxyPlugin.registerWith(engine, appContext),
-                    hiResDac = HiResDacPlugin(appContext, messenger),
-                    usbExclusive = UsbExclusivePlugin(appContext, messenger),
-                    castDiscovery = CastDiscoveryPlugin(appContext, messenger),
-                    castSession = CastSessionPlugin.registerWith(engine, appContext),
-                    roomCorrection = RoomCorrectionPlugin.registerWith(engine, appContext),
-                )
-                byEngine[engine] = plugins
-                engine.addEngineLifecycleListener(plugins.lifecycleListener)
-                return plugins
+                val cleanups = mutableListOf<Pair<String, () -> Unit>>()
+                try {
+                    val audioEffects = AudioEffectsPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("AudioEffects" to { p.cleanup() }) }
+                    val tagEditor = TagEditorPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("TagEditor" to { p.cleanup() }) }
+                    val visualizer = VisualizerPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("Visualizer" to { p.cleanup() }) }
+                    val ringtone = RingtonePlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("Ringtone" to { p.cleanup() }) }
+                    val scrobbler = ScrobblerPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("Scrobbler" to { p.cleanup() }) }
+                    val ytmExtractor = YtmExtractorPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("YtmExtractor" to { p.cleanup() }) }
+                    val ytDownload = YtDownloadPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("YtDownload" to { p.cleanup() }) }
+                    val waveform = WaveformPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("Waveform" to { p.cleanup() }) }
+                    val proxy = ProxyPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("Proxy" to { p.cleanup() }) }
+                    val hiResDac = HiResDacPlugin(appContext, messenger)
+                        .also { p -> cleanups.add("HiResDac" to { p.dispose() }) }
+                    val usbExclusive = UsbExclusivePlugin(appContext, messenger)
+                        .also { p -> cleanups.add("UsbExclusive" to { p.dispose() }) }
+                    val castDiscovery = CastDiscoveryPlugin(appContext, messenger)
+                        .also { p -> cleanups.add("CastDiscovery" to { p.dispose() }) }
+                    val castSession = CastSessionPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("CastSession" to { p.cleanup() }) }
+                    val roomCorrection = RoomCorrectionPlugin.registerWith(engine, appContext)
+                        .also { p -> cleanups.add("RoomCorrection" to { p.cleanup() }) }
+                    val plugins = PulsrEnginePlugins(
+                        engine = engine,
+                        audioEffects = audioEffects,
+                        tagEditor = tagEditor,
+                        visualizer = visualizer,
+                        ringtone = ringtone,
+                        scrobbler = scrobbler,
+                        ytmExtractor = ytmExtractor,
+                        ytDownload = ytDownload,
+                        waveform = waveform,
+                        proxy = proxy,
+                        hiResDac = hiResDac,
+                        usbExclusive = usbExclusive,
+                        castDiscovery = castDiscovery,
+                        castSession = castSession,
+                        roomCorrection = roomCorrection,
+                    )
+                    byEngine[engine] = plugins
+                    engine.addEngineLifecycleListener(plugins.lifecycleListener)
+                    return plugins
+                } catch (t: Throwable) {
+                    byEngine.remove(engine)
+                    for ((name, step) in cleanups.asReversed()) {
+                        try {
+                            step()
+                        } catch (ce: Exception) {
+                            Log.w(TAG, "Rollback cleanup failed for $name: ${ce.message}")
+                        }
+                    }
+                    throw t
+                }
             }
         }
 

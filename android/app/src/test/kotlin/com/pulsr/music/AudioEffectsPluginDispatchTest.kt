@@ -1,15 +1,28 @@
 package com.pulsr.music
 
 import android.os.Build
+import android.os.Looper
+import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.doAnswer
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [Build.VERSION_CODES.TIRAMISU])
@@ -58,5 +71,49 @@ class AudioEffectsPluginDispatchTest {
         )
         verify(disable).success(true)
         verifyNoMoreInteractions(disable)
+    }
+
+    @Test
+    @Config(sdk = [34])
+    fun hiResDacAndUsbPluginsFailClosedWithoutCapabilitiesOrHardware() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val messenger = mock(BinaryMessenger::class.java)
+        val hires = HiResDacPlugin(ctx, messenger)
+
+        // Android 14+ without confirmed mixer attributes or direct USB stream
+        // must report bit-perfect unsupported rather than an optimistic true.
+        val supportedResult = mock(MethodChannel.Result::class.java)
+        hires.onMethodCall(MethodCall("isBitPerfectSupported", null), supportedResult)
+        verify(supportedResult).success(false)
+
+        // DoP/Native DSD probe must never infer nativeDsd without kernel/raw DSD
+        // support and must report dop=false with no USB DAC attached.
+        val dopResult = mock(MethodChannel.Result::class.java)
+        hires.onMethodCall(MethodCall("getDopCapabilities", null), dopResult)
+        val dopCaptor = ArgumentCaptor.forClass(Map::class.java)
+        verify(dopResult).success(dopCaptor.capture())
+        val dopMap = dopCaptor.value
+        assertEquals(false, dopMap["dop"])
+        assertEquals(false, dopMap["nativeDsd"])
+
+        // resetHardwareVolume cleanly reports no_device instead of dropping Result.
+        val usb = UsbExclusivePlugin(ctx, messenger)
+        val latch = CountDownLatch(1)
+        val resetResult = mock(MethodChannel.Result::class.java)
+        doAnswer {
+            latch.countDown()
+            null
+        }.`when`(resetResult).success(any())
+        usb.onMethodCall(MethodCall("resetHardwareVolume", null), resetResult)
+        val deadline = System.currentTimeMillis() + 3000
+        while (latch.count > 0 && System.currentTimeMillis() < deadline) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            latch.await(20, TimeUnit.MILLISECONDS)
+        }
+        assertTrue(latch.await(0, TimeUnit.MILLISECONDS))
+        val resetCaptor = ArgumentCaptor.forClass(Map::class.java)
+        verify(resetResult).success(resetCaptor.capture())
+        assertNotNull(resetCaptor.value["error"])
+        assertFalse(resetCaptor.value.isEmpty())
     }
 }

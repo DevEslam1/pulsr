@@ -61,12 +61,14 @@ object AudioTempFiles {
         return sniffExtension(context, uri)
     }
 
+    @JvmOverloads
     @Throws(IOException::class)
     fun copyToTempFile(
         context: Context,
         uri: Uri,
         prefix: String,
         maxBytes: Long = Long.MAX_VALUE,
+        throwOnOverflow: Boolean = true,
     ): File {
         val suffix = extensionFor(context, uri).ifEmpty { ".tmp" }
         val temp = File.createTempFile(prefix, suffix, context.cacheDir)
@@ -74,7 +76,7 @@ object AudioTempFiles {
             val input = context.contentResolver.openInputStream(uri)
                 ?: throw IOException("Cannot open $uri")
             input.use { src ->
-                temp.outputStream().use { out -> copyLimited(src, out, maxBytes) }
+                temp.outputStream().use { out -> copyLimited(src, out, maxBytes, throwOnOverflow) }
             }
         } catch (e: Exception) {
             runCatching { temp.delete() }
@@ -139,7 +141,12 @@ object AudioTempFiles {
         return ""
     }
 
-    private fun copyLimited(input: InputStream, out: java.io.OutputStream, maxBytes: Long) {
+    internal fun copyLimited(
+        input: InputStream,
+        out: java.io.OutputStream,
+        maxBytes: Long,
+        throwOnOverflow: Boolean = true,
+    ) {
         val buffer = ByteArray(64 * 1024)
         var remaining = maxBytes
         while (remaining > 0) {
@@ -149,7 +156,7 @@ object AudioTempFiles {
             out.write(buffer, 0, n)
             remaining -= n
         }
-        if (remaining == 0L && input.read() != -1) {
+        if (throwOnOverflow && remaining == 0L && input.read() != -1) {
             throw IOException("Source exceeds maxBytes ($maxBytes)")
         }
     }

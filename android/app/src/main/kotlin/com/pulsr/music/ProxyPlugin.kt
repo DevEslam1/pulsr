@@ -8,7 +8,9 @@ import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.net.Proxy
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * MethodChannel plugin for managing proxy pool settings and testing connectivity from Flutter.
@@ -18,14 +20,27 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private var channel: MethodChannel? = null
     private var context: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val executor = Executors.newFixedThreadPool(2)
+    @Volatile
+    private var executor: ExecutorService = newExecutor()
+    private val executorLock = Any()
+    @Volatile
+    private var engineAttached = false
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/proxy"
+        private val activeEngines = AtomicInteger(0)
+
+        private fun newExecutor(): ExecutorService =
+            Executors.newFixedThreadPool(2) { r ->
+                Thread(r, "PulsrProxy").apply { isDaemon = true }
+            }
 
         fun registerWith(flutterEngine: FlutterEngine, context: Context): ProxyPlugin {
             val plugin = ProxyPlugin()
             plugin.context = context
+            plugin.ensureExecutor()
+            plugin.engineAttached = true
+            activeEngines.incrementAndGet()
             DnsOverHttpsResolver.initialize(context)
             val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel = channel
@@ -41,9 +56,25 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         }
     }
 
+    private fun ensureExecutor(): ExecutorService {
+        val current = executor
+        if (!current.isShutdown) return current
+        synchronized(executorLock) {
+            if (executor.isShutdown) {
+                executor = newExecutor()
+            }
+            return executor
+        }
+    }
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
-        binding.applicationContext?.let { DnsOverHttpsResolver.initialize(it) }
+        ensureExecutor()
+        if (!engineAttached) {
+            engineAttached = true
+            activeEngines.incrementAndGet()
+        }
+        DnsOverHttpsResolver.initialize(binding.applicationContext)
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel?.setMethodCallHandler(this)
         ProxyPool.setOnPathChangeListener { label ->
@@ -61,11 +92,18 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel?.setMethodCallHandler(null)
         channel = null
         context = null
+        val currentExecutor = executor
         try {
-            executor.shutdownNow()
-            executor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+            currentExecutor.shutdownNow()
+            currentExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)
         } catch (_: Exception) {}
-        ProxyManager.dispose()
+        if (engineAttached) {
+            engineAttached = false
+            val remaining = activeEngines.updateAndGet { count -> if (count > 0) count - 1 else 0 }
+            if (remaining == 0) {
+                ProxyManager.dispose()
+            }
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -131,7 +169,7 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 val timeoutMs = call.argument<Int>("timeoutMs") ?: 10000
 
                 try {
-                    executor.execute {
+                    ensureExecutor().execute {
                         val res = ProxyManager.testConnection(testUrl, timeoutMs)
                         mainHandler.post {
                             try {

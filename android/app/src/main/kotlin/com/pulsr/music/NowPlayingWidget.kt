@@ -99,9 +99,9 @@ class NowPlayingWidget : AppWidgetProvider() {
         val action = intent.action ?: return false
         if (action !in WIDGET_ACTIONS) return false
 
-        // Fast-path: matching token injected into our PendingIntents
+        // Fast-path: matching active or within-grace-window rotated token
         val token = intent.getStringExtra(EXTRA_WIDGET_TOKEN)
-        if (token != null && token == getWidgetToken(context)) return true
+        if (isValidWidgetToken(context, token)) return true
 
         // Signature-level permission check if granted
         try {
@@ -281,6 +281,8 @@ class NowPlayingWidget : AppWidgetProvider() {
         private const val WIDGET_ACTION_PREFIX = "com.pulsr.music.widget."
         private const val WIDGET_CONTROL_PERMISSION = "com.pulsr.music.permission.WIDGET_CONTROL"
 
+        private const val TOKEN_GRACE_WINDOW_MS = 5 * 60 * 1000L
+
         private val secureRandom by lazy { java.security.SecureRandom() }
         private val widgetTokenLock = Any()
 
@@ -303,14 +305,32 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
         }
 
+        internal fun isValidWidgetToken(context: Context, candidate: String?): Boolean = synchronized(widgetTokenLock) {
+            if (candidate.isNullOrEmpty()) return@synchronized false
+            val active = getWidgetToken(context)
+            if (candidate == active) return@synchronized true
+            val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
+            val previous = prefs.getString("token_previous", null)
+            val prevExpiresAt = prefs.getLong("token_prev_expires_at", 0L)
+            previous != null && candidate == previous && System.currentTimeMillis() <= prevExpiresAt
+        }
+
         fun rotateWidgetToken(context: Context): String = synchronized(widgetTokenLock) {
             val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
+            val prevToken = prefs.getString("token_active", null)
             val newToken = generateToken()
             val now = System.currentTimeMillis()
-            prefs.edit()
+            val editor = prefs.edit()
                 .putString("token_active", newToken)
                 .putLong("token_created_at", now)
-                .commit()
+            if (prevToken != null) {
+                editor.putString("token_previous", prevToken)
+                editor.putLong("token_prev_expires_at", now + TOKEN_GRACE_WINDOW_MS)
+            } else {
+                editor.remove("token_previous")
+                editor.remove("token_prev_expires_at")
+            }
+            editor.commit()
             newToken
         }
 
@@ -336,9 +356,12 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private var cachedMediaBrowser: MediaBrowserCompat? = null
         private var cachedMediaController: MediaControllerCompat? = null
-        private var cachedArtworkPath: String? = null
-        private var cachedArtworkMtime: Long = 0L
-        private var cachedArtworkBitmap: Bitmap? = null
+        @Volatile private var cachedArtworkPath: String? = null
+        @Volatile private var cachedArtworkMtime: Long = 0L
+        @Volatile private var cachedArtworkBitmap: Bitmap? = null
+        private val artworkExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            Thread(r, "PulsrWidgetArtwork").apply { isDaemon = true }
+        }
 
         /// Content version rendered by the last *full* repaint per widget ID. Compared against
         /// the `contentVersion` the Dart side persists to recognise a progress-only
@@ -564,6 +587,45 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
         }
 
+        private fun pushRemoteViews(
+            context: Context,
+            appWidgetManager: AppWidgetManager,
+            appWidgetId: Int,
+            data: SharedPreferences,
+            isProgressOnly: Boolean,
+            predecodedBitmap: Bitmap? = null
+        ) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val viewsTiny = createPopulatedRemoteViews(context, R.layout.widget_now_playing_tiny, data, 44, isProgressOnly, predecodedBitmap)
+                val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing_compact, data, 44, isProgressOnly, predecodedBitmap)
+                val viewsSmall = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, isProgressOnly, predecodedBitmap)
+                val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68, isProgressOnly, predecodedBitmap)
+                val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88, isProgressOnly, predecodedBitmap)
+                val viewMapping = mapOf(
+                    SizeF(140f, 60f) to viewsTiny,
+                    SizeF(250f, 60f) to viewsCompact,
+                    SizeF(250f, 110f) to viewsSmall,
+                    SizeF(250f, 170f) to viewsMedium,
+                    SizeF(250f, 250f) to viewsLarge
+                )
+                val remoteViews = RemoteViews(viewMapping)
+                appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
+            } else {
+                val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+                val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+                val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
+                val (layoutId, artDp) = when {
+                    minWidth < 250 -> Pair(R.layout.widget_now_playing_tiny, 44)
+                    minHeight >= 250 -> Pair(R.layout.widget_now_playing_large, 88)
+                    minHeight >= 170 -> Pair(R.layout.widget_now_playing_medium, 68)
+                    minHeight >= 110 && minWidth >= 250 -> Pair(R.layout.widget_now_playing, 56)
+                    else -> Pair(R.layout.widget_now_playing_compact, 44)
+                }
+                val views = createPopulatedRemoteViews(context, layoutId, data, artDp, isProgressOnly, predecodedBitmap)
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            }
+        }
+
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
@@ -577,34 +639,26 @@ class NowPlayingWidget : AppWidgetProvider() {
                 val cached = cachedArtworkBitmap
                 val progressOnly = isProgressOnly && cached != null && !cached.isRecycled
 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val viewsTiny = createPopulatedRemoteViews(context, R.layout.widget_now_playing_tiny, data, 44, progressOnly)
-                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing_compact, data, 44, progressOnly)
-                    val viewsSmall = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, progressOnly)
-                    val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68, progressOnly)
-                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88, progressOnly)
-                    val viewMapping = mapOf(
-                        SizeF(140f, 60f) to viewsTiny,
-                        SizeF(250f, 60f) to viewsCompact,
-                        SizeF(250f, 110f) to viewsSmall,
-                        SizeF(250f, 170f) to viewsMedium,
-                        SizeF(250f, 250f) to viewsLarge
-                    )
-                    val remoteViews = RemoteViews(viewMapping)
-                    appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
-                } else {
-                    val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-                    val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
-                    val minWidth = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0) ?: 0
-                    val (layoutId, artDp) = when {
-                        minWidth < 250 -> Pair(R.layout.widget_now_playing_tiny, 44)
-                        minHeight >= 250 -> Pair(R.layout.widget_now_playing_large, 88)
-                        minHeight >= 170 -> Pair(R.layout.widget_now_playing_medium, 68)
-                        minHeight >= 110 && minWidth >= 250 -> Pair(R.layout.widget_now_playing, 56)
-                        else -> Pair(R.layout.widget_now_playing_compact, 44)
+                pushRemoteViews(context, appWidgetManager, appWidgetId, data, progressOnly)
+
+                val artworkPath = getSafeString(data, "artwork")
+                if (!progressOnly && !artworkPath.isNullOrEmpty()) {
+                    val appContext = context.applicationContext ?: context
+                    val cachedSamePath = cachedArtworkPath == artworkPath && cached != null && !cached.isRecycled
+                    artworkExecutor.execute {
+                        val decoded = getOrDecodeArtworkBitmap(appContext, artworkPath) ?: return@execute
+                        if (decoded.isRecycled) return@execute
+                        if (cachedSamePath && decoded === cached) return@execute
+                        updateHandler.post {
+                            try {
+                                if (decoded.isRecycled) return@post
+                                val latestData = HomeWidgetPlugin.getData(appContext)
+                                if (getSafeString(latestData, "artwork") != artworkPath) return@post
+                                val mgr = AppWidgetManager.getInstance(appContext)
+                                pushRemoteViews(appContext, mgr, appWidgetId, latestData, false, decoded)
+                            } catch (_: Throwable) {}
+                        }
                     }
-                    val views = createPopulatedRemoteViews(context, layoutId, data, artDp, progressOnly)
-                    appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
 
                 if (!progressOnly) {
@@ -648,7 +702,8 @@ class NowPlayingWidget : AppWidgetProvider() {
             layoutId: Int,
             data: SharedPreferences,
             targetArtDp: Int,
-            isProgressOnly: Boolean = false
+            isProgressOnly: Boolean = false,
+            predecodedBitmap: Bitmap? = null
         ): RemoteViews {
             val views = RemoteViews(context.packageName, layoutId)
 
@@ -800,19 +855,18 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
 
             // ---- Artwork ----
-            // On a progress-only tick reuse the already-decoded bitmap so the
-            // per-second update never touches disk. getOrDecodeArtworkBitmap is
-            // itself cached by path+mtime, so a full render would also avoid the
-            // decode — preferring the cache here just keeps the fast path explicit
-            // and guards against a stale prefs `artwork` path during the tick.
+            // Never decode artwork on the main thread: reuse a valid in-memory or
+            // pre-decoded bitmap immediately while background decode refreshes.
             val artworkPath = getSafeString(data, "artwork")
             val cachedBmp = cachedArtworkBitmap
-            val bmp = if (isProgressOnly && cachedBmp != null && !cachedBmp.isRecycled) {
-                cachedBmp
-            } else if (!artworkPath.isNullOrEmpty()) {
-                getOrDecodeArtworkBitmap(context, artworkPath)
-            } else {
-                null
+            val bmp = when {
+                predecodedBitmap != null && !predecodedBitmap.isRecycled -> predecodedBitmap
+                !artworkPath.isNullOrEmpty() &&
+                    cachedArtworkPath == artworkPath &&
+                    cachedBmp != null &&
+                    !cachedBmp.isRecycled -> cachedBmp
+                isProgressOnly && cachedBmp != null && !cachedBmp.isRecycled -> cachedBmp
+                else -> null
             }
             if (bmp != null && !bmp.isRecycled) {
                 views.setImageViewBitmap(R.id.widget_artwork, bmp)
