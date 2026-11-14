@@ -113,6 +113,9 @@ class AudioPlayer {
   /// platform mixer. Replayed on every platform activation like the other
   /// output-path preferences so a newly built sink gets it before playback.
   int _tapSrcTargetRate = 0;
+  int? _lastSampleRate;
+  int? _lastChannelCount;
+  int? _lastPcmEncoding;
 
   /// Effective (not requested) state of the optional output paths, surfaced to
   /// the app so a native fallback is visible instead of silently diverging
@@ -1436,8 +1439,20 @@ class AudioPlayer {
     bool enabled, {
     bool preferExclusive = true,
     int targetBufferMs = 150,
+    int? sampleRate,
+    int? channelCount,
+    int? pcmEncoding,
   }) async {
     if (_disposed) return false;
+    if (sampleRate != null && sampleRate > 0) {
+      _lastSampleRate = sampleRate;
+    }
+    if (channelCount != null && channelCount > 0) {
+      _lastChannelCount = channelCount;
+    }
+    if (pcmEncoding != null && pcmEncoding > 0) {
+      _lastPcmEncoding = pcmEncoding;
+    }
     try {
       final channel = _activeControlChannel;
       if (!_active || channel == null) {
@@ -1447,12 +1462,28 @@ class AudioPlayer {
         _aaudioOutputActive = false;
         return true; // remembered; flushed on platform activation
       }
-      final accepted = await channel.invokeMethod<bool>('dspSetAaudioOutput', {
-            'enabled': enabled,
-            'preferExclusive': preferExclusive,
-            'targetBufferMs': targetBufferMs,
-          }) ??
-          false;
+      final effectiveSampleRate =
+          (sampleRate != null && sampleRate > 0) ? sampleRate : _lastSampleRate;
+      final effectiveChannelCount = (channelCount != null && channelCount > 0)
+          ? channelCount
+          : _lastChannelCount;
+      final effectivePcmEncoding = (pcmEncoding != null && pcmEncoding > 0)
+          ? pcmEncoding
+          : _lastPcmEncoding;
+      final args = <String, dynamic>{
+        'enabled': enabled,
+        'preferExclusive': preferExclusive,
+        'targetBufferMs': targetBufferMs,
+        if (effectiveSampleRate != null && effectiveSampleRate > 0)
+          'sampleRate': effectiveSampleRate,
+        if (effectiveChannelCount != null && effectiveChannelCount > 0)
+          'channelCount': effectiveChannelCount,
+        if (effectivePcmEncoding != null && effectivePcmEncoding > 0)
+          'pcmEncoding': effectivePcmEncoding,
+      };
+      final accepted =
+          await channel.invokeMethod<bool>('dspSetAaudioOutput', args) ??
+              false;
       if (accepted) {
         _aaudioOutputEnabled = enabled;
         _aaudioPreferExclusive = preferExclusive;
@@ -1983,6 +2014,22 @@ class AudioPlayer {
                       : null,
                 );
               }
+            } else if (call.method == 'dspTrackFormat') {
+              final args = call.arguments;
+              if (args is Map) {
+                final rate = args['sampleRate'];
+                if (rate is int && rate > 0) {
+                  _lastSampleRate = rate;
+                }
+                final channels = args['channelCount'];
+                if (channels is int && channels > 0) {
+                  _lastChannelCount = channels;
+                }
+                final encoding = args['pcmEncoding'];
+                if (encoding is int && encoding > 0) {
+                  _lastPcmEncoding = encoding;
+                }
+              }
             }
             return null;
           });
@@ -1994,6 +2041,12 @@ class AudioPlayer {
                     'enabled': _aaudioOutputEnabled,
                     'preferExclusive': _aaudioPreferExclusive,
                     'targetBufferMs': _aaudioTargetBufferMs,
+                    if (_lastSampleRate != null && _lastSampleRate! > 0)
+                      'sampleRate': _lastSampleRate,
+                    if (_lastChannelCount != null && _lastChannelCount! > 0)
+                      'channelCount': _lastChannelCount,
+                    if (_lastPcmEncoding != null && _lastPcmEncoding! > 0)
+                      'pcmEncoding': _lastPcmEncoding,
                   }) ??
                   false;
           final aaudioActive = _aaudioOutputEnabled && aaudioAccepted;

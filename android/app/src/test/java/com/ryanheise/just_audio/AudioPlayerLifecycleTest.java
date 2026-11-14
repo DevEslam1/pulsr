@@ -95,6 +95,20 @@ public class AudioPlayerLifecycleTest {
         return args;
     }
 
+    @org.junit.Before
+    public void setUpAaudioProbe() {
+        AudioPlayer.clearAaudioProbeCache();
+        PulsrOutputRouting.select(null);
+        AudioPlayer.setProbeExecutorForTest(Runnable::run);
+    }
+
+    @org.junit.After
+    public void tearDownAaudioProbe() {
+        AudioPlayer.setProbeExecutorForTest(null);
+        AudioPlayer.clearAaudioProbeCache();
+        PulsrOutputRouting.select(null);
+    }
+
     @Test
     public void floatToggleBeforeInitializationIsRememberedWithoutBuildingPlayer()
             throws Exception {
@@ -144,6 +158,7 @@ public class AudioPlayerLifecycleTest {
         final MethodChannel.Result result = mock(MethodChannel.Result.class);
 
         player.onMethodCall(new MethodCall("dspSetAaudioOutput", aaudioArgs()), result);
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
 
         verify(sink).requestModeChange(false);
         verify(exo, never()).release();
@@ -207,6 +222,7 @@ public class AudioPlayerLifecycleTest {
         args.put("pcmEncoding", C.ENCODING_PCM_FLOAT);
         final MethodChannel.Result result = mock(MethodChannel.Result.class);
         player.onMethodCall(new MethodCall("dspSetAaudioOutput", args), result);
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
 
         verify(result).success(true);
         assertEquals(2, probedEncodings.size());
@@ -263,5 +279,129 @@ public class AudioPlayerLifecycleTest {
         assertEquals(Boolean.TRUE, getField(player, "tapSrcFailed"));
         player.dispose();
         assertEquals(Boolean.FALSE, getField(player, "tapSrcFailed"));
+    }
+
+    @Test
+    public void dspSetAaudioOutputProbesOffMainThreadAndCompletesOnMainHandler() throws Exception {
+        final List<Runnable> queuedTasks = new ArrayList<>();
+        AudioPlayer.setProbeExecutorForTest(queuedTasks::add);
+        final AudioPlayer player = newProbeAcceptingPlayer();
+        final MethodChannel.Result result = mock(MethodChannel.Result.class);
+
+        // Method call must return immediately without running the probe or completing result.
+        player.onMethodCall(new MethodCall("dspSetAaudioOutput", aaudioArgs()), result);
+        assertEquals(1, queuedTasks.size());
+        verify(result, never()).success(any());
+
+        // Worker runs off main thread; result waits until main handler drains.
+        queuedTasks.get(0).run();
+        verify(result, never()).success(any());
+
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        verify(result).success(true);
+        assertEquals(Boolean.TRUE, getField(player, "aaudioOutputEnabled"));
+    }
+
+    @Test
+    public void aaudioProbeCachesPerTupleAndClearsOnDeviceOrRouteChange() throws Exception {
+        final int[] probeCalls = {0};
+        class CountingProbePlayer extends AudioPlayer {
+            CountingProbePlayer() {
+                super(RuntimeEnvironment.getApplication(), mock(BinaryMessenger.class),
+                        "lifecycle-cache-" + (++nextId), null, null, null, false, false);
+            }
+
+            @Override
+            boolean isAaudioOutputSupported() {
+                return true;
+            }
+
+            @Override
+            boolean probeAaudioOutput(int sampleRate, int channels, int targetBufferMs,
+                    boolean preferExclusive, int pcmEncoding) {
+                probeCalls[0]++;
+                return true;
+            }
+
+            @Override
+            boolean probeAaudioOutput(int sampleRate, int channels, int targetBufferMs,
+                    boolean preferExclusive) {
+                probeCalls[0]++;
+                return true;
+            }
+        }
+
+        final CountingProbePlayer p1 = new CountingProbePlayer();
+        p1.onMethodCall(new MethodCall("dspSetAaudioOutput", aaudioArgs()),
+                mock(MethodChannel.Result.class));
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        assertEquals(1, probeCalls[0]);
+
+        // Second call with identical (device, rate, channels, encoding, exclusive) uses cache.
+        final CountingProbePlayer p2 = new CountingProbePlayer();
+        p2.onMethodCall(new MethodCall("dspSetAaudioOutput", aaudioArgs()),
+                mock(MethodChannel.Result.class));
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        assertEquals(1, probeCalls[0]);
+
+        // Different exclusive flag is a cache miss.
+        final Map<String, Object> sharedArgs = aaudioArgs();
+        sharedArgs.put("preferExclusive", false);
+        final CountingProbePlayer p3 = new CountingProbePlayer();
+        p3.onMethodCall(new MethodCall("dspSetAaudioOutput", sharedArgs),
+                mock(MethodChannel.Result.class));
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        assertEquals(2, probeCalls[0]);
+
+        // PulsrOutputRouting.select clears cache.
+        PulsrOutputRouting.select(null);
+        final CountingProbePlayer p4 = new CountingProbePlayer();
+        p4.onMethodCall(new MethodCall("dspSetAaudioOutput", aaudioArgs()),
+                mock(MethodChannel.Result.class));
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        assertEquals(3, probeCalls[0]);
+
+        // Route-change event clears cache.
+        AudioPlayer.onRouteChanged();
+        final CountingProbePlayer p5 = new CountingProbePlayer();
+        p5.onMethodCall(new MethodCall("dspSetAaudioOutput", aaudioArgs()),
+                mock(MethodChannel.Result.class));
+        org.robolectric.shadows.ShadowLooper.idleMainLooper();
+        assertEquals(4, probeCalls[0]);
+    }
+
+    @Test
+    public void probeSingleAaudioEncodingForwardsPreferredDeviceId() throws Exception {
+        final android.media.AudioDeviceInfo usbDevice =
+                org.robolectric.shadows.AudioDeviceInfoBuilder.newBuilder()
+                        .setType(android.media.AudioDeviceInfo.TYPE_USB_DEVICE)
+                        .build();
+        PulsrOutputRouting.select(usbDevice);
+        assertEquals(usbDevice.getId(), PulsrOutputRouting.preferredDeviceId());
+
+        final int[] capturedDeviceId = {-1};
+        final AudioPlayer player = new AudioPlayer(
+                RuntimeEnvironment.getApplication(),
+                mock(BinaryMessenger.class),
+                "lifecycle-device-" + (++nextId),
+                null,
+                null,
+                null,
+                false,
+                false) {
+            @Override
+            long openAaudioProbeStream(int sampleRate, int channels, int nativeEncoding,
+                    int targetBufferMs, boolean preferExclusive, int deviceId) {
+                capturedDeviceId[0] = deviceId;
+                return 0L;
+            }
+        };
+
+        player.probeSingleAaudioEncoding(48000, 2, AaudioNativeBridge.ENCODING_PCM_I16, 150, true);
+        assertEquals(usbDevice.getId(), capturedDeviceId[0]);
+
+        PulsrOutputRouting.select(null);
+        player.probeSingleAaudioEncoding(48000, 2, AaudioNativeBridge.ENCODING_PCM_I16, 150, true);
+        assertEquals(0, capturedDeviceId[0]);
     }
 }

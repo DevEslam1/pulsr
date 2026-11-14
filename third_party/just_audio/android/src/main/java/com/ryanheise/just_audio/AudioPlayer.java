@@ -1,6 +1,9 @@
 package com.ryanheise.just_audio;
 
 import android.content.Context;
+import android.media.AudioDeviceCallback;
+import android.media.AudioDeviceInfo;
+import android.media.AudioManager;
 import android.media.audiofx.AudioEffect;
 import android.media.audiofx.Equalizer;
 import android.media.audiofx.LoudnessEnhancer;
@@ -70,11 +73,40 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class AudioPlayer implements MethodCallHandler, Player.Listener, MetadataOutput {
     public static final int ERROR_ABORT = 10000000;
 
     static final String TAG = "AudioPlayer";
+
+    private static final Executor AAUDIO_PROBE_EXECUTOR =
+            Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "pulsr-aaudio-probe");
+                t.setDaemon(true);
+                return t;
+            });
+    private static volatile Executor probeExecutor = AAUDIO_PROBE_EXECUTOR;
+    private static final ConcurrentHashMap<String, Boolean> AAUDIO_PROBE_CACHE =
+            new ConcurrentHashMap<>();
+    private static final AtomicInteger AAUDIO_PROBE_CACHE_GENERATION =
+            new AtomicInteger();
+
+    public static void clearAaudioProbeCache() {
+        AAUDIO_PROBE_CACHE_GENERATION.incrementAndGet();
+        AAUDIO_PROBE_CACHE.clear();
+    }
+
+    static void onRouteChanged() {
+        clearAaudioProbeCache();
+    }
+
+    static void setProbeExecutorForTest(Executor executor) {
+        probeExecutor = executor != null ? executor : AAUDIO_PROBE_EXECUTOR;
+    }
 
     private static Random random = new Random();
 
@@ -123,6 +155,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private volatile boolean aaudioOutputEnabled = false;
     private volatile boolean aaudioPreferExclusive = true;
     private volatile int aaudioTargetBufferMs = 150;
+    private volatile boolean disposed = false;
+    private int aaudioRequestGeneration = 0;
+    private AudioDeviceCallback routeDeviceCallback;
+    private boolean routeCallbackPrimed = false;
     // Pulsr fork: tap-side SRC target (device output rate). 0 = disabled: the
     // AudioTrack opens at the source rate as before and AudioFlinger performs
     // any rate conversion. When set, the DSP processor declares this rate as
@@ -259,6 +295,48 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             }
         }
         enqueuePlaybackEvent();
+        registerRouteChangeCallback();
+    }
+
+    private void registerRouteChangeCallback() {
+        try {
+            final AudioManager audioManager =
+                    (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager == null) return;
+            routeCallbackPrimed = false;
+            routeDeviceCallback = new AudioDeviceCallback() {
+                @Override
+                public void onAudioDevicesAdded(AudioDeviceInfo[] addedDevices) {
+                    if (!routeCallbackPrimed) {
+                        routeCallbackPrimed = true;
+                        return;
+                    }
+                    onRouteChanged();
+                }
+
+                @Override
+                public void onAudioDevicesRemoved(AudioDeviceInfo[] removedDevices) {
+                    routeCallbackPrimed = true;
+                    onRouteChanged();
+                }
+            };
+            audioManager.registerAudioDeviceCallback(routeDeviceCallback, handler);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    private void unregisterRouteChangeCallback() {
+        final AudioDeviceCallback cb = routeDeviceCallback;
+        routeDeviceCallback = null;
+        if (cb == null) return;
+        try {
+            final AudioManager audioManager =
+                    (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (audioManager != null) {
+                audioManager.unregisterAudioDeviceCallback(cb);
+            }
+        } catch (RuntimeException ignored) {
+        }
     }
 
     @Override
@@ -280,11 +358,18 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     @Override
     public void onTracksChanged(Tracks tracks) {
+        androidx.media3.common.Format detectedAudioFormat = null;
         for (int i = 0; i < tracks.getGroups().size(); i++) {
-            TrackGroup trackGroup = tracks.getGroups().get(i).getMediaTrackGroup();
+            Tracks.Group group = tracks.getGroups().get(i);
+            TrackGroup trackGroup = group.getMediaTrackGroup();
+            boolean isSelectedAudio = group.getType() == C.TRACK_TYPE_AUDIO && group.isSelected();
 
             for (int j = 0; j < trackGroup.length; j++) {
-                Metadata metadata = trackGroup.getFormat(j).metadata;
+                androidx.media3.common.Format fmt = trackGroup.getFormat(j);
+                if (isSelectedAudio && group.isTrackSelected(j)) {
+                    detectedAudioFormat = fmt;
+                }
+                Metadata metadata = fmt.metadata;
 
                 if (metadata != null) {
                     for (int k = 0; k < metadata.length(); k++) {
@@ -296,6 +381,25 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     }
                 }
             }
+        }
+        if (detectedAudioFormat == null && player != null) {
+            detectedAudioFormat = player.getAudioFormat();
+        }
+        if (detectedAudioFormat != null
+                && (detectedAudioFormat.sampleRate > 0
+                        || detectedAudioFormat.channelCount > 0
+                        || detectedAudioFormat.pcmEncoding != C.ENCODING_INVALID)) {
+            final androidx.media3.common.Format reported = detectedAudioFormat;
+            handler.post(() -> {
+                if (disposed) return;
+                try {
+                    methodChannel.invokeMethod("dspTrackFormat", mapOf(
+                            "sampleRate", reported.sampleRate,
+                            "channelCount", reported.channelCount,
+                            "pcmEncoding", reported.pcmEncoding));
+                } catch (RuntimeException ignored) {
+                }
+            });
         }
     }
 
@@ -513,12 +617,19 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
      * package-private/overridable so JVM tests can exercise the mode-change
      * path without native code.
      */
+    long openAaudioProbeStream(int sampleRate, int channels, int nativeEncoding,
+            int targetBufferMs, boolean preferExclusive, int deviceId) {
+        return AaudioNativeBridge.nativeOpenForDevice(sampleRate, channels,
+                nativeEncoding, preferExclusive, targetBufferMs, deviceId);
+    }
+
     int probeSingleAaudioEncoding(int sampleRate, int channels, int nativeEncoding,
             int targetBufferMs, boolean preferExclusive) {
         long probe = 0L;
         try {
-            probe = AaudioNativeBridge.nativeOpen(sampleRate, channels,
-                    nativeEncoding, preferExclusive, targetBufferMs);
+            final int deviceId = PulsrOutputRouting.preferredDeviceId();
+            probe = openAaudioProbeStream(sampleRate, channels,
+                    nativeEncoding, targetBufferMs, preferExclusive, deviceId);
             if (probe == 0L) return 0;
             // If exclusive mode was requested, confirm the stream really is
             // exclusive; a device may silently grant shared mode instead.
@@ -598,6 +709,23 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         return false;
     }
 
+    private void finishAaudioProbe(int requestGeneration, boolean enabled,
+            boolean changed, boolean probeOk, Result result) {
+        if (disposed || requestGeneration != aaudioRequestGeneration) {
+            result.success(false);
+            return;
+        }
+        final boolean modeChanged = aaudioOutputEnabled != probeOk;
+        final boolean forceReconfigure = probeOk && changed && !modeChanged;
+        aaudioOutputEnabled = probeOk;
+        if (sinkWrapper != null && (modeChanged || forceReconfigure)) {
+            // Apply on the playback thread by swapping the inner sink; the
+            // ExoPlayer (and any in-flight load/seek) is left untouched.
+            sinkWrapper.requestModeChange(forceReconfigure);
+        }
+        result.success(probeOk == enabled);
+    }
+
     private void completeSeek() {
         seekPos = null;
         seekResult.success(new HashMap<String, Object>());
@@ -641,6 +769,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         // BEFORE the sink is built, so handle it without forcing
         // initialization (same pattern as dspSetFloatOutput).
         if ("dspSetAaudioOutput".equals(call.method)) {
+            final int requestGeneration = ++aaudioRequestGeneration;
             Boolean requested = call.argument("enabled");
             Boolean exclusive = call.argument("preferExclusive");
             Integer bufferMs = call.argument("targetBufferMs");
@@ -667,7 +796,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             if (effective && !aaudioOutputEnabled) {
                 // Library availability alone says nothing about whether this
                 // device grants the requested sharing mode. Probe a real stream
-                // before accepting/persisting the preference.
+                // on a dedicated single-thread executor before accepting.
                 androidx.media3.common.Format format = player == null ? null : player.getAudioFormat();
                 Integer requestedRate = call.argument("sampleRate");
                 int rate = (requestedRate != null && requestedRate > 0)
@@ -683,26 +812,37 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         ? requestedEncoding
                         : (format != null ? format.pcmEncoding
                                 : androidx.media3.common.C.ENCODING_INVALID);
-                effective = (pcmEncoding == androidx.media3.common.C.ENCODING_INVALID
-                        || pcmEncoding == androidx.media3.common.C.ENCODING_PCM_16BIT)
-                        ? probeAaudioOutput(rate, channels,
-                                aaudioTargetBufferMs, aaudioPreferExclusive)
-                        : probeAaudioOutput(rate, channels,
-                                aaudioTargetBufferMs, aaudioPreferExclusive, pcmEncoding);
-                // A second hardware stream open at another rate used to run on
-                // this (main) thread after a successful probe. The first probe
-                // already proves the device can open the requested mode; the
-                // other-rate check only doubled the UI-thread stall.
+                final int probeEncoding = (pcmEncoding == androidx.media3.common.C.ENCODING_INVALID)
+                        ? androidx.media3.common.C.ENCODING_PCM_16BIT
+                        : pcmEncoding;
+                final int deviceId = PulsrOutputRouting.preferredDeviceId();
+                final boolean preferExclusiveSnapshot = aaudioPreferExclusive;
+                final int targetBufferSnapshot = aaudioTargetBufferMs;
+                final String cacheKey = deviceId + ":" + rate + ":" + channels + ":"
+                        + probeEncoding + ":" + preferExclusiveSnapshot;
+                final Boolean cached = AAUDIO_PROBE_CACHE.get(cacheKey);
+                if (cached != null) {
+                    finishAaudioProbe(requestGeneration, enabled, changed, cached, result);
+                    return;
+                }
+                final int cacheGeneration = AAUDIO_PROBE_CACHE_GENERATION.get();
+                final boolean changedSnapshot = changed;
+                probeExecutor.execute(() -> {
+                    final boolean probeOk = (probeEncoding == androidx.media3.common.C.ENCODING_PCM_16BIT)
+                            ? probeAaudioOutput(rate, channels,
+                                    targetBufferSnapshot, preferExclusiveSnapshot)
+                            : probeAaudioOutput(rate, channels,
+                                    targetBufferSnapshot, preferExclusiveSnapshot, probeEncoding);
+                    if (AAUDIO_PROBE_CACHE_GENERATION.get() == cacheGeneration
+                            && PulsrOutputRouting.preferredDeviceId() == deviceId) {
+                        AAUDIO_PROBE_CACHE.put(cacheKey, probeOk);
+                    }
+                    handler.post(() -> finishAaudioProbe(
+                            requestGeneration, enabled, changedSnapshot, probeOk, result));
+                });
+                return;
             }
-            final boolean modeChanged = aaudioOutputEnabled != effective;
-            final boolean forceReconfigure = effective && changed && !modeChanged;
-            aaudioOutputEnabled = effective;
-            if (sinkWrapper != null && (modeChanged || forceReconfigure)) {
-                // Apply on the playback thread by swapping the inner sink; the
-                // ExoPlayer (and any in-flight load/seek) is left untouched.
-                sinkWrapper.requestModeChange(forceReconfigure);
-            }
-            result.success(effective == enabled);
+            finishAaudioProbe(requestGeneration, enabled, changed, effective, result);
             return;
         }
 
@@ -1232,6 +1372,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     /** Called on the playback thread when AAudio failed; fall back in place. */
     private void onAaudioOutputRejected(String reason, Exception cause) {
+        clearAaudioProbeCache();
         boolean wasEnabled = aaudioOutputEnabled;
         aaudioOutputEnabled = false;
         Log.w(TAG, "AAudio output rejected (" + reason + "); using AudioTrack path", cause);
@@ -1522,6 +1663,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     public void dispose() {
+        disposed = true;
+        aaudioRequestGeneration++;
+        unregisterRouteChangeCallback();
         if (processingState == ProcessingState.loading) {
             abortExistingConnection(true);
         }

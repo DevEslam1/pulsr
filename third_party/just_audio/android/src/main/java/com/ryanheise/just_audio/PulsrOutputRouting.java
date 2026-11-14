@@ -135,7 +135,13 @@ public final class PulsrOutputRouting {
             }
         }
         preferred = device;
+        AudioPlayer.clearAaudioProbeCache();
         return allApplied;
+    }
+
+    /** Returns the selected preferred output device ID, or 0 for system default. */
+    public static synchronized int preferredDeviceId() {
+        return preferred == null ? 0 : preferred.getId();
     }
 
     /** [device ID, app AudioTrack rate, PCM encoding]. Zero means unverified.
