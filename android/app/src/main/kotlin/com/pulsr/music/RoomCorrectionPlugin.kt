@@ -134,11 +134,15 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             captureThread = Thread {
                 val buf = ByteArray(8192)
                 var overrunCount = 0
+                var fatalExit = false
+                var fatalMessage: String? = null
                 try {
                     while (capturing.get() && !Thread.currentThread().isInterrupted) {
                         val n = try {
                             record.read(buf, 0, buf.size)
-                        } catch (_: Throwable) {
+                        } catch (t: Throwable) {
+                            fatalExit = true
+                            fatalMessage = "AudioRecord read failed (${t.message ?: t.javaClass.simpleName})"
                             break
                         }
                         if (n < 0) {
@@ -146,17 +150,8 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
                                 AudioRecord.ERROR_DEAD_OBJECT,
                                 AudioRecord.ERROR_INVALID_OPERATION,
                                 AudioRecord.ERROR_BAD_VALUE -> {
-                                    val code = n
-                                    mainHandler.post {
-                                        try {
-                                            eventSink?.error(
-                                                "CAPTURE_ERROR",
-                                                "AudioRecord read failed ($code)",
-                                                null
-                                            )
-                                        } catch (_: Exception) {
-                                        }
-                                    }
+                                    fatalExit = true
+                                    fatalMessage = "AudioRecord read failed ($n)"
                                     break
                                 }
                                 else -> overrunCount++
@@ -178,6 +173,16 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
                     }
                 } finally {
                     capturing.set(false)
+                    if (fatalExit) {
+                        val msg = fatalMessage ?: "AudioRecord capture error"
+                        mainHandler.post {
+                            stopRecording(expectedRecord = record)
+                            try {
+                                eventSink?.error("CAPTURE_ERROR", msg, null)
+                            } catch (_: Exception) {
+                            }
+                        }
+                    }
                 }
             }.apply {
                 name = "PulsrRoomCapture"
@@ -195,7 +200,19 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
         }
     }
 
-    private fun stopRecording() {
+    private fun stopRecording(expectedRecord: AudioRecord? = null) {
+        if (expectedRecord != null && audioRecord !== expectedRecord) {
+            // A newer capture session replaced audioRecord before the fatal cleanup
+            // runnable fired; still stop and release the dead AudioRecord cleanly.
+            val cleanupTask = Runnable {
+                runCatching { expectedRecord.stop() }
+                runCatching { expectedRecord.release() }
+            }
+            if (runCatching { backgroundExecutor.execute(cleanupTask) }.isFailure) {
+                cleanupTask.run()
+            }
+            return
+        }
         capturing.set(false)
         currentSampleRate = 0
         val record = audioRecord
@@ -207,7 +224,7 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             thread?.interrupt()
         } catch (_: Throwable) {}
 
-        backgroundExecutor.execute {
+        val releaseTask = Runnable {
             try {
                 record?.stop()
             } catch (_: Throwable) {}
@@ -217,6 +234,9 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             try {
                 thread?.join(500)
             } catch (_: Throwable) {}
+        }
+        if (runCatching { backgroundExecutor.execute(releaseTask) }.isFailure) {
+            releaseTask.run()
         }
     }
 
