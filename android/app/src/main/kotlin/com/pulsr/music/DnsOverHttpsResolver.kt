@@ -7,10 +7,10 @@ import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.URL
 import java.net.URLEncoder
+import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import org.json.JSONObject
 
@@ -25,7 +25,13 @@ object DnsOverHttpsResolver {
     private const val NEGATIVE_TTL_MS = 30_000L
     private const val MAX_CACHE_SIZE = 256
     private const val HARD_DEADLINE_MS = 3000L
+    private const val HAPPY_EYEBALLS_DELAY_MS = 250L
+    private const val SECOND_FAMILY_LINGER_MS = 120L
     private const val QUERY_TIMEOUT_MS = 1500
+    private val IPV4_LITERAL_REGEX =
+        Regex("""^(?:0|[1-9]\d{0,2})(?:\.(?:0|[1-9]\d{0,2})){3}$""")
+    private val IPV6_HEX_CHAR_REGEX = Regex("""^[0-9a-fA-F:]+$""")
+    private val IPV6_GROUP_REGEX = Regex("""^[0-9a-fA-F]{1,4}$""")
 
     private data class CacheEntry(val addresses: List<InetAddress>, val expiresAt: Long)
 
@@ -50,42 +56,75 @@ object DnsOverHttpsResolver {
 
     private fun now(): Long = System.currentTimeMillis()
 
-    private fun isNumericIp(ip: String): Boolean {
+    internal fun isNumericIp(ip: String): Boolean {
+        val candidate = ip.trim()
+        if (candidate.isEmpty()) return false
+        if (isStrictIpv4Literal(candidate)) return true
+        return isStrictIpv6Literal(candidate)
+    }
+
+    private fun isStrictIpv4Literal(ip: String): Boolean {
+        if (!IPV4_LITERAL_REGEX.matches(ip)) return false
         val parts = ip.split('.')
-        if (parts.size == 4) {
-            return parts.all { part ->
-                part.toIntOrNull()?.let { it in 0..255 } == true && (part == "0" || !part.startsWith("0"))
-            }
+        return parts.size == 4 && parts.all { part -> part.toIntOrNull() in 0..255 }
+    }
+
+    private fun isStrictIpv6Literal(ip: String): Boolean {
+        if (!ip.contains(':')) return false
+        val normalizedHex = if (ip.contains('.')) {
+            val lastColon = ip.lastIndexOf(':')
+            if (lastColon < 0) return false
+            val v4Tail = ip.substring(lastColon + 1)
+            if (!isStrictIpv4Literal(v4Tail)) return false
+            // Replace the validated 32-bit IPv4 tail with two 16-bit groups so
+            // total group counting enforces <= 8 groups uniformly.
+            ip.substring(0, lastColon + 1) + "0:0"
+        } else {
+            ip
         }
-        if (ip.contains(':') && ip.count { it == ':' } >= 2) {
-            // Require at least one hex digit (rejects ":::"/"::") and at most one
-            // "::" compression run, so malformed strings are never mistaken for
-            // literals and handed to the socket layer.
-            val hasHexDigit = ip.any { c -> c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F' }
-            if (!hasHexDigit || ip.split("::").size > 2) return false
-            val hexParts = ip.split(':')
-            return hexParts.all { it.isEmpty() || (it.length <= 4 && it.all { c -> c in '0'..'9' || c in 'a'..'f' || c in 'A'..'F' }) }
+
+        if (!IPV6_HEX_CHAR_REGEX.matches(normalizedHex)) return false
+        if (normalizedHex.contains(":::")) return false
+        if (normalizedHex.startsWith(':') && !normalizedHex.startsWith("::")) return false
+        if (normalizedHex.endsWith(':') && !normalizedHex.endsWith("::")) return false
+
+        val halves = normalizedHex.split("::")
+        if (halves.size > 2) return false
+        val hasCompression = halves.size == 2
+        val leftGroups = if (halves[0].isEmpty()) emptyList() else halves[0].split(':')
+        if (!leftGroups.all { IPV6_GROUP_REGEX.matches(it) }) return false
+
+        if (!hasCompression) {
+            return leftGroups.size == 8
         }
-        return false
+
+        val rightGroups = if (halves[1].isEmpty()) emptyList() else halves[1].split(':')
+        if (!rightGroups.all { IPV6_GROUP_REGEX.matches(it) }) return false
+        val totalGroups = leftGroups.size + rightGroups.size
+        // "::" must elide at least one group, and "::" alone (0 explicit groups)
+        // is rejected alongside > 7 explicit groups around compression.
+        return totalGroups in 1..7
     }
 
     private fun cached(hostname: String): CacheEntry? {
+        val key = hostname.trim().lowercase(Locale.ROOT)
         val at = now()
         return synchronized(cacheLock) {
-            val entry = dnsCache[hostname]
+            val entry = dnsCache[key]
             if (entry != null && at < entry.expiresAt) {
                 entry
             } else {
-                if (entry != null) dnsCache.remove(hostname)
+                if (entry != null) dnsCache.remove(key)
                 null
             }
         }
     }
 
     private fun putInCache(hostname: String, addresses: List<InetAddress>, ttlMillis: Long) {
+        val key = hostname.trim().lowercase(Locale.ROOT)
         val ttl = ttlMillis.coerceIn(NEGATIVE_TTL_MS, CACHE_TTL_MS)
         synchronized(cacheLock) {
-            dnsCache[hostname] = CacheEntry(addresses, now() + ttl)
+            dnsCache[key] = CacheEntry(addresses, now() + ttl)
         }
     }
 
@@ -97,36 +136,60 @@ object DnsOverHttpsResolver {
      * deadline so a dead DoH endpoint cannot stall playback.
      */
     fun resolveAll(hostname: String): List<InetAddress> {
+        val normalizedHost = hostname.trim().lowercase(Locale.ROOT)
+        if (normalizedHost.isEmpty()) return emptyList()
+
         // A literal address needs no resolver round-trip (and a DoH query for
-        // "1.2.3.4" cannot answer anyway).
-        if (isNumericIp(hostname)) {
-            return runCatching { listOf(InetAddress.getByName(hostname)) }.getOrDefault(emptyList())
+        // "1.2.3.4" cannot answer anyway). Only invoke InetAddress.getByName on
+        // strings that strictly match our numeric IP regex/group parser so we
+        // can never trigger a synchronous system DNS lookup.
+        if (isNumericIp(normalizedHost)) {
+            return runCatching { listOf(InetAddress.getByName(normalizedHost)) }.getOrDefault(emptyList())
         }
-        cached(hostname)?.let { return orderAddresses(it.addresses) }
+        cached(normalizedHost)?.let { return orderAddresses(it.addresses) }
 
         val deadline = now() + HARD_DEADLINE_MS
-        val answers = java.util.concurrent.ConcurrentLinkedQueue<Pair<InetAddress, Long>>()
+        val answers = ConcurrentLinkedQueue<Pair<InetAddress, Long>>()
         val minTtl = AtomicLong(Long.MAX_VALUE)
+        val firstAnswerAt = AtomicLong(0L)
+        val inFlight = AtomicInteger(0)
+        val waitLock = Object()
 
         fun collect(results: List<Pair<InetAddress, Long>>) {
-            for (answer in results) {
-                answers.add(answer)
-                minTtl.accumulateAndGet(answer.second) { a, b -> minOf(a, b) }
+            if (results.isEmpty()) return
+            synchronized(waitLock) {
+                for (answer in results) {
+                    answers.add(answer)
+                    minTtl.accumulateAndGet(answer.second) { a, b -> minOf(a, b) }
+                }
+                firstAnswerAt.compareAndSet(0L, now())
+                waitLock.notifyAll()
             }
         }
 
-        fun startProvider(baseUrl: String, latch: CountDownLatch) {
+        fun startProvider(baseUrl: String) {
             for (recordType in listOf("A", "AAAA")) {
-                executor.execute {
-                    try {
-                        val remaining = deadline - now()
-                        if (remaining > 0) {
-                            val timeout = minOf(QUERY_TIMEOUT_MS.toLong(), remaining).toInt()
-                            collect(queryDoH(baseUrl, hostname, recordType, timeout))
+                inFlight.incrementAndGet()
+                try {
+                    executor.execute {
+                        try {
+                            val remaining = deadline - now()
+                            if (remaining > 0) {
+                                val timeout = minOf(QUERY_TIMEOUT_MS.toLong(), remaining).toInt()
+                                collect(queryDoH(baseUrl, normalizedHost, recordType, timeout))
+                            }
+                        } catch (_: Exception) {
+                        } finally {
+                            synchronized(waitLock) {
+                                inFlight.decrementAndGet()
+                                waitLock.notifyAll()
+                            }
                         }
-                    } catch (_: Exception) {
-                    } finally {
-                        latch.countDown()
+                    }
+                } catch (_: Throwable) {
+                    synchronized(waitLock) {
+                        inFlight.decrementAndGet()
+                        waitLock.notifyAll()
                     }
                 }
             }
@@ -135,51 +198,59 @@ object DnsOverHttpsResolver {
         // Happy Eyeballs for DoH: Cloudflare starts immediately. If it has not
         // produced a usable answer within 250 ms (or settles without one),
         // Google races in parallel instead of waiting for the full timeout.
-        val cfLatch = CountDownLatch(2)
-        startProvider("https://1.1.1.1/dns-query", cfLatch)
-        try {
-            cfLatch.await(250L, TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+        startProvider("https://1.1.1.1/dns-query")
+        val fallbackAt = minOf(deadline, now() + HAPPY_EYEBALLS_DELAY_MS)
+        synchronized(waitLock) {
+            try {
+                while (inFlight.get() > 0 && answers.isEmpty()) {
+                    val remaining = fallbackAt - now()
+                    if (remaining <= 0L) break
+                    waitLock.wait(remaining)
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
         }
-        var googleLatch: CountDownLatch? = null
+
         // Cloudflare settling without an answer (NXDOMAIN or both queries
         // empty) must still race Google; only a usable answer skips the fallback.
         if (answers.isEmpty() && now() < deadline) {
-            val latch = CountDownLatch(2)
-            googleLatch = latch
-            startProvider("https://dns.google/resolve", latch)
+            startProvider("https://dns.google/resolve")
         }
 
-        // Return as soon as either provider has finished with a usable answer
-        // instead of blocking on the slower provider's full timeout. Latches
-        // cannot wait on "either", so poll in short slices and re-check both.
-        try {
-            while (true) {
-                val cfDone = cfLatch.count == 0L
-                val google = googleLatch
-                val googleDone = google == null || google.count == 0L
-                if (cfDone && googleDone) break
-                if (answers.isNotEmpty() && (cfDone || google?.count == 0L)) break
-                val remaining = deadline - now()
-                if (remaining <= 0L) break
-                val waiter = if (!cfDone) cfLatch else google ?: break
-                waiter.await(minOf(remaining, 25L), TimeUnit.MILLISECONDS)
+        // Once at least one answer arrives, linger at most 120 ms for the second
+        // address family (A/AAAA) to land so an unresponsive family cannot pin the
+        // lookup to the full timeout.
+        synchronized(waitLock) {
+            try {
+                while (inFlight.get() > 0) {
+                    val nowMs = now()
+                    if (nowMs >= deadline) break
+                    val answeredAt = firstAnswerAt.get()
+                    val waitMs = if (answeredAt > 0L) {
+                        val lingerDeadline = minOf(deadline, answeredAt + SECOND_FAMILY_LINGER_MS)
+                        if (nowMs >= lingerDeadline) break
+                        lingerDeadline - nowMs
+                    } else {
+                        deadline - nowMs
+                    }
+                    waitLock.wait(waitMs)
+                }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
             }
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
         }
 
         val addresses = answers.map { it.first }
             .distinctBy { it.hostAddress }
         if (addresses.isEmpty()) {
-            putInCache(hostname, emptyList(), NEGATIVE_TTL_MS)
+            putInCache(normalizedHost, emptyList(), NEGATIVE_TTL_MS)
             return emptyList()
         }
 
         val ttl = if (minTtl.get() == Long.MAX_VALUE) NEGATIVE_TTL_MS
         else (minTtl.get() * 1000L).coerceIn(NEGATIVE_TTL_MS, CACHE_TTL_MS)
-        putInCache(hostname, addresses, ttl)
+        putInCache(normalizedHost, addresses, ttl)
         return orderAddresses(addresses)
     }
 
@@ -190,9 +261,10 @@ object DnsOverHttpsResolver {
         timeoutMs: Int,
     ): List<Pair<InetAddress, Long>> {
         if (timeoutMs <= 0) return emptyList()
+        val normalizedHost = hostname.trim().lowercase(Locale.ROOT)
         var conn: HttpURLConnection? = null
         return try {
-            val encodedName = URLEncoder.encode(hostname, "UTF-8")
+            val encodedName = URLEncoder.encode(normalizedHost, "UTF-8")
             val url = URL("$baseUrl?name=$encodedName&type=$recordType")
             // Bypass proxy: DoH must reach the resolver even when a custom
             // proxy is dead, otherwise a bad proxy loops into DoH failure.
