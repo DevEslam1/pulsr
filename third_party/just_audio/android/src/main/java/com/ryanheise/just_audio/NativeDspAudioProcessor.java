@@ -55,8 +55,16 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             long engineHandle, ByteBuffer inBuffer, int inFrames, int channels,
             ByteBuffer outBuffer, int maxOutFrames, double srcRate, double dstRate);
     private static native boolean nativeIsBitPerfect(long engineHandle);
+    private static native boolean nativeIsUsbExclusive(long engineHandle);
     private static native void nativeResyncForTrack(
             long engineHandle, double sampleRate, int channels);
+
+    /**
+     * Sentinel returned by nativeProcessDirectFloatBuffer when Direct USB ring
+     * is temporarily full so FloatDspAudioSink stalls cleanly without dropping
+     * PCM frames or advancing input buffers.
+     */
+    static final int DIRECT_USB_RETRY = Integer.MIN_VALUE + 1;
 
     // Lifetime safety. The playback thread takes the READ side around every JNI
     // call (queueInput/onFlush/onReset/resetNativeState); release() takes the
@@ -129,9 +137,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
      * configure time).
      */
     public void setFloatOutput(boolean enabled) {
-        // Float AudioTrack output exists from API 21; minSdk is well above it,
-        // but degrading to 16-bit is cheaper than risking a silent sink.
-        this.floatOutputEnabled = enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
+        this.floatOutputEnabled = enabled;
     }
 
     public boolean isFloatOutputEnabled() {
@@ -297,6 +303,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     // fade the complete chain without replacing another owner's envelope.
     private volatile boolean transitionMuted;
     private volatile float transitionGain = 1.0f;
+    private volatile boolean directUsbBackpressured = false;
 
     /**
      * Carries an in-flight gain ramp / transition fade onto a replacement
@@ -385,6 +392,48 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
     }
 
+    boolean isUsbExclusiveActive() {
+        engineLock.readLock().lock();
+        try {
+            final long handle = nativeEngineHandle.get();
+            if (handle == 0 || !NATIVE_AVAILABLE) return false;
+            try {
+                return nativeIsUsbExclusive(handle);
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
+                return false;
+            }
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
+    boolean consumeDirectUsbBackpressure() {
+        final boolean busy = directUsbBackpressured;
+        directUsbBackpressured = false;
+        return busy;
+    }
+
+    boolean hasPendingGainCurve() {
+        synchronized (rampLock) {
+            if (rampGains != null || Math.abs(staticGain - 1.0f) > 0.0001f) {
+                return true;
+            }
+        }
+        return transitionMuted || Math.abs(transitionGain - 1.0f) > 0.0001f;
+    }
+
+    /**
+     * True when native bit-perfect bypass is active without USB exclusive
+     * streaming, tap-side SRC, or transport gain curves.
+     */
+    boolean canBypassFloatPath() {
+        return isNativeAvailableForConfiguration()
+                && isBitPerfectNative()
+                && !isUsbExclusiveActive()
+                && tapSrcTargetRate <= 0
+                && !hasPendingGainCurve();
+    }
+
     /** A rate-changing failure must never consume source-rate PCM. */
     static final class TapSrcException extends RuntimeException {
         TapSrcException(String message, Throwable cause) { super(message, cause); }
@@ -456,6 +505,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     /** Original integer PCM is read-only metadata for native USB raw delivery. */
     public void queueInput(ByteBuffer inputBuffer, ByteBuffer sourcePcm,
             int sourceBitDepth, int sourceSampleRate) {
+        directUsbBackpressured = false;
         int position = inputBuffer.position();
         int limit = inputBuffer.limit();
         int frameCount = (limit - position) / inputAudioFormat.bytesPerFrame;
@@ -539,23 +589,6 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             startPos = rampPosFrames;
             idleGain = staticGain;
             gainActive = curve != null || Math.abs(idleGain - 1.0f) > 0.0001f;
-            // Consume the frames we are about to emit. When the curve is
-            // exhausted it transitions into a static gain equal to its last
-            // value, so a fade-out stays silent and a fade-in becomes
-            // transparent instead of leaving a stale curve behind. A held
-            // static gain now persists through bit-perfect blocks too (the
-            // engine applies it on the bypass path), so the old one-block
-            // ramp-to-unity — which resurrected audio after a completed sleep
-            // fade-out — is gone.
-            if (curve != null) {
-                rampPosFrames += emitFrames;
-                if (rampPosFrames >= (long) (curve.length - 1) * segFrames) {
-                    staticGain = curve[curve.length - 1];
-                    rampGains = null;
-                    rampSegmentMs = 0;
-                    rampPosFrames = 0;
-                }
-            }
         }
         if (transitionMuted || Math.abs(transitionGain - 1.0f) > 0.0001f) {
             gainActive = true;
@@ -586,7 +619,6 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 }
                 gains.put(f, gain * profileGain);
             }
-            transitionGain = profileGain;
         }
 
         int processed = emitFrames;
@@ -608,6 +640,10 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                         rawEligible ? sourcePcm : null,
                         rawEligible ? sourcePcm.position() : 0,
                         rawEligible ? sourceBitDepth : 0, sourceSampleRate);
+                if (processed == DIRECT_USB_RETRY) {
+                    directUsbBackpressured = true;
+                    return;
+                }
                 exclusiveSilence = processed == Integer.MIN_VALUE;
                 bitPerfect = processed < 0 && !exclusiveSilence;
                 if (exclusiveSilence) processed = emitFrames;
@@ -617,6 +653,22 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 logJniFailureOnce("nativeProcessDirectFloatBuffer", e);
                 processed = emitFrames;
                 bitPerfect = false;
+            }
+        }
+        // Commit transport gain/ramp progress only after native delivery
+        // succeeds (backpressure retries reuse the exact same frames & curve).
+        transitionGain = profileGain;
+        if (curve != null) {
+            synchronized (rampLock) {
+                if (rampGains == curve) {
+                    rampPosFrames += emitFrames;
+                    if (rampPosFrames >= (long) (curve.length - 1) * segFrames) {
+                        staticGain = curve[curve.length - 1];
+                        rampGains = null;
+                        rampSegmentMs = 0;
+                        rampPosFrames = 0;
+                    }
+                }
             }
         }
         if (processed <= 0 || processed > emitFrames) {
@@ -688,6 +740,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onFlush() {
+        directUsbBackpressured = false;
         releaseUsbProducer();
         tapSrcFailure = null;
         tapSrcActive = inputAudioFormat.sampleRate > 0 && outputAudioFormat.sampleRate > 0
@@ -736,6 +789,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
     @Override
     protected void onReset() {
+        directUsbBackpressured = false;
         transitionMuted = false;
         transitionGain = 1.0f;
         tapSrcActive = false;

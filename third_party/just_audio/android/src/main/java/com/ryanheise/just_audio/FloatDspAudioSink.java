@@ -38,6 +38,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private final NativeDspAudioProcessor processor;
     private final boolean forceFloatForPcm16;
     private final boolean pcm16Boundary;
+    private final boolean allowBitPerfectIntegerBypass;
+    private boolean bypassedForBitPerfect;
     private ByteBuffer quantizedOutput;
     private boolean processFloat;
     private int inputEncoding;
@@ -60,6 +62,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private Format lastInputFormat;
     private Format configuredOutputFormat;
     private int lastBufferSize;
+    private int[] lastOutputChannels;
     private boolean eosQueued;
     private Format deferredFormat;
     private int deferredBufferSize;
@@ -98,10 +101,18 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             }
             remapped = changed;
             outputFrameBytes = sampleBytes * (mapping == null ? format.channelCount : mapping.length);
-            initialDelayBytes = Math.multiplyExact(Math.max(0, format.encoderDelay), inputFrameBytes);
+            initialDelayBytes = checkedMultiply(Math.max(0, format.encoderDelay), inputFrameBytes);
             delayBytes = initialDelayBytes;
-            tail = new byte[Math.multiplyExact(Math.max(0, format.encoderPadding), inputFrameBytes)];
+            tail = new byte[checkedMultiply(Math.max(0, format.encoderPadding), inputFrameBytes)];
             nextTail = new byte[tail.length];
+        }
+
+        private static int checkedMultiply(int a, int b) {
+            long product = (long) a * (long) b;
+            if (product != (int) product) {
+                throw new ArithmeticException("integer overflow");
+            }
+            return (int) product;
         }
 
         boolean edits() { return delayBytes != 0 || tail.length != 0 || remapped; }
@@ -168,10 +179,17 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor,
             boolean forceFloatForPcm16, boolean pcm16Boundary) {
+        this(delegate, processor, forceFloatForPcm16, pcm16Boundary, false);
+    }
+
+    FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor,
+            boolean forceFloatForPcm16, boolean pcm16Boundary,
+            boolean allowBitPerfectIntegerBypass) {
         super(delegate);
         this.processor = processor;
         this.forceFloatForPcm16 = forceFloatForPcm16;
         this.pcm16Boundary = pcm16Boundary;
+        this.allowBitPerfectIntegerBypass = allowBitPerfectIntegerBypass;
         if (this.processor != null) {
             this.processor.setFloatOutput(true);
         }
@@ -204,6 +222,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             deferredChannels = outputChannels == null ? null : outputChannels.clone();
             return;
         }
+        lastInputFormat = format;
+        lastBufferSize = bufferSize;
+        lastOutputChannels = outputChannels == null ? null : outputChannels.clone();
         final int encoding = format.pcmEncoding;
         final boolean sameInput = processFloat
                 && format.sampleRate == lastSampleRate
@@ -218,10 +239,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 || encoding == C.ENCODING_PCM_16BIT
                 || encoding == C.ENCODING_PCM_24BIT
                 || encoding == C.ENCODING_PCM_32BIT;
-        final boolean bypass16 = !forceFloatForPcm16 && encoding == C.ENCODING_PCM_16BIT;
+        final boolean bitPerfectBypass16 = allowBitPerfectIntegerBypass
+                && encoding == C.ENCODING_PCM_16BIT
+                && processor != null
+                && processor.canBypassFloatPath();
+        final boolean bypass16 = (!forceFloatForPcm16 || bitPerfectBypass16)
+                && encoding == C.ENCODING_PCM_16BIT;
         if (processor == null || !supported || bypass16) {
+            bypassedForBitPerfect = bitPerfectBypass16;
             frameEditor = null;
-            lastInputFormat = format;
             if (processor != null && !supported) {
                 Log.w(TAG, "Unsupported PCM encoding " + encoding
                         + "; native DSP bypassed for this format");
@@ -230,9 +256,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             pendingInput = null;
             processFloat = false;
             processorOutputFormat = AudioProcessor.AudioFormat.NOT_SET;
+            configuredOutputFormat = format;
             super.configure(format, bufferSize, outputChannels);
             return;
         }
+        bypassedForBitPerfect = false;
 
         try {
             // An identical configure during a partial write is negotiation, not
@@ -243,8 +271,6 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         } catch (IllegalArgumentException | ArithmeticException e) {
             throw new ConfigurationException(e, format);
         }
-        lastInputFormat = format;
-        lastBufferSize = bufferSize;
         eosQueued = false;
         final int mappedChannels = outputChannels == null ? format.channelCount : outputChannels.length;
         final AudioProcessor.AudioFormat output;
@@ -291,6 +317,21 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     public boolean handleBuffer(ByteBuffer input, long presentationTimeUs, int accessUnits)
             throws InitializationException, WriteException {
         if (!input.hasRemaining()) return true;
+        if (pendingInput == null && deferredFormat == null
+                && allowBitPerfectIntegerBypass && forceFloatForPcm16
+                && processor != null && lastInputFormat != null
+                && lastInputFormat.pcmEncoding == C.ENCODING_PCM_16BIT) {
+            final boolean wantBypass = processor.canBypassFloatPath();
+            if (wantBypass != bypassedForBitPerfect) {
+                try {
+                    configure(lastInputFormat.buildUpon().setEncoderDelay(0).build(),
+                            lastBufferSize, lastOutputChannels);
+                } catch (ConfigurationException e) {
+                    throw new InitializationException("Mid-stream PCM bypass switch failed",
+                            0, lastInputFormat, false, e);
+                }
+            }
+        }
         if ((!processFloat || processor == null) && frameEditor == null) {
             return super.handleBuffer(input, presentationTimeUs, accessUnits);
         }
@@ -309,6 +350,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 } else {
                     // Capture BEFORE conversion; packed conversion advances only its own view.
                     processor.queueInput(pcm, original, sampleBytes * 8, lastInputFormat.sampleRate);
+                }
+                if (processor.consumeDirectUsbBackpressure()) {
+                    // Direct USB ring is temporarily full: stall cleanly so Media3
+                    // retries this exact input buffer without advancing or dropping frames.
+                    return false;
                 }
                 pendingInputEnd = edited ? input.limit()
                         : input.position() + (pcm.position() - pcmStart) / 4 * sampleBytes;
@@ -525,6 +571,8 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         lastSampleRate = -1;
         lastChannelCount = -1;
         lastPcmEncoding = C.ENCODING_INVALID;
+        lastOutputChannels = null;
+        bypassedForBitPerfect = false;
         processorOutputFormat = AudioProcessor.AudioFormat.NOT_SET;
         if (processFloat && processor != null) processor.reset();
         processFloat = false;

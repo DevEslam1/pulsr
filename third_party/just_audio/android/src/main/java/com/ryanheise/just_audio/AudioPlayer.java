@@ -1034,8 +1034,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         String type = (String)map.get("type");
         switch (type) {
         case "AndroidLoudnessEnhancer":
-            if (Build.VERSION.SDK_INT < 19)
-                throw new RuntimeException("AndroidLoudnessEnhancer requires minSdkVersion >= 19");
             int targetGain = (int)Math.round((((Double)map.get("targetGain")) * 100.0)); // target gain needs to be provided in milliBel, the user provides the value in deciBel
             LoudnessEnhancer loudnessEnhancer = new LoudnessEnhancer(audioSessionId);
             loudnessEnhancer.setTargetGain(targetGain);
@@ -1116,8 +1114,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
      * platform forced a safe degradation to the existing 16-bit path.
      */
     private boolean applyFloatOutput(boolean enabled) {
-        boolean supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
-        boolean effective = enabled && supported;
+        boolean effective = enabled;
         boolean changed = floatOutputEnabled != effective;
         floatOutputEnabled = effective;
         if (changed && sinkWrapper != null) {
@@ -1180,8 +1177,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             };
             // The wrapper selects float/16-bit/AAudio per configure, so let the
             // renderers factory report float capability unconditionally.
-            renderersFactoryImpl.setEnableAudioFloatOutput(
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP);
+            renderersFactoryImpl.setEnableAudioFloatOutput(true);
             renderersFactoryImpl.setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER);
             RenderersFactory renderersFactory = (eventHandler, videoListener, audioListener, textOutput, metadataOutput) -> {
                 Renderer[] defaultRenderers = renderersFactoryImpl

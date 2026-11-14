@@ -32,7 +32,7 @@ final class Pcm16Quantizer {
      * Requantises a DSP float sample to dithered 16-bit PCM (default path only).
      */
     static short fromFloat(float value) {
-        if (!Float.isFinite(value)) return 0;
+        if (Float.isNaN(value) || Float.isInfinite(value)) return 0;
         final double scaled = (double) value * 32768.0;
         final double dither;
         if (scaled == Math.rint(scaled)) {

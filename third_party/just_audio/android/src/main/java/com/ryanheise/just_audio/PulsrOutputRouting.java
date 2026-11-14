@@ -2,6 +2,7 @@ package com.ryanheise.just_audio;
 
 import android.media.AudioDeviceInfo;
 import android.media.AudioTrack;
+import android.os.Build;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import java.lang.reflect.Field;
@@ -199,7 +200,7 @@ public final class PulsrOutputRouting {
     }
 
     private static int[] snapshot(AudioTrack track) {
-        AudioDeviceInfo routed = track.getRoutedDevice();
+        AudioDeviceInfo routed = Build.VERSION.SDK_INT >= 24 ? track.getRoutedDevice() : null;
         return new int[] {routed == null ? 0 : routed.getId(), track.getSampleRate(), track.getAudioFormat()};
     }
 }
