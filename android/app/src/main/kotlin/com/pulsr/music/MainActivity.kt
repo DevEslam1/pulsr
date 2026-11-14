@@ -1,5 +1,6 @@
 package com.pulsr.music
  
+import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -635,11 +636,15 @@ class MainActivity : AudioServiceActivity() {
         for (intent in oemIntents) {
             try {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                if (intent.resolveActivity(packageManager) != null) {
-                    startActivity(intent)
-                    return true
-                }
-            } catch (_: Exception) {}
+                // Android 11+ hides un-queried OEM packages from resolveActivity(), so
+                // attempt startActivity directly and fall through on missing/unexported
+                // targets down to Settings.ACTION_APPLICATION_DETAILS_SETTINGS.
+                startActivity(intent)
+                return true
+            } catch (_: ActivityNotFoundException) {
+            } catch (_: SecurityException) {
+            } catch (_: Exception) {
+            }
         }
         return false
     }

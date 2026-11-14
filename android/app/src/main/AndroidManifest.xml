@@ -237,7 +237,16 @@
             <action android:name="com.android.music.metachanged" />
         </intent>
         <intent>
+            <action android:name="com.android.music.playstatechanged" />
+        </intent>
+        <intent>
             <action android:name="fm.last.android.metachanged" />
+        </intent>
+        <intent>
+            <action android:name="com.adam.aslfms.notify.playstatechanged" />
+        </intent>
+        <intent>
+            <action android:name="net.jjc1138.android.scrobbler.action.MUSIC_STATUS" />
         </intent>
         <!-- Scrobbler packages -->
         <package android:name="com.adam.aslfms" />
