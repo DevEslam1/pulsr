@@ -847,4 +847,58 @@ public class PulsrAudioSinkTest {
         assertFalse(sink.isTapSrcFailed());
         sink.release();
     }
+
+    @Test
+    public void getFormatSupportIsModeAwareForAaudioAndNonAaudioPaths() {
+        final Flag aaudio = new Flag(true);
+        final Flag exclusive = new Flag(true);
+        final Flag floatMode = new Flag(false);
+        final PulsrAudioSink sink = new PulsrAudioSink(
+                RuntimeEnvironment.getApplication(),
+                aaudio,
+                exclusive,
+                new IntValue(150),
+                floatMode,
+                () -> null,
+                processor -> {},
+                new Fallbacks(aaudio, floatMode),
+                new Factory());
+        try {
+            AAudioAudioSink.setDeviceApiLevelOverrideForTest(31);
+            final Format pcm16 = FORMAT;
+            final Format pcm24 = FORMAT.buildUpon().setPcmEncoding(C.ENCODING_PCM_24BIT).build();
+            final Format pcmFloat = FORMAT.buildUpon().setPcmEncoding(C.ENCODING_PCM_FLOAT).build();
+            final Format pcm32 = FORMAT.buildUpon().setPcmEncoding(C.ENCODING_PCM_32BIT).build();
+
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY, sink.getFormatSupport(pcm16));
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY, sink.getFormatSupport(pcm24));
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY, sink.getFormatSupport(pcmFloat));
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY, sink.getFormatSupport(pcm32));
+
+            // 32-bit requires API 31 + exclusive for direct support.
+            AAudioAudioSink.setDeviceApiLevelOverrideForTest(30);
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_WITH_TRANSCODING,
+                    sink.getFormatSupport(pcm32));
+
+            AAudioAudioSink.setDeviceApiLevelOverrideForTest(31);
+            exclusive.value = false;
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_WITH_TRANSCODING,
+                    sink.getFormatSupport(pcm32));
+
+            // Disabling AAudio restores AudioTrack-centric support reporting.
+            aaudio.value = false;
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY, sink.getFormatSupport(pcm16));
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_WITH_TRANSCODING,
+                    sink.getFormatSupport(pcm24));
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_WITH_TRANSCODING,
+                    sink.getFormatSupport(pcmFloat));
+
+            floatMode.value = true;
+            assertEquals(AudioSink.SINK_FORMAT_SUPPORTED_DIRECTLY,
+                    sink.getFormatSupport(pcmFloat));
+        } finally {
+            AAudioAudioSink.setDeviceApiLevelOverrideForTest(-1);
+            sink.release();
+        }
+    }
 }

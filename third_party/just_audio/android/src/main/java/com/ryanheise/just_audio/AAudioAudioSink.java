@@ -88,6 +88,7 @@ public final class AAudioAudioSink implements AudioSink {
     }
 
     private Bridge bridge = NATIVE_BRIDGE;
+    private static volatile int globalDeviceApiLevelForTest = -1;
     private int deviceApiLevelForTest = -1;
     private ClockMs clockMs = SystemClock::elapsedRealtime;
 
@@ -99,6 +100,14 @@ public final class AAudioAudioSink implements AudioSink {
     /** Test seam to exercise pre-API-31 behavior under Robolectric SDK 33. */
     void setDeviceApiLevelForTest(int apiLevel) {
         this.deviceApiLevelForTest = apiLevel;
+    }
+
+    static void setDeviceApiLevelOverrideForTest(int apiLevel) {
+        globalDeviceApiLevelForTest = apiLevel;
+    }
+
+    static int deviceApiLevel() {
+        return globalDeviceApiLevelForTest >= 0 ? globalDeviceApiLevelForTest : Build.VERSION.SDK_INT;
     }
 
     /** Test seam to advance elapsed time deterministically during drain tests. */
@@ -121,7 +130,7 @@ public final class AAudioAudioSink implements AudioSink {
     private boolean transcodingPcm32 = false;
 
     private boolean useNativeInt32() {
-        final int sdk = deviceApiLevelForTest >= 0 ? deviceApiLevelForTest : Build.VERSION.SDK_INT;
+        final int sdk = deviceApiLevelForTest >= 0 ? deviceApiLevelForTest : deviceApiLevel();
         return preferExclusive && sdk >= 31;
     }
     // Reusable scratch buffer for 32-bit → float32 conversion. Allocated

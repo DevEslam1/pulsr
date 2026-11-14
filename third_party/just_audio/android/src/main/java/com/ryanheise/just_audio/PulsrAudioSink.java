@@ -120,6 +120,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     private boolean pendingForce;
     private boolean aaudioSuspendedByParams;
     private String lastSuspensionReason = "speed_requires_audiotrack";
+    private int lastReportedFormatSupport = -1;
     @Nullable private NativeDspAudioProcessor continuousState;
 
     private boolean hasStagedInput() {
@@ -255,25 +256,43 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     @Override
     public int getFormatSupport(Format format) {
-        // The wrapper always feeds the inner DefaultAudioSink via float (or lets
-        // AAudio accept/convert), so the wrapper advertises exactly what the
-        // DefaultAudioSink path can transcode. AAudio restrictions are handled at
-        // configure time with an in-place fallback instead of rejecting here.
-        if (!MimeTypes.AUDIO_RAW.equals(format.sampleMimeType)) {
-            return SINK_FORMAT_UNSUPPORTED;
-        }
-        if (!Util.isEncodingLinearPcm(format.pcmEncoding)) {
-            return SINK_FORMAT_UNSUPPORTED;
-        }
-        if (format.pcmEncoding == C.ENCODING_PCM_16BIT) {
-            return SINK_FORMAT_SUPPORTED_DIRECTLY;
-        }
-        if (format.pcmEncoding == C.ENCODING_PCM_FLOAT) {
-            return (floatEnabled.get() && !precisionFallback) || aaudioEnabled.get()
+        // VERIFY: on a device with a 24-bit FLAC that the decoder output stays 24-bit/float over AAudio.
+        final int support;
+        if (!MimeTypes.AUDIO_RAW.equals(format.sampleMimeType)
+                || !Util.isEncodingLinearPcm(format.pcmEncoding)) {
+            support = SINK_FORMAT_UNSUPPORTED;
+        } else if (desiredMode() == Mode.AAUDIO
+                && format.sampleRate > 0
+                && format.channelCount > 0
+                && format.channelCount <= 2) {
+            if (format.pcmEncoding == C.ENCODING_PCM_16BIT
+                    || format.pcmEncoding == C.ENCODING_PCM_FLOAT
+                    || format.pcmEncoding == C.ENCODING_PCM_24BIT
+                    || (format.pcmEncoding == C.ENCODING_PCM_32BIT
+                            && AAudioAudioSink.deviceApiLevel() >= 31
+                            && preferExclusive.get())) {
+                support = SINK_FORMAT_SUPPORTED_DIRECTLY;
+            } else {
+                support = SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
+            }
+        } else if (format.pcmEncoding == C.ENCODING_PCM_16BIT) {
+            support = SINK_FORMAT_SUPPORTED_DIRECTLY;
+        } else if (format.pcmEncoding == C.ENCODING_PCM_FLOAT) {
+            support = (floatEnabled.get() && !precisionFallback) || aaudioEnabled.get()
                     ? SINK_FORMAT_SUPPORTED_DIRECTLY
                     : SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
+        } else {
+            support = SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
         }
-        return SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
+        if (support != lastReportedFormatSupport) {
+            lastReportedFormatSupport = support;
+            Log.i(TAG, "getFormatSupport(mode=" + desiredMode()
+                    + ", enc=" + format.pcmEncoding
+                    + ", rate=" + format.sampleRate
+                    + ", ch=" + format.channelCount
+                    + ") -> " + support);
+        }
+        return support;
     }
 
     @Override
