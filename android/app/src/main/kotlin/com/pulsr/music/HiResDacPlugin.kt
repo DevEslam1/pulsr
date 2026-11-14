@@ -1548,18 +1548,60 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
      * version + label (diagnostics only - never claims native-DSD support). */
     private fun probeUsbDac(): Pair<Int, String?> {
         return try {
-            val usbAudioDevice = usbManager?.deviceList?.values?.firstOrNull { device ->
-                (0 until device.interfaceCount).any {
-                    val cls = device.getInterface(it).interfaceClass
-                    cls == UsbConstants.USB_CLASS_AUDIO || cls == 0xFF // vendor-specific UAC
+            val attached = usbManager?.deviceList?.values?.toList().orEmpty()
+            if (attached.isEmpty()) return Pair(UsbDacDiagnostics.UAC_NONE, null)
+
+            val summaries = attached.map { device ->
+                val ifaces = (0 until device.interfaceCount).map { idx ->
+                    val iface = device.getInterface(idx)
+                    UsbAudioControlParser.InterfaceSignature(
+                        iface.interfaceClass,
+                        iface.interfaceSubclass,
+                        iface.interfaceProtocol,
+                    )
                 }
-            } ?: return Pair(UsbDacDiagnostics.UAC_NONE, null)
+                UsbAudioControlParser.UsbDeviceSummary(
+                    id = device.deviceId,
+                    vendorId = device.vendorId,
+                    productId = device.productId,
+                    manufacturerName = device.manufacturerName,
+                    productName = device.productName,
+                    interfaces = ifaces,
+                )
+            }
+            val routeUsb = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)?.let { pickUsbOutputDevice(it) }
+                } catch (_: Throwable) {
+                    null
+                }
+            } else {
+                null
+            }
+            val routeAddress = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                routeUsb?.address
+            } else {
+                null
+            }
+            val preferredSummary = UsbAudioControlParser.selectPreferredAudioDevice(
+                devices = summaries,
+                routeProductName = routeUsb?.productName?.toString(),
+                routeAddress = routeAddress,
+            ) ?: return Pair(UsbDacDiagnostics.UAC_NONE, null)
+
+            val usbAudioDevice = attached.firstOrNull { it.deviceId == preferredSummary.id }
+                ?: return Pair(UsbDacDiagnostics.UAC_NONE, null)
             val label = listOfNotNull(usbAudioDevice.manufacturerName, usbAudioDevice.productName)
                 .joinToString(" ").trim().ifEmpty { null }
-            val interfacePairs = (0 until usbAudioDevice.interfaceCount).map {
-                val iface = usbAudioDevice.getInterface(it)
-                Pair(iface.interfaceSubclass, iface.interfaceProtocol)
-            }
+            val interfacePairs = preferredSummary.interfaces
+                .filter {
+                    UsbAudioControlParser.isAudioControlInterface(
+                        it.interfaceClass,
+                        it.interfaceSubclass,
+                        it.interfaceProtocol,
+                    )
+                }
+                .map { Pair(it.interfaceSubclass, it.interfaceProtocol) }
             val uac = try {
                 UsbDacDiagnostics.uacVersionFromUsbInterfaces(interfacePairs)
             } catch (_: Throwable) {

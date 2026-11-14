@@ -266,6 +266,118 @@ object UsbAudioControlParser {
         return hasControl && hasStreaming
     }
 
+    data class InterfaceSignature(
+        val interfaceClass: Int,
+        val interfaceSubclass: Int,
+        val interfaceProtocol: Int,
+    )
+
+    data class UsbDeviceSummary(
+        val id: Int,
+        val vendorId: Int,
+        val productId: Int,
+        val manufacturerName: String?,
+        val productName: String?,
+        val interfaces: List<InterfaceSignature>,
+    )
+
+    /**
+     * True when [interfaces] contains BOTH an audio-shaped AudioControl (0x01)
+     * and AudioStreaming (0x02) interface validated via
+     * [isAudioControlInterface] and [isAudioStreamingInterface].
+     *
+     * When [vendorOnly] is true, standard `CLASS_AUDIO` (0x01) interfaces are
+     * skipped so vendor-specific (`0xFF`) matching requires both roles on `0xFF`.
+     */
+    fun hasAudioControlAndStreamingPair(
+        interfaces: Iterable<InterfaceSignature>,
+        vendorOnly: Boolean = false,
+    ): Boolean {
+        var hasControl = false
+        var hasStreaming = false
+        for (iface in interfaces) {
+            if (vendorOnly && iface.interfaceClass == CLASS_AUDIO) continue
+            if (isAudioControlInterface(
+                    iface.interfaceClass,
+                    iface.interfaceSubclass,
+                    iface.interfaceProtocol,
+                    allowVendor = true,
+                )
+            ) {
+                hasControl = true
+            }
+            if (isAudioStreamingInterface(
+                    iface.interfaceClass,
+                    iface.interfaceSubclass,
+                    iface.interfaceProtocol,
+                    allowVendor = true,
+                )
+            ) {
+                hasStreaming = true
+            }
+            if (hasControl && hasStreaming) return true
+        }
+        return false
+    }
+
+    private val VID_PID_IN_ADDRESS_REGEX =
+        Regex("""(?:^|[^0-9a-fA-F])([0-9a-fA-F]{4}):([0-9a-fA-F]{4})(?:$|[^0-9a-fA-F])""")
+
+    /**
+     * Selects the best USB audio playback device from [devices]. Every
+     * candidate must expose a verified AudioControl + AudioStreaming pair via
+     * [hasAudioControlAndStreamingPair]. When a routed audio device hint
+     * ([routeProductName] / [routeAddress]) is available, prefers the matching
+     * device (VID:PID match in [routeAddress], then product/manufacturer name
+     * match, preferring standard `CLASS_AUDIO`), falling back to the first
+     * qualifying device.
+     */
+    fun selectPreferredAudioDevice(
+        devices: List<UsbDeviceSummary>,
+        routeProductName: String? = null,
+        routeAddress: String? = null,
+    ): UsbDeviceSummary? {
+        val candidates = devices.filter { hasAudioControlAndStreamingPair(it.interfaces) }
+        if (candidates.isEmpty()) return null
+
+        val vidPidMatch = routeAddress?.let { VID_PID_IN_ADDRESS_REGEX.find(it) }
+        val routeVid = vidPidMatch?.groupValues?.getOrNull(1)?.toIntOrNull(16)
+        val routePid = vidPidMatch?.groupValues?.getOrNull(2)?.toIntOrNull(16)
+        val normalizedRouteName = routeProductName?.trim().orEmpty()
+
+        var best: UsbDeviceSummary? = null
+        var bestScore = Int.MIN_VALUE
+        for (candidate in candidates) {
+            var score = 0
+            if (routeVid != null && routePid != null &&
+                candidate.vendorId == routeVid && candidate.productId == routePid
+            ) {
+                score += 1000
+            }
+            if (normalizedRouteName.isNotEmpty()) {
+                val prod = candidate.productName?.trim().orEmpty()
+                val full = listOfNotNull(candidate.manufacturerName, candidate.productName)
+                    .joinToString(" ").trim()
+                when {
+                    prod.isNotEmpty() && prod.equals(normalizedRouteName, ignoreCase = true) -> score += 500
+                    full.isNotEmpty() && full.equals(normalizedRouteName, ignoreCase = true) -> score += 500
+                    prod.isNotEmpty() && normalizedRouteName.contains(prod, ignoreCase = true) -> score += 200
+                    normalizedRouteName.length >= 3 && prod.contains(normalizedRouteName, ignoreCase = true) -> score += 200
+                }
+            }
+            val hasStandardAudio = candidate.interfaces.any {
+                it.interfaceClass == CLASS_AUDIO &&
+                    isAudioFunctionInterface(it.interfaceClass, it.interfaceSubclass, it.interfaceProtocol, allowVendor = false)
+            }
+            if (hasStandardAudio) score += 50
+            if (score > bestScore) {
+                bestScore = score
+                best = candidate
+            }
+        }
+        return best
+    }
+
     fun parse(descriptors: ByteArray?): Result {
         if (descriptors == null || descriptors.size < 8) {
             return Result(UAC_NONE, null, null)

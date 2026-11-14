@@ -430,27 +430,18 @@ class UsbExclusivePlugin(
      * an audio-shaped control and an audio-shaped streaming interface, so an
      * ADB/debug accessory (also 0xFF) can never match on one stray interface.
      */
-    private fun hasVendorAudioPair(device: UsbDevice): Boolean {
-        var control = false
-        var streaming = false
-        for (index in 0 until device.interfaceCount) {
-            val iface = device.getInterface(index)
-            if (iface.interfaceClass == UsbConstants.USB_CLASS_AUDIO) continue
-            if (UsbAudioControlParser.isAudioControlInterface(
-                    iface.interfaceClass, iface.interfaceSubclass, iface.interfaceProtocol,
+    private fun hasVendorAudioPair(device: UsbDevice): Boolean =
+        UsbAudioControlParser.hasAudioControlAndStreamingPair(
+            interfaces = (0 until device.interfaceCount).map { idx ->
+                val iface = device.getInterface(idx)
+                UsbAudioControlParser.InterfaceSignature(
+                    iface.interfaceClass,
+                    iface.interfaceSubclass,
+                    iface.interfaceProtocol,
                 )
-            ) {
-                control = true
-            }
-            if (UsbAudioControlParser.isAudioStreamingInterface(
-                    iface.interfaceClass, iface.interfaceSubclass, iface.interfaceProtocol,
-                )
-            ) {
-                streaming = true
-            }
-        }
-        return control && streaming
-    }
+            },
+            vendorOnly = true,
+        )
 
     /** Interfaces of [device] that are AudioStreaming interfaces. */
     private fun UsbDevice.streamingInterfaces(): List<UsbInterface> =
