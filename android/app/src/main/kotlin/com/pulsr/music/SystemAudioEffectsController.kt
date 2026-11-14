@@ -21,6 +21,20 @@ class SystemAudioEffectsController(private val context: Context) {
     companion object {
         private const val TAG = "SystemAudioEffects"
 
+        val FRAMEWORK_EFFECT_TYPE_UUIDS: Set<UUID> = buildSet {
+            add(AudioEffect.EFFECT_TYPE_EQUALIZER)
+            add(AudioEffect.EFFECT_TYPE_BASS_BOOST)
+            add(AudioEffect.EFFECT_TYPE_VIRTUALIZER)
+            add(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                add(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)
+            }
+            add(AudioEffect.EFFECT_TYPE_PRESET_REVERB)
+            add(AudioEffect.EFFECT_TYPE_ENV_REVERB)
+            // Visualizer doesn't expose a public AudioEffect.EFFECT_TYPE_* constant.
+            add(UUID.fromString("e46b26a0-dddd-11db-8afd-0002a5d5c51b"))
+        }
+
         // Known vendor Dolby / OEM effect UUIDs and name signatures
         val KNOWN_VENDOR_EFFECTS = listOf(
             // Dolby Atmos / DAP UUIDs
@@ -30,11 +44,31 @@ class SystemAudioEffectsController(private val context: Context) {
             VendorEffectSignature("Samsung SoundAlive", UUID.fromString("c2e5d5f0-94bd-4763-afae-4e12d633f8b9"), "soundalive"),
             // OnePlus / Oppo Dirac Sound
             VendorEffectSignature("Dirac Sound Research", UUID.fromString("e0e6539b-1781-7261-676f-6f7974656368"), "dirac"),
-            // Motorola Moto Audio
-            VendorEffectSignature("Motorola Moto Audio", UUID.fromString("37cc2c00-dddd-11db-8577-0002a5d5c51b"), "motoaudio"),
+            // Motorola Moto Audio (implementor/name keyword match only; no stock type UUID)
+            VendorEffectSignature("Motorola Moto Audio", null, "motoaudio"),
             // Generic fallback keywords: "dolby", "atmos", "dap", "dirac", "soundalive", "waves"
             VendorEffectSignature("Generic Dolby/Vendor Match", null, "atmos")
         )
+
+        internal fun matchesVendorDescriptor(
+            name: String,
+            implementor: String,
+            typeUuid: UUID?,
+            effectUuid: UUID?,
+        ): Boolean {
+            val isFrameworkType = typeUuid != null && typeUuid in FRAMEWORK_EFFECT_TYPE_UUIDS
+            val isFrameworkImpl = effectUuid != null && effectUuid in FRAMEWORK_EFFECT_TYPE_UUIDS
+            return KNOWN_VENDOR_EFFECTS.any { vendor ->
+                val matchKeyword = vendor.keyword.isNotEmpty() &&
+                    (name.contains(vendor.keyword, ignoreCase = true) ||
+                        implementor.contains(vendor.keyword, ignoreCase = true))
+                val matchUuid = vendor.uuid != null &&
+                    !isFrameworkType &&
+                    !isFrameworkImpl &&
+                    (typeUuid == vendor.uuid || effectUuid == vendor.uuid)
+                matchKeyword || matchUuid
+            }
+        }
     }
 
     data class VendorEffectSignature(
@@ -92,18 +126,10 @@ class SystemAudioEffectsController(private val context: Context) {
                 val typeUuid = desc.type
                 val uuid = desc.uuid
 
-                for (vendor in KNOWN_VENDOR_EFFECTS) {
-                    val matchKeyword = vendor.keyword.isNotEmpty() &&
-                            (name.contains(vendor.keyword, ignoreCase = true) ||
-                             implementor.contains(vendor.keyword, ignoreCase = true))
-                    val matchUuid = vendor.uuid != null &&
-                            (typeUuid == vendor.uuid || uuid == vendor.uuid)
-
-                    if (matchKeyword || matchUuid) {
-                        val descriptorInfo = "$name ($implementor)"
-                        if (!detectedBundles.contains(descriptorInfo)) {
-                            detectedBundles.add(descriptorInfo)
-                        }
+                if (matchesVendorDescriptor(name, implementor, typeUuid, uuid)) {
+                    val descriptorInfo = "$name ($implementor)"
+                    if (!detectedBundles.contains(descriptorInfo)) {
+                        detectedBundles.add(descriptorInfo)
                     }
                 }
             }
@@ -177,12 +203,7 @@ class SystemAudioEffectsController(private val context: Context) {
                 val name = desc.name ?: ""
                 val implementor = desc.implementor ?: ""
 
-                val isMatched = KNOWN_VENDOR_EFFECTS.any { vendor ->
-                    (vendor.keyword.isNotEmpty() &&
-                     (name.contains(vendor.keyword, ignoreCase = true) ||
-                      implementor.contains(vendor.keyword, ignoreCase = true))) ||
-                    (vendor.uuid != null && (desc.type == vendor.uuid || desc.uuid == vendor.uuid))
-                }
+                val isMatched = matchesVendorDescriptor(name, implementor, desc.type, desc.uuid)
 
                 if (isMatched && desc.type != null && desc.uuid != null) {
                     matchedDescriptors++
