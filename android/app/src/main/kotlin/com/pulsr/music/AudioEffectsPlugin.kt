@@ -1265,6 +1265,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         @Volatile private var cachedSupportedEffects: Array<AudioEffect.Descriptor>? = null
         @Volatile private var effectsCacheTimestamp: Long = 0L
         private const val EFFECTS_CACHE_TTL_MS = 60_000L
+        private const val HAL_LIMITER_MIN_ATTACK_MS = 0.1
+        private const val HAL_LIMITER_MAX_ATTACK_MS = 50.0
+        private const val HAL_LIMITER_MIN_RELEASE_MS = 10.0
+        private const val HAL_LIMITER_MAX_RELEASE_MS = 2000.0
         @Volatile private var _oemWarningLogged = false
 
         fun refreshEffectsCache(): Array<AudioEffect.Descriptor>? {
@@ -3021,7 +3025,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         limiterRatio = clamp(it, 1.0, 20.0)
                     }
                     (call.argument<Number>("attackMs"))?.toDouble()?.let {
-                        limiterAttackMs = clamp(it, 0.1, 100.0)
+                        limiterAttackMs = clamp(it, HAL_LIMITER_MIN_ATTACK_MS, HAL_LIMITER_MAX_ATTACK_MS)
                     }
                     (call.argument<Number>("makeupGainDb"))?.toDouble()?.let {
                         limiterMakeupGainDb = clamp(it, 0.0, 12.0)
@@ -5858,12 +5862,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     // Compressor knobs when the user set them; otherwise keep the
                     // brickwall defaults (attack follows lookahead, ratio 20).
                     val attackMs = if (limiterAttackMs > 0.0) {
-                        limiterAttackMs.toFloat().coerceIn(0.1f, 50f)
+                        clamp(limiterAttackMs, HAL_LIMITER_MIN_ATTACK_MS, HAL_LIMITER_MAX_ATTACK_MS).toFloat()
                     } else {
-                        limiterLookaheadMs.toFloat().coerceIn(0.1f, 50f)
+                        clamp(limiterLookaheadMs, HAL_LIMITER_MIN_ATTACK_MS, HAL_LIMITER_MAX_ATTACK_MS).toFloat()
                     }
                     limiter.attackTime = attackMs
-                    limiter.releaseTime = limiterReleaseMs.toFloat().coerceIn(10f, 2000f)
+                    limiter.releaseTime = clamp(
+                        limiterReleaseMs,
+                        HAL_LIMITER_MIN_RELEASE_MS,
+                        HAL_LIMITER_MAX_RELEASE_MS,
+                    ).toFloat()
                     limiter.ratio = limiterRatio.toFloat().coerceIn(1f, 20f)
                     limiter.threshold = limiterThresholdDb.toFloat().coerceIn(-60f, 0f)
                     limiter.postGain = baseGain + limiterMakeupGainDb.toFloat()
