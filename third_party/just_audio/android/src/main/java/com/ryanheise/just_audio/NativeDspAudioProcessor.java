@@ -8,6 +8,7 @@ import androidx.media3.common.audio.BaseAudioProcessor;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -361,10 +362,24 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         // sample-identical to the source, and the bit-perfect fast path copies
         // the ORIGINAL input bytes, which would then play at the wrong rate.
         final int target = tapSrcTargetRate;
-        if (target >= 8000 && target <= 768000
+        final boolean willSrc = target >= 8000 && target <= 768000
                 && inputAudioFormat.sampleRate > 0
                 && target != inputAudioFormat.sampleRate
-                && !isBitPerfectNative()) {
+                && !isBitPerfectNative();
+        // Pre-size scratch, gain, and resample buffers during configure() on the
+        // ExoPlayer playback thread (never the C++ real-time audio thread) so
+        // steady-state queueInput() calls do not reallocate.
+        final int channels = Math.max(1, inputAudioFormat.channelCount);
+        final int inRate = inputAudioFormat.sampleRate > 0 ? inputAudioFormat.sampleRate : 48000;
+        final int preSizeFrames = Math.max(4096, inRate / 10);
+        ensureScratch(preSizeFrames * channels);
+        final double maxRatio = willSrc ? Math.max(1.0, (double) target / (double) inRate) : 1.0;
+        final int maxOutFrames = willSrc
+                ? (int) Math.ceil(preSizeFrames * maxRatio) + (int) Math.ceil(64.0 * maxRatio) + 32
+                : preSizeFrames;
+        ensureGainScratch(maxOutFrames);
+        if (willSrc) {
+            ensureResampleScratch(maxOutFrames * channels);
             return new AudioFormat(target, inputAudioFormat.channelCount,
                     inputAudioFormat.encoding);
         }
@@ -516,14 +531,24 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
 
         final int channelCount = inputAudioFormat.channelCount;
         final boolean inputIsFloat = inputAudioFormat.encoding == C.ENCODING_PCM_FLOAT;
-        FloatBuffer floats = ensureScratch(frameCount * channelCount);
+        final int sampleCount = frameCount * channelCount;
+        FloatBuffer floats = ensureScratch(sampleCount);
 
         if (inputIsFloat) {
-            for (int i = 0; i < frameCount * channelCount; i++) {
-                floats.put(i, inputBuffer.getFloat(position + i * 4));
+            if (inputBuffer.order() == ByteOrder.nativeOrder()) {
+                ByteBuffer slice = inputBuffer.duplicate().order(ByteOrder.nativeOrder());
+                slice.position(position);
+                slice.limit(position + sampleCount * 4);
+                floats.clear();
+                floats.put(slice.asFloatBuffer());
+                floats.clear();
+            } else {
+                for (int i = 0; i < sampleCount; i++) {
+                    floats.put(i, inputBuffer.getFloat(position + i * 4));
+                }
             }
         } else {
-            for (int i = 0; i < frameCount * channelCount; i++) {
+            for (int i = 0; i < sampleCount; i++) {
                 floats.put(i, inputBuffer.getShort(position + i * 2) / 32768f);
             }
         }
@@ -719,7 +744,9 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
 
         final int gainedSamples = nativeGainedFrames * channelCount;
-        for (int i = 0; i < processed * channelCount; i++) {
+        final int totalOutSamples = processed * channelCount;
+        final ThreadLocalRandom rng = outputIsFloat ? null : ThreadLocalRandom.current();
+        for (int i = 0; i < totalOutSamples; i++) {
             float value = emitFloats.get(i);
             if (gains != null && i >= gainedSamples) {
                 // Fallback: the engine did not run (or ran only a head), so the
@@ -731,7 +758,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
                 // Emit straight float32: no 16-bit re-quantisation after DSP.
                 output.putFloat(value);
             } else {
-                output.putShort(Pcm16Quantizer.fromFloat(value));
+                output.putShort(Pcm16Quantizer.fromFloat(value, rng));
             }
         }
         inputBuffer.position(limit);

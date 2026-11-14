@@ -1,5 +1,6 @@
 package com.ryanheise.just_audio;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -16,6 +17,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Random;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -736,5 +738,308 @@ public class FloatDspAudioSinkTest {
         assertFalse(processor.isTapSrcActive());
         wrapper.reset();
         processor.release();
+    }
+
+    @Test
+    public void directUsbBackpressureStallsWithoutAdvancingOrDroppingEditedFrames()
+            throws Exception {
+        final int[] calls = {0};
+        NativeDspAudioProcessor processor = new NativeDspAudioProcessor() {
+            @Override boolean isNativeAvailableForConfiguration() { return true; }
+            @Override boolean isBitPerfectNative() { return true; }
+            @Override boolean isUsbExclusiveActive() { return true; }
+            @Override int processNativeBlock(ByteBuffer buffer, int frames, int channels,
+                    ByteBuffer gains, ByteBuffer source, int sourceOffset,
+                    int sourceDepth, int sourceRate) {
+                calls[0]++;
+                if (calls[0] == 1) {
+                    return DIRECT_USB_RETRY;
+                }
+                return -frames;
+            }
+        };
+        processor.setFloatOutput(true);
+        FakeSink sink = new FakeSink();
+        FloatDspAudioSink wrapper = new FloatDspAudioSink(sink, processor, true, false, true);
+        Format input = source(48000, 1, C.ENCODING_PCM_16BIT).buildUpon()
+                .setEncoderDelay(1).build();
+        wrapper.configure(input, 0, null);
+
+        ByteBuffer pcm = ByteBuffer.allocateDirect(6).order(ByteOrder.LITTLE_ENDIAN);
+        pcm.putShort((short) 111).putShort((short) 222).putShort((short) 333).flip();
+
+        assertFalse("backpressured buffer must stall cleanly without consuming input",
+                wrapper.handleBuffer(pcm, 1000L, 1));
+        assertEquals(0, pcm.position());
+        assertEquals(0, sink.writeCount);
+
+        assertTrue("retry after backpressure must emit exact remaining post-delay frames",
+                wrapper.handleBuffer(pcm, 1000L, 1));
+        assertEquals(6, pcm.position());
+        assertEquals(1, sink.writeCount);
+        ByteBuffer emitted = ByteBuffer.allocate(sink.accepted.size()).order(ByteOrder.LITTLE_ENDIAN);
+        for (byte b : sink.accepted) emitted.put(b);
+        emitted.flip();
+        assertEquals(8, emitted.remaining());
+        assertEquals(222.0f / 32768.0f, emitted.getFloat(), 1e-6f);
+        assertEquals(333.0f / 32768.0f, emitted.getFloat(), 1e-6f);
+
+        wrapper.reset();
+        processor.release();
+    }
+
+    @Test
+    public void bitPerfectIntegerBypassSkipsFloatConversionAndReengagesMidStream()
+            throws Exception {
+        final boolean[] bitPerfect = {true};
+        final boolean[] usbExclusive = {false};
+        final int[] nativeCalls = {0};
+        NativeDspAudioProcessor processor = new NativeDspAudioProcessor() {
+            @Override boolean isNativeAvailableForConfiguration() { return true; }
+            @Override boolean isBitPerfectNative() { return bitPerfect[0]; }
+            @Override boolean isUsbExclusiveActive() { return usbExclusive[0]; }
+            @Override int processNativeBlock(ByteBuffer buffer, int frames, int channels,
+                    ByteBuffer gains, ByteBuffer source, int sourceOffset,
+                    int sourceDepth, int sourceRate) {
+                nativeCalls[0]++;
+                return frames;
+            }
+        };
+        processor.setFloatOutput(true);
+        FakeSink sink = new FakeSink();
+        FloatDspAudioSink wrapper = new FloatDspAudioSink(sink, processor, true, false, true);
+        Format format = source(44100, 2, C.ENCODING_PCM_16BIT);
+        wrapper.configure(format, 0, null);
+
+        assertEquals(C.ENCODING_PCM_16BIT, lastConfigured(sink).pcmEncoding);
+        ByteBuffer first = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
+        first.putShort((short) 1000).putShort((short) -1000).flip();
+        assertTrue(wrapper.handleBuffer(first, 0L, 1));
+        assertEquals(0, nativeCalls[0]);
+
+        bitPerfect[0] = false;
+        ByteBuffer second = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
+        second.putShort((short) 2000).putShort((short) -2000).flip();
+        assertTrue(wrapper.handleBuffer(second, 10L, 1));
+        assertEquals(C.ENCODING_PCM_FLOAT, lastConfigured(sink).pcmEncoding);
+        assertEquals(1, nativeCalls[0]);
+
+        usbExclusive[0] = true;
+        bitPerfect[0] = true;
+        ByteBuffer third = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
+        third.putShort((short) 3000).putShort((short) -3000).flip();
+        assertTrue(wrapper.handleBuffer(third, 20L, 1));
+        assertEquals(C.ENCODING_PCM_FLOAT, lastConfigured(sink).pcmEncoding);
+        assertEquals(2, nativeCalls[0]);
+
+        wrapper.reset();
+        processor.release();
+    }
+
+    @Test
+    public void pcmFrameEditorBulkCopyBitIdenticalAcrossDelayPaddingAndPartialBuffers() {
+        final int[] encodings = {
+                C.ENCODING_PCM_16BIT, C.ENCODING_PCM_24BIT, C.ENCODING_PCM_32BIT
+        };
+        final Random rng = new Random(0x5EED_1401L);
+        for (int encoding : encodings) {
+            for (int channels = 1; channels <= 4; channels++) {
+                final int delay = rng.nextInt(12);
+                final int padding = rng.nextInt(12);
+                final Format fmt = source(48000, channels, encoding).buildUpon()
+                        .setEncoderDelay(delay)
+                        .setEncoderPadding(padding)
+                        .build();
+                final FloatDspAudioSink.PcmFrameEditor editor =
+                        new FloatDspAudioSink.PcmFrameEditor(fmt, null);
+
+                final int sampleBytes = encoding == C.ENCODING_PCM_16BIT ? 2
+                        : encoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+                final int frameBytes = sampleBytes * channels;
+                int refDelay = Math.max(0, delay) * frameBytes;
+                byte[] refTail = new byte[Math.max(0, padding) * frameBytes];
+                int refTailSize = 0;
+
+                // Sequence of varied chunk sizes (including tiny chunks < padding).
+                final int[] chunkFrames = {1, 2, 0, 3, 7, 1, 15, 64, 5, 31};
+                for (int frames : chunkFrames) {
+                    final int totalBytes = frames * frameBytes;
+                    final byte[] raw = new byte[totalBytes + 8];
+                    rng.nextBytes(raw);
+                    final int offset = totalBytes > 0 ? rng.nextInt(4) : 0;
+                    final ByteBuffer buf = (rng.nextBoolean()
+                            ? ByteBuffer.allocateDirect(raw.length)
+                            : ByteBuffer.wrap(new byte[raw.length]))
+                            .order(ByteOrder.nativeOrder());
+                    buf.put(raw).position(offset).limit(offset + totalBytes);
+
+                    final ByteBuffer actual = editor.prepare(buf.duplicate());
+                    final byte[] actualBytes = new byte[actual.remaining()];
+                    actual.get(actualBytes);
+                    editor.commit();
+
+                    // Byte-wise reference implementation.
+                    final int skipped = Math.min(refDelay, buf.remaining());
+                    refDelay -= skipped;
+                    final int available = refTailSize + buf.remaining() - skipped;
+                    final int emitBytes = Math.max(0, available - refTail.length);
+                    final byte[] expectedBytes = new byte[emitBytes];
+                    for (int i = 0; i < emitBytes; i++) {
+                        expectedBytes[i] = i < refTailSize
+                                ? refTail[i]
+                                : buf.get(buf.position() + skipped + i - refTailSize);
+                    }
+                    final int nextTailSize = available - emitBytes;
+                    final byte[] nextTail = new byte[refTail.length];
+                    for (int i = 0; i < nextTailSize; i++) {
+                        final int idx = emitBytes + i;
+                        nextTail[i] = idx < refTailSize
+                                ? refTail[idx]
+                                : buf.get(buf.position() + skipped + idx - refTailSize);
+                    }
+                    refTail = nextTail;
+                    refTailSize = nextTailSize;
+
+                    assertArrayEquals("enc=" + encoding + " ch=" + channels + " frames=" + frames,
+                            expectedBytes, actualBytes);
+                }
+            }
+        }
+    }
+
+    @Test
+    public void floatConversionMatchesReferenceAcross16And24And32Bit() throws Exception {
+        final Random rng = new Random(0x5EED_1402L);
+        final int frames = 97;
+        final int channels = 2;
+        final int samples = frames * channels;
+        final int[] encodings = {
+                C.ENCODING_PCM_16BIT, C.ENCODING_PCM_24BIT, C.ENCODING_PCM_32BIT
+        };
+
+        for (int encoding : encodings) {
+            final int sampleBytes = encoding == C.ENCODING_PCM_16BIT ? 2
+                    : encoding == C.ENCODING_PCM_24BIT ? 3 : 4;
+            final ByteBuffer input = ByteBuffer.allocateDirect(samples * sampleBytes)
+                    .order(ByteOrder.nativeOrder());
+            final float[] expected = new float[samples];
+            for (int i = 0; i < samples; i++) {
+                if (encoding == C.ENCODING_PCM_16BIT) {
+                    short s = (short) (rng.nextInt(65536) - 32768);
+                    input.putShort(s);
+                    expected[i] = s / 32768f;
+                } else if (encoding == C.ENCODING_PCM_24BIT) {
+                    int s24 = (rng.nextInt(1 << 24) << 8) >> 8;
+                    input.put((byte) (s24 & 0xff));
+                    input.put((byte) ((s24 >> 8) & 0xff));
+                    input.put((byte) ((s24 >> 16) & 0xff));
+                    expected[i] = (float) (s24 / 8388608.0);
+                } else {
+                    int s32 = rng.nextInt();
+                    input.putInt(s32);
+                    expected[i] = (float) (s32 * (1.0 / 2147483648.0));
+                }
+            }
+            input.flip();
+
+            FakeProcessor proc = new FakeProcessor();
+            proc.output = new AudioFormat(48000, channels, C.ENCODING_PCM_FLOAT);
+            FakeSink sink = new FakeSink();
+            FloatDspAudioSink wrapper = new FloatDspAudioSink(sink, proc, true);
+            wrapper.configure(source(48000, channels, encoding), 0, null);
+            assertTrue(wrapper.handleBuffer(input, 0L, 1));
+            assertEquals(samples, proc.receivedFloats.size());
+            for (int i = 0; i < samples; i++) {
+                assertEquals("enc=" + encoding + " i=" + i,
+                        Float.floatToRawIntBits(expected[i]),
+                        Float.floatToRawIntBits(proc.receivedFloats.get(i)));
+            }
+            wrapper.reset();
+            proc.release();
+        }
+    }
+
+    @Test
+    public void pcm16QuantizerHoistedRngMatchesReferenceBitForBit() {
+        final Random inputRng = new Random(0x5EED_1403L);
+        final Random refRng = new Random(0xBEEF_1234L);
+        final Random testRng = new Random(0xBEEF_1234L);
+        final float[] specials = {
+                Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY,
+                0.0f, -0.0f, 1.0f, -1.0f, 2.0f, -2.0f,
+                1.0f / 32768f, -16384.0f / 32768f, 0.1234567f
+        };
+        for (int i = 0; i < 2000; i++) {
+            final float v = i < specials.length ? specials[i] : (inputRng.nextFloat() * 2.4f - 1.2f);
+            final short expected;
+            if (Float.isNaN(v) || Float.isInfinite(v)) {
+                expected = 0;
+            } else {
+                final double scaled = (double) v * 32768.0;
+                final double dither = scaled == Math.rint(scaled)
+                        ? 0.0
+                        : (refRng.nextDouble() - refRng.nextDouble());
+                final long sample = Math.round(scaled + dither);
+                expected = sample > Short.MAX_VALUE ? Short.MAX_VALUE
+                        : (sample < Short.MIN_VALUE ? Short.MIN_VALUE : (short) sample);
+            }
+            assertEquals("sample=" + i, expected, Pcm16Quantizer.fromFloat(v, testRng));
+        }
+    }
+
+    @Test
+    public void nativeDspBulkFloatInputMatchesElementWiseNonNativeCopy() throws Exception {
+        final Random rng = new Random(0x5EED_1404L);
+        final int frames = 128;
+        final int channels = 2;
+        final int sampleCount = frames * channels;
+        final float[] values = new float[sampleCount];
+        values[0] = -0.0f;
+        values[1] = 0.0f;
+        values[2] = Float.MIN_NORMAL;
+        values[3] = -1.0f;
+        for (int i = 4; i < sampleCount; i++) {
+            values[i] = rng.nextFloat() * 2.0f - 1.0f;
+        }
+
+        final ByteBuffer nativeOrdered = ByteBuffer.allocateDirect(sampleCount * 4)
+                .order(ByteOrder.nativeOrder());
+        final ByteOrder nonNativeOrder = ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN
+                ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN;
+        final ByteBuffer nonNativeOrdered = ByteBuffer.allocateDirect(sampleCount * 4)
+                .order(nonNativeOrder);
+        for (float v : values) {
+            nativeOrdered.putFloat(v);
+            nonNativeOrdered.putFloat(v);
+        }
+        nativeOrdered.flip();
+        nonNativeOrdered.flip();
+
+        final NativeDecision fastProc = new NativeDecision();
+        fastProc.perfect = false;
+        fastProc.setFloatOutput(true);
+        fastProc.configure(new AudioFormat(48000, channels, C.ENCODING_PCM_FLOAT));
+        fastProc.flush();
+        fastProc.queueInput(nativeOrdered);
+        final ByteBuffer fastOut = fastProc.getOutput().order(ByteOrder.nativeOrder());
+
+        final NativeDecision slowProc = new NativeDecision();
+        slowProc.perfect = false;
+        slowProc.setFloatOutput(true);
+        slowProc.configure(new AudioFormat(48000, channels, C.ENCODING_PCM_FLOAT));
+        slowProc.flush();
+        slowProc.queueInput(nonNativeOrdered);
+        final ByteBuffer slowOut = slowProc.getOutput().order(ByteOrder.nativeOrder());
+
+        assertEquals(sampleCount * 4, fastOut.remaining());
+        assertEquals(fastOut.remaining(), slowOut.remaining());
+        for (int i = 0; i < sampleCount; i++) {
+            assertEquals("float bits at i=" + i,
+                    Float.floatToRawIntBits(slowOut.getFloat()),
+                    Float.floatToRawIntBits(fastOut.getFloat()));
+        }
+
+        fastProc.release();
+        slowProc.release();
     }
 }

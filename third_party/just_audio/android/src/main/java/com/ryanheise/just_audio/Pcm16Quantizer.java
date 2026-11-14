@@ -1,5 +1,6 @@
 package com.ryanheise.just_audio;
 
+import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -32,6 +33,14 @@ final class Pcm16Quantizer {
      * Requantises a DSP float sample to dithered 16-bit PCM (default path only).
      */
     static short fromFloat(float value) {
+        return fromFloat(value, ThreadLocalRandom.current());
+    }
+
+    /**
+     * Requantises a DSP float sample to dithered 16-bit PCM using a
+     * caller-supplied RNG (hoisted once per buffer on hot paths).
+     */
+    static short fromFloat(float value, Random rng) {
         if (Float.isNaN(value) || Float.isInfinite(value)) return 0;
         final double scaled = (double) value * 32768.0;
         final double dither;
@@ -42,7 +51,6 @@ final class Pcm16Quantizer {
         } else {
             // TPDF dither: the difference of two independent [0,1) uniforms is
             // a triangular distribution over (-1, +1), i.e. +/-1 LSB.
-            final ThreadLocalRandom rng = ThreadLocalRandom.current();
             dither = rng.nextDouble() - rng.nextDouble();
         }
         final long sample = Math.round(scaled + dither);

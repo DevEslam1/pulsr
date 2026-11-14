@@ -43,10 +43,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private ByteBuffer quantizedOutput;
     private boolean processFloat;
     private int inputEncoding;
-    // Reusable conversion staging: direct float bytes + a reusable decode array.
+    // Reusable conversion staging: direct float bytes (written directly via FloatBuffer).
     private ByteBuffer converted;
     private FloatBuffer convertedFloats;
-    private float[] decodeScratch;
     private ByteBuffer pendingOutput;
     private ByteBuffer pendingInput;
     private int pendingInputEnd;
@@ -105,6 +104,13 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             delayBytes = initialDelayBytes;
             tail = new byte[checkedMultiply(Math.max(0, format.encoderPadding), inputFrameBytes)];
             nextTail = new byte[tail.length];
+            // Pre-size direct staging during configure() on the ExoPlayer playback
+            // thread (never the C++ real-time thread) so steady-state prepare() avoids allocations.
+            if (edits()) {
+                int preSizeFrames = Math.max(4096, format.sampleRate > 0 ? format.sampleRate / 10 : 4800);
+                staging = ByteBuffer.allocateDirect(Math.max(16384, preSizeFrames * outputFrameBytes))
+                        .order(ByteOrder.nativeOrder());
+            }
         }
 
         private static int checkedMultiply(int a, int b) {
@@ -129,17 +135,43 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             if (staging == null || staging.capacity() < outputBytes)
                 staging = ByteBuffer.allocateDirect(Math.max(16384, outputBytes)).order(ByteOrder.nativeOrder());
             staging.clear();
-            for (int f = 0; f < emitBytes; f += inputFrameBytes) {
-                int count = outputFrameBytes / sampleBytes;
-                for (int c = 0; c < count; c++) {
-                    int channel = channels == null ? c : channels[c];
-                    for (int b = 0; b < sampleBytes; b++)
-                        staging.put(byteAt(source, skipped, f + channel * sampleBytes + b));
+            if (channels == null) {
+                int fromTail = Math.min(emitBytes, tailSize);
+                if (fromTail > 0) {
+                    staging.put(tail, 0, fromTail);
                 }
+                int fromSource = emitBytes - fromTail;
+                if (fromSource > 0) {
+                    ByteBuffer slice = source.duplicate();
+                    int start = source.position() + skipped;
+                    slice.position(start).limit(start + fromSource);
+                    staging.put(slice);
+                }
+                nextTailSize = available - emitBytes;
+                int tailRemain = Math.max(0, tailSize - emitBytes);
+                if (tailRemain > 0) {
+                    System.arraycopy(tail, emitBytes, nextTail, 0, tailRemain);
+                }
+                int srcForTail = nextTailSize - tailRemain;
+                if (srcForTail > 0) {
+                    int srcTailStart = source.position() + skipped + Math.max(0, emitBytes - tailSize);
+                    ByteBuffer slice = source.duplicate();
+                    slice.position(srcTailStart);
+                    slice.get(nextTail, tailRemain, srcForTail);
+                }
+            } else {
+                for (int f = 0; f < emitBytes; f += inputFrameBytes) {
+                    int count = outputFrameBytes / sampleBytes;
+                    for (int c = 0; c < count; c++) {
+                        int channel = channels[c];
+                        for (int b = 0; b < sampleBytes; b++)
+                            staging.put(byteAt(source, skipped, f + channel * sampleBytes + b));
+                    }
+                }
+                nextTailSize = available - emitBytes;
+                for (int i = 0; i < nextTailSize; i++)
+                    nextTail[i] = byteAt(source, skipped, emitBytes + i);
             }
-            nextTailSize = available - emitBytes;
-            for (int i = 0; i < nextTailSize; i++)
-                nextTail[i] = byteAt(source, skipped, emitBytes + i);
             staging.flip();
             return staging;
         }
@@ -407,9 +439,11 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             quantizedOutput = ByteBuffer.allocateDirect(Math.max(16384, samples * 2)).order(ByteOrder.nativeOrder());
         quantizedOutput.clear();
         ByteBuffer input = output.duplicate().order(ByteOrder.nativeOrder());
+        final java.util.concurrent.ThreadLocalRandom rng =
+                java.util.concurrent.ThreadLocalRandom.current();
         for (int i = 0; i < samples; i++) {
             if (encoding == C.ENCODING_PCM_FLOAT) {
-                quantizedOutput.putShort(Pcm16Quantizer.fromFloat(input.getFloat()));
+                quantizedOutput.putShort(Pcm16Quantizer.fromFloat(input.getFloat(), rng));
             } else {
                 int code;
                 if (bytes == 3) {
@@ -420,7 +454,6 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 double scaled = code / (bytes == 3 ? 256.0 : 65536.0);
                 double dither = 0;
                 if (scaled != Math.rint(scaled)) {
-                    java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
                     dither = rng.nextDouble() - rng.nextDouble();
                 }
                 long quantized = Math.round(scaled + dither);
@@ -567,7 +600,6 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         pendingInput = null;
         converted = null;
         convertedFloats = null;
-        decodeScratch = null;
         lastSampleRate = -1;
         lastChannelCount = -1;
         lastPcmEncoding = C.ENCODING_INVALID;
@@ -597,11 +629,13 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 : (inputEncoding == C.ENCODING_PCM_24BIT ? 3 : 4);
         final int samples = pcm.remaining() / sampleBytes;
         ensureConvertCapacity(samples);
-        final float[] out = decodeScratch;
+        converted.clear();
+        convertedFloats.clear();
+        final FloatBuffer out = convertedFloats;
         if (inputEncoding == C.ENCODING_PCM_16BIT) {
             final ShortBuffer shorts = pcm.asShortBuffer();
             for (int i = 0; i < samples; i++) {
-                out[i] = shorts.get(i) / 32768f;
+                out.put(i, shorts.get(i) / 32768f);
             }
         } else if (inputEncoding == C.ENCODING_PCM_24BIT) {
             // Correct little-endian packed 24-bit (PCM_24BIT_PACKED) unpack:
@@ -616,7 +650,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 // a paired arithmetic-shift (works on all Java VMs).
                 final int unsigned24 = b0 | (b1 << 8) | (b2 << 16);
                 final int signed32   = (unsigned24 << 8) >> 8;   // arithmetic sign-extend
-                out[i] = (float) (signed32 / 8388608.0);         // ÷ 2^23
+                out.put(i, (float) (signed32 / 8388608.0));      // ÷ 2^23
             }
         } else {
             final IntBuffer ints = pcm.asIntBuffer();
@@ -624,26 +658,22 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 // Scaling via double does NOT preserve int32 low bits: the
                 // final float still has only 24 significant bits. This is an
                 // explicitly lossy playback path, not an exact integer bypass.
-                out[i] = (float) (ints.get(i) * (1.0 / 2147483648.0));
+                out.put(i, (float) (ints.get(i) * (1.0 / 2147483648.0)));
             }
         }
-        converted.clear();
-        convertedFloats.clear();
-        convertedFloats.put(out, 0, samples);
         converted.limit(samples * 4);
         converted.position(0);
         return converted;
     }
 
     private void ensureConvertCapacity(int samples) {
-        if (converted != null && decodeScratch != null
-                && converted.capacity() >= samples * 4 && decodeScratch.length >= samples) {
+        if (converted != null && convertedFloats != null
+                && converted.capacity() >= samples * 4) {
             return;
         }
         final int capacitySamples = Math.max(samples, PRESIZE_SAMPLES);
         converted = ByteBuffer.allocateDirect(capacitySamples * 4).order(ByteOrder.nativeOrder());
         convertedFloats = converted.asFloatBuffer();
-        decodeScratch = new float[capacitySamples];
     }
 
     /** Human-readable name for a C.ENCODING_PCM_* value (hi-res truth probe). */
