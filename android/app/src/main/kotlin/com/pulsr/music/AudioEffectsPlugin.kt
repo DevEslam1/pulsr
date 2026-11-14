@@ -868,8 +868,29 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             lookahead
         }
 
-        val isBitExact = isBitPerfectBypassActive ||
-            (activeDspStages == 0 && !isDitherEnabled && !isReplayGainEnabled && !dvcActive && !isBypassCompareActive)
+        val sessionAttached = currentAudioSessionId != 0
+        val halColoring = computeHalColoring(
+            sessionAttached = sessionAttached,
+            virtualizerEnabled = isVirtualizerEnabled,
+            bassBoostStrength = bassBoostStrength.toInt(),
+            volumeBoostMilliBels = volumeBoostMilliBels,
+            eqEnabled = isEqEnabled,
+            eqOwner = currentEqOwner,
+            dynamicsEnabled = isDynamicsEnabled,
+            dynamicsPresetNativeActive = isDynamicsPresetNativeActive,
+            dynamicsPreset = currentDynamicsPreset,
+            spatializerFallbackActive = isSpatializerFallbackActive,
+        )
+        val isBitExact = computeChainBitExact(
+            isBitPerfectBypassActive = isBitPerfectBypassActive,
+            activeDspStages = activeDspStages,
+            isDitherEnabled = isDitherEnabled,
+            isReplayGainEnabled = isReplayGainEnabled,
+            dvcActive = dvcActive,
+            isBypassCompareActive = isBypassCompareActive,
+            halColoring = halColoring,
+            bitPerfectSystemEffectsActive = bitPerfectSystemEffectsActive,
+        )
 
         return mapOf(
             "nativeEngineLoaded" to isNativeDspLoaded,
@@ -877,6 +898,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "bufferSize" to (if (latencyFrames > 0) latencyFrames else 512),
             "activeStagesBitmask" to activeDspStages,
             "activeStages" to activeStagesList,
+            "halStagesActive" to halColoring,
             "isBitPerfectActive" to isBitPerfectBypassActive,
             "isBypassCompareActive" to isBypassCompareActive,
             "isDitherEnabled" to isDitherEnabled,
@@ -1101,6 +1123,40 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             val high = kotlin.math.max(clamp(rawHigh, 1000.0, 10000.0), low + 1.0)
             return low to high
         }
+
+        internal fun computeHalColoring(
+            sessionAttached: Boolean,
+            virtualizerEnabled: Boolean,
+            bassBoostStrength: Int,
+            volumeBoostMilliBels: Int,
+            eqEnabled: Boolean,
+            eqOwner: EqOwner,
+            dynamicsEnabled: Boolean,
+            dynamicsPresetNativeActive: Boolean,
+            dynamicsPreset: String,
+            spatializerFallbackActive: Boolean,
+        ): Boolean = sessionAttached && (
+            virtualizerEnabled ||
+                bassBoostStrength > 0 ||
+                volumeBoostMilliBels > 0 ||
+                (eqEnabled && eqOwner == EqOwner.HAL) ||
+                (dynamicsEnabled && !dynamicsPresetNativeActive && dynamicsPreset != "off") ||
+                spatializerFallbackActive
+        )
+
+        internal fun computeChainBitExact(
+            isBitPerfectBypassActive: Boolean,
+            activeDspStages: Int,
+            isDitherEnabled: Boolean,
+            isReplayGainEnabled: Boolean,
+            dvcActive: Boolean,
+            isBypassCompareActive: Boolean,
+            halColoring: Boolean,
+            bitPerfectSystemEffectsActive: Boolean,
+        ): Boolean = !halColoring && !bitPerfectSystemEffectsActive && (
+            isBitPerfectBypassActive ||
+                (activeDspStages == 0 && !isDitherEnabled && !isReplayGainEnabled && !dvcActive && !isBypassCompareActive)
+        )
 
         internal fun clampCacheBudgetBytes(bytes: Long): Long =
             bytes.coerceIn(1L * 1024 * 1024, 256L * 1024 * 1024)
