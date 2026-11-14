@@ -404,4 +404,34 @@ public class AudioPlayerLifecycleTest {
         player.probeSingleAaudioEncoding(48000, 2, AaudioNativeBridge.ENCODING_PCM_I16, 150, true);
         assertEquals(0, capturedDeviceId[0]);
     }
+
+    @Test
+    public void pluginDetachesEngineLifecycleListenerAndGuardsPreRestartAfterDetach() {
+        final List<io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener> added = new ArrayList<>();
+        final List<io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener> removed = new ArrayList<>();
+        final JustAudioPlugin plugin = new JustAudioPlugin();
+        plugin.attach(
+                RuntimeEnvironment.getApplication(),
+                mock(BinaryMessenger.class),
+                new JustAudioPlugin.LifecycleHost() {
+                    @Override
+                    public void add(io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener listener) {
+                        added.add(listener);
+                    }
+
+                    @Override
+                    public void remove(io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener listener) {
+                        removed.add(listener);
+                    }
+                });
+        assertEquals(1, added.size());
+        final io.flutter.embedding.engine.FlutterEngine.EngineLifecycleListener listener = added.get(0);
+
+        listener.onPreEngineRestart();
+        plugin.detach();
+        assertEquals(Collections.singletonList(listener), removed);
+
+        // Must be a safe no-op when invoked after detach cleared methodCallHandler.
+        listener.onPreEngineRestart();
+    }
 }
