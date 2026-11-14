@@ -307,4 +307,35 @@ class AudioIntentClassifierTest {
             )
         )
     }
+
+    @Test
+    fun acceptsExpandedCanonicalAudioExtensionsAndRejectsPlaylists() {
+        val acceptedExtensions = listOf("webm", "oga", "aifc", "wma", "ape", "tta", "wv", "aif", "mp4")
+        for (ext in acceptedExtensions) {
+            assertTrue(
+                "Expected .$ext VIEW intent to be accepted",
+                AudioIntentClassifier.isAudioIntentParts(
+                    action = "android.intent.action.VIEW",
+                    scheme = "file",
+                    path = "/storage/emulated/0/Music/track.$ext",
+                    host = null,
+                    mimeType = null,
+                    textExtra = null,
+                )
+            )
+        }
+        for (playlistExt in listOf("m3u", "m3u8")) {
+            assertFalse(
+                "Expected .$playlistExt playlist without audio MIME to remain rejected",
+                AudioIntentClassifier.isAudioIntentParts(
+                    action = "android.intent.action.VIEW",
+                    scheme = "file",
+                    path = "/storage/emulated/0/Music/list.$playlistExt",
+                    host = null,
+                    mimeType = null,
+                    textExtra = null,
+                )
+            )
+        }
+    }
 }

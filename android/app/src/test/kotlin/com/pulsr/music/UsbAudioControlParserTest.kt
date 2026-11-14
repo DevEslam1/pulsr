@@ -566,4 +566,87 @@ class UsbAudioControlParserTest {
         assertNull(result.streamingInterface)
         assertEquals(UsbAudioControlParser.UAC_NONE, result.uacVersion)
     }
+
+    @Test
+    fun hasAudioControlAndStreamingPairHandlesStandardVendorOnlyAndIncompletePairs() {
+        val standardAc = UsbAudioControlParser.InterfaceSignature(0x01, 0x01, 0x20)
+        val standardAs = UsbAudioControlParser.InterfaceSignature(0x01, 0x02, 0x20)
+        val vendorAc = UsbAudioControlParser.InterfaceSignature(0xFF, 0x01, 0x20)
+        val vendorAs = UsbAudioControlParser.InterfaceSignature(0xFF, 0x02, 0x20)
+        val adbIface = UsbAudioControlParser.InterfaceSignature(0xFF, 0x42, 0x01)
+
+        assertTrue(UsbAudioControlParser.hasAudioControlAndStreamingPair(listOf(standardAc, standardAs)))
+        assertTrue(UsbAudioControlParser.hasAudioControlAndStreamingPair(listOf(vendorAc, vendorAs)))
+        assertTrue(
+            UsbAudioControlParser.hasAudioControlAndStreamingPair(
+                listOf(vendorAc, vendorAs),
+                vendorOnly = true,
+            )
+        )
+        assertFalse(
+            UsbAudioControlParser.hasAudioControlAndStreamingPair(
+                listOf(standardAc, standardAs),
+                vendorOnly = true,
+            )
+        )
+        assertFalse(UsbAudioControlParser.hasAudioControlAndStreamingPair(listOf(standardAc)))
+        assertFalse(UsbAudioControlParser.hasAudioControlAndStreamingPair(listOf(vendorAs)))
+        assertFalse(UsbAudioControlParser.hasAudioControlAndStreamingPair(listOf(vendorAc, adbIface)))
+    }
+
+    @Test
+    fun selectPreferredAudioDevicePrefersRoutedVidPidThenNameThenStandardAudio() {
+        val nonAudio = UsbAudioControlParser.UsbDeviceSummary(
+            id = 1,
+            vendorId = 0x18D1,
+            productId = 0x4EE7,
+            manufacturerName = "Google",
+            productName = "ADB",
+            interfaces = listOf(UsbAudioControlParser.InterfaceSignature(0xFF, 0x42, 0x01)),
+        )
+        val vendorDac = UsbAudioControlParser.UsbDeviceSummary(
+            id = 2,
+            vendorId = 0x20B1,
+            productId = 0x3008,
+            manufacturerName = "Acme",
+            productName = "Vendor DAC",
+            interfaces = listOf(
+                UsbAudioControlParser.InterfaceSignature(0xFF, 0x01, 0x20),
+                UsbAudioControlParser.InterfaceSignature(0xFF, 0x02, 0x20),
+            ),
+        )
+        val standardDac = UsbAudioControlParser.UsbDeviceSummary(
+            id = 3,
+            vendorId = 0x1234,
+            productId = 0x5678,
+            manufacturerName = "FiiO",
+            productName = "K11",
+            interfaces = listOf(
+                UsbAudioControlParser.InterfaceSignature(0x01, 0x01, 0x20),
+                UsbAudioControlParser.InterfaceSignature(0x01, 0x02, 0x20),
+            ),
+        )
+
+        assertNull(UsbAudioControlParser.selectPreferredAudioDevice(listOf(nonAudio)))
+        assertEquals(
+            standardDac,
+            UsbAudioControlParser.selectPreferredAudioDevice(listOf(nonAudio, vendorDac, standardDac)),
+        )
+        assertEquals(
+            vendorDac,
+            UsbAudioControlParser.selectPreferredAudioDevice(
+                devices = listOf(nonAudio, standardDac, vendorDac),
+                routeProductName = "K11",
+                routeAddress = "usb-20b1:3008-0",
+            ),
+        )
+        assertEquals(
+            vendorDac,
+            UsbAudioControlParser.selectPreferredAudioDevice(
+                devices = listOf(nonAudio, standardDac, vendorDac),
+                routeProductName = "Vendor DAC",
+                routeAddress = null,
+            ),
+        )
+    }
 }

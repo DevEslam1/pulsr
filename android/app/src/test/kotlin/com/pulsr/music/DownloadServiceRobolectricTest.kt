@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Build
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -21,6 +22,8 @@ class DownloadServiceRobolectricTest {
 
     @Before
     fun setUp() {
+        DownloadService.tombstoneNowMs = { android.os.SystemClock.elapsedRealtime() }
+        DownloadService.clearTombstonesForTesting()
         DownloadChunkStateStore.clearAll(RuntimeEnvironment.getApplication())
         DownloadService.onDownloadCompletedListener = { completed.add(it) }
         DownloadService.onDownloadCancelledListener = { cancelled.add(it) }
@@ -30,6 +33,8 @@ class DownloadServiceRobolectricTest {
     fun tearDown() {
         DownloadService.onDownloadCompletedListener = null
         DownloadService.onDownloadCancelledListener = null
+        DownloadService.clearTombstonesForTesting()
+        DownloadService.tombstoneNowMs = { android.os.SystemClock.elapsedRealtime() }
         DownloadChunkStateStore.clearAll(RuntimeEnvironment.getApplication())
     }
 
@@ -88,5 +93,40 @@ class DownloadServiceRobolectricTest {
         // The placeholder is posted and removed again; the id records that
         // startForeground() actually ran before the service stopped itself.
         assertTrue(shadow.lastForegroundNotificationId > 0)
+    }
+
+    @Test
+    fun cancelTombstoneBlocksStaleUpdateUntilRestartOrTtlExpiry() {
+        var fakeClockMs = 10_000L
+        DownloadService.tombstoneNowMs = { fakeClockMs }
+
+        val service = Robolectric.buildService(DownloadService::class.java).create().get()
+        service.onStartCommand(startIntent(service, "v2"), 0, 1)
+
+        val cancelSingle = Intent(service, DownloadService::class.java).apply {
+            action = DownloadService.ACTION_CANCEL
+            putExtra(DownloadService.EXTRA_VIDEO_ID, "v2")
+        }
+        service.onStartCommand(cancelSingle, 0, 2)
+        assertTrue(DownloadService.isTombstoned("v2"))
+        assertEquals(listOf("v2"), cancelled)
+
+        // Late UPDATE(100) after CANCEL must be dropped and must not fire completion.
+        service.onStartCommand(updateIntent(service, "v2", 100), 0, 3)
+        assertTrue(completed.isEmpty())
+
+        // Advancing past 30s TTL expires the tombstone.
+        fakeClockMs += DownloadService.TOMBSTONE_TTL_MS + 1L
+        assertFalse(DownloadService.isTombstoned("v2"))
+
+        // Explicit restart clears tombstone immediately even before TTL.
+        fakeClockMs = 20_000L
+        service.onStartCommand(cancelSingle, 0, 4)
+        assertTrue(DownloadService.isTombstoned("v2"))
+        service.onStartCommand(startIntent(service, "v2"), 0, 5)
+        assertFalse(DownloadService.isTombstoned("v2"))
+
+        service.onStartCommand(updateIntent(service, "v2", 100), 0, 6)
+        assertEquals(listOf("v2"), completed)
     }
 }
