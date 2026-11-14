@@ -112,7 +112,7 @@ object ProxyPool {
     @Volatile
     private var onPathChangeListener: ((String) -> Unit)? = null
 
-    fun setOnPathChangeListener(listener: (String) -> Unit) {
+    fun setOnPathChangeListener(listener: ((String) -> Unit)?) {
         onPathChangeListener = listener
     }
 

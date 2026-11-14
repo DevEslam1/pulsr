@@ -10,6 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.net.Proxy
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -101,6 +102,7 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             engineAttached = false
             val remaining = activeEngines.updateAndGet { count -> if (count > 0) count - 1 else 0 }
             if (remaining == 0) {
+                ProxyPool.setOnPathChangeListener(null)
                 ProxyManager.dispose()
             }
         }
@@ -167,19 +169,37 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "testProxy" -> {
                 val testUrl = call.argument<String>("testUrl") ?: "https://www.google.com/generate_204"
                 val timeoutMs = call.argument<Int>("timeoutMs") ?: 10000
+                val replied = AtomicBoolean(false)
 
                 try {
                     ensureExecutor().execute {
-                        val res = ProxyManager.testConnection(testUrl, timeoutMs)
-                        mainHandler.post {
-                            try {
-                                result.success(res)
-                            } catch (_: Exception) {
+                        try {
+                            val res = ProxyManager.testConnection(testUrl, timeoutMs)
+                            if (engineAttached && !Thread.currentThread().isInterrupted &&
+                                replied.compareAndSet(false, true)
+                            ) {
+                                mainHandler.post {
+                                    try {
+                                        result.success(res)
+                                    } catch (_: Exception) {
+                                    }
+                                }
+                            }
+                        } finally {
+                            if (replied.compareAndSet(false, true)) {
+                                mainHandler.post {
+                                    try {
+                                        result.error("PLUGIN_DISPOSED", "Proxy plugin is shutting down", null)
+                                    } catch (_: Exception) {
+                                    }
+                                }
                             }
                         }
                     }
-                } catch (e: java.util.concurrent.RejectedExecutionException) {
-                    result.error("PLUGIN_DISPOSED", "Proxy plugin is shutting down", null)
+                } catch (_: java.util.concurrent.RejectedExecutionException) {
+                    if (replied.compareAndSet(false, true)) {
+                        result.error("PLUGIN_DISPOSED", "Proxy plugin is shutting down", null)
+                    }
                 }
             }
             "testAllProxies" -> {
