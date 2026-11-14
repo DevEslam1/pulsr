@@ -53,6 +53,9 @@ class NowPlayingWidget : AppWidgetProvider() {
             // shares our prefix must not reach the action handler.
             if (!isTrustedWidgetAction(context, intent)) {
                 android.util.Log.w("NowPlayingWidget", "Rejected unauthorized widget action: $action")
+                // Self-heal stale tokens (e.g. after 24h idle rotation) by minting
+                // and pushing fresh PendingIntents immediately without executing the action.
+                scheduleDebouncedWidgetUpdate(context, 0L)
                 return
             }
             handleWidgetAction(context, intent)
@@ -277,14 +280,20 @@ class NowPlayingWidget : AppWidgetProvider() {
         const val ACTION_SHUFFLE = "com.pulsr.music.widget.SHUFFLE"
         const val ACTION_REPEAT = "com.pulsr.music.widget.REPEAT"
         const val EXTRA_RATIO = "extra_ratio"
-        private const val EXTRA_WIDGET_TOKEN = "com.pulsr.music.widget.extra.TOKEN"
+        internal const val EXTRA_WIDGET_TOKEN = "com.pulsr.music.widget.extra.TOKEN"
         private const val WIDGET_ACTION_PREFIX = "com.pulsr.music.widget."
         private const val WIDGET_CONTROL_PERMISSION = "com.pulsr.music.permission.WIDGET_CONTROL"
 
         private const val TOKEN_GRACE_WINDOW_MS = 5 * 60 * 1000L
+        private const val TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000L // 24 hours
 
         private val secureRandom by lazy { java.security.SecureRandom() }
         private val widgetTokenLock = Any()
+
+        @Volatile private var cachedActiveToken: String? = null
+        @Volatile private var cachedTokenCreatedAt: Long = 0L
+        @Volatile private var cachedPreviousToken: String? = null
+        @Volatile private var cachedPreviousTokenExpiresAt: Long = 0L
 
         private fun generateToken(): String {
             val bytes = ByteArray(32)
@@ -292,13 +301,21 @@ class NowPlayingWidget : AppWidgetProvider() {
             return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
         }
 
-        private fun getWidgetToken(context: Context): String = synchronized(widgetTokenLock) {
+        private fun hydrateTokenCacheIfNeeded(context: Context) {
+            if (cachedActiveToken != null) return
             val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
-            val token = prefs.getString("token_active", null)
-            val createdAt = prefs.getLong("token_created_at", 0L)
+            cachedActiveToken = prefs.getString("token_active", null)
+            cachedTokenCreatedAt = prefs.getLong("token_created_at", 0L)
+            cachedPreviousToken = prefs.getString("token_previous", null)
+            cachedPreviousTokenExpiresAt = prefs.getLong("token_prev_expires_at", 0L)
+        }
+
+        internal fun getWidgetToken(context: Context): String = synchronized(widgetTokenLock) {
+            hydrateTokenCacheIfNeeded(context)
+            val token = cachedActiveToken
+            val createdAt = cachedTokenCreatedAt
             val now = System.currentTimeMillis()
-            val maxAgeMs = 24 * 60 * 60 * 1000L // 24 hours
-            if (token != null && createdAt > 0L && (now - createdAt) < maxAgeMs) {
+            if (token != null && createdAt > 0L && (now - createdAt) < TOKEN_MAX_AGE_MS) {
                 token
             } else {
                 rotateWidgetToken(context)
@@ -309,34 +326,52 @@ class NowPlayingWidget : AppWidgetProvider() {
             if (candidate.isNullOrEmpty()) return@synchronized false
             val active = getWidgetToken(context)
             if (candidate == active) return@synchronized true
-            val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
-            val previous = prefs.getString("token_previous", null)
-            val prevExpiresAt = prefs.getLong("token_prev_expires_at", 0L)
+            val previous = cachedPreviousToken
+            val prevExpiresAt = cachedPreviousTokenExpiresAt
             previous != null && candidate == previous && System.currentTimeMillis() <= prevExpiresAt
         }
 
         fun rotateWidgetToken(context: Context): String = synchronized(widgetTokenLock) {
+            hydrateTokenCacheIfNeeded(context)
             val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
-            val prevToken = prefs.getString("token_active", null)
+            val prevToken = cachedActiveToken
             val newToken = generateToken()
             val now = System.currentTimeMillis()
+            cachedActiveToken = newToken
+            cachedTokenCreatedAt = now
             val editor = prefs.edit()
                 .putString("token_active", newToken)
                 .putLong("token_created_at", now)
             if (prevToken != null) {
+                val prevExpiresAt = now + TOKEN_GRACE_WINDOW_MS
+                cachedPreviousToken = prevToken
+                cachedPreviousTokenExpiresAt = prevExpiresAt
                 editor.putString("token_previous", prevToken)
-                editor.putLong("token_prev_expires_at", now + TOKEN_GRACE_WINDOW_MS)
+                editor.putLong("token_prev_expires_at", prevExpiresAt)
             } else {
+                cachedPreviousToken = null
+                cachedPreviousTokenExpiresAt = 0L
                 editor.remove("token_previous")
                 editor.remove("token_prev_expires_at")
             }
-            editor.commit()
+            editor.apply()
             newToken
         }
 
         fun clearWidgetToken(context: Context) = synchronized(widgetTokenLock) {
+            cachedActiveToken = null
+            cachedTokenCreatedAt = 0L
+            cachedPreviousToken = null
+            cachedPreviousTokenExpiresAt = 0L
             val prefs = context.getSharedPreferences("widget_tokens", Context.MODE_PRIVATE)
-            prefs.edit().clear().commit()
+            prefs.edit().clear().apply()
+        }
+
+        internal fun resetTokenCacheForTesting() = synchronized(widgetTokenLock) {
+            cachedActiveToken = null
+            cachedTokenCreatedAt = 0L
+            cachedPreviousToken = null
+            cachedPreviousTokenExpiresAt = 0L
         }
 
         /// C-10: the complete set of broadcasts this receiver will act on.
@@ -390,12 +425,13 @@ class NowPlayingWidget : AppWidgetProvider() {
         private val mediaBrowserLock = Any()
 
         private val updateHandler = Handler(Looper.getMainLooper())
-        private var pendingUpdateRunnable: Runnable? = null
+        @Volatile internal var pendingUpdateRunnable: Runnable? = null
 
         fun scheduleDebouncedWidgetUpdate(context: Context, delayMs: Long = 150L, isProgressOnly: Boolean = false) {
             val appContext = context.applicationContext ?: context
             pendingUpdateRunnable?.let { updateHandler.removeCallbacks(it) }
             val runnable = Runnable {
+                pendingUpdateRunnable = null
                 try {
                     val appWidgetManager = AppWidgetManager.getInstance(appContext)
                     val componentName = ComponentName(appContext, NowPlayingWidget::class.java)
@@ -697,7 +733,7 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
         }
 
-        private fun createPopulatedRemoteViews(
+        internal fun createPopulatedRemoteViews(
             context: Context,
             layoutId: Int,
             data: SharedPreferences,
