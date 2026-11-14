@@ -137,6 +137,7 @@ class CastDiscoveryPlugin(
         val listener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String?) {
                 discovering = true
+                lastError = null
             }
 
             override fun onServiceFound(serviceInfo: NsdServiceInfo?) {
@@ -188,8 +189,10 @@ class CastDiscoveryPlugin(
 
     @Suppress("DEPRECATION")
     private fun resolve(nsd: NsdManager, serviceInfo: NsdServiceInfo) {
+        if (!discovering || discoveryListener == null) return
         val serviceName = serviceInfo.serviceName
         synchronized(resolveLock) {
+            if (!discovering || discoveryListener == null) return
             if (!serviceName.isNullOrEmpty() && resolveQueue.any { it.serviceName == serviceName }) {
                 return
             }
@@ -208,7 +211,7 @@ class CastDiscoveryPlugin(
     private fun processNextResolve(nsd: NsdManager) {
         val nextService: NsdServiceInfo
         synchronized(resolveLock) {
-            if (resolveQueue.isEmpty()) {
+            if (!discovering || discoveryListener == null || resolveQueue.isEmpty()) {
                 isResolving = false
                 return
             }
@@ -223,7 +226,7 @@ class CastDiscoveryPlugin(
 
             override fun onServiceResolved(info: NsdServiceInfo?) {
                 try {
-                    if (info != null) {
+                    if (info != null && discovering && discoveryListener != null) {
                         val attrs = mutableMapOf<String, String>()
                         try {
                             info.attributes?.forEach { (k, v) ->
