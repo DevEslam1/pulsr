@@ -901,4 +901,73 @@ public class PulsrAudioSinkTest {
             sink.release();
         }
     }
+
+    private PulsrAudioSink configureDeferredFloatToDefaultSwap(
+            FloatDspAudioSink first, AudioSink rawFirst, AudioSink replacement) throws Exception {
+        final Flag aaudio = new Flag(false);
+        final Flag floatMode = new Flag(true);
+        final Factory factory = new Factory();
+        factory.queue.add(holder(first));
+        final PulsrAudioSink sink = newSink(aaudio, floatMode,
+                new Fallbacks(aaudio, floatMode), factory);
+        sink.configure(FORMAT, 0, null);
+        assertFalse(sink.handleBuffer(stereo16(100, -100), 10L, 1));
+        floatMode.value = false;
+        factory.queue.add(holder(replacement));
+        sink.applyPendingMode(false);
+        verify(rawFirst, org.mockito.Mockito.never()).release();
+        return sink;
+    }
+
+    @Test
+    public void pendingModeProcessedOnPlayToEndOfStream() throws Exception {
+        final AudioSink rawFirst = mock(AudioSink.class);
+        when(rawFirst.handleBuffer(any(), anyLong(), anyInt())).thenReturn(false, true);
+        final FloatDspAudioSink first = new FloatDspAudioSink(rawFirst, new CopyProcessor());
+        final AudioSink replacement = mock(AudioSink.class);
+        final PulsrAudioSink sink = configureDeferredFloatToDefaultSwap(first, rawFirst, replacement);
+
+        sink.playToEndOfStream();
+        verify(rawFirst).playToEndOfStream();
+        verify(rawFirst).release();
+        verify(replacement).configure(FORMAT, 0, null);
+        verify(replacement).playToEndOfStream();
+        sink.release();
+    }
+
+    @Test
+    public void pendingModeProcessedOnPause() throws Exception {
+        final AudioSink rawFirst = mock(AudioSink.class);
+        when(rawFirst.handleBuffer(any(), anyLong(), anyInt())).thenReturn(false);
+        final FloatDspAudioSink first = new FloatDspAudioSink(rawFirst, new CopyProcessor());
+        org.mockito.Mockito.doAnswer(inv -> {
+            final Field f = FloatDspAudioSink.class.getDeclaredField("pendingInput");
+            f.setAccessible(true);
+            f.set(first, null);
+            return null;
+        }).when(rawFirst).pause();
+        final AudioSink replacement = mock(AudioSink.class);
+        final PulsrAudioSink sink = configureDeferredFloatToDefaultSwap(first, rawFirst, replacement);
+
+        sink.pause();
+        verify(rawFirst).pause();
+        verify(rawFirst).release();
+        verify(replacement).configure(FORMAT, 0, null);
+        sink.release();
+    }
+
+    @Test
+    public void pendingModeProcessedAfterFlush() throws Exception {
+        final AudioSink rawFirst = mock(AudioSink.class);
+        when(rawFirst.handleBuffer(any(), anyLong(), anyInt())).thenReturn(false);
+        final FloatDspAudioSink first = new FloatDspAudioSink(rawFirst, new CopyProcessor());
+        final AudioSink replacement = mock(AudioSink.class);
+        final PulsrAudioSink sink = configureDeferredFloatToDefaultSwap(first, rawFirst, replacement);
+
+        sink.flush();
+        verify(rawFirst).flush();
+        verify(rawFirst).release();
+        verify(replacement).configure(FORMAT, 0, null);
+        sink.release();
+    }
 }

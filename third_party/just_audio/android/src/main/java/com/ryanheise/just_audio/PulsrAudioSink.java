@@ -229,6 +229,15 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         }
     }
 
+    private void processPendingModeIfReady() {
+        if (pendingModeRequested && !hasStagedInput()) {
+            boolean force = pendingForce;
+            pendingModeRequested = false;
+            pendingForce = false;
+            applyPendingMode(force);
+        }
+    }
+
     // ---- AudioSink ----
 
     @Override
@@ -346,12 +355,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         }
         try {
             boolean consumed = inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
-            if (pendingModeRequested && !hasStagedInput()) {
-                boolean force = pendingForce;
-                pendingModeRequested = false;
-                pendingForce = false;
-                applyPendingMode(force);
-            }
+            processPendingModeIfReady();
             return consumed;
         } catch (NativeDspAudioProcessor.TapSrcException e) {
             // No source or editor state was committed. Reconfigure at source
@@ -391,6 +395,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     public void playToEndOfStream() throws WriteException {
         endOfStreamQueued = true;
         if (inner != null) inner.playToEndOfStream();
+        processPendingModeIfReady();
     }
 
     @Override
@@ -525,6 +530,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         if (inner != null) inner.pause();
         if (currentInner != null && currentInner.processor != null)
             currentInner.processor.releaseUsbProducer();
+        processPendingModeIfReady();
     }
 
     @Override
@@ -540,6 +546,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         if (mode == Mode.DEFAULT && current != null && current.processor != null) {
             current.processor.resetNativeState();
         }
+        processPendingModeIfReady();
     }
 
     @Override
