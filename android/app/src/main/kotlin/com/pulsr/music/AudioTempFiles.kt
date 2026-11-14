@@ -37,8 +37,21 @@ object AudioTempFiles {
         "audio/3gpp" to ".3gp",
     )
 
-    private val ALLOWED_EXTENSIONS =
-        MIME_TO_EXTENSION.values.toSet() + setOf(".alac", ".mka", ".aifc")
+    /**
+     * Canonical set of supported audio extensions shared across file-temp copying
+     * and inbound intent classification. Playlist formats (.m3u / .m3u8) are
+     * intentionally excluded.
+     */
+    val AUDIO_EXTENSIONS: Set<String> = MIME_TO_EXTENSION.values.toSet() + setOf(
+        ".alac",
+        ".mka",
+        ".aifc",
+        ".oga",
+        ".tta",
+        ".wv",
+        ".aif",
+        ".mp4",
+    )
 
     fun extensionFor(context: Context, uri: Uri): String {
         val fromName = runCatching { displayName(context, uri) }
@@ -47,7 +60,7 @@ object AudioTempFiles {
             ?.lowercase()
             ?.filter { it in 'a'..'z' || it in '0'..'9' }
             ?.takeIf { it.length in 1..8 }
-        if (fromName != null && ".$fromName" in ALLOWED_EXTENSIONS) return ".$fromName"
+        if (fromName != null && ".$fromName" in AUDIO_EXTENSIONS) return ".$fromName"
 
         val mime = runCatching { context.contentResolver.getType(uri) }
             .getOrNull()

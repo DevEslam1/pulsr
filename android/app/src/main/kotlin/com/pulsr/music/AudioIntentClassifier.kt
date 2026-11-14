@@ -15,10 +15,7 @@ import java.io.File
  */
 object AudioIntentClassifier {
 
-    private val AUDIO_EXTENSIONS = listOf(
-        ".mp3", ".flac", ".wav", ".aac", ".m4a", ".ogg", ".opus",
-        ".mka", ".dsf", ".dff", ".aiff", ".alac",
-    )
+    private val AUDIO_EXTENSIONS: Set<String> get() = AudioTempFiles.AUDIO_EXTENSIONS
 
     private val TEXT_EXTENSIONS = listOf(".txt", ".list", ".conf", ".csv")
 
