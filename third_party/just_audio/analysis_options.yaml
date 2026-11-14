@@ -12,4 +12,4 @@ analyzer:
 linter:
   rules:
     prefer_single_quotes: false
-    unawaited_futures: false
+    unawaited_futures: true

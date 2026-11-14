@@ -27,7 +27,9 @@ JustAudioPlatform get _pluginPlatform {
     // Dispose of all existing players within this FlutterEngine. This helps to
     // shut down existing players on a hot restart.
     try {
-      pluginPlatform.disposeAllPlayers(DisposeAllPlayersRequest());
+      unawaited(pluginPlatform
+          .disposeAllPlayers(DisposeAllPlayersRequest())
+          .then<void>((_) {}, onError: (_) {}));
     } catch (e) {
       // Silently ignore if a platform doesn't support this method.
     }
@@ -1153,7 +1155,7 @@ class AudioPlayer {
     if (_playlist.children.length != 1 || audioSource is! UriAudioSource) {
       throw Exception('Playlist must contain 1 UriAudioSource');
     }
-    _setPlatformActive(true)?.catchError((dynamic e) async => null);
+    unawaited(_setPlatformActive(true)?.catchError((dynamic e) async => null));
     final duration = await _load(
         await _platform,
         start == null && end == null
@@ -1212,12 +1214,12 @@ class AudioPlayer {
           // NOTE: If a load() request happens simultaneously, this may result
           // in two play requests being sent. The platform implementation should
           // ignore the second play request since it is already playing.
-          _sendPlayRequest(await _platform, playCompleter);
+          unawaited(_sendPlayRequest(await _platform, playCompleter));
         } else {
           // If the native platform wasn't already active, activating it will
           // implicitly restore the playing state and send a play request.
-          _setPlatformActive(true, playCompleter: playCompleter)
-              ?.catchError((dynamic e) async => null);
+          unawaited(_setPlatformActive(true, playCompleter: playCompleter)
+              ?.catchError((dynamic e) async => null));
         }
       }
     } else {
@@ -1301,7 +1303,7 @@ class AudioPlayer {
   /// [setVolume] ramps.
   Future<bool> dspSetGainCurve(final List<double> gains,
       {final int segmentMs = 20}) async {
-    if (_disposed || gains.isEmpty) return false;
+    if (_disposed || gains.isEmpty || !_isAndroid()) return false;
     try {
       if (!_active) return false;
       final channel = _activeControlChannel;
@@ -1311,9 +1313,12 @@ class AudioPlayer {
             'segmentMs': segmentMs,
           }) ??
           false;
-    } catch (_) {
+    } catch (e) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows) or the native
       // processor rejected the curve — signal the caller to step instead.
+      if (kDebugMode) {
+        debugPrint('dspSetGainCurve failed: $e');
+      }
       return false;
     }
   }
@@ -1321,41 +1326,50 @@ class AudioPlayer {
   /// Pulsr fork: clears any gain curve armed via [dspSetGainCurve] and
   /// restores transparent unity gain. Returns `false` if unsupported.
   Future<bool> dspClearGainCurve() async {
-    if (_disposed) return false;
+    if (_disposed || !_isAndroid()) return false;
     try {
       if (!_active) return false;
       final channel = _activeControlChannel;
       if (channel == null) return false;
       return await channel.invokeMethod<bool>('dspClearGainCurve') ?? false;
-    } catch (_) {
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('dspClearGainCurve failed: $e');
+      }
       return false;
     }
   }
 
   /// Fades profile changes separately from sleep and crossfade envelopes.
   Future<bool> dspSetTransitionMuted(bool muted) async {
-    if (_disposed || !_active) return false;
+    if (_disposed || !_active || !_isAndroid()) return false;
     final channel = _activeControlChannel;
     if (channel == null) return false;
     try {
       return await channel
               .invokeMethod<bool>('dspSetTransitionMuted', {'muted': muted}) ??
           false;
-    } catch (_) {
+    } catch (e) {
       // Not the Pulsr Android fork — let the caller apply without a fade.
+      if (kDebugMode) {
+        debugPrint('dspSetTransitionMuted failed: $e');
+      }
       return false;
     }
   }
 
   /// Actual render-thread gain; a requested mute alone is not an acknowledgement.
   Future<double?> dspGetTransitionGain() async {
-    if (_disposed || !_active) return null;
+    if (_disposed || !_active || !_isAndroid()) return null;
     final channel = _activeControlChannel;
     if (channel == null) return null;
     try {
       return await channel.invokeMethod<double>('dspGetTransitionGain');
-    } catch (_) {
+    } catch (e) {
       // Not the Pulsr Android fork — signal "cannot report" to the caller.
+      if (kDebugMode) {
+        debugPrint('dspGetTransitionGain failed: $e');
+      }
       return null;
     }
   }
@@ -1376,9 +1390,13 @@ class AudioPlayer {
       final channel = _activeControlChannel;
       if (!_active || channel == null) {
         _floatOutputEnabled = enabled;
-        _floatOutputActive = false;
+        _applyOutputModeEffect(
+          aaudioActive: _aaudioOutputActive,
+          floatActive: false,
+        );
         return true; // remembered; flushed on platform activation
       }
+      if (!_isAndroid()) return false;
       final accepted = await channel
               .invokeMethod<bool>('dspSetFloatOutput', {'enabled': enabled}) ??
           false;
@@ -1389,8 +1407,11 @@ class AudioPlayer {
         reason: enabled && !accepted ? 'float_rejected' : null,
       );
       return accepted;
-    } catch (_) {
+    } catch (e) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows).
+      if (kDebugMode) {
+        debugPrint('dspSetFloatOutput failed: $e');
+      }
       return false;
     }
   }
@@ -1416,13 +1437,17 @@ class AudioPlayer {
         _tapSrcTargetRate = clamped;
         return true; // remembered; flushed on platform activation
       }
+      if (!_isAndroid()) return false;
       final accepted = await channel
               .invokeMethod<bool>('dspSetTapSrcRate', {'rate': clamped}) ??
           false;
       if (accepted) _tapSrcTargetRate = clamped;
       return accepted;
-    } catch (_) {
+    } catch (e) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows).
+      if (kDebugMode) {
+        debugPrint('dspSetTapSrcRate failed: $e');
+      }
       return false;
     }
   }
@@ -1453,15 +1478,26 @@ class AudioPlayer {
     if (pcmEncoding != null && pcmEncoding > 0) {
       _lastPcmEncoding = pcmEncoding;
     }
+    final bool validBufferMs = targetBufferMs >= 8 && targetBufferMs <= 1000;
+    if (!validBufferMs && kDebugMode) {
+      debugPrint(
+          'Ignoring AAudio targetBufferMs=$targetBufferMs outside 8..1000');
+    }
+    final int effectiveBufferMs =
+        validBufferMs ? targetBufferMs : _aaudioTargetBufferMs;
     try {
       final channel = _activeControlChannel;
       if (!_active || channel == null) {
         _aaudioOutputEnabled = enabled;
         _aaudioPreferExclusive = preferExclusive;
-        _aaudioTargetBufferMs = targetBufferMs;
-        _aaudioOutputActive = false;
+        _aaudioTargetBufferMs = effectiveBufferMs;
+        _applyOutputModeEffect(
+          aaudioActive: false,
+          floatActive: _floatOutputActive,
+        );
         return true; // remembered; flushed on platform activation
       }
+      if (!_isAndroid()) return false;
       final effectiveSampleRate =
           (sampleRate != null && sampleRate > 0) ? sampleRate : _lastSampleRate;
       final effectiveChannelCount = (channelCount != null && channelCount > 0)
@@ -1473,7 +1509,7 @@ class AudioPlayer {
       final args = <String, dynamic>{
         'enabled': enabled,
         'preferExclusive': preferExclusive,
-        'targetBufferMs': targetBufferMs,
+        'targetBufferMs': effectiveBufferMs,
         if (effectiveSampleRate != null && effectiveSampleRate > 0)
           'sampleRate': effectiveSampleRate,
         if (effectiveChannelCount != null && effectiveChannelCount > 0)
@@ -1487,7 +1523,7 @@ class AudioPlayer {
       if (accepted) {
         _aaudioOutputEnabled = enabled;
         _aaudioPreferExclusive = preferExclusive;
-        _aaudioTargetBufferMs = targetBufferMs;
+        _aaudioTargetBufferMs = effectiveBufferMs;
       }
       final aaudioActive = accepted && enabled;
       // The explicit settings action already reports an active-player
@@ -1498,8 +1534,11 @@ class AudioPlayer {
         floatActive: !aaudioActive && _floatOutputEnabled,
       );
       return accepted;
-    } catch (_) {
+    } catch (e) {
       // Not the Pulsr Android fork (web/iOS/macOS/windows).
+      if (kDebugMode) {
+        debugPrint('dspSetAaudioOutput failed: $e');
+      }
       return false;
     }
   }
@@ -1651,7 +1690,7 @@ class AudioPlayer {
           await (await _platform)
               .seek(SeekRequest(position: position, index: index));
           if (playing && !_active) {
-            _setPlatformActive(true)?.catchError((dynamic e) async => null);
+            unawaited(_setPlatformActive(true)?.catchError((dynamic e) async => null));
           }
         } finally {
           _seeking = false;
@@ -1746,7 +1785,7 @@ class AudioPlayer {
         s._dispose();
       }
       _audioSources.clear();
-      _proxy.stop();
+      unawaited(_proxy.stop());
       await _playerDataSubscription?.cancel();
       await _playbackEventSubscription?.cancel();
       await _androidAudioAttributesSubscription?.cancel();
@@ -1992,7 +2031,7 @@ class AudioPlayer {
       // other call configures the native audio sink, and keep listening for
       // native fallbacks (e.g. the device refusing AAudio later) so the app can
       // reflect the effective mode.
-      if (active && !_isUnitTest()) {
+      if (active && _isAndroid() && !_isUnitTest()) {
         try {
           final control =
               MethodChannel('com.ryanheise.just_audio.methods.${platform.id}');
@@ -2068,7 +2107,10 @@ class AudioPlayer {
             floatActive: !aaudioActive && _floatOutputEnabled && floatAccepted,
             reason: reason,
           );
-        } catch (_) {
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('just_audio DSP activation failed: $e');
+          }
           // Not the Pulsr Android fork — keep the default 16-bit path.
           _platformControlChannel?.setMethodCallHandler(null);
           _platformControlChannel = null;
@@ -2155,7 +2197,7 @@ class AudioPlayer {
           if (checkInterruption()) return inactiveResult(platform);
         }
         if (playing) {
-          _sendPlayRequest(platform, playCompleter);
+          unawaited(_sendPlayRequest(platform, playCompleter));
         }
       }
 
@@ -3993,7 +4035,7 @@ class LockCachingAudioSource extends StreamAudioSource {
           final subEnd =
               min(data.length, max(0, data.length - (_progress - end)));
           cacheResponse.controller.add(data.sublist(0, subEnd));
-          cacheResponse.controller.close();
+          unawaited(cacheResponse.controller.close());
         } else {
           cacheResponse.controller.add(data);
         }
@@ -4052,7 +4094,7 @@ class LockCachingAudioSource extends StreamAudioSource {
         final httpClient = _createHttpClient(userAgent: _player?._userAgent);
 
         final rangeRequest = _HttpRangeRequest(start, end);
-        _getUrl(httpClient, uri, headers: {
+        unawaited(_getUrl(httpClient, uri, headers: {
           if (headers != null) ...headers!,
           HttpHeaders.rangeHeader: rangeRequest.header,
         }).then((httpRequest) async {
@@ -4073,7 +4115,7 @@ class LockCachingAudioSource extends StreamAudioSource {
           request.fail(e, stackTrace);
         }).onError((Object e, StackTrace st) {
           request.fail(e, st);
-        });
+        }));
       }
     }, onDone: () async {
       if (sourceLength == null) {
@@ -4081,7 +4123,7 @@ class LockCachingAudioSource extends StreamAudioSource {
       }
       for (var cacheResponse in inProgressResponses) {
         if (!cacheResponse.controller.isClosed) {
-          cacheResponse.controller.close();
+          unawaited(cacheResponse.controller.close());
         }
       }
       // Flush and close the sink BEFORE renaming: renaming while the sink
@@ -4124,7 +4166,7 @@ class LockCachingAudioSource extends StreamAudioSource {
       // Close all in progress requests
       for (final res in inProgressResponses) {
         res.controller.addError(e, stackTrace);
-        res.controller.close();
+        unawaited(res.controller.close());
       }
       _downloading = false;
     }, cancelOnError: true);
@@ -4204,7 +4246,7 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
     _requests.clear();
     if (!_downloadProgressSubject.isClosed) {
-      _downloadProgressSubject.close();
+      unawaited(_downloadProgressSubject.close());
     }
   }
 }
@@ -4323,9 +4365,9 @@ _ProxyHandler _proxyHandlerForSource(StreamAudioSource source) {
     final subscription = stream.listen(request.response.add,
         onError: (e, st) {}, onDone: completer.complete);
 
-    request.response.done.then((dynamic value) {
-      subscription.cancel();
-    });
+    unawaited(request.response.done.then((dynamic value) {
+      unawaited(subscription.cancel());
+    }));
 
     await completer.future;
 
@@ -4406,7 +4448,7 @@ _ProxyHandler _proxyHandlerForUri(
       } else {
         request.response.bufferOutput = false;
         var done = false;
-        request.response.done.then((dynamic _) => done = true);
+        unawaited(request.response.done.then((dynamic _) => done = true));
         await for (var chunk in originResponse) {
           if (done) break;
           request.response.add(chunk);
@@ -4431,8 +4473,8 @@ _ProxyHandler _proxyHandlerForUri(
           clientSocket.add,
           onDone: () async {
             await clientSocket.flush();
-            socket.close();
-            clientSocket.close();
+            unawaited(socket.close());
+            unawaited(clientSocket.close());
             done.complete();
           },
         );
