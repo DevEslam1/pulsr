@@ -362,14 +362,19 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var replayGainSnapshot: ReplayGainSnapshot? = null
 
     private val disposed = java.util.concurrent.atomic.AtomicBoolean(false)
-    @Volatile private var reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
-        java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrNativeControl") }
-    )
+    private val executorLock = Any()
+    @Volatile private var reverbExecutor = createReverbExecutor()
+
+    private fun createReverbExecutor(threadName: String = "PulsrNativeControl"): java.util.concurrent.ExecutorService =
+        java.util.concurrent.Executors.newSingleThreadExecutor(
+            java.util.concurrent.ThreadFactory { r -> Thread(r, threadName) }
+        )
 
     private fun safeReverbExecute(onDropped: (() -> Unit)? = null, action: () -> Unit): Boolean {
         if (disposed.get()) return false
+        val attemptedExecutor = reverbExecutor
         try {
-            reverbExecutor.execute {
+            attemptedExecutor.execute {
                 if (disposed.get() || !isNativeDspLoaded) {
                     // Action dropped after scheduling: signal the caller so a
                     // pending reply (e.g. result.success) is not lost.
@@ -382,21 +387,28 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         } catch (e: java.util.concurrent.RejectedExecutionException) {
             if (disposed.get()) return false
             try {
-                val oldExecutor = reverbExecutor
-                Log.w(TAG, "Reverb executor rejected; shutting down old executor and creating new one")
-                oldExecutor.shutdownNow()
-                try {
-                    if (!oldExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                        Log.w(TAG, "Old reverb executor didn't terminate cleanly")
+                var oldExecutor: java.util.concurrent.ExecutorService? = null
+                val freshExecutor = synchronized(executorLock) {
+                    if (disposed.get()) return false
+                    if (reverbExecutor === attemptedExecutor || reverbExecutor.isShutdown || reverbExecutor.isTerminated) {
+                        val previous = reverbExecutor
+                        Log.w(TAG, "Reverb executor rejected; shutting down old executor and creating new one")
+                        previous.shutdownNow()
+                        oldExecutor = previous
+                        reverbExecutor = createReverbExecutor()
                     }
-                } catch (ie: InterruptedException) {
-                    Thread.currentThread().interrupt()
+                    reverbExecutor
                 }
-
-                reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
-                    java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrNativeControl") }
-                )
-                reverbExecutor.execute {
+                oldExecutor?.let { previous ->
+                    try {
+                        if (!previous.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                            Log.w(TAG, "Old reverb executor didn't terminate cleanly")
+                        }
+                    } catch (ie: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    }
+                }
+                freshExecutor.execute {
                     if (disposed.get() || !isNativeDspLoaded) {
                         onDropped?.invoke()
                         return@execute
@@ -702,11 +714,34 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun startRtfGovernor() {
         if (rtfGovernorRunnable != null) return
         val r = object : Runnable {
+            private fun clearSelfOnMain() {
+                val self = this
+                if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                    if (rtfGovernorRunnable === self) {
+                        mainHandler.removeCallbacks(self)
+                        rtfGovernorRunnable = null
+                    }
+                } else {
+                    mainHandler.post {
+                        if (rtfGovernorRunnable === self) {
+                            mainHandler.removeCallbacks(self)
+                            rtfGovernorRunnable = null
+                        }
+                    }
+                }
+            }
+
             override fun run() {
-                if (disposed.get() || !isRtfGovernorEnabled) return
+                if (disposed.get() || !isRtfGovernorEnabled) {
+                    clearSelfOnMain()
+                    return
+                }
                 if (isNativeDspLoaded) {
                     safeReverbExecute {
-                        if (disposed.get() || !isRtfGovernorEnabled) return@safeReverbExecute
+                        if (disposed.get() || !isRtfGovernorEnabled) {
+                            clearSelfOnMain()
+                            return@safeReverbExecute
+                        }
                         val rtf = try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
                         if (rtf > 0.60) {
                             consecutiveHighRtfCount++
@@ -727,6 +762,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             consecutiveLowRtfCount = 0
                         }
                     }
+                }
+                if (disposed.get() || !isRtfGovernorEnabled) {
+                    clearSelfOnMain()
+                    return
                 }
                 mainHandler.postDelayed(this, 500L)
             }
@@ -1482,11 +1521,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         methodChannel = MethodChannel(messenger, CHANNEL_NAME)
         methodChannel.setMethodCallHandler(this)
         // Recreate executor if previously shut down
-        if (reverbExecutor.isShutdown || reverbExecutor.isTerminated) {
-            Log.i(TAG, "Reverb executor was shut down; creating fresh instance")
-            reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
-                java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrReverbDSP") }
-            )
+        synchronized(executorLock) {
+            if (reverbExecutor.isShutdown || reverbExecutor.isTerminated) {
+                Log.i(TAG, "Reverb executor was shut down; creating fresh instance")
+                reverbExecutor = createReverbExecutor("PulsrReverbDSP")
+            }
         }
         configureNativeMemoryBudget(appContext)
         startRtfGovernor()
@@ -1815,8 +1854,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         
         // Shutdown of native executor
         try {
-            reverbExecutor.shutdownNow()
-            if (!reverbExecutor.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+            val executorToShutdown = synchronized(executorLock) {
+                reverbExecutor.also { it.shutdownNow() }
+            }
+            if (!executorToShutdown.awaitTermination(100, java.util.concurrent.TimeUnit.MILLISECONDS)) {
                 Log.w(TAG, "Native control executor didn't terminate cleanly")
             }
         } catch (ie: InterruptedException) {
