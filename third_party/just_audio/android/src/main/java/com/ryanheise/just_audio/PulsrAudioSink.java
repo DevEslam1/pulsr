@@ -58,6 +58,13 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         default void onAaudioSuspended(String reason, boolean suspended) {}
 
         default void onTapSrcFailed(Exception cause) {}
+
+        default void onSinkReset() {}
+    }
+
+    @Override
+    public void clearTapSrcFailed() {
+        tapSrcFailed = false;
     }
 
     boolean isTapSrcFailed() {
@@ -185,6 +192,11 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         return floatEnabled.get() && !precisionFallback ? Mode.FLOAT : Mode.DEFAULT;
     }
 
+    @Override
+    public void clearFloatFallback() {
+        precisionFallback = false;
+    }
+
     /** Called from the app thread; the actual swap runs on the playback thread. */
     @Override
     public void requestModeChange() {
@@ -194,8 +206,6 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     @Override
     public void requestModeChange(boolean force) {
         if (released) return;
-        // A new explicit float request may retry a previously rejected route.
-        if (!force && floatEnabled.get()) precisionFallback = false;
         final ExoPlayer player = playerSupplier.get();
         if (player == null) return;
         final boolean forceSwap = force;
@@ -557,6 +567,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         pendingModeRequested = false;
         pendingForce = false;
         tapSrcFailed = false;
+        if (fallbackListener != null) fallbackListener.onSinkReset();
         decodedPcm = new int[] {0, 0, 0};
         if (currentInner != null && currentInner.processor != null)
             currentInner.processor.releaseUsbProducer();

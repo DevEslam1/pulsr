@@ -136,6 +136,30 @@ int main() {
               "I32 -max saturates at -max");
     }
 
+    // Initial AAudio buffer sizing must prevent 2 ms exclusive-mode starvation.
+    check(pulsr::ComputeInitialBufferFrames(48, 5760, 5760) == 2880,
+          "120 ms target at 48 kHz should prefill 60 ms instead of 2 ms");
+    check(pulsr::ComputeInitialBufferFrames(48, 1152, 1152) == 576,
+          "24 ms target at 48 kHz should start at 12 ms");
+    check(pulsr::ComputeInitialBufferFrames(960, 1920, 1152) == 1920,
+          "burst*2 floor should hold when burst is large relative to target");
+    check(pulsr::ComputeInitialBufferFrames(960, 480, 0) == 480,
+          "initial buffer must never exceed reported stream capacity");
+    check(pulsr::ComputeInitialBufferFrames(0, 2048, 4096) == 2048,
+          "unknown burst must clamp cleanly to stream capacity");
+
+    // Stream capacity must leave headroom above targetBufferMs for adaptive expansion.
+    check(pulsr::ComputeStreamCapacityFrames(48000, 120) == 24000,
+          "120 ms target at 48 kHz should allow 500 ms capacity headroom");
+    check(pulsr::ComputeStreamCapacityFrames(48000, 200) == 38400,
+          "200 ms target at 48 kHz should allow 4x capacity headroom");
+    check(pulsr::ComputeStreamCapacityFrames(768000, 800) == 1536000,
+          "high sample rate capacity should cap at 2 seconds when above 4x target");
+    check(pulsr::ComputeStreamCapacityFrames(48000, 3000) == 144000,
+          "capacity must stay at least targetFrames even when target exceeds 2 seconds");
+    check(pulsr::ComputeStreamCapacityFrames(48000, 0) == 0,
+          "non-positive targetBufferMs leaves builder capacity unset");
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " AAudioSink support check(s) failed." << std::endl;
         return 1;

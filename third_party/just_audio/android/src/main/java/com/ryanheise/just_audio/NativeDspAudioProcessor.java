@@ -217,7 +217,11 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     @Override
     protected void finalize() throws Throwable {
         try {
-            release();
+            // API 33+ is covered by the Cleaner; skip so the finalizer thread
+            // never blocks on engineLock behind a playback-thread read lock.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                release();
+            }
         } finally {
             super.finalize();
         }

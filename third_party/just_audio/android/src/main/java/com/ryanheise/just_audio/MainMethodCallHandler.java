@@ -78,7 +78,11 @@ public class MainMethodCallHandler implements MethodCallHandler {
 
     void dispose() {
         for (AudioPlayer player : new ArrayList<AudioPlayer>(players.values())) {
-            player.dispose();
+            try {
+                player.dispose();
+            } catch (RuntimeException e) {
+                android.util.Log.w("MainMethodCallHandler", "player dispose failed", e);
+            }
         }
         players.clear();
     }

@@ -55,6 +55,7 @@ set(DSP_CORE_SOURCES
     ConvolutionReverb.cpp
     SincResampler.cpp
     DsdDecoder.cpp
+    DopFramer.cpp
     SpatialPanner.cpp
     HarmonicSaturation.cpp
     StereoWidth.cpp

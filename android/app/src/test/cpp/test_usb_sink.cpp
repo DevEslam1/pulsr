@@ -628,9 +628,15 @@ int main() {
         check(sink.GetRawPcmBitDepth() == 0, "processed delivery must never report raw depth");
 
         Access::prepare(sink, 4, 32, 16);
+        check(sink.WaitForWriteSpace(1, 0) == 0,
+              "WaitForWriteSpace must report 0 immediately when ring has space");
         check(!sink.WritePcm(source.data(), 2, 2, 32, 48000, 101) && sink.GetLastError() == ENOSPC &&
               Access::written(sink) == 0, "overrun must reject entire block, not partially publish");
         check(sink.WritePcm(source.data(), 1, 2, 32, 48000, 101), "fitting block may follow rejected overrun");
+        check(sink.WaitForWriteSpace(1, 2) == 1,
+              "WaitForWriteSpace must report 1 (backpressure) when active exclusive ring is full");
+        check(sink.WaitForWriteSpace(8, 2) == -1,
+              "WaitForWriteSpace must report -1 when requested frames exceed total ring capacity");
         check(Access::enter(sink, 101), "writer lease for close-drain test must admit");
         std::atomic<bool> closeReturned{false};
         std::thread closer([&] { sink.Close(); closeReturned.store(true); });

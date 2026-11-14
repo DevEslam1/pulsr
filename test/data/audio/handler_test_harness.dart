@@ -46,6 +46,8 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
   LoopModeMessage loopMode = LoopModeMessage.off;
   ProcessingStateMessage processingState = ProcessingStateMessage.idle;
   bool disposed = false;
+  double lastVolume = 1.0;
+  final List<double> volumeHistory = [];
 
   @override
   Stream<PlaybackEventMessage> get playbackEventMessageStream => _events.stream;
@@ -130,8 +132,11 @@ class FakeNativeAudioPlayer extends AudioPlayerPlatform {
   }
 
   @override
-  Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async =>
-      SetVolumeResponse();
+  Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async {
+    lastVolume = request.volume;
+    volumeHistory.add(request.volume);
+    return SetVolumeResponse();
+  }
 
   @override
   Future<SetSpeedResponse> setSpeed(SetSpeedRequest request) async =>

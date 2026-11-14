@@ -281,6 +281,40 @@ void main() {
         expect(state.queueHistory, contains(historySong));
         expect(state.errorMessage, equals('Skip to previous failed'));
       });
+
+      test('does not jump to queueHistory when position is at 3.5 seconds',
+          () async {
+        final handler = MockAudioHandler();
+        final song1 = buildSong(1);
+        final historySong = buildSong(99, title: 'History Song');
+        var playSongCalls = 0;
+
+        PlayerState state = PlayerState(
+          queueSlice: QueueSlice(
+            queue: [song1],
+            currentIndex: 0,
+            queueHistory: [historySong],
+          ),
+          playback: const PlaybackSlice(
+            position: Duration(milliseconds: 3500),
+          ),
+        );
+
+        final transport = PlayerTransportController(
+          audioHandler: handler,
+          getState: () => state,
+          emit: (s) => state = s,
+          isClosed: () => false,
+          onPlaySong: (song, {queue, initialPosition, queueIndex}) async {
+            playSongCalls++;
+          },
+        );
+
+        await transport.previous();
+
+        expect(playSongCalls, equals(0));
+        expect(state.queueHistory, contains(historySong));
+      });
     });
 
     group('1.11 cacheSlotSongs LRU Cap', () {

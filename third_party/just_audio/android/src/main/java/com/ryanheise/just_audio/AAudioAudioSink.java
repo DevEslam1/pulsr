@@ -268,7 +268,7 @@ public final class AAudioAudioSink implements AudioSink {
     }
 
     @Override
-    public void configure(Format inputFormat, int specifiedBufferSizeSize,
+    public void configure(Format inputFormat, int specifiedBufferSize,
             int[] outputChannels) throws ConfigurationException {
         if (outputChannels != null) {
             throw new ConfigurationException(
@@ -321,7 +321,7 @@ public final class AAudioAudioSink implements AudioSink {
         }
         if (handle != 0L && !routePending && hasQueuedFrames()) {
             pendingConfigureFormat = inputFormat;
-            pendingConfigureBufferSize = specifiedBufferSizeSize;
+            pendingConfigureBufferSize = specifiedBufferSize;
             pendingConfigureOutputChannels = null;
             drainDeadlineElapsedMs = clockMs.elapsedRealtime()
                     + Math.max(targetBufferMs * 2L, 500L);

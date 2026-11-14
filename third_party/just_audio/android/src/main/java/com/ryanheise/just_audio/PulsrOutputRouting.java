@@ -251,7 +251,11 @@ public final class PulsrOutputRouting {
         }
         for (DefaultAudioSink sink : sinks) {
             AudioTrack track = getAudioTrackFromSink(sink);
-            if (track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return true;
+            try {
+                if (track != null && track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return true;
+            } catch (IllegalStateException released) {
+                // Track released concurrently by the playback thread; skip it.
+            }
         }
         return false;
     }
@@ -312,11 +316,21 @@ public final class PulsrOutputRouting {
         AudioTrack fallback = null;
         for (DefaultAudioSink sink : sinks) {
             AudioTrack track = getAudioTrackFromSink(sink);
-            if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) continue;
-            fallback = track;
-            if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return snapshot(track);
+            try {
+                if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) continue;
+                if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return snapshot(track);
+                fallback = track;
+            } catch (IllegalStateException released) {
+                // Track released concurrently by the playback thread; skip it.
+            }
         }
-        if (fallback != null) return snapshot(fallback);
+        if (fallback != null) {
+            try {
+                return snapshot(fallback);
+            } catch (IllegalStateException released) {
+                // fall through to native/zero result
+            }
+        }
         return nativeFallback != null ? nativeFallback : new int[] {0, 0, 0};
     }
 

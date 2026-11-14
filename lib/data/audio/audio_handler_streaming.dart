@@ -59,6 +59,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   }
 
   UriAudioSource _createAudioSource(SongsTableData song, MediaItem tag) {
+    _recordResolvedDsdTransport(song.id, isDop: false, isNativeDsd: false);
     if (PulsrAudioHandler._isStreamUrl(song.path)) {
       return AudioSource.uri(Uri.parse(song.path), tag: tag);
     }
@@ -228,23 +229,37 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         // never implied by the file format or by an absent/failed probe.
         final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
         final dsdMode = prefs.getString(PrefsKeys.dsdOutputMode) ?? 'dop';
-        final wantDop = dsdMode == 'dop';
-        final wantNative = dsdMode == 'native';
+        final bitPerfectActive =
+            (prefs.getBool(PrefsKeys.strictBitPerfect) ?? false) ||
+                ((prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+                    (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true));
+        // DoP requires an active bit-perfect/bypassed pipeline so DSP/volume
+        // math cannot corrupt the 0x05/0xFA DoP markers into ultrasonic noise.
+        final wantDop = dsdMode == 'dop' && bitPerfectActive;
+        // Native 32-bit raw USB DSD frames are not yet supported on Android's
+        // PCM transfer path; use DoP or PCM decimation only.
+        const wantNative = false;
         DsdDacCapabilities? caps;
-        if (wantDop || wantNative) {
+        if (wantDop) {
           caps = await DsdDecoderHelper.probeDopCapabilities();
         }
-        final forceNativeDsd = wantNative && (caps?.canUseNativeDsd ?? false);
-        final forceDop =
-            !forceNativeDsd && wantDop && (caps?.canUseDop ?? false);
+        final forceDop = wantDop && (caps?.canUseDop ?? false);
         final containerBits = prefs.getInt(PrefsKeys.dopContainerBits) ?? 24;
         return DsdDecoderHelper.decodeDsdFile(
           song,
           tag,
           forceDop: forceDop,
-          forceNativeDsd: forceNativeDsd,
+          forceNativeDsd: wantNative,
           dopCapabilities: caps,
           dopContainerBits: containerBits == 32 ? 32 : 24,
+          updateGlobalState: false,
+          onTransportResolved: (isDop, isNativeDsd) {
+            _recordResolvedDsdTransport(
+              song.id,
+              isDop: isDop,
+              isNativeDsd: isNativeDsd,
+            );
+          },
         );
       }
       // Route lossless containers through the format-aware decoder so MQA files
@@ -254,7 +269,18 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       if ((ext == 'flac' || ext == 'wav') &&
           !song.path.startsWith('content:') &&
           song.uri?.startsWith('content:') != true) {
-        return _formatDecoder.decodeForFormat(song, tag);
+        return _formatDecoder.decodeForFormat(
+          song,
+          tag,
+          updateGlobalState: false,
+          onTransportResolved: (isDop, isNativeDsd) {
+            _recordResolvedDsdTransport(
+              song.id,
+              isDop: isDop,
+              isNativeDsd: isNativeDsd,
+            );
+          },
+        );
       }
       return _createAudioSource(song, tag);
     }
@@ -294,6 +320,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
           song.remoteId!,
           quality: _currentStreamingQuality());
       if (cachedFile != null) {
+        _recordResolvedDsdTransport(song.id, isDop: false, isNativeDsd: false);
         return AudioSource.file(cachedFile.path, tag: tag);
       }
     }
@@ -303,6 +330,7 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
     // the source instantly (no blocking await on stream resolution) and start
     // buffering as soon as bytes arrive. If the background warm populated the
     // URL cache, the lazy resolve completes near-instantly.
+    _recordResolvedDsdTransport(song.id, isDop: false, isNativeDsd: false);
     return _buildResolvingYoutubeSource(song: song, tag: tag);
   }
 
@@ -418,7 +446,13 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   /// Automix / Smart Transitions toggle on the shared crossfade manager.
   Future<void> setAutomixEnabled(bool enabled) async {
+    if (_crossfadeManager.automixEnabled == enabled) return;
+    final wasGapless = _gaplessMode;
     _crossfadeManager.automixEnabled = enabled;
+    final isGapless = _gaplessMode;
+    if (wasGapless != isGapless) {
+      _scheduleEngineSwitch(toGapless: isGapless);
+    }
   }
 
   /// Seeds the crossfade BPM map for [song] from manual overrides.
@@ -624,6 +658,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
 
   bool get _gaplessMode;
 
+  void _scheduleEngineSwitch({required bool toGapless});
+
   /// Supplied by [PulsrAudioQueueEngine]: the pre-committed non-gapless shuffle
   /// successor to warm, or null (gapless / not shuffling / no next).
   SongsTableData? _nonGaplessShuffleNextSong();
@@ -682,4 +718,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   Future<void> setPitch(double pitch);
   Future<void> restorePersistedSpeed();
   Future<void> restorePersistedPitch();
+  void _recordResolvedDsdTransport(
+    int songId, {
+    required bool isDop,
+    required bool isNativeDsd,
+  });
 }

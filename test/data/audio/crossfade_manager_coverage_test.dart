@@ -118,6 +118,29 @@ void main() {
       expect(manager.effectiveFadeDuration(trackId: 't1'),
           const Duration(seconds: 8));
     });
+
+    test('effectiveTransitionDuration uses 8s Automix fallback when duration is zero',
+        () {
+      manager.duration = Duration.zero;
+      manager.automixEnabled = false;
+      expect(manager.effectiveTransitionDuration(trackId: 't1'), Duration.zero);
+
+      manager.automixEnabled = true;
+      expect(
+        manager.effectiveTransitionDuration(trackId: 't1'),
+        const Duration(seconds: 8),
+      );
+
+      final decision = CrossfadeManager.arbitrateTransition(
+        configuredCrossfade:
+            manager.effectiveTransitionDuration(trackId: 't1'),
+        remainingTrackDuration: const Duration(seconds: 20),
+        isSameDecoderConfig: true,
+        isRepeatOne: false,
+      );
+      expect(decision.isCrossfade, isTrue);
+      expect(decision.effectiveDuration, const Duration(seconds: 8));
+    });
   });
 
   group('curve evaluation', () {
@@ -332,6 +355,33 @@ void main() {
       verify(() => playerA.stop()).called(1);
       verify(() => playerA.setVolume(0.5)).called(1);
       verify(() => playerB.setVolume(0.5)).called(1);
+    });
+
+    test('cancel still stops inactive player and restores volume when native curve clear returns false',
+        () async {
+      when(() => playerA.dspSetGainCurve(any(),
+          segmentMs: any(named: 'segmentMs'))).thenAnswer((_) async => true);
+      when(() => playerA.dspClearGainCurve()).thenAnswer((_) async => false);
+
+      fakeAsync((async) {
+        manager.beginCrossfade(1);
+        unawaited(manager.crossfadeVolumes(
+          active: playerA,
+          inactive: playerB,
+          fromActiveVol: 1.0,
+          toInactiveVol: 1.0,
+          duration: const Duration(milliseconds: 200),
+          fadeId: manager.currentFadeId,
+        ));
+        async.elapse(const Duration(milliseconds: 20));
+        unawaited(manager.cancel(playerB, playerA, restoreVolume: 0.75));
+        async.flushMicrotasks();
+        expect(manager.isCrossfading, isFalse);
+        verify(() => playerB.stop()).called(1);
+        verify(() => playerB.setVolume(0.75)).called(1);
+        verify(() => playerA.setVolume(0.75)).called(1);
+        async.elapse(const Duration(milliseconds: 300));
+      });
     });
 
     test('beginCrossfade completes a previous dangling completer', () {

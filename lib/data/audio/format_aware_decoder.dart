@@ -22,15 +22,22 @@ class FormatAwareDecoder {
 
   /// Decodes and wraps [song] into an optimal [AudioSource].
   Future<AudioSource> decodeForFormat(
-      SongsTableData song, MediaItem tag) async {
-    // Reset the DoP transport flag for every load. It is a process-wide static
-    // that [DsdDecoderHelper] sets true only when a compatible USB DAC is in
-    // use; without this reset it stayed true after the first DoP DSD track,
-    // forcing unity mixer volume and disabling native ReplayGain for every
-    // subsequent track. The DSD branch below re-sets it when appropriate.
-    AudioQualityInfo.dsdDopActive = false;
+    SongsTableData song,
+    MediaItem tag, {
+    bool updateGlobalState = true,
+    void Function(bool isDop, bool isNativeDsd)? onTransportResolved,
+  }) async {
+    // Reset the DoP transport flag for every load when running on the active
+    // global path. Pre-buffered/concurrent loads pass updateGlobalState=false
+    // and report via [onTransportResolved] so they don't clobber the currently
+    // playing track's transport state.
+    if (updateGlobalState) {
+      AudioQualityInfo.dsdDopActive = false;
+      AudioQualityInfo.dsdNativeActive = false;
+    }
 
     if (song.source == SongSource.youtube) {
+      onTransportResolved?.call(false, false);
       return resolveYtmStream(song, tag);
     }
 
@@ -74,16 +81,27 @@ class FormatAwareDecoder {
               stackTrace: st,
               category: 'FormatAwareDecoder');
         }
+        onTransportResolved?.call(false, false);
         return AudioSource.uri(Uri.file(song.path), tag: tag);
       case 'alac':
       case 'aiff':
+        onTransportResolved?.call(false, false);
         return AudioSource.uri(Uri.file(song.path), tag: tag);
 
       // 2. DSD Formats (Direct Stream Digital)
       case 'dsf':
       case 'dff':
-        final decoder = decodeDsdToPcm ?? DsdDecoderHelper.decodeDsdFile;
-        return decoder(song, tag);
+        if (decodeDsdToPcm != null) {
+          final source = await decodeDsdToPcm!(song, tag);
+          onTransportResolved?.call(false, false);
+          return source;
+        }
+        return DsdDecoderHelper.decodeDsdFile(
+          song,
+          tag,
+          updateGlobalState: updateGlobalState,
+          onTransportResolved: onTransportResolved,
+        );
 
       // 3. Compressed Standard Formats
       case 'mp3':
@@ -92,6 +110,7 @@ class FormatAwareDecoder {
       case 'ogg':
       case 'opus':
       default:
+        onTransportResolved?.call(false, false);
         return AudioSource.uri(Uri.file(song.path), tag: tag);
     }
   }

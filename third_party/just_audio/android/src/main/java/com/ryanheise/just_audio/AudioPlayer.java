@@ -295,6 +295,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private void registerRouteChangeCallback() {
+        if (disposed) return;
+        unregisterRouteChangeCallback();
         try {
             final AudioManager audioManager =
                     (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
@@ -746,12 +748,21 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 Integer rate = call.argument("rate");
                 int r = rate == null ? 0 : rate;
                 int normalized = (r >= 8000 && r <= 768000) ? r : 0;
-                if (normalized != tapSrcTargetRate) {
+                final boolean rateChanged = normalized != tapSrcTargetRate;
+                // Same-rate re-sends deliberately keep the failure latch (avoids
+                // retry loops); only a different rate clears it.
+                if (rateChanged) {
                     tapSrcFailed = false;
+                    if (sinkWrapper != null) sinkWrapper.clearTapSrcFailed();
                 }
                 tapSrcTargetRate = normalized;
                 if (dspAudioProcessor != null) {
                     dspAudioProcessor.setTapSrcTargetRate(tapSrcFailed ? 0 : tapSrcTargetRate);
+                    // The output format is latched in onConfigure, so a live
+                    // rate change needs a forced sink reconfigure.
+                    if (rateChanged && sinkWrapper != null) {
+                        sinkWrapper.requestModeChange(true);
+                    }
                 }
                 result.success(true);
                 return;
@@ -1258,6 +1269,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         boolean changed = floatOutputEnabled != effective;
         floatOutputEnabled = effective;
         if (changed && sinkWrapper != null) {
+            // Only an explicit float enable may retry a rejected float path.
+            if (effective) sinkWrapper.clearFloatFallback();
             sinkWrapper.requestModeChange();
         }
         return effective == enabled;
@@ -1290,6 +1303,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         @Override
                         public void onFloatRejected(String reason, Exception cause) {
                             onFloatOutputRejected(reason, cause);
+                        }
+
+                        @Override
+                        public void onSinkReset() {
+                            AudioPlayer.this.onSinkReset();
                         }
 
                         @Override
@@ -1359,6 +1377,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         if (processor != null) {
             processor.setTapSrcTargetRate(tapSrcFailed ? 0 : tapSrcTargetRate);
         }
+    }
+
+    /** Sink reset clears its own latch; keep the player-level latch in step. */
+    void onSinkReset() {
+        tapSrcFailed = false;
     }
 
     /** Latches tap-SRC failure so subsequent processors keep source rate until reset. */
@@ -1655,6 +1678,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     public void dispose() {
         disposed = true;
         aaudioRequestGeneration++;
+        methodChannel.setMethodCallHandler(null);
         unregisterRouteChangeCallback();
         if (processingState == ProcessingState.loading) {
             abortExistingConnection(true);

@@ -249,6 +249,10 @@ struct ReplayGainParamSet {
     double albumGainDb = 0.0;
     double trackPeak = 1.0;
     double albumPeak = 1.0;
+    // false = tag missing (JNI sends NaN). Album mode falls back to track gain;
+    // with neither tag the gain is just preAmpDb (untagged).
+    bool hasTrackGain = true;
+    bool hasAlbumGain = true;
     double preAmpDb = 0.0;
     bool preventClipping = true;
     bool enabled = false;
@@ -268,6 +272,10 @@ struct DitherParamSet {
 struct BitPerfectParamSet {
     bool enabled = false;
     bool isDop = false;
+    // Software attenuation fallback [0.0, 1.0] used ONLY when Direct USB PCM
+    // output is active and UAC hardware volume does not own the DAC level.
+    // Unity (1.0) guarantees bit-exact sample pass-through; ignored on DoP.
+    double directUsbGain = 1.0;
 };
 
 // Direct Volume Control (DVC). Android's media stream is pinned to maximum by

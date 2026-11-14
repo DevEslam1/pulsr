@@ -106,7 +106,7 @@ class PlaybackStateCoordinator {
   }
 
   /// Called on player position stream tick.
-  void onPositionTick(Duration pos) {
+  void onPositionTick(Duration pos, {bool markDirty = true}) {
     if (_disposed) return;
     _lastEmittedPosition = pos;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -129,8 +129,24 @@ class PlaybackStateCoordinator {
 
     // BUG-02/21: only dirty when the position actually differs from the last
     // value written, so pausing (or an unchanged tick) stops the 2s disk write.
-    if (pos != _lastSavedPosition) {
+    if (markDirty && pos != _lastSavedPosition) {
       markPositionDirty();
+    }
+  }
+
+  /// Emits [pos] immediately on both standard and high-rate streams (for seeks
+  /// and session restores) without waiting for the 16ms/250ms throttle windows.
+  void emitImmediatePosition(Duration pos) {
+    if (_disposed) return;
+    _lastEmittedPosition = pos;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _lastHighRatePositionEmitMs = now;
+    _lastStandardPositionEmitMs = now;
+    if (!_highRatePositionSubject.isClosed) {
+      _highRatePositionSubject.add(pos);
+    }
+    if (!_positionSubject.isClosed) {
+      _positionSubject.add(pos);
     }
   }
 
@@ -144,10 +160,33 @@ class PlaybackStateCoordinator {
     _lastStandardPositionEmitMs = 0;
   }
 
-  /// Marks position as needing persistence on next 2s periodic timer tick.
+  /// Marks position as needing persistence on next periodic timer tick.
   void markPositionDirty() {
     if (_disposed) return;
     _positionDirty = true;
+  }
+
+  /// Clears any pending dirty flag without forcing a save (e.g. after stop).
+  void clearDirty() {
+    _positionDirty = false;
+  }
+
+  /// Resets the tracked saved position when changing tracks so ticks at the
+  /// same offset as the previous track still dirty persistence.
+  void resetSavedPosition() {
+    _lastSavedPosition = Duration.zero;
+  }
+
+  /// Stops the periodic save timer cleanly before player teardown in stop().
+  void pauseSaving() {
+    _saveTimer?.cancel();
+    _saveTimer = null;
+  }
+
+  /// Restarts the periodic save timer if playback resumes after stop().
+  void resumeSaving() {
+    if (_disposed || _saveTimer != null) return;
+    _initSaveTimer();
   }
 
   bool get isPositionDirty => _positionDirty;

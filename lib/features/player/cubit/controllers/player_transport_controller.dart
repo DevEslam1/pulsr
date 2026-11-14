@@ -168,7 +168,7 @@ class PlayerTransportController {
     // If we're at the very beginning of the queue and track position is within 3 seconds,
     // jump to the most recently played track from queueHistory if available.
     if (state.currentIndex == 0 &&
-        state.position.inSeconds <= 3 &&
+        state.position <= const Duration(seconds: 3) &&
         state.queueHistory.isNotEmpty &&
         _onPlaySong != null) {
       final lastPlayed = state.queueHistory.first;

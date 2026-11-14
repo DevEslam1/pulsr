@@ -176,7 +176,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         }
         if (_songs.isEmpty || _activePlayer.playing) return;
         _broadcastState(_activePlayer.playbackEvent);
-        _positionSubject.add(pos);
+        _emitPosition(pos);
       }
     } catch (e, st) {
       ErrorLogger.log('Error restoring last playback session',
@@ -196,6 +196,27 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     } catch (_) {
       return true;
     }
+  }
+
+  Future<void> _cleanupSelfAbortedCrossfade(double restoreVolume) async {
+    try {
+      await _inactivePlayer.dspClearGainCurve();
+    } catch (_) {}
+    try {
+      await _activePlayer.dspClearGainCurve();
+    } catch (_) {}
+    try {
+      await _inactivePlayer.stop();
+    } catch (_) {}
+    try {
+      await _inactivePlayer.setSpeed(_userBaseSpeed);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reset inactive player speed on abort',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+    try {
+      await _activePlayer.setVolume(restoreVolume);
+    } catch (_) {}
   }
 
   bool _crossfadeStartInFlight = false;
@@ -242,7 +263,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
               : (nextSong.remoteArtworkUrl != null
                   ? Uri.tryParse(nextSong.remoteArtworkUrl!)
                   : ArtworkUriResolver.getCachedArtworkUri(songId));
-          if (!_songs.any((s) => s.id == songId)) return;
+          if (!_songs.any((s) => s.id == songId)) {
+            await _cleanupSelfAbortedCrossfade(initialActiveVolume);
+            return;
+          }
           ArtworkUriResolver.resolveArtworkUri(nextSong).then((artUri) {
             if (artUri != null &&
                 artUri != fastArtUri &&
@@ -252,19 +276,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
                   .add(PulsrAudioHandler._songToMediaItem(nextSong, artUri));
             }
           }).catchError((_) {});
-          if (!_songs.any((s) => s.id == songId)) return;
-          // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
-          // fade meanwhile, loading the source now would push phantom audio into a
-          // player that cancel() already stopped — bail on the stale fade.
-          if (_crossfadeManager.currentFadeId != currentFadeId) {
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
+          if (!_songs.any((s) => s.id == songId)) {
+            await _cleanupSelfAbortedCrossfade(initialActiveVolume);
             return;
           }
+          // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
+          // fade meanwhile, cancel() already owns and reset both players — bail
+          // out without mutating the superseding track's volume or preload.
+          if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
           final baseSpeed = perSongPlaybackStore
                   .getSpeed(PulsrAudioHandler.trackKeyFor(nextSong)) ??
@@ -280,27 +299,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
             final item = PulsrAudioHandler._songToMediaItem(nextSong, artUri);
             final source = await _resolveAudioSource(nextSong, item);
-            if (_crossfadeManager.currentFadeId != currentFadeId) {
-              try {
-                await _inactivePlayer.stop();
-              } catch (_) {}
-              try {
-                await _activePlayer.setVolume(initialActiveVolume);
-              } catch (_) {}
-              return;
-            }
+            if (_crossfadeManager.currentFadeId != currentFadeId) return;
             await _inactivePlayer.setAudioSource(source, preload: true);
           }
           _tripleBufferPipeline.clearPreload();
-          if (!_songs.any((s) => s.id == songId)) return;
-
-          if (_crossfadeManager.currentFadeId != currentFadeId) {
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
+          if (_crossfadeManager.currentFadeId != currentFadeId) return;
+          if (!_songs.any((s) => s.id == songId)) {
+            await _cleanupSelfAbortedCrossfade(initialActiveVolume);
             return;
           }
 
@@ -323,15 +328,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           }
 
           // FIX-B02: Abort if crossfade ID changed during play() await
-          if (_crossfadeManager.currentFadeId != currentFadeId) {
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
-            return;
-          }
+          if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
           // Poll until the decoder has produced its first audio frame
           // (processingState == ready/buffering with playing==true), or until
@@ -349,27 +346,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           }
 
           // FIX-B02: Abort if crossfade ID changed during settle loop
-          if (_crossfadeManager.currentFadeId != currentFadeId) {
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
-            return;
-          }
+          if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
           final ps = _inactivePlayer.processingState;
           if (ps != ProcessingState.ready && ps != ProcessingState.buffering) {
             ErrorLogger.log(
                 'Inactive player not ready for crossfade (state: $ps); falling back to direct transition',
                 category: 'AudioHandler');
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
+            await _cleanupSelfAbortedCrossfade(initialActiveVolume);
             await playSongAt(nextIndex);
             return;
           }
@@ -379,25 +363,12 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           // fall back to a hard transition to avoid a truncated fade.
           if (!_canStartCrossfade(_inactivePlayer)) {
             await Future.delayed(const Duration(milliseconds: 250));
-            if (_crossfadeManager.currentFadeId != currentFadeId) {
-              try {
-                await _inactivePlayer.stop();
-              } catch (_) {}
-              try {
-                await _activePlayer.setVolume(initialActiveVolume);
-              } catch (_) {}
-              return;
-            }
+            if (_crossfadeManager.currentFadeId != currentFadeId) return;
             if (!_canStartCrossfade(_inactivePlayer)) {
               ErrorLogger.log(
                   'Inactive player under-buffered for crossfade; falling back to direct transition',
                   category: 'AudioHandler');
-              try {
-                await _inactivePlayer.stop();
-              } catch (_) {}
-              try {
-                await _activePlayer.setVolume(initialActiveVolume);
-              } catch (_) {}
+              await _cleanupSelfAbortedCrossfade(initialActiveVolume);
               await playSongAt(nextIndex);
               return;
             }
@@ -407,15 +378,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           // the gain ramp opens — eliminates the brief full-volume transient.
           await Future.delayed(const Duration(milliseconds: 20));
 
-          if (_crossfadeManager.currentFadeId != currentFadeId) {
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
-            return;
-          }
+          if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
           final active = _activePlayer;
           final inactive = _inactivePlayer;
@@ -435,7 +398,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
               ? outDuration - _activePlayer.position
               : Duration.zero;
           final decision = CrossfadeManager.arbitrateTransition(
-            configuredCrossfade: _crossfadeManager.effectiveFadeDuration(
+            configuredCrossfade: _crossfadeManager.effectiveTransitionDuration(
               trackId: nextSong.id.toString(),
             ),
             remainingTrackDuration: remaining,
@@ -447,12 +410,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             ErrorLogger.log(
                 'Crossfade arbitration chose a hard transition: ${decision.reason}',
                 category: 'AudioHandler');
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
+            await _cleanupSelfAbortedCrossfade(initialActiveVolume);
             await playSongAt(nextIndex);
             return;
           }
@@ -554,24 +512,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             transitionPlan: automixPlan,
           );
 
-          if (_crossfadeManager.currentFadeId != currentFadeId) {
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await active.setVolume(initialActiveVolume);
-            } catch (_) {}
-            return;
-          }
+          if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
           final resolvedIndex = _songs.indexWhere((s) => s.id == songId);
           if (resolvedIndex == -1) {
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await active.setVolume(initialActiveVolume);
-            } catch (_) {}
+            await _cleanupSelfAbortedCrossfade(initialActiveVolume);
             return;
           }
 
@@ -646,10 +591,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         } catch (e, st) {
           ErrorLogger.log('Error during crossfade playback',
               error: e, stackTrace: st, category: 'AudioHandler');
-          try {
-            await _inactivePlayer.stop();
-          } catch (_) {}
           if (_crossfadeManager.currentFadeId == currentFadeId) {
+            try {
+              await _inactivePlayer.stop();
+            } catch (_) {}
             await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
                 restoreVolume: _volume);
             if (nextIndex >= 0 && nextIndex < _songs.length) {
@@ -672,31 +617,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
             // volume; keeping the outgoing track's value made a later
             // pause/seek restore the wrong gain.
             _preCrossfadeVolume = null;
-          } else {
-            // Stale fade (a skip/stop superseded it): drop any native gain
-            // curves armed meanwhile so neither player keeps a fade multiplier
-            // applied after the volumes are restored here. Clear both players:
-            // depending on whether the post-fade swap ran, the outgoing player
-            // may be either one.
-            try {
-              await _inactivePlayer.dspClearGainCurve();
-            } catch (_) {}
-            try {
-              await _activePlayer.dspClearGainCurve();
-            } catch (_) {}
-            try {
-              await _inactivePlayer.stop();
-            } catch (_) {}
-            try {
-              await _inactivePlayer.setSpeed(_userBaseSpeed);
-            } catch (e, st) {
-              ErrorLogger.log('Failed to reset inactive player speed on abort',
-                  error: e, stackTrace: st, category: 'AudioHandler');
-            }
-            try {
-              await _activePlayer.setVolume(initialActiveVolume);
-            } catch (_) {}
           }
+          // If superseded (_crossfadeManager.currentFadeId != currentFadeId),
+          // the superseding cancel()/caller owns the players; never overwrite
+          // its active volume or stop its new preload here.
         }
       });
     } finally {
@@ -960,8 +884,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       {int initialIndex = 0,
       Duration? initialPosition,
       bool autoPlay = true}) async {
+    final loadGen = ++_loadQueueGeneration;
     _pendingPlaybackStart = songs.isNotEmpty && autoPlay;
     await effectsReady;
+    if (loadGen != _loadQueueGeneration) return;
     if (songs.isNotEmpty && autoPlay && !_pendingPlaybackStart) return;
     if (songs.isEmpty) {
       _songs = [];
@@ -979,6 +905,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       return;
     }
 
+    _resumePositionSaving();
     _isManualSkip = true;
     // Warm artwork for the next two tracks so the notification/queue UI is
     // ready. (The former YouTube "warm" blocks here were empty no-ops.)
@@ -992,6 +919,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
+    if (loadGen != _loadQueueGeneration) return;
 
     // Fast-path: if gapless queue is already loaded with the exact same songs,
     // immediately seek to the requested track instead of tearing down
@@ -1285,7 +1213,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         if (_playGeneration != generation) return;
         _broadcastState(_activePlayer.playbackEvent);
         if (initialPosition != null) {
-          _positionSubject.add(initialPosition);
+          _emitPosition(initialPosition);
         }
       } else {
         await _activePlayer.setVolume(targetVolume);
@@ -1836,7 +1764,10 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     _consecutiveFailures++;
     if (_consecutiveFailures >= 3 || _consecutiveFailures >= _songs.length) {
       if (!_errorSubject.isClosed) {
-        _errorSubject.add('Playback failed for consecutive tracks. Stopping.');
+        _errorSubject.add(
+          '${PulsrAudioHandler.failureCascadeHaltPrefix}'
+          'Playback failed for consecutive tracks. Stopping.',
+        );
       }
       await halt();
     } else {
@@ -1924,7 +1855,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
   int? get _playerBSessionId;
 
-  StreamController<Duration> get _positionSubject;
+  void _emitPosition(Duration position);
+
+  void _resumePositionSaving();
 
   @override
   int get _preloadCountForCurrentBucket;
@@ -1968,6 +1901,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
 
   int get _gaplessLoadGeneration;
   set _gaplessLoadGeneration(int value);
+
+  int get _loadQueueGeneration;
+  set _loadQueueGeneration(int value);
 
   void _notifyTrackChanged(SongsTableData song);
 }

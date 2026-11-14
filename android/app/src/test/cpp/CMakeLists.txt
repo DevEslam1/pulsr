@@ -115,7 +115,7 @@ pulsr_add_test(test_engine_registry ${DSP_SRCS})
 pulsr_add_test(test_limiter_true_peak ${MAIN_CPP}/LookaheadLimiter.cpp)
 
 pulsr_add_test(test_sinc_resampler ${MAIN_CPP}/SincResampler.cpp)
-pulsr_add_test(test_dop_framer)
+pulsr_add_test(test_dop_framer ${MAIN_CPP}/DopFramer.cpp)
 pulsr_add_test(test_resampler_polyphase ${MAIN_CPP}/SincResampler.cpp)
 
 pulsr_add_test(test_channel_manager ${MAIN_CPP}/ChannelManager.cpp)
@@ -123,3 +123,5 @@ pulsr_add_test(test_dac_voicing ${DSP_SRCS})
 pulsr_add_test(test_dither_hires ${DSP_SRCS})
 pulsr_add_test(test_dsp_effects ${DSP_SRCS})
 pulsr_add_test(test_rtf_governor ${DSP_SRCS})
+
+pulsr_add_test(test_rg_dop ${DSP_SRCS})

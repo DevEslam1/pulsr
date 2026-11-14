@@ -297,4 +297,104 @@ void main() {
       expect(handler!.mediaItem.value?.title, 'Track 2');
     });
   });
+
+  group('transition and coordinator hardening', () {
+    test('setAutomixEnabled updates gapless vs dual-player mode when crossfade is 0',
+        () async {
+      handler = await buildTestHandler(repository: repo, ytmService: ytm);
+      handler!.setCrossfadeDuration(Duration.zero);
+      handler!.setGaplessEnabled(true);
+      await handler!.loadQueue([localSong(1), localSong(2)], autoPlay: false);
+
+      await handler!.setAutomixEnabled(true);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(handler!.crossfadeDuration, Duration.zero);
+      expect(handler!.isGaplessEnabled, isTrue);
+    });
+
+    test('concurrent loadQueue keeps only the latest queue', () async {
+      handler = await buildTestHandler(repository: repo, ytmService: ytm);
+      final first =
+          handler!.loadQueue([localSong(1), localSong(2)], autoPlay: false);
+      final second = handler!.loadQueue([localSong(10)], autoPlay: false);
+      await Future.wait([first, second]);
+
+      expect(handler!.queue.value.map((m) => m.id).toList(), ['10']);
+      expect(handler!.mediaItem.value?.id, '10');
+    });
+
+    test('end-to-end _startCrossfade swaps active player and updates mediaItem',
+        () async {
+      handler = await buildTestHandler(repository: repo, ytmService: ytm);
+      handler!.setGaplessEnabled(false);
+      handler!.setCrossfadeDuration(const Duration(milliseconds: 500));
+      await handler!.loadQueue(
+        [localSong(1, durationMs: 60000), localSong(2, durationMs: 60000)],
+        autoPlay: true,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final outgoing = platform.players.values.first;
+      outgoing.emitPlayback(
+        processingState: ProcessingStateMessage.ready,
+        updatePosition: const Duration(seconds: 59),
+        durationOverride: const Duration(seconds: 60),
+      );
+
+      for (var i = 0; i < 150 && handler!.mediaItem.value?.id != '2'; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      // Allow outgoing cleanup + stop() (80ms post-swap drain) to complete.
+      await Future<void>.delayed(const Duration(milliseconds: 140));
+
+      expect(handler!.mediaItem.value?.id, '2');
+      expect(outgoing.playing, isFalse);
+      final incoming = platform.players.values.firstWhere((p) => p != outgoing);
+      expect(incoming.volumeHistory.length, greaterThan(1));
+      expect(incoming.lastVolume, greaterThan(0.0));
+    });
+
+    test(
+        'automix 0s triggers _startCrossfade and manual skipToNext supersedes it cleanly',
+        () async {
+      handler = await buildTestHandler(repository: repo, ytmService: ytm);
+      handler!.setCrossfadeDuration(Duration.zero);
+      await handler!.setAutomixEnabled(true);
+      await handler!.loadQueue(
+        [
+          localSong(1, durationMs: 60000),
+          localSong(2, durationMs: 60000),
+          localSong(3, durationMs: 60000),
+        ],
+        autoPlay: true,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final outgoing = platform.players.values.first;
+      // Automix 0s uses an 8s effective transition margin + triggerMargin (~1.75s),
+      // so 53s reliably crosses the trigger threshold.
+      outgoing.emitPlayback(
+        processingState: ProcessingStateMessage.ready,
+        updatePosition: const Duration(seconds: 53),
+        durationOverride: const Duration(seconds: 60),
+      );
+
+      for (var i = 0;
+          i < 100 &&
+              !platform.players.values.any((p) => p != outgoing && p.playing);
+          i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(
+        platform.players.values.any((p) => p != outgoing && p.playing),
+        isTrue,
+      );
+
+      await handler!.skipToNext();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(handler!.mediaItem.value?.id, '2');
+      expect(outgoing.lastVolume, greaterThan(0.0));
+    });
+  });
 }

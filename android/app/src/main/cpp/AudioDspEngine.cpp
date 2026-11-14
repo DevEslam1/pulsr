@@ -919,7 +919,13 @@ void AudioDspEngine::resetInternal() {
     smoothedReplayGain_ = 1.0;
     targetReplayGain_ = 1.0;
     smoothedDirectVolume_ = 1.0;
+    smoothedDirectUsbVolume_ = 1.0;
     smoothedSafetyGain_ = 1.0;
+    gainBoostLatched_ = false;
+    lastRgTrackDb_ = 0.0;
+    lastRgAlbumDb_ = 0.0;
+    lastRgHasTrack_ = true;
+    lastRgHasAlbum_ = true;
     std::memset(ditherErrorHistory_, 0, sizeof(ditherErrorHistory_));
     limiterGrDb_.store(0.0f, std::memory_order_relaxed);
     shortTermLoudnessDeltaDb_.store(0.0f, std::memory_order_relaxed);
@@ -1138,6 +1144,44 @@ static bool applyTransportGain(float* buffer, int frames, int channels,
     return altered;
 }
 
+// Smooths `smoothedState` toward `targetGain` over ~20ms and applies a C0
+// per-frame linear ramp across `buffer`. Returns false without touching any
+// sample when both state and target are already exact unity (1.0).
+static bool applySmoothedBlockGain(float* buffer, int frames, int channels,
+                                   double sampleRate, double targetGain,
+                                   double& smoothedState) {
+    if (targetGain == 1.0 && smoothedState == 1.0) {
+        return false;
+    }
+    const double startGain = smoothedState;
+    if (std::abs(targetGain - smoothedState) > 1e-5) {
+        const double sr = sampleRate > 0.0 ? sampleRate : 48000.0;
+        const double tau = 0.020;
+        const double alpha =
+            1.0 - std::exp(-static_cast<double>(frames) / (sr * tau));
+        smoothedState += alpha * (targetGain - smoothedState);
+    } else {
+        smoothedState = targetGain;
+    }
+    if (std::abs(smoothedState - 1.0) <= 1e-6 &&
+        std::abs(startGain - 1.0) <= 1e-6) {
+        if (targetGain == 1.0) smoothedState = 1.0;
+        return false;
+    }
+    const double delta = smoothedState - startGain;
+    const double invFrames =
+        (frames > 1) ? (1.0 / static_cast<double>(frames - 1)) : 0.0;
+    for (int f = 0; f < frames; ++f) {
+        const double t = static_cast<double>(f) * invFrames;
+        const double s = (frames > 1) ? t : 1.0;
+        const float g = static_cast<float>(startGain + s * delta);
+        for (int ch = 0; ch < channels; ++ch) {
+            buffer[f * channels + ch] *= g;
+        }
+    }
+    return true;
+}
+
 int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                                        const float* transportGains) {
     if (!buffer || frames <= 0 || channels <= 0) return frames;
@@ -1245,7 +1289,17 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         resampler_.applyParams(snapshot->resampler);
         saturation_.applyParams(snapshot->saturation);
         stereoWidth_.applyParams(snapshot->stereoWidth);
-        loudnessContour_.applyParams(snapshot->loudness);
+        {
+            // With DVC the platform stream is pinned to max, so the real listening
+            // level is the DVC gain, not the pushed slider value. Drive the
+            // equal-loudness lift from it so the curve tracks what is heard.
+            auto loudnessParams = snapshot->loudness;
+            if (snapshot->directVolume.enabled) {
+                loudnessParams.volumeLinear =
+                    std::clamp(snapshot->directVolume.gainLinear, 0.0, 1.0);
+            }
+            loudnessContour_.applyParams(loudnessParams);
+        }
         subCrossover_.applyParams(snapshot->subCrossover);
         channelManager_.applyParams(snapshot->channelManager);
         dacVoicing_.applyParams(snapshot->dacVoicing);
@@ -1297,9 +1351,28 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // weekly sound dose still has to be metered. Read-only: no gain is
         // applied and the safety limiter never runs on this path.
         const double bpSr = sampleRate_.load(std::memory_order_acquire);
+        // The gain stages are skipped here, so restart their smoothing at
+        // unity; leaving bit-perfect must not ramp from a stale gain.
+        smoothedReplayGain_ = 1.0;
+        smoothedDirectVolume_ = 1.0;
+        // DoP words are DSD payload, not PCM: metering them yields a bogus
+        // dose and scaling them destroys the 0x05/0xFA markers.
+        if (snapshot->bitPerfect.isDop) {
+            smoothedDirectUsbVolume_ = 1.0;
+            return frames;
+        }
         if (snapshot->headphoneSafety.enabled && frames > 0 && bpSr > 0.0) {
             meterDoseReadOnly(buffer, frames, channels, bpSr,
                               snapshot->headphoneSafety);
+        }
+        // When Direct USB lacks DAC hardware volume control and user lowers
+        // device/app volume, attenuate PCM smoothly before leaving bit-perfect
+        // bypass; at unity (1.0) this is a zero-touch pass-through.
+        const double usbTarget =
+            std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
+        if (applySmoothedBlockGain(buffer, frames, channels, bpSr, usbTarget,
+                                   smoothedDirectUsbVolume_)) {
+            lastBlockBitPerfect_.store(false, std::memory_order_relaxed);
         }
         // Dose is metered on the un-attenuated signal (worst case), then the
         // transport gain rides on the bypassed bytes so a crossfade/sleep fade
@@ -1316,6 +1389,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
+        smoothedReplayGain_ = 1.0;
+        smoothedDirectVolume_ = 1.0;
         // Auto-Level: cancel the DSP chain's measured loudness change on the dry
         // signal. If the chain measured +3 dB, the dry path is trimmed -3 dB so
         // the comparison is level-matched. Clamp the correction so a momentary
@@ -1356,13 +1431,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
 
     // ReplayGain 2.0 / EBU R128 pre-gain calculation
     if (snapshot->replayGain.enabled && snapshot->replayGain.mode != ReplayGainMode::Off) {
-        double rawGainDb = (snapshot->replayGain.mode == ReplayGainMode::Album)
-            ? (snapshot->replayGain.albumGainDb + snapshot->replayGain.preAmpDb)
-            : (snapshot->replayGain.trackGainDb + snapshot->replayGain.preAmpDb);
+        // Album mode falls back to the track tag when the album tag is
+        // missing; with neither tag only the pre-amp applies.
+        const auto& rg = snapshot->replayGain;
+        const bool useAlbum = rg.mode == ReplayGainMode::Album && rg.hasAlbumGain;
+        const bool useTrack = !useAlbum && rg.hasTrackGain;
+        const double tagDb = useAlbum ? rg.albumGainDb : (useTrack ? rg.trackGainDb : 0.0);
+        double rawGainDb = tagDb + rg.preAmpDb;
         double gainLinear = std::pow(10.0, rawGainDb / 20.0);
-        if (snapshot->replayGain.preventClipping) {
-            double peak = (snapshot->replayGain.mode == ReplayGainMode::Album)
-                ? snapshot->replayGain.albumPeak : snapshot->replayGain.trackPeak;
+        if (snapshot->replayGain.preventClipping && (useAlbum || useTrack)) {
+            double peak = useAlbum ? rg.albumPeak : rg.trackPeak;
             if (peak > 0.0 && gainLinear * peak > 1.0) {
                 gainLinear = 1.0 / peak;
             }
@@ -1378,6 +1456,19 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     const double rgSmoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (currentSr * rgTau));
     const double startReplayGain = smoothedReplayGain_;
     smoothedReplayGain_ += rgSmoothFactor * (targetReplayGain_ - smoothedReplayGain_);
+    // A change of the tag values (not pre-amp/mode) means a new track: the new
+    // gain must be in force from its first block, not eased in from the previous
+    // track's gain. The block ramp (start->target) still avoids a hard step.
+    {
+        const auto& rgt = snapshot->replayGain;
+        const bool tagsChanged = rgt.trackGainDb != lastRgTrackDb_ || rgt.albumGainDb != lastRgAlbumDb_ ||
+            rgt.hasTrackGain != lastRgHasTrack_ || rgt.hasAlbumGain != lastRgHasAlbum_;
+        if (tagsChanged) {
+            smoothedReplayGain_ = targetReplayGain_;
+            lastRgTrackDb_ = rgt.trackGainDb; lastRgAlbumDb_ = rgt.albumGainDb;
+            lastRgHasTrack_ = rgt.hasTrackGain; lastRgHasAlbum_ = rgt.hasAlbumGain;
+        }
+    }
 
     // Net gain check for conditional limiter insertion
     const uint32_t rawStages = snapshot->activeStages;
@@ -1399,7 +1490,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
     channelManager_.setEnabled((stages & STAGE_CHANNEL_MANAGER) && snapshot->channelManager.enabled);
     dacVoicing_.setEnabled((stages & STAGE_DAC_VOICING) && snapshot->dacVoicing.enabled);
-    bool hasNetPositiveGain = smoothedReplayGain_ > 1.001 || smoothedDirectVolume_ > 1.001 ||
+    // Hysteresis (on >1.001, off <1.0002) so a gain settling near the threshold
+    // cannot flap the limiter and its latency.
+    {
+        const double gMax = std::max(smoothedReplayGain_, smoothedDirectVolume_);
+        if (gMax > 1.001) gainBoostLatched_ = true;
+        else if (gMax < 1.0002) gainBoostLatched_ = false;
+    }
+    bool hasNetPositiveGain = gainBoostLatched_ ||
                               channelManager_.canBoost(channels);
     if (snapshot->directVolume.enabled && snapshot->directVolume.gainLinear > 1.001) {
         hasNetPositiveGain = true;
@@ -1459,8 +1557,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // chain until that crossfade completes instead of dropping ~5 ms abruptly.
     limiter_.setProcessingActive(limiterRequested);
     const bool runLimiter = limiterRequested || limiter_.isDraining();
-    const bool dvcActive = snapshot->directVolume.enabled &&
-        (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(snapshot->directVolume.gainLinear - 1.0) > 1e-4);
+    const double dvcRequestedTarget = snapshot->directVolume.enabled
+        ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
+        : 1.0;
+    const double usbRequestedTarget =
+        std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
+    const double composedDirectTarget = dvcRequestedTarget * usbRequestedTarget;
+    const bool dvcActive =
+        (snapshot->directVolume.enabled || usbRequestedTarget < 0.9999) &&
+        (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 ||
+         std::abs(composedDirectTarget - 1.0) > 1e-4);
     // A raw activeStages bit is not evidence that a stage is doing work: the
     // UI commonly publishes 0xFFFFFFFF with every stage flag off. Include a
     // stage only when its own enabled flag (or an active ramp) says so.
@@ -1511,12 +1617,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     if (nonUnityGain) {
         // Apply smoothed ReplayGain pre-gain before EQ stage
         if (std::abs(smoothedReplayGain_ - 1.0) > 1e-4 || std::abs(startReplayGain - 1.0) > 1e-4) {
-            // S-curve smoothstep ramp per frame so all channels share the same gain for a frame.
+            // Linear per-frame ramp (continuous slope across blocks); all channels share one gain per frame.
             const double rgDelta = smoothedReplayGain_ - startReplayGain;
             const double invFrames = (frames > 1) ? (1.0 / static_cast<double>(frames - 1)) : 0.0;
             for (int f = 0; f < frames; ++f) {
                 const double t = static_cast<double>(f) * invFrames;
-                const double s = (frames > 1) ? (t * t * (3.0 - 2.0 * t)) : 1.0;
+                const double s = (frames > 1) ? t : 1.0;  // linear: C0 across blocks, no zero-slope steps
                 const float g = static_cast<float>(startReplayGain + s * rgDelta);
                 for (int ch = 0; ch < channels; ++ch) {
                     buffer[f * channels + ch] *= g;
@@ -1619,35 +1725,18 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             loudnessContour_.processInterleaved(buffer, frames, channels);
         }
 
-        // 9b. Direct Volume Control (DVC): applied before the limiter so that any digital
-        //     preamp or gain boost (> 1.0) is smoothly limited by LookaheadLimiter instead of
-        //     hard-clipping against [-1, 1]. Smoothed over 20ms to avoid zipper noise on slider drags.
+        // 9b. Direct Volume Control (DVC) + Direct USB software fallback gain:
+        //     applied before the limiter so that any digital preamp/boost (> 1.0)
+        //     is smoothly limited, and smoothed over 20ms to avoid zipper noise.
         {
-            const double dvcTarget = snapshot->directVolume.enabled
-                ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
-                : 1.0;
-            const double startDvc = smoothedDirectVolume_;
-            if (std::abs(dvcTarget - smoothedDirectVolume_) > 1e-5) {
-                const double dvcTau = 0.020;
-                const double dvcSmooth =
-                    1.0 - std::exp(-static_cast<double>(frames) / (currentSr * dvcTau));
-                smoothedDirectVolume_ += dvcSmooth * (dvcTarget - smoothedDirectVolume_);
-            } else {
-                smoothedDirectVolume_ = dvcTarget;
-            }
-            if (std::abs(smoothedDirectVolume_ - 1.0) > 1e-4 || std::abs(startDvc - 1.0) > 1e-4) {
-                // S-curve smoothstep ramp per frame so all channels share the same gain for a frame.
-                const double dvcDelta = smoothedDirectVolume_ - startDvc;
-                const double invFrames = (frames > 1) ? (1.0 / static_cast<double>(frames - 1)) : 0.0;
-                for (int f = 0; f < frames; ++f) {
-                    const double t = static_cast<double>(f) * invFrames;
-                    const double s = (frames > 1) ? (t * t * (3.0 - 2.0 * t)) : 1.0;
-                    const float g = static_cast<float>(startDvc + s * dvcDelta);
-                    for (int ch = 0; ch < channels; ++ch) {
-                        buffer[f * channels + ch] *= g;
-                    }
-                }
-            }
+            const double dvcTarget =
+                (snapshot->directVolume.enabled
+                     ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
+                     : 1.0) *
+                std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
+            smoothedDirectUsbVolume_ = 1.0;
+            applySmoothedBlockGain(buffer, frames, channels, currentSr,
+                                   dvcTarget, smoothedDirectVolume_);
         }
 
         // 9c. Multichannel trim/delay (2-8 channels). Runs before the limiter
@@ -1989,13 +2078,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             // an active attenuation (ReplayGain < 1 or DVC < 1) does not jump
             // back to 0 dB and blast the listener.
             const double replayGainTarget = targetReplayGain_;
-            const double dvcTarget = snapshot->directVolume.enabled
-                ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
-                : 1.0;
+            const double dvcTarget =
+                (snapshot->directVolume.enabled
+                     ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
+                     : 1.0) *
+                std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
             resetInternal();
             targetReplayGain_ = replayGainTarget;
             smoothedReplayGain_ = replayGainTarget;
             smoothedDirectVolume_ = dvcTarget;
+            smoothedDirectUsbVolume_ = 1.0;
         }
     }
 

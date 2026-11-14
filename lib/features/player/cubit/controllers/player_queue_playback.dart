@@ -225,6 +225,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       currentIndex: effectiveIndex,
       position: startPos,
       speed: state.playbackSpeed,
+      trackTiers: nextTrackTiers,
     );
     _debouncedPersistQueueSlots();
     _bumpQueueVersion();

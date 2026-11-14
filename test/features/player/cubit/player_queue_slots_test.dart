@@ -592,4 +592,50 @@ void main() {
       expect(same, isTrue);
     });
   });
+
+  group('queue slot trackTiers preservation', () {
+    test('swapReconciledSong remaps and preserves trackTiers in saved slots',
+        () async {
+      final oldSong = buildSong(10);
+      final newSong = buildSong(20);
+      state = PlayerState(
+        queueSlice: QueueSlice(
+          queue: [oldSong, buildSong(2)],
+          currentIndex: 0,
+          activeQueueSlot: 0,
+          trackTiers: const {10: QueueTier.autoplay, 2: QueueTier.userQueue},
+        ),
+      );
+      slots[0] = const QueueSlotData(
+        songIds: [10, 2],
+        currentIndex: 0,
+        position: Duration.zero,
+        trackTiers: {10: QueueTier.autoplay, 2: QueueTier.userQueue},
+      );
+
+      await buildController().swapReconciledSong(oldSong, newSong);
+
+      expect(slots[0]!.songIds, [20, 2]);
+      expect(slots[0]!.trackTiers,
+          const {20: QueueTier.autoplay, 2: QueueTier.userQueue});
+      expect(state.trackTiers,
+          const {20: QueueTier.autoplay, 2: QueueTier.userQueue});
+    });
+
+    test('addToQueue and removeQueueItem keep slot trackTiers synchronized',
+        () async {
+      final s1 = buildSong(1);
+      final s2 = buildSong(2);
+      state = stateWithQueue([s1]);
+      final controller = buildController();
+
+      await controller.addToQueue(s2);
+      expect(slots[0]!.trackTiers, const {2: QueueTier.userQueue});
+      expect(state.trackTiers, const {2: QueueTier.userQueue});
+
+      await controller.removeQueueItem(1);
+      expect(slots[0]!.trackTiers, isEmpty);
+      expect(state.trackTiers, isEmpty);
+    });
+  });
 }

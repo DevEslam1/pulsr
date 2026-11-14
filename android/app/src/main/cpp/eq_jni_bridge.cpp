@@ -1024,6 +1024,8 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReplayGainParams(
     };
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.replayGain.mode = enabled ? m : ReplayGainMode::Off;
+        snap.replayGain.hasTrackGain = std::isfinite(trackGainDb);
+        snap.replayGain.hasAlbumGain = std::isfinite(albumGainDb);
         snap.replayGain.trackGainDb = finiteOr(trackGainDb, 0.0);
         snap.replayGain.albumGainDb = finiteOr(albumGainDb, 0.0);
         snap.replayGain.trackPeak =
@@ -1093,6 +1095,18 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBitPerfectParams(
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.bitPerfect.enabled = enabled;
         snap.bitPerfect.isDop = isDop;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDirectUsbVolume(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble gainLinear) {
+    double g = gainLinear;
+    if (!(g >= 0.0)) g = 0.0;
+    if (!std::isfinite(g) || g > 1.0) g = 1.0;
+    if (std::abs(g - 1.0) < 1e-6) g = 1.0;
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.bitPerfect.directUsbGain = g;
     });
 }
 
@@ -1420,8 +1434,14 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     // Lock-free admission: one atomic increment in the engine's slot, then a
     // revalidation against teardown. No locks, no shared_ptr traffic.
     EngineLease lease(static_cast<int64_t>(engineHandle));
+    constexpr jint kDirectUsbRetry = INT32_MIN + 1;
     auto* engine = lease.get();
     if (!engine) return reject(ENODEV);
+    // Apply bounded backpressure before advancing DSP filter/gain/dose state so a
+    // full USB ring retries the exact block instead of silently dropping frames.
+    if (exclusive && usb.IsActive() && usb.WaitForWriteSpace(frameCount, 12) == 1) {
+        return kDirectUsbRetry;
+    }
     try {
         const jint processed = static_cast<jint>(engine->processInterleaved(
             floatBuffer, frameCount, channels, transportGains));
@@ -1437,10 +1457,11 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
                 written = usb.WriteInterleaved(floatBuffer, frameCount, channels,
                     static_cast<int>(engine->getSampleRate()), static_cast<int64_t>(engineHandle));
             }
-            // Success OR rejection is exclusive: positive acknowledgement makes
-            // Java consume the zeroed float view, never copy raw into the HAL.
             std::memset(floatBuffer, 0, blockBytes);
-            if (!written) return frameCount; // sink already recorded actionable errno
+            if (!written) {
+                if (usb.GetLastError() == ENOSPC) return kDirectUsbRetry;
+                return INT32_MIN;
+            }
             return processed;
         }
         return engine->wasLastBlockBitPerfect() ? -processed : processed;
@@ -1543,6 +1564,12 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStart(
     auto res = pulsr::UsbAudioSink::instance().Open(
                fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, 2);
     return static_cast<jint>(res);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsUsbExclusive(
+        JNIEnv* /* env */, jclass /* clazz */) {
+    return pulsr::UsbAudioSink::instance().IsExclusive() ? JNI_TRUE : JNI_FALSE;
 }
 
 JNIEXPORT jint JNICALL

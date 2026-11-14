@@ -168,6 +168,16 @@ class CrossfadeManager {
     return calculateBpmAlignedDuration(duration, bpm);
   }
 
+  /// Effective transition duration used by both trigger scheduling and
+  /// [arbitrateTransition]. When [automixEnabled] is active and [duration] is
+  /// 0s, Automix falls back to an 8-second mix window.
+  Duration effectiveTransitionDuration({String? trackId}) {
+    if (automixEnabled && duration <= Duration.zero) {
+      return const Duration(seconds: 8);
+    }
+    return effectiveFadeDuration(trackId: trackId);
+  }
+
   /// Evaluates the curve fraction (0.0 to 1.0) based on active [curve].
   /// Always returns 0→1; the caller controls direction via [from]/[to].
   double evaluateCurve(double fraction) {
@@ -735,16 +745,34 @@ class CrossfadeManager {
       var index = 0;
       for (final player in players) {
         if (armed.contains(player) && !cleared[index]) {
-          throw StateError('Could not clear the active native gain curve.');
+          ErrorLogger.log(
+            'Could not clear active native gain curve during crossfade cancel',
+            category: 'CrossfadeManager',
+          );
         }
         index++;
       }
       _outgoingWithArmedCurve = null;
       _nativeCurveArmedOnOutgoing = false;
       if (!hadActiveFade) return;
-      await inactivePlayer.stop();
-      await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
-      await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
+      try {
+        await inactivePlayer.stop();
+      } catch (e, st) {
+        ErrorLogger.log('Error stopping inactive player on crossfade cancel',
+            error: e, stackTrace: st, category: 'CrossfadeManager');
+      }
+      try {
+        await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
+      } catch (e, st) {
+        ErrorLogger.log('Error restoring inactive player volume on cancel',
+            error: e, stackTrace: st, category: 'CrossfadeManager');
+      }
+      try {
+        await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
+      } catch (e, st) {
+        ErrorLogger.log('Error restoring active player volume on cancel',
+            error: e, stackTrace: st, category: 'CrossfadeManager');
+      }
     } catch (e, st) {
       ErrorLogger.log('Error canceling crossfade players',
           error: e, stackTrace: st, category: 'CrossfadeManager');

@@ -488,7 +488,7 @@ void main() {
       });
     });
 
-    test('cancel refuses volume restoration when an armed curve is not cleared',
+    test('cancel stops inactive player and restores volumes even when an armed curve is not cleared',
         () {
       fakeAsync((async) {
         when(() => mockPlayerA.dspSetGainCurve(any(),
@@ -502,13 +502,15 @@ void main() {
           fadeId: crossfadeManager.nextFadeId(),
         ));
         async.flushMicrotasks();
-        unawaited(expectLater(
-            crossfadeManager.cancel(mockPlayerB, mockPlayerA,
-                restoreVolume: 0.7),
-            throwsStateError));
+        var completed = false;
+        unawaited(crossfadeManager
+            .cancel(mockPlayerB, mockPlayerA, restoreVolume: 0.7)
+            .then((_) => completed = true));
         async.flushMicrotasks();
-        verifyNever(() => mockPlayerA.setVolume(0.7));
-        verifyNever(() => mockPlayerB.setVolume(0.7));
+        expect(completed, isTrue);
+        verify(() => mockPlayerB.stop()).called(1);
+        verify(() => mockPlayerB.setVolume(0.7)).called(1);
+        verify(() => mockPlayerA.setVolume(0.7)).called(1);
       });
     });
 

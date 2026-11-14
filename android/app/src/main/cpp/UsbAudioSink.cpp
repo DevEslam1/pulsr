@@ -69,7 +69,7 @@ inline int ioctl(int, unsigned long, ...) { return -1; }
 namespace pulsr {
 
 namespace {
-constexpr int kNumUrbs = 4;
+constexpr int kNumUrbs = 8;
 constexpr int kTargetUrbDurationUs = 8000;
 } // namespace
 
@@ -239,11 +239,12 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     frameAccumulator_ = 0;
     feedbackRatePerSec_ = sampleRate_;  // nominal until a feedback sample arrives
 
-    // Power-of-two ring buffer capacity for mask-based indexing (at least 250ms slack).
+    // Power-of-two ring buffer capacity for mask-based indexing (at least 1000ms
+    // slack so Media3's AudioTrack prefill burst and clock drift never drop blocks).
     const size_t targetRingBytes = std::max(
         static_cast<size_t>(bytesPerUrb_) * 32,
         static_cast<size_t>(sampleRate_) * static_cast<size_t>(channels_) *
-            static_cast<size_t>(bytesPerSample_) / 4);
+            static_cast<size_t>(bytesPerSample_));
     size_t cap = 2048;
     while (cap < targetRingBytes) cap <<= 1;
     ring_.assign(cap, 0);
@@ -906,6 +907,48 @@ double UsbAudioSink::GetBufferedMs() {
         : 0.0;
     const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_) * serviceIntervalUs_ / 1000.0;
     return ringMs + urbMs;
+}
+
+int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
+    if (frames <= 0) return -1;
+    const auto checkOnce = [this, frames]() -> int {
+        uint32_t gate = 0;
+        if (!writerGate_.compare_exchange_strong(
+                gate, kWriterBusy,
+                std::memory_order_acq_rel, std::memory_order_acquire)) {
+            return -1;
+        }
+        int status = -1;
+        if (exclusive_.load(std::memory_order_acquire) &&
+            active_.load(std::memory_order_acquire)) {
+            const size_t cap = ring_.size();
+            const size_t frameBytes =
+                static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
+            if (cap > 1 && frameBytes > 0) {
+                const size_t neededFrames = static_cast<size_t>(frames);
+                const size_t maxFitFrames = (cap - 1) / frameBytes;
+                if (neededFrames <= maxFitFrames) {
+                    const size_t w = ringWrite_.load(std::memory_order_relaxed);
+                    const size_t r = ringRead_.load(std::memory_order_acquire);
+                    const size_t occupied = w - r;
+                    const size_t space = cap > occupied ? cap - occupied - 1 : 0;
+                    status = (neededFrames <= space / frameBytes) ? 0 : 1;
+                }
+            }
+        }
+        writerGate_.fetch_and(~kWriterBusy, std::memory_order_release);
+        return status;
+    };
+
+    int res = checkOnce();
+    if (res <= 0 || maxWaitMs <= 0) return res;
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::milliseconds(maxWaitMs);
+    while (res == 1 && std::chrono::steady_clock::now() < deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        res = checkOnce();
+    }
+    return res;
 }
 
 bool UsbAudioSink::setupFeedbackUrbs() {

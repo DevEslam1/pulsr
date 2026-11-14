@@ -6,6 +6,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -279,6 +280,26 @@ void main() {
 
       expect(handler.skipToNextCalls, 0);
       expect(cubit.state.errorMessage, 'fail two');
+    });
+
+    test('handler cascade halt notice clears consecutive counter without skipping',
+        () async {
+      final song1 = buildSong(1);
+      final song2 = buildSong(2);
+      final cubit = buildCubit();
+      addTearDown(cubit.close);
+
+      await cubit.playSong(song1, queue: [song1, song2]);
+
+      handler.emitError('first failure');
+      await pumpEventQueue();
+      handler.emitError(
+          '${PulsrAudioHandler.failureCascadeHaltPrefix}Playback failed for consecutive tracks. Stopping.');
+      await pumpEventQueue();
+
+      expect(handler.skipToNextCalls, 0);
+      expect(cubit.state.errorMessage,
+          'Playback failed for consecutive tracks. Stopping.');
     });
   });
 }

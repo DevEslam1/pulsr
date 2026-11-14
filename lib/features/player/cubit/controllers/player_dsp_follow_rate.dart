@@ -26,11 +26,32 @@ extension PlayerDspFollowRate on PlayerDspController {
         tagged: song.sampleRate ?? 0,
         decoded: settings.currentOutputDevice?.decodedSampleRate ?? 0,
       );
-      final usbStatus = UsbExclusiveService().lastStatus;
+      final usb = UsbExclusiveService();
+      final usbStatus = usb.lastStatus;
+      final directStreaming = usbStatus.streamingActive;
+      // Ownership survives a per-track suspend: the stream is stopped but the
+      // preference and the sink claim stay armed for the next supported track.
+      var directOwned = directStreaming;
+      try {
+        final cubit = _settingsCubit;
+        if (cubit != null && cubit.bitPerfectViaDirectStream == true) {
+          directOwned = true;
+        }
+      } catch (_) {
+        directOwned = directStreaming;
+      }
+      if (!directOwned) {
+        _lockedDirectUsbRate = null;
+      } else if (directStreaming && usbStatus.streamingSampleRate > 0) {
+        _lockedDirectUsbRate = usbStatus.streamingSampleRate;
+      }
       if (!following &&
-          usbStatus.streamingActive &&
+          directStreaming &&
           effectiveTrackRate > 0 &&
           usbStatus.streamingSampleRate != effectiveTrackRate) {
+        if (usbStatus.streamingSampleRate > 0) {
+          _lockedDirectUsbRate = usbStatus.streamingSampleRate;
+        }
         final notice = L10nHolder.current?.directUsbFollowFormatSuspendedNotice ??
             'Direct USB requires the source rate; follow-format is disabled.';
         await _settingsCubit!.suspendDirectBitPerfectForTrack(notice);
@@ -41,16 +62,26 @@ extension PlayerDspFollowRate on PlayerDspController {
         _lastFollowedSampleRate = null;
         return;
       }
+      final expectedLockedRate = _lockedDirectUsbRate ??
+          (settings.currentOutputDevice?.targetSampleRate ?? 0);
+      final canResumeSuspendedDirect = !following &&
+          directOwned &&
+          !directStreaming &&
+          settings.bitPerfectOutput &&
+          effectiveTrackRate > 0 &&
+          (expectedLockedRate <= 0 ||
+              expectedLockedRate == effectiveTrackRate) &&
+          (usbStatus.supportedRates.isEmpty ||
+              usbStatus.supportedRates.contains(effectiveTrackRate));
       // The user's "Per-Track Output Format Negotiation" switch is the master
       // gate: off means keep one manual/manufacturer output format for the
       // whole session instead of renegotiating per track. Strict bit-perfect
       // promises the track's own format, so it cannot be silently muted by
-      // that switch.
-      if (!settings.outputFormatNegotiationEnabled &&
-          !settings.strictBitPerfect) {
+      // that switch. Direct USB may also resume when a following track matches
+      // the locked sample rate after a transient per-track suspend.
+      if (!following && !canResumeSuspendedDirect) {
         return;
       }
-      if (!settings.followTrackSampleRate && !settings.strictBitPerfect) return;
       // Bluetooth Hi-Res: the A2DP link owns the format, so exclusive
       // bit-perfect is impossible, but when the codec advertises the track's
       // native rate we can ask it to switch — avoiding an unnecessary platform
@@ -71,10 +102,7 @@ extension PlayerDspFollowRate on PlayerDspController {
       final device = settings.currentOutputDevice;
       // The direct UAC2 sink (Bit-Perfect fallback) switches rate by
       // re-starting the isochronous stream; the platform mixer attributes
-      // are not involved on that path. Resolve it here because the depth
-      // fallback needs the live stream format.
-      final usb = UsbExclusiveService();
-      final directStreaming = usb.lastStatus.streamingActive;
+      // are not involved on that path (resolved above alongside directOwned).
       final activeDevice =
           device?.availableDevices.where((d) => d.isCurrent).firstOrNull;
       final deviceDepth = activeDevice?.maxBitDepth ?? (device?.bitDepth ?? 0);
@@ -91,7 +119,8 @@ extension PlayerDspFollowRate on PlayerDspController {
       );
       // The mode belongs in the dedup key: switching Bit-Perfect off and on
       // reopens the output, so the previous confirmation is no longer valid.
-      final producerChannels = await usb.getProducerChannels();
+      final producerChannels =
+          directOwned ? await usb.getProducerChannels() : 2;
       final trackChannels = producerChannels > 0 ? producerChannels : 2;
       final route =
           '${activeDevice?.id}|${usb.lastStatus.deviceId}|${device?.activeDeviceType}'
@@ -100,32 +129,15 @@ extension PlayerDspFollowRate on PlayerDspController {
           '|${device?.decodedPcmEncoding}|$trackChannels';
       final rate = HiResAudioService.followTrackRateToApply(
         trackSampleRate: effectiveTrackRate > 0 ? effectiveTrackRate : song.sampleRate,
-        lastRequestedSampleRate:
-            depth == _lastFollowedBitDepth && route == _lastFollowedRoute
+        lastRequestedSampleRate: canResumeSuspendedDirect
+            ? null
+            : (depth == _lastFollowedBitDepth && route == _lastFollowedRoute
                 ? _lastFollowedSampleRate
-                : null,
+                : null),
         isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
-        followTrackEnabled:
-            settings.followTrackSampleRate || settings.strictBitPerfect,
+        followTrackEnabled: following || canResumeSuspendedDirect,
       );
       if (rate == null) return;
-      // `usb` and `directStreaming` are resolved above, before the depth
-      // fallback, which needs the live stream format.
-      // Ownership survives a per-track suspend: the stream is stopped but the
-      // preference and the sink claim stay armed for the next supported track.
-      // The rate guard and the advertised-rate source must follow ownership,
-      // not just the live stream, or a suspended session would renegotiate
-      // against the mixer's caps and restart the sink at a rate the tee cannot
-      // honour (the UAC2 path forwards decoded PCM with no resampler).
-      bool directOwned = directStreaming;
-      try {
-        final cubit = _settingsCubit;
-        if (cubit != null && cubit.bitPerfectViaDirectStream == true) {
-          directOwned = true;
-        }
-      } catch (e) {
-        directOwned = directStreaming;
-      }
       // Negotiate the format against the advertised device caps so a device
       // that cannot honour the track's exact rate still receives the highest
       // supported tier instead of a flat exclusive-mixer rejection. Unknown

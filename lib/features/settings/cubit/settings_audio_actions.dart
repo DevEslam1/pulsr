@@ -561,6 +561,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // animate ON and immediately snap back OFF whenever the route rejected
     // exclusive mode (e.g. USB DAC on Android < 14).
     final prefs = await SharedPreferences.getInstance();
+    if (enabled && !state.floatOutputEnabled) {
+      await setFloatOutputEnabled(true);
+    }
     if (enabled && _bitPerfectViaDirectStream && !await _stopDirectUsbStreaming()) {
       safeEmit(state.copyWith(errorMessage: L10nHolder.current?.directUsbStreamStopFailedRetry ?? 'Could not stop the previous USB stream. Retry disabling Bit-Perfect.'));
       return;
@@ -1451,7 +1454,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     try {
       safeEmit(state.copyWith(usbHardwareVolumeEnabled: enabled));
       final prefs = await SharedPreferences.getInstance();
-      return await prefs.setBool(PrefsKeys.usbHardwareVolumeEnabled, enabled);
+      final saved =
+          await prefs.setBool(PrefsKeys.usbHardwareVolumeEnabled, enabled);
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().syncUsbHardwareVolumeState(enabled);
+      } else if (!enabled) {
+        await UsbExclusiveService().resetHardwareVolume();
+      }
+      return saved;
     } catch (_) {
       return false;
     }

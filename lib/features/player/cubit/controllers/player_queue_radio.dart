@@ -267,6 +267,7 @@ extension PlayerQueueRadio on PlayerQueueController {
           currentIndex: fresh.currentIndex,
           position: fresh.position,
           speed: fresh.playbackSpeed,
+          trackTiers: updatedTiers,
         );
         debouncedPersistQueueSlots();
         _bumpQueueVersion();

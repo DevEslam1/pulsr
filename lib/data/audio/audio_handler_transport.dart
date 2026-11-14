@@ -3,6 +3,7 @@ part of 'audio_handler.dart';
 mixin PulsrAudioTransport on BaseAudioHandler {
   @override
   Future<void> play() {
+    _resumePositionSaving();
     // A user/system-initiated play clears the becoming-noisy auto-resume
     // arming so only a becoming-noisy pause keeps it armed (item 2).
     _pausedForNoisy = false;
@@ -116,7 +117,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // and caused seekDirect to still hit a 100ms window check first.
     // This method is now a thin pass-through: clamp, optimistic broadcast, seek.
     if (position < Duration.zero) position = Duration.zero;
-    _positionSubject.add(position);
+    _emitPosition(position);
     await _performSeek(position);
   }
 
@@ -126,7 +127,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   Future<void> seekDirect(Duration position) async {
     ErrorLogger.addBreadcrumb('Playback seekDirect to ${position.inSeconds}s',
         category: 'player');
-    _positionSubject.add(position);
+    _emitPosition(position);
     await _performSeek(position);
   }
 
@@ -140,10 +141,10 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       await _activePlayer.seek(position);
     } catch (_) {
       // Roll back to the last known good position on failure.
-      _positionSubject.add(_activePlayer.position);
+      _emitPosition(_activePlayer.position);
       rethrow;
     }
-    _positionSubject.add(position);
+    _emitPosition(position);
     _saveCurrentPosition();
   }
 
@@ -334,7 +335,8 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         restoreVolume: _volume);
     if (_gaplessMode && _gaplessLoaded) {
       _playGeneration++;
-      if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
+      if (!isDoubleTap &&
+          _activePlayer.position > const Duration(seconds: 3)) {
         await _activePlayer.seek(Duration.zero);
         if (wasPlaying) {
           unawaited(_activePlayer.play());
@@ -361,7 +363,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
       }
       return;
     }
-    if (!isDoubleTap && _activePlayer.position.inSeconds > 3) {
+    if (!isDoubleTap && _activePlayer.position > const Duration(seconds: 3)) {
       await _activePlayer.seek(Duration.zero);
       if (wasPlaying) {
         unawaited(_activePlayer.play());
@@ -1014,7 +1016,9 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   AudioPlayer get _playerB;
 
-  StreamController<Duration> get _positionSubject;
+  void _emitPosition(Duration position);
+
+  void _resumePositionSaving();
 
   double? get _preCrossfadeVolume;
 

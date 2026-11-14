@@ -371,6 +371,24 @@ class UsbExclusiveService {
     }
   }
 
+  /// Reset USB Feature Unit hardware volume back to 0 dB (unity gain) when
+  /// handing volume control back to software/DVC or disabling hardware volume.
+  Future<bool> resetHardwareVolume() async {
+    if (!_isAndroid) return false;
+    try {
+      final dynamic res = await _methodChannel
+          .invokeMethod<dynamic>('resetHardwareVolume')
+          .timeout(const Duration(seconds: 5));
+      if (res is Map && res['error'] != null) return false;
+      await getStatus();
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reset USB hardware volume',
+          error: e, stackTrace: st, category: 'UsbExclusive');
+      return false;
+    }
+  }
+
   /// Raw UAC2 isochronous streaming (experimental; unvalidated on hardware).
   Future<UsbStreamResult> startStreaming({
     int sampleRate = 48000,

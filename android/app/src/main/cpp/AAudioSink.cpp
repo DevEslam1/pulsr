@@ -74,9 +74,8 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
                                        AAUDIO_CONTENT_TYPE_MUSIC);
     AAudioStreamBuilder_setUsage(builder, AAUDIO_USAGE_MEDIA);
     if (config_.targetBufferMs > 0) {
-        const int32_t capacity = static_cast<int32_t>(
-            (static_cast<int64_t>(config_.sampleRate) *
-             config_.targetBufferMs) / 1000);
+        const int32_t capacity =
+            ComputeStreamCapacityFrames(config_.sampleRate, config_.targetBufferMs);
         if (capacity > 0) {
             AAudioStreamBuilder_setBufferCapacityInFrames(builder, capacity);
         }
@@ -120,14 +119,18 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     }
     const int32_t frameBytes =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
-    // Start at ~2 bursts so latency stays low; the configured target is the
-    // capacity ceiling the xrun governor may grow into.
+    // Size the initial buffer with healthy headroom so exclusive streams fed
+    // from non-RT threads do not xrun immediately at start/seek.
+    const int32_t targetFrames = config_.targetBufferMs > 0
+        ? static_cast<int32_t>(
+              (static_cast<int64_t>(config_.sampleRate) *
+               config_.targetBufferMs) / 1000)
+        : 0;
     int32_t initialBuffer = 0;
     {
         const int32_t burst = AAudioStream_getFramesPerBurst(stream);
         const int32_t capacity = AAudioStream_getBufferCapacityInFrames(stream);
-        initialBuffer = burst > 0 ? burst * 2 : capacity;
-        if (capacity > 0) initialBuffer = std::min(initialBuffer, capacity);
+        initialBuffer = ComputeInitialBufferFrames(burst, capacity, targetFrames);
         if (initialBuffer > 0) {
             AAudioStream_setBufferSizeInFrames(stream, initialBuffer);
         }
@@ -348,7 +351,9 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     if (st == nullptr || releasing_.load(std::memory_order_acquire)) return -1;
 
     const float curVol = volume_.load(std::memory_order_relaxed);
-    const bool applyVol = (!bitPerfect_ && curVol != 1.0f);
+    // At unity (1.0f, including all DoP and hardware-volume playback) samples
+    // are passed untouched; < 1.0f allows volume control on exclusive PCM.
+    const bool applyVol = (curVol != 1.0f);
 
     alignas(16) uint8_t stackScratch[2048];
     uint8_t* scratchPtr = nullptr;
@@ -464,7 +469,9 @@ void AAudioSink::Flush() {
 }
 
 void AAudioSink::SetVolume(float volume) {
-    if (bitPerfect_) return;  // DoP carrier must stay bit-perfect
+    // DoP carrier safety is enforced by PlaybackVolumeController locking volume
+    // to 1.0f while DoP is active. Keep storing the requested volume so
+    // non-DoP exclusive PCM streams still respond to device/app volume control.
     volume_.store(volume < 0.0f ? 0.0f : (volume > 1.0f ? 1.0f : volume),
                   std::memory_order_relaxed);
 }

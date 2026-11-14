@@ -216,7 +216,7 @@ abstract class SettingsState with _$SettingsState {
     // Opt-in USB DAC hardware volume control (UAC Feature Unit).
     @Default(false) bool usbHardwareVolumeEnabled,
     @Default(true) bool aaudioPreferExclusive,
-    @Default(24) int aaudioTargetBufferMs,
+    @Default(120) int aaudioTargetBufferMs,
     // Resampler quality (0=Fast/linear .. 3=Ultra/64-tap).
     @Default(3) int sincResamplerQuality,
     // BPM-synced crossfade (needs a known BPM for the incoming track).

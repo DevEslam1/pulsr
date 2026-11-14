@@ -31,8 +31,8 @@ void main() {
     //   playlists_screen.dart -12174B (playlists_screen_components part:
     //     hero card, playlist card and the dashed-border wrapper)
     const caps = {
-      'lib/data/audio/audio_handler.dart': 223500,
-      'lib/features/player/cubit/player_cubit.dart': 170000,
+      'lib/data/audio/audio_handler.dart': 145000,
+      'lib/features/player/cubit/player_cubit.dart': 50000,
       'lib/features/library/presentation/library_screen.dart': 88000,
       'lib/data/audio/equalizer_manager.dart': 106950,
       'lib/features/settings/cubit/settings_cubit.dart': 82500,

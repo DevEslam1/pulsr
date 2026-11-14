@@ -395,6 +395,11 @@ private:
     double targetReplayGain_ = 1.0;
     // Direct Volume Control output gain, smoothed across a 20ms window.
     double smoothedDirectVolume_ = 1.0;
+    // Direct USB software fallback gain (bit-perfect PCM only), smoothed across 20ms.
+    double smoothedDirectUsbVolume_ = 1.0;
+    bool gainBoostLatched_ = false;
+    double lastRgTrackDb_ = 0.0, lastRgAlbumDb_ = 0.0;
+    bool lastRgHasTrack_ = true, lastRgHasAlbum_ = true;
 
     // Dose metering + attenuation, shared by the normal chain and the
     // bypass-compare path. Strictly RT-safe: no allocation, no locks.

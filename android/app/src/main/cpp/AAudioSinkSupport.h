@@ -130,4 +130,45 @@ inline void ApplyI32Volume(int32_t* data, int32_t sampleCount, float gain,
     }
 }
 
+// Computes stream buffer capacity headroom in frames. The builder capacity is
+// an immutable ceiling for AAudioStream_setBufferSizeInFrames, so clamping it
+// to targetBufferMs prevents CheckAndAdaptBuffer from expanding on XRuns.
+inline int32_t ComputeStreamCapacityFrames(int32_t sampleRate,
+                                           int32_t targetBufferMs) {
+    if (sampleRate <= 0 || targetBufferMs <= 0) return 0;
+    const int64_t targetFrames =
+        (static_cast<int64_t>(sampleRate) * targetBufferMs) / 1000;
+    if (targetFrames <= 0) return 0;
+    const int64_t headroom =
+        std::max<int64_t>(targetFrames * 4, static_cast<int64_t>(sampleRate) / 2);
+    const int64_t ceiling =
+        std::max<int64_t>(targetFrames, static_cast<int64_t>(sampleRate) * 2);
+    return static_cast<int32_t>(std::min(headroom, ceiling));
+}
+
+// Computes initial AAudio buffer size in frames. Starting at only burst*2
+// (~2 ms at 48 kHz) starves exclusive streams fed by non-real-time Java
+// threads; floor to max(burst*4, targetFrames/2), keep >= burst*2 (bounded
+// by capacity), and never exceed capacity or positive targetFrames.
+inline int32_t ComputeInitialBufferFrames(int32_t burst, int32_t capacity,
+                                          int32_t targetFrames) {
+    if (capacity <= 0 && targetFrames <= 0) {
+        return burst > 0 ? burst * 4 : 0;
+    }
+    int32_t desired = burst > 0 ? burst * 4 : capacity;
+    if (targetFrames > 0) {
+        const int32_t halfTarget = targetFrames / 2;
+        if (halfTarget > desired) desired = halfTarget;
+        if (desired > targetFrames) desired = targetFrames;
+    }
+    if (burst > 0) {
+        const int32_t floorFrames = burst * 2;
+        if (desired < floorFrames) desired = floorFrames;
+    }
+    if (capacity > 0 && desired > capacity) {
+        desired = capacity;
+    }
+    return desired;
+}
+
 }  // namespace pulsr

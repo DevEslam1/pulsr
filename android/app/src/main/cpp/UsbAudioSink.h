@@ -73,6 +73,10 @@ public:
     uint64_t GetChannelMismatchFrames() const { return channelMismatchFrames_.load(std::memory_order_relaxed); }
     void ResetChannelMismatchFrames() { channelMismatchFrames_.store(0, std::memory_order_relaxed); }
     double GetBufferedMs();
+    // Bounded backpressure check: returns 0 when `frames` fit in the ring,
+    // 1 when active & exclusive but full after `maxWaitMs`, or -1 when
+    // inactive/closed/unbounded so callers can route through normal error handling.
+    int WaitForWriteSpace(int frames, int maxWaitMs);
 
     // Queries supported sample rates for the AudioStreaming interface using USBDEVFS_CONTROL.
     static std::vector<int> QuerySupportedRates(int fd, int interfaceNumber);

@@ -151,7 +151,7 @@ class DsdDecoderHelper {
         dsd512: map['dsd512'] == true,
         dop: map['dop'] == true,
         nativeDac: map['nativeDac'] == true,
-        nativeDsd: map['nativeDsd'] == true || map['dsd512'] == true,
+        nativeDsd: map['nativeDsd'] == true,
       );
     } catch (_) {
       return DsdDacCapabilities.none;
@@ -181,6 +181,8 @@ class DsdDecoderHelper {
     bool forceNativeDsd = false,
     DsdDacCapabilities? dopCapabilities,
     int dopContainerBits = 24,
+    bool updateGlobalState = true,
+    void Function(bool isDop, bool isNativeDsd)? onTransportResolved,
   }) async {
     final file = File(song.path);
     if (!await file.exists()) {
@@ -224,8 +226,10 @@ class DsdDecoderHelper {
         (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
 
     // Reset transport flags until framing is verified
-    AudioQualityInfo.dsdDopActive = false;
-    AudioQualityInfo.dsdNativeActive = false;
+    if (updateGlobalState) {
+      AudioQualityInfo.dsdDopActive = false;
+      AudioQualityInfo.dsdNativeActive = false;
+    }
 
     if (useNativeDsd) {
       // Direct Native DSD (Raw bitstream without DoP marker overhead)
@@ -251,7 +255,10 @@ class DsdDecoderHelper {
         channels: 2,
         bitsPerSample: 8,
       );
-      AudioQualityInfo.dsdNativeActive = true;
+      if (updateGlobalState) {
+        AudioQualityInfo.dsdNativeActive = true;
+      }
+      onTransportResolved?.call(false, true);
       return DsdPcmStreamAudioSource(wavBytes, tag: tag);
     }
 
@@ -269,18 +276,22 @@ class DsdDecoderHelper {
         left = Uint8List.fromList([...left, 0x69]);
         right = Uint8List.fromList([...right, 0x69]);
       }
-      // DoP wants the oldest DSD bit in the MSB. DSF is LSB-first, so reverse
-      // the bits of every byte first (the decoder-bound PCM path is unaffected,
-      // it takes bitOrder explicitly).
-      if (bitOrder == 0) {
-        left = _reverseBits(left);
-        right = _reverseBits(right);
-      }
-
+      // DoP wants the oldest DSD bit in the MSB. DSF is LSB-first, so pass
+      // reverseBits: bitOrder == 0 so native C++ DopFramer reverses bits inline
+      // in a single pass without intermediate buffer copies.
+      final bool reverseBits = bitOrder == 0;
       final use32Bit = dopContainerBits == 32;
       final dopBytes = use32Bit
-          ? DopEncoder.encodeToDopPcm32(dsdLeft: left, dsdRight: right)
-          : DopEncoder.encodeToDopPcm24(dsdLeft: left, dsdRight: right);
+          ? DopEncoder.encodeToDopPcm32(
+              dsdLeft: left,
+              dsdRight: right,
+              reverseBits: reverseBits,
+            )
+          : DopEncoder.encodeToDopPcm24(
+              dsdLeft: left,
+              dsdRight: right,
+              reverseBits: reverseBits,
+            );
 
       final wavBytes = buildDopWavContainer(
         dopPcmBytes: dopBytes,
@@ -289,7 +300,10 @@ class DsdDecoderHelper {
         bitsPerSample: use32Bit ? 32 : 24,
       );
 
-      AudioQualityInfo.dsdDopActive = true;
+      if (updateGlobalState) {
+        AudioQualityInfo.dsdDopActive = true;
+      }
+      onTransportResolved?.call(true, false);
       return DsdPcmStreamAudioSource(wavBytes, tag: tag);
     }
 
@@ -341,6 +355,11 @@ class DsdDecoderHelper {
       channels: 2,
     );
 
+    if (updateGlobalState) {
+      AudioQualityInfo.dsdDopActive = false;
+      AudioQualityInfo.dsdNativeActive = false;
+    }
+    onTransportResolved?.call(false, false);
     return DsdPcmStreamAudioSource(wavBytes, tag: tag);
   }
 

@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
@@ -55,6 +54,7 @@ import 'gapless_trim_handler.dart';
 import 'optimized_dsp_pipeline.dart';
 import 'playback_analytics.dart';
 import 'replay_gain_math.dart';
+import 'usb_hardware_volume_curve.dart';
 import '../../domain/models/audio_quality_info.dart';
 import 'smart_preload_scheduler.dart';
 import 'stream_pre_resolver.dart';
@@ -67,6 +67,8 @@ import 'collaborators/tap_src_controller.dart';
 import 'dac_voicing_service.dart';
 import 'collaborators/aaudio_output_controller.dart';
 import 'collaborators/playback_volume_controller.dart';
+import 'collaborators/playback_position_persister.dart';
+import 'collaborators/playback_state_coordinator.dart';
 import 'collaborators/stream_resolution_pipeline.dart';
 import 'playback_queue_state_machine.dart';
 import 'ab_loop_manager.dart';
@@ -534,6 +536,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _gaplessTargetReached = false;
   @override
   int _gaplessLoadGeneration = 0;
+  @override
+  int _loadQueueGeneration = 0;
 
   /// User-facing gapless toggle (persisted as `setting_gapless`). Gapless is
   /// disabled by default and is mutually exclusive with crossfade.
@@ -541,23 +545,88 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _gaplessEnabled = false;
   bool get isGaplessEnabled => _gaplessEnabled;
 
-  /// Gapless is mutually exclusive with crossfade. Enabling crossfade (duration > 0) switches
-  /// to the overlapping dual-player engine, which cannot also produce a seamless
-  /// join, so the two are mutually exclusive by construction. An explicit
-  /// gapless OFF also falls back to per-track playback when crossfade is 0.
+  /// Gapless is mutually exclusive with crossfade and Automix. Enabling either
+  /// crossfade (duration > 0) or Automix switches to the overlapping
+  /// dual-player engine, which cannot share the single-player concat path.
   @override
   bool get _gaplessMode =>
-      _gaplessEnabled && _crossfadeManager.duration <= Duration.zero;
+      _gaplessEnabled &&
+      _crossfadeManager.duration <= Duration.zero &&
+      !_crossfadeManager.automixEnabled;
 
   final StreamController<SongsTableData> _onTrackChangedSubject =
       StreamController<SongsTableData>.broadcast();
   Stream<SongsTableData> get onTrackChanged => _onTrackChangedSubject.stream;
 
+  final Map<int, bool> _resolvedDopBySongId = {};
+  final Map<int, bool> _resolvedNativeDsdBySongId = {};
+  bool _lastSyncedNativeDop = false;
+
+  @override
+  void _recordResolvedDsdTransport(
+    int songId, {
+    required bool isDop,
+    required bool isNativeDsd,
+  }) {
+    if (_resolvedDopBySongId.length >= 512 &&
+        !_resolvedDopBySongId.containsKey(songId)) {
+      _resolvedDopBySongId.remove(_resolvedDopBySongId.keys.first);
+      _resolvedNativeDsdBySongId.remove(_resolvedNativeDsdBySongId.keys.first);
+    }
+    _resolvedDopBySongId[songId] = isDop;
+    _resolvedNativeDsdBySongId[songId] = isNativeDsd;
+  }
+
+  bool _isSongDopActive(SongsTableData? song) {
+    if (song == null) return AudioQualityInfo.dsdDopActive;
+    final resolved = _resolvedDopBySongId[song.id];
+    if (resolved != null) return resolved;
+    return song.id == currentSong?.id && AudioQualityInfo.dsdDopActive;
+  }
+
+  bool _isBitPerfectBypassEnabled() {
+    final prefs = _cachedPrefs;
+    return (prefs?.getBool(PrefsKeys.strictBitPerfect) ?? false) ||
+        ((prefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
+            (prefs?.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true));
+  }
+
+  Future<void> _syncDopToEffectsEngine(bool isDop) async {
+    if (!Platform.isAndroid) return;
+    if (isDop == _lastSyncedNativeDop) return;
+    _lastSyncedNativeDop = isDop;
+    try {
+      await AudioEffectsChannel().setBypassDspForBitPerfect(
+        _isBitPerfectBypassEnabled(),
+        isDop: isDop,
+      );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to sync DoP transport state ($isDop) to effects engine',
+        error: e,
+        stackTrace: st,
+        category: 'AudioHandler',
+      );
+    }
+  }
+
   @override
   void _notifyTrackChanged(SongsTableData song) {
     _cueStartSeeked = false;
     _cueAdvanceTriggered = false;
+    _playbackStateCoordinator.resetSavedPosition();
+    final previousDop = AudioQualityInfo.dsdDopActive;
+    final isDop = _resolvedDopBySongId[song.id] ?? false;
+    final isNativeDsd = _resolvedNativeDsdBySongId[song.id] ?? false;
+    AudioQualityInfo.dsdDopActive = isDop;
+    AudioQualityInfo.dsdNativeActive = isNativeDsd;
+    if (isDop != _lastSyncedNativeDop) {
+      unawaited(_syncDopToEffectsEngine(isDop));
+    }
     unawaited(_pushNativeReplayGain(song));
+    if (isDop != previousDop) {
+      unawaited(_reapplyActiveVolume());
+    }
     if (!_onTrackChangedSubject.isClosed) {
       _onTrackChangedSubject.add(song);
     }
@@ -568,8 +637,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _cueStartSeeked = false;
   bool _cueAdvanceTriggered = false;
 
-  bool _positionDirty = false;
-  Timer? _positionSaveTimer;
+  late final PlaybackStateCoordinator _playbackStateCoordinator;
+  late final PlaybackPositionPersister _positionPersister;
   Timer? _fadeInGuardTimer; // FIX-#12: tracked for disposal
 
   // Transient stream-error retry bookkeeping (see _retryCurrentOrSkip).
@@ -597,36 +666,37 @@ class PulsrAudioHandler extends BaseAudioHandler
     });
   }
 
-  @override
-  final StreamController<Duration> _positionSubject =
-      StreamController<Duration>.broadcast();
-  Stream<Duration> get positionStream => _positionSubject.stream;
-
-  final StreamController<Duration> _highRatePositionSubject =
-      StreamController<Duration>.broadcast();
+  Stream<Duration> get positionStream => _playbackStateCoordinator.positionStream;
 
   /// High-rate stream (~16ms granularity, 60fps) for fluid waveform seeks.
   Stream<Duration> get highRatePositionStream =>
-      _highRatePositionSubject.stream;
-  int _lastHighRatePositionEmitMs = 0;
+      _playbackStateCoordinator.highRatePositionStream;
 
   /// High-rate stream compensated for DSP and native hardware latency (B-11).
   Stream<Duration> get compensatedHighRatePositionStream =>
-      _highRatePositionSubject.stream
+      highRatePositionStream
           .map((pos) => _dspPipeline.getCompensatedPosition(pos));
 
   /// Stream of playback positions compensated for DSP and native hardware latency.
-  Stream<Duration> get compensatedPositionStream => _positionSubject.stream
+  Stream<Duration> get compensatedPositionStream => positionStream
       .map((pos) => _dspPipeline.getCompensatedPosition(pos));
+
+  @override
+  void _emitPosition(Duration position) =>
+      _playbackStateCoordinator.emitImmediatePosition(position);
+
+  @override
+  void _resumePositionSaving() => _playbackStateCoordinator.resumeSaving();
 
   @override
   final StreamController<String> _errorSubject =
       StreamController<String>.broadcast();
   Stream<String> get errorStream => _errorSubject.stream;
-  // Output-mode fallbacks are informational, not playback failures. They ride
-  // the error stream prefixed so PlayerCubit can show them without engaging
-  // the unplayable-track auto-skip path.
+  // Output-mode fallbacks and cascade halts are terminal/informational notices:
+  // they ride the error stream prefixed so PlayerCubit displays them without
+  // re-entering its unplayable-track auto-skip path.
   static const String outputModeNoticePrefix = '__pulsr_output_mode__:';
+  static const String failureCascadeHaltPrefix = '__pulsr_cascade_halt__:';
   String? _lastOutputModeNotice;
   int? _currentAudioSessionId;
   final StreamController<int?> _audioSessionIdSubject =
@@ -662,7 +732,6 @@ class PulsrAudioHandler extends BaseAudioHandler
           ? getIt<HiResAudioService>()
           : null);
 
-  int _lastPositionEmitMs = 0;
   @override
   double? _preCrossfadeVolume;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -684,6 +753,43 @@ class PulsrAudioHandler extends BaseAudioHandler
         _prefetchPlayer = prefetchPlayer ?? AudioPlayer(),
         _injectedLatencyTracker = latencyTracker,
         _injectedHiResAudioService = hiResAudioService {
+    _playbackStateCoordinator = PlaybackStateCoordinator(
+      onSavePositionRequested: saveCurrentPositionImmediate,
+      saveInterval: const Duration(seconds: 2),
+      minDeltaMs: 0,
+    );
+    _positionPersister = PlaybackPositionPersister(
+      repository: _repository,
+      readSnapshot: () {
+        if (_songs.isEmpty ||
+            _currentIndex < 0 ||
+            _currentIndex >= _songs.length) {
+          return null;
+        }
+        final currentSong = _songs[_currentIndex];
+        final isIdle = _activePlayer.processingState == ProcessingState.idle;
+        final posMs = (_pendingLazyPosition != null && isIdle)
+            ? _pendingLazyPosition!.inMilliseconds
+            : _activePlayer.position.inMilliseconds;
+        return PlaybackPositionSnapshot(
+          songId: currentSong.id,
+          queueIndex: _currentIndex,
+          positionMs: posMs,
+          queueIds: _songs.map((s) => s.id).toList(),
+          isIdle: isIdle,
+          queueDirty: _queueDirty,
+          savedQueueIndex: _savedQueueIndex,
+        );
+      },
+      readCurrentPositionMs: () => _activePlayer.position.inMilliseconds,
+      isDisposed: () => _disposed,
+      clearDirty: _playbackStateCoordinator.clearDirty,
+      markDirty: _playbackStateCoordinator.markPositionDirty,
+      onQueueSaved: (index) {
+        _queueDirty = false;
+        _savedQueueIndex = index;
+      },
+    );
     _equalizerManager = EqualizerManager(
       loudnessEnhancerA: loudnessEnhancerA,
       loudnessEnhancerB: loudnessEnhancerB,
@@ -1268,12 +1374,62 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const double assumedOutputSampleRate = 48000.0;
 
   bool _hardwareVolumeOwned = false;
+  bool? _usbHardwareVolumeOverride;
+  double _lastDirectUsbVolume = -1.0;
+
+  bool _isUsbHardwareVolumeEnabled() =>
+      _usbHardwareVolumeOverride ??
+      (_cachedPrefs?.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false);
+
+  @visibleForTesting
+  static bool shouldForwardSystemVolumeToOutput({
+    required bool bitPerfectBypass,
+    required bool aaudioOutputEnabled,
+    required bool directUsbStreaming,
+  }) {
+    // Shared AudioTrack lets Android's STREAM_MUSIC mixer scale analog level;
+    // Direct USB, AAudio Exclusive, and Android 14+ bit-perfect direct paths
+    // bypass that mixer, so physical volume keys must forward into output gain.
+    return bitPerfectBypass || aaudioOutputEnabled || directUsbStreaming;
+  }
+
+  bool _shouldForwardSystemVolumeToOutput() {
+    final prefs = _cachedPrefs;
+    return shouldForwardSystemVolumeToOutput(
+      bitPerfectBypass: _isBitPerfectBypassEnabled(),
+      aaudioOutputEnabled: prefs?.getBool(PrefsKeys.aaudioOutputEnabled) ?? false,
+      directUsbStreaming: UsbExclusiveService().lastStatus.streamingActive,
+    );
+  }
+
+  Future<void> _syncDirectUsbVolume(double appliedPlayerVolume) async {
+    if (!Platform.isAndroid) return;
+    final streamingUsb = UsbExclusiveService().lastStatus.streamingActive;
+    if (!streamingUsb) {
+      if (_lastDirectUsbVolume >= 0.0 &&
+          (_lastDirectUsbVolume - 1.0).abs() >= 1e-6) {
+        await AudioEffectsChannel().setDirectUsbVolume(1.0);
+      }
+      _lastDirectUsbVolume = -1.0;
+      return;
+    }
+    final directGain =
+        (!_hardwareVolumeOwnsOutput() && !_isSongDopActive(currentSong))
+            ? appliedPlayerVolume.clamp(0.0, 1.0)
+            : 1.0;
+    if (_lastDirectUsbVolume >= 0.0 &&
+        (_lastDirectUsbVolume - directGain).abs() < 1e-6) {
+      return;
+    }
+    _lastDirectUsbVolume = directGain;
+    await AudioEffectsChannel().setDirectUsbVolume(directGain);
+  }
 
   /// Software gain may only be released when the DAC itself is holding the
   /// level: a saved preference plus a USB route proves neither permission,
   /// capability, nor a value that actually landed in the hardware register.
   bool _hardwareVolumeOwnsOutput() {
-    if (!(_cachedPrefs?.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false)) {
+    if (!_isUsbHardwareVolumeEnabled()) {
       return false;
     }
     final usb = UsbExclusiveService().lastStatus;
@@ -1285,8 +1441,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   void _syncVolumeControllerSettings() {
     final prefs = _cachedPrefs;
-    final bitPerfect = (prefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
-        (prefs?.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+    final bitPerfect = _isBitPerfectBypassEnabled();
     final hardwareVolume = _hardwareVolumeOwnsOutput();
     _volumeController?.updateSettings(
       userVolume: _volume,
@@ -1298,7 +1453,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       isDucked: _duckActive,
       nativeRgActive: _nativeRgActive && Platform.isAndroid,
       dvcEnabled: _dvcEnabled,
-      isDopActive: AudioQualityInfo.dsdDopActive,
+      isDopActive: _isSongDopActive(currentSong),
       bitPerfectBypass: bitPerfect,
       hardwareVolumeActive: hardwareVolume,
     );
@@ -1321,7 +1476,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       return target;
     }
 
-    if (AudioQualityInfo.dsdDopActive) return 1.0;
+    if (_isSongDopActive(song)) return 1.0;
     if (song == null) {
       if (_dvcEnabled) {
         unawaited(_pushDvcGain(_volume));
@@ -1331,8 +1486,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     final prefs = _cachedPrefs;
     if (prefs == null) return _volume;
-    final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
-        (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+    final bitPerfect = _isBitPerfectBypassEnabled();
     if (bitPerfect) {
       return _hardwareVolumeOwnsOutput() ? 1.0 : _volume;
     }
@@ -1436,7 +1590,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _syncNativeRgFlag();
       return;
     }
-    if (AudioQualityInfo.dsdDopActive) {
+    if (_isSongDopActive(song)) {
       await disableNative();
       return;
     }
@@ -1445,8 +1599,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       await disableNative();
       return;
     }
-    final bitPerfect = (prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
-        (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true);
+    final bitPerfect = _isBitPerfectBypassEnabled();
     if (bitPerfect) {
       await disableNative();
       return;
@@ -1496,8 +1649,84 @@ class PulsrAudioHandler extends BaseAudioHandler
   DateTime? _lastNativeRgPush;
   int? _lastNativeRgSongId;
 
-  Future<void> setVolume(double volume) async {
-    // NaN.clamp() returns NaN, which would poison every composed gain after it.
+  bool _usbHwVolumeBusy = false;
+  bool _usbHwVolumeDirty = false;
+
+  /// Drives the DAC's hardware attenuator from the player volume while
+  /// USB bit-perfect streaming is active, so the in-app slider keeps working
+  /// when software gain is released. Latest-wins: at most one control transfer
+  /// is in flight and a drag collapses to its final value.
+  Future<void> _pushUsbHardwareVolume() async {
+    if (!Platform.isAndroid) return;
+    if (!_isUsbHardwareVolumeEnabled()) {
+      return;
+    }
+    _usbHwVolumeDirty = true;
+    if (_usbHwVolumeBusy) return;
+    _usbHwVolumeBusy = true;
+    try {
+      while (_usbHwVolumeDirty && !_disposed) {
+        _usbHwVolumeDirty = false;
+        final usb = UsbExclusiveService().lastStatus;
+        final min = usb.minVolumeDb;
+        final max = usb.maxVolumeDb;
+        if (!usb.attached ||
+            !usb.permitted ||
+            !usb.streamingActive ||
+            !usb.hasVolumeControl ||
+            min == null ||
+            max == null) {
+          return;
+        }
+        await UsbExclusiveService().setHardwareVolume(
+          UsbHardwareVolumeCurve.dbFor(_volume, minDb: min, maxDb: max),
+        );
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to push USB hardware volume',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    } finally {
+      _usbHwVolumeBusy = false;
+    }
+  }
+
+  /// Synchronizes active gain stages immediately when [usbHardwareVolumeEnabled]
+  /// is toggled in Settings so disabling hardware volume resets the DAC Feature
+  /// Unit to 0 dB and restores Direct USB/software attenuation without a jump.
+  Future<void> syncUsbHardwareVolumeState(bool enabled) async {
+    _usbHardwareVolumeOverride = enabled;
+    if (!enabled && Platform.isAndroid) {
+      await UsbExclusiveService().resetHardwareVolume();
+    }
+    if (enabled) {
+      await _pushUsbHardwareVolume();
+    }
+    _hardwareVolumeOwned = _hardwareVolumeOwnsOutput();
+    _syncVolumeControllerSettings();
+    await _reapplyActiveVolume();
+  }
+
+  /// Keeps [_volume] synchronized when the user drags the USB DAC hardware
+  /// slider in Settings without echoing back into [setHardwareVolume].
+  void syncVolumeFromExternalHardwareDb(
+    double db, {
+    required double minDb,
+    required double maxDb,
+  }) {
+    final linear = UsbHardwareVolumeCurve.linearFor(
+      db,
+      minDb: minDb,
+      maxDb: maxDb,
+    );
+    if (!linear.isFinite) return;
+    _volume = linear.clamp(0.0, 1.0);
+    if (!_volumeSubject.isClosed) {
+      _volumeSubject.add(_volume);
+    }
+    _volumeController?.updateSettings(userVolume: _volume);
+  }
+
+  Future<void> setVolume(double volume) async {    // NaN.clamp() returns NaN, which would poison every composed gain after it.
     _volume = volume.isFinite ? volume.clamp(0.0, 1.0) : _volume;
     if (!_volumeSubject.isClosed) {
       _volumeSubject.add(_volume);
@@ -1514,6 +1743,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _lastNativeRgSongId = song?.id;
       await _pushNativeReplayGain(song);
     }
+    unawaited(_pushUsbHardwareVolume());
     final target = _calculateReplayGainVolume(song);
     _volumeController?.updateSettings(userVolume: _volume);
     try {
@@ -1525,8 +1755,9 @@ class PulsrAudioHandler extends BaseAudioHandler
           error: e, stackTrace: st, category: 'AudioHandler');
     }
     if (!_crossfadeManager.isCrossfading) {
-      await _activePlayer
-          .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
+      final applied = (target * _sleepFadeFactor).clamp(0.0, 1.0);
+      unawaited(_syncDirectUsbVolume(applied));
+      await _activePlayer.setVolume(applied);
     }
   }
 
@@ -1544,8 +1775,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_crossfadeManager.isCrossfading) return;
     final target = _calculateReplayGainVolume(currentSong);
     try {
-      await _activePlayer
-          .setVolume((target * _sleepFadeFactor).clamp(0.0, 1.0));
+      final applied = (target * _sleepFadeFactor).clamp(0.0, 1.0);
+      unawaited(_syncDirectUsbVolume(applied));
+      await _activePlayer.setVolume(applied);
     } catch (e, st) {
       ErrorLogger.log('Failed to re-apply active player volume',
           error: e, stackTrace: st, category: 'AudioHandler');
@@ -1635,40 +1867,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _equalizerManager.onAppPaused();
   }
 
-  File? _cachedRecoveryFile;
-
-  Future<File?> _getLastPositionRecoveryFile() async {
-    // Resolved once: this runs every ~2s while playing and the path never
-    // changes, so don't hit the path_provider platform channel each time.
-    final cached = _cachedRecoveryFile;
-    if (cached != null) return cached;
-    try {
-      final dir = await getApplicationDocumentsDirectory();
-      return _cachedRecoveryFile = File(p.join(dir.path, 'last_position.json'));
-    } catch (_) {
-      return null;
-    }
-  }
-
   @override
-  Future<Map<String, dynamic>?> _readCrashPositionRecovery() async {
-    try {
-      final file = await _getLastPositionRecoveryFile();
-      if (file == null) return null;
-      // Prefer the committed file, then fall back to the surviving .tmp: if the
-      // process died between writing .tmp and committing the rename, the only
-      // valid snapshot lives in .tmp.
-      for (final candidate in [file, File('${file.path}.tmp')]) {
-        if (await candidate.exists()) {
-          final content = await candidate.readAsString();
-          if (content.isNotEmpty) {
-            return jsonDecode(content) as Map<String, dynamic>;
-          }
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
+  Future<Map<String, dynamic>?> _readCrashPositionRecovery() =>
+      _positionPersister.readCrashPositionRecovery();
 
   @override
   double _userBaseSpeed = 1.0;
@@ -1687,144 +1888,18 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
-  Future<void>? _positionSaveInFlight;
-  bool _positionSaveQueued = false;
-
   /// Serialized + coalesced: the 2s timer, [didChangeAppLifecycleState] and the
-  /// lifecycle observer can all fire together on backgrounding, and two
-  /// overlapping DB/file writes can land out of order. While a write is in
-  /// flight, further calls just request one more pass and await the same run.
+  /// lifecycle observer can all fire together on backgrounding.
   @override
-  Future<void> saveCurrentPositionImmediate() async {
-    final inFlight = _positionSaveInFlight;
-    if (inFlight != null) {
-      _positionSaveQueued = true;
-      return inFlight;
-    }
-    final completer = Completer<void>();
-    _positionSaveInFlight = completer.future;
-    try {
-      do {
-        _positionSaveQueued = false;
-        await _writePositionSnapshot();
-      } while (_positionSaveQueued && !_disposed);
-    } finally {
-      _positionSaveInFlight = null;
-      completer.complete();
-    }
-  }
-
-  int? _lastPersistedSongId;
-  int _lastPersistedPositionMs = 0;
-
-  Future<void> _writePositionSnapshot() async {
-    final hasPosition = _songs.isNotEmpty &&
-        _currentIndex >= 0 &&
-        _currentIndex < _songs.length;
-    if (!hasPosition) {
-      // Nothing to write; clear so the periodic timer does not spin.
-      _positionDirty = false;
-      return;
-    }
-    final currentSong = _songs[_currentIndex];
-    final isIdleWithPending = _pendingLazyPosition != null &&
-        _activePlayer.processingState == ProcessingState.idle;
-    final posMs = isIdleWithPending
-        ? _pendingLazyPosition!.inMilliseconds
-        : _activePlayer.position.inMilliseconds;
-
-    // B5: Guard against writing positionMs < lastPersisted for the same songId
-    // unless actively seeking or at track restart (posMs == 0 with idle/buffering restart).
-    if (_lastPersistedSongId == currentSong.id &&
-        posMs < _lastPersistedPositionMs &&
-        posMs == 0 &&
-        _activePlayer.processingState == ProcessingState.idle) {
-      // Player stopped and reset to 0 — skip overwriting the good resume point
-      _positionDirty = false;
-      return;
-    }
-
-    _lastPersistedSongId = currentSong.id;
-    _lastPersistedPositionMs = posMs;
-
-    try {
-      await PositionCrashGuard.writeSnapshot(
-        songId: currentSong.id,
-        queueIndex: _currentIndex,
-        positionMs: posMs,
-        queueIds: _songs.map((s) => s.id).toList(),
-      );
-      final recoveryFile = await _getLastPositionRecoveryFile();
-      if (recoveryFile != null) {
-        final payload = jsonEncode({
-          'songId': currentSong.id,
-          'positionMs': posMs,
-          'queueIndex': _currentIndex,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        });
-        // Atomic commit: write to a sibling .tmp then rename, so a crash during
-        // the write cannot leave a truncated recovery file — the exact scenario
-        // this file exists to survive.
-        final tmpFile = File('${recoveryFile.path}.tmp');
-        await tmpFile.writeAsString(payload, flush: true);
-        try {
-          await tmpFile.rename(recoveryFile.path);
-        } on FileSystemException {
-          // Platforms that reject rename-over-existing (e.g. Windows): copy
-          // then delete, leaving the valid .tmp in place until the copy lands.
-          await tmpFile.copy(recoveryFile.path);
-          try {
-            await tmpFile.delete();
-          } catch (e, st) {
-            ErrorLogger.log('Failed to remove recovery temp file',
-                error: e, stackTrace: st, category: 'AudioHandler');
-          }
-        }
-      }
-    } catch (_) {}
-    try {
-      await _repository.updateLastPosition(currentSong.id, posMs);
-      if (_queueDirty || _currentIndex != _savedQueueIndex) {
-        await _repository.saveQueue(
-            _songs.map((s) => s.id).toList(), _currentIndex, posMs);
-        _queueDirty = false;
-        _savedQueueIndex = _currentIndex;
-      } else {
-        // Same track, later position: refresh just the current row so a cold
-        // resume restores where the user actually was, not the position from
-        // the last structural queue edit (skipToNext never dirtied the queue).
-        await _repository.updateQueuePosition(posMs);
-      }
-      // Only clear AFTER a successful write, and only if no newer position arrived
-      // while the async database write was in flight.
-      if (_activePlayer.position.inMilliseconds == posMs) {
-        _positionDirty = false;
-      }
-      unawaited(PositionCrashGuard.clearSnapshot());
-    } catch (e, st) {
-      // Re-dirty so the periodic timer (and a later app pause) retries.
-      _positionDirty = true;
-      ErrorLogger.log('Failed to save current position',
-          error: e, stackTrace: st, category: 'AudioHandler');
-    }
-  }
+  Future<void> saveCurrentPositionImmediate() =>
+      _positionPersister.saveCurrentPositionImmediate();
 
   @override
   void _saveCurrentPosition() {
-    _positionDirty = true;
-  }
-
-  void _initSaveTimer() {
-    _positionSaveTimer?.cancel();
-    _positionSaveTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (_positionDirty) {
-        unawaited(saveCurrentPositionImmediate());
-      }
-    });
+    _playbackStateCoordinator.markPositionDirty();
   }
 
   Future<void> _init() async {
-    _initSaveTimer();
     AudioMemoryManager.adaptBudgetToSystemRam();
     await _initPrefs();
     // Restore the 24/32-bit float DSP path before any other player call so the
@@ -1846,7 +1921,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         preferExclusive:
             _cachedPrefs?.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
         targetBufferMs:
-            _cachedPrefs?.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 24,
+            _cachedPrefs?.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 120,
       );
     } catch (e, st) {
       ErrorLogger.log('Failed to restore AAudio output setting',
@@ -2008,9 +2083,22 @@ class PulsrAudioHandler extends BaseAudioHandler
       getInactivePlayer: () => _inactivePlayer,
     );
     _syncVolumeControllerSettings();
+    var wasDirectStreaming = UsbExclusiveService().lastStatus.streamingActive;
     _hardwareVolumeOwned = _hardwareVolumeOwnsOutput();
-    _subscriptions.add(UsbExclusiveService().statusStream.listen((_) {
+    _subscriptions.add(UsbExclusiveService().statusStream.listen((status) {
       if (_disposed) return;
+      final startedStreaming = !wasDirectStreaming && status.streamingActive;
+      wasDirectStreaming = status.streamingActive;
+      if (startedStreaming) {
+        if (_isUsbHardwareVolumeEnabled() && !status.hardwareVolumeApplied) {
+          unawaited(_pushUsbHardwareVolume());
+        } else {
+          // Force the active target onto a freshly opened Direct USB stream
+          // instead of leaving its native gain initialized to full scale (1.0).
+          _lastDirectUsbVolume = -1.0;
+          unawaited(_reapplyActiveVolume());
+        }
+      }
       final owned = _hardwareVolumeOwnsOutput();
       if (owned == _hardwareVolumeOwned) return;
       _hardwareVolumeOwned = owned;
@@ -2272,30 +2360,19 @@ class PulsrAudioHandler extends BaseAudioHandler
           (pos) {
             if (_disposed) return;
             if (isTargetActive()) {
-              final now = DateTime.now().millisecondsSinceEpoch;
-              if (now - _lastHighRatePositionEmitMs >= 16 ||
-                  pos == Duration.zero) {
-                _lastHighRatePositionEmitMs = now;
-                if (!_highRatePositionSubject.isClosed) {
-                  _highRatePositionSubject.add(pos);
-                }
-              }
-              if (now - _lastPositionEmitMs >= 250 || pos == Duration.zero) {
-                _lastPositionEmitMs = now;
-                if (!_positionSubject.isClosed) {
-                  _positionSubject.add(pos);
-                }
-              }
+              _playbackStateCoordinator.onPositionTick(
+                pos,
+                markDirty: player.playing,
+              );
               // FIX-B03: Guard failure reset on position ticks: only reset when ready and pos > 2s
               if (player.processingState == ProcessingState.ready &&
                   pos > const Duration(seconds: 2) &&
                   _consecutiveFailures > 0) {
                 _consecutiveFailures = 0;
               }
-              // Only dirty the 2s DB writer while actually playing; otherwise
-              // a paused track keeps rewriting the same position forever.
+              // AB loop wrap, CUE end advance, bookmark autosave, and adaptive
+              // healthy-window reporting only apply during active playback.
               if (player.playing) {
-                _saveCurrentPosition();
                 // F1: AB loop wrap. Pass the live playback speed so the
                 // look-ahead widens at 2–4x (a single ~150ms position tick
                 // jumps far enough to overshoot the fixed 1x window otherwise).
@@ -2397,12 +2474,8 @@ class PulsrAudioHandler extends BaseAudioHandler
                   // arbiter's 500 ms tail guard. A fixed 1.5 s margin truncated
                   // every fade whose resolve ran long, because prepare ate the
                   // margin and the arbiter then clamped the fade itself.
-                  final effFade = _crossfadeManager.automixEnabled
-                      ? (_crossfadeManager.duration > Duration.zero
-                          ? _crossfadeManager.duration
-                          : const Duration(seconds: 8))
-                      : _crossfadeManager.effectiveFadeDuration(
-                          trackId: _songs[nextIdx].id.toString());
+                  final effFade = _crossfadeManager.effectiveTransitionDuration(
+                      trackId: _songs[nextIdx].id.toString());
                   final settleMargin = _crossfadeManager.triggerMargin;
                   if (duration > effFade + settleMargin &&
                       compensatedPos >= duration - effFade - settleMargin) {
@@ -2793,13 +2866,26 @@ class PulsrAudioHandler extends BaseAudioHandler
     // software-volume path (setVolume) still owns the value in that case.
     _subscriptions.add(
       AudioEffectsChannel().onSystemVolumeChanged.listen((ratio) {
-        if (ratio.isFinite && ratio >= 0.0) {
-          final clamped = ratio.clamp(0.0, 1.0);
+        if (_dvcEnabled) {
+          // DVC pins STREAM_MUSIC to maximum and applies user gain natively;
+          // ignore Android's pinned max stream callbacks so `_volume` is not
+          // overwritten back to 1.0.
+          return;
+        }
+        final clamped =
+            (ratio.isFinite && ratio >= 0.0) ? ratio.clamp(0.0, 1.0) : null;
+        if (clamped != null) {
           _lastSystemVolumeRatio = clamped;
+        }
+        final forwardToOutput = _shouldForwardSystemVolumeToOutput();
+        if (forwardToOutput && clamped != null) {
           _volume = clamped;
           if (!_volumeSubject.isClosed) {
             _volumeSubject.add(_volume);
           }
+          _volumeController?.updateSettings(userVolume: _volume);
+          unawaited(_pushUsbHardwareVolume());
+          unawaited(_reapplyActiveVolume());
         }
         if (_equalizerManager.isLoudnessContourEnabled) {
           unawaited(_feedLoudnessContourVolume());
@@ -3175,10 +3261,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     _sleepFadeFactor = 1.0;
     _interruption.reset();
     _pausedForNoisy = false;
-    // Cancel the periodic save timer BEFORE saving and stopping players,
-    // ensuring no trailing ticks run while players report 0.
-    _positionSaveTimer?.cancel();
-    _positionSaveTimer = null;
+    // Pause periodic saving BEFORE persisting and stopping players so trailing
+    // ticks cannot write zero over the saved position.
+    _playbackStateCoordinator.pauseSaving();
     // Persist the REAL position before the players are stopped.
     try {
       await saveCurrentPositionImmediate();
@@ -3200,7 +3285,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     // The stopped players report position 0; make sure the timer cannot write
     // that over the position saved above.
-    _positionDirty = false;
+    _playbackStateCoordinator.clearDirty();
     try {
       await AudioEffectsChannel().releaseEffects();
     } catch (e, st) {
@@ -3279,8 +3364,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       } catch (_) {}
       _lifecycleObserver = null;
     }
-    _positionSaveTimer?.cancel();
-    _positionSaveTimer = null;
     _seekDebounceTimer?.cancel();
     _seekDebounceTimer = null;
     _fadeInGuardTimer?.cancel(); // FIX-#12
@@ -3333,8 +3416,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       _volumeController?.dispose();
     } catch (_) {}
-    if (!_positionSubject.isClosed) _positionSubject.close();
-    if (!_highRatePositionSubject.isClosed) _highRatePositionSubject.close();
+    _playbackStateCoordinator.dispose();
     if (!_audioSessionIdSubject.isClosed) _audioSessionIdSubject.close();
     if (!_errorSubject.isClosed) _errorSubject.close();
     if (!_onTrackChangedSubject.isClosed) _onTrackChangedSubject.close();

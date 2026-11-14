@@ -236,6 +236,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: 0,
       position: state.position,
       speed: state.playbackSpeed,
+      trackTiers: retainedTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
@@ -279,6 +280,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: validIndex,
       position: restorePosition,
       speed: state.playbackSpeed,
+      trackTiers: state.trackTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
@@ -336,6 +338,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: newCurrentIndex,
       position: state.position,
       speed: state.playbackSpeed,
+      trackTiers: state.trackTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
@@ -361,6 +364,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         currentIndex: state.currentIndex,
         position: state.position,
         speed: state.playbackSpeed,
+        trackTiers: state.trackTiers,
       );
       debouncedPersistQueueSlots();
       _bumpQueueVersion();
@@ -391,6 +395,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         currentIndex: 0,
         position: Duration.zero,
         speed: state.playbackSpeed,
+        trackTiers: const {},
       );
       debouncedPersistQueueSlots();
       _bumpQueueVersion();
@@ -446,6 +451,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: newIndex,
       position: removingCurrent ? Duration.zero : state.position,
       speed: state.playbackSpeed,
+      trackTiers: updatedTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
@@ -660,6 +666,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       _slotLookupCache.remove(oldId);
       _queueSlots.updateAll((slot, data) {
         if (!data.songIds.contains(oldId)) return data;
+        final slotTiers = Map<int, QueueTier>.from(data.trackTiers);
+        final existingTier = slotTiers.remove(oldId);
+        if (existingTier != null) {
+          slotTiers[safeNewSong.id] = existingTier;
+        }
         return QueueSlotData(
           songIds: data.songIds
               .map((id) => id == oldId ? safeNewSong.id : id)
@@ -667,6 +678,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           currentIndex: data.currentIndex,
           position: data.position,
           speed: data.speed,
+          trackTiers: Map<int, QueueTier>.unmodifiable(slotTiers),
         );
       });
       if (state.queue.any((s) => s.id == oldId)) {
@@ -706,19 +718,32 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     }
   }
 
+  void _promoteSongToUserQueue(int songId) {
+    final s = _getState();
+    if (s.trackTiers[songId] == QueueTier.userQueue) return;
+    final updatedTiers = Map<int, QueueTier>.from(s.trackTiers)
+      ..[songId] = QueueTier.userQueue;
+    setQueueSlot(
+      s.activeQueueSlot,
+      songs: s.queue,
+      currentIndex: s.currentIndex,
+      position: s.position,
+      speed: s.playbackSpeed,
+      trackTiers: updatedTiers,
+    );
+    debouncedPersistQueueSlots();
+    _emit(s.copyWith(
+      queueSlice: s.queueSlice.copyWith(trackTiers: updatedTiers),
+    ));
+  }
+
   Future<void> addToQueue(SongsTableData song) =>
       _queueMutex.protect(() => _addToQueueLocked(song));
 
   Future<void> _addToQueueLocked(SongsTableData song) async {
     final state = _getState();
     if (state.queue.isNotEmpty && _isSameTrack(state.queue.last, song)) {
-      final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
-      if (updatedTiers[song.id] != QueueTier.userQueue) {
-        updatedTiers[song.id] = QueueTier.userQueue;
-        _emit(state.copyWith(
-          queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
-        ));
-      }
+      _promoteSongToUserQueue(song.id);
       return;
     }
 
@@ -733,12 +758,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     if (existingIdx != -1) {
       // Reordering an already-present non-current song to the end doesn't grow the queue
       await _reorderQueueLocked(existingIdx, state.queue.length - 1);
-      final s = _getState();
-      final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
-      updatedTiers[song.id] = QueueTier.userQueue;
-      _emit(s.copyWith(
-        queueSlice: s.queueSlice.copyWith(trackTiers: updatedTiers),
-      ));
+      _promoteSongToUserQueue(song.id);
       return;
     }
 
@@ -785,6 +805,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: s.currentIndex,
       position: s.position,
       speed: s.playbackSpeed,
+      trackTiers: updatedTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
@@ -810,13 +831,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     final targetSlot = (state.currentIndex + 1).clamp(0, state.queue.length);
     if (targetSlot < state.queue.length &&
         _isSameTrack(state.queue[targetSlot], song)) {
-      final updatedTiers = Map<int, QueueTier>.from(state.trackTiers);
-      if (updatedTiers[song.id] != QueueTier.userQueue) {
-        updatedTiers[song.id] = QueueTier.userQueue;
-        _emit(state.copyWith(
-          queueSlice: state.queueSlice.copyWith(trackTiers: updatedTiers),
-        ));
-      }
+      _promoteSongToUserQueue(song.id);
       return;
     }
 
@@ -832,12 +847,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       final adjustedTarget =
           targetSlot > existingIdx ? targetSlot - 1 : targetSlot;
       await _reorderQueueLocked(existingIdx, adjustedTarget);
-      final s = _getState();
-      final updatedTiers = Map<int, QueueTier>.from(s.trackTiers);
-      updatedTiers[song.id] = QueueTier.userQueue;
-      _emit(s.copyWith(
-        queueSlice: s.queueSlice.copyWith(trackTiers: updatedTiers),
-      ));
+      _promoteSongToUserQueue(song.id);
       return;
     }
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {
@@ -877,6 +887,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: s.currentIndex,
       position: s.position,
       speed: s.playbackSpeed,
+      trackTiers: updatedTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();
@@ -959,6 +970,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       currentIndex: s.currentIndex,
       position: s.position,
       speed: s.playbackSpeed,
+      trackTiers: updatedTiers,
     );
     debouncedPersistQueueSlots();
     _bumpQueueVersion();

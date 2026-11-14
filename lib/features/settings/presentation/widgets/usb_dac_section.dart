@@ -1,6 +1,8 @@
 // lib/features/settings/presentation/widgets/usb_dac_section.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../data/audio/audio_handler.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
@@ -89,6 +91,17 @@ class _UsbDacSectionState extends State<UsbDacSection> {
       return;
     }
     await _service.setHardwareVolume(db);
+    final minDb = _status.minVolumeDb;
+    final maxDb = _status.maxVolumeDb;
+    if (minDb != null &&
+        maxDb != null &&
+        getIt.isRegistered<PulsrAudioHandler>()) {
+      getIt<PulsrAudioHandler>().syncVolumeFromExternalHardwareDb(
+        db,
+        minDb: minDb,
+        maxDb: maxDb,
+      );
+    }
     await _refresh();
   }
 

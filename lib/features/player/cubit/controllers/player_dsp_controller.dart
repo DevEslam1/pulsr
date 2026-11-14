@@ -168,6 +168,7 @@ class PlayerDspController {
   int? _lastFollowedSampleRate;
   int? _lastFollowedBitDepth;
   String? _lastFollowedRoute;
+  int? _lockedDirectUsbRate;
   // Last codec rate requested by the Bluetooth Hi-Res alignment, so a track
   // that already matches the codec does not trigger a redundant switch.
   int? _lastFollowedBtCodecRate;

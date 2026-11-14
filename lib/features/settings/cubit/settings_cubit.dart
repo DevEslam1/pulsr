@@ -581,9 +581,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           prefs.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false,
       aaudioPreferExclusive:
           prefs.getBool(PrefsKeys.aaudioPreferExclusive) ?? true,
-      // 24 ms is a USB-DAC-safe default; 150 ms remains available for
-      // jittery links and is still the right value on Bluetooth.
-      aaudioTargetBufferMs: prefs.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 24,
+      // 120 ms prevents exclusive-mode XRuns on hi-res PCM while staying within
+      // a single AudioTrack prefill; 150 ms+ remains configurable for Bluetooth.
+      aaudioTargetBufferMs: prefs.getInt(PrefsKeys.aaudioTargetBufferMs) ?? 120,
       sincResamplerQuality: prefs.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
       bpmSyncCrossfadeEnabled:
           prefs.getBool(PrefsKeys.bpmSyncCrossfadeEnabled) ?? false,
@@ -1123,7 +1123,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           );
           safeEmit(state.copyWith(systemEffectsStatus: status));
         } catch (_) {}
-        if (loadedState.strictBitPerfect) {
+        if (loadedState.strictBitPerfect || loadedState.bitPerfectOutput) {
           await setFloatOutputEnabled(true);
         }
         if (loadedState.bitPerfectOutput) {
