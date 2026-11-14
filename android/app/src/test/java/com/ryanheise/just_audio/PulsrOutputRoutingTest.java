@@ -39,8 +39,8 @@ public class PulsrOutputRoutingTest {
         // Start from a known (null) preference so register() is not the call
         // that throws.
         PulsrOutputRouting.select(null);
-        PulsrOutputRouting.register(playerA, false);
-        PulsrOutputRouting.register(playerB, false);
+        PulsrOutputRouting.register(playerA);
+        PulsrOutputRouting.register(playerB);
         doThrow(new IllegalStateException("released"))
                 .when(playerA).setPreferredAudioDevice(any());
 
@@ -99,5 +99,72 @@ public class PulsrOutputRoutingTest {
         final Field field = PulsrOutputRouting.class.getDeclaredField("nativeSinks");
         field.setAccessible(true);
         return (Set<AAudioAudioSink>) field.get(null);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void decodedOwnersUsesWeakReferencesAndPrunesClearedEntries() throws Exception {
+        final androidx.media3.exoplayer.audio.AudioSink inner =
+                mock(androidx.media3.exoplayer.audio.AudioSink.class);
+        final PulsrAudioSink sink = new PulsrAudioSink(
+                org.robolectric.RuntimeEnvironment.getApplication(),
+                () -> false, () -> false, () -> 50, () -> false, () -> playerA, p -> {}, null,
+                (nativeMode, floatMode) -> new PulsrAudioSink.Inner(inner, null, null, null));
+        final androidx.media3.common.Format pcm16 = new androidx.media3.common.Format.Builder()
+                .setSampleMimeType(androidx.media3.common.MimeTypes.AUDIO_RAW)
+                .setSampleRate(48000).setChannelCount(2)
+                .setPcmEncoding(androidx.media3.common.C.ENCODING_PCM_16BIT).build();
+        sink.configure(pcm16, 0, null);
+
+        final Field ownersField = PulsrOutputRouting.class.getDeclaredField("decodedOwners");
+        ownersField.setAccessible(true);
+        final java.util.Map<PulsrAudioSink, java.lang.ref.WeakReference<ExoPlayer>> owners =
+                (java.util.Map<PulsrAudioSink, java.lang.ref.WeakReference<ExoPlayer>>)
+                        ownersField.get(null);
+        assertTrue(owners.get(sink) instanceof java.lang.ref.WeakReference);
+        assertTrue(owners.get(sink).get() == playerA);
+
+        // Simulate GC clearing the ExoPlayer reference; snapshot must prune the entry.
+        owners.put(sink, new java.lang.ref.WeakReference<>(null));
+        org.junit.Assert.assertArrayEquals(new int[] {0, 0, 0},
+                PulsrOutputRouting.decodedPcmSnapshot(playerA));
+        assertFalse(owners.containsKey(sink));
+        sink.release();
+    }
+
+    @Test
+    public void capturingAudioOutputProviderCapturesAudioTrackBeforeReflection() throws Exception {
+        final android.content.Context context = org.robolectric.RuntimeEnvironment.getApplication();
+        final PulsrOutputRouting.CapturingAudioOutputProvider provider =
+                PulsrOutputRouting.createCapturingOutputProvider(context);
+        final androidx.media3.exoplayer.audio.DefaultAudioSink sink =
+                new androidx.media3.exoplayer.audio.DefaultAudioSink.Builder(context)
+                        .setAudioOutputProvider(provider)
+                        .build();
+        PulsrOutputRouting.observe(sink, provider);
+        try {
+            final androidx.media3.exoplayer.audio.AudioOutputProvider.OutputConfig config =
+                    new androidx.media3.exoplayer.audio.AudioOutputProvider.OutputConfig.Builder()
+                            .setEncoding(androidx.media3.common.C.ENCODING_PCM_16BIT)
+                            .setSampleRate(48000)
+                            .setChannelMask(android.media.AudioFormat.CHANNEL_OUT_STEREO)
+                            .setBufferSize(4096)
+                            .build();
+            final androidx.media3.exoplayer.audio.AudioOutput output = provider.getAudioOutput(config);
+            assertTrue(output instanceof androidx.media3.exoplayer.audio.AudioTrackAudioOutput);
+            final android.media.AudioTrack captured = provider.getCapturedTrack();
+            org.junit.Assert.assertNotNull(captured);
+            assertTrue(captured == ((androidx.media3.exoplayer.audio.AudioTrackAudioOutput) output).getAudioTrack());
+            org.junit.Assert.assertArrayEquals(
+                    new int[] {0, 48000, android.media.AudioFormat.ENCODING_PCM_16BIT},
+                    PulsrOutputRouting.snapshot());
+
+            output.release();
+            provider.release();
+            org.junit.Assert.assertNull(provider.getCapturedTrack());
+        } finally {
+            PulsrOutputRouting.unobserve(sink);
+            sink.release();
+        }
     }
 }

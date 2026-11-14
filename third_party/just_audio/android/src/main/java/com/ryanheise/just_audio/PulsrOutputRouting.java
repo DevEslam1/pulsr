@@ -1,13 +1,25 @@
 package com.ryanheise.just_audio;
 
+import android.content.Context;
+import android.content.pm.ApplicationInfo;
 import android.media.AudioDeviceInfo;
 import android.media.AudioTrack;
 import android.os.Build;
+import android.util.Log;
+import androidx.annotation.Nullable;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.audio.AudioOutput;
+import androidx.media3.exoplayer.audio.AudioOutputProvider;
+import androidx.media3.exoplayer.audio.AudioTrackAudioOutput;
+import androidx.media3.exoplayer.audio.AudioTrackAudioOutputProvider;
 import androidx.media3.exoplayer.audio.DefaultAudioSink;
+import androidx.media3.exoplayer.audio.ForwardingAudioOutputProvider;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
@@ -15,15 +27,67 @@ import java.util.WeakHashMap;
 /** App-owned media routing. Preferences and measured routes are deliberately separate. */
 @androidx.media3.common.util.UnstableApi
 public final class PulsrOutputRouting {
-    private static final Map<ExoPlayer, Boolean> players = new WeakHashMap<>();
+    private static final String TAG = "PulsrOutputRouting";
+    private static final Set<ExoPlayer> players =
+            Collections.newSetFromMap(new WeakHashMap<>());
     // Use explicit-lifetime sets for sinks: WeakHashMap risks silent GC-collection
     // of active sinks if the renderer holds the only strong reference internally.
     private static final Set<DefaultAudioSink> sinks = new HashSet<>();
     private static final Set<AAudioAudioSink> nativeSinks = new HashSet<>();
-    private static final Map<PulsrAudioSink, ExoPlayer> decodedOwners = new WeakHashMap<>();
+    private static final Map<PulsrAudioSink, WeakReference<ExoPlayer>> decodedOwners =
+            new WeakHashMap<>();
+    private static final Map<DefaultAudioSink, CapturingAudioOutputProvider> capturedProviders =
+            new WeakHashMap<>();
 
-    static synchronized void observeDecoded(PulsrAudioSink sink, ExoPlayer player) {
-        decodedOwners.put(sink, player);
+    static final class CapturingAudioOutputProvider extends ForwardingAudioOutputProvider {
+        @Nullable private volatile WeakReference<AudioTrack> latestTrack;
+
+        CapturingAudioOutputProvider(AudioOutputProvider delegate) {
+            super(delegate);
+        }
+
+        @Override
+        public AudioOutput getAudioOutput(OutputConfig config) throws InitializationException {
+            AudioOutput output = super.getAudioOutput(config);
+            if (output instanceof AudioTrackAudioOutput) {
+                latestTrack = new WeakReference<>(((AudioTrackAudioOutput) output).getAudioTrack());
+            }
+            return output;
+        }
+
+        @Override
+        public void release() {
+            latestTrack = null;
+            super.release();
+        }
+
+        @Nullable
+        AudioTrack getCapturedTrack() {
+            final WeakReference<AudioTrack> ref = latestTrack;
+            return ref == null ? null : ref.get();
+        }
+    }
+
+    static CapturingAudioOutputProvider createCapturingOutputProvider(Context context) {
+        captureDebugFlag(context);
+        return new CapturingAudioOutputProvider(
+                new AudioTrackAudioOutputProvider.Builder(context).build());
+    }
+
+    private static void captureDebugFlag(@Nullable Context context) {
+        if (context == null) return;
+        ApplicationInfo info = context.getApplicationInfo();
+        if (info != null) {
+            debugBuild = (info.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        }
+    }
+
+    static synchronized void observeDecoded(PulsrAudioSink sink, @Nullable ExoPlayer player) {
+        if (player == null) {
+            decodedOwners.remove(sink);
+        } else {
+            decodedOwners.put(sink, new WeakReference<>(player));
+        }
     }
 
     static synchronized void unobserveDecoded(PulsrAudioSink sink) { decodedOwners.remove(sink); }
@@ -35,6 +99,8 @@ public final class PulsrOutputRouting {
     private static boolean reflectionLookupDone = false;
     private static boolean audioOutputReflectionDone = false;
     private static boolean reflectionWarningLogged = false;
+    private static boolean trackMissLogged = false;
+    private static volatile boolean debugBuild = false;
 
     private static synchronized void ensureReflectionInitialized() {
         if (reflectionLookupDone) return;
@@ -52,15 +118,34 @@ public final class PulsrOutputRouting {
 
         if (audioTrackField == null && audioOutputField == null && !reflectionWarningLogged) {
             reflectionWarningLogged = true;
-            android.util.Log.w("PulsrOutputRouting",
+            Log.w(TAG,
                 "Media3 DefaultAudioSink reflection unavailable; output-device telemetry will return [0,0,0].");
-            android.util.Log.e("PulsrOutputRouting",
+            Log.e(TAG,
                 "TELEMETRY_DEGRADED: DefaultAudioSink fields (audioTrack/audioOutput) lookup failed.");
         }
     }
 
+    @Nullable
     private static AudioTrack getAudioTrackFromSink(DefaultAudioSink sink) {
         if (sink == null) return null;
+        final CapturingAudioOutputProvider provider = capturedProviders.get(sink);
+        if (provider != null) {
+            final AudioTrack captured = provider.getCapturedTrack();
+            if (captured != null) return captured;
+        }
+
+        final AudioTrack reflected = getAudioTrackViaReflection(sink);
+        if (reflected != null) return reflected;
+
+        if (!trackMissLogged && (debugBuild || Log.isLoggable(TAG, Log.DEBUG))) {
+            trackMissLogged = true;
+            Log.d(TAG, "Unable to read AudioTrack from DefaultAudioSink via provider or reflection.");
+        }
+        return null;
+    }
+
+    @Nullable
+    private static AudioTrack getAudioTrackViaReflection(DefaultAudioSink sink) {
         ensureReflectionInitialized();
 
         if (audioTrackField != null) {
@@ -107,16 +192,29 @@ public final class PulsrOutputRouting {
 
     private PulsrOutputRouting() {}
 
-    public static synchronized void register(ExoPlayer player, boolean aaudio) {
-        players.put(player, aaudio);
+    public static synchronized void register(ExoPlayer player) {
+        players.add(player);
         player.setPreferredAudioDevice(preferred);
     }
 
     public static synchronized void unregister(ExoPlayer player) { players.remove(player); }
 
-    public static synchronized void observe(DefaultAudioSink sink) { sinks.add(sink); }
+    public static synchronized void observe(DefaultAudioSink sink) {
+        observe(sink, null);
+    }
 
-    public static synchronized void unobserve(DefaultAudioSink sink) { sinks.remove(sink); }
+    static synchronized void observe(DefaultAudioSink sink,
+            @Nullable CapturingAudioOutputProvider provider) {
+        sinks.add(sink);
+        if (provider != null) {
+            capturedProviders.put(sink, provider);
+        }
+    }
+
+    public static synchronized void unobserve(DefaultAudioSink sink) {
+        sinks.remove(sink);
+        capturedProviders.remove(sink);
+    }
 
     public static synchronized void observe(AAudioAudioSink sink) { nativeSinks.add(sink); }
 
@@ -127,7 +225,7 @@ public final class PulsrOutputRouting {
         // the routing of the remaining players nor leave the stored
         // preference disagreeing with the iteration.
         boolean allApplied = true;
-        for (ExoPlayer player : players.keySet()) {
+        for (ExoPlayer player : players) {
             try {
                 player.setPreferredAudioDevice(device);
             } catch (RuntimeException failure) {
@@ -164,7 +262,15 @@ public final class PulsrOutputRouting {
      */
     public static synchronized int[] decodedPcmSnapshot() {
         PulsrAudioSink active = null;
-        for (PulsrAudioSink sink : decodedOwners.keySet()) {
+        final Iterator<Map.Entry<PulsrAudioSink, WeakReference<ExoPlayer>>> it =
+                decodedOwners.entrySet().iterator();
+        while (it.hasNext()) {
+            final Map.Entry<PulsrAudioSink, WeakReference<ExoPlayer>> entry = it.next();
+            if (entry.getValue() == null || entry.getValue().get() == null) {
+                it.remove();
+                continue;
+            }
+            final PulsrAudioSink sink = entry.getKey();
             if (!sink.isPlayingForTelemetry()) continue;
             // During crossfade there is no unique active session. Unknown is
             // safer than mixing one player's decoder with another's output.
@@ -174,9 +280,18 @@ public final class PulsrOutputRouting {
         return active == null ? new int[] {0, 0, 0} : active.decodedPcmSnapshot();
     }
 
-    public static synchronized int[] decodedPcmSnapshot(ExoPlayer player) {
-        for (Map.Entry<PulsrAudioSink, ExoPlayer> entry : decodedOwners.entrySet()) {
-            if (entry.getValue() == player) return entry.getKey().decodedPcmSnapshot();
+    public static synchronized int[] decodedPcmSnapshot(@Nullable ExoPlayer player) {
+        if (player == null) return new int[] {0, 0, 0};
+        final Iterator<Map.Entry<PulsrAudioSink, WeakReference<ExoPlayer>>> it =
+                decodedOwners.entrySet().iterator();
+        while (it.hasNext()) {
+            final Map.Entry<PulsrAudioSink, WeakReference<ExoPlayer>> entry = it.next();
+            final ExoPlayer owner = entry.getValue() == null ? null : entry.getValue().get();
+            if (owner == null) {
+                it.remove();
+                continue;
+            }
+            if (owner == player) return entry.getKey().decodedPcmSnapshot();
         }
         return new int[] {0, 0, 0};
     }

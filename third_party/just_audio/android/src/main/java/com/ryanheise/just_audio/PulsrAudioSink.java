@@ -821,12 +821,15 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         // converter discards PCM24/32 low bytes before custom DSP can see them.
         NativeDspAudioProcessor processor = new NativeDspAudioProcessor();
         processor.setFloatOutput(true);
+        PulsrOutputRouting.CapturingAudioOutputProvider outputProvider =
+                PulsrOutputRouting.createCapturingOutputProvider(context);
         DefaultAudioSink defaultSink = new DefaultAudioSink.Builder(context)
+                .setAudioOutputProvider(outputProvider)
                 .setEnableFloatOutput(requested == Mode.FLOAT)
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[0])
                 .build();
-        PulsrOutputRouting.observe(defaultSink);
+        PulsrOutputRouting.observe(defaultSink, outputProvider);
         AudioSink outer = new FloatDspAudioSink(
                 defaultSink, processor, true, requested == Mode.DEFAULT, true);
         return new Inner(outer, defaultSink, null, processor);

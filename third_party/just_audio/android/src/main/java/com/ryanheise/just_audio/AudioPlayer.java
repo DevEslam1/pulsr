@@ -1344,7 +1344,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
             }
             player = builder.build();
-            PulsrOutputRouting.register(player, aaudioOutputEnabled);
+            PulsrOutputRouting.register(player);
             // Pulsr fork: sample-accurate seeking. EXACT forces the decoder to
             // pre-roll from the previous sync point and discard up to the
             // requested sample, giving frame-accurate (0-sample error) seeks
