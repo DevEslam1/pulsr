@@ -4113,7 +4113,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "isOffloadAllowed" -> {
-                    result.success(!hasActiveEffects() && !dvcEnabled && !dvcActive)
+                    result.success(
+                        !hasActiveEffects() &&
+                            !dvcEnabled &&
+                            !dvcActive &&
+                            !isBitPerfectBypassActive &&
+                            !isDopActive,
+                    )
                 }
 
                 "getSystemMusicVolume" -> {
