@@ -644,4 +644,32 @@ void main() {
     expect(controller.isClosed, isFalse);
     controller.dispose();
   });
+
+  test(
+      'P2-20 startAbsoluteSleepTimer clamps/advances times >24h in past so remaining is never negative',
+      () {
+    final handler = _MockAudioHandler();
+    DateTime? passedStopTime;
+    when(() => handler.startAbsoluteSleepTimer(any())).thenAnswer((inv) {
+      passedStopTime = inv.positionalArguments.single as DateTime;
+    });
+
+    var state = const PlayerState();
+    final controller =
+        make(handler, getState: () => state, emit: (s) => state = s);
+
+    // 75 hours (~3 days + 3h) in the past: single +1 day would still be < 0.
+    final staleStopTime =
+        DateTime.now().subtract(const Duration(days: 3, hours: 3));
+    controller.startAbsoluteSleepTimer(staleStopTime);
+
+    expect(state.sleepTimerRemaining, isNotNull);
+    expect(state.sleepTimerRemaining!.isNegative, isFalse);
+    expect(state.sleepTimerRemaining! <= const Duration(days: 1), isTrue);
+    expect(passedStopTime, isNotNull);
+    expect(
+        passedStopTime!
+            .isAfter(DateTime.now().subtract(const Duration(seconds: 1))),
+        isTrue);
+  });
 }

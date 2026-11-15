@@ -35,10 +35,17 @@ class PlaybackSleepTimer {
   void startAbsolute(DateTime stopTime) {
     var effectiveStopTime = stopTime;
     final now = DateTime.now();
-    var diff = stopTime.difference(now);
+    // AUDIT-FIX (P2-20): Advance stale timestamps (>24h in past) to the next
+    // future 24h cycle and clamp remaining non-negative.
+    var diff = effectiveStopTime.difference(now);
     if (diff.isNegative) {
-      effectiveStopTime = stopTime.add(const Duration(days: 1));
+      final daysToAdd =
+          ((-diff.inMicroseconds) ~/ Duration.microsecondsPerDay) + 1;
+      effectiveStopTime = effectiveStopTime.add(Duration(days: daysToAdd));
       diff = effectiveStopTime.difference(now);
+      if (diff.isNegative) {
+        diff = Duration.zero;
+      }
     }
     _audioHandler.startAbsoluteSleepTimer(effectiveStopTime);
     final s = _getState();
