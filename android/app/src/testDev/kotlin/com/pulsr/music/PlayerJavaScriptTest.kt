@@ -183,4 +183,43 @@ class PlayerJavaScriptTest {
         assertNotNull("Legacy decipher steps should be extracted", steps)
         assertEquals(listOf("reverse", "swap:2", "splice:1"), steps)
     }
+
+    @Test
+    fun testSingleQuotedStringTableDecipherStepsExtraction() {
+        // Mirrors player fad7e4e9: single-quoted string table with double-quoted .split(";")
+        val table = MutableList(106) { "x$it" }
+        table[0] = "length"
+        table[2] = "C"
+        table[5] = ""
+        table[24] = "signatureCipher"
+        table[43] = "join"
+        table[44] = "slice"
+        table[45] = "split"
+        table[52] = "splice"
+        table[64] = "reverse"
+        table[71] = "wW"
+        table[100] = "Z2"
+        table[104] = "T"
+
+        val baseJsPrefix = """
+            var x=0;aa='${table.joinToString(";")}'.split("__SPLIT__");
+            zN={Z2:function(a,b){a[aa[52]](0,b)},wW:function(a,b){var c=a[0];a[0]=a[b%a[aa[0]]];a[b%a[aa[0]]]=c},T:function(a){a[aa[64]]()}};
+            Ww=function(a,b,c){var d=b^a;if(!(a<<2&7)){var e=op(d^1,d^2,c)}(a-8|33)>=a&&(a-6^21)<a&&(e=c[aa[d^7000]](aa[5]),zN[aa[d^6929]](e,2),zN[aa[d^6962]](e,d^6960),zN[aa[d^6929]](e,1),zN[aa[d^6962]](e,d^7036),zN[aa[d^6929]](e,1),zN[aa[d^6962]](e,d^7003),h=e[aa[d^7006]](aa[5]));return h};
+            if(k.s){var m=l,n=h.sp,p=Ww(23,7010,mr(19,7308,h.s));}
+        """.trimIndent()
+
+        val expectedSteps = listOf("splice:2", "swap:69", "splice:1", "swap:9", "splice:1", "swap:46")
+        val cache = JsDecipherCache()
+
+        for (splitArg in listOf("\";\"", "';'")) {
+            val sampleJs = baseJsPrefix.replace("\"__SPLIT__\"", splitArg)
+            val steps = PlayerJavaScript.extractModernDecipherSteps(sampleJs)
+            assertNotNull("Single-quoted string table with .split($splitArg) should be parsed", steps)
+            assertEquals(expectedSteps, steps)
+            assertEquals(
+                "sfghijklcnopqretuvwxyz0123456789",
+                cache.applyTransforms("abcdefghijklmnopqrstuvwxyz0123456789", steps!!)
+            )
+        }
+    }
 }

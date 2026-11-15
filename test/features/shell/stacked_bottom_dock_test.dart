@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/responsive/layout_delegate.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -48,6 +49,7 @@ void main() {
     required DockStackMode mode,
     required ValueChanged<DockStackMode> onModeChanged,
     required bool hasSong,
+    ShellLayoutMode? layoutMode,
   }) {
     when(() => playerCubit.state).thenReturn(
       PlayerState(
@@ -97,6 +99,7 @@ void main() {
                       onOpenNowPlaying: () {},
                       mode: mode,
                       onModeChanged: onModeChanged,
+                      layoutMode: layoutMode,
                     ),
                   ),
                 ],
@@ -217,5 +220,61 @@ void main() {
     await tester.tapAt(Offset(navBarRect.center.dx, navBarRect.top + 4));
     await tester.pumpAndSettle();
     expect(currentMode, equals(DockStackMode.navBarOnTop));
+  });
+
+  testWidgets(
+      'bottomNavWide dock renders embedded nav bar without overflow with active song',
+      (tester) async {
+    tester.view.physicalSize = const Size(850, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      buildTestWidget(
+        mode: DockStackMode.defaultLayout,
+        onModeChanged: (_) {},
+        hasSong: true,
+        layoutMode: ShellLayoutMode.bottomNavWide,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final navBar = tester.widget<PulsrBottomNavBar>(
+      find.byType(PulsrBottomNavBar),
+    );
+    expect(navBar.embedded, isTrue);
+    expect(navBar.iconOnly, isTrue);
+  });
+
+  testWidgets(
+      'bottomNavWide dock renders embedded nav bar without overflow when no song is playing',
+      (tester) async {
+    tester.view.physicalSize = const Size(850, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      buildTestWidget(
+        mode: DockStackMode.defaultLayout,
+        onModeChanged: (_) {},
+        hasSong: false,
+        layoutMode: ShellLayoutMode.bottomNavWide,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    final navBar = tester.widget<PulsrBottomNavBar>(
+      find.byType(PulsrBottomNavBar),
+    );
+    expect(navBar.embedded, isTrue);
+    expect(navBar.iconOnly, isFalse);
   });
 }

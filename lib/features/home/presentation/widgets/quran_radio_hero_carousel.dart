@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -18,8 +19,8 @@ import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
-
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Data descriptor for a Quran radio station presented in the hero card carousel.
 class QuranHeroItem {
   final RadioStation station;
@@ -52,12 +53,13 @@ class QuranHeroItem {
   String? getBadgeText(bool isArabic) => isArabic ? badgeTextAr : badgeTextEn;
 }
 
-/// Swipeable Quran Radio Hero Carousel for the HomeScreen.
+/// Swipeable Quran Radio Hero Carousel — "Mihrab" edition.
 ///
-/// Displays curated Quran radio channels starting with Sheikh Mohamed Siddiq
-/// El-Minshawi, offering an immersive, tactile audio experience with live
-/// transport controls, responsive card scaling, ambient reciter artwork,
-/// and smooth page indicators.
+/// Each station is presented as a luminous prayer-niche: reciter artwork framed
+/// inside a pointed arch on the trailing edge, a hand-drawn eight-fold khatam
+/// lattice etched across the surface, manuscript-gilt ornamentation derived
+/// from the active theme accent, live transport controls, parallax artwork
+/// framing, and a diamond-windowed page indicator.
 class QuranRadioHeroCarousel extends StatefulWidget {
   final PlayerCubit? playerCubit;
   final double height;
@@ -191,8 +193,7 @@ class QuranRadioHeroCarousel extends StatefulWidget {
         station: RadioStation(
           id: 'cur-quran-banna-mojawwad',
           name: 'إذاعة الشيخ محمود علي البنا (مجود)',
-          url:
-              'https://backup.qurango.net/radio/mahmoud_ali__albanna_mojawwad',
+          url: 'https://backup.qurango.net/radio/mahmoud_ali__albanna_mojawwad',
           genre: 'Quran',
           artworkUrl: RadioStationStore.bannaHomeCard,
         ),
@@ -333,7 +334,6 @@ class QuranRadioHeroCarousel extends StatefulWidget {
     Map<String, int> lastPlayedByUrl = const {},
   }) {
     if (baseItems.isEmpty) return const [];
-
     final byUrl = <String, QuranHeroItem>{};
     final indexByUrl = <String, int>{};
     for (var i = 0; i < baseItems.length; i++) {
@@ -385,8 +385,7 @@ class QuranRadioHeroCarousel extends StatefulWidget {
   }
 
   @override
-  State<QuranRadioHeroCarousel> createState() =>
-      _QuranRadioHeroCarouselState();
+  State<QuranRadioHeroCarousel> createState() => _QuranRadioHeroCarouselState();
 }
 
 class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
@@ -407,7 +406,6 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
       initialPage: 0,
       viewportFraction: 0.93,
     );
-
     RadioStationStore.heroPinnedUrls.addListener(_onOrderPrefsChanged);
     RadioStationStore.heroSortMode.addListener(_onOrderPrefsChanged);
 
@@ -513,19 +511,21 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final gilt = _giltOf(context);
     final total = _stations.length;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Swipeable Cards Area
+        // ── Swipeable mihrab cards ──────────────────────────────────────────
         SizedBox(
           height: widget.height,
           child: PageView.builder(
             key: const PageStorageKey('quran_radio_hero_carousel_pv'),
             controller: _pageController,
             physics: const BouncingScrollPhysics(),
+            padEnds: false,
             itemCount: total,
             onPageChanged: (index) {
               if (index != _currentPage) {
@@ -542,13 +542,16 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   if (_pageController.position.haveDimensions) {
                     final page = _pageController.page ??
                         _pageController.initialPage.toDouble();
-                    value = (page - index).clamp(-1.0, 1.0);
+                    value = (page - index).clamp(-1.0, 1.0).toDouble();
                   } else {
-                    value = (_currentPage - index).toDouble().clamp(-1.0, 1.0);
+                    value = (_currentPage - index)
+                        .toDouble()
+                        .clamp(-1.0, 1.0)
+                        .toDouble();
                   }
-                  final scale = 1.0 - (value.abs() * 0.04);
-                  final opacity = (1.0 - (value.abs() * 0.2)).clamp(0.8, 1.0);
-
+                  final scale = 1.0 - (value.abs() * 0.045);
+                  final opacity =
+                      (1.0 - (value.abs() * 0.18)).clamp(0.82, 1.0).toDouble();
                   return Transform.scale(
                     scale: scale,
                     child: Opacity(
@@ -561,6 +564,8 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: _QuranHeroCard(
                     item: item,
+                    pageController: _pageController,
+                    pageIndex: index,
                     isPinned: RadioStationStore.heroPinnedUrls.value
                         .contains(item.station.url),
                     onTap: () {
@@ -581,10 +586,8 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
             },
           ),
         ),
-
         const SizedBox(height: AppSpacing.s10),
-
-        // Indicator strip: Windowed dot indicator + tabular counter + Quick Radio chip
+        // ── Indicator strip: diamond window + tabular counter + radio chip ──
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6.0),
           child: Row(
@@ -606,10 +609,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   }
                 },
               ),
-
               const SizedBox(width: AppSpacing.xs),
-
-              // Compact tabular page counter (e.g. 1/11, 12/31)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 6.0,
@@ -635,9 +635,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   ),
                 ),
               ),
-
               const Spacer(),
-
               // Quick "All Stations" tonal action chip
               Semantics(
                 button: true,
@@ -663,7 +661,12 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                             4.5,
                           ),
                           decoration: BoxDecoration(
-                            color: p.accent.withValues(alpha: 0.12),
+                            gradient: LinearGradient(
+                              colors: [
+                                p.accent.withValues(alpha: 0.16),
+                                gilt.withValues(alpha: 0.10),
+                              ],
+                            ),
                             borderRadius:
                                 isCapsule ? radius : AppRadii.circular(999),
                             border: Border.all(
@@ -709,8 +712,10 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
       ],
     );
   }
+
   void _showCardOptionsSheet(BuildContext context, QuranHeroItem item) {
     final p = context.palette;
+    final gilt = _giltOf(context);
     final isArabic = Localizations.localeOf(context).languageCode == 'ar';
     final stationTitle = item.getReciterTitle(isArabic);
     final stationUrl = item.station.url;
@@ -734,26 +739,14 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                       pinnedUrls.isNotEmpty && pinnedUrls.first == stationUrl;
                   final hasCustomOrder = pinnedUrls.isNotEmpty ||
                       activeSort != QuranHeroSortMode.curated;
-
                   return Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Header
+                      // ── Illuminated header: arch thumbnail + titles ───────
                       Row(
                         children: [
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.sm),
-                            decoration: BoxDecoration(
-                              color: p.accent.withValues(alpha: 0.12),
-                              borderRadius: AppRadii.r12All,
-                            ),
-                            child: Icon(
-                              Icons.radio_rounded,
-                              color: p.accent,
-                              size: 24,
-                            ),
-                          ),
+                          _ArchThumb(item: item, width: 44, height: 54),
                           const SizedBox(width: AppSpacing.sm),
                           Expanded(
                             child: Column(
@@ -779,12 +772,31 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                               ],
                             ),
                           ),
+                          if (isPinned) ...[
+                            const SizedBox(width: AppSpacing.xs),
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: gilt.withValues(alpha: 0.14),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: gilt.withValues(alpha: 0.35),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.push_pin_rounded,
+                                size: 13,
+                                color: gilt,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
-
-                      const SizedBox(height: AppSpacing.md),
-
-                      // Pin to First / Unpin Action
+                      const SizedBox(height: AppSpacing.sm),
+                      const _OrnamentDivider(),
+                      const SizedBox(height: AppSpacing.sm),
+                      // ── Pin to First / Unpin action ───────────────────────
                       ListTile(
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadii.r14All,
@@ -794,12 +806,19 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                           ),
                         ),
                         tileColor: p.accent.withValues(alpha: 0.10),
-                        leading: Icon(
-                          isPinnedFirst
-                              ? Icons.push_pin_outlined
-                              : Icons.push_pin_rounded,
-                          color: p.accent,
-                          size: 22,
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: p.accent.withValues(alpha: 0.14),
+                            borderRadius: AppRadii.r12All,
+                          ),
+                          child: Icon(
+                            isPinnedFirst
+                                ? Icons.push_pin_outlined
+                                : Icons.push_pin_rounded,
+                            color: p.accent,
+                            size: 20,
+                          ),
                         ),
                         title: Text(
                           isPinnedFirst
@@ -873,12 +892,12 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                           }
                         },
                       ),
-
                       const SizedBox(height: AppSpacing.md),
-
-                      // Sort Order Header + Optional Reset
+                      // ── Sort order header + optional reset ────────────────
                       Row(
                         children: [
+                          _StarGlyph(size: 10, color: gilt),
+                          const SizedBox(width: 6),
                           Text(
                             context.l10n.sortRadioCardsTitle,
                             style: TextStyle(
@@ -927,10 +946,8 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                             ),
                         ],
                       ),
-
                       const SizedBox(height: AppSpacing.xs),
-
-                      // Sort Mode Selector Row
+                      // ── Sort mode selector row ────────────────────────────
                       Row(
                         children: [
                           _SortOptionChip(
@@ -972,20 +989,25 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: AppSpacing.md),
-
-                      // Hide Action
+                      // ── Hide action ───────────────────────────────────────
                       ListTile(
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadii.r14All,
                         ),
                         tileColor:
                             p.surfaceContainerHigh.withValues(alpha: 0.5),
-                        leading: Icon(
-                          Icons.visibility_off_rounded,
-                          color: p.favorite,
-                          size: 22,
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: p.favorite.withValues(alpha: 0.12),
+                            borderRadius: AppRadii.r12All,
+                          ),
+                          child: Icon(
+                            Icons.visibility_off_rounded,
+                            color: p.favorite,
+                            size: 20,
+                          ),
                         ),
                         title: Text(
                           context.l10n.hideRadioCardsFromHome,
@@ -1022,6 +1044,299 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
             },
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Illumination palette: manuscript gilt derived from the active theme accent,
+// so ornamentation stays coherent across all ten Pulsr themes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+Color _giltOf(BuildContext context) {
+  final p = context.palette;
+  return Color.lerp(
+    p.accent,
+    const Color(0xFFC9A24B),
+    p.isDark ? 0.58 : 0.50,
+  )!;
+}
+
+Color _onGilt(Color gilt) {
+  return ThemeData.estimateBrightnessForColor(gilt) == Brightness.dark
+      ? const Color(0xFFFFF7E6)
+      : const Color(0xFF231A06);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Geometry: eight-pointed khatam star + pointed mihrab arch path.
+// ─────────────────────────────────────────────────────────────────────────────
+
+Path _eightPointStarPath(Offset center, double radius) {
+  const points = 8;
+  final inner = radius * 0.46;
+  final path = Path();
+  for (var i = 0; i < points * 2; i++) {
+    final r = i.isEven ? radius : inner;
+    final a = -math.pi / 2 + i * math.pi / points;
+    final pt = Offset(
+      center.dx + r * math.cos(a),
+      center.dy + r * math.sin(a),
+    );
+    if (i == 0) {
+      path.moveTo(pt.dx, pt.dy);
+    } else {
+      path.lineTo(pt.dx, pt.dy);
+    }
+  }
+  path.close();
+  return path;
+}
+
+Path _mihrabPath(double w, double h) {
+  final shoulder = h * 0.34;
+  const r = 12.0;
+  final path = Path()
+    ..moveTo(0, h - r)
+    ..lineTo(0, shoulder)
+    ..cubicTo(0, h * 0.12, w * 0.22, h * 0.045, w / 2, 0)
+    ..cubicTo(w * 0.78, h * 0.045, w, h * 0.12, w, shoulder)
+    ..lineTo(w, h - r)
+    ..quadraticBezierTo(w, h, w - r, h)
+    ..lineTo(r, h)
+    ..quadraticBezierTo(0, h, 0, h - r)
+    ..close();
+  return path;
+}
+
+class _MihrabClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) => _mihrabPath(size.width, size.height);
+
+  @override
+  bool shouldReclip(covariant _MihrabClipper oldClipper) => false;
+}
+
+/// Gilt rim stroked over the arch aperture, with a soft broadcast glow and a
+/// finial bead at the apex. [glow] animates 0→1 while the station is on air.
+class _MihrabRimPainter extends CustomPainter {
+  final Color color;
+  final double glow;
+
+  const _MihrabRimPainter({required this.color, required this.glow});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = _mihrabPath(size.width, size.height);
+    if (glow > 0.01) {
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6
+          ..color = color.withValues(alpha: 0.30 * glow)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+      );
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.3
+        ..color = color.withValues(alpha: 0.55 + 0.35 * glow),
+    );
+    canvas.drawCircle(
+      Offset(size.width / 2, 2.2),
+      2.0,
+      Paint()..color = color.withValues(alpha: 0.9),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MihrabRimPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.glow != glow;
+}
+
+/// Faint eight-fold star lattice etched across the card surface — painted once
+/// inside a [RepaintBoundary], never per scroll frame.
+class _KhatamLatticePainter extends CustomPainter {
+  static const double cell = 46.0;
+  final Color color;
+
+  const _KhatamLatticePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final star = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8
+      ..color = color;
+    final dot = Paint()..color = color;
+    for (double y = cell / 2; y < size.height + cell; y += cell) {
+      for (double x = cell / 2; x < size.width + cell; x += cell) {
+        canvas.drawPath(_eightPointStarPath(Offset(x, y), cell * 0.30), star);
+      }
+    }
+    for (double y = 0; y <= size.height + cell; y += cell) {
+      for (double x = 0; x <= size.width + cell; x += cell) {
+        canvas.drawCircle(Offset(x, y), 0.9, dot);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _KhatamLatticePainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// Small filled eight-point star used as a station seal / ornamental glyph.
+class _StarGlyph extends StatelessWidget {
+  final double size;
+  final Color color;
+
+  const _StarGlyph({required this.size, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(painter: _StarFillPainter(color)),
+    );
+  }
+}
+
+class _StarFillPainter extends CustomPainter {
+  final Color color;
+
+  const _StarFillPainter(this.color);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(
+      _eightPointStarPath(
+        Offset(size.width / 2, size.height / 2),
+        math.min(size.width, size.height) / 2,
+      ),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _StarFillPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// Hairline rule interrupted by a gilt diamond and flanking beads.
+class _OrnamentDivider extends StatelessWidget {
+  const _OrnamentDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return SizedBox(
+      height: 12,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _OrnamentDividerPainter(
+          line: p.hairline,
+          ornament: _giltOf(context),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrnamentDividerPainter extends CustomPainter {
+  final Color line;
+  final Color ornament;
+
+  const _OrnamentDividerPainter({required this.line, required this.ornament});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height / 2;
+    final cx = size.width / 2;
+    final lp = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8
+      ..color = line;
+    canvas.drawLine(Offset(0, y), Offset(cx - 14, y), lp);
+    canvas.drawLine(Offset(cx + 14, y), Offset(size.width, y), lp);
+    final diamond = Path()
+      ..moveTo(cx, y - 4)
+      ..lineTo(cx + 4, y)
+      ..lineTo(cx, y + 4)
+      ..lineTo(cx - 4, y)
+      ..close();
+    canvas.drawPath(diamond, Paint()..color = ornament);
+    final bead = Paint()..color = ornament.withValues(alpha: 0.7);
+    canvas.drawCircle(Offset(cx - 9, y), 1.1, bead);
+    canvas.drawCircle(Offset(cx + 9, y), 1.1, bead);
+  }
+
+  @override
+  bool shouldRepaint(covariant _OrnamentDividerPainter oldDelegate) =>
+      oldDelegate.line != line || oldDelegate.ornament != ornament;
+}
+
+/// Miniature arch-framed artwork used in the options sheet header.
+class _ArchThumb extends StatelessWidget {
+  final QuranHeroItem item;
+  final double width;
+  final double height;
+
+  const _ArchThumb({
+    required this.item,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final isNetwork = item.artworkAsset.startsWith('http://') ||
+        item.artworkAsset.startsWith('https://');
+    final isHomeCard = item.artworkAsset.contains('home card') ||
+        item.artworkAsset.contains('home_card');
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipPath(
+            clipper: _MihrabClipper(),
+            child: isNetwork
+                ? CachedArtwork(
+                    id: 0,
+                    remoteUrl: item.artworkAsset,
+                    size: width,
+                    fallbackIcon: Icons.radio_rounded,
+                  )
+                : Image.asset(
+                    item.artworkAsset,
+                    fit: BoxFit.cover,
+                    alignment: isHomeCard
+                        ? Alignment.centerRight
+                        : const Alignment(0.0, -0.15),
+                    errorBuilder: (_, __, ___) => Container(
+                      color: p.accentContainer.withValues(alpha: 0.2),
+                      child: Icon(
+                        Icons.radio_rounded,
+                        size: 20,
+                        color: p.accent.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+          ),
+          IgnorePointer(
+            child: CustomPaint(
+              painter: _MihrabRimPainter(color: _giltOf(context), glow: 0),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1094,9 +1409,11 @@ class _SortOptionChip extends StatelessWidget {
   }
 }
 
-/// The individual stylized hero card for a single Quran station.
+/// The individual mihrab hero card for a single Quran station.
 class _QuranHeroCard extends StatelessWidget {
   final QuranHeroItem item;
+  final PageController pageController;
+  final int pageIndex;
   final bool isPinned;
   final VoidCallback onTap;
   final void Function(bool isCurrent) onPlayPressed;
@@ -1104,6 +1421,8 @@ class _QuranHeroCard extends StatelessWidget {
 
   const _QuranHeroCard({
     required this.item,
+    required this.pageController,
+    required this.pageIndex,
     required this.isPinned,
     required this.onTap,
     required this.onPlayPressed,
@@ -1113,6 +1432,8 @@ class _QuranHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final gilt = _giltOf(context);
+    final onGilt = _onGilt(gilt);
     final isCapsule = context.isCapsuleButtons;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
@@ -1130,9 +1451,8 @@ class _QuranHeroCard extends StatelessWidget {
         final isCurrent = playerState.currentSong?.path == item.station.url;
         final isPlaying = isCurrent && playerState.isPlaying;
         final isBuffering = isCurrent && playerState.isBuffering;
-        final rawIcyTitle = isCurrent
-            ? (playerState.currentSong?.album.trim() ?? '')
-            : '';
+        final rawIcyTitle =
+            isCurrent ? (playerState.currentSong?.album.trim() ?? '') : '';
         final defaultSubtitle = item.getSubtitle(isArabic);
         final displaySubtitle =
             rawIcyTitle.isNotEmpty ? rawIcyTitle : defaultSubtitle;
@@ -1140,17 +1460,19 @@ class _QuranHeroCard extends StatelessWidget {
         final badgeText = item.getBadgeText(isArabic);
         final defaultBadge = context.l10n.holyQuranRadio;
 
+        // Cool accent wash on the editorial side, warm gilt wash toward the niche.
         final surfaceStart = Color.alphaBlend(
           p.accent.withValues(alpha: p.isDark ? 0.09 : 0.06),
           p.surfaceContainerHigh,
         );
         final surfaceEnd = Color.alphaBlend(
-          p.accent.withValues(alpha: p.isDark ? 0.03 : 0.015),
+          gilt.withValues(alpha: p.isDark ? 0.05 : 0.035),
           p.surfaceContainer,
         );
-
         final isHomeCard = item.artworkAsset.contains('home card') ||
             item.artworkAsset.contains('home_card');
+        final isNetwork = item.artworkAsset.startsWith('http://') ||
+            item.artworkAsset.startsWith('https://');
         final ctaRadius = isCapsule
             ? context.buttonRadius(rectRadius: 12.0)
             : AppRadii.circular(999);
@@ -1172,10 +1494,7 @@ class _QuranHeroCard extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: AlignmentDirectional.topStart,
                     end: AlignmentDirectional.bottomEnd,
-                    colors: [
-                      surfaceStart,
-                      surfaceEnd,
-                    ],
+                    colors: [surfaceStart, surfaceEnd],
                   ),
                   borderRadius: AppRadii.r24All,
                   boxShadow: isPlaying
@@ -1192,30 +1511,43 @@ class _QuranHeroCard extends StatelessWidget {
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final portraitWidth =
-                        (constraints.maxWidth * 0.50).clamp(155.0, 240.0);
-                    final trailingReserved =
-                        (constraints.maxWidth * 0.37).clamp(120.0, 175.0);
-                    final isNetwork =
-                        item.artworkAsset.startsWith('http://') ||
-                            item.artworkAsset.startsWith('https://');
+                    final archWidth = (constraints.maxWidth * 0.42)
+                        .clamp(128.0, 190.0)
+                        .toDouble();
+                    final trailingReserved = archWidth + 24.0;
 
                     return Stack(
                       fit: StackFit.expand,
                       children: [
-                        // Subtle warm ambient aura behind the trailing visual stage
+                        // Etched khatam lattice — static, repaint-bounded.
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: ExcludeSemantics(
+                              child: RepaintBoundary(
+                                child: CustomPaint(
+                                  painter: _KhatamLatticePainter(
+                                    color: gilt.withValues(
+                                      alpha: p.isDark ? 0.055 : 0.05,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Warm ambient aura behind the niche.
                         PositionedDirectional(
-                          end: -12,
-                          top: -12,
-                          bottom: -12,
-                          width: portraitWidth + 24,
+                          end: -16,
+                          top: -16,
+                          bottom: -16,
+                          width: archWidth + 32,
                           child: IgnorePointer(
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: RadialGradient(
                                   colors: [
-                                    p.accent.withValues(
-                                        alpha: isPlaying ? 0.22 : 0.11),
+                                    gilt.withValues(
+                                        alpha: isPlaying ? 0.24 : 0.12),
                                     Colors.transparent,
                                   ],
                                 ),
@@ -1223,84 +1555,119 @@ class _QuranHeroCard extends StatelessWidget {
                             ),
                           ),
                         ),
-
-                        // Trailing Visual Stage:
-                        // Panoramic 'home card' assets place the reciter/mosque scene
-                        // on the right half and calligraphy on the left; Alignment.centerRight
-                        // frames ONLY the clean scene so typography never collides with text.
+                        // ── Mihrab niche: arch-clipped artwork + gilt rim ────
                         PositionedDirectional(
-                          end: 0,
-                          top: 0,
-                          bottom: 0,
-                          width: portraitWidth,
+                          end: 8,
+                          top: 8,
+                          bottom: 8,
+                          width: archWidth,
                           child: Stack(
                             fit: StackFit.expand,
                             children: [
-                              if (isNetwork)
-                                CachedArtwork(
-                                  id: 0,
-                                  remoteUrl: item.artworkAsset,
-                                  size: portraitWidth,
-                                  fallbackIcon: Icons.radio_rounded,
-                                )
-                              else
-                                Image.asset(
-                                  item.artworkAsset,
-                                  fit: BoxFit.cover,
-                                  alignment: isHomeCard
-                                      ? Alignment.centerRight
-                                      : const Alignment(0.0, -0.15),
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color:
-                                        p.accentContainer.withValues(alpha: 0.2),
-                                    child: Icon(
-                                      Icons.radio_rounded,
-                                      size: 48,
-                                      color: p.accent.withValues(alpha: 0.3),
+                              ClipPath(
+                                clipper: _MihrabClipper(),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    if (isNetwork)
+                                      CachedArtwork(
+                                        id: 0,
+                                        remoteUrl: item.artworkAsset,
+                                        size: archWidth,
+                                        fallbackIcon: Icons.radio_rounded,
+                                      )
+                                    else
+                                      // Parallax framing: the panoramic scene
+                                      // drifts gently against the swipe.
+                                      AnimatedBuilder(
+                                        animation: pageController,
+                                        builder: (context, _) {
+                                          double v = 0.0;
+                                          if (pageController.hasClients &&
+                                              pageController
+                                                  .position.haveDimensions) {
+                                            v = ((pageController.page ??
+                                                        pageController
+                                                            .initialPage
+                                                            .toDouble()) -
+                                                    pageIndex)
+                                                .clamp(-1.0, 1.0)
+                                                .toDouble();
+                                          }
+                                          final ax = isHomeCard
+                                              ? (1.0 - v * 0.30)
+                                                  .clamp(-1.0, 1.0)
+                                                  .toDouble()
+                                              : (v * -0.25)
+                                                  .clamp(-1.0, 1.0)
+                                                  .toDouble();
+                                          return Image.asset(
+                                            item.artworkAsset,
+                                            fit: BoxFit.cover,
+                                            alignment: Alignment(
+                                              ax,
+                                              isHomeCard ? 0.0 : -0.15,
+                                            ),
+                                            errorBuilder: (_, __, ___) =>
+                                                Container(
+                                              color: p.accentContainer
+                                                  .withValues(alpha: 0.2),
+                                              child: Icon(
+                                                Icons.radio_rounded,
+                                                size: 44,
+                                                color: p.accent
+                                                    .withValues(alpha: 0.3),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    // Depth scrim toward the niche floor.
+                                    DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.transparent,
+                                            surfaceEnd.withValues(
+                                              alpha: p.isDark ? 0.34 : 0.16,
+                                            ),
+                                          ],
+                                          stops: const [0.55, 1.0],
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
-
-                              // Silky multi-stop fade from card editorial surface into artwork
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: AlignmentDirectional.centerStart,
-                                    end: AlignmentDirectional.centerEnd,
-                                    colors: [
-                                      surfaceStart,
-                                      surfaceStart.withValues(alpha: 0.96),
-                                      surfaceStart.withValues(alpha: 0.64),
-                                      surfaceStart.withValues(alpha: 0.18),
-                                      Colors.transparent,
-                                    ],
-                                    stops: const [0.0, 0.20, 0.44, 0.74, 1.0],
-                                  ),
+                                    if (isPlaying)
+                                      DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color:
+                                              p.accent.withValues(alpha: 0.05),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
-
-                              // Soft top/bottom vignette to harmonize portrait edges
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      surfaceStart.withValues(
-                                          alpha: p.isDark ? 0.22 : 0.10),
-                                      Colors.transparent,
-                                      surfaceEnd.withValues(
-                                          alpha: p.isDark ? 0.38 : 0.14),
-                                    ],
-                                    stops: const [0.0, 0.55, 1.0],
-                                  ),
+                              // Animated gilt rim + broadcast glow.
+                              IgnorePointer(
+                                child: TweenAnimationBuilder<double>(
+                                  tween:
+                                      Tween<double>(end: isPlaying ? 1.0 : 0.0),
+                                  duration: context.motion(PulsrMotion.layout),
+                                  builder: (context, glow, _) {
+                                    return CustomPaint(
+                                      painter: _MihrabRimPainter(
+                                        color: gilt,
+                                        glow: glow,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                             ],
                           ),
                         ),
-
-                        // Top inner specular highlight hairline
+                        // Top specular hairline with a gilt heart.
                         PositionedDirectional(
                           top: 0,
                           start: 18,
@@ -1314,12 +1681,12 @@ class _QuranHeroCard extends StatelessWidget {
                                     Colors.transparent,
                                     (p.isDark ? Colors.white : Colors.black)
                                         .withValues(
-                                            alpha: p.isDark ? 0.16 : 0.06),
-                                    p.accent.withValues(
-                                        alpha: isPlaying ? 0.45 : 0.18),
+                                            alpha: p.isDark ? 0.14 : 0.05),
+                                    gilt.withValues(
+                                        alpha: isPlaying ? 0.65 : 0.40),
                                     (p.isDark ? Colors.white : Colors.black)
                                         .withValues(
-                                            alpha: p.isDark ? 0.16 : 0.06),
+                                            alpha: p.isDark ? 0.14 : 0.05),
                                     Colors.transparent,
                                   ],
                                 ),
@@ -1327,22 +1694,19 @@ class _QuranHeroCard extends StatelessWidget {
                             ),
                           ),
                         ),
-
-                        // Subtle background audio-wave watermark on leading bottom corner
+                        // Large star seal watermark on the leading floor.
                         PositionedDirectional(
-                          start: -10,
-                          bottom: -14,
+                          start: -16,
+                          bottom: -20,
                           child: ExcludeSemantics(
-                            child: Icon(
-                              Icons.graphic_eq_rounded,
-                              size: 88,
+                            child: _StarGlyph(
+                              size: 96,
                               color: p.accent
-                                  .withValues(alpha: isPlaying ? 0.07 : 0.035),
+                                  .withValues(alpha: isPlaying ? 0.07 : 0.04),
                             ),
                           ),
                         ),
-
-                        // Clean Editorial Content Column (never overlaps portrait or calligraphy)
+                        // ── Editorial column ─────────────────────────────────
                         Padding(
                           padding: EdgeInsetsDirectional.fromSTEB(
                             AppSpacing.md,
@@ -1354,69 +1718,76 @@ class _QuranHeroCard extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Overline Row: Live On-Air or Station Category + Pin indicator
+                              // Overline: live badge / category seal + pin.
                               Row(
                                 children: [
                                   Flexible(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: isPlaying
-                                            ? p.accent.withValues(alpha: 0.18)
-                                            : p.accent.withValues(alpha: 0.11),
-                                        borderRadius: AppRadii.circular(999),
-                                        border: Border.all(
-                                          color: p.accent.withValues(
-                                            alpha: isPlaying ? 0.45 : 0.24,
-                                          ),
-                                          width: 0.8,
+                                    child: AnimatedSwitcher(
+                                      duration:
+                                          context.motion(PulsrMotion.layout),
+                                      child: Container(
+                                        key: ValueKey<bool>(isPlaying),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
                                         ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          if (isPlaying) ...[
-                                            const _PulsingLiveDot(),
-                                            const SizedBox(width: 5),
-                                            Flexible(
-                                              child: Text(
-                                                context
-                                                    .l10n.radioLiveOnAirBadge,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: p.accent,
-                                                  fontSize: AppFontSize.tiny,
-                                                  fontWeight: FontWeight.w800,
-                                                  letterSpacing: 0.45,
+                                        decoration: BoxDecoration(
+                                          color: isPlaying
+                                              ? p.accent.withValues(alpha: 0.18)
+                                              : p.accent
+                                                  .withValues(alpha: 0.11),
+                                          borderRadius: AppRadii.circular(999),
+                                          border: Border.all(
+                                            color: p.accent.withValues(
+                                              alpha: isPlaying ? 0.45 : 0.24,
+                                            ),
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            if (isPlaying) ...[
+                                              const _PulsingLiveDot(),
+                                              const SizedBox(width: 5),
+                                              Flexible(
+                                                child: Text(
+                                                  context
+                                                      .l10n.radioLiveOnAirBadge,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: p.accent,
+                                                    fontSize: AppFontSize.tiny,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 0.45,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                          ] else ...[
-                                            Icon(
-                                              Icons.sensors_rounded,
-                                              size: 11.5,
-                                              color: p.accent,
-                                            ),
-                                            const SizedBox(width: 4.5),
-                                            Flexible(
-                                              child: Text(
-                                                badgeText ?? defaultBadge,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  color: p.accent,
-                                                  fontSize: AppFontSize.tiny,
-                                                  fontWeight: FontWeight.w700,
-                                                  letterSpacing: 0.3,
+                                            ] else ...[
+                                              _StarGlyph(
+                                                size: 10,
+                                                color: p.accent,
+                                              ),
+                                              const SizedBox(width: 4.5),
+                                              Flexible(
+                                                child: Text(
+                                                  badgeText ?? defaultBadge,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                    color: p.accent,
+                                                    fontSize: AppFontSize.tiny,
+                                                    fontWeight: FontWeight.w700,
+                                                    letterSpacing: 0.3,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
+                                            ],
                                           ],
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -1425,27 +1796,24 @@ class _QuranHeroCard extends StatelessWidget {
                                     Container(
                                       padding: const EdgeInsets.all(4),
                                       decoration: BoxDecoration(
-                                        color: p.accent.withValues(alpha: 0.14),
+                                        color: gilt.withValues(alpha: 0.14),
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color:
-                                              p.accent.withValues(alpha: 0.30),
+                                          color: gilt.withValues(alpha: 0.35),
                                           width: 0.7,
                                         ),
                                       ),
                                       child: Icon(
                                         Icons.push_pin_rounded,
                                         size: 10,
-                                        color: p.accent,
+                                        color: gilt,
                                       ),
                                     ),
                                   ],
                                 ],
                               ),
-
                               const SizedBox(height: 7),
-
-                              // Station / Reciter Title
+                              // Station / reciter title.
                               MarqueeText(
                                 text: reciterTitle,
                                 textAlign: TextAlign.start,
@@ -1461,10 +1829,8 @@ class _QuranHeroCard extends StatelessWidget {
                                   letterSpacing: -0.25,
                                 ),
                               ),
-
                               const SizedBox(height: 3),
-
-                              // Subtitle / Live ICY surah info
+                              // Subtitle / live ICY surah ticker.
                               Row(
                                 children: [
                                   if (isPlaying)
@@ -1498,10 +1864,8 @@ class _QuranHeroCard extends StatelessWidget {
                                   ),
                                 ],
                               ),
-
                               const SizedBox(height: 10),
-
-                              // Unified Tactile Action Row
+                              // ── Gilt transport row ─────────────────────────
                               Row(
                                 children: [
                                   ExcludeSemantics(
@@ -1512,7 +1876,8 @@ class _QuranHeroCard extends StatelessWidget {
                                         onTap: () => onPlayPressed(isCurrent),
                                         child: Container(
                                           height: 34,
-                                          padding: EdgeInsetsDirectional.fromSTEB(
+                                          padding:
+                                              EdgeInsetsDirectional.fromSTEB(
                                             isPlaying ? 11 : 10,
                                             0,
                                             isPlaying ? 11 : 13,
@@ -1525,24 +1890,25 @@ class _QuranHeroCard extends StatelessWidget {
                                               colors: [
                                                 Color.alphaBlend(
                                                   Colors.white
-                                                      .withValues(alpha: 0.16),
-                                                  p.accent,
+                                                      .withValues(alpha: 0.20),
+                                                  gilt,
                                                 ),
-                                                p.accent,
+                                                gilt,
                                               ],
                                             ),
                                             borderRadius: ctaRadius,
                                             boxShadow: [
                                               BoxShadow(
-                                                color: p.accent.withValues(
-                                                  alpha: isPlaying ? 0.34 : 0.22,
+                                                color: gilt.withValues(
+                                                  alpha:
+                                                      isPlaying ? 0.34 : 0.22,
                                                 ),
                                                 blurRadius: 10,
                                                 offset: const Offset(0, 3),
                                               ),
                                             ],
                                             border: Border.all(
-                                              color: p.onAccent.withValues(
+                                              color: onGilt.withValues(
                                                 alpha: isPlaying ? 0.32 : 0.16,
                                               ),
                                               width: 0.9,
@@ -1558,15 +1924,16 @@ class _QuranHeroCard extends StatelessWidget {
                                                   child:
                                                       CircularProgressIndicator(
                                                     strokeWidth: 2.0,
-                                                    color: p.onAccent,
+                                                    color: onGilt,
                                                   ),
                                                 )
                                               else
                                                 Icon(
                                                   isPlaying
                                                       ? Icons.pause_rounded
-                                                      : Icons.play_arrow_rounded,
-                                                  color: p.onAccent,
+                                                      : Icons
+                                                          .play_arrow_rounded,
+                                                  color: onGilt,
                                                   size: 19,
                                                 ),
                                               if (!isPlaying) ...[
@@ -1574,7 +1941,7 @@ class _QuranHeroCard extends StatelessWidget {
                                                 Text(
                                                   context.l10n.radioListenNow,
                                                   style: TextStyle(
-                                                    color: p.onAccent,
+                                                    color: onGilt,
                                                     fontSize: 11.5,
                                                     fontWeight: FontWeight.w800,
                                                     letterSpacing: 0.1,
@@ -1598,7 +1965,8 @@ class _QuranHeroCard extends StatelessWidget {
                                         color: p.accent.withValues(alpha: 0.14),
                                         borderRadius: ctaRadius,
                                         border: Border.all(
-                                          color: p.accent.withValues(alpha: 0.35),
+                                          color:
+                                              p.accent.withValues(alpha: 0.35),
                                           width: 0.85,
                                         ),
                                       ),
@@ -1628,17 +1996,20 @@ class _QuranHeroCard extends StatelessWidget {
                             ],
                           ),
                         ),
-
-                        // Crisp outer border overlay never obscured by child artwork
+                        // Animated outer border: hairline at rest, accent on air.
                         Positioned.fill(
                           child: IgnorePointer(
-                            child: DecoratedBox(
+                            child: AnimatedContainer(
+                              duration: context.motion(PulsrMotion.layout),
                               decoration: BoxDecoration(
                                 borderRadius: AppRadii.r24All,
                                 border: Border.all(
                                   color: isPlaying
                                       ? p.accent.withValues(alpha: 0.78)
-                                      : p.accent.withValues(alpha: 0.22),
+                                      : Color.alphaBlend(
+                                          gilt.withValues(alpha: 0.20),
+                                          p.hairline.withValues(alpha: 0.60),
+                                        ),
                                   width: isPlaying ? 1.5 : 1.0,
                                 ),
                               ),
@@ -1658,7 +2029,8 @@ class _QuranHeroCard extends StatelessWidget {
   }
 }
 
-/// Bounded sliding-window dot indicator so large station lists stay clean.
+/// Bounded sliding-window indicator: gilt lozenge for the active page,
+/// rotated-square diamonds for the rest, faded micro-diamonds at clipped edges.
 class _CarouselWindowedDots extends StatelessWidget {
   final int total;
   final int currentPage;
@@ -1675,8 +2047,8 @@ class _CarouselWindowedDots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final gilt = _giltOf(context);
     if (total <= 0) return const SizedBox.shrink();
-
     final visibleCount = math.min(total, _maxVisible);
     final half = visibleCount ~/ 2;
     final start = total <= _maxVisible
@@ -1693,39 +2065,41 @@ class _CarouselWindowedDots extends StatelessWidget {
               final isActive = i == currentPage;
               final isEdgeClipped =
                   (i == start && start > 0) || (i == end - 1 && end < total);
-              final dotHeight = isEdgeClipped ? 3.5 : 5.5;
-              final dotWidth = isActive
-                  ? 18.0
-                  : isEdgeClipped
-                      ? 3.5
-                      : 5.5;
-
-              return GestureDetector(
-                onTap: () => onDotTap(i),
-                behavior: HitTestBehavior.opaque,
-                child: Padding(
-                  padding: const EdgeInsetsDirectional.fromSTEB(0, 6, 4.5, 6),
-                  child: AnimatedContainer(
-                    duration: context.motion(PulsrMotion.layout),
-                    curve: context.motionCurve(PulsrMotion.enter),
-                    width: dotWidth,
-                    height: dotHeight,
-                    decoration: BoxDecoration(
-                      color: isActive
-                          ? p.accent
-                          : p.textTertiary
-                              .withValues(alpha: isEdgeClipped ? 0.22 : 0.36),
-                      borderRadius: BorderRadius.circular(3.0),
-                      boxShadow: isActive
-                          ? [
-                              BoxShadow(
-                                color: p.accent.withValues(alpha: 0.40),
-                                blurRadius: 6,
-                                offset: const Offset(0, 1),
-                              ),
-                            ]
-                          : null,
-                    ),
+              final dotSize = isEdgeClipped ? 3.5 : 5.5;
+              Widget glyph = AnimatedContainer(
+                duration: context.motion(PulsrMotion.layout),
+                curve: context.motionCurve(PulsrMotion.enter),
+                width: isActive ? 20.0 : dotSize,
+                height: isActive ? 6.0 : dotSize,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? gilt
+                      : p.textTertiary
+                          .withValues(alpha: isEdgeClipped ? 0.22 : 0.36),
+                  borderRadius: BorderRadius.circular(isActive ? 3.0 : 1.2),
+                  boxShadow: isActive
+                      ? [
+                          BoxShadow(
+                            color: gilt.withValues(alpha: 0.40),
+                            blurRadius: 6,
+                            offset: const Offset(0, 1),
+                          ),
+                        ]
+                      : null,
+                ),
+              );
+              if (!isActive) {
+                glyph = Transform.rotate(angle: math.pi / 4, child: glyph);
+              }
+              return Semantics(
+                button: true,
+                label: '${i + 1} / $total',
+                child: GestureDetector(
+                  onTap: () => onDotTap(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(0, 6, 4.5, 6),
+                    child: glyph,
                   ),
                 ),
               );
@@ -1791,8 +2165,7 @@ class _PulsingLiveDotState extends State<_PulsingLiveDot>
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: dotColor
-                    .withValues(alpha: _controller.value * 0.7),
+                color: dotColor.withValues(alpha: _controller.value * 0.7),
                 blurRadius: 4,
                 spreadRadius: 1,
               ),
@@ -1808,6 +2181,7 @@ class _PulsingLiveDotState extends State<_PulsingLiveDot>
 class _MiniEqualizerBars extends StatefulWidget {
   final bool isPlaying;
   final Color? color;
+
   const _MiniEqualizerBars({required this.isPlaying, this.color});
 
   @override
@@ -1862,7 +2236,6 @@ class _MiniEqualizerBarsState extends State<_MiniEqualizerBars>
   Widget build(BuildContext context) {
     final p = context.palette;
     final barColor = widget.color ?? p.accent;
-
     return AnimatedBuilder(
       animation: _anim,
       builder: (context, child) {
@@ -1878,7 +2251,6 @@ class _MiniEqualizerBarsState extends State<_MiniEqualizerBars>
         final h4 = widget.isPlaying
             ? (5.0 + 6.0 * (0.5 + 0.5 * math.sin(t + 3.8)))
             : 6.0;
-
         return Row(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.end,

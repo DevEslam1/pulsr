@@ -34,7 +34,8 @@ extension AppButtonStyleContextX on BuildContext {
 
   /// Resolves the border radius according to active button style.
   BorderRadius buttonRadius({double rectRadius = 6.0}) {
-    return PulsrCapsuleStyle.resolveRadius(appButtonStyle, rectRadius: rectRadius);
+    return PulsrCapsuleStyle.resolveRadius(appButtonStyle,
+        rectRadius: rectRadius);
   }
 }
 
@@ -44,10 +45,8 @@ class PulsrCapsuleStyle {
   const PulsrCapsuleStyle._();
 
   /// Resolves the border radius for the active [style].
-  static BorderRadius resolveRadius(
-    AppButtonStyle style, {
-    double rectRadius = 6.0,
-  }) {
+  static BorderRadius resolveRadius(AppButtonStyle style,
+      {double rectRadius = 10.0}) {
     switch (style) {
       case AppButtonStyle.rectangular:
         return BorderRadius.circular(rectRadius);
@@ -58,22 +57,33 @@ class PulsrCapsuleStyle {
     }
   }
 
-  /// Translucent frosted glass surface background.
-  static Color backgroundColor(PulsrPalette p) {
-    return p.isDark
-        ? Colors.white.withValues(alpha: 0.16)
-        : Colors.black.withValues(alpha: 0.08);
-  }
+  /// Aurora glass: lighter fill, brighter specular edge. Depth comes from the
+  /// border + elevation pair, not from a heavy milky fill.
+  static Color backgroundColor(PulsrPalette p) => p.isDark
+      ? Colors.white.withValues(alpha: 0.10)
+      : Colors.black.withValues(alpha: 0.05);
 
-  /// Translucent specular hairline border.
-  static Border border(PulsrPalette p, {double width = 0.8}) {
-    return Border.all(
-      color: p.isDark
-          ? Colors.white.withValues(alpha: 0.12)
-          : Colors.black.withValues(alpha: 0.08),
-      width: width,
-    );
-  }
+  static Border border(PulsrPalette p, {double width = 0.8}) => Border.all(
+        color: p.isDark
+            ? Colors.white.withValues(alpha: 0.14)
+            : Colors.black.withValues(alpha: 0.07),
+        width: width,
+      );
+
+  /// NEW: subtle top-lit gradient for larger glass surfaces (docks, clusters).
+  static LinearGradient surfaceSheen(PulsrPalette p) => LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: p.isDark
+            ? [
+                Colors.white.withValues(alpha: 0.13),
+                Colors.white.withValues(alpha: 0.07),
+              ]
+            : [
+                Colors.white.withValues(alpha: 0.65),
+                Colors.white.withValues(alpha: 0.40),
+              ],
+      );
 
   /// Primary high-contrast foreground color on the frosted glass surface.
   static Color foregroundColor(PulsrPalette p) {

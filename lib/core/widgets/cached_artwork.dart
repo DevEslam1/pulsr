@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -179,6 +180,9 @@ class CachedArtwork extends StatefulWidget {
   /// returns null. Must be [song.albumId] — NOT the song id.
   final int? albumId;
 
+  /// How the image aligns inside its bounds when cropped via [BoxFit.cover].
+  final AlignmentGeometry alignment;
+
   const CachedArtwork({
     super.key,
     required this.id,
@@ -192,6 +196,7 @@ class CachedArtwork extends StatefulWidget {
     this.cacheWidth,
     this.cacheHeight,
     this.albumId,
+    this.alignment = Alignment.center,
   });
 
   /// Drops every cached quality tier for [type]/[id] and notifies mounted
@@ -600,10 +605,17 @@ class _CachedArtworkState extends State<CachedArtwork> {
         // `size: double.infinity` request) left the ClipRRect/SizedBox without
         // a size, cascading into "RenderBox was not laid out" crashes. The
         // hundreds/tiny fallbacks keep the box finite in every context.
-        final double extent = effectiveSize;
+        // Honor tight parent constraints so full-bleed stages never shrink or
+        // letterbox artwork when the container exceeds [widget.size].
+        final double targetWidth =
+            constraints.hasTightWidth ? constraints.maxWidth : effectiveSize;
+        final double targetHeight =
+            constraints.hasTightHeight ? constraints.maxHeight : effectiveSize;
+        final double extent = math.max(targetWidth, targetHeight);
+        final double placeholderSize = math.min(targetWidth, targetHeight);
 
         final placeholder = ArtworkPlaceholder(
-          size: extent,
+          size: placeholderSize,
           borderRadius: effectiveBorderRadius,
           icon: widget.fallbackIcon,
         );
@@ -611,30 +623,39 @@ class _CachedArtworkState extends State<CachedArtwork> {
         final isHq = _isHighRes;
         final dpr = MediaQuery.maybeDevicePixelRatioOf(context) ?? 2.0;
         final decodeDim = isHq
-            ? (effectiveSize * dpr).clamp(300, 1440).round()
-            : (effectiveSize * dpr).clamp(80, 800).round();
+            ? (extent * dpr).clamp(300, 1440).round()
+            : (extent * dpr).clamp(80, 800).round();
 
         final content = AnimatedSwitcher(
           duration: context.motionMs(200),
           switchInCurve: Curves.easeOut,
           switchOutCurve: Curves.easeIn,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            fit: StackFit.passthrough,
+            alignment: Alignment.center,
+            children: [
+              ...previousChildren,
+              if (currentChild != null) currentChild,
+            ],
+          ),
           child: _cachedBytes != null
               ? Image.memory(
                   _cachedBytes!,
                   key: ValueKey(_cacheKey),
-                  width: extent,
-                  height: extent,
+                  width: targetWidth,
+                  height: targetHeight,
                   cacheWidth: widget.cacheWidth ?? decodeDim,
                   cacheHeight: widget.cacheHeight ?? decodeDim,
                   fit: BoxFit.cover,
+                  alignment: widget.alignment,
                   filterQuality:
                       isHq ? FilterQuality.high : FilterQuality.medium,
                   errorBuilder: (context, error, stackTrace) => placeholder,
                 )
               : SizedBox(
                   key: const ValueKey('artwork_placeholder'),
-                  width: extent,
-                  height: extent,
+                  width: targetWidth,
+                  height: targetHeight,
                   child: placeholder,
                 ),
         );
@@ -642,8 +663,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
         return ClipRRect(
           borderRadius: AppRadii.circular(effectiveBorderRadius),
           child: SizedBox(
-            width: extent,
-            height: extent,
+            width: targetWidth,
+            height: targetHeight,
             child: Semantics(
               label: context.l10n.albumArtworkLabel,
               image: true,

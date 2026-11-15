@@ -328,14 +328,18 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                 widget.layoutMode ?? PulsrLayoutDelegate.of(context).layoutMode;
 
             if (effectiveLayoutMode == ShellLayoutMode.bottomNavWide) {
+              final safePadding = MediaQuery.paddingOf(context);
+              final leftPad =
+                  safePadding.left > 0 ? safePadding.left + 4.0 : 14.0;
+              final rightPad =
+                  safePadding.right > 0 ? safePadding.right + 4.0 : 14.0;
               return SafeArea(
                 top: false,
                 left: false,
                 right: false,
                 bottom: true,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  padding: EdgeInsets.fromLTRB(leftPad, 4, rightPad, 4),
                   child: Center(
                     child: ConstrainedBox(
                       constraints:
@@ -399,6 +403,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                                     onTap: widget.onTapNav,
                                     includeSafeArea: false,
                                     iconOnly: true,
+                                    embedded: true,
                                   ),
                                 ),
                               ] else ...[
@@ -408,6 +413,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                                     onTap: widget.onTapNav,
                                     includeSafeArea: false,
                                     iconOnly: false,
+                                    embedded: true,
                                   ),
                                 ),
                               ],

@@ -225,7 +225,38 @@ void main() {
     );
     expect(find.text('Listen Now'), findsWidgets);
     // Windowed dot indicator caps visible dots at 7 even for 11+ stations.
-    expect(find.byType(AnimatedContainer), findsNWidgets(7));
+    expect(
+      find.byWidgetPredicate(
+        (w) => w is Semantics && (w.properties.label?.endsWith('/ 11') ?? false),
+      ),
+      findsNWidgets(7),
+    );
+  });
+
+  testWidgets('landscape wide carousel aligns first card to leading edge',
+      (tester) async {
+    tester.view.physicalSize = const Size(850, 400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      buildHarness(
+        locale: const Locale('en'),
+        child: QuranRadioHeroCarousel(playerCubit: playerCubit),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final pageView = tester.widget<PageView>(find.byType(PageView));
+    expect(pageView.padEnds, isFalse);
+
+    final carouselLeft =
+        tester.getTopLeft(find.byType(QuranRadioHeroCarousel)).dx;
+    final firstCardLeft = tester.getTopLeft(find.byType(InkWell).first).dx;
+    expect(firstCardLeft - carouselLeft, lessThanOrEqualTo(6.0));
   });
 
   test('buildMergedHeroItem localizes curated stations without Custom Station badge',

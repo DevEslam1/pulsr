@@ -3,64 +3,81 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 
 /// {@category DesignSystem}
-/// Standardized elevation & shadow system across Pulsr.
+/// Aurora elevation: every level pairs a tight directional *key* shadow with a
+/// wide, soft *ambient* shadow. Single-shadow elevation reads as a grey sticker;
+/// the pair reads as a physical surface lit from above.
 ///
-/// Provides a consistent 5-level elevation hierarchy:
-/// - [level0]: flat surfaces (no shadow)
-/// - [level1]: cards & tiles at rest (blur 4, offset 0,1)
-/// - [level2]: cards hovered / pressed / raised (blur 8, offset 0,2)
-/// - [level3]: sheets, dialogs, popovers (blur 16, offset 0,4)
-/// - [level4]: floating dock, now-playing card (blur 24, offset 0,8)
+/// - [level0]: flat
+/// - [level1]: cards & tiles at rest
+/// - [level2]: cards hovered / pressed
+/// - [level3]: sheets, dialogs, popovers
+/// - [level4]: floating dock, now-playing hero
 class PulsrElevation {
   const PulsrElevation._();
 
-  /// Flat surface with zero shadow.
   static const List<BoxShadow> level0 = [];
 
-  /// Cards & tiles at rest: 1dp offset, 4dp blur.
-  static List<BoxShadow> level1([dynamic contextOrPalette]) {
-    final isDark = _isDark(contextOrPalette);
-    return [
-      BoxShadow(
-        color: AppColors.scrimAt(isDark ? 0.20 : 0.08),
-        blurRadius: 4,
-        offset: const Offset(0, 1),
-      ),
-    ];
-  }
+  static List<BoxShadow> level1([dynamic contextOrPalette]) => _pair(
+        _isDark(contextOrPalette),
+        keyAlpha: 0.16,
+        ambAlpha: 0.10,
+        keyBlur: 3,
+        ambBlur: 8,
+        keyDy: 1,
+        ambDy: 2,
+      );
 
-  /// Cards hover/press: 2dp offset, 8dp blur.
-  static List<BoxShadow> level2([dynamic contextOrPalette]) {
-    final isDark = _isDark(contextOrPalette);
-    return [
-      BoxShadow(
-        color: AppColors.scrimAt(isDark ? 0.32 : 0.12),
-        blurRadius: 8,
-        offset: const Offset(0, 2),
-      ),
-    ];
-  }
+  static List<BoxShadow> level2([dynamic contextOrPalette]) => _pair(
+        _isDark(contextOrPalette),
+        keyAlpha: 0.24,
+        ambAlpha: 0.16,
+        keyBlur: 6,
+        ambBlur: 14,
+        keyDy: 2,
+        ambDy: 4,
+      );
 
-  /// Sheets & dialogs: 4dp offset, 16dp blur.
-  static List<BoxShadow> level3([dynamic contextOrPalette]) {
-    final isDark = _isDark(contextOrPalette);
-    return [
-      BoxShadow(
-        color: AppColors.scrimAt(isDark ? 0.48 : 0.16),
-        blurRadius: 16,
-        offset: const Offset(0, 4),
-      ),
-    ];
-  }
+  static List<BoxShadow> level3([dynamic contextOrPalette]) => _pair(
+        _isDark(contextOrPalette),
+        keyAlpha: 0.34,
+        ambAlpha: 0.24,
+        keyBlur: 10,
+        ambBlur: 24,
+        keyDy: 4,
+        ambDy: 8,
+      );
 
-  /// Now-playing / floating hero surface: 8dp offset, 24dp blur.
-  static List<BoxShadow> level4([dynamic contextOrPalette]) {
-    final isDark = _isDark(contextOrPalette);
+  static List<BoxShadow> level4([dynamic contextOrPalette]) => _pair(
+        _isDark(contextOrPalette),
+        keyAlpha: 0.44,
+        ambAlpha: 0.32,
+        keyBlur: 16,
+        ambBlur: 40,
+        keyDy: 8,
+        ambDy: 16,
+      );
+
+  static List<BoxShadow> _pair(
+    bool isDark, {
+    required double keyAlpha,
+    required double ambAlpha,
+    required double keyBlur,
+    required double ambBlur,
+    required double keyDy,
+    required double ambDy,
+  }) {
+    // Light mode needs far less ink to read the same depth.
+    final scale = isDark ? 1.0 : 0.45;
     return [
       BoxShadow(
-        color: AppColors.scrimAt(isDark ? 0.65 : 0.24),
-        blurRadius: 24,
-        offset: const Offset(0, 8),
+        color: AppColors.scrimAt(keyAlpha * scale),
+        blurRadius: keyBlur,
+        offset: Offset(0, keyDy),
+      ),
+      BoxShadow(
+        color: AppColors.scrimAt(ambAlpha * scale),
+        blurRadius: ambBlur,
+        offset: Offset(0, ambDy),
       ),
     ];
   }
@@ -68,9 +85,8 @@ class PulsrElevation {
   static bool _isDark(dynamic contextOrPalette) {
     if (contextOrPalette is BuildContext) {
       return contextOrPalette.palette.isDark;
-    } else if (contextOrPalette is PulsrPalette) {
-      return contextOrPalette.isDark;
     }
+    if (contextOrPalette is PulsrPalette) return contextOrPalette.isDark;
     return true;
   }
 }

@@ -24,6 +24,7 @@ class PulsrBottomNavBar extends StatefulWidget {
   final bool includeSafeArea;
   final bool iconOnly;
   final bool enableBlur;
+  final bool embedded;
 
   const PulsrBottomNavBar({
     super.key,
@@ -34,6 +35,7 @@ class PulsrBottomNavBar extends StatefulWidget {
     this.includeSafeArea = true,
     this.iconOnly = false,
     this.enableBlur = false,
+    this.embedded = false,
   });
 
   @override
@@ -62,6 +64,32 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
     final navRadius = isTablet
         ? AppRadii.r28All
         : (widget.iconOnly ? AppRadii.r20All : AppRadii.r24All);
+
+    if (widget.embedded) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.0),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              for (int i = 0; i < items.length; i++)
+                Expanded(
+                  child: _NavTabItem(
+                    item: items[i],
+                    index: i,
+                    isSelected: widget.currentIndex == i,
+                    p: p,
+                    isTablet: isTablet,
+                    iconOnly: widget.iconOnly,
+                    embedded: true,
+                    onTap: () => widget.onTap(i),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return SafeArea(
       top: false,
@@ -289,6 +317,7 @@ class _NavTabItem extends StatelessWidget {
   final PulsrPalette p;
   final bool isTablet;
   final bool iconOnly;
+  final bool embedded;
   final VoidCallback onTap;
 
   const _NavTabItem({
@@ -298,12 +327,14 @@ class _NavTabItem extends StatelessWidget {
     required this.p,
     required this.isTablet,
     required this.iconOnly,
+    this.embedded = false,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final double iconSize = isTablet ? 24.0 : 22.0;
+    final double iconSize =
+        embedded && !iconOnly ? 20.0 : (isTablet ? 24.0 : 22.0);
     final isRtl = Directionality.of(context) == TextDirection.rtl;
     final itemRadius = isTablet ? AppRadii.r22All : AppRadii.r18All;
 
@@ -331,7 +362,7 @@ class _NavTabItem extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               padding: EdgeInsets.symmetric(
                 horizontal: isTablet ? 10 : 6,
-                vertical: AppSpacing.xxs,
+                vertical: embedded ? 2.0 : AppSpacing.xxs,
               ),
               decoration: BoxDecoration(
                 gradient: isSelected

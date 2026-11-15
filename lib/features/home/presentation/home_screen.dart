@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -304,14 +305,29 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
 
     // Reset to local tab if offline only is enabled
     final currentTab = showOnlineTab ? _selectedTab : 0;
+    final safePadding = MediaQuery.paddingOf(context);
+    final basePad = Adaptive.pagePadding(context);
+    // Sections already apply [basePad] horizontally, so only add the delta
+    // needed to clear a physical display cutout without double-padding.
+    final cutoutLeft = safePadding.left > 0
+        ? math.max(0.0, safePadding.left - basePad + 4.0)
+        : 0.0;
+    final cutoutRight = safePadding.right > 0
+        ? math.max(0.0, safePadding.right - basePad + 4.0)
+        : 0.0;
 
     return Scaffold(
       body: SafeArea(
+        top: true,
         bottom: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: Adaptive.contentConstraints(context),
-            child: RefreshIndicator(
+        left: false,
+        right: false,
+        child: Padding(
+          padding: EdgeInsets.only(left: cutoutLeft, right: cutoutRight),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: Adaptive.contentConstraints(context),
+              child: RefreshIndicator(
               color: p.accent,
               backgroundColor: p.surfaceContainer,
               onRefresh: () async {
@@ -577,6 +593,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
             ),
           ),
         ),
+        ),
       ),
     );
   }
@@ -757,47 +774,57 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                     );
                   }
 
-                  if (isTablet) {
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 11,
-                          child: QuranRadioHeroCarousel(
-                            height: 158,
-                            playerCubit: playerCubit,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.s12),
-                        Expanded(
-                          flex: 9,
-                          child: Column(
+                  return LayoutBuilder(
+                    builder: (context, heroConstraints) {
+                      final useSplitHero =
+                          isTablet || heroConstraints.maxWidth >= 600;
+                      if (useSplitHero) {
+                        return IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              favTile,
-                              const SizedBox(height: AppSpacing.s10),
-                              focusTile,
+                              Expanded(
+                                flex: 11,
+                                child: QuranRadioHeroCarousel(
+                                  height: 158,
+                                  playerCubit: playerCubit,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.s12),
+                              Expanded(
+                                flex: 9,
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Expanded(child: favTile),
+                                    const SizedBox(height: AppSpacing.s10),
+                                    Expanded(child: focusTile),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
-                        ),
-                      ],
-                    );
-                  }
+                        );
+                      }
 
-                  return Column(
-                    children: [
-                      QuranRadioHeroCarousel(
-                        height: 152,
-                        playerCubit: playerCubit,
-                      ),
-                      const SizedBox(height: AppSpacing.s10),
-                      Row(
+                      return Column(
                         children: [
-                          Expanded(child: favTile),
-                          const SizedBox(width: AppSpacing.s10),
-                          Expanded(child: focusTile),
+                          QuranRadioHeroCarousel(
+                            height: 152,
+                            playerCubit: playerCubit,
+                          ),
+                          const SizedBox(height: AppSpacing.s10),
+                          Row(
+                            children: [
+                              Expanded(child: favTile),
+                              const SizedBox(width: AppSpacing.s10),
+                              Expanded(child: focusTile),
+                            ],
+                          ),
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   );
                 },
               );

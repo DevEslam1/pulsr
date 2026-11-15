@@ -1,4 +1,6 @@
 // lib/features/player/presentation/themes/clean_player_theme.dart
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -69,7 +71,6 @@ class CleanPlayerTheme extends StatelessWidget {
       :canvasEnabled,
       :canvasAsBackdrop,
       :themeMode,
-      :experienceMode,
     ) = context.select<
         SettingsCubit,
         ({
@@ -77,19 +78,14 @@ class CleanPlayerTheme extends StatelessWidget {
           bool canvasEnabled,
           bool canvasAsBackdrop,
           AppThemeMode themeMode,
-          ExperienceMode experienceMode,
         })>((c) => (
           playerSliderStyle: c.state.playerSliderStyle,
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
           themeMode: c.state.themeMode,
-          experienceMode: c.state.experienceMode,
         ));
 
     final isInSplitView = PlayerSplitViewScope.of(context);
-    final showAbControls = experienceMode == ExperienceMode.professional ||
-        state.abPointA != null ||
-        state.abPointB != null;
     final hasDownload = song != null &&
         (song.source == SongSource.youtube ||
             (song.remoteId != null && song.remoteId!.isNotEmpty));
@@ -167,75 +163,107 @@ class CleanPlayerTheme extends StatelessWidget {
             ),
           );
         } else {
-          // Full-bleed edge-to-edge artwork fading into the background color
-          // Uses lightweight gradient overlay and clamped size for 60/120fps minimization
-          final artworkSize = (constraints.maxWidth * 1.5).clamp(360.0, 720.0);
-          final Widget artworkChild =
-              (canvasEnabled && !canvasAsBackdrop && song != null)
-                  ? CanvasBackdrop(
-                      song: song,
-                      isPlaying: state.isPlaying,
-                      isBackdropMode: false,
-                      fallbackArtwork: CachedArtwork(
-                        id: song.id,
-                        albumId: song.albumId,
-                        remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                        type: ArtworkType.AUDIO,
-                        size: artworkSize,
-                        borderRadius: 0,
-                      ),
-                    )
-                  : CachedArtwork(
-                      id: song?.id ?? 0,
-                      albumId: song?.albumId,
-                      remoteUrl: song?.remoteArtworkUrl ?? song?.artworkUri,
-                      type: ArtworkType.AUDIO,
-                      size: artworkSize,
-                      borderRadius: 0,
-                    );
-
+          // Full-bleed edge-to-edge artwork fading seamlessly into the backdrop.
+          // Sizes directly from the rendered stage bounds so landscape split
+          // panes fill edge-to-edge into the camera cutout & corners without
+          // shrinking or letterboxing.
+          final useLandscapeFade = isLandscape && !isInSplitView;
           upperStage = KeyedSubtree(
             key: const ValueKey('art_stage'),
             child: PlayerGestureScope(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  RepaintBoundary(
+              child: LayoutBuilder(
+                builder: (context, stageConstraints) {
+                  final stageW = stageConstraints.maxWidth.isFinite &&
+                          stageConstraints.maxWidth > 0
+                      ? stageConstraints.maxWidth
+                      : constraints.maxWidth;
+                  final stageH = stageConstraints.maxHeight.isFinite &&
+                          stageConstraints.maxHeight > 0
+                      ? stageConstraints.maxHeight
+                      : stageW;
+                  final artworkSize =
+                      math.max(stageW, stageH).clamp(360.0, 1080.0);
+                  final artAlignment =
+                      useLandscapeFade ? Alignment.center : Alignment.topCenter;
+
+                  final fallbackArt = CachedArtwork(
+                    id: song?.id ?? 0,
+                    albumId: song?.albumId,
+                    remoteUrl: song?.remoteArtworkUrl ?? song?.artworkUri,
+                    type: ArtworkType.AUDIO,
+                    size: artworkSize,
+                    highQuality: true,
+                    borderRadius: 0,
+                    alignment: artAlignment,
+                  );
+
+                  final Widget artworkChild =
+                      (canvasEnabled && !canvasAsBackdrop && song != null)
+                          ? CanvasBackdrop(
+                              song: song,
+                              isPlaying: state.isPlaying,
+                              isBackdropMode: false,
+                              borderRadius: BorderRadius.zero,
+                              fallbackArtwork: fallbackArt,
+                            )
+                          : fallbackArt;
+
+                  final Widget heroArt = RepaintBoundary(
                     child: Hero(
                       tag: props.heroTag,
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        alignment: Alignment.topCenter,
-                        clipBehavior: Clip.hardEdge,
-                        child: SizedBox(
-                          width: constraints.maxWidth,
-                          height: constraints.maxWidth,
-                          child: artworkChild,
-                        ),
+                      child: SizedBox(
+                        width: stageW,
+                        height: stageH,
+                        child: artworkChild,
                       ),
                     ),
-                  ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.transparent,
-                              bottomBg.withValues(alpha: 0.18),
-                              bottomBg.withValues(alpha: 0.65),
-                              bottomBg,
-                            ],
-                            stops: const [0.0, 0.52, 0.70, 0.88, 1.0],
+                  );
+
+                  if (useLandscapeFade) {
+                    final textDirection = Directionality.of(context);
+                    return ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (bounds) => LinearGradient(
+                        begin: AlignmentDirectional.centerStart,
+                        end: AlignmentDirectional.centerEnd,
+                        colors: const [
+                          Colors.white,
+                          Colors.white,
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.68, 1.0],
+                      ).createShader(bounds, textDirection: textDirection),
+                      child: heroArt,
+                    );
+                  }
+
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      heroArt,
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.transparent,
+                                  bottomBg.withValues(alpha: 0.18),
+                                  bottomBg.withValues(alpha: 0.65),
+                                  bottomBg,
+                                ],
+                                stops: const [0.0, 0.52, 0.70, 0.88, 1.0],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
           );
@@ -278,6 +306,7 @@ class CleanPlayerTheme extends StatelessWidget {
                   children: [
                     MarqueeText(
                       text: song?.title ?? context.l10n.noTrackSelected,
+                      textAlign: TextAlign.start,
                       style: TextStyle(
                         color: Colors.white,
                         fontSize:
@@ -382,12 +411,11 @@ class CleanPlayerTheme extends StatelessWidget {
               )
             : null;
 
-        // 4. Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat, AB Loop)
+        // 4. Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat)
         final transportControls = _CleanTransportControls(
           props: props,
           activeColor: activeColor,
           isCompact: isShort,
-          showAbControls: showAbControls,
         );
 
         // Volume Bar for tablet / split-view
@@ -409,7 +437,9 @@ class CleanPlayerTheme extends StatelessWidget {
         // Layout composition
         final Widget content;
         if (isLandscape && !isInSplitView) {
+          final isRtl = Directionality.of(context) == TextDirection.rtl;
           content = Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
                 flex: 5,
@@ -418,6 +448,10 @@ class CleanPlayerTheme extends StatelessWidget {
               Expanded(
                 flex: 5,
                 child: SafeArea(
+                  left: isRtl,
+                  right: !isRtl,
+                  top: true,
+                  bottom: true,
                   child: Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -507,6 +541,7 @@ class CleanPlayerTheme extends StatelessWidget {
 
         // Rich, dynamic ambient backdrop matching the artwork palette
         return Stack(
+          fit: StackFit.expand,
           children: [
             Positioned.fill(
               child: RepaintBoundary(
@@ -530,6 +565,8 @@ class CleanPlayerTheme extends StatelessWidget {
               child: SafeArea(
                 top: true,
                 bottom: false,
+                left: false,
+                right: false,
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 6.0),
                   child: Center(
@@ -800,18 +837,16 @@ class _CleanLosslessBadgePill extends StatelessWidget {
   }
 }
 
-/// Bare Apple Music Transport Controls with Shuffle, Repeat & AB Loop affordances
+/// Bare Apple Music Transport Controls with Shuffle & Repeat affordances
 class _CleanTransportControls extends StatelessWidget {
   final PlayerThemeProps props;
   final Color activeColor;
   final bool isCompact;
-  final bool showAbControls;
 
   const _CleanTransportControls({
     required this.props,
     required this.activeColor,
     this.isCompact = false,
-    this.showAbControls = false,
   });
 
   @override
@@ -824,12 +859,10 @@ class _CleanTransportControls extends StatelessWidget {
     final repeatMode = state.repeatMode;
     final hasPrev = state.hasPreviousNeighbour;
     final hasNext = state.hasNextNeighbour;
-    final abLoopActive = state.abPointA != null && state.abPointB != null;
 
     final double mainIconSize = isCompact ? 44.0 : 54.0;
     final double sideIconSize = isCompact ? 32.0 : 40.0;
     final double auxIconSize = isCompact ? 22.0 : 25.0;
-    final double abButtonSize = isCompact ? 24.0 : 28.0;
     final double buttonGap = isCompact ? 10.0 : 18.0;
 
     return Padding(
@@ -879,45 +912,7 @@ class _CleanTransportControls extends StatelessWidget {
             ),
             SizedBox(width: buttonGap),
 
-            // 2. Point A Button (if AB controls active)
-            if (showAbControls) ...[
-              _CleanAbButton(
-                label: 'A',
-                point: state.abPointA,
-                isActive: state.abPointA != null,
-                isLoopActive: abLoopActive,
-                activeColor: activeColor,
-                buttonSize: abButtonSize,
-                tooltip: state.abPointA != null && state.abPointB != null
-                    ? context.l10n.repeat
-                    : state.abPointA != null
-                        ? 'Point A: ${Formatters.formatDuration(state.abPointA!)} (${context.l10n.clearAbLoop})'
-                        : context.l10n.abLoopSetA,
-                onPressed: () {
-                  PulsrHaptics.selection();
-                  if (state.abPointA != null && state.abPointB != null) {
-                    cubit.toggleAbLoop();
-                  } else {
-                    cubit.setAbPointA();
-                  }
-                },
-                onLongPress: () {
-                  if (state.abPointA != null || state.abPointB != null) {
-                    PulsrHaptics.confirm();
-                    cubit.clearAbLoop();
-                    PulsrToast.show(
-                      context,
-                      message: context.l10n.clearAbLoop,
-                      icon: Icons.clear_rounded,
-                      duration: const Duration(milliseconds: 1200),
-                    );
-                  }
-                },
-              ),
-              SizedBox(width: buttonGap),
-            ],
-
-            // 3. Previous / Rewind Button
+            // 2. Previous / Rewind Button
             IconButton(
               iconSize: sideIconSize,
               padding: EdgeInsets.zero,
@@ -938,7 +933,7 @@ class _CleanTransportControls extends StatelessWidget {
             ),
             SizedBox(width: buttonGap),
 
-            // 4. Play / Pause Button
+            // 3. Play / Pause Button
             IconButton(
               iconSize: mainIconSize,
               padding: EdgeInsets.zero,
@@ -969,7 +964,7 @@ class _CleanTransportControls extends StatelessWidget {
             ),
             SizedBox(width: buttonGap),
 
-            // 5. Next / Fast-Forward Button
+            // 4. Next / Fast-Forward Button
             IconButton(
               iconSize: sideIconSize,
               padding: EdgeInsets.zero,
@@ -990,45 +985,7 @@ class _CleanTransportControls extends StatelessWidget {
             ),
             SizedBox(width: buttonGap),
 
-            // 6. Point B Button (if AB controls active)
-            if (showAbControls) ...[
-              _CleanAbButton(
-                label: 'B',
-                point: state.abPointB,
-                isActive: state.abPointB != null,
-                isLoopActive: abLoopActive,
-                activeColor: activeColor,
-                buttonSize: abButtonSize,
-                tooltip: state.abPointA != null && state.abPointB != null
-                    ? context.l10n.repeat
-                    : state.abPointB != null
-                        ? 'Point B: ${Formatters.formatDuration(state.abPointB!)} (${context.l10n.clearAbLoop})'
-                        : 'Set loop point B',
-                onPressed: () {
-                  PulsrHaptics.selection();
-                  if (state.abPointA != null && state.abPointB != null) {
-                    cubit.toggleAbLoop();
-                  } else {
-                    cubit.setAbPointB();
-                  }
-                },
-                onLongPress: () {
-                  if (state.abPointA != null || state.abPointB != null) {
-                    PulsrHaptics.confirm();
-                    cubit.clearAbLoop();
-                    PulsrToast.show(
-                      context,
-                      message: context.l10n.clearAbLoop,
-                      icon: Icons.clear_rounded,
-                      duration: const Duration(milliseconds: 1200),
-                    );
-                  }
-                },
-              ),
-              SizedBox(width: buttonGap),
-            ],
-
-            // 7. Repeat Button
+            // 5. Repeat Button
             IconButton(
               iconSize: auxIconSize,
               padding: EdgeInsets.zero,
@@ -1089,73 +1046,6 @@ class _CleanTransportControls extends StatelessWidget {
               },
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Circular pill button for setting & displaying loop points A & B
-class _CleanAbButton extends StatelessWidget {
-  final String label;
-  final Duration? point;
-  final bool isActive;
-  final bool isLoopActive;
-  final Color activeColor;
-  final VoidCallback onPressed;
-  final VoidCallback onLongPress;
-  final String tooltip;
-  final double buttonSize;
-
-  const _CleanAbButton({
-    required this.label,
-    required this.point,
-    required this.isActive,
-    required this.isLoopActive,
-    required this.activeColor,
-    required this.onPressed,
-    required this.onLongPress,
-    required this.tooltip,
-    this.buttonSize = 28.0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          onLongPress: onLongPress,
-          borderRadius: BorderRadius.circular(buttonSize / 2),
-          child: Container(
-            width: buttonSize,
-            height: buttonSize,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isActive
-                  ? activeColor.withValues(alpha: 0.28)
-                  : Colors.white.withValues(alpha: 0.12),
-              border: Border.all(
-                color: isLoopActive
-                    ? activeColor
-                    : (isActive
-                        ? activeColor.withValues(alpha: 0.6)
-                        : Colors.white.withValues(alpha: 0.2)),
-                width: isLoopActive ? 1.5 : 1.0,
-              ),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isActive ? Colors.white : Colors.white70,
-                fontSize: buttonSize * 0.44,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
         ),
       ),
     );

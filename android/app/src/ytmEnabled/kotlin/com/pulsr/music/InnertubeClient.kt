@@ -547,13 +547,19 @@ internal class InnertubeClient(
                         if (hasCipher) {
                             cipheredCount++
                         }
+                        val mime = format.optString("mimeType")
+                        if (!mime.startsWith("audio/")) {
+                            // Preserve direct-URL accounting for SABR vs VideoGone diagnostics without
+                            // running cipher/n-transform work on video formats we always discard.
+                            if (!hasCipher && format.optString("url").isNotEmpty()) {
+                                totalUrls++
+                            }
+                            continue
+                        }
                         val url = extractUrlFromFormat(format)
                         if (!url.isNullOrEmpty()) {
                             totalUrls++
-                            val mime = format.optString("mimeType")
-                            if (mime.startsWith("audio/")) {
-                                audioFormats.add(format to url)
-                            }
+                            audioFormats.add(format to url)
                         } else if (!hasCipher && N_QUERY_PARAM.containsMatchIn(format.optString("url"))) {
                             // Direct-URL format whose n could not be transformed;
                             // applyNTransformIfNeeded discarded the burned URL.

@@ -15,6 +15,7 @@ import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
 import 'package:pulsr/features/home/presentation/home_screen.dart';
 import 'package:pulsr/domain/models/radio_station.dart';
 import 'package:pulsr/features/home/presentation/widgets/empty_library.dart';
+import 'package:pulsr/features/home/presentation/widgets/quick_tile.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -98,21 +99,37 @@ void main() {
     addTearDown(() => loginState.dispose());
   });
 
-  Future<void> pumpScreen(WidgetTester tester,
-      {SettingsState settings = const SettingsState()}) async {
-    useScreenSize(tester, const Size(900, 1800));
+  Future<void> pumpScreen(
+    WidgetTester tester, {
+    SettingsState settings = const SettingsState(),
+    Size size = const Size(900, 1800),
+    EdgeInsets padding = EdgeInsets.zero,
+  }) async {
+    useScreenSize(tester, size);
     when(() => settingsCubit.state).thenReturn(settings);
+    final Widget homeChild = HomeScreen(
+      ytmService: ytm,
+      ytmAccountService: account,
+      getSongsUseCase: getSongs,
+    );
     await tester.pumpWidget(screenHarness(
+      size: size,
       providers: [
         BlocProvider<PlayerCubit>.value(value: player),
         BlocProvider<LibraryCubit>.value(value: libraryCubit),
         BlocProvider<SettingsCubit>.value(value: settingsCubit),
       ],
-      child: HomeScreen(
-        ytmService: ytm,
-        ytmAccountService: account,
-        getSongsUseCase: getSongs,
-      ),
+      child: padding == EdgeInsets.zero
+          ? homeChild
+          : Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  padding: padding,
+                  viewPadding: padding,
+                ),
+                child: homeChild,
+              ),
+            ),
     ));
     await tester.pumpAndSettle();
   }
@@ -193,5 +210,40 @@ void main() {
     // The online/local segmented control is hidden in offline-only mode.
     expect(find.text('Online'), findsNothing);
     expect(find.text('Offline Only Mode'), findsOneWidget);
+  });
+
+  testWidgets(
+      'phone landscape places Quran radio card beside Favorites and Focus Flow without overflow',
+      (tester) async {
+    await pumpScreen(tester, size: const Size(850, 400));
+
+    expect(tester.takeException(), isNull);
+    final carouselRect = tester.getRect(find.byType(QuranRadioHeroCarousel));
+    final tileFinders = find.byType(QuickTile);
+    expect(tileFinders, findsNWidgets(2));
+    final favTileRect = tester.getRect(tileFinders.at(0));
+    final focusTileRect = tester.getRect(tileFinders.at(1));
+
+    // Radio card is on the left, while Favorites & Focus Flow match its height on the right.
+    expect(carouselRect.right, lessThanOrEqualTo(favTileRect.left));
+    expect(favTileRect.top, closeTo(carouselRect.top, 1.0));
+    expect(focusTileRect.bottom, closeTo(carouselRect.bottom, 1.0));
+    expect(carouselRect.width, lessThan(500));
+  });
+
+  testWidgets(
+      'landscape camera cutout avoids double horizontal padding while clearing camera',
+      (tester) async {
+    await pumpScreen(
+      tester,
+      size: const Size(994, 456),
+      padding: const EdgeInsets.only(left: 48),
+    );
+
+    expect(tester.takeException(), isNull);
+    final carouselRect = tester.getRect(find.byType(QuranRadioHeroCarousel));
+    // Clears the 48dp cutout (+4dp delta) without double-padding 48 + 12.
+    expect(carouselRect.left, greaterThanOrEqualTo(50.0));
+    expect(carouselRect.left, lessThan(58.0));
   });
 }

@@ -29,10 +29,18 @@ internal object PlayerJavaScript {
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
 
     private class BoundedRhinoContextFactory(
-        private val maxInstructions: Int = 100_000,
-        private val maxDurationMs: Long = 5000L
+        private val maxInstructions: Int = 500_000,
+        private val maxTotalInstructions: Int = 5_000_000,
+        private val maxDurationMs: Long = 30_000L
     ) : org.mozilla.javascript.ContextFactory() {
-        private val startTimeMs = System.currentTimeMillis()
+        @Volatile
+        private var startTimeMs = System.currentTimeMillis()
+        private var totalInstructions: Long = 0L
+
+        /** Resets the wall-clock execution budget after ahead-of-time script compilation completes. */
+        fun resetExecutionTimer() {
+            startTimeMs = System.currentTimeMillis()
+        }
 
         override fun makeContext(): org.mozilla.javascript.Context {
             val cx = super.makeContext()
@@ -43,6 +51,10 @@ internal object PlayerJavaScript {
         override fun observeInstructionCount(cx: org.mozilla.javascript.Context, instructionCount: Int) {
             if (instructionCount > maxInstructions) {
                 throw Error("JavaScript execution exceeded instruction cap ($maxInstructions)")
+            }
+            totalInstructions += instructionCount
+            if (totalInstructions > maxTotalInstructions) {
+                throw Error("JavaScript execution exceeded total instruction cap ($maxTotalInstructions)")
             }
             if (System.currentTimeMillis() - startTimeMs > maxDurationMs) {
                 throw Error("JavaScript execution exceeded wall-clock timeout (${maxDurationMs}ms)")
@@ -83,9 +95,30 @@ internal object PlayerJavaScript {
     private var rhinoNSolverPlayerUrl: String? = null
 
     @Volatile
+    private var rhinoInitFailedUrl: String? = null
+
+    @Volatile
+    private var rhinoInitFailedUntilMs: Long = 0L
+
+    @Volatile
+    private var newPipeSigFailedUrl: String? = null
+
+    @Volatile
+    private var newPipeNFailedUrl: String? = null
+
+    @Volatile
     private var nextFetchAttemptAt: Long = 0L
 
+    private const val RHINO_FAILURE_COOLDOWN_MS = 60_000L
+    private const val MAX_N_MEMO_ENTRIES = 64
+
+    // Lock hierarchy: `lock` may nest `rhinoInitLock`, never the reverse.
     private val lock = Any()
+    private val rhinoInitLock = Any()
+    private val nTransformMemo = object : LinkedHashMap<String, String>(MAX_N_MEMO_ENTRIES, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+            size > MAX_N_MEMO_ENTRIES
+    }
     private val warmUpInProgress = AtomicBoolean(false)
 
     private val N_PARAM_REGEX = Regex("""[?&]n=([^&#]*)""")
@@ -148,6 +181,11 @@ internal object PlayerJavaScript {
             rhinoNSolverFunc = null
             rhinoSigSolverFunc = null
             rhinoNSolverPlayerUrl = null
+            rhinoInitFailedUrl = null
+            rhinoInitFailedUntilMs = 0L
+            newPipeSigFailedUrl = null
+            newPipeNFailedUrl = null
+            nTransformMemo.clear()
             nextFetchAttemptAt = 0L
             appContext?.let { ctx ->
                 val cache = JsDecipherCache.getInstance(ctx)
@@ -220,15 +258,13 @@ internal object PlayerJavaScript {
             // Proactively parse and cache steps into memory and JsDecipherCache
             parseAndCacheSteps()
 
-            // Also trigger modern Rhino n-solver warmup and NewPipe STS in Rhino if possible
-            synchronized(lock) {
-                try {
-                    ensureRhinoNSolver()
-                    YoutubeJavaScriptPlayerManager.getSignatureTimestamp(playerUrl)
-                    logI(TAG, "Player JS warmed up successfully from $playerUrl")
-                } catch (t: Throwable) {
-                    logW(TAG, "Player JS warm-up parse failed (non-fatal): ${t.message}")
-                }
+            // Warm up Rhino n-solver off `lock` so startup compilation never blocks playback calls.
+            try {
+                ensureRhinoNSolver()
+                signatureTimestamp()
+                logI(TAG, "Player JS warmed up successfully from $playerUrl")
+            } catch (t: Throwable) {
+                logW(TAG, "Player JS warm-up parse failed (non-fatal): ${t.message}")
             }
         } catch (t: Throwable) {
             logW(TAG, "Player JS warm-up failed (non-fatal): ${t.message}")
@@ -338,15 +374,18 @@ internal object PlayerJavaScript {
             return rhinoSig
         }
 
-        try {
-            val deciphered: String? =
-                YoutubeJavaScriptPlayerManager.deobfuscateSignature(playerUrl, signature)
-            if (!deciphered.isNullOrEmpty()) {
-                return deciphered
+        if (newPipeSigFailedUrl != playerUrl) {
+            try {
+                val deciphered: String? =
+                    YoutubeJavaScriptPlayerManager.deobfuscateSignature(playerUrl, signature)
+                if (!deciphered.isNullOrEmpty()) {
+                    return deciphered
+                }
+            } catch (t: Throwable) {
+                newPipeSigFailedUrl = playerUrl
+                val msg = t.message ?: ""
+                logW(TAG, "NewPipe signature decipher failed: $msg")
             }
-        } catch (t: Throwable) {
-            val msg = t.message ?: ""
-            logW(TAG, "NewPipe signature decipher failed: $msg")
         }
 
         // Applying guessed steps produces a signature googlevideo answers with
@@ -424,20 +463,20 @@ internal object PlayerJavaScript {
 
     internal fun extractModernDecipherSteps(js: String): List<String>? {
         return try {
-            // 1. Locate string table Nu
+            // 1. Locate string table Nu (supports both single- and double-quoted tables/separators)
             val sigIdx = js.indexOf("signatureCipher")
             if (sigIdx == -1) return null
-            val splitMarker = ".split(\""
-            val splitCall = js.indexOf(splitMarker, sigIdx)
-            if (splitCall == -1) return null
-            val separatorStart = splitCall + splitMarker.length
-            val separatorEnd = js.indexOf("\")", separatorStart)
-            if (separatorEnd == -1) return null
-            val separator = js.substring(separatorStart, separatorEnd)
+            val splitMatch = Regex("""\.split\((["'])([^"']+)\1\)""").find(js, sigIdx) ?: return null
+            val splitCall = splitMatch.range.first
+            if (splitCall == 0) return null
+            val tableQuote = js[splitCall - 1]
+            if (tableQuote != '"' && tableQuote != '\'') return null
+            val separator = splitMatch.groupValues[2]
             if (separator.isEmpty()) return null
             val quoteEnd = splitCall - 1
             val prefix = js.substring(0, sigIdx)
-            val assignRegex = Regex("""[;\n]\s*([a-zA-Z0-9$]+)\s*=\s*\"""")
+            val escapedQuote = Regex.escape(tableQuote.toString())
+            val assignRegex = Regex("""[;\n]\s*([a-zA-Z0-9$]+)\s*=\s*$escapedQuote""")
             val allAssigns = assignRegex.findAll(prefix).toList()
             if (allAssigns.isEmpty()) return null
             val lastAssign = allAssigns.last()
@@ -594,80 +633,128 @@ internal object PlayerJavaScript {
     }
 
     private fun ensureRhinoNSolver() {
-        if (rhinoNScope != null && rhinoNSolverFunc != null && rhinoNSolverPlayerUrl == playerUrl) {
+        val currentPlayerUrl = playerUrl
+        if (rhinoNScope != null && rhinoNSolverFunc != null && rhinoNSolverPlayerUrl == currentPlayerUrl) {
             return
         }
-        val targetUrl = playerUrl.ifEmpty { PINNED_PLAYER_URL }
-        val js = ensureBaseJs()
-        if (js.isNullOrEmpty()) return
-
-        val modernPattern = Regex("""([a-zA-Z0-9$]+)=function\([a-zA-Z0-9$,]+\)\{[^}]*a\.set\("alr","yes"\)[^}]*\}""")
-        val match = modernPattern.find(js)
-        if (match == null) {
-            logD(TAG, "Modern n-solver alr pattern not found in $targetUrl")
+        val targetUrl = currentPlayerUrl.ifEmpty { PINNED_PLAYER_URL }
+        if (rhinoInitFailedUrl == targetUrl && System.currentTimeMillis() < rhinoInitFailedUntilMs) {
             return
         }
-        val funcName = match.groupValues[1]
-        val patchedJs = js.replaceRange(match.range, "globalThis._solver=" + match.value)
 
-        val factory = BoundedRhinoContextFactory()
-        val cx = factory.enterContext()
-        try {
-            cx.optimizationLevel = -1
-            cx.languageVersion = RhinoContext.VERSION_ES6
-            val scope = cx.initStandardObjects()
+        var builtScope: RhinoScriptable? = null
+        var builtNSolver: RhinoFunction? = null
+        var builtSigSolver: RhinoFunction? = null
+        var builtFuncName: String? = null
+        var initFailed = false
 
-            val mockInit = """
-                var window = this; var globalThis = this; var self = this;
-                var location = { href: 'https://www.youtube.com', hostname: 'www.youtube.com', protocol: 'https:', host: 'www.youtube.com' };
-                var document = { currentScript: { src: '$targetUrl' } };
-                var navigator = { userAgent: '$DESKTOP_UA' };
-                function XMLHttpRequest() {}
-                XMLHttpRequest.prototype = {};
-            """.trimIndent()
-            cx.evaluateString(scope, mockInit, "init", 1, null)
-            cx.evaluateString(scope, patchedJs, "base.js", 1, null)
-
-            val helperScript = """
-                globalThis.solveN = function(n) {
-                  var url = globalThis._solver('https://youtube.com/watch?v=yt-dlp-wins', 's', undefined);
-                  url.set('n', n);
-                  var proto = Object.getPrototypeOf(url);
-                  var keys = Object.keys(proto).concat(Object.getOwnPropertyNames(proto));
-                  for (var i = 0; i < keys.length; i++) {
-                    var key = keys[i];
-                    if (key !== 'constructor' && key !== 'set' && key !== 'get' && key !== 'clone') {
-                      url[key]();
-                      break;
-                    }
-                  }
-                  return url.get('n');
-                };
-                // The player's own URL builder is the authoritative signature
-                // transform: fE(url, param, value) applies Vq/Lb and stores the
-                // encoded result under 'param'. This survives player rewrites
-                // that break the regex rule extractor.
-                globalThis.solveSig = function(sig) {
-                  var url = globalThis._solver('https://youtube.com/watch?v=yt-dlp-wins', 's', sig);
-                  var transformed = url.get('s');
-                  return transformed == null ? null : decodeURIComponent(transformed);
-                };
-            """.trimIndent()
-            cx.evaluateString(scope, helperScript, "helper", 1, null)
-
-            val solverFunc = scope.get("solveN", scope) as? RhinoFunction
-            val sigSolverFunc = scope.get("solveSig", scope) as? RhinoFunction
-            if (solverFunc != null) {
-                rhinoNScope = scope
-                rhinoNSolverFunc = solverFunc
-                rhinoSigSolverFunc = sigSolverFunc
-                rhinoNSolverPlayerUrl = playerUrl
-                logI(TAG, "Modern Rhino n-solver ($funcName) initialized successfully for $targetUrl")
+        synchronized(rhinoInitLock) {
+            val latestUrl = playerUrl
+            if (rhinoNScope != null && rhinoNSolverFunc != null && rhinoNSolverPlayerUrl == latestUrl) {
+                return
             }
-        } catch (t: Throwable) {
-            logW(TAG, "Failed to initialize modern Rhino n-solver: ${t.message}")
-        } finally {
-            RhinoContext.exit()
+            val lockedTarget = latestUrl.ifEmpty { PINNED_PLAYER_URL }
+            if (rhinoInitFailedUrl == lockedTarget && System.currentTimeMillis() < rhinoInitFailedUntilMs) {
+                return
+            }
+            val js = ensureBaseJs()
+            if (js.isNullOrEmpty()) return
+
+            val modernPattern = Regex("""([a-zA-Z0-9$]+)=function\([a-zA-Z0-9$,]+\)\{[^}]*a\.set\("alr","yes"\)[^}]*\}""")
+            val match = modernPattern.find(js)
+            if (match == null) {
+                initFailed = true
+                logD(TAG, "Modern n-solver alr pattern not found in $lockedTarget")
+            } else {
+                val funcName = match.groupValues[1]
+                val patchedJs = js.replaceRange(match.range, "globalThis._solver=" + match.value)
+
+                val factory = BoundedRhinoContextFactory()
+                val cx = factory.enterContext()
+                try {
+                    cx.optimizationLevel = -1
+                    cx.languageVersion = RhinoContext.VERSION_ES6
+                    val scope = cx.initStandardObjects()
+
+                    val mockInit = """
+                        var window = this; var globalThis = this; var self = this;
+                        var location = { href: 'https://www.youtube.com', hostname: 'www.youtube.com', protocol: 'https:', host: 'www.youtube.com' };
+                        var document = { currentScript: { src: '$lockedTarget' } };
+                        var navigator = { userAgent: '$DESKTOP_UA' };
+                        function XMLHttpRequest() {}
+                        XMLHttpRequest.prototype = {};
+                    """.trimIndent()
+                    cx.evaluateString(scope, mockInit, "init", 1, null)
+                    val compiled = cx.compileString(patchedJs, "base.js", 1, null)
+                    // Start wall-clock cap only for script execution so cold debug ART AST parsing does not starve it.
+                    factory.resetExecutionTimer()
+                    compiled.exec(cx, scope)
+
+                    val helperScript = """
+                        globalThis.solveN = function(n) {
+                          var url = globalThis._solver('https://youtube.com/watch?v=yt-dlp-wins', 's', undefined);
+                          url.set('n', n);
+                          var proto = Object.getPrototypeOf(url);
+                          var keys = Object.keys(proto).concat(Object.getOwnPropertyNames(proto));
+                          for (var i = 0; i < keys.length; i++) {
+                            var key = keys[i];
+                            if (key !== 'constructor' && key !== 'set' && key !== 'get' && key !== 'clone') {
+                              url[key]();
+                              break;
+                            }
+                          }
+                          return url.get('n');
+                        };
+                        // The player's own URL builder is the authoritative signature
+                        // transform: fE(url, param, value) applies Vq/Lb and stores the
+                        // encoded result under 'param'. This survives player rewrites
+                        // that break the regex rule extractor.
+                        globalThis.solveSig = function(sig) {
+                          var url = globalThis._solver('https://youtube.com/watch?v=yt-dlp-wins', 's', sig);
+                          var transformed = url.get('s');
+                          return transformed == null ? null : decodeURIComponent(transformed);
+                        };
+                    """.trimIndent()
+                    cx.evaluateString(scope, helperScript, "helper", 1, null)
+
+                    val solverFunc = scope.get("solveN", scope) as? RhinoFunction
+                    val sigSolverFunc = scope.get("solveSig", scope) as? RhinoFunction
+                    if (solverFunc != null) {
+                        builtScope = scope
+                        builtNSolver = solverFunc
+                        builtSigSolver = sigSolverFunc
+                        builtFuncName = funcName
+                    } else {
+                        initFailed = true
+                    }
+                } catch (t: Throwable) {
+                    initFailed = true
+                    logW(TAG, "Failed to initialize modern Rhino n-solver: ${t.message}")
+                } finally {
+                    RhinoContext.exit()
+                }
+            }
+        }
+
+        // Publish outside `rhinoInitLock` to preserve the strict `lock -> rhinoInitLock` order.
+        synchronized(lock) {
+            val activeUrl = playerUrl
+            val activeTarget = activeUrl.ifEmpty { PINNED_PLAYER_URL }
+            if (activeTarget != targetUrl && activeUrl.isNotEmpty()) {
+                return
+            }
+            if (builtNSolver != null && builtScope != null) {
+                rhinoNScope = builtScope
+                rhinoNSolverFunc = builtNSolver
+                rhinoSigSolverFunc = builtSigSolver
+                rhinoNSolverPlayerUrl = activeUrl
+                rhinoInitFailedUrl = null
+                rhinoInitFailedUntilMs = 0L
+                logI(TAG, "Modern Rhino n-solver ($builtFuncName) initialized successfully for $activeTarget")
+            } else if (initFailed) {
+                rhinoInitFailedUrl = activeTarget
+                rhinoInitFailedUntilMs = System.currentTimeMillis() + RHINO_FAILURE_COOLDOWN_MS
+            }
         }
     }
 
@@ -719,52 +806,77 @@ internal object PlayerJavaScript {
         }
     }
 
+    private fun replaceNParamInUrl(url: String, nVal: String, transformed: String): String {
+        val encodedOld = java.net.URLEncoder.encode(nVal, "UTF-8")
+        val encodedNew = java.net.URLEncoder.encode(transformed, "UTF-8")
+        val patternExact = Regex("([?&])n=${Regex.escape(nVal)}(?=&|$)")
+        val patternEncoded = Regex("([?&])n=${Regex.escape(encodedOld)}(?=&|$)")
+        return when {
+            patternExact.containsMatchIn(url) -> patternExact.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
+            patternEncoded.containsMatchIn(url) -> patternEncoded.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
+            else -> url.replace("n=$nVal", "n=$transformed")
+        }
+    }
+
     /**
      * Returns [url] with its throttling `n` parameter transformed. Null when the
      * transform is unavailable — an untransformed-`n` URL is answered with 403 by
      * googlevideo, so callers must discard the URL rather than keep it.
      */
-    fun deobfuscateN(url: String): String? = synchronized(lock) {
-        val nMatch = N_PARAM_REGEX.find(url)
-        val nVal = nMatch?.groupValues?.get(1)
+    fun deobfuscateN(url: String): String? {
+        val nVal = N_PARAM_REGEX.find(url)?.groupValues?.get(1)
         if (!nVal.isNullOrEmpty()) {
             ensurePlayerUrl()
+            val memoKey = "$playerUrl\u0000$nVal"
+            val cachedN = synchronized(lock) { nTransformMemo[memoKey] }
+            if (!cachedN.isNullOrEmpty()) {
+                return replaceNParamInUrl(url, nVal, cachedN)
+            }
+
             ensureRhinoNSolver()
-            val transformed = transformN(nVal)
-            if (!transformed.isNullOrEmpty()) {
-                val encodedOld = java.net.URLEncoder.encode(nVal, "UTF-8")
-                val encodedNew = java.net.URLEncoder.encode(transformed, "UTF-8")
-                val patternExact = Regex("([?&])n=${Regex.escape(nVal)}(?=&|$)")
-                val patternEncoded = Regex("([?&])n=${Regex.escape(encodedOld)}(?=&|$)")
-                val deobfuscatedUrl = when {
-                    patternExact.containsMatchIn(url) -> patternExact.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
-                    patternEncoded.containsMatchIn(url) -> patternEncoded.replaceFirst(url, "$1n=" + Regex.escapeReplacement(encodedNew))
-                    else -> url.replace("n=$nVal", "n=$transformed")
+            val transformed = synchronized(lock) {
+                val result = transformN(nVal)
+                if (!result.isNullOrEmpty()) {
+                    nTransformMemo[memoKey] = result
                 }
+                result
+            }
+            if (!transformed.isNullOrEmpty()) {
                 logI(TAG, "Modern Rhino n-transform succeeded: $nVal -> $transformed")
-                return deobfuscatedUrl
+                return replaceNParamInUrl(url, nVal, transformed)
             }
         }
 
-        try {
+        return synchronized(lock) {
             ensurePlayerUrl()
-            val deobfuscated: String? = YoutubeJavaScriptPlayerManager
-                .getUrlWithThrottlingParameterDeobfuscated(playerUrl, url)
-            if (deobfuscated.isNullOrEmpty()) return@synchronized null
+            if (newPipeNFailedUrl == playerUrl) return@synchronized null
+            try {
+                val deobfuscated: String? = YoutubeJavaScriptPlayerManager
+                    .getUrlWithThrottlingParameterDeobfuscated(playerUrl, url)
+                if (deobfuscated.isNullOrEmpty()) {
+                    newPipeNFailedUrl = playerUrl
+                    return@synchronized null
+                }
 
-            // NewPipe's n-function heuristics can latch onto an unrelated helper
-            // whose call is a silent identity. Detect the identity result
-            // so the failure is at least visible in logs instead of presenting as a perfect transform.
-            val before = N_PARAM_REGEX.find(url)?.groupValues?.get(1)
-            val after = N_PARAM_REGEX.find(deobfuscated)?.groupValues?.get(1)
-            if (before != null && before == after) {
-                logW(TAG, "n-parameter deobfuscation produced an identity result; treating as unavailable")
-                return@synchronized null
+                // NewPipe's n-function heuristics can latch onto an unrelated helper
+                // whose call is a silent identity. Detect the identity result
+                // so the failure is at least visible in logs instead of presenting as a perfect transform.
+                val before = N_PARAM_REGEX.find(url)?.groupValues?.get(1)
+                val after = N_PARAM_REGEX.find(deobfuscated)?.groupValues?.get(1)
+                if (before != null && before == after) {
+                    newPipeNFailedUrl = playerUrl
+                    logW(TAG, "n-parameter deobfuscation produced an identity result; treating as unavailable")
+                    return@synchronized null
+                }
+                if (before != null && !after.isNullOrEmpty()) {
+                    nTransformMemo["$playerUrl\u0000$before"] = after
+                }
+                deobfuscated
+            } catch (t: Throwable) {
+                newPipeNFailedUrl = playerUrl
+                logW(TAG, "n-parameter deobfuscation fallback failed: ${t.message}")
+                null
             }
-            deobfuscated
-        } catch (t: Throwable) {
-            logW(TAG, "n-parameter deobfuscation fallback failed: ${t.message}")
-            null
         }
     }
 
@@ -808,6 +920,11 @@ internal object PlayerJavaScript {
             rhinoNSolverFunc = null
             rhinoSigSolverFunc = null
             rhinoNSolverPlayerUrl = null
+            rhinoInitFailedUrl = null
+            rhinoInitFailedUntilMs = 0L
+            newPipeSigFailedUrl = null
+            newPipeNFailedUrl = null
+            nTransformMemo.clear()
             try {
                 YoutubeJavaScriptPlayerManager.clearAllCaches()
             } catch (t: Throwable) {

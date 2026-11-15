@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/widgets/artwork_placeholder.dart';
+import 'package:pulsr/core/widgets/cached_artwork.dart';
+import 'package:pulsr/core/widgets/marquee_text.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/data/services/cast_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
@@ -133,7 +136,13 @@ void main() {
       expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsNothing);
       expect(find.byType(PlayerPlayHandle), findsOneWidget);
 
-      // 2. Track Header: Add to Playlist, Favorite (Star), More / Song Options (...)
+      // 2. Track Header: Title is start-aligned with Artist, plus Add to Playlist, Favorite (Star), More / Song Options (...)
+      final titleMarquee =
+          tester.widget<MarqueeText>(find.byType(MarqueeText));
+      expect(titleMarquee.textAlign, TextAlign.start);
+      final titleRect = tester.getRect(find.text('Test Song Title'));
+      final artistRect = tester.getRect(find.text('Test Artist'));
+      expect(titleRect.left, closeTo(artistRect.left, 1.0));
       expect(find.byIcon(Icons.playlist_add_rounded), findsOneWidget);
       expect(find.byIcon(Icons.star_outline_rounded), findsOneWidget);
       expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
@@ -197,11 +206,33 @@ void main() {
       verify(() => mockPlayerCubit.toggleRepeat()).called(1);
     });
 
-    testWidgets('renders AB Loop buttons and Bookmark banner when active',
+    testWidgets(
+        'does not render A/B circle buttons even in professional mode or when points are set, while keeping Bookmark banner',
         (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 2.75;
       addTearDown(tester.view.resetPhysicalSize);
+
+      when(() => mockSettingsCubit.state).thenReturn(
+        const SettingsState(
+          themeMode: AppThemeMode.dark,
+          nowPlayingDoubleTap: NowPlayingDoubleTapAction.none,
+          nowPlayingArtworkSwipe: NowPlayingArtworkSwipeAction.none,
+          playerSliderStyle: PlayerSliderStyle.capsule,
+          canvasEnabled: false,
+          canvasAsBackdrop: false,
+          experienceMode: ExperienceMode.professional,
+          currentOutputDevice: AudioOutputInfo(
+            deviceName: 'Phone Speaker',
+            isUsbDac: false,
+            sampleRate: 48000,
+            pcmEncoding: 2,
+            bitDepth: 16,
+            isBitPerfectActive: false,
+            isBitPerfectSupported: false,
+          ),
+        ),
+      );
 
       final activeState = PlayerState(
         playback: const PlaybackSlice(
@@ -224,9 +255,9 @@ void main() {
       await tester.pumpWidget(buildSubject(playerState: activeState));
       await tester.pumpAndSettle();
 
-      // Loop points A and B are rendered
-      expect(find.text('A'), findsOneWidget);
-      expect(find.text('B'), findsOneWidget);
+      // Loop points A and B circular buttons are not rendered
+      expect(find.text('A'), findsNothing);
+      expect(find.text('B'), findsNothing);
 
       // Bookmark banner is rendered
       expect(find.byType(PlayerBookmarkPromptBanner), findsOneWidget);
@@ -345,6 +376,36 @@ void main() {
 
       expect(find.byIcon(Icons.cast_connected_rounded), findsNothing);
       expect(find.text('CAST'), findsNothing);
+    });
+
+    testWidgets(
+        'landscape fills left half edge-to-edge into camera/corners and centers play handle',
+        (tester) async {
+      tester.view.physicalSize = const Size(994, 456);
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.padding = const FakeViewPadding(left: 48);
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      final artRect = tester.getRect(find.byType(CachedArtwork));
+      final placeholderRect = tester.getRect(find.byType(ArtworkPlaceholder));
+      final handleRect = tester.getRect(find.byType(PlayerPlayHandle));
+
+      // Artwork stage fills the full left half (into camera cutout & corners).
+      expect(artRect.left, closeTo(0.0, 0.5));
+      expect(artRect.top, closeTo(0.0, 0.5));
+      expect(artRect.right, closeTo(497.0, 1.0));
+      expect(artRect.bottom, closeTo(456.0, 0.5));
+
+      // Inner artwork child stretches to match the full stage without shrinking.
+      expect(placeholderRect.width, closeTo(497.0, 1.0));
+      expect(placeholderRect.height, closeTo(456.0, 1.0));
+
+      // Top grab handle remains horizontally centered on the display.
+      expect(handleRect.center.dx, closeTo(497.0, 1.0));
     });
   });
 }
