@@ -1508,7 +1508,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 )
                 val deviceEncs = device.encodings.filter { it in directEncodings }
                 val encodingsToProbe = if (deviceEncs.isNotEmpty()) deviceEncs else directEncodings
-                val deviceRates = device.sampleRates.filter { it >= 44100 }.sortedDescending()
+                val deviceRates = device.sampleRates.filter { it >= 44100 }.sortedDescending().take(6)
                 val ratesToProbe = if (deviceRates.isNotEmpty()) deviceRates else listOf(192000, 96000, 48000)
                 val channelMask = device.channelMasks.firstOrNull { it != 0 } ?: AudioFormat.CHANNEL_OUT_STEREO
                 for (enc in encodingsToProbe) {

@@ -7,7 +7,6 @@
 // hint never schedules its auto-dismiss timer.
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
@@ -123,6 +122,7 @@ Widget libraryHarness({
   PlayerCubit? playerCubit,
   SettingsCubit? settingsCubit,
   Size size = const Size(1000, 1600),
+  Locale? locale,
 }) {
   return MediaQuery(
     data: MediaQueryData(size: size, disableAnimations: true),
@@ -136,11 +136,8 @@ Widget libraryHarness({
       ],
       child: MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-        ],
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: child,
       ),

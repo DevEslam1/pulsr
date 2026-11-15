@@ -1869,87 +1869,98 @@ class _QuranHeroCard extends StatelessWidget {
                               // ── Gilt transport row ─────────────────────────
                               Row(
                                 children: [
-                                  ExcludeSemantics(
-                                    child: Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        borderRadius: ctaRadius,
-                                        onTap: () => onPlayPressed(isCurrent),
-                                        child: Container(
-                                          height: 34,
-                                          padding:
-                                              EdgeInsetsDirectional.fromSTEB(
-                                            isPlaying ? 11 : 10,
-                                            0,
-                                            isPlaying ? 11 : 13,
-                                            0,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                Color.alphaBlend(
-                                                  Colors.white
-                                                      .withValues(alpha: 0.20),
+                                  Flexible(
+                                    child: ExcludeSemantics(
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          borderRadius: ctaRadius,
+                                          onTap: () => onPlayPressed(isCurrent),
+                                          child: Container(
+                                            height: 34,
+                                            padding:
+                                                EdgeInsetsDirectional.fromSTEB(
+                                              isPlaying ? 11 : 10,
+                                              0,
+                                              isPlaying ? 11 : 13,
+                                              0,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                                colors: [
+                                                  Color.alphaBlend(
+                                                    Colors.white
+                                                        .withValues(alpha: 0.20),
+                                                    gilt,
+                                                  ),
                                                   gilt,
+                                                ],
+                                              ),
+                                              borderRadius: ctaRadius,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: gilt.withValues(
+                                                    alpha:
+                                                        isPlaying ? 0.34 : 0.22,
+                                                  ),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 3),
                                                 ),
-                                                gilt,
                                               ],
-                                            ),
-                                            borderRadius: ctaRadius,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: gilt.withValues(
+                                              border: Border.all(
+                                                color: onGilt.withValues(
                                                   alpha:
-                                                      isPlaying ? 0.34 : 0.22,
+                                                      isPlaying ? 0.32 : 0.16,
                                                 ),
-                                                blurRadius: 10,
-                                                offset: const Offset(0, 3),
+                                                width: 0.9,
                                               ),
-                                            ],
-                                            border: Border.all(
-                                              color: onGilt.withValues(
-                                                alpha: isPlaying ? 0.32 : 0.16,
-                                              ),
-                                              width: 0.9,
                                             ),
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              if (isBuffering)
-                                                SizedBox(
-                                                  width: 14,
-                                                  height: 14,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    strokeWidth: 2.0,
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                if (isBuffering)
+                                                  SizedBox(
+                                                    width: 14,
+                                                    height: 14,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                      strokeWidth: 2.0,
+                                                      color: onGilt,
+                                                    ),
+                                                  )
+                                                else
+                                                  Icon(
+                                                    isPlaying
+                                                        ? Icons.pause_rounded
+                                                        : Icons
+                                                            .play_arrow_rounded,
                                                     color: onGilt,
+                                                    size: 19,
                                                   ),
-                                                )
-                                              else
-                                                Icon(
-                                                  isPlaying
-                                                      ? Icons.pause_rounded
-                                                      : Icons
-                                                          .play_arrow_rounded,
-                                                  color: onGilt,
-                                                  size: 19,
-                                                ),
-                                              if (!isPlaying) ...[
-                                                const SizedBox(width: 5),
-                                                Text(
-                                                  context.l10n.radioListenNow,
-                                                  style: TextStyle(
-                                                    color: onGilt,
-                                                    fontSize: AppFontSize.label,
-                                                    fontWeight: FontWeight.w800,
-                                                    letterSpacing: 0.1,
+                                                if (!isPlaying) ...[
+                                                  const SizedBox(width: 5),
+                                                  Flexible(
+                                                    child: Text(
+                                                      context
+                                                          .l10n.radioListenNow,
+                                                      maxLines: 1,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        color: onGilt,
+                                                        fontSize:
+                                                            AppFontSize.label,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        letterSpacing: 0.1,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
+                                                ],
                                               ],
-                                            ],
+                                            ),
                                           ),
                                         ),
                                       ),

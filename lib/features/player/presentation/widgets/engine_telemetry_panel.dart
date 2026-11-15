@@ -212,26 +212,28 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
 
   Widget _buildEqAutoHeadroomRow(PulsrPalette p, double autoHeadroomDb) {
     final active = autoHeadroomDb < -0.05;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'EQ Auto-Headroom',
-          style: TextStyle(
-            color: p.textSecondary,
-            fontSize: AppFontSize.caption,
+    return Builder(
+      builder: (context) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            context.l10n.eqAutoHeadroomTitle,
+            style: TextStyle(
+              color: p.textSecondary,
+              fontSize: AppFontSize.caption,
+            ),
           ),
-        ),
-        Text(
-          '${autoHeadroomDb.toStringAsFixed(1)} dB',
-          style: TextStyle(
-            color: active ? p.warning : p.textSecondary,
-            fontSize: AppFontSize.caption,
-            fontFeatures: const [FontFeature.tabularFigures()],
-            fontWeight: FontWeight.w600,
+          Text(
+            '${autoHeadroomDb.toStringAsFixed(1)} dB',
+            style: TextStyle(
+              color: active ? p.warning : p.textSecondary,
+              fontSize: AppFontSize.caption,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

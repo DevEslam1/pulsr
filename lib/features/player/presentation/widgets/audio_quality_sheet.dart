@@ -719,7 +719,7 @@ class AudioQualitySheet extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    _outputStreamDescription(outputDevice),
+                    _outputStreamDescription(context, outputDevice),
                     style: TextStyle(
                         color: p.textSecondary, fontSize: AppFontSize.caption),
                   ),
@@ -832,9 +832,13 @@ class AudioQualitySheet extends StatelessWidget {
                               Text(
                                 isSelected
                                     ? (dev.isPreferred && !dev.isCurrent
-                                        ? 'Requested route • waiting for playback confirmation'
-                                        : 'Active route • ${_outputStreamDescription(outputDevice)}')
-                                    : '${dev.typeName} • available output',
+                                        ? context
+                                            .l10n.audioRouteRequestedWaiting
+                                        : context.l10n.audioRouteActive(
+                                            _outputStreamDescription(
+                                                context, outputDevice)))
+                                    : context.l10n
+                                        .audioRouteAvailable(dev.typeName),
                                 style: TextStyle(
                                   color: p.textSecondary,
                                   fontSize: AppFontSize.caption,
@@ -1018,8 +1022,8 @@ class AudioQualitySheet extends StatelessWidget {
                 children: [
                   Text(
                     isConnected
-                        ? context.l10n
-                            .castCastingTo(session.deviceName ?? 'Cast Device')
+                        ? context.l10n.castCastingTo(
+                            session.deviceName ?? context.l10n.castDevice)
                         : context.l10n.castToSpeakerDisplay,
                     style: TextStyle(
                       color: isConnected ? activeColor : p.textPrimary,
@@ -1072,7 +1076,7 @@ class AudioQualitySheet extends StatelessWidget {
       directFormats: outputDevice?.directFormats ?? const [],
     );
     final options = <(int, String, String)>[
-      (0, 'Auto', 'System managed'),
+      (0, context.l10n.audioQualityAuto, context.l10n.audioQualitySystemManaged),
       for (final rate in supportedRates)
         (rate, _sampleRateLabel(rate), _sampleRateTag(rate)),
     ];
@@ -1103,7 +1107,7 @@ class AudioQualitySheet extends StatelessWidget {
                 Flexible(
                   child: Text(
                     context.l10n.exclusiveMixerPrefix(
-                        _outputStreamDescription(outputDevice)),
+                        _outputStreamDescription(context, outputDevice)),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1196,7 +1200,7 @@ class AudioQualitySheet extends StatelessWidget {
                 Flexible(
                   child: Text(
                     context.l10n.exclusiveMixerPrefix(
-                        _outputStreamDescription(outputDevice)),
+                        _outputStreamDescription(context, outputDevice)),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -1348,9 +1352,11 @@ class AudioQualitySheet extends StatelessWidget {
                                 ? blockedReason
                                 : (isBitPerfectEnabled
                                     ? (isBitPerfectActive
-                                        ? 'Source format preserved; DAC sample identity not measured'
+                                        ? context.l10n
+                                            .bitPerfectSourcePreservedUnmeasured
                                         : context.l10n.bpPassThroughArmed)
-                                    : 'Requests exclusive USB mixing where supported'),
+                                    : context.l10n
+                                        .bitPerfectRequestsExclusiveUsb),
                             style: TextStyle(
                               color:
                                   blockedReason != null && !isBitPerfectEnabled
@@ -1447,7 +1453,7 @@ class AudioQualitySheet extends StatelessWidget {
                           maxLines: 6,
                           message: cubit.state.errorMessage ??
                               capturedError ??
-                              'Bit-Perfect output is not supported by the current output device.',
+                              context.l10n.bitPerfectUnsupportedDevice,
                         );
                       },
               ),
@@ -1648,10 +1654,10 @@ class AudioQualitySheet extends StatelessWidget {
     // When the direct UAC2 isochronous sink is running it owns the USB
     // endpoint; label it explicitly rather than showing the AudioTrack driver.
     final driverLabel = effectiveUsbStatus.streamingActive
-        ? 'Pulsr UAC2 Isochronous Sink • ${_outputStreamDescription(outputDevice)}'
+        ? 'Pulsr UAC2 Isochronous Sink • ${_outputStreamDescription(context, outputDevice)}'
         : (settingsState?.aaudioOutputEnabled == true
-            ? 'AAudio • ${_outputStreamDescription(outputDevice)}'
-            : 'Media3 AudioTrack • ${_outputStreamDescription(outputDevice)}');
+            ? 'AAudio • ${_outputStreamDescription(context, outputDevice)}'
+            : 'Media3 AudioTrack • ${_outputStreamDescription(context, outputDevice)}');
     final dacLabel = outputDevice?.deviceName ??
         (outputDevice?.isUsbDac == true
             ? context.l10n.outputDeviceUsbHiResDac
@@ -1786,9 +1792,12 @@ class AudioQualitySheet extends StatelessWidget {
             step: 6,
             title: context.l10n.dspHardwareEndpoint,
             detail: assessment.isVerified
-                ? '$dacLabel • ${_sampleRateLabel(assessment.outputSampleRate)} / '
-                    '${assessment.outputBitDepth}-bit reported by platform'
-                : '$dacLabel • hardware format not verified',
+                ? context.l10n.hardwareFormatReportedByPlatform(
+                    dacLabel,
+                    _sampleRateLabel(assessment.outputSampleRate),
+                    assessment.outputBitDepth,
+                  )
+                : context.l10n.hardwareFormatNotVerified(dacLabel),
             icon: outputDevice?.isUsb == true
                 ? Icons.usb_rounded
                 : (outputDevice?.isBt == true
@@ -2018,18 +2027,25 @@ class _OptionPill extends StatelessWidget {
   }
 }
 
-String _outputStreamDescription(AudioOutputInfo? output) {
+String _outputStreamDescription(
+    BuildContext context, AudioOutputInfo? output) {
+  final l10n = context.l10n;
   if (output == null || output.sampleRate <= 0 || output.bitDepth <= 0) {
-    return 'App stream format unverified';
+    return l10n.appStreamFormatUnverified;
   }
   final frames = output.nativeFramesPerBuffer ?? 0;
   final nativeRate = output.nativeSampleRate ?? 0;
   final bufferMs = (frames > 0 && nativeRate > 0)
       ? (frames / nativeRate * 1000).toStringAsFixed(1)
       : null;
-  return 'App stream: ${_sampleRateLabel(output.sampleRate)} / ${output.bitDepth}-bit '
-      '${output.pcmEncoding == 4 ? "float" : "PCM"}'
-      '${bufferMs == null ? '' : ' • primary buffer hint ~$bufferMs ms'}';
+  final spec = l10n.appStreamFormatSpec(
+    _sampleRateLabel(output.sampleRate),
+    output.bitDepth,
+    output.pcmEncoding == 4 ? 'float' : 'PCM',
+  );
+  return bufferMs == null
+      ? spec
+      : '$spec • ${l10n.appStreamPrimaryBufferHint(bufferMs)}';
 }
 
 String _sampleRateLabel(int rate) {
@@ -2453,7 +2469,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                               child: Text(
                                 (sampleRateHz > 0
                                     ? _sampleRateLabel(sampleRateHz)
-                                    : 'Rate unknown'),
+                                    : context.l10n.outputRateUnknown),
                                 style: const TextStyle(
                                   color: _btAccent,
                                   fontSize: AppFontSize.body,
@@ -2588,12 +2604,12 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 children: [
                   Text(
                     ldacModes[ldacMode.clamp(0, 3)].$1 == 0
-                        ? 'Best Effort'
+                        ? context.l10n.audioQualityBestEffort
                         : ldacModes[ldacMode.clamp(0, 3)].$1 == 1
-                            ? 'Mobile'
+                            ? context.l10n.audioQualityMobile
                             : ldacModes[ldacMode.clamp(0, 3)].$1 == 2
-                                ? 'Standard'
-                                : 'Maximum',
+                                ? context.l10n.audioQualityStandard
+                                : context.l10n.audioQualityMaximum,
                     style: const TextStyle(
                       color: _ldacAccent,
                       fontSize: AppFontSize.bodySmall,

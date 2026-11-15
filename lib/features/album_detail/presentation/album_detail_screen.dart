@@ -613,46 +613,59 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       child: Row(
         children: [
           if (hasSelection)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s10,
-                vertical: AppSpacing.xxs,
-              ),
-              decoration: BoxDecoration(
-                color: p.accent.withValues(alpha: 0.15),
-                borderRadius: AppRadii.r8All,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.check_circle_rounded,
-                    size: 14,
-                    color: p.accent,
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s10,
+                    vertical: AppSpacing.xxs,
                   ),
-                  const SizedBox(width: AppSpacing.xxs),
-                  Text(
-                    context.l10n.selectedCount(_selectedIds.length),
-                    style: TextStyle(
-                      color: p.accent,
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.15),
+                    borderRadius: AppRadii.r8All,
                   ),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 14,
+                        color: p.accent,
+                      ),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Flexible(
+                        child: Text(
+                          context.l10n.selectedCount(_selectedIds.length),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: p.accent,
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             )
           else
-            Text(
-              context.l10n.queue.toUpperCase(),
-              style: TextStyle(
-                color: p.textTertiary,
-                fontSize: AppFontSize.caption,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.8,
+            Expanded(
+              child: Text(
+                context.l10n.queue.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: p.textTertiary,
+                  fontSize: AppFontSize.caption,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.8,
+                ),
               ),
             ),
-          const Spacer(),
+          const SizedBox(width: AppSpacing.xs),
           // In-list sort (gap 07-01, persisted per session).
           Container(
             padding: const EdgeInsets.symmetric(
@@ -687,15 +700,27 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               items: [
                 DropdownMenuItem(
                   value: _AlbumSort.track,
-                  child: Text(context.l10n.sortTrackNumber),
+                  child: Text(
+                    context.l10n.sortTrackNumber,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 DropdownMenuItem(
                   value: _AlbumSort.title,
-                  child: Text(context.l10n.sortAZ),
+                  child: Text(
+                    context.l10n.sortAZ,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
                 DropdownMenuItem(
                   value: _AlbumSort.duration,
-                  child: Text(context.l10n.sortDuration),
+                  child: Text(
+                    context.l10n.sortDuration,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
               onChanged: (v) {

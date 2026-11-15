@@ -69,9 +69,19 @@ public final class PulsrOutputRouting {
     }
 
     static CapturingAudioOutputProvider createCapturingOutputProvider(Context context) {
+        return createCapturingOutputProvider(context, null);
+    }
+
+    static CapturingAudioOutputProvider createCapturingOutputProvider(
+            Context context,
+            @Nullable DefaultAudioSink.AudioTrackBufferSizeProvider bufferSizeProvider) {
         captureDebugFlag(context);
-        return new CapturingAudioOutputProvider(
-                new AudioTrackAudioOutputProvider.Builder(context).build());
+        AudioTrackAudioOutputProvider.Builder builder =
+                new AudioTrackAudioOutputProvider.Builder(context);
+        if (bufferSizeProvider != null) {
+            builder.setAudioTrackBufferSizeProvider(bufferSizeProvider);
+        }
+        return new CapturingAudioOutputProvider(builder.build());
     }
 
     private static void captureDebugFlag(@Nullable Context context) {

@@ -13,6 +13,7 @@ import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
+import '../../../l10n/generated/app_localizations.dart';
 import 'smart_playlist_builder_cubit.dart';
 import 'smart_playlist_builder_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -706,7 +707,7 @@ class _RuleCardState extends State<_RuleCard> {
                       items: SmartRuleField.values.map((f) {
                         return DropdownMenuItem(
                           value: f,
-                          child: Text(f.label,
+                          child: Text(_localizedFieldLabel(context.l10n, f),
                               style: const TextStyle(
                                   fontSize: AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600)),
@@ -743,7 +744,7 @@ class _RuleCardState extends State<_RuleCard> {
                       items: SmartOperator.values.map((o) {
                         return DropdownMenuItem(
                           value: o,
-                          child: Text(o.label,
+                          child: Text(_localizedOperatorLabel(context.l10n, o),
                               style: const TextStyle(
                                   fontSize: AppFontSize.bodySmall,
                                   fontWeight: FontWeight.w600)),
@@ -839,6 +840,39 @@ class _RuleCardState extends State<_RuleCard> {
       ),
     );
   }
+
+  String _localizedFieldLabel(AppLocalizations l, SmartRuleField field) =>
+      switch (field) {
+        SmartRuleField.playCount => l.smartCriteriaFieldPlayCount,
+        SmartRuleField.artist => l.artist,
+        SmartRuleField.album => l.album,
+        SmartRuleField.title => l.title,
+        SmartRuleField.genre => l.genre,
+        SmartRuleField.year => l.year,
+        SmartRuleField.decade => l.smartCriteriaFieldDecade,
+        SmartRuleField.isLossless => l.smartCriteriaFieldLossless,
+        SmartRuleField.dateAdded => l.smartCriteriaFieldDateAdded,
+        SmartRuleField.durationMs => l.duration,
+        SmartRuleField.isFavorite => l.favorite,
+        SmartRuleField.rating => l.smartCriteriaFieldRating,
+        SmartRuleField.lastPlayed => l.smartCriteriaFieldLastPlayed,
+        SmartRuleField.bpm => l.smartCriteriaFieldBpm,
+        SmartRuleField.loudnessRange => l.smartCriteriaFieldLra,
+        SmartRuleField.bitrate => l.smartCriteriaFieldBitrate,
+      };
+
+  String _localizedOperatorLabel(AppLocalizations l, SmartOperator op) =>
+      switch (op) {
+        SmartOperator.equals ||
+        SmartOperator.greaterThan ||
+        SmartOperator.lessThan ||
+        SmartOperator.greaterThanOrEqual ||
+        SmartOperator.lessThanOrEqual =>
+          op.label,
+        SmartOperator.contains => l.smartRuleOpContains,
+        SmartOperator.withinDays => l.smartCriteriaOpWithinDays,
+        SmartOperator.between => l.smartCriteriaOpBetween,
+      };
 
   String _getHintForField(
       BuildContext context, SmartRuleField field, SmartOperator op) {

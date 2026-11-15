@@ -423,33 +423,13 @@ extension _EqSheetShell on _EqualizerSheetState {
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                  child: Container(
-                    height: PulsrLayoutMetrics.fieldHeight(context),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: AppRadii.r20All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      tabAlignment: TabAlignment.fill,
-                      indicator: BoxDecoration(
-                        color: p.accent,
-                        borderRadius: AppRadii.r20All,
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      labelColor: p.onAccent,
-                      unselectedLabelColor: p.textSecondary,
-                      labelStyle: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: AppFontSize.label),
-                      dividerColor: Colors.transparent,
-                      tabs: [
-                        Tab(text: context.l10n.equalizer),
-                        Tab(text: context.l10n.autoEqLabel),
-                        Tab(text: context.l10n.dspSpatialTab),
-                      ],
-                    ),
+                  child: PulsrPillTabBar(
+                    controller: _tabController,
+                    tabs: [
+                      Tab(text: context.l10n.equalizer),
+                      Tab(text: context.l10n.autoEqLabel),
+                      Tab(text: context.l10n.dspSpatialTab),
+                    ],
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -530,33 +510,13 @@ extension _EqSheetShell on _EqualizerSheetState {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.sm,
                                 vertical: AppSpacing.xxs),
-                            child: Container(
-                              height: PulsrLayoutMetrics.fieldHeight(context),
-                              decoration: BoxDecoration(
-                                color: p.surfaceContainer,
-                                borderRadius: AppRadii.r20All,
-                                border: Border.all(color: p.hairline),
-                              ),
-                              child: TabBar(
-                                controller: _tabController,
-                                tabAlignment: TabAlignment.fill,
-                                indicator: BoxDecoration(
-                                  color: p.accent,
-                                  borderRadius: AppRadii.r20All,
-                                ),
-                                indicatorSize: TabBarIndicatorSize.tab,
-                                labelColor: p.onAccent,
-                                unselectedLabelColor: p.textSecondary,
-                                labelStyle: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: AppFontSize.label),
-                                dividerColor: Colors.transparent,
-                                tabs: [
-                                  Tab(text: context.l10n.equalizer),
-                                  Tab(text: context.l10n.autoEqLabel),
-                                  Tab(text: context.l10n.dspSpatialTab),
-                                ],
-                              ),
+                            child: PulsrPillTabBar(
+                              controller: _tabController,
+                              tabs: [
+                                Tab(text: context.l10n.equalizer),
+                                Tab(text: context.l10n.autoEqLabel),
+                                Tab(text: context.l10n.dspSpatialTab),
+                              ],
                             ),
                           ),
                           Expanded(
@@ -1020,9 +980,10 @@ extension _EqSheetShell on _EqualizerSheetState {
     String? dspBlocked,
   ) {
     final preset = state.eqPreset;
-    final simplifiedPresets = <(String, EqPreset)>[
+    final simplifiedPresets = <(String, String, EqPreset)>[
       (
         'Flat',
+        context.l10n.eqPresetFlat,
         EqPreset.defaultPresets.firstWhere(
           (p) => p.name == 'Flat',
           orElse: () => EqPreset.defaultPresets.first,
@@ -1030,6 +991,7 @@ extension _EqSheetShell on _EqualizerSheetState {
       ),
       (
         'Bass Boost',
+        context.l10n.eqPresetBassBoost,
         EqPreset.defaultPresets.firstWhere(
           (p) => p.name == 'Bass Boost',
           orElse: () => EqPreset.defaultPresets.first,
@@ -1037,17 +999,23 @@ extension _EqSheetShell on _EqualizerSheetState {
       ),
       (
         'Vocal',
+        context.l10n.eqPresetVocal,
         EqPreset.defaultPresets.firstWhere((p) => p.name == 'Vocal Boost',
             orElse: () => EqPreset.defaultPresets.first)
       ),
       (
         'Treble',
+        context.l10n.eqPresetTreble,
         const EqPreset(
             name: 'Treble',
             gains: [-1, -0.5, 0, 0, 1, 2, 3.5, 5, 6, 6.5],
             bassBoost: 0.0)
       ),
-      ('Custom', EqPreset(name: 'Custom', gains: List.filled(10, 0.0))),
+      (
+        'Custom',
+        context.l10n.eqPresetCustom,
+        EqPreset(name: 'Custom', gains: List.filled(10, 0.0)),
+      ),
     ];
     final isStandardPreset =
         ['Flat', 'Bass Boost', 'Vocal Boost', 'Treble'].contains(preset.name);
@@ -1073,12 +1041,13 @@ extension _EqSheetShell on _EqualizerSheetState {
           spacing: AppSpacing.xs,
           runSpacing: AppSpacing.xs,
           children: simplifiedPresets.map((entry) {
-            final label = entry.$1;
-            final itemPreset = entry.$2;
-            final bool isSelected = label == 'Custom'
+            final key = entry.$1;
+            final label = entry.$2;
+            final itemPreset = entry.$3;
+            final bool isSelected = key == 'Custom'
                 ? !isStandardPreset
                 : (preset.name == itemPreset.name ||
-                    (label == 'Vocal' && preset.name == 'Vocal Boost'));
+                    (key == 'Vocal' && preset.name == 'Vocal Boost'));
 
             return ChoiceChip(
               label: Text(label),
@@ -1101,7 +1070,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                       if (!state.isEqEnabled) {
                         cubit.setEqualizerEnabled(true);
                       }
-                      if (label == 'Custom') {
+                      if (key == 'Custom') {
                         cubit.applyPreset(EqPreset(
                             name: 'Custom',
                             gains: List<double>.from(state.eqPreset.gains)));
@@ -1344,9 +1313,10 @@ extension _EqSheetShell on _EqualizerSheetState {
   ) {
     final preset = state.eqPreset;
 
-    final simplifiedPresets = <(String, EqPreset)>[
+    final simplifiedPresets = <(String, String, EqPreset)>[
       (
         'Flat',
+        context.l10n.eqPresetFlat,
         EqPreset.defaultPresets.firstWhere(
           (p) => p.name == 'Flat',
           orElse: () => EqPreset.defaultPresets.first,
@@ -1354,6 +1324,7 @@ extension _EqSheetShell on _EqualizerSheetState {
       ),
       (
         'Bass Boost',
+        context.l10n.eqPresetBassBoost,
         EqPreset.defaultPresets.firstWhere(
           (p) => p.name == 'Bass Boost',
           orElse: () => EqPreset.defaultPresets.first,
@@ -1361,17 +1332,23 @@ extension _EqSheetShell on _EqualizerSheetState {
       ),
       (
         'Vocal',
+        context.l10n.eqPresetVocal,
         EqPreset.defaultPresets.firstWhere((p) => p.name == 'Vocal Boost',
             orElse: () => EqPreset.defaultPresets.first)
       ),
       (
         'Treble',
+        context.l10n.eqPresetTreble,
         const EqPreset(
             name: 'Treble',
             gains: [-1, -0.5, 0, 0, 1, 2, 3.5, 5, 6, 6.5],
             bassBoost: 0.0)
       ),
-      ('Custom', EqPreset(name: 'Custom', gains: List.filled(10, 0.0))),
+      (
+        'Custom',
+        context.l10n.eqPresetCustom,
+        EqPreset(name: 'Custom', gains: List.filled(10, 0.0)),
+      ),
     ];
 
     final isStandardPreset =
@@ -1404,12 +1381,13 @@ extension _EqSheetShell on _EqualizerSheetState {
             spacing: AppSpacing.xs,
             runSpacing: AppSpacing.xs,
             children: simplifiedPresets.map((entry) {
-              final label = entry.$1;
-              final itemPreset = entry.$2;
-              final bool isSelected = label == 'Custom'
+              final key = entry.$1;
+              final label = entry.$2;
+              final itemPreset = entry.$3;
+              final bool isSelected = key == 'Custom'
                   ? !isStandardPreset
                   : (preset.name == itemPreset.name ||
-                      (label == 'Vocal' && preset.name == 'Vocal Boost'));
+                      (key == 'Vocal' && preset.name == 'Vocal Boost'));
 
               return ChoiceChip(
                 label: Text(label),
@@ -1432,7 +1410,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                         if (!state.isEqEnabled) {
                           cubit.setEqualizerEnabled(true);
                         }
-                        if (label == 'Custom') {
+                        if (key == 'Custom') {
                           cubit.applyPreset(EqPreset(
                               name: 'Custom',
                               gains: List<double>.from(state.eqPreset.gains)));
@@ -2517,7 +2495,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 ),
                                 if (autoHeadroomDb < -0.05)
                                   Text(
-                                    'Auto-headroom: ${autoHeadroomDb.toStringAsFixed(1)} dB',
+                                    context.l10n.autoHeadroomValue(
+                                        autoHeadroomDb.toStringAsFixed(1)),
                                     style: TextStyle(
                                       fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w600,
@@ -2737,8 +2716,9 @@ extension _EqSheetShell on _EqualizerSheetState {
                           ),
                           Text(
                             preset.bassBoost > 0
-                                ? '${(preset.bassBoost * 100).round()}% punch'
-                                : 'Bass boost bypassed',
+                                ? context.l10n.dspPunchPercent(
+                                    (preset.bassBoost * 100).round())
+                                : context.l10n.bassBoostBypassed,
                             style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 color: p.textTertiary),
@@ -2910,8 +2890,10 @@ extension _EqSheetShell on _EqualizerSheetState {
                           ),
                           Text(
                             state.volumeBoost > 0
-                                ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB hardware gain'
-                                : 'Hardware gain bypassed',
+                                ? context.l10n.hardwareGainPlusDb(
+                                    (state.volumeBoost * 10)
+                                        .toStringAsFixed(1))
+                                : context.l10n.hardwareGainBypassed,
                             style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 color: p.textTertiary),
@@ -3109,8 +3091,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                           Flexible(
                             child: Text(
                               state.isSpatializerSupported
-                                  ? 'Spatial Audio'
-                                  : 'Soundstage Widening',
+                                  ? context.l10n.spatialAudio
+                                  : context.l10n.soundstageWidening,
                               style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: AppFontSize.bodySmall,
@@ -3133,8 +3115,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                             ),
                             child: Text(
                               state.isSpatializerSupported
-                                  ? 'Spatial API'
-                                  : 'Emulated',
+                                  ? context.l10n.spatialApi
+                                  : context.l10n.spatialEmulated,
                               style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
@@ -3148,8 +3130,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                       ),
                       Text(
                         state.isSpatializerSupported
-                            ? 'Android Spatializer API with head tracking'
-                            : 'Stereo field expansion via hardware virtualizer',
+                            ? context.l10n.spatialApiDesc
+                            : context.l10n.spatialVirtualizerDesc,
                         style: TextStyle(
                             fontSize: AppFontSize.caption,
                             color: p.textTertiary),

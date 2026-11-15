@@ -420,20 +420,36 @@ class DownloadTile extends StatelessWidget {
                             ),
                             if (task.status == DownloadStatus.downloading &&
                                 task.speedKbps != null &&
-                                task.speedKbps! > 0)
-                              Text(
-                                '${task.speedKbps!.toStringAsFixed(0)} KB/s',
-                                style: TextStyle(
-                                    color: p.textTertiary, fontSize: AppFontSize.label),
+                                task.speedKbps! > 0) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Flexible(
+                                child: Text(
+                                  l10n.downloadSpeedKbps(
+                                    task.speedKbps!.toStringAsFixed(0),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.label),
+                                ),
                               ),
+                            ],
                             if (task.status == DownloadStatus.downloading &&
                                 task.etaSeconds != null &&
-                                task.etaSeconds! > 0)
-                              Text(
-                                '${l10n.browseEta} ${Formatters.formatDuration(Duration(seconds: task.etaSeconds!))}',
-                                style: TextStyle(
-                                    color: p.textTertiary, fontSize: AppFontSize.label),
+                                task.etaSeconds! > 0) ...[
+                              const SizedBox(width: AppSpacing.xs),
+                              Flexible(
+                                child: Text(
+                                  '${l10n.browseEta} ${Formatters.formatDuration(Duration(seconds: task.etaSeconds!))}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.label),
+                                ),
                               ),
+                            ],
                           ],
                         ),
                       ],

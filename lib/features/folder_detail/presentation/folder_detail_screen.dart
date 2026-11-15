@@ -213,13 +213,14 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
   }
 
   String _formatTotalDuration(int totalMs) {
+    final l = context.l10n;
     final d = Duration(milliseconds: totalMs);
     final hours = d.inHours;
     final minutes = d.inMinutes.remainder(60);
     if (hours > 0) {
-      return '$hours hr $minutes min';
+      return l.durationHoursMinutes(hours, minutes);
     }
-    return '$minutes min';
+    return l.durationMinutesOnly(minutes);
   }
 
   String _formatTrackDuration(int ms) {
@@ -1184,7 +1185,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${song.artist} • ${song.album.isNotEmpty ? song.album : 'Single'}',
+                              '${song.artist} • ${song.album.isNotEmpty ? song.album : context.l10n.singleReleaseLabel}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(

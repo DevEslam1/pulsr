@@ -171,7 +171,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 // Release notes
                 if (info.notes != null && info.notes!.isNotEmpty) ...[
                   Text(
-                    "What's New",
+                    context.l10n.whatsNew,
                     style: TextStyle(
                       color: p.textSecondary,
                       fontSize: AppFontSize.label,

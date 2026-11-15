@@ -77,8 +77,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     children: [
                       Text(
                         state.isSpatializerSupported
-                            ? 'Hardware Spatializer Detected'
-                            : 'Emulated 3D Widening Mode',
+                            ? context.l10n.spatialHardwareDetected
+                            : context.l10n.spatialEmulatedMode,
                         style: TextStyle(
                           fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w700,
@@ -89,8 +89,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       ),
                       Text(
                         state.isSpatializerSupported
-                            ? 'Android Spatializer API with multi-channel soundstage'
-                            : 'Stereo field widening active via hardware virtualizer',
+                            ? context.l10n.spatialMultiChannelDesc
+                            : context.l10n.spatialVirtualizerActiveDesc,
                         style: TextStyle(
                             fontSize: AppFontSize.caption, color: p.textTertiary),
                       ),
@@ -611,7 +611,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             conflictReason: dspBlocked ??
                                 (_nativePcmEffectsAvailable
                                     ? null
-                                    : 'Requires PCM DSP path - not audible yet'))),
+                                    : context.l10n.dspRequiresPcmPath))),
                     const SizedBox(width: AppSpacing.xxs),
                     Switch.adaptive(
                       value: dspBlocked == null &&
@@ -1211,7 +1211,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                             conflictReason: dspBlocked ??
                                                 (_nativePcmEffectsAvailable
                                                     ? null
-                                                    : 'Requires PCM DSP path - not audible yet'))),
+                                                    : context.l10n.dspRequiresPcmPath))),
                                   ],
                                 ),
                                 Text(
@@ -1288,12 +1288,15 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       children: [
                         Text(
                           dspBlocked != null
-                              ? 'Blocked'
+                              ? context.l10n.dspBlockedBadge
                               : (state.stereoBalance.abs() < 0.05
-                                  ? 'Center'
+                                  ? context.l10n.roomPositionCenter
                                   : (state.stereoBalance < 0
-                                      ? 'Left ${(-state.stereoBalance * 100).round()}%'
-                                      : 'Right ${(state.stereoBalance * 100).round()}%')),
+                                      ? context.l10n.balanceLeftPercent(
+                                          (-state.stereoBalance * 100).round())
+                                      : context.l10n.balanceRightPercent(
+                                          (state.stereoBalance * 100)
+                                              .round()))),
                           style: TextStyle(
                               fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w700,
@@ -1336,10 +1339,12 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                   slider: true,
                   label: context.l10n.stereoBalanceMono,
                   value: state.stereoBalance.abs() < 0.05
-                      ? 'Center'
+                      ? context.l10n.roomPositionCenter
                       : (state.stereoBalance < 0
-                          ? 'Left ${(-state.stereoBalance * 100).round()}%'
-                          : 'Right ${(state.stereoBalance * 100).round()}%'),
+                          ? context.l10n.balanceLeftPercent(
+                              (-state.stereoBalance * 100).round())
+                          : context.l10n.balanceRightPercent(
+                              (state.stereoBalance * 100).round())),
                   child: SliderTheme(
                     data: SliderTheme.of(context).copyWith(
                       trackHeight: 4,
@@ -1432,7 +1437,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             conflictReason: dspBlocked ??
                                 (_nativePcmEffectsAvailable
                                     ? null
-                                    : 'Requires PCM DSP path - not audible yet'))),
+                                    : context.l10n.dspRequiresPcmPath))),
                     const SizedBox(width: AppSpacing.xxs),
                     Switch.adaptive(
                       value: dspBlocked == null &&
@@ -1490,7 +1495,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            '${(state.reverbWetDry * 100).round()}% Wet',
+                            context.l10n.dspWetPercent(
+                                (state.reverbWetDry * 100).round()),
                             style: TextStyle(
                                 fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w700,
@@ -1778,7 +1784,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       conflictReason: dspBlocked ??
                           (_nativePcmEffectsAvailable
                               ? null
-                              : 'Requires PCM DSP path - not audible yet'))),
+                              : context.l10n.dspRequiresPcmPath))),
               const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
@@ -1820,7 +1826,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               context: context,
               p: p,
               label: l10n.dspSaturationMix,
-              valueText: '${(state.saturationMix * 100).round()}% Wet',
+              valueText: context.l10n.dspWetPercent(
+                  (state.saturationMix * 100).round()),
               value: state.saturationMix,
               min: 0.0,
               max: 1.0,
@@ -1938,7 +1945,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       conflictReason: dspBlocked ??
                           (_nativePcmEffectsAvailable
                               ? null
-                              : 'Requires PCM DSP path - not audible yet'))),
+                              : context.l10n.dspRequiresPcmPath))),
               const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
@@ -2098,7 +2105,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       conflictReason: dspBlocked ??
                           (_nativePcmEffectsAvailable
                               ? null
-                              : 'Requires PCM DSP path - not audible yet'))),
+                              : context.l10n.dspRequiresPcmPath))),
               const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
@@ -2259,7 +2266,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       conflictReason: dspBlocked ??
                           (_nativePcmEffectsAvailable
                               ? null
-                              : 'Requires PCM DSP path - not audible yet'))),
+                              : context.l10n.dspRequiresPcmPath))),
               const SizedBox(width: AppSpacing.xxs),
               Switch.adaptive(
                 value: dspBlocked == null &&
@@ -2924,7 +2931,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                   conflictReason: dspBlocked ??
                       (_nativePcmEffectsAvailable
                           ? null
-                          : 'Requires PCM DSP path - not audible yet'),
+                          : context.l10n.dspRequiresPcmPath),
                 ),
               ),
               const SizedBox(width: AppSpacing.xxs),
@@ -2970,8 +2977,9 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               icon: const Icon(Icons.folder_open_rounded, size: 16),
               label: Text(
                 hasProfile
-                    ? 'Change Profile: ${state.viperDdcProfileName}'
-                    : 'Select / Load .vdc Profile...',
+                    ? context.l10n
+                        .viperChangeProfile(state.viperDdcProfileName)
+                    : context.l10n.viperSelectLoadProfile,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -3069,7 +3077,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                   conflictReason: dspBlocked ??
                       (_nativePcmEffectsAvailable
                           ? null
-                          : 'Requires PCM DSP path - not audible yet'),
+                          : context.l10n.dspRequiresPcmPath),
                 ),
               ),
               const SizedBox(width: AppSpacing.xxs),
@@ -3213,7 +3221,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                   conflictReason: dspBlocked ??
                       (_nativePcmEffectsAvailable
                           ? null
-                          : 'Requires PCM DSP path - not audible yet'),
+                          : context.l10n.dspRequiresPcmPath),
                 ),
               ),
               const SizedBox(width: AppSpacing.xxs),
@@ -3356,7 +3364,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                   conflictReason: dspBlocked ??
                       (_nativePcmEffectsAvailable
                           ? null
-                          : 'Requires PCM DSP path - not audible yet'),
+                          : context.l10n.dspRequiresPcmPath),
                 ),
               ),
               const SizedBox(width: AppSpacing.xxs),

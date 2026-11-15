@@ -665,7 +665,7 @@ class PlaybackPresetsTile extends StatelessWidget {
         if (context.mounted) {
           ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
             behavior: SnackBarBehavior.floating,
-            content: Text('$label applied'),
+            content: Text(context.l10n.presetAppliedMessage(label)),
             duration: const Duration(seconds: 2),
           ));
         }

@@ -4,12 +4,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
-import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_spacing.dart';
 import '../motion/pulsr_motion.dart';
 import '../theme/aura_theme.dart';
-import '../theme/pulsr_button_style.dart';
 import 'pulsr_pressable.dart';
 
 import '../utils/pulsr_haptics.dart';
@@ -53,7 +51,6 @@ class PulsrSegmentedControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isCapsule = context.isCapsuleButtons;
     if (segments.length < 2) return const SizedBox.shrink();
 
     final clampedIndex = selectedIndex.clamp(0, segments.length - 1);
@@ -61,210 +58,174 @@ class PulsrSegmentedControl extends StatelessWidget {
     if (slidingIndicator) {
       return Container(
         margin: margin,
-        padding: const EdgeInsets.all(3.5),
-        decoration: isCapsule
-            ? PulsrCapsuleStyle.decoration(p,
-                borderRadius: context.buttonRadius(rectRadius: 10.0))
-            : BoxDecoration(
-                color: p.surfaceContainer,
-                borderRadius: AppRadii.r16All,
-                border: Border.all(
-                  color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: p.isDark ? 0.22 : 0.04),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final innerWidth = constraints.maxWidth;
-            final segmentWidth = innerWidth / segments.length;
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.r20All,
+          border: Border.all(color: p.hairline),
+        ),
+        child: ClipRRect(
+          borderRadius: AppRadii.r20All,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final innerWidth = constraints.maxWidth;
+              final segmentWidth = innerWidth / segments.length;
 
-            // fitLabels: proportion segment widths to measured label
-            // widths, dropping icons first when they no longer fit.
-            var weights = List<int>.filled(segments.length, 1);
-            var includeIcons = true;
-            if (fitLabels) {
-              final withIcons = _measuredWeights(context, withIcons: true);
-              final totalWithIcons =
-                  withIcons.fold<int>(0, (a, b) => a + b) / 100.0;
-              includeIcons = totalWithIcons <= innerWidth;
-              weights = includeIcons
-                  ? withIcons
-                  : _measuredWeights(context, withIcons: false);
-            }
-            final totalWeight = weights.fold<int>(0, (a, b) => a + b);
-            double fractionStart(int index) {
-              var sum = 0;
-              for (var k = 0; k < index; k++) {
-                sum += weights[k];
+              // fitLabels: proportion segment widths to measured label
+              // widths, dropping icons first when they no longer fit.
+              var weights = List<int>.filled(segments.length, 1);
+              var includeIcons = true;
+              if (fitLabels) {
+                final withIcons = _measuredWeights(context, withIcons: true);
+                final totalWithIcons =
+                    withIcons.fold<int>(0, (a, b) => a + b) / 100.0;
+                includeIcons = totalWithIcons <= innerWidth;
+                weights = includeIcons
+                    ? withIcons
+                    : _measuredWeights(context, withIcons: false);
               }
-              return totalWeight == 0 ? 0 : sum / totalWeight;
-            }
+              final totalWeight = weights.fold<int>(0, (a, b) => a + b);
+              double fractionStart(int index) {
+                var sum = 0;
+                for (var k = 0; k < index; k++) {
+                  sum += weights[k];
+                }
+                return totalWeight == 0 ? 0 : sum / totalWeight;
+              }
 
-            return Stack(
-              children: [
-                // Dimensional sliding studio indicator pill
-                AnimatedPositionedDirectional(
-                  duration: context.motionMs(240),
-                  curve: context.motionCurve(Curves.easeOutCubic),
-                  start: fitLabels
-                      ? fractionStart(clampedIndex) * innerWidth
-                      : clampedIndex * segmentWidth,
-                  top: 0,
-                  bottom: 0,
-                  width: fitLabels
-                      ? (weights[clampedIndex] / totalWeight) * innerWidth
-                      : segmentWidth,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color.lerp(p.accent, Colors.white, 0.10) ?? p.accent,
-                          p.accent,
-                        ],
+              return Stack(
+                children: [
+                  // Pill indicator matching Equalizer / AutoEq / Spatial & DSP
+                  AnimatedPositionedDirectional(
+                    duration: context.motionMs(240),
+                    curve: context.motionCurve(Curves.easeOutCubic),
+                    start: fitLabels
+                        ? fractionStart(clampedIndex) * innerWidth
+                        : clampedIndex * segmentWidth,
+                    top: 0,
+                    bottom: 0,
+                    width: fitLabels
+                        ? (weights[clampedIndex] / totalWeight) * innerWidth
+                        : segmentWidth,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: p.accent,
+                        borderRadius: AppRadii.r20All,
                       ),
-                      borderRadius: context.buttonRadius(rectRadius: 7.0),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.24),
-                        width: 0.8,
-                      ),
-                      boxShadow: [
-                        ...PulsrElevation.level1(context),
-                        BoxShadow(
-                          color: p.accent.withValues(alpha: 0.28),
-                          blurRadius: 12,
-                          spreadRadius: -2,
-                        ),
-                      ],
                     ),
                   ),
-                ),
-                // Segments row
-                Row(
-                  children: [
-                    for (var i = 0; i < segments.length; i++)
-                      Expanded(
-                        flex: fitLabels ? weights[i] : 1,
-                        child: Semantics(
-                          selected: clampedIndex == i,
-                          button: true,
-                          label: segments[i].label,
-                          onTap: () => onChanged(i),
-                          excludeSemantics: true,
-                          child: PulsrPressable(
-                            pressedScale: 0.97,
-                            enableHaptics: false,
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () {
-                              if (clampedIndex != i) {
-                                PulsrHaptics.selectionClick();
-                                onChanged(i);
-                              }
-                            },
-                            child: fitLabels
-                                ? _fitContent(
-                                    context,
-                                    i,
-                                    clampedIndex,
-                                    includeIcons,
-                                  )
-                                : Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.xs,
-                                      vertical: AppSpacing.s10,
-                                    ),
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        minHeight:
-                                            AppSpacing.minTouchTarget - 20,
+                  // Segments row
+                  Row(
+                    children: [
+                      for (var i = 0; i < segments.length; i++)
+                        Expanded(
+                          flex: fitLabels ? weights[i] : 1,
+                          child: Semantics(
+                            selected: clampedIndex == i,
+                            button: true,
+                            label: segments[i].label,
+                            onTap: () => onChanged(i),
+                            excludeSemantics: true,
+                            child: PulsrPressable(
+                              pressedScale: 0.97,
+                              enableHaptics: false,
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                if (clampedIndex != i) {
+                                  PulsrHaptics.selectionClick();
+                                  onChanged(i);
+                                }
+                              },
+                              child: fitLabels
+                                  ? _fitContent(
+                                      context,
+                                      i,
+                                      clampedIndex,
+                                      includeIcons,
+                                    )
+                                  : Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.xs,
+                                        vertical: AppSpacing.s10,
                                       ),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          AnimatedScale(
-                                            scale:
-                                                clampedIndex == i ? 1.06 : 1.0,
-                                            duration: context.motionMs(180),
-                                            child: Icon(
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minHeight:
+                                              AppSpacing.minTouchTarget - 20,
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
                                               segments[i].icon,
                                               size: 16,
                                               color: clampedIndex == i
                                                   ? p.onAccent
                                                   : p.textSecondary,
                                             ),
-                                          ),
-                                          const SizedBox(width: AppSpacing.s6),
-                                          Flexible(
-                                            child: Text(
-                                              segments[i].count != null
-                                                  ? '${segments[i].label} (${segments[i].count})'
-                                                  : segments[i].label,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: AppFontSize.bodySmall,
-                                                fontWeight: clampedIndex == i
-                                                    ? FontWeight.w800
-                                                    : FontWeight.w600,
-                                                color: clampedIndex == i
-                                                    ? p.onAccent
-                                                    : p.textSecondary,
+                                            const SizedBox(
+                                                width: AppSpacing.s6),
+                                            Flexible(
+                                              child: Text(
+                                                segments[i].count != null
+                                                    ? '${segments[i].label} (${segments[i].count})'
+                                                    : segments[i].label,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontSize: AppFontSize.label,
+                                                  fontWeight: clampedIndex == i
+                                                      ? FontWeight.w700
+                                                      : FontWeight.w600,
+                                                  color: clampedIndex == i
+                                                      ? p.onAccent
+                                                      : p.textSecondary,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                  ),
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ],
-            );
-          },
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       );
     }
 
     return Container(
       margin: margin,
-      padding: const EdgeInsets.all(3.5),
       decoration: BoxDecoration(
         color: p.surfaceContainer,
-        borderRadius: AppRadii.r16All,
-        border: Border.all(
-          color: p.isDark ? AppColors.specularAt(0.12) : p.hairline,
-        ),
+        borderRadius: AppRadii.r20All,
+        border: Border.all(color: p.hairline),
       ),
-      child: Row(
-        children: [
-          for (var i = 0; i < segments.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppSpacing.s6),
-            Expanded(
-              child: _SegmentButton(
-                segment: segments[i],
-                isSelected: selectedIndex == i,
-                onTap: () {
-                  if (selectedIndex != i) {
-                    PulsrHaptics.selectionClick();
-                    onChanged(i);
-                  }
-                },
+      child: ClipRRect(
+        borderRadius: AppRadii.r20All,
+        child: Row(
+          children: [
+            for (var i = 0; i < segments.length; i++)
+              Expanded(
+                child: _SegmentButton(
+                  segment: segments[i],
+                  isSelected: selectedIndex == i,
+                  onTap: () {
+                    if (selectedIndex != i) {
+                      PulsrHaptics.selectionClick();
+                      onChanged(i);
+                    }
+                  },
+                ),
               ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -276,8 +237,8 @@ class PulsrSegmentedControl extends StatelessWidget {
     final scaler = MediaQuery.textScalerOf(context);
     final direction = Directionality.of(context);
     const style = TextStyle(
-      fontSize: AppFontSize.bodySmall,
-      fontWeight: FontWeight.w800,
+      fontSize: AppFontSize.label,
+      fontWeight: FontWeight.w700,
     );
     return [
       for (final segment in segments)
@@ -353,8 +314,8 @@ class PulsrSegmentedControl extends StatelessWidget {
                 maxLines: 1,
                 softWrap: false,
                 style: TextStyle(
-                  fontSize: AppFontSize.bodySmall,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: AppFontSize.label,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   color: isSelected ? p.onAccent : p.textSecondary,
                 ),
               ),
@@ -380,7 +341,6 @@ class _SegmentButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isCapsule = context.isCapsuleButtons;
     final content = AnimatedContainer(
       constraints: const BoxConstraints(minHeight: AppSpacing.minTouchTarget),
       duration: context.motionMs(200),
@@ -390,27 +350,8 @@ class _SegmentButton extends StatelessWidget {
         vertical: AppSpacing.s10,
       ),
       decoration: BoxDecoration(
-        color: !isSelected && isCapsule ? PulsrCapsuleStyle.backgroundColor(p) : null,
-        gradient: isSelected
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  p.accent.withValues(alpha: isCapsule ? 0.35 : 0.24),
-                  p.accent.withValues(alpha: isCapsule ? 0.20 : 0.12),
-                ],
-              )
-            : null,
-        borderRadius: context.buttonRadius(rectRadius: 7.0),
-        border: Border.all(
-          color: isSelected
-              ? p.accent.withValues(alpha: 0.48)
-              : (isCapsule
-                  ? (p.isDark
-                      ? Colors.white.withValues(alpha: 0.12)
-                      : Colors.black.withValues(alpha: 0.08))
-                  : Colors.transparent),
-        ),
+        color: isSelected ? p.accent : Colors.transparent,
+        borderRadius: AppRadii.r20All,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -418,7 +359,7 @@ class _SegmentButton extends StatelessWidget {
           Icon(
             segment.icon,
             size: 16,
-            color: isSelected ? p.accent : p.textSecondary,
+            color: isSelected ? p.onAccent : p.textSecondary,
           ),
           const SizedBox(width: AppSpacing.s6),
           Flexible(
@@ -429,9 +370,9 @@ class _SegmentButton extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: AppFontSize.bodySmall,
-                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? p.accent : p.textSecondary,
+                fontSize: AppFontSize.label,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                color: isSelected ? p.onAccent : p.textSecondary,
               ),
             ),
           ),

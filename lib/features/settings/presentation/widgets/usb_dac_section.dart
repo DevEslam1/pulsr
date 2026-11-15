@@ -248,7 +248,12 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                       const SizedBox(width: AppSpacing.xs),
                       Expanded(
                         child: Text(
-                          'Direct Stream Diagnostics (${_status.lastStreamErrorCode != null ? "Code: ${_status.lastStreamErrorCode}" : "Refused"})',
+                          context.l10n.directStreamDiagnostics(
+                            _status.lastStreamErrorCode != null
+                                ? context.l10n.directStreamCode(
+                                    '${_status.lastStreamErrorCode}')
+                                : context.l10n.directStreamRefused,
+                          ),
                           style: TextStyle(
                             color: p.error,
                             fontWeight: FontWeight.w700,

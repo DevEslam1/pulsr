@@ -978,7 +978,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                             ? p.accent
                             : p.hairline),
                     shape:
-                        RoundedRectangleBorder(borderRadius: AppRadii.r14All),
+                        const RoundedRectangleBorder(borderRadius: AppRadii.r20All),
                   ),
                 ),
             ],

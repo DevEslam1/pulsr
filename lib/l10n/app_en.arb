@@ -7713,5 +7713,510 @@
   "signalPathCopied": "Signal path trace copied",
   "signalPathEncodingsLabel": "Encodings",
   "signalPathChannelsLabel": "Channels",
-  "seekBarSliderStyleTitle": "Seek Bar Slider Style"
+  "seekBarSliderStyleTitle": "Seek Bar Slider Style",
+  "audioRouteRequestedWaiting": "Requested route • waiting for playback confirmation",
+  "@audioRouteRequestedWaiting": {
+    "description": "Subtitle for a selected audio output device awaiting playback confirmation"
+  },
+  "audioRouteActive": "Active route • {spec}",
+  "@audioRouteActive": {
+    "description": "Subtitle for the active audio output route",
+    "placeholders": {
+      "spec": {
+        "type": "String"
+      }
+    }
+  },
+  "audioRouteAvailable": "{deviceType} • available output",
+  "@audioRouteAvailable": {
+    "description": "Subtitle for an available non-selected audio output device",
+    "placeholders": {
+      "deviceType": {
+        "type": "String"
+      }
+    }
+  },
+  "appStreamFormatUnverified": "App stream format unverified",
+  "@appStreamFormatUnverified": {
+    "description": "Shown when output stream sample rate or bit depth is unknown"
+  },
+  "appStreamFormatSpec": "App stream: {rate} / {bitDepth}-bit {encoding}",
+  "@appStreamFormatSpec": {
+    "description": "Output stream specification label",
+    "placeholders": {
+      "rate": {
+        "type": "String"
+      },
+      "bitDepth": {
+        "type": "int"
+      },
+      "encoding": {
+        "type": "String"
+      }
+    }
+  },
+  "appStreamPrimaryBufferHint": "primary buffer hint ~{ms} ms",
+  "@appStreamPrimaryBufferHint": {
+    "description": "Hardware buffer latency hint suffix",
+    "placeholders": {
+      "ms": {
+        "type": "String"
+      }
+    }
+  },
+  "bitPerfectSourcePreservedUnmeasured": "Source format preserved; DAC sample identity not measured",
+  "@bitPerfectSourcePreservedUnmeasured": {
+    "description": "Honest subtitle when bit-perfect routing is active"
+  },
+  "bitPerfectRequestsExclusiveUsb": "Requests exclusive USB mixing where supported",
+  "@bitPerfectRequestsExclusiveUsb": {
+    "description": "Subtitle explaining bit-perfect USB request before enabling"
+  },
+  "bitPerfectUnsupportedDevice": "Bit-Perfect output is not supported by the current output device.",
+  "@bitPerfectUnsupportedDevice": {
+    "description": "Error toast when bit-perfect output is unsupported by device"
+  },
+  "hardwareFormatReportedByPlatform": "{dacLabel} • {rate} / {bitDepth}-bit reported by platform",
+  "@hardwareFormatReportedByPlatform": {
+    "description": "Verified hardware endpoint format reported by OS",
+    "placeholders": {
+      "dacLabel": {
+        "type": "String"
+      },
+      "rate": {
+        "type": "String"
+      },
+      "bitDepth": {
+        "type": "int"
+      }
+    }
+  },
+  "hardwareFormatNotVerified": "{dacLabel} • hardware format not verified",
+  "@hardwareFormatNotVerified": {
+    "description": "Unverified hardware endpoint status",
+    "placeholders": {
+      "dacLabel": {
+        "type": "String"
+      }
+    }
+  },
+  "receiverVolumeUnknown": "Receiver volume unknown",
+  "@receiverVolumeUnknown": {
+    "description": "Tooltip on Cast volume slider when receiver volume is unknown"
+  },
+  "directStreamDiagnostics": "Direct Stream Diagnostics ({detail})",
+  "@directStreamDiagnostics": {
+    "description": "Header for USB direct stream error diagnostics",
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "directStreamCode": "Code: {code}",
+  "@directStreamCode": {
+    "description": "Native error code label",
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "directStreamRefused": "Refused",
+  "@directStreamRefused": {
+    "description": "Fallback status when direct stream failed without numeric code"
+  },
+  "spatialEmulated": "Emulated",
+  "@spatialEmulated": {
+    "description": "Badge shown when spatial audio uses software/hardware virtualizer emulation"
+  },
+  "spatialVirtualizerDesc": "Stereo field expansion via hardware virtualizer",
+  "@spatialVirtualizerDesc": {
+    "description": "Subtitle for emulated spatial soundstage widening"
+  },
+  "spatialHardwareDetected": "Hardware Spatializer Detected",
+  "@spatialHardwareDetected": {
+    "description": "Title in Spatial tab when device supports Android Spatializer"
+  },
+  "spatialEmulatedMode": "Emulated 3D Widening Mode",
+  "@spatialEmulatedMode": {
+    "description": "Title in Spatial tab when emulated via virtualizer"
+  },
+  "spatialMultiChannelDesc": "Android Spatializer API with multi-channel soundstage",
+  "@spatialMultiChannelDesc": {
+    "description": "Subtitle for hardware spatializer in Spatial tab"
+  },
+  "spatialVirtualizerActiveDesc": "Stereo field widening active via hardware virtualizer",
+  "@spatialVirtualizerActiveDesc": {
+    "description": "Subtitle for emulated 3D widening in Spatial tab"
+  },
+  "dspBlockedBadge": "Blocked",
+  "@dspBlockedBadge": {
+    "description": "Status text when DSP panner is blocked by Bit-Perfect mode"
+  },
+  "balanceLeftPercent": "Left {percent}%",
+  "@balanceLeftPercent": {
+    "description": "Stereo balance shifted left",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "balanceRightPercent": "Right {percent}%",
+  "@balanceRightPercent": {
+    "description": "Stereo balance shifted right",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "dspWetPercent": "{percent}% Wet",
+  "@dspWetPercent": {
+    "description": "Wet/dry mix percentage label",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "dspPunchPercent": "{percent}% punch",
+  "@dspPunchPercent": {
+    "description": "Bass boost punch percentage subtitle",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "bassBoostBypassed": "Bass boost bypassed",
+  "@bassBoostBypassed": {
+    "description": "Subtitle when bass boost is off"
+  },
+  "hardwareGainPlusDb": "+{db} dB hardware gain",
+  "@hardwareGainPlusDb": {
+    "description": "Subtitle when hardware loudness gain is active",
+    "placeholders": {
+      "db": {
+        "type": "String"
+      }
+    }
+  },
+  "hardwareGainBypassed": "Hardware gain bypassed",
+  "@hardwareGainBypassed": {
+    "description": "Subtitle when hardware gain is off"
+  },
+  "autoHeadroomValue": "Auto-headroom: {db} dB",
+  "@autoHeadroomValue": {
+    "description": "EQ auto-headroom readout",
+    "placeholders": {
+      "db": {
+        "type": "String"
+      }
+    }
+  },
+  "eqAutoHeadroomTitle": "EQ Auto-Headroom",
+  "@eqAutoHeadroomTitle": {
+    "description": "Label in telemetry panel for EQ auto-headroom"
+  },
+  "eqPresetFlat": "Flat",
+  "@eqPresetFlat": {
+    "description": "Flat equalizer preset label"
+  },
+  "eqPresetBassBoost": "Bass Boost",
+  "@eqPresetBassBoost": {
+    "description": "Bass boost equalizer preset label"
+  },
+  "eqPresetVocal": "Vocal",
+  "@eqPresetVocal": {
+    "description": "Vocal equalizer preset label"
+  },
+  "eqPresetTreble": "Treble",
+  "@eqPresetTreble": {
+    "description": "Treble equalizer preset label"
+  },
+  "eqPresetCustom": "Custom",
+  "@eqPresetCustom": {
+    "description": "Custom equalizer preset label"
+  },
+  "dspRequiresPcmPath": "Requires PCM DSP path - not audible yet",
+  "@dspRequiresPcmPath": {
+    "description": "Warning notice in advanced DSP sections when native PCM path is inactive"
+  },
+  "viperChangeProfile": "Change Profile: {name}",
+  "@viperChangeProfile": {
+    "description": "Button label to change loaded ViPER-DDC profile",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "viperSelectLoadProfile": "Select / Load .vdc Profile...",
+  "@viperSelectLoadProfile": {
+    "description": "Button label to pick a .vdc headphone correction profile"
+  },
+  "bioUnavailable": "Bio unavailable",
+  "@bioUnavailable": {
+    "description": "Fallback text when an artist bio cannot be fetched"
+  },
+  "smartRuleMatchCount": "{count, plural, =0{0 matches} =1{1 match} other{{count} matches}}",
+  "@smartRuleMatchCount": {
+    "description": "Live match counter in smart playlist rule builder",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "smartRuleOpContains": "contains",
+  "@smartRuleOpContains": {
+    "description": "Smart rule operator label: contains"
+  },
+  "smartRuleOpNotContains": "does not contain",
+  "@smartRuleOpNotContains": {
+    "description": "Smart rule operator label: does not contain"
+  },
+  "smartRuleOpEquals": "is exactly",
+  "@smartRuleOpEquals": {
+    "description": "Smart rule operator label: is exactly"
+  },
+  "smartRuleOpStartsWith": "starts with",
+  "@smartRuleOpStartsWith": {
+    "description": "Smart rule operator label: starts with"
+  },
+  "smartRuleOpGreaterThan": "greater than",
+  "@smartRuleOpGreaterThan": {
+    "description": "Smart rule operator label: greater than"
+  },
+  "smartRuleOpLessThan": "less than",
+  "@smartRuleOpLessThan": {
+    "description": "Smart rule operator label: less than"
+  },
+  "smartRuleMatchAllAnd": "Match All Rules (AND)",
+  "@smartRuleMatchAllAnd": {
+    "description": "Smart rule match mode label: AND"
+  },
+  "smartRuleMatchAnyOr": "Match Any Rule (OR)",
+  "@smartRuleMatchAnyOr": {
+    "description": "Smart rule match mode label: OR"
+  },
+  "smartCriteriaFieldPlayCount": "Play Count",
+  "@smartCriteriaFieldPlayCount": {
+    "description": "Smart criteria field: play count"
+  },
+  "smartCriteriaFieldDecade": "Decade",
+  "@smartCriteriaFieldDecade": {
+    "description": "Smart criteria field: decade"
+  },
+  "smartCriteriaFieldLossless": "Lossless Only",
+  "@smartCriteriaFieldLossless": {
+    "description": "Smart criteria field: lossless only"
+  },
+  "smartCriteriaFieldDateAdded": "Date Added",
+  "@smartCriteriaFieldDateAdded": {
+    "description": "Smart criteria field: date added"
+  },
+  "smartCriteriaFieldRating": "Rating (Stars)",
+  "@smartCriteriaFieldRating": {
+    "description": "Smart criteria field: star rating"
+  },
+  "smartCriteriaFieldLastPlayed": "Last Played",
+  "@smartCriteriaFieldLastPlayed": {
+    "description": "Smart criteria field: last played"
+  },
+  "smartCriteriaFieldBpm": "BPM / Tempo",
+  "@smartCriteriaFieldBpm": {
+    "description": "Smart criteria field: BPM / tempo"
+  },
+  "smartCriteriaFieldLra": "LRA Dynamic Range",
+  "@smartCriteriaFieldLra": {
+    "description": "Smart criteria field: loudness range"
+  },
+  "smartCriteriaFieldBitrate": "Bitrate (kbps)",
+  "@smartCriteriaFieldBitrate": {
+    "description": "Smart criteria field: bitrate"
+  },
+  "smartCriteriaOpWithinDays": "Within Days",
+  "@smartCriteriaOpWithinDays": {
+    "description": "Smart criteria operator: within days"
+  },
+  "smartCriteriaOpBetween": "Between",
+  "@smartCriteriaOpBetween": {
+    "description": "Smart criteria operator: between"
+  },
+  "smartPlaylistDescRecentlyAdded": "Tracks added to your library in the last 30 days",
+  "@smartPlaylistDescRecentlyAdded": {
+    "description": "Smart playlist description: recently added"
+  },
+  "smartPlaylistDescMostPlayed": "Your top most-played tracks on repeat",
+  "@smartPlaylistDescMostPlayed": {
+    "description": "Smart playlist description: most played"
+  },
+  "smartPlaylistDescRecentlyPlayed": "Your recent playback listening history",
+  "@smartPlaylistDescRecentlyPlayed": {
+    "description": "Smart playlist description: recently played"
+  },
+  "smartPlaylistDescLongTracks": "Long tracks and extended mixes over 5 minutes",
+  "@smartPlaylistDescLongTracks": {
+    "description": "Smart playlist description: long tracks"
+  },
+  "smartPlaylistDescForgotten": "Tracks you loved but haven't listened to recently",
+  "@smartPlaylistDescForgotten": {
+    "description": "Smart playlist description: forgotten favorites"
+  },
+  "smartPlaylistDescTopRated": "Your highest rated and starred favorite tracks",
+  "@smartPlaylistDescTopRated": {
+    "description": "Smart playlist description: top rated"
+  },
+  "smartPlaylistDescChill": "Relaxing, mellow tracks for unwinding",
+  "@smartPlaylistDescChill": {
+    "description": "Smart playlist description: chill evening"
+  },
+  "smartPlaylistDescWorkout": "High-energy tracks to keep your workout moving",
+  "@smartPlaylistDescWorkout": {
+    "description": "Smart playlist description: workout energy"
+  },
+  "smartPlaylistDescLossless": "High-fidelity lossless tracks in your library",
+  "@smartPlaylistDescLossless": {
+    "description": "Smart playlist description: lossless collection"
+  },
+  "smartPlaylistDesc90s": "Classic tracks and nostalgia from the 1990s",
+  "@smartPlaylistDesc90s": {
+    "description": "Smart playlist description: 90s nostalgia"
+  },
+  "smartPlaylistDescDefault": "Dynamic auto-updating smart playlist based on rules",
+  "@smartPlaylistDescDefault": {
+    "description": "Default smart playlist card description"
+  },
+  "durationHoursMinutes": "{hours, plural, =1{1 hr} other{{hours} hr}} {minutes, plural, =1{1 min} other{{minutes} min}}",
+  "@durationHoursMinutes": {
+    "description": "Formatted hours and minutes total duration",
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "durationMinutesOnly": "{minutes, plural, =1{1 min} other{{minutes} min}}",
+  "@durationMinutesOnly": {
+    "description": "Formatted minutes-only total duration",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "singleReleaseLabel": "Single",
+  "@singleReleaseLabel": {
+    "description": "Fallback album label for a track with no album name"
+  },
+  "downloadSpeedKbps": "{speed} KB/s",
+  "@downloadSpeedKbps": {
+    "description": "Download transfer speed in kilobytes per second",
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "queueSlotShort": "Q{slot}",
+  "@queueSlotShort": {
+    "description": "Compact queue slot badge label (e.g. Q1, Q2, Q3)",
+    "placeholders": {
+      "slot": {
+        "type": "int"
+      }
+    }
+  },
+  "losslessCountLabel": "{count, plural, =1{1 Lossless} other{{count} Lossless}}",
+  "@losslessCountLabel": {
+    "description": "Lossless track count badge",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "flacHiResCountLabel": "{count} FLAC/Hi-Res",
+  "@flacHiResCountLabel": {
+    "description": "Count badge for FLAC / Hi-Res tracks",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "presetAppliedMessage": "{label} applied",
+  "@presetAppliedMessage": {
+    "description": "Confirmation snackbar after applying a playback preset",
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "spotifyImportResolvedSummary": "Successfully created playlist \"{title}\" with {matched} of {total} tracks resolved.",
+  "@spotifyImportResolvedSummary": {
+    "description": "Summary after importing a Spotify playlist",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "matched": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "sliderStyleCapsuleTitle": "Capsule (Apple Music)",
+  "@sliderStyleCapsuleTitle": {
+    "description": "Title for capsule seek bar slider style"
+  },
+  "sliderStyleCapsuleDesc": "Sleek, continuous capsule progress bar without protruding knob",
+  "@sliderStyleCapsuleDesc": {
+    "description": "Subtitle for capsule seek bar slider style"
+  },
+  "sliderStyleNormalShort": "Classic (Knob)",
+  "@sliderStyleNormalShort": {
+    "description": "Short title for classic seek bar slider style"
+  },
+  "sliderStyleNormalTitle": "Classic (Thumb Knob)",
+  "@sliderStyleNormalTitle": {
+    "description": "Title for classic seek bar slider style"
+  },
+  "sliderStyleNormalDesc": "Traditional player track with a prominent circular thumb knob",
+  "@sliderStyleNormalDesc": {
+    "description": "Subtitle for classic seek bar slider style"
+  },
+  "sliderStyleWavyTitle": "Wavy (Organic Sine)",
+  "@sliderStyleWavyTitle": {
+    "description": "Title for wavy seek bar slider style"
+  },
+  "sliderStyleWavyDesc": "Dynamic animated sine wave track that reacts to playback",
+  "@sliderStyleWavyDesc": {
+    "description": "Subtitle for wavy seek bar slider style"
+  },
+  "sliderStyleMinimalTitle": "Minimal (Hairline)",
+  "@sliderStyleMinimalTitle": {
+    "description": "Title for minimal seek bar slider style"
+  },
+  "sliderStyleMinimalDesc": "Ultra-thin modern progress line with subtle scrub indicator",
+  "@sliderStyleMinimalDesc": {
+    "description": "Subtitle for minimal seek bar slider style"
+  },
+  "custodyCertificateHeader": "Pulsr chain-of-custody certificate",
+  "@custodyCertificateHeader": {
+    "description": "Header of exported audio chain-of-custody report"
+  },
+  "badgePro": "PRO",
+  "@badgePro": {
+    "description": "Short Pro feature badge label"
+  }
 }

@@ -132,7 +132,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           borderRadius: AppRadii.r4All,
                         ),
                         child: Text(
-                          '$losslessCount Lossless',
+                          context.l10n.losslessCountLabel(losslessCount),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(

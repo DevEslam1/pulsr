@@ -69,6 +69,7 @@ Widget screenHarness({
   required Widget child,
   List<BlocProvider> providers = const [],
   Size size = const Size(800, 1200),
+  Locale? locale,
 }) {
   final router = GoRouter(
     initialLocation: '/target',
@@ -90,6 +91,7 @@ Widget screenHarness({
     data: MediaQueryData(size: size, disableAnimations: true),
     child: MaterialApp.router(
       theme: AuraTheme.darkTheme,
+      locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,

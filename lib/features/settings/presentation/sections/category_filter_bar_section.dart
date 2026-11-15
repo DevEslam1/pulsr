@@ -57,13 +57,10 @@ mixin CategoryFilterBarSection
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? p.accent.withValues(alpha: 0.16)
-                        : p.surfaceContainer,
-                    borderRadius: AppRadii.full,
+                    color: isSelected ? p.accent : p.surfaceContainer,
+                    borderRadius: AppRadii.r20All,
                     border: Border.all(
                       color: isSelected ? p.accent : p.hairline,
-                      width: isSelected ? 1.5 : 1.0,
                     ),
                   ),
                   child: Row(
@@ -72,16 +69,16 @@ mixin CategoryFilterBarSection
                       Icon(
                         item.icon,
                         size: 15,
-                        color: isSelected ? p.accent : item.color,
+                        color: isSelected ? p.onAccent : item.color,
                       ),
                       const SizedBox(width: AppSpacing.s6),
                       Text(
                         item.title,
                         style: TextStyle(
-                          color: isSelected ? p.accent : p.textPrimary,
+                          color: isSelected ? p.onAccent : p.textSecondary,
                           fontSize: AppFontSize.label,
                           fontWeight:
-                              isSelected ? FontWeight.w800 : FontWeight.w600,
+                              isSelected ? FontWeight.w700 : FontWeight.w600,
                         ),
                       ),
                     ],

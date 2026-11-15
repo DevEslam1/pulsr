@@ -1192,7 +1192,7 @@ class _CleanDownBar extends StatelessWidget {
                               ? AppColors.accentCyan
                               : (isUsb ? AppColors.dacGold : activeColor),
                           tooltip: isCast
-                              ? 'Google Cast'
+                              ? context.l10n.googleCast
                               : context.l10n.audioOutputAndDac,
                           onTap: () {
                             PulsrHaptics.lightImpact();

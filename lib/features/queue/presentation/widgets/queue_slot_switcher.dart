@@ -36,7 +36,7 @@ class QueueSlotSwitcher extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(slotCount, (slotIndex) {
         final isSelected = activeSlot == slotIndex;
-        final label = 'Q${slotIndex + 1}';
+        final label = l10n.queueSlotShort(slotIndex + 1);
         final tooltip = l10n.queueSlotTooltip(slotIndex + 1);
 
         return Padding(
@@ -138,7 +138,7 @@ class QueueSlotBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final slotNumber = activeSlot + 1;
-    final label = 'Q$slotNumber';
+    final label = context.l10n.queueSlotShort(slotNumber);
 
     return Semantics(
       label: context.l10n.queueSlotTooltip(slotNumber),

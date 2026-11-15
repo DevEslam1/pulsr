@@ -970,4 +970,24 @@ public class PulsrAudioSinkTest {
         verify(replacement).configure(FORMAT, 0, null);
         sink.release();
     }
+
+    @Test
+    public void defaultCreateInnerBuildsRealMedia3SinkInFloatAndDefaultModes() {
+        for (boolean floatMode : new boolean[] {true, false}) {
+            final PulsrAudioSink sink = new PulsrAudioSink(
+                    RuntimeEnvironment.getApplication(),
+                    () -> false,
+                    () -> floatMode,
+                    () -> 280,
+                    () -> false,
+                    () -> null,
+                    p -> {},
+                    null);
+            // Triggers ensureInner() -> createInner() against real Media3
+            // DefaultAudioSink.Builder + AudioTrackAudioOutputProvider.Builder
+            // + DefaultAudioTrackBufferSizeProvider without throwing.
+            sink.getFormatSupport(FORMAT);
+            sink.release();
+        }
+    }
 }

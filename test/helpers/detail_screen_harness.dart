@@ -3,7 +3,6 @@
 // PlayerCubit (the tile's BlocSelector only reads state/stream).
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -26,21 +25,24 @@ Widget detailHarness({
   required Widget child,
   PlayerCubit? playerCubit,
   Size size = const Size(1024, 2000),
+  Locale? locale,
 }) {
   return MediaQuery(
     data: MediaQueryData(size: size, disableAnimations: true),
     child: Directionality(
-      textDirection: TextDirection.ltr,
-      child: _Harness(playerCubit: playerCubit, child: child),
+      textDirection:
+          locale?.languageCode == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+      child: _Harness(playerCubit: playerCubit, locale: locale, child: child),
     ),
   );
 }
 
 class _Harness extends StatelessWidget {
-  const _Harness({required this.child, this.playerCubit});
+  const _Harness({required this.child, this.playerCubit, this.locale});
 
   final Widget child;
   final PlayerCubit? playerCubit;
+  final Locale? locale;
 
   @override
   Widget build(BuildContext context) {
@@ -48,11 +50,8 @@ class _Harness extends StatelessWidget {
       value: playerCubit ?? stubPlayerCubit(),
       child: MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-        ],
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: child,
       ),

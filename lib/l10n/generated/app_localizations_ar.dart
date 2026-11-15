@@ -10023,4 +10023,355 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get seekBarSliderStyleTitle => 'نمط شريط التمرير';
+
+  @override
+  String get audioRouteRequestedWaiting =>
+      'المسار المطلوب • في انتظار تأكيد التشغيل';
+
+  @override
+  String audioRouteActive(String spec) {
+    return 'المسار النشط • $spec';
+  }
+
+  @override
+  String audioRouteAvailable(String deviceType) {
+    return '$deviceType • مخرج متاح';
+  }
+
+  @override
+  String get appStreamFormatUnverified => 'تنسيق بث التطبيق غير موثق';
+
+  @override
+  String appStreamFormatSpec(String rate, int bitDepth, String encoding) {
+    return 'بث التطبيق: $rate / $bitDepth-بت $encoding';
+  }
+
+  @override
+  String appStreamPrimaryBufferHint(String ms) {
+    return 'تلميح المخزن المؤقت الأساسي ~$ms مللي ثانية';
+  }
+
+  @override
+  String get bitPerfectSourcePreservedUnmeasured =>
+      'تم الحفاظ على تنسيق المصدر؛ هوية عينة DAC غير مقاسة';
+
+  @override
+  String get bitPerfectRequestsExclusiveUsb => 'يطلب مزج USB حصري عند الدعم';
+
+  @override
+  String get bitPerfectUnsupportedDevice =>
+      'إخراج Bit-Perfect غير مدعوم من قبل جهاز الإخراج الحالي.';
+
+  @override
+  String hardwareFormatReportedByPlatform(
+      String dacLabel, String rate, int bitDepth) {
+    return '$dacLabel • $rate / $bitDepth-بت تم الإبلاغ عنه بواسطة النظام';
+  }
+
+  @override
+  String hardwareFormatNotVerified(String dacLabel) {
+    return '$dacLabel • تنسيق العتاد غير موثق';
+  }
+
+  @override
+  String get receiverVolumeUnknown => 'مستوى صوت المستقبل غير معروف';
+
+  @override
+  String directStreamDiagnostics(String detail) {
+    return 'تشخيصات البث المباشر ($detail)';
+  }
+
+  @override
+  String directStreamCode(String code) {
+    return 'الرمز: $code';
+  }
+
+  @override
+  String get directStreamRefused => 'مرفوض';
+
+  @override
+  String get spatialEmulated => 'محاكى';
+
+  @override
+  String get spatialVirtualizerDesc =>
+      'توسيع مجال الاستيريو عبر المحاكي الصوتي للعتاد';
+
+  @override
+  String get spatialHardwareDetected => 'تم اكتشاف معالج مكاني في العتاد';
+
+  @override
+  String get spatialEmulatedMode => 'وضع التوسيع ثلاثي الأبعاد المحاكى';
+
+  @override
+  String get spatialMultiChannelDesc =>
+      'واجهة Android Spatializer مع مسرح صوتي متعدد القنوات';
+
+  @override
+  String get spatialVirtualizerActiveDesc =>
+      'توسيع مجال الاستيريو نشط عبر المحاكي الصوتي';
+
+  @override
+  String get dspBlockedBadge => 'محجوب';
+
+  @override
+  String balanceLeftPercent(int percent) {
+    return 'يسار $percent%';
+  }
+
+  @override
+  String balanceRightPercent(int percent) {
+    return 'يمين $percent%';
+  }
+
+  @override
+  String dspWetPercent(int percent) {
+    return '$percent% تأثير';
+  }
+
+  @override
+  String dspPunchPercent(int percent) {
+    return '$percent% قوة جهير';
+  }
+
+  @override
+  String get bassBoostBypassed => 'تم تجاوز تعزيز الجهير';
+
+  @override
+  String hardwareGainPlusDb(String db) {
+    return '+$db ديسيبل كسب عتادي';
+  }
+
+  @override
+  String get hardwareGainBypassed => 'تم تجاوز الكسب العتادي';
+
+  @override
+  String autoHeadroomValue(String db) {
+    return 'هامش الأمان التلقائي: $db ديسيبل';
+  }
+
+  @override
+  String get eqAutoHeadroomTitle => 'هامش الأمان التلقائي للمعادل';
+
+  @override
+  String get eqPresetFlat => 'مسطح';
+
+  @override
+  String get eqPresetBassBoost => 'تعزيز الجهير';
+
+  @override
+  String get eqPresetVocal => 'الأصوات البشرية';
+
+  @override
+  String get eqPresetTreble => 'الحدة العالية';
+
+  @override
+  String get eqPresetCustom => 'مخصص';
+
+  @override
+  String get dspRequiresPcmPath => 'يتطلب مسار معالجة PCM - غير مسموع حالياً';
+
+  @override
+  String viperChangeProfile(String name) {
+    return 'تغيير الملف: $name';
+  }
+
+  @override
+  String get viperSelectLoadProfile => 'اختيار / تحميل ملف .vdc...';
+
+  @override
+  String get bioUnavailable => 'السيرة الذاتية غير متوفرة';
+
+  @override
+  String smartRuleMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count تطابق',
+      many: '$count تطابقاً',
+      few: '$count تطابقات',
+      two: 'تطابقان',
+      one: 'تطابق واحد',
+      zero: '0 تطابقات',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get smartRuleOpContains => 'يحتوي على';
+
+  @override
+  String get smartRuleOpNotContains => 'لا يحتوي على';
+
+  @override
+  String get smartRuleOpEquals => 'يساوي تماماً';
+
+  @override
+  String get smartRuleOpStartsWith => 'يبدأ بـ';
+
+  @override
+  String get smartRuleOpGreaterThan => 'أكبر من';
+
+  @override
+  String get smartRuleOpLessThan => 'أصغر من';
+
+  @override
+  String get smartRuleMatchAllAnd => 'تطابق كل القواعد (و)';
+
+  @override
+  String get smartRuleMatchAnyOr => 'تطابق أي قاعدة (أو)';
+
+  @override
+  String get smartCriteriaFieldPlayCount => 'عدد مرات التشغيل';
+
+  @override
+  String get smartCriteriaFieldDecade => 'العقد';
+
+  @override
+  String get smartCriteriaFieldLossless => 'بدون فقدان فقط';
+
+  @override
+  String get smartCriteriaFieldDateAdded => 'تاريخ الإضافة';
+
+  @override
+  String get smartCriteriaFieldRating => 'التقييم (نجوم)';
+
+  @override
+  String get smartCriteriaFieldLastPlayed => 'آخر تشغيل';
+
+  @override
+  String get smartCriteriaFieldBpm => 'نبضة/دقيقة / الإيقاع';
+
+  @override
+  String get smartCriteriaFieldLra => 'النطاق الديناميكي LRA';
+
+  @override
+  String get smartCriteriaFieldBitrate => 'معدل البت (ك.بت/ث)';
+
+  @override
+  String get smartCriteriaOpWithinDays => 'خلال أيام';
+
+  @override
+  String get smartCriteriaOpBetween => 'بين';
+
+  @override
+  String get smartPlaylistDescRecentlyAdded =>
+      'المقاطع المضافة إلى مكتبتك خلال آخر 30 يوماً';
+
+  @override
+  String get smartPlaylistDescMostPlayed => 'أكثر مقاطعك تشغيلاً وتكراراً';
+
+  @override
+  String get smartPlaylistDescRecentlyPlayed => 'سجل الاستماع والتشغيل الأخير';
+
+  @override
+  String get smartPlaylistDescLongTracks =>
+      'المقاطع الطويلة والمزج الممتد لأكثر من 5 دقائق';
+
+  @override
+  String get smartPlaylistDescForgotten =>
+      'مقاطع أحببتها ولم تستمع إليها مؤخراً';
+
+  @override
+  String get smartPlaylistDescTopRated => 'أعلى مقاطعك تقييماً وتمييزاً بنجمة';
+
+  @override
+  String get smartPlaylistDescChill => 'مقاطع هادئة ومريحة للاسترخاء';
+
+  @override
+  String get smartPlaylistDescWorkout => 'مقاطع عالية الطاقة لمواصلة التمرين';
+
+  @override
+  String get smartPlaylistDescLossless =>
+      'مقاطع عالية الدقة بدون فقدان في مكتبتك';
+
+  @override
+  String get smartPlaylistDesc90s => 'مقاطع كلاسيكية وحنين من حقبة التسعينيات';
+
+  @override
+  String get smartPlaylistDescDefault =>
+      'قائمة ذكية متجددة تلقائياً وفق قواعد مخصصة';
+
+  @override
+  String durationHoursMinutes(int hours, int minutes) {
+    return '$hours ساعة $minutes دقيقة';
+  }
+
+  @override
+  String durationMinutesOnly(int minutes) {
+    return '$minutes دقيقة';
+  }
+
+  @override
+  String get singleReleaseLabel => 'أغنية منفردة';
+
+  @override
+  String downloadSpeedKbps(String speed) {
+    return '$speed ك.بايت/ث';
+  }
+
+  @override
+  String queueSlotShort(int slot) {
+    return 'ق$slot';
+  }
+
+  @override
+  String losslessCountLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count بدون فقدان',
+      one: 'مقطع واحد بدون فقدان',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String flacHiResCountLabel(int count) {
+    return '$count FLAC/عالي الدقة';
+  }
+
+  @override
+  String presetAppliedMessage(String label) {
+    return 'تم تطبيق $label';
+  }
+
+  @override
+  String spotifyImportResolvedSummary(String title, int matched, int total) {
+    return 'تم إنشاء قائمة التشغيل \"$title\" مع مطابقة $matched من أصل $total مقاطع.';
+  }
+
+  @override
+  String get sliderStyleCapsuleTitle => 'كبسولة (Apple Music)';
+
+  @override
+  String get sliderStyleCapsuleDesc =>
+      'شريط تقدم كبسولي أنيق ومتصل بدون مقبض بارز';
+
+  @override
+  String get sliderStyleNormalShort => 'كلاسيكي (مقبض)';
+
+  @override
+  String get sliderStyleNormalTitle => 'كلاسيكي (مقبض سحب)';
+
+  @override
+  String get sliderStyleNormalDesc => 'شريط مشغل تقليدي مع مقبض دائري واضح';
+
+  @override
+  String get sliderStyleWavyTitle => 'متموج (موجة عضوية)';
+
+  @override
+  String get sliderStyleWavyDesc => 'شريط موجة جيبية متحرك يتفاعل مع التشغيل';
+
+  @override
+  String get sliderStyleMinimalTitle => 'بسيط (خط رفيع)';
+
+  @override
+  String get sliderStyleMinimalDesc =>
+      'خط تقدم عصري فائق النحافة مع مؤشر سحب لطيف';
+
+  @override
+  String get custodyCertificateHeader => 'شهادة سلسلة حفظ الصوت في Pulsr';
+
+  @override
+  String get badgePro => 'احترافي';
 }

@@ -834,11 +834,12 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         // converter discards PCM24/32 low bytes before custom DSP can see them.
         NativeDspAudioProcessor processor = new NativeDspAudioProcessor();
         processor.setFloatOutput(true);
-        PulsrOutputRouting.CapturingAudioOutputProvider outputProvider =
-                PulsrOutputRouting.createCapturingOutputProvider(context);
         // Scale Media3 AudioTrack PCM buffer durations from the requested
         // targetBufferMs so high-bitrate Bluetooth codecs (LDAC 990 / aptX
         // Lossless / LHDC) and hi-res PCM streams avoid buffer underruns.
+        // Pass the buffer-size provider to AudioTrackAudioOutputProvider because
+        // Media3's DefaultAudioSink.Builder forbids setting both
+        // audioOutputProvider and audioTrackBufferSizeProvider together.
         int requestedMs = targetBufferMs.get();
         int minPcmBufferUs = requestedMs > 0 ? Math.max(250_000, requestedMs * 1_000) : 250_000;
         int maxPcmBufferUs = Math.max(750_000, minPcmBufferUs * 2);
@@ -847,9 +848,10 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                         .setMinPcmBufferDurationUs(minPcmBufferUs)
                         .setMaxPcmBufferDurationUs(maxPcmBufferUs)
                         .build();
+        PulsrOutputRouting.CapturingAudioOutputProvider outputProvider =
+                PulsrOutputRouting.createCapturingOutputProvider(context, bufferSizeProvider);
         DefaultAudioSink defaultSink = new DefaultAudioSink.Builder(context)
                 .setAudioOutputProvider(outputProvider)
-                .setAudioTrackBufferSizeProvider(bufferSizeProvider)
                 .setEnableFloatOutput(requested == Mode.FLOAT)
                 .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                 .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[0])

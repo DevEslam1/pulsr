@@ -6,6 +6,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 
 enum SmartRuleField {
   title('Title'),
@@ -18,6 +19,16 @@ enum SmartRuleField {
 
   final String label;
   const SmartRuleField(this.label);
+
+  String localizedLabel(AppLocalizations l) => switch (this) {
+        SmartRuleField.title => l.title,
+        SmartRuleField.artist => l.artist,
+        SmartRuleField.album => l.album,
+        SmartRuleField.genre => l.genre,
+        SmartRuleField.year => l.year,
+        SmartRuleField.duration => l.duration,
+        SmartRuleField.isFavorite => l.favorite,
+      };
 }
 
 enum SmartRuleOperator {
@@ -30,6 +41,15 @@ enum SmartRuleOperator {
 
   final String label;
   const SmartRuleOperator(this.label);
+
+  String localizedLabel(AppLocalizations l) => switch (this) {
+        SmartRuleOperator.contains => l.smartRuleOpContains,
+        SmartRuleOperator.notContains => l.smartRuleOpNotContains,
+        SmartRuleOperator.equals => l.smartRuleOpEquals,
+        SmartRuleOperator.startsWith => l.smartRuleOpStartsWith,
+        SmartRuleOperator.greaterThan => l.smartRuleOpGreaterThan,
+        SmartRuleOperator.lessThan => l.smartRuleOpLessThan,
+      };
 }
 
 enum SmartRuleMatchMode {
@@ -38,6 +58,11 @@ enum SmartRuleMatchMode {
 
   final String label;
   const SmartRuleMatchMode(this.label);
+
+  String localizedLabel(AppLocalizations l) => switch (this) {
+        SmartRuleMatchMode.all => l.smartRuleMatchAllAnd,
+        SmartRuleMatchMode.any => l.smartRuleMatchAnyOr,
+      };
 }
 
 class SmartRule {
@@ -158,30 +183,36 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            DropdownButton<SmartRuleMatchMode>(
-              value: _matchMode,
-              underline: const SizedBox.shrink(),
-              items: SmartRuleMatchMode.values.map((mode) {
-                return DropdownMenuItem(
-                  value: mode,
-                  child: Text(
-                    mode.label,
-                    style: TextStyle(
-                      fontSize: AppFontSize.bodySmall,
-                      fontWeight: FontWeight.w700,
-                      color: p.textPrimary,
+            Expanded(
+              child: DropdownButton<SmartRuleMatchMode>(
+                value: _matchMode,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                items: SmartRuleMatchMode.values.map((mode) {
+                  return DropdownMenuItem(
+                    value: mode,
+                    child: Text(
+                      mode.localizedLabel(context.l10n),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: AppFontSize.bodySmall,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary,
+                      ),
                     ),
-                  ),
-                );
-              }).toList(growable: false),
-              onChanged: (newMode) {
-                if (newMode != null) {
-                  setState(() => _matchMode = newMode);
-                  _notify();
-                }
-              },
+                  );
+                }).toList(growable: false),
+                onChanged: (newMode) {
+                  if (newMode != null) {
+                    setState(() => _matchMode = newMode);
+                    _notify();
+                  }
+                },
+              ),
             ),
-            if (widget.previewSongs != null)
+            if (widget.previewSongs != null) ...[
+              const SizedBox(width: AppSpacing.xs),
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
@@ -190,7 +221,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                   borderRadius: AppRadii.r12All,
                 ),
                 child: Text(
-                  '$_matchingCount matches',
+                  context.l10n.smartRuleMatchCount(_matchingCount),
                   style: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w700,
@@ -198,6 +229,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                   ),
                 ),
               ),
+            ],
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -223,6 +255,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                       flex: 4,
                       child: DropdownButtonFormField<SmartRuleField>(
                         initialValue: rule.field,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm),
@@ -232,7 +265,13 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                         ),
                         items: SmartRuleField.values.map((f) {
                           return DropdownMenuItem(
-                              value: f, child: Text(f.label));
+                            value: f,
+                            child: Text(
+                              f.localizedLabel(context.l10n),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
                         }).toList(growable: false),
                         onChanged: (newField) {
                           if (newField != null) {
@@ -248,6 +287,7 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                       flex: 5,
                       child: DropdownButtonFormField<SmartRuleOperator>(
                         initialValue: rule.operator,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm),
@@ -257,7 +297,13 @@ class _SmartPlaylistRuleBuilderState extends State<SmartPlaylistRuleBuilder> {
                         ),
                         items: SmartRuleOperator.values.map((op) {
                           return DropdownMenuItem(
-                              value: op, child: Text(op.label));
+                            value: op,
+                            child: Text(
+                              op.localizedLabel(context.l10n),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
                         }).toList(growable: false),
                         onChanged: (newOp) {
                           if (newOp != null) {

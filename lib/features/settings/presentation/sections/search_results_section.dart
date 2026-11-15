@@ -283,7 +283,7 @@ mixin SettingsSearchResults
                             borderRadius: AppRadii.r6All,
                           ),
                           child: Text(
-                            "PRO",
+                            context.l10n.badgePro,
                             style: TextStyle(
                               color: p.onAccent,
                               fontSize: AppFontSize.caption,
@@ -761,10 +761,10 @@ mixin SettingsSearchResults
         category: lookCat,
         title: context.l10n.seekBarSliderStyleTitle,
         subtitle: switch (state.playerSliderStyle) {
-          PlayerSliderStyle.capsule => 'Capsule (Apple Music)',
-          PlayerSliderStyle.normal => 'Classic (Knob)',
-          PlayerSliderStyle.wavy => 'Wavy (Organic Sine)',
-          PlayerSliderStyle.minimal => 'Minimal (Hairline)',
+          PlayerSliderStyle.capsule => context.l10n.sliderStyleCapsuleTitle,
+          PlayerSliderStyle.normal => context.l10n.sliderStyleNormalShort,
+          PlayerSliderStyle.wavy => context.l10n.sliderStyleWavyTitle,
+          PlayerSliderStyle.minimal => context.l10n.sliderStyleMinimalTitle,
         },
         icon: Icons.linear_scale_rounded,
         keywords: ['slider', 'seekbar', 'seek bar', 'wavy', 'capsule', 'normal'],

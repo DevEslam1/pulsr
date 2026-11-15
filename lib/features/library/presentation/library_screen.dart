@@ -29,7 +29,7 @@ import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_dismissible.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
-import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
+import '../../../core/widgets/pulsr_pill_tab_bar.dart';
 import '../../../core/widgets/pulsr_switch.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -837,7 +837,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 borderRadius: AppRadii.r4All,
                               ),
                               child: Text(
-                                '$losslessCount FLAC/Hi-Res',
+                                context.l10n.flacHiResCountLabel(losslessCount),
                                 style: TextStyle(
                                   color: p.info,
                                   fontSize: AppFontSize.caption,
@@ -927,46 +927,37 @@ class _LibraryScreenState extends State<LibraryScreen>
                     const SizedBox(width: AppSpacing.xs),
                   ],
                   bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(kTextTabBarHeight),
-                    child: PulsrScrollEdgeFade(
-                      enabled: true,
-                      child: TabBar(
-                        key: ValueKey(
-                          'library_tab_bar_${_activeTabs.map((t) => t.name).join('_')}',
-                        ),
-                        controller: _tabController,
-                        isScrollable: true,
-                        tabAlignment: TabAlignment.start,
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 6),
-                        indicatorSize: TabBarIndicatorSize.label,
-                        indicatorColor: p.accent,
-                        indicatorWeight: 3.0,
-                        indicator: UnderlineTabIndicator(
-                          borderSide: BorderSide(
-                            color: p.accent,
-                            width: 3.0,
-                          ),
-                          borderRadius: AppRadii.circular(1.5),
-                        ),
-                        dividerColor: p.hairline.withValues(alpha: 0.18),
-                        dividerHeight: 1.0,
-                        splashBorderRadius: AppRadii.r6All,
-                        labelColor: p.accent,
-                        unselectedLabelColor: p.textSecondary,
-                        labelStyle: const TextStyle(
-                          fontSize: AppFontSize.bodySmall,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                        ),
-                        unselectedLabelStyle: const TextStyle(
-                          fontSize: AppFontSize.bodySmall,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -0.2,
-                        ),
-                        physics: const BouncingScrollPhysics(),
-                        tabs: _activeTabs
-                            .map((tab) => _buildTabItem(context, tab, state, p))
-                            .toList(),
+                    preferredSize: Size.fromHeight(
+                      PulsrLayoutMetrics.fieldHeight(context) + AppSpacing.xs,
+                    ),
+                    child: Padding(
+                      padding: EdgeInsetsDirectional.fromSTEB(
+                        Adaptive.pagePadding(context),
+                        0,
+                        Adaptive.pagePadding(context),
+                        AppSpacing.xs,
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isScrollable = _needsScrollableTabs(
+                            context,
+                            state,
+                            constraints.maxWidth,
+                          );
+                          return PulsrPillTabBar(
+                            tabBarKey: ValueKey(
+                              'library_tab_bar_${isScrollable}_${_activeTabs.map((t) => t.name).join('_')}',
+                            ),
+                            controller: _tabController,
+                            isScrollable: isScrollable,
+                            scrollEdgeFade: isScrollable,
+                            physics: const BouncingScrollPhysics(),
+                            tabs: _activeTabs
+                                .map((tab) =>
+                                    _buildTabItem(context, tab, state, p))
+                                .toList(),
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -998,95 +989,62 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
+  bool _needsScrollableTabs(
+    BuildContext context,
+    LibraryState state,
+    double availableWidth,
+  ) {
+    if (_activeTabs.length <= 1) return false;
+    final usableWidth = (availableWidth - 2.0).clamp(0.0, double.infinity);
+    final slotWidth = usableWidth / _activeTabs.length;
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    const labelStyle = TextStyle(
+      fontSize: AppFontSize.label,
+      fontWeight: FontWeight.w700,
+    );
+    const badgeStyle = TextStyle(
+      fontSize: AppFontSize.caption,
+      fontWeight: FontWeight.w800,
+    );
+
+    for (final tab in _activeTabs) {
+      final labelPainter = TextPainter(
+        text: TextSpan(text: tab.title(context), style: labelStyle),
+        textDirection: direction,
+        maxLines: 1,
+        textScaler: scaler,
+      )..layout();
+      var itemWidth = labelPainter.width + AppSpacing.md;
+      labelPainter.dispose();
+
+      final count = switch (tab) {
+        LibraryTabItem.downloaded => state.downloadedSongs.length,
+        LibraryTabItem.favorites => state.favorites.length,
+        _ => 0,
+      };
+      if (count > 0) {
+        final badgePainter = TextPainter(
+          text: TextSpan(text: '$count', style: badgeStyle),
+          textDirection: direction,
+          maxLines: 1,
+          textScaler: scaler,
+        )..layout();
+        itemWidth += badgePainter.width + AppSpacing.s6 * 3;
+        badgePainter.dispose();
+      }
+      if (itemWidth > slotWidth) return true;
+    }
+    return false;
+  }
+
   Widget _buildTabItem(
     BuildContext context,
     LibraryTabItem tab,
     LibraryState state,
     PulsrPalette p,
   ) {
-    final tabAccent = tab.color(p);
-    Widget content;
-    switch (tab) {
-      case LibraryTabItem.songs:
-        content = Text(context.l10n.songs);
-        break;
-      case LibraryTabItem.downloaded:
-        final count = state.downloadedSongs.length;
-        content = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(context.l10n.downloaded),
-            if (count > 0) ...[
-              const SizedBox(width: AppSpacing.s6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s6,
-                  vertical: AppSpacing.s2,
-                ),
-                decoration: BoxDecoration(
-                  color: tabAccent.withValues(alpha: 0.18),
-                  borderRadius: AppRadii.r6All,
-                ),
-                child: Text(
-                  '$count',
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w800,
-                    color: tabAccent,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        );
-        break;
-      case LibraryTabItem.albums:
-        content = Text(context.l10n.albums);
-        break;
-      case LibraryTabItem.artists:
-        content = Text(context.l10n.artists);
-        break;
-      case LibraryTabItem.favorites:
-        final favCount = state.favorites.length;
-        content = Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(context.l10n.favorites),
-            if (favCount > 0) ...[
-              const SizedBox(width: AppSpacing.s6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.s6,
-                  vertical: AppSpacing.s2,
-                ),
-                decoration: BoxDecoration(
-                  color: tabAccent.withValues(alpha: 0.18),
-                  borderRadius: AppRadii.r6All,
-                ),
-                child: Text(
-                  '$favCount',
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w800,
-                    color: tabAccent,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        );
-        break;
-      case LibraryTabItem.folders:
-        content = Text(context.l10n.folders);
-        break;
-      case LibraryTabItem.genres:
-        content = Text(context.l10n.genres);
-        break;
-      case LibraryTabItem.years:
-        content = Text(context.l10n.years);
-        break;
-    }
-
+    final tabIndex = _activeTabs.indexOf(tab);
     return Tab(
       child: Semantics(
         onLongPressHint: context.l10n.libraryManageTabs,
@@ -1099,13 +1057,112 @@ class _LibraryScreenState extends State<LibraryScreen>
             PulsrHaptics.mediumImpact();
             _showManageTabsSheet(context, state);
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s8),
-            child: content,
+          child: AnimatedBuilder(
+            animation: _tabController,
+            builder: (context, _) {
+              final isSelected = _tabController.index == tabIndex;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+                child: _buildTabItemContent(
+                  context,
+                  tab,
+                  state,
+                  p,
+                  isSelected: isSelected,
+                ),
+              );
+            },
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildTabItemContent(
+    BuildContext context,
+    LibraryTabItem tab,
+    LibraryState state,
+    PulsrPalette p, {
+    required bool isSelected,
+  }) {
+    final tabAccent = tab.color(p);
+    final badgeBg = isSelected
+        ? p.onAccent.withValues(alpha: 0.22)
+        : tabAccent.withValues(alpha: 0.16);
+    final badgeFg = isSelected ? p.onAccent : tabAccent;
+
+    switch (tab) {
+      case LibraryTabItem.songs:
+        return Text(context.l10n.songs, maxLines: 1);
+      case LibraryTabItem.downloaded:
+        final count = state.downloadedSongs.length;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.l10n.downloaded, maxLines: 1),
+            if (count > 0) ...[
+              const SizedBox(width: AppSpacing.s6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s6,
+                  vertical: AppSpacing.s2,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: AppRadii.r6All,
+                ),
+                child: Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w800,
+                    color: badgeFg,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      case LibraryTabItem.albums:
+        return Text(context.l10n.albums, maxLines: 1);
+      case LibraryTabItem.artists:
+        return Text(context.l10n.artists, maxLines: 1);
+      case LibraryTabItem.favorites:
+        final favCount = state.favorites.length;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(context.l10n.favorites, maxLines: 1),
+            if (favCount > 0) ...[
+              const SizedBox(width: AppSpacing.s6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.s6,
+                  vertical: AppSpacing.s2,
+                ),
+                decoration: BoxDecoration(
+                  color: badgeBg,
+                  borderRadius: AppRadii.r6All,
+                ),
+                child: Text(
+                  '$favCount',
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w800,
+                    color: badgeFg,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      case LibraryTabItem.folders:
+        return Text(context.l10n.folders, maxLines: 1);
+      case LibraryTabItem.genres:
+        return Text(context.l10n.genres, maxLines: 1);
+      case LibraryTabItem.years:
+        return Text(context.l10n.years, maxLines: 1);
+    }
   }
 
   Widget _buildTabView(

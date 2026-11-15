@@ -204,10 +204,10 @@ mixin SettingsAppearanceSection
           Icons.linear_scale_rounded,
           context.l10n.seekBarSliderStyleTitle,
           switch (state.playerSliderStyle) {
-            PlayerSliderStyle.capsule => 'Capsule (Apple Music)',
-            PlayerSliderStyle.normal => 'Classic (Knob)',
-            PlayerSliderStyle.wavy => 'Wavy (Organic Sine)',
-            PlayerSliderStyle.minimal => 'Minimal (Hairline)',
+            PlayerSliderStyle.capsule => context.l10n.sliderStyleCapsuleTitle,
+            PlayerSliderStyle.normal => context.l10n.sliderStyleNormalShort,
+            PlayerSliderStyle.wavy => context.l10n.sliderStyleWavyTitle,
+            PlayerSliderStyle.minimal => context.l10n.sliderStyleMinimalTitle,
           },
           trailingBadge: context.l10n.settingsBadgeStyle,
           onTap: () => showSliderStylePickerSheet(

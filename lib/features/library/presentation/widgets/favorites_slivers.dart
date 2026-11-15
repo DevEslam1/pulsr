@@ -492,7 +492,7 @@ class _FavoritesHeaderCard extends StatelessWidget {
                               borderRadius: AppRadii.r4All,
                             ),
                             child: Text(
-                              '$losslessCount Lossless',
+                              context.l10n.losslessCountLabel(losslessCount),
                               style: TextStyle(
                                 fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,

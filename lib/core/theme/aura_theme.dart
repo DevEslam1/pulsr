@@ -838,22 +838,26 @@ class AuraTheme {
             fontSize: AppFontSize.label),
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: p.accent,
-        unselectedLabelColor: p.textTertiary,
-        indicatorColor: p.accent,
-        indicatorSize: TabBarIndicatorSize.label,
-        dividerColor: p.hairline,
+        labelColor: p.onAccent,
+        unselectedLabelColor: p.textSecondary,
+        indicator: BoxDecoration(
+          color: p.accent,
+          borderRadius: AppRadii.r20All,
+        ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        splashBorderRadius: AppRadii.r20All,
         labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         labelStyle: const TextStyle(
             fontFamily: fontFamily,
             fontFamilyFallback: fontFallbacks,
-            fontWeight: FontWeight.w800,
-            fontSize: AppFontSize.body),
+            fontWeight: FontWeight.w700,
+            fontSize: AppFontSize.label),
         unselectedLabelStyle: const TextStyle(
             fontFamily: fontFamily,
             fontFamilyFallback: fontFallbacks,
             fontWeight: FontWeight.w600,
-            fontSize: AppFontSize.body),
+            fontSize: AppFontSize.label),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.transparent,
@@ -902,7 +906,7 @@ class AuraTheme {
               WidgetStatePropertyAll(p.accent.withValues(alpha: 0.08)),
           side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
           shape: const WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: AppRadii.r12All)),
+              RoundedRectangleBorder(borderRadius: AppRadii.r20All)),
           textStyle: WidgetStatePropertyAll(TextStyle(
             fontFamily: fontFamily,
             fontFamilyFallback: fontFallbacks,

@@ -17814,6 +17814,553 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Seek Bar Slider Style'**
   String get seekBarSliderStyleTitle;
+
+  /// Subtitle for a selected audio output device awaiting playback confirmation
+  ///
+  /// In en, this message translates to:
+  /// **'Requested route • waiting for playback confirmation'**
+  String get audioRouteRequestedWaiting;
+
+  /// Subtitle for the active audio output route
+  ///
+  /// In en, this message translates to:
+  /// **'Active route • {spec}'**
+  String audioRouteActive(String spec);
+
+  /// Subtitle for an available non-selected audio output device
+  ///
+  /// In en, this message translates to:
+  /// **'{deviceType} • available output'**
+  String audioRouteAvailable(String deviceType);
+
+  /// Shown when output stream sample rate or bit depth is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'App stream format unverified'**
+  String get appStreamFormatUnverified;
+
+  /// Output stream specification label
+  ///
+  /// In en, this message translates to:
+  /// **'App stream: {rate} / {bitDepth}-bit {encoding}'**
+  String appStreamFormatSpec(String rate, int bitDepth, String encoding);
+
+  /// Hardware buffer latency hint suffix
+  ///
+  /// In en, this message translates to:
+  /// **'primary buffer hint ~{ms} ms'**
+  String appStreamPrimaryBufferHint(String ms);
+
+  /// Honest subtitle when bit-perfect routing is active
+  ///
+  /// In en, this message translates to:
+  /// **'Source format preserved; DAC sample identity not measured'**
+  String get bitPerfectSourcePreservedUnmeasured;
+
+  /// Subtitle explaining bit-perfect USB request before enabling
+  ///
+  /// In en, this message translates to:
+  /// **'Requests exclusive USB mixing where supported'**
+  String get bitPerfectRequestsExclusiveUsb;
+
+  /// Error toast when bit-perfect output is unsupported by device
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect output is not supported by the current output device.'**
+  String get bitPerfectUnsupportedDevice;
+
+  /// Verified hardware endpoint format reported by OS
+  ///
+  /// In en, this message translates to:
+  /// **'{dacLabel} • {rate} / {bitDepth}-bit reported by platform'**
+  String hardwareFormatReportedByPlatform(
+      String dacLabel, String rate, int bitDepth);
+
+  /// Unverified hardware endpoint status
+  ///
+  /// In en, this message translates to:
+  /// **'{dacLabel} • hardware format not verified'**
+  String hardwareFormatNotVerified(String dacLabel);
+
+  /// Tooltip on Cast volume slider when receiver volume is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver volume unknown'**
+  String get receiverVolumeUnknown;
+
+  /// Header for USB direct stream error diagnostics
+  ///
+  /// In en, this message translates to:
+  /// **'Direct Stream Diagnostics ({detail})'**
+  String directStreamDiagnostics(String detail);
+
+  /// Native error code label
+  ///
+  /// In en, this message translates to:
+  /// **'Code: {code}'**
+  String directStreamCode(String code);
+
+  /// Fallback status when direct stream failed without numeric code
+  ///
+  /// In en, this message translates to:
+  /// **'Refused'**
+  String get directStreamRefused;
+
+  /// Badge shown when spatial audio uses software/hardware virtualizer emulation
+  ///
+  /// In en, this message translates to:
+  /// **'Emulated'**
+  String get spatialEmulated;
+
+  /// Subtitle for emulated spatial soundstage widening
+  ///
+  /// In en, this message translates to:
+  /// **'Stereo field expansion via hardware virtualizer'**
+  String get spatialVirtualizerDesc;
+
+  /// Title in Spatial tab when device supports Android Spatializer
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware Spatializer Detected'**
+  String get spatialHardwareDetected;
+
+  /// Title in Spatial tab when emulated via virtualizer
+  ///
+  /// In en, this message translates to:
+  /// **'Emulated 3D Widening Mode'**
+  String get spatialEmulatedMode;
+
+  /// Subtitle for hardware spatializer in Spatial tab
+  ///
+  /// In en, this message translates to:
+  /// **'Android Spatializer API with multi-channel soundstage'**
+  String get spatialMultiChannelDesc;
+
+  /// Subtitle for emulated 3D widening in Spatial tab
+  ///
+  /// In en, this message translates to:
+  /// **'Stereo field widening active via hardware virtualizer'**
+  String get spatialVirtualizerActiveDesc;
+
+  /// Status text when DSP panner is blocked by Bit-Perfect mode
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked'**
+  String get dspBlockedBadge;
+
+  /// Stereo balance shifted left
+  ///
+  /// In en, this message translates to:
+  /// **'Left {percent}%'**
+  String balanceLeftPercent(int percent);
+
+  /// Stereo balance shifted right
+  ///
+  /// In en, this message translates to:
+  /// **'Right {percent}%'**
+  String balanceRightPercent(int percent);
+
+  /// Wet/dry mix percentage label
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% Wet'**
+  String dspWetPercent(int percent);
+
+  /// Bass boost punch percentage subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% punch'**
+  String dspPunchPercent(int percent);
+
+  /// Subtitle when bass boost is off
+  ///
+  /// In en, this message translates to:
+  /// **'Bass boost bypassed'**
+  String get bassBoostBypassed;
+
+  /// Subtitle when hardware loudness gain is active
+  ///
+  /// In en, this message translates to:
+  /// **'+{db} dB hardware gain'**
+  String hardwareGainPlusDb(String db);
+
+  /// Subtitle when hardware gain is off
+  ///
+  /// In en, this message translates to:
+  /// **'Hardware gain bypassed'**
+  String get hardwareGainBypassed;
+
+  /// EQ auto-headroom readout
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-headroom: {db} dB'**
+  String autoHeadroomValue(String db);
+
+  /// Label in telemetry panel for EQ auto-headroom
+  ///
+  /// In en, this message translates to:
+  /// **'EQ Auto-Headroom'**
+  String get eqAutoHeadroomTitle;
+
+  /// Flat equalizer preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Flat'**
+  String get eqPresetFlat;
+
+  /// Bass boost equalizer preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Bass Boost'**
+  String get eqPresetBassBoost;
+
+  /// Vocal equalizer preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Vocal'**
+  String get eqPresetVocal;
+
+  /// Treble equalizer preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Treble'**
+  String get eqPresetTreble;
+
+  /// Custom equalizer preset label
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get eqPresetCustom;
+
+  /// Warning notice in advanced DSP sections when native PCM path is inactive
+  ///
+  /// In en, this message translates to:
+  /// **'Requires PCM DSP path - not audible yet'**
+  String get dspRequiresPcmPath;
+
+  /// Button label to change loaded ViPER-DDC profile
+  ///
+  /// In en, this message translates to:
+  /// **'Change Profile: {name}'**
+  String viperChangeProfile(String name);
+
+  /// Button label to pick a .vdc headphone correction profile
+  ///
+  /// In en, this message translates to:
+  /// **'Select / Load .vdc Profile...'**
+  String get viperSelectLoadProfile;
+
+  /// Fallback text when an artist bio cannot be fetched
+  ///
+  /// In en, this message translates to:
+  /// **'Bio unavailable'**
+  String get bioUnavailable;
+
+  /// Live match counter in smart playlist rule builder
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{0 matches} =1{1 match} other{{count} matches}}'**
+  String smartRuleMatchCount(int count);
+
+  /// Smart rule operator label: contains
+  ///
+  /// In en, this message translates to:
+  /// **'contains'**
+  String get smartRuleOpContains;
+
+  /// Smart rule operator label: does not contain
+  ///
+  /// In en, this message translates to:
+  /// **'does not contain'**
+  String get smartRuleOpNotContains;
+
+  /// Smart rule operator label: is exactly
+  ///
+  /// In en, this message translates to:
+  /// **'is exactly'**
+  String get smartRuleOpEquals;
+
+  /// Smart rule operator label: starts with
+  ///
+  /// In en, this message translates to:
+  /// **'starts with'**
+  String get smartRuleOpStartsWith;
+
+  /// Smart rule operator label: greater than
+  ///
+  /// In en, this message translates to:
+  /// **'greater than'**
+  String get smartRuleOpGreaterThan;
+
+  /// Smart rule operator label: less than
+  ///
+  /// In en, this message translates to:
+  /// **'less than'**
+  String get smartRuleOpLessThan;
+
+  /// Smart rule match mode label: AND
+  ///
+  /// In en, this message translates to:
+  /// **'Match All Rules (AND)'**
+  String get smartRuleMatchAllAnd;
+
+  /// Smart rule match mode label: OR
+  ///
+  /// In en, this message translates to:
+  /// **'Match Any Rule (OR)'**
+  String get smartRuleMatchAnyOr;
+
+  /// Smart criteria field: play count
+  ///
+  /// In en, this message translates to:
+  /// **'Play Count'**
+  String get smartCriteriaFieldPlayCount;
+
+  /// Smart criteria field: decade
+  ///
+  /// In en, this message translates to:
+  /// **'Decade'**
+  String get smartCriteriaFieldDecade;
+
+  /// Smart criteria field: lossless only
+  ///
+  /// In en, this message translates to:
+  /// **'Lossless Only'**
+  String get smartCriteriaFieldLossless;
+
+  /// Smart criteria field: date added
+  ///
+  /// In en, this message translates to:
+  /// **'Date Added'**
+  String get smartCriteriaFieldDateAdded;
+
+  /// Smart criteria field: star rating
+  ///
+  /// In en, this message translates to:
+  /// **'Rating (Stars)'**
+  String get smartCriteriaFieldRating;
+
+  /// Smart criteria field: last played
+  ///
+  /// In en, this message translates to:
+  /// **'Last Played'**
+  String get smartCriteriaFieldLastPlayed;
+
+  /// Smart criteria field: BPM / tempo
+  ///
+  /// In en, this message translates to:
+  /// **'BPM / Tempo'**
+  String get smartCriteriaFieldBpm;
+
+  /// Smart criteria field: loudness range
+  ///
+  /// In en, this message translates to:
+  /// **'LRA Dynamic Range'**
+  String get smartCriteriaFieldLra;
+
+  /// Smart criteria field: bitrate
+  ///
+  /// In en, this message translates to:
+  /// **'Bitrate (kbps)'**
+  String get smartCriteriaFieldBitrate;
+
+  /// Smart criteria operator: within days
+  ///
+  /// In en, this message translates to:
+  /// **'Within Days'**
+  String get smartCriteriaOpWithinDays;
+
+  /// Smart criteria operator: between
+  ///
+  /// In en, this message translates to:
+  /// **'Between'**
+  String get smartCriteriaOpBetween;
+
+  /// Smart playlist description: recently added
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks added to your library in the last 30 days'**
+  String get smartPlaylistDescRecentlyAdded;
+
+  /// Smart playlist description: most played
+  ///
+  /// In en, this message translates to:
+  /// **'Your top most-played tracks on repeat'**
+  String get smartPlaylistDescMostPlayed;
+
+  /// Smart playlist description: recently played
+  ///
+  /// In en, this message translates to:
+  /// **'Your recent playback listening history'**
+  String get smartPlaylistDescRecentlyPlayed;
+
+  /// Smart playlist description: long tracks
+  ///
+  /// In en, this message translates to:
+  /// **'Long tracks and extended mixes over 5 minutes'**
+  String get smartPlaylistDescLongTracks;
+
+  /// Smart playlist description: forgotten favorites
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks you loved but haven\'t listened to recently'**
+  String get smartPlaylistDescForgotten;
+
+  /// Smart playlist description: top rated
+  ///
+  /// In en, this message translates to:
+  /// **'Your highest rated and starred favorite tracks'**
+  String get smartPlaylistDescTopRated;
+
+  /// Smart playlist description: chill evening
+  ///
+  /// In en, this message translates to:
+  /// **'Relaxing, mellow tracks for unwinding'**
+  String get smartPlaylistDescChill;
+
+  /// Smart playlist description: workout energy
+  ///
+  /// In en, this message translates to:
+  /// **'High-energy tracks to keep your workout moving'**
+  String get smartPlaylistDescWorkout;
+
+  /// Smart playlist description: lossless collection
+  ///
+  /// In en, this message translates to:
+  /// **'High-fidelity lossless tracks in your library'**
+  String get smartPlaylistDescLossless;
+
+  /// Smart playlist description: 90s nostalgia
+  ///
+  /// In en, this message translates to:
+  /// **'Classic tracks and nostalgia from the 1990s'**
+  String get smartPlaylistDesc90s;
+
+  /// Default smart playlist card description
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic auto-updating smart playlist based on rules'**
+  String get smartPlaylistDescDefault;
+
+  /// Formatted hours and minutes total duration
+  ///
+  /// In en, this message translates to:
+  /// **'{hours, plural, =1{1 hr} other{{hours} hr}} {minutes, plural, =1{1 min} other{{minutes} min}}'**
+  String durationHoursMinutes(int hours, int minutes);
+
+  /// Formatted minutes-only total duration
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes, plural, =1{1 min} other{{minutes} min}}'**
+  String durationMinutesOnly(int minutes);
+
+  /// Fallback album label for a track with no album name
+  ///
+  /// In en, this message translates to:
+  /// **'Single'**
+  String get singleReleaseLabel;
+
+  /// Download transfer speed in kilobytes per second
+  ///
+  /// In en, this message translates to:
+  /// **'{speed} KB/s'**
+  String downloadSpeedKbps(String speed);
+
+  /// Compact queue slot badge label (e.g. Q1, Q2, Q3)
+  ///
+  /// In en, this message translates to:
+  /// **'Q{slot}'**
+  String queueSlotShort(int slot);
+
+  /// Lossless track count badge
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 Lossless} other{{count} Lossless}}'**
+  String losslessCountLabel(int count);
+
+  /// Count badge for FLAC / Hi-Res tracks
+  ///
+  /// In en, this message translates to:
+  /// **'{count} FLAC/Hi-Res'**
+  String flacHiResCountLabel(int count);
+
+  /// Confirmation snackbar after applying a playback preset
+  ///
+  /// In en, this message translates to:
+  /// **'{label} applied'**
+  String presetAppliedMessage(String label);
+
+  /// Summary after importing a Spotify playlist
+  ///
+  /// In en, this message translates to:
+  /// **'Successfully created playlist \"{title}\" with {matched} of {total} tracks resolved.'**
+  String spotifyImportResolvedSummary(String title, int matched, int total);
+
+  /// Title for capsule seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Capsule (Apple Music)'**
+  String get sliderStyleCapsuleTitle;
+
+  /// Subtitle for capsule seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Sleek, continuous capsule progress bar without protruding knob'**
+  String get sliderStyleCapsuleDesc;
+
+  /// Short title for classic seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Classic (Knob)'**
+  String get sliderStyleNormalShort;
+
+  /// Title for classic seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Classic (Thumb Knob)'**
+  String get sliderStyleNormalTitle;
+
+  /// Subtitle for classic seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Traditional player track with a prominent circular thumb knob'**
+  String get sliderStyleNormalDesc;
+
+  /// Title for wavy seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Wavy (Organic Sine)'**
+  String get sliderStyleWavyTitle;
+
+  /// Subtitle for wavy seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic animated sine wave track that reacts to playback'**
+  String get sliderStyleWavyDesc;
+
+  /// Title for minimal seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Minimal (Hairline)'**
+  String get sliderStyleMinimalTitle;
+
+  /// Subtitle for minimal seek bar slider style
+  ///
+  /// In en, this message translates to:
+  /// **'Ultra-thin modern progress line with subtle scrub indicator'**
+  String get sliderStyleMinimalDesc;
+
+  /// Header of exported audio chain-of-custody report
+  ///
+  /// In en, this message translates to:
+  /// **'Pulsr chain-of-custody certificate'**
+  String get custodyCertificateHeader;
+
+  /// Short Pro feature badge label
+  ///
+  /// In en, this message translates to:
+  /// **'PRO'**
+  String get badgePro;
 }
 
 class _AppLocalizationsDelegate

@@ -7,6 +7,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/responsive/pulsr_responsive_tokens.dart';
 import '../../../../core/services/settings_cache.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -234,116 +235,94 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                       // Data-driven Segmented Selector
                       Expanded(
                         child: Container(
-                          padding: const EdgeInsets.all(3.5),
+                          height: PulsrLayoutMetrics.fieldHeight(context),
                           decoration: BoxDecoration(
-                            color: p.surfaceContainerHighest
-                                .withValues(alpha: 0.55),
-                            borderRadius: AppRadii.r12All,
-                            border: Border.all(
-                              color: p.hairline.withValues(alpha: 0.8),
-                            ),
+                            color: p.surfaceContainer,
+                            borderRadius: AppRadii.r20All,
+                            border: Border.all(color: p.hairline),
                           ),
-                          child: Row(
-                            children: [
-                              for (int i = 0; i < tabs.length; i++) ...[
-                                if (i > 0)
-                                  const SizedBox(width: AppSpacing.xxs),
-                                Expanded(
-                                  child: Semantics(
-                                    button: true,
-                                    selected: safeTabIndex == i,
-                                    label: tabs[i].label(context),
-                                    child: GestureDetector(
-                                      behavior: HitTestBehavior.opaque,
-                                      onTap: () {
-                                        if (_selectedTabIndex != i) {
-                                          PulsrHaptics.selectionClick();
-                                          setState(() => _selectedTabIndex = i);
-                                        }
-                                      },
-                                      child: AnimatedContainer(
-                                        duration: context.motionMs(200),
-                                        curve: context
-                                            .motionCurve(Curves.easeOutCubic),
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: AppSpacing.s6,
-                                          horizontal: AppSpacing.xxs,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          gradient: safeTabIndex == i
-                                              ? LinearGradient(
-                                                  begin: Alignment.topLeft,
-                                                  end: Alignment.bottomRight,
-                                                  colors: [
-                                                    Color.alphaBlend(
-                                                      Colors.white.withValues(
-                                                          alpha: 0.14),
-                                                      p.accent,
-                                                    ),
-                                                    p.accent,
-                                                  ],
-                                                )
-                                              : null,
-                                          borderRadius: AppRadii.r8All,
-                                          boxShadow: safeTabIndex == i
-                                              ? [
-                                                  BoxShadow(
-                                                    color: p.accent.withValues(
-                                                        alpha: 0.28),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 2),
-                                                  ),
-                                                ]
-                                              : null,
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              tabs[i].icon,
-                                              size: 15,
-                                              color: safeTabIndex == i
-                                                  ? p.onAccent
-                                                  : p.textSecondary,
-                                            ),
-                                            const SizedBox(
-                                                width: AppSpacing.s6),
-                                            Flexible(
-                                              child: tabs[i].headerWidget !=
-                                                      null
-                                                  ? tabs[i].headerWidget!(
-                                                      context,
-                                                      safeTabIndex == i,
-                                                    )
-                                                  : Text(
-                                                      tabs[i].label(context),
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: TextStyle(
-                                                        fontSize:
-                                                            AppFontSize.label,
-                                                        fontWeight:
-                                                            safeTabIndex == i
-                                                                ? FontWeight
-                                                                    .w800
-                                                                : FontWeight
-                                                                    .w600,
-                                                        color: safeTabIndex == i
-                                                            ? p.onAccent
-                                                            : p.textSecondary,
+                          child: ClipRRect(
+                            borderRadius: AppRadii.r20All,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                for (int i = 0; i < tabs.length; i++)
+                                  Expanded(
+                                    child: Semantics(
+                                      button: true,
+                                      selected: safeTabIndex == i,
+                                      label: tabs[i].label(context),
+                                      child: GestureDetector(
+                                        behavior: HitTestBehavior.opaque,
+                                        onTap: () {
+                                          if (_selectedTabIndex != i) {
+                                            PulsrHaptics.selectionClick();
+                                            setState(
+                                                () => _selectedTabIndex = i);
+                                          }
+                                        },
+                                        child: AnimatedContainer(
+                                          duration: context.motionMs(200),
+                                          curve: context
+                                              .motionCurve(Curves.easeOutCubic),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.xs,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: safeTabIndex == i
+                                                ? p.accent
+                                                : Colors.transparent,
+                                            borderRadius: AppRadii.r20All,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                tabs[i].icon,
+                                                size: 15,
+                                                color: safeTabIndex == i
+                                                    ? p.onAccent
+                                                    : p.textSecondary,
+                                              ),
+                                              const SizedBox(
+                                                  width: AppSpacing.s6),
+                                              Flexible(
+                                                child: tabs[i].headerWidget !=
+                                                        null
+                                                    ? tabs[i].headerWidget!(
+                                                        context,
+                                                        safeTabIndex == i,
+                                                      )
+                                                    : Text(
+                                                        tabs[i].label(context),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: TextStyle(
+                                                          fontSize:
+                                                              AppFontSize.label,
+                                                          fontWeight:
+                                                              safeTabIndex == i
+                                                                  ? FontWeight
+                                                                      .w700
+                                                                  : FontWeight
+                                                                      .w600,
+                                                          color:
+                                                              safeTabIndex == i
+                                                                  ? p.onAccent
+                                                                  : p.textSecondary,
+                                                        ),
                                                       ),
-                                                    ),
-                                            ),
-                                          ],
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),

@@ -16,9 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('static raw Text literals do not increase (28-01 ratchet)', () {
-    // Baseline lowered from 63 after the full-app l10n sweep (Discord, updater,
-    // radio cards, wizard, room correction, quality sheet, Quran errors).
-    const baseline = 34;
+    // Baseline lowered from 63 -> 34 -> 33 after P4 telemetry/chrome sweep.
+    const baseline = 33;
     final pattern = RegExp(r"Text\(\s*'([^'$]*)'");
     var count = 0;
     final offenders = <String>[];
@@ -37,5 +36,38 @@ void main() {
     expect(count, lessThanOrEqualTo(baseline),
         reason: 'static raw Text literals grew ($count > $baseline). Localize '
             'via ARB + context.l10n. New offenders:\n${offenders.join('\n')}');
+  });
+
+  test('double-quoted static Text and raw Tooltip literals stay bounded', () {
+    const doubleQuoteBaseline = 2;
+    const tooltipBaseline = 0;
+    final dblPattern = RegExp(r'Text\(\s*"([^"$]*)"');
+    final tipPattern = RegExp(r'''Tooltip\([^)]*message:\s*['"]([^'"$]+)['"]''');
+    var dblCount = 0;
+    var tipCount = 0;
+    final dblOffenders = <String>[];
+    final tipOffenders = <String>[];
+    final dir = Directory('lib');
+    for (final f in dir.listSync(recursive: true).whereType<File>()) {
+      if (!f.path.endsWith('.dart')) continue;
+      if (f.path.contains('l10n${Platform.pathSeparator}generated')) continue;
+      final text = f.readAsStringSync();
+      for (final m in dblPattern.allMatches(text)) {
+        final s = m.group(1)!;
+        if (s.trim().isEmpty) continue;
+        dblCount++;
+        dblOffenders.add('${f.path}: $s');
+      }
+      for (final m in tipPattern.allMatches(text)) {
+        final s = m.group(1)!;
+        if (s.trim().isEmpty) continue;
+        tipCount++;
+        tipOffenders.add('${f.path}: $s');
+      }
+    }
+    expect(dblCount, lessThanOrEqualTo(doubleQuoteBaseline),
+        reason: 'Double-quoted static Text grew:\n${dblOffenders.join('\n')}');
+    expect(tipCount, lessThanOrEqualTo(tooltipBaseline),
+        reason: 'Raw Tooltip literals found:\n${tipOffenders.join('\n')}');
   });
 }

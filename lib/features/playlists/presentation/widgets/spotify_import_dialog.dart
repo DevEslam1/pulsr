@@ -297,7 +297,11 @@ class _SpotifyImportDialogState extends State<SpotifyImportDialog> {
                 border: Border.all(color: p.hairline),
               ),
               child: Text(
-                'Successfully created playlist "${res.playlistTitle}" with ${res.matchedCount} of ${res.totalTracks} tracks resolved.',
+                context.l10n.spotifyImportResolvedSummary(
+                  res.playlistTitle,
+                  res.matchedCount,
+                  res.totalTracks,
+                ),
                 style: TextStyle(
                   color: p.textPrimary,
                   fontSize: AppFontSize.bodySmall,

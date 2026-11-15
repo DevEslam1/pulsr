@@ -1441,29 +1441,30 @@ void showSliderStylePickerSheet(
   final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
       context.palette.textSecondary;
 
+  final l10n = context.l10n;
   final styles = [
     (
       style: PlayerSliderStyle.capsule,
-      title: 'Capsule (Apple Music)',
-      subtitle: 'Sleek, continuous capsule progress bar without protruding knob',
+      title: l10n.sliderStyleCapsuleTitle,
+      subtitle: l10n.sliderStyleCapsuleDesc,
       icon: Icons.horizontal_rule_rounded,
     ),
     (
       style: PlayerSliderStyle.normal,
-      title: 'Classic (Thumb Knob)',
-      subtitle: 'Traditional player track with a prominent circular thumb knob',
+      title: l10n.sliderStyleNormalTitle,
+      subtitle: l10n.sliderStyleNormalDesc,
       icon: Icons.radio_button_checked_rounded,
     ),
     (
       style: PlayerSliderStyle.wavy,
-      title: 'Wavy (Organic Sine)',
-      subtitle: 'Dynamic animated sine wave track that reacts to playback',
+      title: l10n.sliderStyleWavyTitle,
+      subtitle: l10n.sliderStyleWavyDesc,
       icon: Icons.waves_rounded,
     ),
     (
       style: PlayerSliderStyle.minimal,
-      title: 'Minimal (Hairline)',
-      subtitle: 'Ultra-thin modern progress line with subtle scrub indicator',
+      title: l10n.sliderStyleMinimalTitle,
+      subtitle: l10n.sliderStyleMinimalDesc,
       icon: Icons.remove_rounded,
     ),
   ];

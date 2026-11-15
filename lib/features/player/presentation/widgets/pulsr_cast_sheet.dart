@@ -575,7 +575,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 )
                               : _volumeUnknown
                                   ? Tooltip(
-                                      message: 'Receiver volume unknown',
+                                      message:
+                                          context.l10n.receiverVolumeUnknown,
                                       child: Slider(
                                         value: _castVolume,
                                         activeColor:

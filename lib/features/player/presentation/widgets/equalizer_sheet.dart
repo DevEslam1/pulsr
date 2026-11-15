@@ -44,6 +44,7 @@ import '../../../settings/cubit/settings_state.dart';
 import '../../../settings/presentation/widgets/room_correction_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_pill_tab_bar.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
 import 'package:pulsr/core/constants/app_typography.dart';

@@ -103,13 +103,14 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
     });
 
     try {
+      final shareSubject = context.l10n.custodyCertificateHeader;
       final directory =
           await (widget.getTempDirectory ?? getTemporaryDirectory)();
       final artifact =
           await exportCustodyCertificate(report, directory: directory);
       final result = await SharePlus.instance.share(ShareParams(
         text: artifact.jsonText,
-        subject: 'Pulsr chain-of-custody certificate',
+        subject: shareSubject,
       ));
       if (!mounted || result.status == ShareResultStatus.dismissed) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -38,7 +38,6 @@ class ArtistDetailScreen extends StatefulWidget {
 }
 
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
-  static const _bioUnavailableText = 'Bio unavailable';
   bool _bioExpanded = false;
   late GetArtistsUseCase _useCase;
   late final ArtistBioService _bioService;
@@ -186,7 +185,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                           size: 16, color: p.textTertiary),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        _bioUnavailableText,
+                        context.l10n.bioUnavailable,
                         style: TextStyle(
                           fontSize: AppFontSize.label,
                           color: p.textTertiary,

@@ -882,7 +882,7 @@ class PlayerBottomActionDock extends StatelessWidget {
                               ? Icons.cast_connected_rounded
                               : deviceOutputIcon,
                           tooltip:
-                              isCast ? 'Google Cast' : l10n.audioOutputAndDac,
+                              isCast ? l10n.googleCast : l10n.audioOutputAndDac,
                           badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
                           isActive: isCast || isUsb,
                           activeColor:

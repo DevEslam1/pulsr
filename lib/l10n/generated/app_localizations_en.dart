@@ -10077,4 +10077,378 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get seekBarSliderStyleTitle => 'Seek Bar Slider Style';
+
+  @override
+  String get audioRouteRequestedWaiting =>
+      'Requested route • waiting for playback confirmation';
+
+  @override
+  String audioRouteActive(String spec) {
+    return 'Active route • $spec';
+  }
+
+  @override
+  String audioRouteAvailable(String deviceType) {
+    return '$deviceType • available output';
+  }
+
+  @override
+  String get appStreamFormatUnverified => 'App stream format unverified';
+
+  @override
+  String appStreamFormatSpec(String rate, int bitDepth, String encoding) {
+    return 'App stream: $rate / $bitDepth-bit $encoding';
+  }
+
+  @override
+  String appStreamPrimaryBufferHint(String ms) {
+    return 'primary buffer hint ~$ms ms';
+  }
+
+  @override
+  String get bitPerfectSourcePreservedUnmeasured =>
+      'Source format preserved; DAC sample identity not measured';
+
+  @override
+  String get bitPerfectRequestsExclusiveUsb =>
+      'Requests exclusive USB mixing where supported';
+
+  @override
+  String get bitPerfectUnsupportedDevice =>
+      'Bit-Perfect output is not supported by the current output device.';
+
+  @override
+  String hardwareFormatReportedByPlatform(
+      String dacLabel, String rate, int bitDepth) {
+    return '$dacLabel • $rate / $bitDepth-bit reported by platform';
+  }
+
+  @override
+  String hardwareFormatNotVerified(String dacLabel) {
+    return '$dacLabel • hardware format not verified';
+  }
+
+  @override
+  String get receiverVolumeUnknown => 'Receiver volume unknown';
+
+  @override
+  String directStreamDiagnostics(String detail) {
+    return 'Direct Stream Diagnostics ($detail)';
+  }
+
+  @override
+  String directStreamCode(String code) {
+    return 'Code: $code';
+  }
+
+  @override
+  String get directStreamRefused => 'Refused';
+
+  @override
+  String get spatialEmulated => 'Emulated';
+
+  @override
+  String get spatialVirtualizerDesc =>
+      'Stereo field expansion via hardware virtualizer';
+
+  @override
+  String get spatialHardwareDetected => 'Hardware Spatializer Detected';
+
+  @override
+  String get spatialEmulatedMode => 'Emulated 3D Widening Mode';
+
+  @override
+  String get spatialMultiChannelDesc =>
+      'Android Spatializer API with multi-channel soundstage';
+
+  @override
+  String get spatialVirtualizerActiveDesc =>
+      'Stereo field widening active via hardware virtualizer';
+
+  @override
+  String get dspBlockedBadge => 'Blocked';
+
+  @override
+  String balanceLeftPercent(int percent) {
+    return 'Left $percent%';
+  }
+
+  @override
+  String balanceRightPercent(int percent) {
+    return 'Right $percent%';
+  }
+
+  @override
+  String dspWetPercent(int percent) {
+    return '$percent% Wet';
+  }
+
+  @override
+  String dspPunchPercent(int percent) {
+    return '$percent% punch';
+  }
+
+  @override
+  String get bassBoostBypassed => 'Bass boost bypassed';
+
+  @override
+  String hardwareGainPlusDb(String db) {
+    return '+$db dB hardware gain';
+  }
+
+  @override
+  String get hardwareGainBypassed => 'Hardware gain bypassed';
+
+  @override
+  String autoHeadroomValue(String db) {
+    return 'Auto-headroom: $db dB';
+  }
+
+  @override
+  String get eqAutoHeadroomTitle => 'EQ Auto-Headroom';
+
+  @override
+  String get eqPresetFlat => 'Flat';
+
+  @override
+  String get eqPresetBassBoost => 'Bass Boost';
+
+  @override
+  String get eqPresetVocal => 'Vocal';
+
+  @override
+  String get eqPresetTreble => 'Treble';
+
+  @override
+  String get eqPresetCustom => 'Custom';
+
+  @override
+  String get dspRequiresPcmPath => 'Requires PCM DSP path - not audible yet';
+
+  @override
+  String viperChangeProfile(String name) {
+    return 'Change Profile: $name';
+  }
+
+  @override
+  String get viperSelectLoadProfile => 'Select / Load .vdc Profile...';
+
+  @override
+  String get bioUnavailable => 'Bio unavailable';
+
+  @override
+  String smartRuleMatchCount(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count matches',
+      one: '1 match',
+      zero: '0 matches',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get smartRuleOpContains => 'contains';
+
+  @override
+  String get smartRuleOpNotContains => 'does not contain';
+
+  @override
+  String get smartRuleOpEquals => 'is exactly';
+
+  @override
+  String get smartRuleOpStartsWith => 'starts with';
+
+  @override
+  String get smartRuleOpGreaterThan => 'greater than';
+
+  @override
+  String get smartRuleOpLessThan => 'less than';
+
+  @override
+  String get smartRuleMatchAllAnd => 'Match All Rules (AND)';
+
+  @override
+  String get smartRuleMatchAnyOr => 'Match Any Rule (OR)';
+
+  @override
+  String get smartCriteriaFieldPlayCount => 'Play Count';
+
+  @override
+  String get smartCriteriaFieldDecade => 'Decade';
+
+  @override
+  String get smartCriteriaFieldLossless => 'Lossless Only';
+
+  @override
+  String get smartCriteriaFieldDateAdded => 'Date Added';
+
+  @override
+  String get smartCriteriaFieldRating => 'Rating (Stars)';
+
+  @override
+  String get smartCriteriaFieldLastPlayed => 'Last Played';
+
+  @override
+  String get smartCriteriaFieldBpm => 'BPM / Tempo';
+
+  @override
+  String get smartCriteriaFieldLra => 'LRA Dynamic Range';
+
+  @override
+  String get smartCriteriaFieldBitrate => 'Bitrate (kbps)';
+
+  @override
+  String get smartCriteriaOpWithinDays => 'Within Days';
+
+  @override
+  String get smartCriteriaOpBetween => 'Between';
+
+  @override
+  String get smartPlaylistDescRecentlyAdded =>
+      'Tracks added to your library in the last 30 days';
+
+  @override
+  String get smartPlaylistDescMostPlayed =>
+      'Your top most-played tracks on repeat';
+
+  @override
+  String get smartPlaylistDescRecentlyPlayed =>
+      'Your recent playback listening history';
+
+  @override
+  String get smartPlaylistDescLongTracks =>
+      'Long tracks and extended mixes over 5 minutes';
+
+  @override
+  String get smartPlaylistDescForgotten =>
+      'Tracks you loved but haven\'t listened to recently';
+
+  @override
+  String get smartPlaylistDescTopRated =>
+      'Your highest rated and starred favorite tracks';
+
+  @override
+  String get smartPlaylistDescChill => 'Relaxing, mellow tracks for unwinding';
+
+  @override
+  String get smartPlaylistDescWorkout =>
+      'High-energy tracks to keep your workout moving';
+
+  @override
+  String get smartPlaylistDescLossless =>
+      'High-fidelity lossless tracks in your library';
+
+  @override
+  String get smartPlaylistDesc90s =>
+      'Classic tracks and nostalgia from the 1990s';
+
+  @override
+  String get smartPlaylistDescDefault =>
+      'Dynamic auto-updating smart playlist based on rules';
+
+  @override
+  String durationHoursMinutes(int hours, int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      hours,
+      locale: localeName,
+      other: '$hours hr',
+      one: '1 hr',
+    );
+    String _temp1 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes min',
+      one: '1 min',
+    );
+    return '$_temp0 $_temp1';
+  }
+
+  @override
+  String durationMinutesOnly(int minutes) {
+    String _temp0 = intl.Intl.pluralLogic(
+      minutes,
+      locale: localeName,
+      other: '$minutes min',
+      one: '1 min',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get singleReleaseLabel => 'Single';
+
+  @override
+  String downloadSpeedKbps(String speed) {
+    return '$speed KB/s';
+  }
+
+  @override
+  String queueSlotShort(int slot) {
+    return 'Q$slot';
+  }
+
+  @override
+  String losslessCountLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Lossless',
+      one: '1 Lossless',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String flacHiResCountLabel(int count) {
+    return '$count FLAC/Hi-Res';
+  }
+
+  @override
+  String presetAppliedMessage(String label) {
+    return '$label applied';
+  }
+
+  @override
+  String spotifyImportResolvedSummary(String title, int matched, int total) {
+    return 'Successfully created playlist \"$title\" with $matched of $total tracks resolved.';
+  }
+
+  @override
+  String get sliderStyleCapsuleTitle => 'Capsule (Apple Music)';
+
+  @override
+  String get sliderStyleCapsuleDesc =>
+      'Sleek, continuous capsule progress bar without protruding knob';
+
+  @override
+  String get sliderStyleNormalShort => 'Classic (Knob)';
+
+  @override
+  String get sliderStyleNormalTitle => 'Classic (Thumb Knob)';
+
+  @override
+  String get sliderStyleNormalDesc =>
+      'Traditional player track with a prominent circular thumb knob';
+
+  @override
+  String get sliderStyleWavyTitle => 'Wavy (Organic Sine)';
+
+  @override
+  String get sliderStyleWavyDesc =>
+      'Dynamic animated sine wave track that reacts to playback';
+
+  @override
+  String get sliderStyleMinimalTitle => 'Minimal (Hairline)';
+
+  @override
+  String get sliderStyleMinimalDesc =>
+      'Ultra-thin modern progress line with subtle scrub indicator';
+
+  @override
+  String get custodyCertificateHeader => 'Pulsr chain-of-custody certificate';
+
+  @override
+  String get badgePro => 'PRO';
 }

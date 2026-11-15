@@ -33,31 +33,32 @@ class SmartPlaylistCard extends StatelessWidget {
   });
 
   static String _describePlaylist(BuildContext context, String name) {
+    final l = context.l10n;
     final lower = name.toLowerCase();
     if (lower.contains('recently added')) {
-      return 'Tracks added to your library in the last 30 days';
+      return l.smartPlaylistDescRecentlyAdded;
     } else if (lower.contains('most played')) {
-      return 'Your top most-played tracks on repeat';
+      return l.smartPlaylistDescMostPlayed;
     } else if (lower.contains('recently played')) {
-      return 'Your recent playback listening history';
+      return l.smartPlaylistDescRecentlyPlayed;
     } else if (lower.contains('long track')) {
-      return 'Long tracks and extended mixes over 5 minutes';
+      return l.smartPlaylistDescLongTracks;
     } else if (lower.contains('forgotten')) {
-      return 'Tracks you loved but haven\'t listened to recently';
+      return l.smartPlaylistDescForgotten;
     } else if (lower.contains('top rated') || lower.contains('star')) {
-      return 'Your highest rated and starred favorite tracks';
+      return l.smartPlaylistDescTopRated;
     } else if (lower.contains('chill')) {
-      return 'Relaxing, mellow tracks for unwinding';
+      return l.smartPlaylistDescChill;
     } else if (lower.contains('workout') || lower.contains('energy')) {
-      return 'High-energy tracks to keep your workout moving';
+      return l.smartPlaylistDescWorkout;
     } else if (lower.contains('lossless') ||
         lower.contains('hi-res') ||
         lower.contains('audiophile')) {
-      return 'High-fidelity lossless tracks in your library';
+      return l.smartPlaylistDescLossless;
     } else if (lower.contains('90s')) {
-      return 'Classic tracks and nostalgia from the 1990s';
+      return l.smartPlaylistDesc90s;
     }
-    return 'Dynamic auto-updating smart playlist based on rules';
+    return l.smartPlaylistDescDefault;
   }
 
   @override
