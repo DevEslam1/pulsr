@@ -16,6 +16,18 @@ import '../player_test_support.dart';
 
 class _FollowHiRes extends Mock implements HiResAudioService {}
 
+class _BassTrackingAudioHandler extends RecordingAudioHandler {
+  final List<double> bassBoostHistory = <double>[];
+  double lastBassBoost = 0.0;
+
+  @override
+  Future<void> setBassBoost(double amount) async {
+    bassBoostHistory.add(amount);
+    lastBassBoost = amount;
+    await super.setBassBoost(amount);
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -465,6 +477,45 @@ void main() {
       handler.throwCalls.add('setViperDdc');
       await controller.setDspEffectsEnabled(false);
       expect(state.errorMessage, contains('Failed to update DSP effects'));
+    });
+
+    test(
+        'disable/repeat-disable/re-enable keeps bass boost state and engine '
+        'in sync without clobbering snapshot', () async {
+      final bassHandler = _BassTrackingAudioHandler();
+      var localState = const PlayerState();
+      final localController = PlayerDspController(
+        audioHandler: bassHandler,
+        settingsCubit: settings,
+        getState: () => localState,
+        emit: (s) => localState = s,
+        syncAudioEffects: ({bool force = false}) {},
+        isClosed: () => false,
+      );
+      addTearDown(localController.dispose);
+
+      await localController.setBassBoost(0.6);
+      expect(localState.effectiveBassBoost, closeTo(0.6, 1e-6));
+      expect(bassHandler.lastBassBoost, closeTo(0.6, 1e-6));
+      expect(localState.isDspEffectsActive, isTrue);
+      expect(localState.activeDspEffectStagesCount, 1);
+
+      await localController.setDspEffectsEnabled(false);
+      expect(localState.effectiveBassBoost, 0.0);
+      expect(bassHandler.lastBassBoost, 0.0);
+      expect(localState.isDspEffectsActive, isFalse);
+      expect(localState.activeDspEffectStagesCount, 0);
+
+      // Repeat disable must not clobber the captured snapshot.
+      await localController.setDspEffectsEnabled(false);
+      expect(localState.effectiveBassBoost, 0.0);
+      expect(bassHandler.lastBassBoost, 0.0);
+
+      await localController.setDspEffectsEnabled(true);
+      expect(localState.effectiveBassBoost, closeTo(0.6, 1e-6));
+      expect(bassHandler.lastBassBoost, closeTo(0.6, 1e-6));
+      expect(localState.isDspEffectsActive, isTrue);
+      expect(localState.activeDspEffectStagesCount, 1);
     });
   });
 

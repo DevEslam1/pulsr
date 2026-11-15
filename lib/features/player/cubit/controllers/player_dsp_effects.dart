@@ -207,225 +207,248 @@ extension PlayerDspEffectsExtension on PlayerDspController {
               effectiveBassBoost: 0.0,
             ),
           ));
-        await _audioHandler.setSpatializerEnabled(false);
-        await _audioHandler.setVirtualizerEnabled(false);
-        await _audioHandler.setDynamicsPreset(DynamicsPreset.off,
-            enabled: false);
-        await _audioHandler.setCrossfeed(false);
-        await _audioHandler.setLookaheadLimiter(false);
-        await _audioHandler.setReverb(false);
-        await _audioHandler.setSaturation(false);
-        await _audioHandler.setStereoWidth(false);
-        await _audioHandler.setLoudnessContour(false);
-        await _audioHandler.setSubCrossover(false);
-        await _audioHandler.setDynamicEq(false);
-        await _audioHandler.setViperDdc(false);
-        await _audioHandler.setArbitraryEq(false);
-        await _audioHandler.setLiveProg(false);
-        await _audioHandler.setDynamicBass(enabled: false);
-        await _audioHandler.setVolumeBoost(0.0);
-        try {
-          await _audioHandler.equalizerManager.setMultibandCompressor(false);
-        } catch (_) {}
-      } else {
-        final snap = _dspSnapshot;
-        if (snap != null && snap.isDspEffectsActive) {
-          final currentDsp = state.dsp;
-          final restoredDsp = currentDsp.copyWith(
-            isSpatializerEnabled: snap.isSpatializerEnabled,
-            isVirtualizerEnabled: snap.isVirtualizerEnabled,
-            virtualizerStrength: snap.virtualizerStrength,
-            isDynamicsEnabled: snap.isDynamicsEnabled,
-            dynamicsPreset: snap.dynamicsPreset,
-            isCrossfeedEnabled: snap.isCrossfeedEnabled,
-            crossfeedDelayUs: snap.crossfeedDelayUs,
-            crossfeedFeedDb: snap.crossfeedFeedDb,
-            crossfeedMode: snap.crossfeedMode,
-            isLimiterEnabled: snap.isLimiterEnabled,
-            limiterThresholdDb: snap.limiterThresholdDb,
-            limiterReleaseMs: snap.limiterReleaseMs,
-            isReverbEnabled: snap.isReverbEnabled,
-            reverbPreset: snap.reverbPreset,
-            reverbWetDry: snap.reverbWetDry,
-            isSaturationEnabled: snap.isSaturationEnabled,
-            saturationDrive: snap.saturationDrive,
-            saturationMix: snap.saturationMix,
-            saturationTilt: snap.saturationTilt,
-            saturationMultiband: snap.saturationMultiband,
-            isStereoWidthEnabled: snap.isStereoWidthEnabled,
-            stereoWidth: snap.stereoWidth,
-            stereoWidthMultiband: snap.stereoWidthMultiband,
-            stereoWidthLow: snap.stereoWidthLow,
-            stereoWidthMid: snap.stereoWidthMid,
-            stereoWidthHigh: snap.stereoWidthHigh,
-            stereoWidthLowCrossoverHz: snap.stereoWidthLowCrossoverHz,
-            stereoWidthHighCrossoverHz: snap.stereoWidthHighCrossoverHz,
-            isLoudnessContourEnabled: snap.isLoudnessContourEnabled,
-            loudnessContourIntensity: snap.loudnessContourIntensity,
-            isSubCrossoverEnabled: snap.isSubCrossoverEnabled,
-            subCrossoverCornerHz: snap.subCrossoverCornerHz,
-            subCrossoverSlopeDbPerOct: snap.subCrossoverSlopeDbPerOct,
-            subCrossoverGain: snap.subCrossoverGain,
-            subCrossoverBassMono: snap.subCrossoverBassMono,
-            subCrossoverAntiPop: snap.subCrossoverAntiPop,
-            isDynamicEqEnabled: snap.isDynamicEqEnabled,
-            dynamicEqBands: snap.dynamicEqBands,
-            isViperDdcEnabled: snap.isViperDdcEnabled,
-            viperDdcProfileName: snap.viperDdcProfileName,
-            isArbitraryEqEnabled: snap.isArbitraryEqEnabled,
-            arbitraryEqLinearPhase: snap.arbitraryEqLinearPhase,
-            arbitraryEqString: snap.arbitraryEqString,
-            isLiveProgEnabled: snap.isLiveProgEnabled,
-            liveProgCode: snap.liveProgCode,
-            isDynamicBassEnabled: snap.isDynamicBassEnabled,
-            dynamicBassStrength: snap.dynamicBassStrength,
-            dynamicBassPreset: snap.dynamicBassPreset,
-            volumeBoost: snap.volumeBoost,
-            effectiveVolumeBoost: snap.effectiveVolumeBoost,
-            effectiveBassBoost: snap.effectiveBassBoost,
-          );
-          _emit(state.copyWith(dsp: restoredDsp));
-          if (snap.isSpatializerEnabled) {
-            await _audioHandler.setSpatializerEnabled(true);
-          }
-          if (snap.isVirtualizerEnabled) {
-            await _audioHandler.setVirtualizerEnabled(true);
-            await _audioHandler
-                .setVirtualizerStrength(snap.virtualizerStrength);
-          }
-          if (snap.isDynamicsEnabled &&
-              snap.dynamicsPreset != DynamicsPreset.off) {
-            await _audioHandler.setDynamicsPreset(snap.dynamicsPreset,
-                enabled: true);
-          }
-          if (snap.isCrossfeedEnabled) {
-            await _audioHandler.setCrossfeed(true,
-                delayUs: snap.crossfeedDelayUs,
-                feedDb: snap.crossfeedFeedDb,
-                mode: snap.crossfeedMode);
-          }
-          if (snap.isLimiterEnabled) {
-            await _audioHandler.setLookaheadLimiter(true,
-                thresholdDb: snap.limiterThresholdDb,
-                releaseMs: snap.limiterReleaseMs);
-          }
-          if (snap.isReverbEnabled) {
-            await _audioHandler.setReverb(true,
-                preset: snap.reverbPreset, wetDry: snap.reverbWetDry);
-          }
-          if (snap.isSaturationEnabled) {
-            await _audioHandler.setSaturation(true,
-                drive: snap.saturationDrive,
-                mix: snap.saturationMix,
-                tilt: snap.saturationTilt,
-                multiband: snap.saturationMultiband);
-          }
-          if (snap.isStereoWidthEnabled) {
-            await _audioHandler.setStereoWidth(true,
-                width: snap.stereoWidth,
-                multiband: snap.stereoWidthMultiband,
-                lowWidth: snap.stereoWidthLow,
-                midWidth: snap.stereoWidthMid,
-                highWidth: snap.stereoWidthHigh,
-                lowCrossoverHz: snap.stereoWidthLowCrossoverHz,
-                highCrossoverHz: snap.stereoWidthHighCrossoverHz);
-          }
-          if (snap.isLoudnessContourEnabled) {
-            await _audioHandler.setLoudnessContour(true,
-                intensity: snap.loudnessContourIntensity);
-          }
-          if (snap.isSubCrossoverEnabled) {
-            await _audioHandler.setSubCrossover(true,
-                cornerHz: snap.subCrossoverCornerHz,
-                slopeDbPerOct: snap.subCrossoverSlopeDbPerOct,
-                gain: snap.subCrossoverGain,
-                bassMono: snap.subCrossoverBassMono,
-                antiPop: snap.subCrossoverAntiPop);
-          }
-          if (snap.isDynamicEqEnabled) {
-            await _audioHandler.setDynamicEq(true);
-            for (int i = 0; i < snap.dynamicEqBands.length; i++) {
-              await _audioHandler.setDynamicEqBand(i, snap.dynamicEqBands[i]);
-            }
-          }
-          if (snap.isViperDdcEnabled) {
-            await _audioHandler.setViperDdc(true,
-                profileName: snap.viperDdcProfileName);
-          }
-          if (snap.isArbitraryEqEnabled) {
-            await _audioHandler.setArbitraryEq(
-              true,
-              eqString: snap.arbitraryEqString,
-              linearPhase: snap.arbitraryEqLinearPhase,
-            );
-          }
-          if (snap.isLiveProgEnabled) {
-            await _audioHandler.setLiveProg(true, code: snap.liveProgCode);
-          }
-          if (snap.isDynamicBassEnabled) {
-            await _audioHandler.setDynamicBass(
-              enabled: true,
-              strength: snap.dynamicBassStrength,
-              preset: snap.dynamicBassPreset,
-            );
-          }
-          if (snap.volumeBoost > 0.0) {
-            final allowedDb = GainStagingBudget.clampBoostDb(
-              requestedBoostDb:
-                  snap.volumeBoost * GainStagingBudget.maxVolumeBoostDb,
-              committedStages: _activeGainStages(excludeVolumeBoost: true),
-            );
-            final safeValue = (allowedDb / GainStagingBudget.maxVolumeBoostDb)
-                .clamp(0.0, 1.0)
-                .toDouble();
-            await _audioHandler.setVolumeBoost(safeValue);
-          }
+          await _audioHandler.setSpatializerEnabled(false);
+          await _audioHandler.setVirtualizerEnabled(false);
+          await _audioHandler.setDynamicsPreset(DynamicsPreset.off,
+              enabled: false);
+          await _audioHandler.setCrossfeed(false);
+          await _audioHandler.setLookaheadLimiter(false);
+          await _audioHandler.setReverb(false);
+          await _audioHandler.setSaturation(false);
+          await _audioHandler.setStereoWidth(false);
+          await _audioHandler.setLoudnessContour(false);
+          await _audioHandler.setSubCrossover(false);
+          await _audioHandler.setDynamicEq(false);
+          await _audioHandler.setViperDdc(false);
+          await _audioHandler.setArbitraryEq(false);
+          await _audioHandler.setLiveProg(false);
+          await _audioHandler.setDynamicBass(enabled: false);
+          await _audioHandler.setVolumeBoost(0.0);
+          // AUDIT-FIX (P0-3): Policy — bass boost belongs to the bypassable
+          // DSP effects domain alongside volume boost. Zeroing effectiveBassBoost
+          // in state must push 0.0 to the engine on disable and re-push the
+          // headroom-clamped snapshot value on restore.
+          await _audioHandler.setBassBoost(0.0);
+          try {
+            await _audioHandler.equalizerManager.setMultibandCompressor(false);
+          } catch (_) {}
         } else {
-          final enableSpatial = state.isSpatializerSupported;
-          final enableVirt = !enableSpatial && state.isVirtualizerSupported;
-          _emit(state.copyWith(
-            dsp: state.dsp.copyWith(
-              isSpatializerEnabled: enableSpatial,
-              isVirtualizerEnabled: enableVirt,
-              virtualizerStrength:
-                  enableVirt ? 0.35 : state.virtualizerStrength,
-              isLimiterEnabled: true,
-              limiterThresholdDb: -0.2,
-              limiterReleaseMs: 50.0,
-            ),
-          ));
-          if (enableSpatial) {
-            await _audioHandler.setSpatializerEnabled(true);
+          final snap = _dspSnapshot;
+          if (snap != null && snap.isDspEffectsActive) {
+            final currentDsp = state.dsp;
+            final restoredDsp = currentDsp.copyWith(
+              isSpatializerEnabled: snap.isSpatializerEnabled,
+              isVirtualizerEnabled: snap.isVirtualizerEnabled,
+              virtualizerStrength: snap.virtualizerStrength,
+              isDynamicsEnabled: snap.isDynamicsEnabled,
+              dynamicsPreset: snap.dynamicsPreset,
+              isCrossfeedEnabled: snap.isCrossfeedEnabled,
+              crossfeedDelayUs: snap.crossfeedDelayUs,
+              crossfeedFeedDb: snap.crossfeedFeedDb,
+              crossfeedMode: snap.crossfeedMode,
+              isLimiterEnabled: snap.isLimiterEnabled,
+              limiterThresholdDb: snap.limiterThresholdDb,
+              limiterReleaseMs: snap.limiterReleaseMs,
+              isReverbEnabled: snap.isReverbEnabled,
+              reverbPreset: snap.reverbPreset,
+              reverbWetDry: snap.reverbWetDry,
+              isSaturationEnabled: snap.isSaturationEnabled,
+              saturationDrive: snap.saturationDrive,
+              saturationMix: snap.saturationMix,
+              saturationTilt: snap.saturationTilt,
+              saturationMultiband: snap.saturationMultiband,
+              isStereoWidthEnabled: snap.isStereoWidthEnabled,
+              stereoWidth: snap.stereoWidth,
+              stereoWidthMultiband: snap.stereoWidthMultiband,
+              stereoWidthLow: snap.stereoWidthLow,
+              stereoWidthMid: snap.stereoWidthMid,
+              stereoWidthHigh: snap.stereoWidthHigh,
+              stereoWidthLowCrossoverHz: snap.stereoWidthLowCrossoverHz,
+              stereoWidthHighCrossoverHz: snap.stereoWidthHighCrossoverHz,
+              isLoudnessContourEnabled: snap.isLoudnessContourEnabled,
+              loudnessContourIntensity: snap.loudnessContourIntensity,
+              isSubCrossoverEnabled: snap.isSubCrossoverEnabled,
+              subCrossoverCornerHz: snap.subCrossoverCornerHz,
+              subCrossoverSlopeDbPerOct: snap.subCrossoverSlopeDbPerOct,
+              subCrossoverGain: snap.subCrossoverGain,
+              subCrossoverBassMono: snap.subCrossoverBassMono,
+              subCrossoverAntiPop: snap.subCrossoverAntiPop,
+              isDynamicEqEnabled: snap.isDynamicEqEnabled,
+              dynamicEqBands: snap.dynamicEqBands,
+              isViperDdcEnabled: snap.isViperDdcEnabled,
+              viperDdcProfileName: snap.viperDdcProfileName,
+              isArbitraryEqEnabled: snap.isArbitraryEqEnabled,
+              arbitraryEqLinearPhase: snap.arbitraryEqLinearPhase,
+              arbitraryEqString: snap.arbitraryEqString,
+              isLiveProgEnabled: snap.isLiveProgEnabled,
+              liveProgCode: snap.liveProgCode,
+              isDynamicBassEnabled: snap.isDynamicBassEnabled,
+              dynamicBassStrength: snap.dynamicBassStrength,
+              dynamicBassPreset: snap.dynamicBassPreset,
+              volumeBoost: snap.volumeBoost,
+              effectiveVolumeBoost: snap.effectiveVolumeBoost,
+              effectiveBassBoost: snap.effectiveBassBoost,
+            );
+            _emit(state.copyWith(dsp: restoredDsp));
+            if (snap.isSpatializerEnabled) {
+              await _audioHandler.setSpatializerEnabled(true);
+            }
+            if (snap.isVirtualizerEnabled) {
+              await _audioHandler.setVirtualizerEnabled(true);
+              await _audioHandler
+                  .setVirtualizerStrength(snap.virtualizerStrength);
+            }
+            if (snap.isDynamicsEnabled &&
+                snap.dynamicsPreset != DynamicsPreset.off) {
+              await _audioHandler.setDynamicsPreset(snap.dynamicsPreset,
+                  enabled: true);
+            }
+            if (snap.isCrossfeedEnabled) {
+              await _audioHandler.setCrossfeed(true,
+                  delayUs: snap.crossfeedDelayUs,
+                  feedDb: snap.crossfeedFeedDb,
+                  mode: snap.crossfeedMode);
+            }
+            if (snap.isLimiterEnabled) {
+              await _audioHandler.setLookaheadLimiter(true,
+                  thresholdDb: snap.limiterThresholdDb,
+                  releaseMs: snap.limiterReleaseMs);
+            }
+            if (snap.isReverbEnabled) {
+              await _audioHandler.setReverb(true,
+                  preset: snap.reverbPreset, wetDry: snap.reverbWetDry);
+            }
+            if (snap.isSaturationEnabled) {
+              await _audioHandler.setSaturation(true,
+                  drive: snap.saturationDrive,
+                  mix: snap.saturationMix,
+                  tilt: snap.saturationTilt,
+                  multiband: snap.saturationMultiband);
+            }
+            if (snap.isStereoWidthEnabled) {
+              await _audioHandler.setStereoWidth(true,
+                  width: snap.stereoWidth,
+                  multiband: snap.stereoWidthMultiband,
+                  lowWidth: snap.stereoWidthLow,
+                  midWidth: snap.stereoWidthMid,
+                  highWidth: snap.stereoWidthHigh,
+                  lowCrossoverHz: snap.stereoWidthLowCrossoverHz,
+                  highCrossoverHz: snap.stereoWidthHighCrossoverHz);
+            }
+            if (snap.isLoudnessContourEnabled) {
+              await _audioHandler.setLoudnessContour(true,
+                  intensity: snap.loudnessContourIntensity);
+            }
+            if (snap.isSubCrossoverEnabled) {
+              await _audioHandler.setSubCrossover(true,
+                  cornerHz: snap.subCrossoverCornerHz,
+                  slopeDbPerOct: snap.subCrossoverSlopeDbPerOct,
+                  gain: snap.subCrossoverGain,
+                  bassMono: snap.subCrossoverBassMono,
+                  antiPop: snap.subCrossoverAntiPop);
+            }
+            if (snap.isDynamicEqEnabled) {
+              await _audioHandler.setDynamicEq(true);
+              for (int i = 0; i < snap.dynamicEqBands.length; i++) {
+                await _audioHandler.setDynamicEqBand(i, snap.dynamicEqBands[i]);
+              }
+            }
+            if (snap.isViperDdcEnabled) {
+              await _audioHandler.setViperDdc(true,
+                  profileName: snap.viperDdcProfileName);
+            }
+            if (snap.isArbitraryEqEnabled) {
+              await _audioHandler.setArbitraryEq(
+                true,
+                eqString: snap.arbitraryEqString,
+                linearPhase: snap.arbitraryEqLinearPhase,
+              );
+            }
+            if (snap.isLiveProgEnabled) {
+              await _audioHandler.setLiveProg(true, code: snap.liveProgCode);
+            }
+            if (snap.isDynamicBassEnabled) {
+              await _audioHandler.setDynamicBass(
+                enabled: true,
+                strength: snap.dynamicBassStrength,
+                preset: snap.dynamicBassPreset,
+              );
+            }
+            if (snap.effectiveBassBoost > 0.0) {
+              final allowedDb = GainStagingBudget.clampBoostDb(
+                requestedBoostDb:
+                    snap.effectiveBassBoost * GainStagingBudget.maxBassBoostDb,
+                committedStages: _activeGainStages(excludeBassBoost: true),
+              );
+              final safeBass = (allowedDb / GainStagingBudget.maxBassBoostDb)
+                  .clamp(0.0, 1.0)
+                  .toDouble();
+              await _audioHandler.setBassBoost(safeBass);
+              if (!_isClosed() &&
+                  (safeBass - snap.effectiveBassBoost).abs() > 0.001) {
+                final s = _getState();
+                _emit(s.copyWith(
+                  dsp: s.dsp.copyWith(effectiveBassBoost: safeBass),
+                ));
+              }
+            }
+            if (snap.volumeBoost > 0.0) {
+              final allowedDb = GainStagingBudget.clampBoostDb(
+                requestedBoostDb:
+                    snap.volumeBoost * GainStagingBudget.maxVolumeBoostDb,
+                committedStages: _activeGainStages(excludeVolumeBoost: true),
+              );
+              final safeValue = (allowedDb / GainStagingBudget.maxVolumeBoostDb)
+                  .clamp(0.0, 1.0)
+                  .toDouble();
+              await _audioHandler.setVolumeBoost(safeValue);
+            }
+          } else {
+            final enableSpatial = state.isSpatializerSupported;
+            final enableVirt = !enableSpatial && state.isVirtualizerSupported;
+            _emit(state.copyWith(
+              dsp: state.dsp.copyWith(
+                isSpatializerEnabled: enableSpatial,
+                isVirtualizerEnabled: enableVirt,
+                virtualizerStrength:
+                    enableVirt ? 0.35 : state.virtualizerStrength,
+                isLimiterEnabled: true,
+                limiterThresholdDb: -0.2,
+                limiterReleaseMs: 50.0,
+              ),
+            ));
+            if (enableSpatial) {
+              await _audioHandler.setSpatializerEnabled(true);
+            }
+            if (enableVirt) {
+              await _audioHandler.setVirtualizerEnabled(true);
+              await _audioHandler.setVirtualizerStrength(0.35);
+            }
+            await _audioHandler.setLookaheadLimiter(true,
+                thresholdDb: -0.2, releaseMs: 50.0);
           }
-          if (enableVirt) {
-            await _audioHandler.setVirtualizerEnabled(true);
-            await _audioHandler.setVirtualizerStrength(0.35);
-          }
-          await _audioHandler.setLookaheadLimiter(true,
-              thresholdDb: -0.2, releaseMs: 50.0);
-        }
-        if (_multibandCompressorRestore) {
-          await _audioHandler.equalizerManager.setMultibandCompressor(true);
-          // Clear only after the native call accepted it, so a failure leaves
-          // the restore intent intact for the next enable attempt.
-          _multibandCompressorRestore = false;
-          if (!_isClosed()) {
-            final s = _getState();
-            if (!s.dsp.isMultibandCompressorEnabled) {
-              _emit(s.copyWith(
-                dsp: s.dsp.copyWith(isMultibandCompressorEnabled: true),
-              ));
+          if (_multibandCompressorRestore) {
+            await _audioHandler.equalizerManager.setMultibandCompressor(true);
+            // Clear only after the native call accepted it, so a failure leaves
+            // the restore intent intact for the next enable attempt.
+            _multibandCompressorRestore = false;
+            if (!_isClosed()) {
+              final s = _getState();
+              if (!s.dsp.isMultibandCompressorEnabled) {
+                _emit(s.copyWith(
+                  dsp: s.dsp.copyWith(isMultibandCompressorEnabled: true),
+                ));
+              }
             }
           }
         }
+      } catch (e) {
+        _syncAudioEffects();
+        final s = _getState();
+        _emit(s.copyWith(
+            playback: s.playback
+                .copyWith(errorMessage: 'Failed to update DSP effects: $e')));
       }
-    } catch (e) {
-      _syncAudioEffects();
-      final s = _getState();
-      _emit(s.copyWith(
-          playback: s.playback
-              .copyWith(errorMessage: 'Failed to update DSP effects: $e')));
-    }
     });
   }
 

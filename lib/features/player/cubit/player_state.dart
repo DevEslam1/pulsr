@@ -260,6 +260,7 @@ abstract class DspSlice with _$DspSlice {
       isArbitraryEqEnabled ||
       isLiveProgEnabled ||
       isDynamicBassEnabled ||
+      effectiveBassBoost > 0.01 ||
       volumeBoost > 0.01;
 
   bool get isDspEffectsActive =>
@@ -279,6 +280,7 @@ abstract class DspSlice with _$DspSlice {
       isArbitraryEqEnabled ||
       isLiveProgEnabled ||
       isDynamicBassEnabled ||
+      effectiveBassBoost > 0.01 ||
       volumeBoost > 0.01;
 
   int get activeDspStagesCount {
@@ -301,6 +303,7 @@ abstract class DspSlice with _$DspSlice {
     if (isArbitraryEqEnabled) count++;
     if (isLiveProgEnabled) count++;
     if (isDynamicBassEnabled) count++;
+    if (effectiveBassBoost > 0.01) count++;
     if (volumeBoost > 0.01) count++;
     return count;
   }
