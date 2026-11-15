@@ -89,6 +89,7 @@ class YtmUrlCache {
   /// a URL that expires moments after launch would just 403 on first play.
   static const Duration _restoreMinTtl = Duration(minutes: 10);
   static const Duration _persistDebounce = Duration(seconds: 3);
+  static const int _maxRestoreBytes = 2 * 1024 * 1024;
 
   File? _diskFile;
   bool _restored = false;
@@ -122,6 +123,13 @@ class YtmUrlCache {
       final file = File('${dir.path}/$_diskFileName');
       _diskFile = file;
       if (!await file.exists()) return;
+      // Hygiene pass: cap persisted cache restore at 2 MB to avoid OOM/jank.
+      final size = await file.length();
+      if (size > _maxRestoreBytes) {
+        debugPrint(
+            '[YtmUrlCache] Ignoring oversized restore file ($size bytes)');
+        return;
+      }
       final raw = await file.readAsString();
       if (raw.trim().isEmpty) return;
       final decoded = jsonDecode(raw);

@@ -95,7 +95,6 @@ bool isQuranTrack(SongsTableData? song) {
     'abdulbasit',
     'abdelbasset',
     'الحصري',
-    'حصري',
     'hussary',
     'hossary',
     'مصطفي اسماعيل',

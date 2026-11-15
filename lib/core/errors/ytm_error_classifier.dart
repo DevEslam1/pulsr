@@ -95,8 +95,8 @@ class YtmException implements Exception {
       (details != null && details!.toLowerCase().contains('unauthenticated'));
 
   /// Fatal error where looping / skipping the queue will only worsen the block.
-  bool get isFatal =>
-      isNetwork || isDisabled || isBotBlocked || isThrottled || isAuth;
+  /// Network errors are excluded (retryable with backoff; hardening pass).
+  bool get isFatal => isDisabled || isBotBlocked || isThrottled || isAuth;
 
   /// This one video cannot be played, but others still can.
   bool get isUnavailable =>

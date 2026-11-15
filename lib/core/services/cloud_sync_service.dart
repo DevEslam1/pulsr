@@ -36,16 +36,81 @@ class CloudSyncService {
   final AppDatabase _db;
   SharedPreferences? _prefs;
 
+  static const String _keyLocalModifiedFavorites =
+      'cloud_sync_local_modified_favorites';
   static final Map<String, int> _localModifiedFavorites = {};
+  static bool _localModifiedLoaded = false;
+  static Future<void>? _localModifiedPersistChain;
 
-  static void recordLocalFavoriteModified(String stableOrRemoteId, [int? timestampMs]) {
+  static Future<void> _ensureLocalModifiedFavoritesLoaded() async {
+    if (_localModifiedLoaded) return;
+    _localModifiedLoaded = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyLocalModifiedFavorites);
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          for (final entry in decoded.entries) {
+            final k = entry.key?.toString();
+            final v = entry.value;
+            if (k != null &&
+                v is num &&
+                !_localModifiedFavorites.containsKey(k)) {
+              _localModifiedFavorites[k] = v.toInt();
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Best-effort: pure-Dart tests run without a platform SP binding.
+    }
+  }
+
+  static void _persistLocalModifiedFavoritesAsync() {
+    final previous = _localModifiedPersistChain ?? Future<void>.value();
+    _localModifiedPersistChain = previous.then((_) async {
+      await _ensureLocalModifiedFavoritesLoaded();
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+            _keyLocalModifiedFavorites, jsonEncode(_localModifiedFavorites));
+      } catch (_) {
+        // Best-effort: pure-Dart tests run without a platform SP binding.
+      }
+    });
+  }
+
+  static void recordLocalFavoriteModified(String stableOrRemoteId,
+      [int? timestampMs]) {
     _localModifiedFavorites[stableOrRemoteId] =
         timestampMs ?? DateTime.now().millisecondsSinceEpoch;
+    _persistLocalModifiedFavoritesAsync();
   }
 
   @visibleForTesting
   static void clearLocalModifiedFavoritesForTesting() {
     _localModifiedFavorites.clear();
+    _localModifiedLoaded = false;
+    _localModifiedPersistChain = null;
+  }
+
+  @visibleForTesting
+  static void simulateRestartForTesting() {
+    _localModifiedFavorites.clear();
+    _localModifiedLoaded = false;
+  }
+
+  @visibleForTesting
+  static Future<void> flushLocalModifiedFavoritesForTesting() async {
+    await _localModifiedPersistChain;
+  }
+
+  @visibleForTesting
+  static Future<int?> localFavoriteModifiedAtForTesting(
+      String stableOrRemoteId) async {
+    await _ensureLocalModifiedFavoritesLoaded();
+    return _localModifiedFavorites[stableOrRemoteId];
   }
 
   static int extractCloudTimestamp(Map<String, dynamic> data) {
@@ -343,13 +408,28 @@ class CloudSyncService {
     return false;
   }
 
+  @visibleForTesting
+  Future<bool> uploadLocalDataForTesting(
+    DocumentReference userDoc, {
+    required bool syncFavorites,
+    required bool syncPlaylists,
+    FirebaseFirestore? firestoreOverride,
+  }) =>
+      _uploadLocalData(
+        userDoc,
+        syncFavorites: syncFavorites,
+        syncPlaylists: syncPlaylists,
+        firestoreOverride: firestoreOverride,
+      );
+
   Future<bool> _uploadLocalData(
     DocumentReference userDoc, {
     required bool syncFavorites,
     required bool syncPlaylists,
+    FirebaseFirestore? firestoreOverride,
   }) async {
     final prefs = await _getPrefs();
-    final firestore = FirebaseFirestore.instance;
+    final firestore = firestoreOverride ?? FirebaseFirestore.instance;
     final deviceId = await getDeviceId();
     WriteBatch currentBatch = firestore.batch();
     // Hashes for the docs currently staged in `currentBatch`. They are merged
@@ -429,6 +509,7 @@ class CloudSyncService {
         pendingHashes[docId] = hash;
         opCount++;
         await commitBatchIfFull();
+        if (commitFailed) return false;
       }
 
       // Tombstone favorites this device previously uploaded and no longer has.
@@ -451,6 +532,7 @@ class CloudSyncService {
         pendingHashes[removedId] = 'deleted';
         opCount++;
         await commitBatchIfFull();
+        if (commitFailed) return false;
       }
       favoriteBaseline = localFavoriteDocIds;
     }
@@ -491,6 +573,7 @@ class CloudSyncService {
           pendingHashes[plDocId] = plHash;
           opCount++;
           await commitBatchIfFull();
+          if (commitFailed) return false;
         }
 
         final songsRes = await _repository.getPlaylistSongs(pl.id);
@@ -533,6 +616,7 @@ class CloudSyncService {
             pendingHashes[fullKey] = sHash;
             opCount++;
             await commitBatchIfFull();
+            if (commitFailed) return false;
           }
         }
 
@@ -553,6 +637,7 @@ class CloudSyncService {
           pendingHashes['${plDocId}_$removedId'] = 'deleted';
           opCount++;
           await commitBatchIfFull();
+          if (commitFailed) return false;
         }
         playlistSongBaseline ??= <String, Set<String>>{};
         playlistSongBaseline[plDocId] = localSongDocIds;
@@ -575,10 +660,12 @@ class CloudSyncService {
         pendingHashes['pl_tombstone_$removedId'] = 'deleted';
         opCount++;
         await commitBatchIfFull();
+        if (commitFailed) return false;
       }
       playlistBaseline = localPlaylistDocIds;
     }
 
+    if (commitFailed) return false;
     if (opCount > 0) {
       final ok = await _commitWithRetry(currentBatch);
       if (ok) {
@@ -610,6 +697,7 @@ class CloudSyncService {
   }) async {
     // 1. Merge Favorites
     if (syncFavorites) {
+      await _ensureLocalModifiedFavoritesLoaded();
       final lastSync = lastSyncTime;
       Query<Map<String, dynamic>> favQuery = userDoc.collection('favorites');
       if (lastSync != null) {

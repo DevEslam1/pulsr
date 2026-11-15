@@ -20,7 +20,7 @@ class NetworkChangeMonitor {
   final Connectivity _connectivity;
 
   StreamSubscription<List<ConnectivityResult>>? _sub;
-  final StreamController<void> _controller = StreamController<void>.broadcast();
+  StreamController<void> _controller = StreamController<void>.broadcast();
 
   List<ConnectivityResult>? _lastResults;
   Timer? _debounce;
@@ -32,11 +32,16 @@ class NetworkChangeMonitor {
   Future<void> start() async {
     if (_started) return;
     _started = true;
+    if (_controller.isClosed) {
+      _controller = StreamController<void>.broadcast();
+    }
     try {
       _lastResults = await _connectivity.checkConnectivity();
     } catch (_) {
       _lastResults = null;
     }
+    if (!_started || _controller.isClosed) return;
+    await _sub?.cancel();
     _sub = _connectivity.onConnectivityChanged.listen(_onResults);
   }
 
@@ -66,9 +71,13 @@ class NetworkChangeMonitor {
   }
 
   Future<void> dispose() async {
-    _debounce?.cancel();
-    await _sub?.cancel();
-    await _controller.close();
     _started = false;
+    _debounce?.cancel();
+    _debounce = null;
+    await _sub?.cancel();
+    _sub = null;
+    if (!_controller.isClosed) {
+      await _controller.close();
+    }
   }
 }

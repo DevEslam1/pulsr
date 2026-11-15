@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/duplicate_finder_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -169,6 +171,43 @@ void main() {
       );
 
       expect(group.key, equals('180-500-1'));
+    });
+
+    test('Pass 2 matches identical audio across adjacent (+/-1) bucket boundary',
+        () async {
+      final dir = await Directory.systemTemp.createTemp('pulsr_dup_boundary_');
+      addTearDown(() async {
+        if (await dir.exists()) await dir.delete(recursive: true);
+      });
+
+      final bytes = List<int>.generate(4096, (i) => i % 251);
+      final fileA = File('${dir.path}/a.mp3')..writeAsBytesSync(bytes);
+      final fileB = File('${dir.path}/b.mp3')..writeAsBytesSync(bytes);
+
+      // Different metadata skips Pass 1; durations fall on either side of the
+      // .round() 1000ms boundary (120 vs 121) and stale DB size on either side
+      // of the 10KB rounding boundary (0 vs 1).
+      final duplicates = await service.findDuplicates([
+        _testSong(
+          id: 10,
+          title: 'First Name',
+          artist: 'Artist A',
+          durationMs: 120499,
+          fileSize: 4999,
+          path: fileA.path,
+        ),
+        _testSong(
+          id: 11,
+          title: 'Renamed Copy',
+          artist: 'Artist B',
+          durationMs: 120501,
+          fileSize: 5001,
+          path: fileB.path,
+        ),
+      ]);
+
+      expect(duplicates.length, 1);
+      expect(duplicates.first.songs.map((s) => s.id), unorderedEquals([10, 11]));
     });
   });
 }

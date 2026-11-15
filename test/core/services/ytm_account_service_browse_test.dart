@@ -1069,5 +1069,92 @@ void main() {
       expect(tracks.single.videoId, 'wrapTrack01');
       expect(await service.fetchPlaylistTracks(''), isEmpty);
     });
+
+    test(
+        'musicTwoRowItemRenderer skips Album/bullet/year metadata runs when parsing artist',
+        () async {
+      final service = await loggedIn();
+      handler = (request) async => _json(
+            200,
+            _shelf([
+              {
+                'musicTwoRowItemRenderer': {
+                  'navigationEndpoint': {
+                    'watchEndpoint': {'videoId': 'twoRowVid01'},
+                  },
+                  'title': {
+                    'runs': [
+                      {'text': 'Track Title'},
+                    ],
+                  },
+                  'subtitle': {
+                    'runs': [
+                      {'text': 'Album'},
+                      {'text': '•'},
+                      {'text': '2023'},
+                      {'text': '•'},
+                      {'text': 'Real Artist'},
+                      {'text': '•'},
+                      {'text': '3:45'},
+                    ],
+                  },
+                },
+              },
+            ]),
+          );
+
+      final tracks = await service.fetchHomeRecommendations();
+      expect(tracks, hasLength(1));
+      expect(tracks.single.artist, equals('Real Artist'));
+      expect(
+        tracks.single.duration,
+        equals(const Duration(minutes: 3, seconds: 45)),
+      );
+    });
+
+    test(
+        'musicResponsiveListItemRenderer skips Album/bullet/year runs when parsing artist',
+        () async {
+      final service = await loggedIn();
+      handler = (request) async => _json(
+            200,
+            _shelf([
+              {
+                'musicResponsiveListItemRenderer': {
+                  'playlistItemData': {'videoId': 'listRowVid1'},
+                  'flexColumns': [
+                    {
+                      'musicResponsiveListItemFlexColumnRenderer': {
+                        'text': {
+                          'runs': [
+                            {'text': 'Song Title'},
+                          ],
+                        },
+                      },
+                    },
+                    {
+                      'musicResponsiveListItemFlexColumnRenderer': {
+                        'text': {
+                          'runs': [
+                            {'text': 'Album'},
+                            {'text': '•'},
+                            {'text': '2023'},
+                            {'text': '•'},
+                            {'text': 'Real Artist'},
+                          ],
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            ]),
+          );
+
+      final details = await service.fetchPlaylistDetails('LM');
+      expect(details, isNotNull);
+      expect(details!.tracks, hasLength(1));
+      expect(details.tracks.single.artist, equals('Real Artist'));
+    });
   });
 }

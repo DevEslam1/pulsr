@@ -89,5 +89,54 @@ void main() {
       expect(store.list.first.name, equals('Updated Name'));
       expect(store.list.first.url, equals('https://example.com/live2'));
     });
+
+    test('does not match bare حصري as Hussary artwork or Quran station', () {
+      const exclusiveStation = RadioStation(
+        id: 'st-exclusive',
+        name: 'بث حصري للأخبار',
+        url: 'https://example.com/live-news',
+      );
+
+      expect(
+        RadioStationStore.resolveArtworkForStation(
+          id: exclusiveStation.id,
+          name: exclusiveStation.name,
+          url: exclusiveStation.url,
+        ),
+        isNull,
+      );
+      expect(
+        RadioStationStore.resolveHomeCardForStation(
+          id: exclusiveStation.id,
+          name: exclusiveStation.name,
+          url: exclusiveStation.url,
+        ),
+        isNull,
+      );
+      expect(RadioStationStore.isQuranStation(exclusiveStation), isFalse);
+
+      const hussaryStation = RadioStation(
+        id: 'st-hussary',
+        name: 'الشيخ الحصري',
+        url: 'https://example.com/recitation',
+      );
+      expect(
+        RadioStationStore.resolveArtworkForStation(
+          id: hussaryStation.id,
+          name: hussaryStation.name,
+          url: hussaryStation.url,
+        ),
+        equals(RadioStationStore.hussaryArtwork),
+      );
+      expect(
+        RadioStationStore.resolveHomeCardForStation(
+          id: hussaryStation.id,
+          name: hussaryStation.name,
+          url: hussaryStation.url,
+        ),
+        equals(RadioStationStore.hussaryHomeCard),
+      );
+      expect(RadioStationStore.isQuranStation(hussaryStation), isTrue);
+    });
   });
 }

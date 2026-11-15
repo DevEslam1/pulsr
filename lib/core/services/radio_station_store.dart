@@ -383,7 +383,6 @@ class RadioStationStore {
         lowerUrl.contains('hussary') ||
         lowerUrl.contains('alhussary') ||
         lowerName.contains('الحصري') ||
-        lowerName.contains('حصري') ||
         lowerName.contains('hussary')) {
       return hussaryArtwork;
     }
@@ -545,7 +544,6 @@ class RadioStationStore {
         lowerUrl.contains('hussary') ||
         lowerUrl.contains('alhussary') ||
         lowerName.contains('الحصري') ||
-        lowerName.contains('حصري') ||
         lowerName.contains('hussary')) {
       return hussaryHomeCard;
     }
@@ -652,7 +650,6 @@ class RadioStationStore {
         name.contains('عبد الباسط') ||
         name.contains('عبدالباسط') ||
         name.contains('الحصري') ||
-        name.contains('حصري') ||
         name.contains('مصطفى إسماعيل') ||
         name.contains('البنا') ||
         name.contains('الطبلاوي') ||

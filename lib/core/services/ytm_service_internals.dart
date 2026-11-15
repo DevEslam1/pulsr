@@ -120,3 +120,14 @@ void _collectSearchTracks(dynamic node, List<YtmTrack> tracks) {
     }
   }
 }
+
+/// Inserts or refreshes [key] -> [value] in [map] and evicts the oldest
+/// entries once [map] exceeds [YtmService._maxVideoFailureKeys] (FIFO/LRU
+/// bound from the hardening pass).
+void _capMap<V>(Map<String, V> map, String key, V value) {
+  map.remove(key);
+  map[key] = value;
+  while (map.length > YtmService._maxVideoFailureKeys) {
+    map.remove(map.keys.first);
+  }
+}

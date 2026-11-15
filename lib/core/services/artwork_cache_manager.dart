@@ -346,7 +346,12 @@ class ArtworkCacheManager {
     }
   }
 
-  /// Prefetches artwork for a list of cache keys or URLs in the background.
+  /// Warms existing disk-cached artwork entries into the in-memory cache for
+  /// up to 50 [keys].
+  ///
+  /// Disk→memory only: this method never performs remote HTTP fetches (safe in
+  /// `AppConfig.isPure` / offline mode); uncached URL keys remain misses until
+  /// stored via [put].
   Future<void> prefetch(List<String> keys) async {
     for (final key in keys.take(50)) {
       if (key.isEmpty || _memoryCache.containsKey(key)) continue;

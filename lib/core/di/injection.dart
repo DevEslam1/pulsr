@@ -27,12 +27,39 @@ final GetIt getIt = GetIt.instance;
 
 final Completer<void> _initializationReady = Completer<void>();
 
+/// Marker registered once [configureDependencies] succeeds; using a GetIt
+/// binding lets `getIt.reset()` in tests reset idempotency cleanly.
+class _DiConfiguredMarker {
+  const _DiConfiguredMarker();
+}
+
+Future<void>? _configureInFlight;
+
 /// Completes when [configureDependencies] has finished (or failed). The splash
 /// gates its routing on this real signal instead of an arbitrary delay (I25).
 Future<void> get initializationReady => _initializationReady.future;
 
 @InjectableInit()
-Future<void> configureDependencies({bool warmUpAsync = true}) async {
+Future<void> configureDependencies({bool warmUpAsync = true}) {
+  // Hardening pass: make DI initialization idempotent across repeated or
+  // overlapping calls and ensure _initializationReady completes at most once.
+  if (getIt.isRegistered<_DiConfiguredMarker>()) {
+    if (!_initializationReady.isCompleted) _initializationReady.complete();
+    return Future<void>.value();
+  }
+  final inFlight = _configureInFlight;
+  if (inFlight != null) return inFlight;
+
+  final future = _configureDependenciesImpl(warmUpAsync: warmUpAsync);
+  _configureInFlight = future;
+  return future.whenComplete(() {
+    if (identical(_configureInFlight, future)) {
+      _configureInFlight = null;
+    }
+  });
+}
+
+Future<void> _configureDependenciesImpl({required bool warmUpAsync}) async {
   try {
     getIt.init();
     if (!getIt.isRegistered<DiscordRpcService>()) {
@@ -55,6 +82,10 @@ Future<void> configureDependencies({bool warmUpAsync = true}) async {
       // ensureAppDependenciesReady(). Skipping the eager 12 s audio-handler
       // warm-up here is what moves the first frame ahead of the audio graph.
       validateDependencies(getIt);
+      if (!getIt.isRegistered<_DiConfiguredMarker>()) {
+        getIt.registerSingleton<_DiConfiguredMarker>(
+            const _DiConfiguredMarker());
+      }
       return;
     }
     // Pre-warm async singletons so sync getIt<T>() in main.dart never throws
@@ -97,6 +128,9 @@ Future<void> configureDependencies({bool warmUpAsync = true}) async {
       await _warmUpOverrideStores();
     }
     validateDependencies(getIt);
+    if (!getIt.isRegistered<_DiConfiguredMarker>()) {
+      getIt.registerSingleton<_DiConfiguredMarker>(const _DiConfiguredMarker());
+    }
   } finally {
     if (!_initializationReady.isCompleted) _initializationReady.complete();
   }

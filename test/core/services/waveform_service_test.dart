@@ -40,6 +40,8 @@ void main() {
   setUp(() {
     decodeCalls = 0;
     service.clearMemoryCache();
+    service.nowProvider = DateTime.now;
+    service.resetPruneThrottleForTesting();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_pathProviderChannel, (call) async {
       return tempRoot.path;
@@ -293,6 +295,8 @@ void main() {
     });
 
     test('re-tagging a file prunes the stale cache entry', () async {
+      var now = DateTime(2026, 1, 1, 12, 0);
+      service.nowProvider = () => now;
       final audio = File('${tempRoot.path}/retagged.bin')
         ..writeAsBytesSync(List<int>.filled(2000, 6));
 
@@ -303,12 +307,52 @@ void main() {
       // Append bytes so size (and therefore the cache key) changes.
       audio.writeAsBytesSync(List<int>.filled(4000, 6), mode: FileMode.append);
       service.clearMemoryCache();
+      now = now.add(const Duration(seconds: 61));
 
       await service.getWaveform(songId: 9112, filePath: audio.path, count: 22);
 
       expect(stale.existsSync(), isFalse,
           reason: 'the old mtime/size entry should have been pruned');
       expect(diskFileFor(audio.path, 22).existsSync(), isTrue);
+    });
+
+    test(
+        'throttles _pruneStaleEntries to at most once per 60s per source prefix',
+        () async {
+      var now = DateTime(2026, 1, 1, 12, 0);
+      service.nowProvider = () => now;
+
+      final audioA = File('${tempRoot.path}/throttle_a.bin')
+        ..writeAsBytesSync(List<int>.filled(2000, 6));
+      await service.getWaveform(songId: 9120, filePath: audioA.path, count: 22);
+      final staleA = diskFileFor(audioA.path, 22);
+      expect(staleA.existsSync(), isTrue);
+
+      // Within 60s for same source prefix: prune is skipped.
+      now = now.add(const Duration(seconds: 30));
+      audioA.writeAsBytesSync(List<int>.filled(500, 6), mode: FileMode.append);
+      service.clearMemoryCache();
+      await service.getWaveform(songId: 9120, filePath: audioA.path, count: 22);
+      expect(staleA.existsSync(), isTrue,
+          reason: 'prune must be throttled within 60s for the same prefix');
+
+      // Different source prefix still prunes immediately.
+      final audioB = File('${tempRoot.path}/throttle_b.bin')
+        ..writeAsBytesSync(List<int>.filled(1000, 7));
+      final staleB = File(
+          '${tempRoot.path}/waveforms/${_fnv(audioB.path)}_1_1_22.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('[0.5]');
+      await service.getWaveform(songId: 9121, filePath: audioB.path, count: 22);
+      expect(staleB.existsSync(), isFalse,
+          reason: 'another source prefix should prune independently');
+
+      // After 60s window expires, same source prefix prunes again.
+      now = now.add(const Duration(seconds: 31));
+      audioA.writeAsBytesSync(List<int>.filled(500, 6), mode: FileMode.append);
+      service.clearMemoryCache();
+      await service.getWaveform(songId: 9120, filePath: audioA.path, count: 22);
+      expect(staleA.existsSync(), isFalse);
     });
 
     test('a non-existent local file still yields a waveform', () async {

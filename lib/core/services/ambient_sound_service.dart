@@ -396,6 +396,10 @@ class AmbientSoundService extends ChangeNotifier {
   static AudioPlayer Function() playerFactory =
       () => AudioPlayer(handleInterruptions: false);
 
+  @visibleForTesting
+  static Future<SharedPreferences> Function() prefsProvider =
+      SharedPreferences.getInstance;
+
   final Map<AmbientSoundEffect, AudioPlayer> _players = {};
   final Map<AmbientSoundEffect, int> _generation = {};
   bool _disposed = false;
@@ -711,21 +715,31 @@ class AmbientSoundService extends ChangeNotifier {
     _persistTimer = Timer(const Duration(milliseconds: 400), _executePersist);
   }
 
-  void _executePersist() {
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setDouble(_keyMaster, _masterVolume);
-      prefs.setBool(_keyAllowQuran, _allowDuringQuran);
-      prefs.setString(_keyMixes, jsonEncode(_mixes));
-      prefs.setStringList(
-        _keyActiveEffects,
-        _activeEffects.map((e) => e.name).toList(),
-      );
-      for (final effect in AmbientSoundEffect.values) {
-        prefs.setDouble(
-          '$_keyVolumePrefix${effect.name}',
-          _volumes[effect] ?? 0.5,
-        );
-      }
-    }).catchError((_) {});
+  @visibleForTesting
+  Future<void> executePersistForTesting() => _executePersist();
+
+  Future<void> _executePersist() async {
+    // Hardening pass: await every prefs.set* in a single Future.wait so no
+    // SharedPreferences write failure escapes as an unhandled async error.
+    try {
+      final prefs = await prefsProvider();
+      await Future.wait<bool>([
+        prefs.setDouble(_keyMaster, _masterVolume),
+        prefs.setBool(_keyAllowQuran, _allowDuringQuran),
+        prefs.setString(_keyMixes, jsonEncode(_mixes)),
+        prefs.setStringList(
+          _keyActiveEffects,
+          _activeEffects.map((e) => e.name).toList(),
+        ),
+        for (final effect in AmbientSoundEffect.values)
+          prefs.setDouble(
+            '$_keyVolumePrefix${effect.name}',
+            _volumes[effect] ?? 0.5,
+          ),
+      ]);
+    } catch (e, st) {
+      ErrorLogger.log('Ambient persistence failed',
+          error: e, stackTrace: st, category: 'AmbientSoundService');
+    }
   }
 }

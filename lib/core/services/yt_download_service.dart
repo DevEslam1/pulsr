@@ -462,6 +462,7 @@ class YtDownloadService {
     }
 
     File? temp;
+    var bodyCommitted = false;
     File? tempArt;
     Future<String?>? artworkFuture;
     try {
@@ -514,109 +515,119 @@ class YtDownloadService {
       var stream = await _resolveDownloadStream(videoId, quality,
           title: song.title, artist: song.artist);
 
-      // Pre-download storage check (BUG-06)
-      try {
-        final freeBytes =
-            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
-        if (freeBytes != null && freeBytes > 0) {
-          // F3: see [requiredPreflightBytes]. The old 100MB floor refused
-          // small tracks on a device with plenty of room for them; the
-          // body-derived requirement already includes a 10MB margin.
-          final requiredSpace = requiredPreflightBytes(stream);
-          const minSafetyBytes = 20 * 1024 * 1024;
-          if (freeBytes < minSafetyBytes || freeBytes < requiredSpace) {
-            return const Left(
-                DownloadFailure('Insufficient storage space for download'));
-          }
-        }
-      } catch (_) {
-        // Best-effort: failure intentionally ignored on this non-critical path.
-      }
-
       var ext = safeExtension(stream.container);
-      temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
-
-      if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
-        return const Left(DownloadFailure('Download canceled'));
-      }
-
-      onProgress
-          ?.call(const YtDownloadProgress(YtDownloadStage.downloading, 0));
-      ErrorLogger.addBreadcrumb('Download started: $videoId container=$ext',
-          category: 'download', data: {'videoId': videoId, 'ext': ext});
-
-      // Mirror progress into the foreground notification so the user can see it
-      // with the app closed — the whole point of running the service.
-      void reportProgress(YtDownloadProgress p) {
-        onProgress?.call(p);
-        if (p.stage == YtDownloadStage.downloading) {
-          // F5: byte progress reaching 1.0 does NOT mean the job is finished —
-          // tagging, saving and indexing still run — and the foreground service
-          // treats `progress == 100` as "remove this job, and stop the service
-          // if it was the last one". Reporting 1.0 here tore the ongoing
-          // notification (and its Resume action) down a few hundred
-          // milliseconds early, so hold at 99 until the `done` stage.
-          final capped = p.fraction?.clamp(0.0, 0.99);
-          _foreground.publish(videoId, song.title, capped);
-        }
-      }
-
-      // 2. Download audio with transparent 403 re-resolution & resume (206 verified)
-      stream = await _downloadAudioWithRetry(
-        stream: stream,
-        videoId: videoId,
-        quality: quality,
-        dest: temp,
-        task: task,
-        onProgress: reportProgress,
+      final minExpected =
+          stream.duration.inSeconds > 0 ? estimateBytes(stream) ~/ 2 : null;
+      final committed = await YtDownloadArtifactStore.findCommittedTemp(
+        dir,
+        videoId,
+        ext,
+        minExpectedBytes: minExpected,
       );
-
-      if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
-        return const Left(DownloadFailure('Download canceled'));
-      }
-
-      // Download integrity verification (BUG-12)
-      if (!await temp.exists()) {
-        return const Left(DownloadFailure('Downloaded file was not created'));
-      }
-      final tempSize = await temp.length();
-      if (tempSize < 1024) {
-        return const Left(
-            DownloadFailure('Downloaded audio file is corrupt or incomplete'));
-      }
-      // A body served without a Content-Length cannot be size-checked against
-      // the response, so check it against what the stream said it was. Below
-      // half the expected bytes the transfer was truncated, and committing it
-      // produced a track that plays for twenty seconds and stops.
-      final expectedBytes = estimateBytes(stream);
-      if (stream.duration.inSeconds > 0 && tempSize < expectedBytes ~/ 2) {
-        return Left(DownloadFailure(
-            'Download incomplete: ${tempSize ~/ 1024}KB of ~${expectedBytes ~/ 1024}KB'));
-      }
-
-      // The container has to be read from the bytes, not taken on trust. A URL
-      // cache entry written by the playback path carries no YtmStream, so its
-      // container was *guessed* from the URL and defaulted to m4a — which wrote
-      // WebM/Opus bytes into a .m4a and then handed them to the MP4 tagger.
       var mimeType = stream.mimeType;
-      final sniffed = await _sniffContainer(temp);
-      if (sniffed != null) {
-        mimeType = sniffed.mime;
-        final sniffedExt = safeExtension(sniffed.ext);
-        if (sniffedExt != ext) {
-          ErrorLogger.addBreadcrumb(
-              'Download container corrected: $ext → ${sniffed.ext}',
-              category: 'download',
-              data: {'videoId': videoId});
-          ext = sniffedExt;
-          File? renamed;
-          try {
-            renamed = await temp.rename(p.join(dir.path, 'ytdl_$videoId.$ext'));
-          } catch (_) {
-            // Best-effort: failure intentionally ignored on this non-critical path.
-          }
-          if (renamed != null) temp = renamed;
+
+      if (committed != null) {
+        temp = committed.file;
+        ext = committed.ext;
+        bodyCommitted = true;
+      } else {
+        // Pre-download storage check (BUG-06; F3: [requiredPreflightBytes]
+        // avoids refusing small tracks with a 100MB floor).
+        if (!await YtDownloadArtifactStore.hasFreeDiskSpace(
+            requiredPreflightBytes(stream))) {
+          return const Left(
+              DownloadFailure('Insufficient storage space for download'));
         }
+
+        temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
+
+        if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+          return const Left(DownloadFailure('Download canceled'));
+        }
+
+        onProgress
+            ?.call(const YtDownloadProgress(YtDownloadStage.downloading, 0));
+        ErrorLogger.addBreadcrumb('Download started: $videoId container=$ext',
+            category: 'download', data: {'videoId': videoId, 'ext': ext});
+
+        // Mirror progress into the foreground notification so the user can see it
+        // with the app closed — the whole point of running the service.
+        void reportProgress(YtDownloadProgress p) {
+          onProgress?.call(p);
+          if (p.stage == YtDownloadStage.downloading) {
+            // F5: byte progress reaching 1.0 does NOT mean the job is finished —
+            // tagging, saving and indexing still run — and the foreground service
+            // treats `progress == 100` as "remove this job, and stop the service
+            // if it was the last one". Reporting 1.0 here tore the ongoing
+            // notification (and its Resume action) down a few hundred
+            // milliseconds early, so hold at 99 until the `done` stage.
+            final capped = p.fraction?.clamp(0.0, 0.99);
+            _foreground.publish(videoId, song.title, capped);
+          }
+        }
+
+        // 2. Download audio with transparent 403 re-resolution & resume (206 verified)
+        stream = await _downloadAudioWithRetry(
+          stream: stream,
+          videoId: videoId,
+          quality: quality,
+          dest: temp,
+          task: task,
+          onProgress: reportProgress,
+        );
+
+        if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
+          return const Left(DownloadFailure('Download canceled'));
+        }
+
+        // Download integrity verification (BUG-12)
+        if (!await temp.exists()) {
+          return const Left(
+              DownloadFailure('Downloaded file was not created'));
+        }
+        final tempSize = await temp.length();
+        if (tempSize < 1024) {
+          return const Left(DownloadFailure(
+              'Downloaded audio file is corrupt or incomplete'));
+        }
+        // A body served without a Content-Length cannot be size-checked against
+        // the response, so check it against what the stream said it was. Below
+        // half the expected bytes the transfer was truncated, and committing it
+        // produced a track that plays for twenty seconds and stops.
+        final expectedBytes = estimateBytes(stream);
+        if (stream.duration.inSeconds > 0 && tempSize < expectedBytes ~/ 2) {
+          return Left(DownloadFailure(
+              'Download incomplete: ${tempSize ~/ 1024}KB of ~${expectedBytes ~/ 1024}KB'));
+        }
+
+        // The container has to be read from the bytes, not taken on trust. A URL
+        // cache entry written by the playback path carries no YtmStream, so its
+        // container was *guessed* from the URL and defaulted to m4a — which wrote
+        // WebM/Opus bytes into a .m4a and then handed them to the MP4 tagger.
+        mimeType = stream.mimeType;
+        final sniffed = await _sniffContainer(temp);
+        if (sniffed != null) {
+          mimeType = sniffed.mime;
+          final sniffedExt = safeExtension(sniffed.ext);
+          if (sniffedExt != ext) {
+            ErrorLogger.addBreadcrumb(
+                'Download container corrected: $ext → ${sniffed.ext}',
+                category: 'download',
+                data: {'videoId': videoId});
+            ext = sniffedExt;
+            File? renamed;
+            try {
+              renamed =
+                  await temp.rename(p.join(dir.path, 'ytdl_$videoId.$ext'));
+            } catch (_) {
+              // Best-effort: failure intentionally ignored on this non-critical path.
+            }
+            if (renamed != null) temp = renamed;
+          }
+        }
+
+        bodyCommitted = true;
+        await YtDownloadArtifactStore.markCommitted(temp, videoId);
       }
 
       // Repair placeholder metadata from the stream resolver before tagging,
@@ -772,38 +783,13 @@ class YtDownloadService {
           error: e, stackTrace: st, category: 'YTM');
       return Left(DownloadFailure('Download failed: $e', e));
     } finally {
+      final wasCanceled = task.isCanceled || _canceledVideoIds.contains(videoId);
       _canceledVideoIds.remove(videoId);
-      if (artworkFuture != null) {
-        try {
-          final resolvedArtPath = await artworkFuture;
-          if (resolvedArtPath != null) {
-            final resolvedArtFile = File(resolvedArtPath);
-            if (await resolvedArtFile.exists()) {
-              await resolvedArtFile.delete().catchError((_) => resolvedArtFile);
-            }
-          }
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
-        }
-      }
-      if (temp != null) {
-        try {
-          if (await temp.exists()) {
-            await temp.delete();
-          }
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
-        }
-      }
-      if (tempArt != null) {
-        try {
-          if (await tempArt!.exists()) {
-            await tempArt!.delete();
-          }
-        } catch (_) {
-          // Best-effort: failure intentionally ignored on this non-critical path.
-        }
-      }
+      await YtDownloadArtifactStore.cleanupScratch(
+        temp: (wasCanceled && bodyCommitted) ? null : temp,
+        tempArt: tempArt,
+        artworkFuture: artworkFuture,
+      );
     }
   }
 

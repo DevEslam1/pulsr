@@ -2,16 +2,20 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/errors/failures.dart';
+import 'package:pulsr/core/router/app_router.dart';
 import 'package:pulsr/core/services/file_intent_handler.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
+import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
 
@@ -368,6 +372,79 @@ void main() {
       );
       // No crash, no repository interaction.
       verifyNever(() => repository.getSongByPath(any()));
+    });
+
+    test('pulsr://shuffle awaits playSong before handleAudioUri returns',
+        () async {
+      final completer = Completer<void>();
+      var playCompleted = false;
+      when(() => repository.watchAllSongs(limit: 200))
+          .thenAnswer((_) => Stream.value(const Right([existingSong])));
+      when(() => playerCubit.playSong(any(), queue: any(named: 'queue')))
+          .thenAnswer((_) async {
+        await completer.future;
+        playCompleted = true;
+      });
+
+      var resolved = false;
+      final future = handler.handleAudioUri('pulsr://shuffle').then((res) {
+        resolved = true;
+        return res;
+      });
+
+      await pumpEventQueue();
+      expect(resolved, isFalse);
+
+      completer.complete();
+      await future;
+      expect(playCompleted, isTrue);
+    });
+
+    testWidgets('skips proxy text files larger than 10 MB', (tester) async {
+      final temp = Directory.systemTemp.createTempSync('fih_big_proxy');
+      final largeFile =
+          File('${temp.path}${Platform.pathSeparator}large_proxies.txt');
+      addTearDown(() {
+        if (temp.existsSync()) temp.deleteSync(recursive: true);
+      });
+      // Prepend a valid proxy line and pad just past 10 MB so reading would succeed in parsing.
+      final raf = largeFile.openSync(mode: FileMode.write);
+      try {
+        raf.writeStringSync('proxy.example.com:8080\n');
+        raf.setPositionSync(10 * 1024 * 1024 + 128);
+        raf.writeByteSync(0x0a);
+      } finally {
+        raf.closeSync();
+      }
+
+      final router = GoRouter(
+        navigatorKey: rootNavigatorKey,
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, __) => const Scaffold(body: Text('Home')),
+          ),
+          GoRoute(
+            path: '/proxy-settings',
+            builder: (_, __) => const Scaffold(body: Text('ProxySettingsPage')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp.router(
+          routerConfig: router,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.runAsync(() => handler.handleAudioUri(largeFile.path));
+      await tester.pumpAndSettle();
+
+      expect(find.text('ProxySettingsPage'), findsNothing);
     });
   });
 }

@@ -263,5 +263,49 @@ void main() {
 
       expect(identical(SponsorBlockService.instance, di), isTrue);
     });
+
+    test('setEnabledCategories clears cache so next getSegments re-fetches',
+        () async {
+      var callCount = 0;
+      final countingClient = MockClient((request) async {
+        callCount++;
+        return http.Response('[]', 200);
+      });
+
+      final service = SponsorBlockService(countingClient);
+      await service.setEnabledCategories({'sponsor'});
+      await service.getSegments('vidCatChange1');
+      expect(callCount, 1);
+
+      // Same category set returns cached result without a new request.
+      await service.getSegments('vidCatChange1');
+      expect(callCount, 1);
+
+      // Changing categories clears the cache and issues a new request.
+      await service.setEnabledCategories({'intro'});
+      await service.getSegments('vidCatChange1');
+      expect(callCount, 2);
+    });
+
+    test('setSkipEnabled(true) clears cache when re-enabling skipping',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.sponsorBlockEnabled: true,
+      });
+      var callCount = 0;
+      final countingClient = MockClient((request) async {
+        callCount++;
+        return http.Response('[]', 200);
+      });
+
+      final service = SponsorBlockService(countingClient);
+      await service.getSegments('vidReenable1');
+      expect(callCount, 1);
+
+      await service.setSkipEnabled(false);
+      await service.setSkipEnabled(true);
+      await service.getSegments('vidReenable1');
+      expect(callCount, 2);
+    });
   });
 }

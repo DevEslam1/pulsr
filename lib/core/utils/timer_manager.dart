@@ -10,8 +10,13 @@ mixin TimerManager {
   @visibleForTesting
   int get activeTimerCount => _activeTimers.where((t) => t.isActive).length;
 
+  /// Returns total tracked list size (including inactive entries before prune).
+  @visibleForTesting
+  int get trackedTimerCountForTesting => _activeTimers.length;
+
   /// Registers and starts a one-shot [Timer].
   Timer scheduleTimer(Duration duration, void Function() callback) {
+    _activeTimers.removeWhere((t) => !t.isActive);
     late final Timer timer;
     timer = Timer(duration, () {
       _activeTimers.remove(timer);
@@ -23,6 +28,7 @@ mixin TimerManager {
 
   /// Registers and starts a recurring [Timer.periodic].
   Timer schedulePeriodic(Duration period, void Function(Timer timer) callback) {
+    _activeTimers.removeWhere((t) => !t.isActive);
     final timer = Timer.periodic(period, callback);
     _activeTimers.add(timer);
     return timer;

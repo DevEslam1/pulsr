@@ -156,6 +156,7 @@ class CueParser {
         return null;
       }
 
+      int sampleRate = 44100;
       bool isLast = false;
       while (!isLast) {
         final blockHeader = await raf.read(4);
@@ -165,7 +166,18 @@ class CueParser {
         final length =
             (blockHeader[1] << 16) | (blockHeader[2] << 8) | blockHeader[3];
 
-        if (blockType == 4) {
+        if (blockType == 0) {
+          // STREAMINFO block: extract 20-bit sample rate at bytes 10..12
+          final blockData = await raf.read(length);
+          if (blockData.length >= 13) {
+            final parsedRate = (blockData[10] << 12) |
+                (blockData[11] << 4) |
+                (blockData[12] >> 4);
+            if (parsedRate > 0) {
+              sampleRate = parsedRate;
+            }
+          }
+        } else if (blockType == 4) {
           // VORBIS_COMMENT block
           final blockData = await raf.read(length);
           if (blockData.length == length) {
@@ -176,7 +188,8 @@ class CueParser {
           // CUESHEET block
           final blockData = await raf.read(length);
           if (blockData.length == length) {
-            final cue = _parseFlacCuesheetBlock(blockData);
+            final cue =
+                _parseFlacCuesheetBlock(blockData, sampleRate: sampleRate);
             if (cue != null) return cue;
           }
         } else {
@@ -234,7 +247,12 @@ class CueParser {
     return null;
   }
 
-  static String? _parseFlacCuesheetBlock(List<int> bytes) {
+  static String? _parseFlacCuesheetBlock(
+    List<int> bytes, {
+    int sampleRate = 44100,
+  }) {
+    final effectiveSampleRate = sampleRate > 0 ? sampleRate : 44100;
+    final samplesPerFrame = effectiveSampleRate / 75.0;
     try {
       if (bytes.length < 396) return null;
       final numTracks = bytes[395];
@@ -268,7 +286,7 @@ class CueParser {
           offset += 12;
 
           final totalSamples = trackOffsetSamples + pointOffsetSamples;
-          final totalFrames = (totalSamples / 588.0).round();
+          final totalFrames = (totalSamples / samplesPerFrame).round();
           final minutes = totalFrames ~/ (75 * 60);
           final seconds = (totalFrames % (75 * 60)) ~/ 75;
           final frames = totalFrames % 75;

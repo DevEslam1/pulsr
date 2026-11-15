@@ -2,6 +2,21 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
 import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
+
+class _FakeSpan extends Fake implements ISentrySpan {
+  bool wasFinished = false;
+  SpanStatus? finishStatus;
+
+  @override
+  void setTag(String key, String value) {}
+
+  @override
+  Future<void> finish({SpanStatus? status, DateTime? endTimestamp}) async {
+    wasFinished = true;
+    finishStatus = status;
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -242,6 +257,21 @@ void main() {
       expect(json['stageOffsetsMs'],
           containsPair(PlaybackStage.resolutionRequested.name, 10));
       expect(json['totalMs'], equals(30));
+    });
+
+    test('dispose finishes active Sentry transaction as cancelled', () {
+      final fakeSpan = _FakeSpan();
+      final customTracker = PlaybackLatencyTracker.withClock(
+        clock,
+        transactionFactory: (_, __) => fakeSpan,
+      );
+
+      customTracker.start(videoId: 'disposeVid');
+      expect(fakeSpan.wasFinished, isFalse);
+
+      customTracker.dispose();
+      expect(fakeSpan.wasFinished, isTrue);
+      expect(fakeSpan.finishStatus, equals(SpanStatus.cancelled()));
     });
   });
 }

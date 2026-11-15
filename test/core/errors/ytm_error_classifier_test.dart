@@ -271,6 +271,20 @@ void main() {
           isTrue);
     });
   });
+
+  group('YtmException.isFatal vs retryability', () {
+    test('network errors are retryable and not fatal', () {
+      for (final code in ['YTM_NETWORK', 'YTM_TIMEOUT', 'YTM_OFFLINE']) {
+        final ex = YtmException(code);
+        expect(ex.isNetwork, isTrue, reason: code);
+        expect(ex.isFatal, isFalse, reason: code);
+        expect(ex.isTerminalResolveFailure, isFalse, reason: code);
+        expect(YtmErrorClassifier.classify(ex).recoveryAction,
+            YtmRecoveryAction.retryWithBackoff,
+            reason: code);
+      }
+    });
+  });
 }
 
 /// Stands in for `DownloadFailure`, which lives behind an fpdart import the

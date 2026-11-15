@@ -162,13 +162,15 @@ class RadioBrowserService {
     });
   }
 
+  static final RegExp _stationUuidPattern = RegExp(r'^[0-9a-fA-F-]{8,64}$');
+
   /// Casts a vote/rate for [stationUuid] on the active radio-browser mirror.
   ///
   /// Increments the station's vote count in the global directory. Returns true
   /// when the directory confirms the vote (`{"ok": true, ...}`).
   Future<bool> voteForStation(String stationUuid) async {
     final uuid = stationUuid.trim();
-    if (uuid.isEmpty) return false;
+    if (!_stationUuidPattern.hasMatch(uuid)) return false;
 
     try {
       return await _executeWithFallback((endpoint) async {

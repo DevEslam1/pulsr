@@ -1270,7 +1270,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           error: e,
           stackTrace: st,
           category: 'AudioHandler');
-      if (e.isFatal) {
+      // Dead network is retryable (`!isFatal`), yet still fails remaining YTM
+      // queue items immediately so gapless preloading doesn't skip through them.
+      if (e.isFatal || e.isNetwork) {
         await _failCurrentPlayback(fatal: true);
         return;
       }
@@ -1725,7 +1727,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
           category: 'AudioHandler');
       // A dead network, bot challenge, or extractor-less build fails every remaining YouTube
       // row, so skipping through them is pointless — halt immediately.
-      await _failCurrentPlayback(fatal: e.isFatal);
+      await _failCurrentPlayback(fatal: e.isFatal || e.isNetwork);
     } on DsdUnsupportedException catch (e, st) {
       if (generation != _playGeneration) return;
       // DSD (DSF/DFF) on a platform with no native decoder (e.g. iOS) must

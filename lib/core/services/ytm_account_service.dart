@@ -32,6 +32,7 @@ import '../utils/ytm_rate_limiter.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidOptions;
 import 'ytm_cookie_codec.dart';
+import 'ytm_media_helpers.dart';
 
 enum SessionValidationResult {
   valid,
@@ -2944,9 +2945,8 @@ class YtmAccountService {
               : 'Unknown Title';
           final bylineRuns =
               renderer['shortBylineText']?['runs'] as List<dynamic>?;
-          final artist = bylineRuns?.isNotEmpty == true
-              ? bylineRuns![0]['text'] as String? ?? 'Unknown Artist'
-              : 'Unknown Artist';
+          final artist =
+              YtmMediaHelpers.firstArtistRun(bylineRuns) ?? 'Unknown Artist';
           final lengthSeconds =
               int.tryParse(renderer['lengthSeconds']?.toString() ?? '0') ?? 0;
           final thumbnails =
@@ -2994,6 +2994,8 @@ class YtmAccountService {
 
             final subRuns = renderer['subtitle']?['runs'] as List<dynamic>?;
             if (subRuns != null && subRuns.isNotEmpty) {
+              artist =
+                  YtmMediaHelpers.firstArtistRun(subRuns) ?? 'Unknown Artist';
               final texts = subRuns
                   .map((r) => r['text']?.toString().trim() ?? '')
                   .where((t) => t.isNotEmpty && t != '•' && t != '·')
@@ -3009,10 +3011,6 @@ class YtmAccountService {
                     parts[2] != null) {
                   durationMs =
                       (parts[0]! * 3600 + parts[1]! * 60 + parts[2]!) * 1000;
-                } else if (t.toLowerCase() != 'song' &&
-                    t.toLowerCase() != 'video' &&
-                    artist == 'Unknown Artist') {
-                  artist = t;
                 }
               }
             }
@@ -3139,17 +3137,8 @@ class YtmAccountService {
         final col1Runs = flexColumns[1]
             ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
         if (col1Runs is List && col1Runs.isNotEmpty) {
-          final texts = col1Runs
-              .map((r) => r['text']?.toString().trim() ?? '')
-              .where((t) => t.isNotEmpty && t != '•' && t != '·')
-              .toList();
-          for (final t in texts) {
-            if (t.toLowerCase() != 'song' &&
-                t.toLowerCase() != 'video' &&
-                artist == 'Unknown Artist') {
-              artist = t;
-            }
-          }
+          artist =
+              YtmMediaHelpers.firstArtistRun(col1Runs) ?? 'Unknown Artist';
         }
       }
 

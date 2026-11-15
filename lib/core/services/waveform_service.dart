@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -31,6 +32,15 @@ class WaveformService {
   /// permanently shadows the accurate native PCM decode under the same key.
   final Set<String> _syntheticMemKeys = {};
   Directory? _cacheDir;
+
+  static const Duration _pruneInterval = Duration(seconds: 60);
+  final Map<String, DateTime> _lastPruneByPrefix = {};
+
+  @visibleForTesting
+  DateTime Function() nowProvider = DateTime.now;
+
+  @visibleForTesting
+  void resetPruneThrottleForTesting() => _lastPruneByPrefix.clear();
 
   /// Returns cached or instant synthetic waveform samples synchronously (0ms latency),
   /// guaranteeing immediate display on frame 1 without flashing a fallback bar.
@@ -183,6 +193,16 @@ class WaveformService {
       final prefix = path.startsWith('content:')
           ? 'content_${_hashPath(path)}_'
           : '${_hashPath(path)}_';
+      // Hygiene pass: throttle directory scans per source prefix to <= once per 60s.
+      final now = nowProvider();
+      final lastPruned = _lastPruneByPrefix[prefix];
+      if (lastPruned != null && now.difference(lastPruned) < _pruneInterval) {
+        return;
+      }
+      _lastPruneByPrefix[prefix] = now;
+      if (_lastPruneByPrefix.length > _maxMemCacheSize) {
+        _lastPruneByPrefix.remove(_lastPruneByPrefix.keys.first);
+      }
       await for (final entity in dir.list()) {
         if (entity is File &&
             entity.path != keep &&

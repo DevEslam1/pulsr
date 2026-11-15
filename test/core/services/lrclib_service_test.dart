@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/lrclib_service.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockHttpClient extends Mock implements HttpClient {}
 
@@ -227,6 +230,43 @@ void main() {
 
         expect(result, isNull);
       });
+    });
+
+    test('times out when response body stream stalls', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      await SharedPreferences.getInstance();
+
+      final stalledBody = StreamController<String>();
+      addTearDown(stalledBody.close);
+
+      when(() => mockResponse.statusCode).thenReturn(200);
+      when(() => mockResponse.transform<String>(any()))
+          .thenAnswer((_) => stalledBody.stream);
+
+      fakeAsync((async) {
+        LyricsResult? result;
+        var completed = false;
+        service
+            .fetchLyrics(trackName: 'Stall', artistName: 'Artist')
+            .then((value) {
+          result = value;
+          completed = true;
+        });
+
+        async.flushMicrotasks();
+        expect(completed, isFalse);
+
+        // Advance past the 3s timeouts for the get + search candidate calls.
+        async.elapse(const Duration(seconds: 10));
+        expect(completed, isTrue);
+        expect(result, isNull);
+      });
+    });
+
+    test('dispose does not close an injected HttpClient', () {
+      service.dispose();
+      verifyNever(() => mockClient.close(force: any(named: 'force')));
     });
   });
 }

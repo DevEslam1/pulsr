@@ -25,6 +25,7 @@ void main() {
           r'hello\*world\?');
       expect(InputSanitizer.sanitizeSearchQuery('track (feat. artist) [2026]'),
           r'track \(feat\. artist\) \[2026\]');
+      expect(InputSanitizer.sanitizeSearchQuery('  AC/DC  '), 'AC/DC');
     });
 
     test('isSafeRelativePath checks directory traversal and absolute prefixes',

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../constants/channels.dart';
@@ -38,40 +39,55 @@ class AppConfig {
     }
   }
 
+  static const String _rawEnableYtm = String.fromEnvironment('ENABLE_YTM');
+  static const String _rawYtm = String.fromEnvironment('YTM');
+  static const String _rawYtmEnabled = String.fromEnvironment('YTM_ENABLED');
+  static const String _rawLowerYtm = String.fromEnvironment('ytm');
+  static const String _rawDashYtm = String.fromEnvironment('-ytm');
+  static const String _rawDoubleDashYtm = String.fromEnvironment('--ytm');
+  static const String _rawLowerFlavor = String.fromEnvironment('flavor');
+
+  static const String _rawYtmDefine = _rawEnableYtm != ''
+      ? _rawEnableYtm
+      : _rawYtm != ''
+          ? _rawYtm
+          : _rawYtmEnabled != ''
+              ? _rawYtmEnabled
+              : _rawLowerYtm != ''
+                  ? _rawLowerYtm
+                  : _rawDashYtm != ''
+                      ? _rawDashYtm
+                      : _rawDoubleDashYtm;
+
+  /// Pure alias parser mirroring the compile-time [ytmEnabled] expression.
+  /// Documents all supported flag values including the legacy misspelling
+  /// `'enebeld'`.
+  @visibleForTesting
+  static bool parseYtmEnabled(String flagValue, {String flavorValue = ''}) {
+    final normalizedFlag = flagValue.trim().toLowerCase();
+    if (normalizedFlag == 'true' ||
+        normalizedFlag == '1' ||
+        normalizedFlag == 'enabled' ||
+        // Legacy misspelling alias kept for backwards compatibility.
+        normalizedFlag == 'enebeld') {
+      return true;
+    }
+    if (normalizedFlag.isNotEmpty) return false;
+    return flavorValue.trim().toLowerCase() == 'ytm';
+  }
+
   /// YouTube Music search/stream/download. Off by default so Play Store builds
   /// never expose it; enable with `--dart-define=ENABLE_YTM=true`.
   ///
   /// Being a `const false` lets Dart tree-shake the guarded branches, but the
   /// generated DI config still imports every service, so this is not a
   /// guarantee that no YouTube code reaches the binary.
-  static const bool ytmEnabled = bool.fromEnvironment('ENABLE_YTM',
-      defaultValue: bool.fromEnvironment('YTM',
-          defaultValue: bool.fromEnvironment('YTM_ENABLED',
-              defaultValue: bool.fromEnvironment('ytm',
-                  defaultValue: bool.fromEnvironment('-ytm',
-                      defaultValue: bool.fromEnvironment('--ytm',
-                          defaultValue: String.fromEnvironment('FLAVOR') ==
-                                  'ytm' ||
-                              String.fromEnvironment('flavor') == 'ytm' ||
-                              String.fromEnvironment('ENABLE_YTM') == '1' ||
-                              String.fromEnvironment('ENABLE_YTM') ==
-                                  'enabled' ||
-                              String.fromEnvironment('ENABLE_YTM') ==
-                                  'enebeld' ||
-                              String.fromEnvironment('YTM') == '1' ||
-                              String.fromEnvironment('YTM') == 'enabled' ||
-                              String.fromEnvironment('ytm') == '1' ||
-                              String.fromEnvironment('ytm') == 'enabled' ||
-                              String.fromEnvironment('ytm') == 'enebeld' ||
-                              String.fromEnvironment('-ytm') == 'true' ||
-                              String.fromEnvironment('-ytm') == '1' ||
-                              String.fromEnvironment('-ytm') == 'enabled' ||
-                              String.fromEnvironment('-ytm') == 'enebeld' ||
-                              String.fromEnvironment('--ytm') == 'true' ||
-                              String.fromEnvironment('--ytm') == '1' ||
-                              String.fromEnvironment('--ytm') == 'enabled' ||
-                              String.fromEnvironment('--ytm') ==
-                                  'enebeld'))))));
+  static const bool ytmEnabled = _rawYtmDefine == 'true' ||
+      _rawYtmDefine == '1' ||
+      _rawYtmDefine == 'enabled' ||
+      // Legacy misspelling alias kept for backwards compatibility with scripts.
+      _rawYtmDefine == 'enebeld' ||
+      (_rawYtmDefine == '' && (flavor == 'ytm' || _rawLowerFlavor == 'ytm'));
 
   /// In-app voice search. There is no on-device speech recognizer wired up, so
   /// the mic affordance is hidden entirely unless this is explicitly enabled

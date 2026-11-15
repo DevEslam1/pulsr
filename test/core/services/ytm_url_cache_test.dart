@@ -1,7 +1,13 @@
 // test/core/services/ytm_url_cache_test.dart
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
+
+const _pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -111,6 +117,50 @@ void main() {
       expect(smallCache.get('a'), isNull);
       expect(smallCache.get('b'), isNotNull);
       expect(smallCache.get('c'), isNotNull);
+    });
+
+    test('restore() caps disk file read at 2 MB and ignores larger/corrupt files',
+        () async {
+      final tempDir =
+          await Directory.systemTemp.createTemp('ytm_url_cache_restore_');
+      addTearDown(() async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(_pathProviderChannel, null);
+        if (await tempDir.exists()) await tempDir.delete(recursive: true);
+      });
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(_pathProviderChannel, (call) async {
+        return tempDir.path;
+      });
+
+      final futureExpiryMs =
+          clock.now().add(const Duration(hours: 2)).millisecondsSinceEpoch;
+      final oversizedPayload = jsonEncode([
+        {
+          'videoId': 'vidHuge',
+          'url': 'https://googlevideo.com/huge',
+          'quality': 'high',
+          'expiresAt': futureExpiryMs,
+        },
+        {
+          'videoId': 'vidPad',
+          'url': 'https://googlevideo.com/${'a' * (2 * 1024 * 1024 + 512)}',
+          'quality': 'high',
+          'expiresAt': futureExpiryMs,
+        },
+      ]);
+      final file = File('${tempDir.path}/ytm_url_cache_v1.json')
+        ..writeAsStringSync(oversizedPayload);
+      expect(file.lengthSync(), greaterThan(2 * 1024 * 1024));
+
+      await cache.restore();
+      expect(cache.length, 0);
+
+      // Corrupt file under 2 MB is also safely ignored.
+      final corruptCache = YtmUrlCache.withClock(clock);
+      file.writeAsStringSync('{not valid json');
+      await corruptCache.restore();
+      expect(corruptCache.length, 0);
     });
   });
 }

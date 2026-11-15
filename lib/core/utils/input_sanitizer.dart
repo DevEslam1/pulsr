@@ -26,6 +26,10 @@ class InputSanitizer {
   }
 
   /// Trims search queries and escapes regex special characters.
+  ///
+  /// Reserved strictly for callers that build a `RegExp`; `contains`-based
+  /// search paths (e.g. [SearchAlgorithmUtils]) should trim/normalize directly
+  /// without escaping so queries like `"AC/DC"` or `"(feat.)"` match literally.
   static String sanitizeSearchQuery(String query) {
     final trimmed = query.trim();
     return trimmed.replaceAllMapped(

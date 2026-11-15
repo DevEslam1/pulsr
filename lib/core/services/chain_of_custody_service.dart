@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import '../../data/audio/audio_effects_channel.dart';
 
 /// Outcome of a custody verification, and the ONLY thing the UI may present as a
@@ -230,12 +231,17 @@ class ChainOfCustodyReport {
     return json;
   }
 
+  /// Exposed for unit testing canonical JSON serialization.
+  @visibleForTesting
+  static String canonicalizeForTesting(Object? value) => _canonicalize(value);
+
   /// JSON with sorted keys at every depth, so two equivalent reports serialize to
   /// the same bytes regardless of map insertion order.
   static String _canonicalize(Object? value) {
     if (value is Map) {
       final keys = value.keys.map((k) => k.toString()).toList()..sort();
-      final parts = keys.map((key) => '"$key":${_canonicalize(value[key])}');
+      final parts =
+          keys.map((key) => '${jsonEncode(key)}:${_canonicalize(value[key])}');
       return '{${parts.join(',')}}';
     }
     if (value is List) {

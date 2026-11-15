@@ -39,7 +39,9 @@ class _ThrottledSliderState extends State<ThrottledSlider> {
   @override
   void didUpdateWidget(ThrottledSlider oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (_debounceTimer == null) {
+    // Hygiene pass: preserve local preview across unrelated rebuilds until
+    // gesture end clears it or the parent value catches up.
+    if (_previewValue != null && widget.value == _previewValue) {
       _previewValue = null;
     }
   }

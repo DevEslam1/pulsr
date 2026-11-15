@@ -798,4 +798,68 @@ void main() {
       expect(channelCalls.map((c) => c.method), contains('clearNetworkCaches'));
     });
   });
+
+  group('bounded per-video caches (cap 256)', () {
+    test('evicts oldest _loudnessByVideoId entry beyond 256', () {
+      final service = _newService();
+
+      for (var i = 0; i <= 256; i++) {
+        service.recordLoudness('vid_$i', -i.toDouble());
+      }
+
+      expect(service.getLoudnessDb('vid_0'), isNull);
+      expect(service.getLoudnessDb('vid_1'), -1.0);
+      expect(service.getLoudnessDb('vid_256'), -256.0);
+    });
+
+    test('evicts oldest _alternateVideoIds entry beyond 256', () async {
+      final service = _newService();
+      var searchCalls = 0;
+
+      channelHandler = (call) async {
+        if (call.method == 'search') {
+          searchCalls++;
+          final args = call.arguments as Map<Object?, Object?>;
+          final query = (args['query'] as String?) ?? '';
+          final idx = query.replaceFirst('Artist Song ', '');
+          return [_resultRow(videoId: 'alt_$idx')];
+        }
+        if (call.method == 'resolveStream') {
+          final args = call.arguments as Map<Object?, Object?>;
+          final vid = (args['videoId'] as String?) ?? 'alt';
+          return _streamRow(videoId: vid);
+        }
+        return null;
+      };
+
+      for (var i = 0; i <= 256; i++) {
+        final stream = await service.resolveAlternateStream(
+          'Song $i',
+          'Artist',
+          originalVideoId: 'orig_$i',
+        );
+        expect(stream?.videoId, 'alt_$i');
+      }
+      expect(searchCalls, 257);
+
+      // Newest entry stays cached -> direct resolveStream, no new search.
+      final latestBefore = searchCalls;
+      final cached = await service.resolveAlternateStream(
+        'Song 256',
+        'Artist',
+        originalVideoId: 'orig_256',
+      );
+      expect(cached?.videoId, 'alt_256');
+      expect(searchCalls, latestBefore);
+
+      // Oldest entry ('orig_0') was evicted -> must perform a fresh search.
+      final evicted = await service.resolveAlternateStream(
+        'Song 0',
+        'Artist',
+        originalVideoId: 'orig_0',
+      );
+      expect(evicted?.videoId, 'alt_0');
+      expect(searchCalls, latestBefore + 1);
+    });
+  });
 }

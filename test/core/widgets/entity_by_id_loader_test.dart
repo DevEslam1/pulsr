@@ -72,4 +72,41 @@ void main() {
     // Flush the skeleton shimmer's delayed timers before teardown.
     await tester.pump(const Duration(seconds: 1));
   });
+
+  testWidgets(
+      'watch keeps skeleton on empty list then renders when matching id arrives',
+      (tester) async {
+    final controller = StreamController<Result<List<String>>>();
+    addTearDown(controller.close);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: EntityByIdLoader<String>(
+          watch: () => controller.stream,
+          match: (item) => item.startsWith('target:'),
+          builder: (context, item) => Scaffold(body: Text('Loaded: $item')),
+          notFoundMessage: 'Not found',
+        ),
+      ),
+    );
+
+    // Emit an empty list first: must keep skeleton (not "Not found") and stay subscribed.
+    controller.add(const Right(<String>[]));
+    await tester.pump();
+    expect(find.text('Not found'), findsNothing);
+    expect(find.textContaining('Loaded:'), findsNothing);
+
+    // Emit a list containing the matching id: builder must render.
+    controller.add(const Right(<String>['other', 'target:v1']));
+    await tester.pump();
+    expect(find.text('Loaded: target:v1'), findsOneWidget);
+
+    // Later emission updates the entity in place.
+    controller.add(const Right(<String>['target:v2']));
+    await tester.pump();
+    expect(find.text('Loaded: target:v2'), findsOneWidget);
+
+    // Flush the skeleton shimmer's delayed timers before teardown.
+    await tester.pump(const Duration(seconds: 1));
+  });
 }

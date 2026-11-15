@@ -28,17 +28,23 @@ class _TrackCandidate {
 
 @lazySingleton
 class LrclibService {
+  static const Duration _requestTimeout = Duration(seconds: 3);
+
   final HttpClient _client;
+  final bool _ownsClient;
 
   LrclibService({HttpClient? client})
       : _client = client ??
             (HttpClient()
               ..connectionTimeout = const Duration(seconds: 3)
               ..idleTimeout = const Duration(seconds: 15)
-              ..maxConnectionsPerHost = 6);
+              ..maxConnectionsPerHost = 6),
+        _ownsClient = client == null;
 
   void dispose() {
-    _client.close(force: false);
+    if (_ownsClient) {
+      _client.close(force: false);
+    }
   }
 
   Future<LyricsResult?> fetchLyrics({
@@ -291,6 +297,24 @@ class LrclibService {
     return artistMatch || durationMatch;
   }
 
+  Future<dynamic> _getJson(Uri uri) {
+    return (() async {
+      final request = await _client.getUrl(uri);
+      request.headers.set(HttpHeaders.userAgentHeader,
+          'PulsrMusic/1.0.0 (https://github.com/pulsr)');
+      final response = await request.close();
+
+      if (response.statusCode == 200) {
+        final responseBody = await response.transform(utf8.decoder).join();
+        return jsonDecode(responseBody);
+      } else {
+        await response.drain();
+        return null;
+      }
+    })()
+        .timeout(_requestTimeout);
+  }
+
   Future<LyricsResult?> _tryGetLyrics({
     required String trackName,
     required String artistName,
@@ -312,27 +336,18 @@ class LrclibService {
       }
 
       final uri = Uri.https('lrclib.net', '/api/get', queryParams);
-      final request = await _client.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader,
-          'PulsrMusic/1.0.0 (https://github.com/pulsr)');
-      final response =
-          await request.close().timeout(const Duration(seconds: 3));
-
-      if (response.statusCode == 200) {
-        final responseBody = await response.transform(utf8.decoder).join();
-        final json = jsonDecode(responseBody) as Map<String, dynamic>;
+      final decoded = await _getJson(uri);
+      if (decoded is Map<String, dynamic>) {
         // Swapped/normalized candidates can resolve a real but DIFFERENT
         // song (e.g. "Hamaki" by "Adrenaline"); require relevance.
         if (!_isRelevantMatch(
-          json,
+          decoded,
           expectedArtist: expectedArtist,
           expectedDurationSec: expectedDurationSec,
         )) {
           return null;
         }
-        return _extractLyricsFromJson(json);
-      } else {
-        await response.drain();
+        return _extractLyricsFromJson(decoded);
       }
     } catch (e) {
       ErrorLogger.log('LRCLIB get query skipped: $e', category: 'LRCLIB');
@@ -347,41 +362,30 @@ class LrclibService {
   }) async {
     try {
       final uri = Uri.https('lrclib.net', '/api/search', {'q': query});
-      final request = await _client.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader,
-          'PulsrMusic/1.0.0 (https://github.com/pulsr)');
-      final response =
-          await request.close().timeout(const Duration(seconds: 3));
-
-      if (response.statusCode == 200) {
-        final responseBody = await response.transform(utf8.decoder).join();
-        final list = jsonDecode(responseBody);
-        if (list is List && list.isNotEmpty) {
-          final relevant = list
-              .whereType<Map<String, dynamic>>()
-              .where((item) => _isRelevantMatch(
-                    item,
-                    expectedArtist: expectedArtist,
-                    expectedDurationSec: expectedDurationSec,
-                  ))
-              .toList();
-          if (relevant.isEmpty) return null;
-          // Pass 1: Prioritize synced lyrics
-          for (final item in relevant) {
-            final synced = item['syncedLyrics'] as String?;
-            if (synced != null && synced.trim().isNotEmpty) {
-              final res = _extractLyricsFromJson(item);
-              if (res != null && res.lines.isNotEmpty) return res;
-            }
-          }
-          // Pass 2: Fallback to plain lyrics
-          for (final item in relevant) {
+      final list = await _getJson(uri);
+      if (list is List && list.isNotEmpty) {
+        final relevant = list
+            .whereType<Map<String, dynamic>>()
+            .where((item) => _isRelevantMatch(
+                  item,
+                  expectedArtist: expectedArtist,
+                  expectedDurationSec: expectedDurationSec,
+                ))
+            .toList();
+        if (relevant.isEmpty) return null;
+        // Pass 1: Prioritize synced lyrics
+        for (final item in relevant) {
+          final synced = item['syncedLyrics'] as String?;
+          if (synced != null && synced.trim().isNotEmpty) {
             final res = _extractLyricsFromJson(item);
             if (res != null && res.lines.isNotEmpty) return res;
           }
         }
-      } else {
-        await response.drain();
+        // Pass 2: Fallback to plain lyrics
+        for (final item in relevant) {
+          final res = _extractLyricsFromJson(item);
+          if (res != null && res.lines.isNotEmpty) return res;
+        }
       }
     } catch (e) {
       ErrorLogger.log('LRCLIB search query skipped: $e', category: 'LRCLIB');

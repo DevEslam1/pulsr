@@ -11,6 +11,23 @@ class YtDownloadArtifactStore {
   static const Duration orphanMaxAge = Duration(minutes: 10);
   static const MethodChannel _channel = MethodChannel(PulsrChannels.ytDownload);
 
+  /// Checks preflight storage space against [requiredSpace] bytes.
+  /// Returns false only when the platform positively reports insufficient space.
+  static Future<bool> hasFreeDiskSpace(int requiredSpace) async {
+    try {
+      final freeBytes = await _channel.invokeMethod<int>('getFreeDiskSpace');
+      if (freeBytes != null && freeBytes > 0) {
+        const minSafetyBytes = 20 * 1024 * 1024;
+        if (freeBytes < minSafetyBytes || freeBytes < requiredSpace) {
+          return false;
+        }
+      }
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
+    return true;
+  }
+
   /// Removes a just-saved MediaStore file/row after the library hand-off
   /// failed, so a failed reconcile cannot leave an orphan that a later scan
   /// imports as a duplicate.
@@ -95,6 +112,83 @@ class YtDownloadArtifactStore {
       }
     } catch (_) {
       // Best-effort: failure intentionally ignored on this non-critical path.
+    }
+  }
+
+  /// Looks up a previously committed scratch download for [videoId] so a retry
+  /// after post-download cancellation reuses the verified body on disk.
+  static Future<({File file, String ext})?> findCommittedTemp(
+    Directory dir,
+    String videoId,
+    String preferredExt, {
+    int? minExpectedBytes,
+  }) async {
+    final candidates = <String>[
+      preferredExt,
+      for (final c in const ['m4a', 'webm', 'mp3', 'opus'])
+        if (c != preferredExt) c,
+    ];
+    for (final candExt in candidates) {
+      final cand = File(p.join(dir.path, 'ytdl_$videoId.$candExt'));
+      final stamp = File('${cand.path}.committed.stamp');
+      try {
+        if (!await cand.exists() || !await stamp.exists()) continue;
+        if ((await stamp.readAsString()).trim() != videoId) continue;
+        final len = await cand.length();
+        if (len < 1024) continue;
+        if (minExpectedBytes != null && len < minExpectedBytes) continue;
+        return (file: cand, ext: candExt);
+      } catch (_) {
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
+    }
+    return null;
+  }
+
+  /// Writes a committed-body marker next to [temp] so post-download
+  /// cancellation does not discard an already-verified audio payload.
+  static Future<void> markCommitted(File temp, String videoId) async {
+    try {
+      await File('${temp.path}.committed.stamp').writeAsString(videoId);
+    } catch (_) {
+      // Best-effort: failure intentionally ignored on this non-critical path.
+    }
+  }
+
+  /// Best-effort deletion of scratch files in `_executeDownload`'s `finally`.
+  static Future<void> cleanupScratch({
+    File? temp,
+    File? tempArt,
+    Future<String?>? artworkFuture,
+  }) async {
+    if (artworkFuture != null) {
+      try {
+        final resolvedArtPath = await artworkFuture;
+        if (resolvedArtPath != null) {
+          final resolvedArtFile = File(resolvedArtPath);
+          if (await resolvedArtFile.exists()) {
+            await resolvedArtFile.delete().catchError((_) => resolvedArtFile);
+          }
+        }
+      } catch (_) {
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
+    }
+    if (temp != null) {
+      for (final file in [temp, File('${temp.path}.committed.stamp')]) {
+        try {
+          if (await file.exists()) await file.delete();
+        } catch (_) {
+          // Best-effort: failure intentionally ignored on this non-critical path.
+        }
+      }
+    }
+    if (tempArt != null) {
+      try {
+        if (await tempArt.exists()) await tempArt.delete();
+      } catch (_) {
+        // Best-effort: failure intentionally ignored on this non-critical path.
+      }
     }
   }
 }

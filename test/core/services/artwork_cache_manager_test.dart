@@ -200,6 +200,28 @@ void main() {
       // prefetch-2 was never written anywhere, so it stays a miss.
       expect(await manager.get('prefetch-2'), isNull);
     });
+
+    test(
+        'disk-to-memory warming serves prefetched entry even after disk eviction and does not fetch remote URLs',
+        () async {
+      final payload = _bytes(64, 7);
+      await manager.put('warm-disk-key', payload);
+      manager.trimMemoryForPressure();
+
+      // Warm memory from disk, then wipe disk files.
+      await manager.prefetch(
+          ['warm-disk-key', 'https://example.com/remote-only-cover.jpg']);
+      final diskFiles = Directory('${tempRoot.path}/artwork_cache')
+          .listSync()
+          .whereType<File>();
+      for (final f in diskFiles) {
+        f.deleteSync();
+      }
+
+      expect(await manager.get('warm-disk-key'), payload);
+      expect(await manager.get('https://example.com/remote-only-cover.jpg'),
+          isNull);
+    });
   });
 
   group('toLowQualityArtworkUrl', () {

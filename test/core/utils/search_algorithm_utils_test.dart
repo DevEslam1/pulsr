@@ -112,6 +112,25 @@ void main() {
           SearchAlgorithmUtils.filterWithFuzzy(pool, 'extraordinery', 'Songs');
       expect(results.map((s) => s.id), [9]);
     });
+
+    test('surfaces exact-title match positioned after limit within ranking window',
+        () {
+      final pool = [
+        for (var i = 0; i < 6; i++)
+          _song(id: i + 1, title: 'Another Love Remix $i', artist: 'Artist $i'),
+        _song(id: 99, title: 'Love', artist: 'Exact Artist'),
+      ];
+
+      final results = SearchAlgorithmUtils.filterWithFuzzy(
+        pool,
+        'love',
+        'Songs',
+        maxResults: 5,
+      );
+
+      expect(results.length, 5);
+      expect(results.first.id, 99);
+    });
   });
 
   // C-04: format filter chips.
@@ -165,6 +184,24 @@ void main() {
       ];
       final results = SearchAlgorithmUtils.filterWithFuzzy(mp3, 'ext', 'MP3');
       expect(results.map((s) => s.id), [9]);
+    });
+
+    test('matches punctuation queries like "AC/DC" and "(feat.)" literally',
+        () {
+      final pool = [
+        _song(id: 1, title: 'Back in Black', artist: 'AC/DC', path: '/1.mp3'),
+        _song(
+            id: 2,
+            title: 'Song (feat. Artist)',
+            artist: 'Other',
+            path: '/2.mp3'),
+      ];
+      final acdc = SearchAlgorithmUtils.filterWithFuzzy(pool, 'AC/DC', 'All');
+      expect(acdc.map((s) => s.id), [1]);
+
+      final paren =
+          SearchAlgorithmUtils.filterWithFuzzy(pool, '(feat. artist)', 'All');
+      expect(paren.map((s) => s.id), [2]);
     });
   });
 }

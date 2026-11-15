@@ -1,8 +1,30 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ambient_sound_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/fake_audio_player.dart';
+
+class _ThrowingSharedPreferences extends Fake implements SharedPreferences {
+  @override
+  Future<bool> setDouble(String key, double value) => Future<bool>.delayed(
+        const Duration(milliseconds: 5),
+        () => Future<bool>.error(StateError('setDouble failed for $key')),
+      );
+
+  @override
+  Future<bool> setBool(String key, bool value) =>
+      Future<bool>.error(StateError('setBool failed for $key'));
+
+  @override
+  Future<bool> setString(String key, String value) =>
+      Future<bool>.error(StateError('setString failed for $key'));
+
+  @override
+  Future<bool> setStringList(String key, List<String> value) =>
+      Future<bool>.error(StateError('setStringList failed for $key'));
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -236,6 +258,24 @@ void main() {
 
       // Clean up
       await service.setEnabled(false);
+    });
+
+    test('_executePersist produces no unhandled async errors when prefs.set* fail',
+        () async {
+      final uncaught = <Object>[];
+      AmbientSoundService.prefsProvider =
+          () async => _ThrowingSharedPreferences();
+      addTearDown(
+          () => AmbientSoundService.prefsProvider = SharedPreferences.getInstance);
+
+      await runZonedGuarded(() async {
+        await AmbientSoundService().executePersistForTesting();
+        await Future<void>.delayed(const Duration(milliseconds: 30));
+      }, (error, _) {
+        uncaught.add(error);
+      });
+
+      expect(uncaught, isEmpty);
     });
   });
 }

@@ -201,7 +201,9 @@ extension GetItInjectableX on _i174.GetIt {
           ytmAccountService: gh<_i631.YtmAccountService>(),
         ));
     gh.lazySingleton<_i452.MetadataSearchService>(
-        () => _i452.MetadataSearchService(gh<_i519.Client>()));
+      () => _i452.MetadataSearchService(gh<_i519.Client>()),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i629.ScrobblerService>(() => _i629.ScrobblerService(
           gh<_i519.Client>(),
           gh<_i558.FlutterSecureStorage>(),

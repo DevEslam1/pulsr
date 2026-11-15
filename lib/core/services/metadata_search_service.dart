@@ -1,6 +1,7 @@
 // lib/core/services/metadata_search_service.dart
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
@@ -32,10 +33,26 @@ class OnlineTrackMetadata {
 
 @lazySingleton
 class MetadataSearchService {
+  static const int _maxArtworkBytes = 10 * 1024 * 1024;
+  static final RegExp _luceneSpecialChars =
+      RegExp(r'[+\-&|!(){}\[\]^"~*?:\\/]');
+
   final http.Client _httpClient;
+  final bool _ownsClient;
 
   MetadataSearchService([http.Client? httpClient])
-      : _httpClient = httpClient ?? http.Client();
+      : _httpClient = httpClient ?? http.Client(),
+        _ownsClient = httpClient == null;
+
+  @disposeMethod
+  void dispose() {
+    if (_ownsClient) {
+      _httpClient.close();
+    }
+  }
+
+  static String _escapeLucene(String value) =>
+      value.trim().replaceAllMapped(_luceneSpecialChars, (m) => '\\${m[0]}');
 
   /// Searches online metadata matching [title] & [artist].
   /// Sources: iTunes Search API first (fast, high-res artwork), then
@@ -125,11 +142,11 @@ class MetadataSearchService {
     if (results.isEmpty && title.trim().isNotEmpty) {
       try {
         final query = [
-          'recording:"${title.trim()}"',
+          'recording:"${_escapeLucene(title)}"',
           if (artist != null &&
               artist.isNotEmpty &&
               artist.toLowerCase() != 'unknown artist')
-            'artist:"${artist.trim()}"',
+            'artist:"${_escapeLucene(artist)}"',
         ].join(' AND ');
         final uri = Uri.https('musicbrainz.org', '/ws/2/recording/', {
           'query': query,
@@ -204,14 +221,34 @@ class MetadataSearchService {
       if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
         return null;
       }
-      final response =
-          await _httpClient.get(uri).timeout(const Duration(seconds: 12));
-      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+      final streamed = await _httpClient
+          .send(http.Request('GET', uri))
+          .timeout(const Duration(seconds: 12));
+      final contentLength = streamed.contentLength;
+      if (streamed.statusCode != 200 ||
+          (contentLength != null && contentLength > _maxArtworkBytes)) {
+        await streamed.stream.listen(null).cancel();
+        return null;
+      }
+
+      final builder = BytesBuilder(copy: false);
+      var totalBytes = 0;
+      await for (final chunk
+          in streamed.stream.timeout(const Duration(seconds: 12))) {
+        totalBytes += chunk.length;
+        if (totalBytes > _maxArtworkBytes) {
+          return null;
+        }
+        builder.add(chunk);
+      }
+
+      final bytes = builder.takeBytes();
+      if (bytes.isNotEmpty) {
         final dir = await getTemporaryDirectory();
         final fileName =
             'auto_art_${DateTime.now().millisecondsSinceEpoch}.jpg';
         final file = File(p.join(dir.path, fileName));
-        await file.writeAsBytes(response.bodyBytes);
+        await file.writeAsBytes(bytes);
         return file.path;
       }
     } catch (e, st) {

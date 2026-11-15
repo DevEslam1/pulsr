@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/cue_parser.dart';
 
@@ -118,6 +121,74 @@ FILE "cd_image.bin" BINARY
       expect(chapters.single.title, equals('Audio Track After Data'));
       expect(chapters.single.start,
           equals(const Duration(minutes: 5, seconds: 2)));
+    });
+
+    test('Parses embedded FLAC CUESHEET using STREAMINFO 48 kHz sample rate',
+        () async {
+      final tempDir = Directory.systemTemp.createTempSync('cue_flac_48k');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      final flacFile =
+          File('${tempDir.path}${Platform.pathSeparator}test_48k.flac');
+
+      // Build minimal FLAC with STREAMINFO (48000 Hz) + CUESHEET (last block).
+      final builder = BytesBuilder();
+      builder.add(<int>[0x66, 0x4C, 0x61, 0x43]); // "fLaC"
+
+      // Block 0: STREAMINFO, not last (0x00), length = 34
+      final streamInfo = Uint8List(34);
+      const sampleRate = 48000; // 0x0BB80
+      streamInfo[10] = (sampleRate >> 12) & 0xFF;
+      streamInfo[11] = (sampleRate >> 4) & 0xFF;
+      streamInfo[12] = (sampleRate & 0x0F) << 4;
+      builder.add(<int>[0x00, 0x00, 0x00, 34]);
+      builder.add(streamInfo);
+
+      // Block 5: CUESHEET, last (0x85)
+      final cueBlock = BytesBuilder();
+      cueBlock.add(Uint8List(395));
+      cueBlock.addByte(2); // numTracks
+
+      void writeUint64BE(int value) {
+        final bd = ByteData(8)..setUint64(0, value, Endian.big);
+        cueBlock.add(bd.buffer.asUint8List());
+      }
+
+      // Track 1
+      writeUint64BE(0);
+      cueBlock.addByte(1); // trackNum = 1
+      cueBlock.add(Uint8List(12)); // ISRC
+      cueBlock.addByte(0); // flags
+      cueBlock.add(Uint8List(13)); // reserved
+      cueBlock.addByte(1); // numIndexPoints = 1
+      writeUint64BE(0);
+      cueBlock.addByte(1);
+      cueBlock.add(Uint8List(3));
+
+      // Track 2: 10 seconds at 48 kHz = 480,000 samples
+      writeUint64BE(480000);
+      cueBlock.addByte(2); // trackNum = 2
+      cueBlock.add(Uint8List(12)); // ISRC
+      cueBlock.addByte(0); // flags
+      cueBlock.add(Uint8List(13)); // reserved
+      cueBlock.addByte(1); // numIndexPoints = 1
+      writeUint64BE(0);
+      cueBlock.addByte(1);
+      cueBlock.add(Uint8List(3));
+
+      final cueBytes = cueBlock.toBytes();
+      builder.add(<int>[
+        0x85,
+        (cueBytes.length >> 16) & 0xFF,
+        (cueBytes.length >> 8) & 0xFF,
+        cueBytes.length & 0xFF,
+      ]);
+      builder.add(cueBytes);
+
+      await flacFile.writeAsBytes(builder.toBytes());
+
+      final chapters = await CueParser.findAndParseCue(flacFile.path);
+      expect(chapters, hasLength(2));
+      expect(chapters[1].start, equals(const Duration(seconds: 10)));
     });
   });
 }

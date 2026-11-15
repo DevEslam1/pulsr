@@ -42,7 +42,7 @@ class DuplicateFinderService {
   static Future<List<DuplicateGroup>> findDuplicatesInternal(
       List<SongsTableData> allSongs) async {
     final Map<String, List<SongsTableData>> byTitleArtist = {};
-    final Map<String, List<SongsTableData>> byDurationSize = {};
+    final Map<(int, int), List<SongsTableData>> byDurationSize = {};
 
     for (final song in allSongs) {
       final normTitle = _normalizeString(song.title);
@@ -54,8 +54,9 @@ class DuplicateFinderService {
       if (song.durationMs > 10000 && song.fileSize != null) {
         final durationBucket = (song.durationMs / 1000).round();
         final sizeBucket = (song.fileSize! / 10000).round();
-        final durSizeKey = '$durationBucket-$sizeBucket';
-        byDurationSize.putIfAbsent(durSizeKey, () => []).add(song);
+        byDurationSize
+            .putIfAbsent((durationBucket, sizeBucket), () => [])
+            .add(song);
       }
     }
 
@@ -91,24 +92,38 @@ class DuplicateFinderService {
       }
     }
 
-    // Pass 2: Duration + Size matches verified with audio file content checksum.
+    // Pass 2: Duration + Size matches (including adjacent +/-1 buckets for
+    // rounding boundary immunity; hygiene pass) verified with checksum.
+    final seenCandidateSets = <String>{};
     for (final entry in byDurationSize.entries) {
-      if (entry.value.length > 1) {
-        final remaining =
-            entry.value.where((s) => !capturedSongIds.contains(s.id)).toList();
-        if (remaining.length > 1) {
-          final clusters = await _verifyWithChecksum(remaining);
-          for (final cluster in clusters) {
-            result.add(DuplicateGroup(
-              key: '${entry.key}-${cluster.first.id}',
-              songs: cluster,
-              reason: L10nHolder.current?.dupReasonChecksum ??
-                  'Identical Audio Content (Checksum Verified)',
-            ));
-            for (final song in cluster) {
-              capturedSongIds.add(song.id);
+      final durBucket = entry.key.$1;
+      final sizeBucket = entry.key.$2;
+      final candidates = <SongsTableData>[];
+      final seenIds = <int>{};
+      for (var dd = -1; dd <= 1; dd++) {
+        for (var ds = -1; ds <= 1; ds++) {
+          final neighbor = byDurationSize[(durBucket + dd, sizeBucket + ds)];
+          if (neighbor == null) continue;
+          for (final song in neighbor) {
+            if (!capturedSongIds.contains(song.id) && seenIds.add(song.id)) {
+              candidates.add(song);
             }
           }
+        }
+      }
+      if (candidates.length <= 1) continue;
+      final sortedIds = (candidates.map((s) => s.id).toList()..sort()).join(',');
+      if (!seenCandidateSets.add(sortedIds)) continue;
+      final clusters = await _verifyWithChecksum(candidates);
+      for (final cluster in clusters) {
+        result.add(DuplicateGroup(
+          key: '$durBucket-$sizeBucket-${cluster.first.id}',
+          songs: cluster,
+          reason: L10nHolder.current?.dupReasonChecksum ??
+              'Identical Audio Content (Checksum Verified)',
+        ));
+        for (final song in cluster) {
+          capturedSongIds.add(song.id);
         }
       }
     }

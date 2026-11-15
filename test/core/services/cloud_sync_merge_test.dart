@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/cloud_sync_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   group('CloudSyncService LWW Merge & Timestamps', () {
     setUp(() {
       CloudSyncService.clearLocalModifiedFavoritesForTesting();
@@ -50,6 +52,28 @@ void main() {
 
     test('shouldCloudWin: equal timestamps break ties in favor of cloud', () {
       expect(CloudSyncService.shouldCloudWin(cloudTimestamp: 1000, localTimestamp: 1000), isTrue);
+    });
+
+    test('local favorite modification timestamp persists across restart simulation',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      CloudSyncService.clearLocalModifiedFavoritesForTesting();
+
+      CloudSyncService.recordLocalFavoriteModified('fav-restart-1', 5000);
+      await CloudSyncService.flushLocalModifiedFavoritesForTesting();
+
+      CloudSyncService.simulateRestartForTesting();
+      final restored =
+          await CloudSyncService.localFavoriteModifiedAtForTesting('fav-restart-1');
+
+      expect(restored, equals(5000));
+      expect(
+        CloudSyncService.shouldCloudWin(
+          cloudTimestamp: 3000,
+          localTimestamp: restored,
+        ),
+        isFalse,
+      );
     });
   });
 }

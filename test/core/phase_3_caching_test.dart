@@ -45,6 +45,20 @@ void main() {
           cache.getString('test_string', defaultValue: 'none'), equals('none'));
     });
 
+    test(
+        'SettingsCache reads reflect external SharedPreferences writes (read-through)',
+        () async {
+      SharedPreferences.setMockInitialValues({'ext_flag': false});
+      final cache = SettingsCache();
+      await cache.init();
+      expect(cache.getBool('ext_flag'), isFalse);
+
+      final rawPrefs = await SharedPreferences.getInstance();
+      await rawPrefs.setBool('ext_flag', true);
+
+      expect(cache.getBool('ext_flag'), isTrue);
+    });
+
     test('ArtworkCacheManager memory LRU and prefetch work without error',
         () async {
       final manager = ArtworkCacheManager();

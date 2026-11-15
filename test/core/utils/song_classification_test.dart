@@ -176,5 +176,27 @@ void main() {
       );
       expect(isQuranTrack(newsSong), isFalse);
     });
+
+    test('bare حصري phrase like بث حصري is not classified as Quran', () {
+      final exclusiveBroadcast = _song(
+        id: -4,
+        path: 'https://example.com/live-broadcast',
+        source: SongSource.radio,
+      ).copyWith(
+        title: 'بث حصري',
+        artist: 'إذاعة عامة',
+      );
+      expect(isQuranTrack(exclusiveBroadcast), isFalse);
+
+      final hussaryRecitation = _song(
+        id: 12,
+        path: '/storage/audio/recitation.mp3',
+        source: SongSource.local,
+      ).copyWith(
+        title: 'تلاوة مباركة',
+        artist: 'محمود خليل الحصري',
+      );
+      expect(isQuranTrack(hussaryRecitation), isTrue);
+    });
   });
 }

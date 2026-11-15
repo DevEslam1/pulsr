@@ -25,6 +25,7 @@ import 'ytm_service.dart';
 
 @singleton
 class FileIntentHandler {
+  static const int _maxProxyTextBytes = 10 * 1024 * 1024;
   static const MethodChannel _channel = MethodChannel(PulsrChannels.fileOpener);
   static int _tempIdCounter = 0;
   static int _getNextTempId() {
@@ -262,16 +263,15 @@ class FileIntentHandler {
         }
         if (voiceUri.host == 'shuffle') {
           final res = await _repository.watchAllSongs(limit: 200).first;
-          res.fold((_) {}, (songs) async {
-            if (songs.isNotEmpty) {
-              final shuffled = List<SongsTableData>.from(songs)..shuffle();
-              await _playerCubit.playSong(shuffled.first, queue: shuffled);
-              final navCtx = rootNavigatorKey.currentContext;
-              if (navCtx != null && navCtx.mounted) {
-                navCtx.push('/now-playing');
-              }
+          final songs = res.fold((_) => <SongsTableData>[], (s) => s);
+          if (songs.isNotEmpty) {
+            final shuffled = List<SongsTableData>.from(songs)..shuffle();
+            await _playerCubit.playSong(shuffled.first, queue: shuffled);
+            final navCtx = rootNavigatorKey.currentContext;
+            if (navCtx != null && navCtx.mounted) {
+              navCtx.push('/now-playing');
             }
-          });
+          }
           return;
         }
         if (voiceUri.host == 'favorites') {
@@ -356,7 +356,8 @@ class FileIntentHandler {
         if (isTextExt) {
           try {
             final file = File(cleanPath);
-            if (await file.exists()) {
+            if (await file.exists() &&
+                await file.length() <= _maxProxyTextBytes) {
               final content = await file.readAsString();
               final proxies = ProxyEntry.parseList(content);
               if (proxies.isNotEmpty) {
@@ -367,7 +368,9 @@ class FileIntentHandler {
                 return null;
               }
             }
-          } catch (_) {}
+          } catch (_) {
+            // Fall through to unsupported format notice on unreadable files.
+          }
         } else {
           final parsedProxies = ProxyEntry.parseList(uriOrPath);
           if (parsedProxies.isNotEmpty) {

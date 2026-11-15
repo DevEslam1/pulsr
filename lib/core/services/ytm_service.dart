@@ -158,9 +158,7 @@ class YtmService {
 
   /// Records the resolved loudness offset in dB for the given [videoId].
   void recordLoudness(String videoId, double? loudnessDb) {
-    if (loudnessDb != null) {
-      _loudnessByVideoId[videoId] = loudnessDb;
-    }
+    if (loudnessDb != null) _capMap(_loudnessByVideoId, videoId, loudnessDb);
   }
 
   /// Caps the per-video failure/cooldown maps so a long session with many
@@ -1057,7 +1055,7 @@ class YtmService {
             );
             if (stream.url.trim().isNotEmpty) {
               if (originalVideoId != null && originalVideoId.isNotEmpty) {
-                _alternateVideoIds[originalVideoId] = candId;
+                _capMap(_alternateVideoIds, originalVideoId, candId);
                 final urlCache = getIt.isRegistered<YtmUrlCache>()
                     ? getIt<YtmUrlCache>()
                     : null;

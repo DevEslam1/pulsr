@@ -244,8 +244,11 @@ class SearchAlgorithmUtils {
       return false;
     }
 
+    // Collect beyond [limit] so exact/high-relevance hits appearing later in
+    // the unsorted list aren't dropped before ranking.
+    final candidateLimit = limit <= 100000 ? limit * 3 : limit;
     for (final song in songs) {
-      if (matches.length >= limit) break;
+      if (matches.length >= candidateLimit) break;
 
       final norm = _normalizedMetadata(song);
 
@@ -274,7 +277,7 @@ class SearchAlgorithmUtils {
       if (a.score != b.score) return a.score.compareTo(b.score);
       return a.song.title.toLowerCase().compareTo(b.song.title.toLowerCase());
     });
-    return [for (final m in matches) m.song];
+    return [for (final m in matches.take(limit)) m.song];
   }
 
   static int _relevanceScore(_NormMeta norm, String q) {

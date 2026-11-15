@@ -1335,4 +1335,43 @@ void main() {
           reason: 'the duplicate must not run its own transfer');
     });
   });
+
+  group('cancel after body committed', () {
+    test(
+        'cancel during tagging preserves committed temp file and retry reuses it',
+        () async {
+      const videoId = 'vidCancelTag1';
+      server = (request) async => sequential(_m4aBody(2 * 1024 * 1024));
+
+      _mockChannel(_tagChannel, (call) async {
+        if (call.method == 'writeTags') {
+          writeTagsCalls++;
+          lastWriteTagsArgs = (call.arguments as Map).cast<Object?, Object?>();
+          if (writeTagsCalls == 1) {
+            service.cancel(videoId);
+          }
+        }
+        return null;
+      });
+
+      final first = await service.download(_song(videoId: videoId));
+      first.match(
+        (failure) => expect(failure.message, 'Download canceled'),
+        (_) => fail('expected cancel failure'),
+      );
+
+      final destFile = File(p.join(tempDir.path, 'ytdl_$videoId.m4a'));
+      expect(destFile.existsSync(), isTrue,
+          reason: 'committed temp file must survive cancel during tagging');
+      final requestsAfterFirst = client.requests.length;
+      expect(requestsAfterFirst, greaterThan(0));
+
+      final retry = await service.download(_song(videoId: videoId));
+      expect(retry.isRight(), isTrue);
+      expect(client.requests.length, equals(requestsAfterFirst),
+          reason: 'retry must reuse the committed temp file without re-downloading');
+      expect(destFile.existsSync(), isFalse,
+          reason: 'committed temp file should be cleaned up once save completes');
+    });
+  });
 }

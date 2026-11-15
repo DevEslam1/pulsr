@@ -94,4 +94,28 @@ void main() {
     },
     timeout: const Timeout(Duration(minutes: 2)),
   );
+
+  test(
+    'configureDependencies() is idempotent when called twice',
+    () async {
+      Object? secondError;
+      await runZonedGuarded(() async {
+        await configureDependencies(warmUpAsync: false)
+            .timeout(const Duration(seconds: 30));
+        try {
+          await configureDependencies(warmUpAsync: false)
+              .timeout(const Duration(seconds: 10));
+        } catch (e) {
+          secondError = e;
+        }
+      }, (error, stack) {});
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(secondError, isNull);
+      expect(initializationReady, completes);
+      expect(() => validateDependencies(getIt), returnsNormally);
+    },
+    timeout: const Timeout(Duration(minutes: 1)),
+  );
 }

@@ -116,13 +116,20 @@ class PlaybackLatencyTracker {
   @factoryMethod
   PlaybackLatencyTracker()
       : _clock = const SystemClock(),
-        _enableDebugPrint = true;
+        _enableDebugPrint = true,
+        _transactionFactory = null;
 
   @visibleForTesting
-  PlaybackLatencyTracker.withClock(this._clock) : _enableDebugPrint = false;
+  PlaybackLatencyTracker.withClock(
+    this._clock, {
+    ISentrySpan? Function(String videoId, DateTime now)? transactionFactory,
+  })  : _enableDebugPrint = false,
+        _transactionFactory = transactionFactory;
 
   final Clock _clock;
   final bool _enableDebugPrint;
+  final ISentrySpan? Function(String videoId, DateTime now)?
+      _transactionFactory;
 
   _Session? _active;
   bool _disposed = false;
@@ -159,15 +166,17 @@ class PlaybackLatencyTracker {
     final playId = _generatePlayId(videoId, now);
     ISentrySpan? transaction;
     try {
-      transaction = Sentry.startTransaction(
-        'playback:$videoId',
-        'playback',
-        description: 'tap-to-audible for $videoId',
-        startTimestamp: now,
-        bindToScope: false,
-      );
-      transaction.setTag('videoId', videoId);
-      if (quality != null) transaction.setTag('quality', quality);
+      transaction = _transactionFactory != null
+          ? _transactionFactory!(videoId, now)
+          : Sentry.startTransaction(
+              'playback:$videoId',
+              'playback',
+              description: 'tap-to-audible for $videoId',
+              startTimestamp: now,
+              bindToScope: false,
+            );
+      transaction?.setTag('videoId', videoId);
+      if (quality != null) transaction?.setTag('quality', quality);
     } catch (_) {
       transaction = null;
     }
@@ -456,21 +465,28 @@ class PlaybackLatencyTracker {
     return '${videoId}_${now.millisecondsSinceEpoch}_${now.microsecond}';
   }
 
-  @visibleForTesting
-  void debugReset() {
+  void _cancelActiveTransaction() {
     if (_active != null && !_active!.closed) {
       try {
         _active!.transaction?.finish(status: SpanStatus.cancelled());
-      } catch (_) {}
+      } catch (_) {
+        // Best-effort: failure intentionally ignored on span cancellation.
+      }
+      _active!.closed = true;
     }
     _active = null;
+  }
+
+  @visibleForTesting
+  void debugReset() {
+    _cancelActiveTransaction();
     _history.clear();
   }
 
   @disposeMethod
   void dispose() {
     _disposed = true;
-    _active = null;
+    _cancelActiveTransaction();
     if (!_reportController.isClosed) {
       _reportController.close();
     }

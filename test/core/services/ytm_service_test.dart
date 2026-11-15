@@ -86,7 +86,7 @@ void main() {
     });
 
     test('isFatal correctly identifies blocking errors', () {
-      expect(const YtmException('YTM_NETWORK').isFatal, isTrue);
+      expect(const YtmException('YTM_NETWORK').isFatal, isFalse);
       expect(const YtmException('YTM_BOT_BLOCKED').isFatal, isTrue);
       expect(const YtmException('YTM_DISABLED').isFatal, isTrue);
       expect(const YtmException('YTM_AUTH').isFatal, isTrue);

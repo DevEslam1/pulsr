@@ -87,20 +87,30 @@ class _EntityByIdLoaderState<T> extends State<EntityByIdLoader<T>> {
       _sub = widget.watch!().listen(
         (result) {
           if (generation != _generation) return;
+          T? matched;
           result.fold((_) {}, (list) {
             for (final item in list) {
               if (widget.match!(item)) {
-                _entity = item;
+                matched = item;
                 break;
               }
             }
           });
           if (!mounted) return;
-          setState(() => _done = true);
-          _sub?.cancel();
+          if (matched != null) {
+            setState(() {
+              _entity = matched;
+              _done = true;
+            });
+          }
         },
         onError: (_) {
           if (mounted && generation == _generation) {
+            setState(() => _done = true);
+          }
+        },
+        onDone: () {
+          if (mounted && generation == _generation && !_done) {
             setState(() => _done = true);
           }
         },

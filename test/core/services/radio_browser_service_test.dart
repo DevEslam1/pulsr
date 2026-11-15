@@ -199,17 +199,42 @@ void main() {
           return http.Response(jsonEncode({'ok': true, 'message': 'voted'}), 200);
         });
 
+        const validUuid = '960e57c0-0601-11e8-ae97-52543be04c81';
         final service = RadioBrowserService(client: client);
-        final ok = await service.voteForStation('uuid-999');
+        final ok = await service.voteForStation(validUuid);
         expect(ok, isTrue);
-        expect(requested!.path, '/json/vote/uuid-999');
+        expect(requested!.path, '/json/vote/$validUuid');
       });
 
       test('voteForStation returns false on non-200 or failure', () async {
         final client = MockClient((_) async => http.Response('not found', 404));
         final service = RadioBrowserService(client: client);
-        expect(await service.voteForStation('uuid-missing'), isFalse);
+        expect(
+          await service.voteForStation('00000000-0000-0000-0000-000000000000'),
+          isFalse,
+        );
         expect(await service.voteForStation(''), isFalse);
+      });
+
+      test('voteForStation rejects invalid stationUuid without HTTP calls',
+          () async {
+        var calls = 0;
+        final client = MockClient((_) async {
+          calls++;
+          return http.Response(jsonEncode({'ok': true}), 200);
+        });
+        final service = RadioBrowserService(client: client);
+
+        for (final bad in [
+          '../admin',
+          'uuid-999',
+          'abc123', // shorter than 8 chars
+          'a' * 65, // longer than 64 chars
+          '960e57c0 0601-11e8',
+        ]) {
+          expect(await service.voteForStation(bad), isFalse, reason: bad);
+        }
+        expect(calls, 0);
       });
     });
   });

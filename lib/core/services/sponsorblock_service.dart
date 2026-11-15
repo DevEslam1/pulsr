@@ -101,7 +101,11 @@ class SponsorBlockService {
     // first call, loadPreferences() would otherwise overwrite the explicit
     // value with the persisted (old) one before we write the new value.
     await loadPreferences();
+    final wasEnabled = _enabled;
     _enabled = enabled;
+    if (enabled && !wasEnabled) {
+      clearCache();
+    }
     try {
       await _prefs?.setBool(PrefsKeys.sponsorBlockEnabled, enabled);
     } catch (_) {}
@@ -110,6 +114,7 @@ class SponsorBlockService {
   Future<void> setEnabledCategories(Set<String> categories) async {
     await loadPreferences();
     _enabledCategories = categories.where(supportedCategories.contains).toSet();
+    clearCache();
     try {
       await _prefs?.setStringList(
           PrefsKeys.sponsorBlockCategories, _enabledCategories.toList());

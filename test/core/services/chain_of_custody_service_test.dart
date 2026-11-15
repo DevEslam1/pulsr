@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/chain_of_custody_service.dart';
 
@@ -325,5 +327,16 @@ void main() {
       );
       expect(hashed, isNull);
     });
+  });
+
+  test('_canonicalize encodes map keys with quotes and backslashes as valid JSON',
+      () {
+    final canonical = ChainOfCustodyReport.canonicalizeForTesting({
+      'b"quoted\\key': 1,
+      'a': {'nested"k': true},
+    });
+    final decoded = jsonDecode(canonical) as Map<String, dynamic>;
+    expect(decoded['b"quoted\\key'], 1);
+    expect((decoded['a'] as Map<String, dynamic>)['nested"k'], isTrue);
   });
 }

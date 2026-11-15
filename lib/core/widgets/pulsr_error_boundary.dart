@@ -16,6 +16,10 @@ typedef ErrorBoundaryBuilder = Widget Function(
 
 /// A resilient error boundary that catches rendering/runtime errors in its subtree,
 /// logs them via [ErrorLogger], and displays a graceful fallback UI with retry support.
+///
+/// The synchronous `try/catch` inside `build` only covers exceptions thrown
+/// directly by [builder]; descendant widget build errors are captured via a
+/// scoped `ErrorWidget.builder` override installed while this boundary is mounted.
 class PulsrErrorBoundary extends StatefulWidget {
   final Widget? child;
   final WidgetBuilder? builder;
@@ -44,7 +48,59 @@ class PulsrErrorBoundary extends StatefulWidget {
 }
 
 class _PulsrErrorBoundaryState extends State<PulsrErrorBoundary> {
+  static final List<_PulsrErrorBoundaryState> _mountedBoundaries =
+      <_PulsrErrorBoundaryState>[];
+  static ErrorWidgetBuilder? _savedErrorBuilder;
+
   Object? _error;
+  int _retryKey = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_mountedBoundaries.isEmpty) {
+      _savedErrorBuilder = ErrorWidget.builder;
+      ErrorWidget.builder = _scopedErrorWidgetBuilder;
+    }
+    _mountedBoundaries.add(this);
+  }
+
+  @override
+  void dispose() {
+    _mountedBoundaries.remove(this);
+    if (_mountedBoundaries.isEmpty && _savedErrorBuilder != null) {
+      ErrorWidget.builder = _savedErrorBuilder!;
+      _savedErrorBuilder = null;
+    }
+    super.dispose();
+  }
+
+  static Widget _scopedErrorWidgetBuilder(FlutterErrorDetails details) {
+    var logged = false;
+    return Builder(
+      builder: (ctx) {
+        final boundary =
+            ctx.findAncestorStateOfType<_PulsrErrorBoundaryState>();
+        if (boundary != null && boundary.mounted) {
+          if (!logged) {
+            logged = true;
+            ErrorLogger.log(
+              'Caught by PulsrErrorBoundary',
+              error: details.exception,
+              stackTrace: details.stack,
+              category: boundary.widget.category ?? 'ErrorBoundary',
+            );
+          }
+          return boundary._buildFallback(ctx, details.exception);
+        }
+        final previous = _savedErrorBuilder;
+        if (previous != null) {
+          return previous(details);
+        }
+        return ErrorWidget(details.exception);
+      },
+    );
+  }
 
   @override
   void didUpdateWidget(covariant PulsrErrorBoundary oldWidget) {
@@ -58,6 +114,7 @@ class _PulsrErrorBoundaryState extends State<PulsrErrorBoundary> {
   void _retry() {
     setState(() {
       _error = null;
+      _retryKey++;
     });
     widget.onRetry?.call();
   }
@@ -114,11 +171,15 @@ class _PulsrErrorBoundaryState extends State<PulsrErrorBoundary> {
       return _buildFallback(context, _error!);
     }
 
+    // Synchronous try/catch only covers [widget.builder]; descendant build
+    // failures are routed through [_scopedErrorWidgetBuilder].
     try {
-      if (widget.builder != null) {
-        return widget.builder!(context);
-      }
-      return widget.child!;
+      final content =
+          widget.builder != null ? widget.builder!(context) : widget.child!;
+      return KeyedSubtree(
+        key: ValueKey<int>(_retryKey),
+        child: content,
+      );
     } catch (e, st) {
       _reportError(e, st);
       return _buildFallback(context, e);
