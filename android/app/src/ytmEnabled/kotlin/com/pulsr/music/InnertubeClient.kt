@@ -1596,7 +1596,7 @@ internal class InnertubeClient(
                 if (code == 429) {
                     val retryAfter = response.header("Retry-After")?.toLongOrNull()
                     val backoff = rateLimiter.onRateLimited(retryAfter)
-                    ProxyManager.onPathFailed(urlStr)
+                    ProxyManager.onPathFailed(urlStr, ProxyPool.FailureType.NETWORK)
                     Log.w(TAG, "[$traceId] Rate limited (429) on attempt $attempt. Backing off for ${backoff}ms")
                     lastError = InnertubeException(
                         signal = YtmBlockSignal.RateLimited,
@@ -1659,7 +1659,7 @@ internal class InnertubeClient(
                 }
                 lastError = e
             } catch (e: UnknownHostException) {
-                ProxyManager.onPathFailed(urlStr)
+                ProxyManager.onPathFailed(urlStr, ProxyPool.FailureType.NETWORK)
                 val host = Uri.parse(urlStr).host
                 if (host != null) {
                     val dohResolved = runCatching { DnsOverHttpsResolver.resolve(host) }
@@ -1676,7 +1676,13 @@ internal class InnertubeClient(
                 lastError = e
                 val isInterrupted = Thread.currentThread().isInterrupted || call?.isCanceled() == true
                 if (!isInterrupted) {
-                    ProxyManager.onPathFailed(urlStr)
+                    val failureType = when (e) {
+                        is java.net.SocketTimeoutException,
+                        is java.io.InterruptedIOException,
+                        -> ProxyPool.FailureType.TIMEOUT
+                        else -> ProxyPool.FailureType.NETWORK
+                    }
+                    ProxyManager.onPathFailed(urlStr, failureType)
                     Log.w(TAG, "[$traceId] Network error on attempt $attempt for ${clientType.name}: ${e.message}")
                 } else {
                     break

@@ -40,8 +40,10 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         }
 
         var connection: HttpURLConnection? = null
+        var proxied = false
         try {
             val proxy = ProxyManager.getProxy(request.url())
+            proxied = proxy != null
             if (proxy == null && ProxyManager.isBlocked()) {
                 throw IOException("Proxy paths are blocked (fail-closed)")
             }
@@ -102,7 +104,9 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             if (code == HTTP_TOO_MANY_REQUESTS) {
                 val retryAfter = connection.getHeaderField("Retry-After")?.trim()?.toLongOrNull()
                 RateLimiter.shared.onRateLimited(retryAfter)
-                ProxyManager.onPathFailed(request.url())
+                if (proxied) {
+                    ProxyManager.onPathFailed(request.url(), ProxyPool.FailureType.NETWORK)
+                }
                 throw RateLimitedException("HTTP 429 Too Many Requests: Rate limited by YouTube", retryAfter)
             }
 
@@ -130,13 +134,18 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             // then throttled every path and marked the network failed.
             if (code >= 400 && body != null && BOT_MARKERS.any { body.contains(it, ignoreCase = true) }) {
                 RateLimiter.shared.onRateLimited()
-                ProxyManager.onPathFailed(request.url())
+                if (proxied) {
+                    ProxyManager.onPathFailed(request.url(), ProxyPool.FailureType.UNKNOWN)
+                }
                 throw ReCaptchaException("YouTube bot verification required: Sign in to confirm you're not a bot", request.url())
             }
 
             // Mark successful request in rate limiter
             if (code in 200..299) {
                 RateLimiter.shared.onSuccess()
+                if (proxied) {
+                    ProxyManager.onPathSuccess()
+                }
             }
 
             return Response(
@@ -148,7 +157,18 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             )
         } catch (e: ReCaptchaException) {
             throw e
+        } catch (e: RateLimitedException) {
+            throw e
         } catch (e: IOException) {
+            if (proxied) {
+                val failureType = when (e) {
+                    is java.net.SocketTimeoutException,
+                    is java.io.InterruptedIOException,
+                    -> ProxyPool.FailureType.TIMEOUT
+                    else -> ProxyPool.FailureType.NETWORK
+                }
+                ProxyManager.onPathFailed(request.url(), failureType)
+            }
             throw e
         } catch (e: Exception) {
             throw IOException("Request to ${request.url()} failed: ${e.message}", e)

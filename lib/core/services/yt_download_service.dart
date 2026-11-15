@@ -106,6 +106,7 @@ class YtDownloadService {
   final Map<String, _QueuedDownload> _activeDownloads = {};
   static const int _maxCanceledIds = 200;
   final Set<String> _canceledVideoIds = <String>{};
+  DateTime _lastTransferPolicyCheck = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Per-download quality overrides requested from the search row's picker.
   final YtDownloadQualityPolicy _qualityPolicy = YtDownloadQualityPolicy();
@@ -449,6 +450,21 @@ class YtDownloadService {
       }
     }
     return null;
+  }
+
+  /// Re-evaluates the Wi-Fi/offline policy while bytes are flowing.
+  ///
+  /// The start/retry checks alone let a transfer that began on Wi-Fi continue
+  /// over cellular after a handover, because the failure — and the policy
+  /// re-check in the repository — only happens once the request errors.
+  Future<void> _assertTransferPolicy() async {
+    final now = DateTime.now();
+    if (now.difference(_lastTransferPolicyCheck) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastTransferPolicyCheck = now;
+    final block = await downloadPolicyBlock();
+    if (block != null) throw block;
   }
 
   Future<Result<int>> _executeDownload(_QueuedDownload task) async {
@@ -879,6 +895,10 @@ class YtDownloadService {
         );
         return currentStream;
       } catch (e) {
+        // A mid-transfer policy flip (Wi-Fi -> cellular in Wi-Fi-only mode)
+        // must park the task instead of burning five retries on the blocked
+        // path.
+        if (await downloadPolicyBlock() != null) rethrow;
         attempts++;
         debugPrint(
             '[YtDownloadService] Download attempt $attempts failed for $videoId: $e');
@@ -1232,6 +1252,7 @@ class YtDownloadService {
                     _canceledVideoIds.contains(task.song.remoteId)) {
                   throw const DownloadFailure('Download canceled');
                 }
+                await _assertTransferPolicy();
                 try {
                   sink.add(chunk);
                 } on FileSystemException catch (e) {
@@ -1631,6 +1652,7 @@ class YtDownloadService {
         if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
           throw const DownloadFailure('Download canceled');
         }
+        await _assertTransferPolicy();
         received += chunk.length;
         sink.add(chunk);
         if (onProgress != null) {
