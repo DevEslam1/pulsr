@@ -97,7 +97,7 @@ void main() {
 
       expect(cubit.state.themeMode, AppThemeMode.dark);
       expect(cubit.state.playerThemeMode, PlayerThemeMode.classic);
-      expect(cubit.state.visualizerStyle, VisualizerStyle.bar);
+      expect(cubit.state.visualizerStyle, VisualizerStyle.off);
       expect(cubit.state.miniPlayerSwipeLeft, MiniPlayerSwipeAction.next);
       expect(cubit.state.miniPlayerSwipeRight, MiniPlayerSwipeAction.prev);
       expect(cubit.state.nowPlayingDoubleTap,

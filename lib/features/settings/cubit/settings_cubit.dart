@@ -329,7 +329,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     final playerSliderStyleStr = prefs.getString(_keyPlayerSliderStyle);
     final playerSliderStyle = PlayerSliderStyle.values.firstWhere(
       (e) => e.name == playerSliderStyleStr,
-      orElse: () => PlayerSliderStyle.normal,
+      orElse: () => PlayerSliderStyle.capsule,
     );
     final appButtonStyleStr = prefs.getString(_keyAppButtonStyle);
     final appButtonStyle = AppButtonStyle.values.firstWhere(
@@ -343,10 +343,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
     );
 
     final visualizerStyleStr =
-        prefs.getString(_keyVisualizerStyle) ?? VisualizerStyle.bar.name;
+        prefs.getString(_keyVisualizerStyle) ?? VisualizerStyle.off.name;
     final visualizerStyle = VisualizerStyle.values.firstWhere(
       (e) => e.name == visualizerStyleStr,
-      orElse: () => VisualizerStyle.bar,
+      orElse: () => VisualizerStyle.off,
     );
 
     final miniPlayerSwipeLeftStr = prefs.getString(_keyMiniPlayerSwipeLeft) ??

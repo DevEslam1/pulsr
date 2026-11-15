@@ -52,7 +52,7 @@ final List<_Toggle> _toggles = [
       PrefsKeys.resumeAfterInterruption,
       (c) => c.state.resumeAfterInterruption,
       (c, v) => c.setResumeAfterInterruption(v)),
-  _Toggle('waveformSeekBarEnabled', true, 'setting_waveform_seek_bar',
+  _Toggle('waveformSeekBarEnabled', false, 'setting_waveform_seek_bar',
       (c) => c.state.waveformSeekBarEnabled, (c, v) => c.setWaveformSeekBar(v)),
   _Toggle('autoThemeByTime', false, 'setting_auto_theme_by_time',
       (c) => c.state.autoThemeByTime, (c, v) => c.setAutoThemeByTime(v)),

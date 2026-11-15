@@ -89,11 +89,11 @@ void main() {
       restored.close();
     });
 
-    test('playerSliderStyle defaults to normal and persists/restores', () async {
-      expect(const SettingsState().playerSliderStyle, PlayerSliderStyle.normal);
+    test('playerSliderStyle defaults to capsule and persists/restores', () async {
+      expect(const SettingsState().playerSliderStyle, PlayerSliderStyle.capsule);
 
       final cubit = SettingsCubit(scannerService: mockScannerService);
-      expect(cubit.state.playerSliderStyle, PlayerSliderStyle.normal);
+      expect(cubit.state.playerSliderStyle, PlayerSliderStyle.capsule);
 
       await cubit.setPlayerSliderStyle(PlayerSliderStyle.wavy);
       expect(cubit.state.playerSliderStyle, PlayerSliderStyle.wavy);

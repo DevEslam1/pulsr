@@ -86,7 +86,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(true) bool autoHideSystemMedia,
     @Default(ThemeColorSource.artwork) ThemeColorSource themeColorSource,
     @Default(true) bool resumeAfterInterruption,
-    @Default(true) bool waveformSeekBarEnabled,
+    @Default(false) bool waveformSeekBarEnabled,
     @Default(AppThemeMode.dark) AppThemeMode themeMode,
     @Default(VisualDensityMode.comfortable)
     VisualDensityMode visualDensityMode,
@@ -110,9 +110,9 @@ abstract class SettingsState with _$SettingsState {
     @Default(24.0) double customThemeRadius,
     @Default(true) bool customThemeGlow,
     @Default(PlayerThemeMode.classic) PlayerThemeMode playerThemeMode,
-    @Default(PlayerSliderStyle.normal) PlayerSliderStyle playerSliderStyle,
+    @Default(PlayerSliderStyle.capsule) PlayerSliderStyle playerSliderStyle,
     @Default(AppButtonStyle.rectangular) AppButtonStyle appButtonStyle,
-    @Default(VisualizerStyle.bar) VisualizerStyle visualizerStyle,
+    @Default(VisualizerStyle.off) VisualizerStyle visualizerStyle,
     @Default(MiniPlayerSwipeAction.next)
     MiniPlayerSwipeAction miniPlayerSwipeLeft,
     @Default(MiniPlayerSwipeAction.prev)
