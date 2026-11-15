@@ -121,7 +121,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   /// Raw visible-window computation for the current zoom, ignoring any frozen
   /// window. Kept separate so a zoom change mid-drag can refresh the freeze
   /// instead of reusing a stale range (BUG-08).
-  ({int startIndex, int visibleCount}) _computeWindow(int totalCount) {
+  ({int startIndex, int visibleCount}) _computeWindow(
+    int totalCount, {
+    double? centerMs,
+  }) {
     if (totalCount <= 0) return (startIndex: 0, visibleCount: 0);
     if (totalCount == 1) return (startIndex: 0, visibleCount: 1);
     final int visibleCount = (totalCount /
@@ -129,7 +132,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                 PlayerConstants.waveformMaxZoom))
         .round()
         .clamp(2, totalCount);
-    final effectiveMs = widget.position.inMilliseconds.toDouble();
+    final effectiveMs = centerMs ?? widget.position.inMilliseconds.toDouble();
     final double centerRatio = widget.duration.inMilliseconds > 0
         ? effectiveMs / widget.duration.inMilliseconds
         : 0.0;
@@ -252,24 +255,53 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                   PlayerConstants.waveformMinZoom,
                                   PlayerConstants.waveformMaxZoom,
                                 );
-                                // BUG-08: if a scrub is in progress, re-freeze the
-                                // window at the new zoom so coordinate mapping stays
-                                // accurate.
+                                // AUDIT-FIX (P0-5b): Re-freeze the window around
+                                // _dragValue (not engine widget.position) so
+                                // the thumb's screen X and drag ratio stay
+                                // locked under the finger during mid-drag zoom.
                                 if (_dragFrozenWindow != null) {
-                                  _dragFrozenWindow =
-                                      _computeWindow(totalCount);
-                                  // AUDIT-FIX: Recompute _dragValue to keep thumb ratio stable under new window
+                                  final oldWindow = _dragFrozenWindow!;
+                                  final durationMs =
+                                      widget.duration.inMilliseconds;
                                   if (_dragValue != null &&
-                                      widget.duration.inMilliseconds > 0) {
-                                    final ratio = (_dragValue! /
-                                            widget.duration.inMilliseconds)
-                                        .clamp(0.0, 1.0);
-                                    _dragValue =
-                                        (ratio * widget.duration.inMilliseconds)
-                                            .clamp(
-                                                0.0,
-                                                widget.duration.inMilliseconds
-                                                    .toDouble());
+                                      durationMs > 0 &&
+                                      totalCount > 1 &&
+                                      oldWindow.visibleCount > 0) {
+                                    final double prevRatio =
+                                        (_dragValue! / durationMs)
+                                            .clamp(0.0, 1.0);
+                                    final double xInWindow =
+                                        ((prevRatio * totalCount -
+                                                    oldWindow.startIndex) /
+                                                oldWindow.visibleCount)
+                                            .clamp(0.0, 1.0);
+                                    final int newVisible = (totalCount /
+                                            _zoomScale.clamp(
+                                                PlayerConstants.waveformMinZoom,
+                                                PlayerConstants
+                                                    .waveformMaxZoom))
+                                        .round()
+                                        .clamp(2, totalCount);
+                                    final int newStart =
+                                        (prevRatio * totalCount -
+                                                xInWindow * newVisible)
+                                            .round()
+                                            .clamp(0, totalCount - newVisible);
+                                    _dragFrozenWindow = (
+                                      startIndex: newStart,
+                                      visibleCount: newVisible,
+                                    );
+                                    final double newGlobalRatio =
+                                        ((newStart + xInWindow * newVisible) /
+                                                totalCount)
+                                            .clamp(0.0, 1.0);
+                                    _dragValue = (newGlobalRatio * durationMs)
+                                        .clamp(0.0, durationMs.toDouble());
+                                  } else {
+                                    _dragFrozenWindow = _computeWindow(
+                                      totalCount,
+                                      centerMs: _dragValue,
+                                    );
                                   }
                                 }
                               });
@@ -301,8 +333,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                             final seekVal =
                                 (ratio * maxDuration).clamp(0.0, maxDuration);
                             if (_lastHapticCheckMs != null) {
-                              if ((seekVal == 0.0 && _lastHapticCheckMs! > 0.0) ||
-                                  (seekVal == maxDuration && _lastHapticCheckMs! < maxDuration)) {
+                              if ((seekVal == 0.0 &&
+                                      _lastHapticCheckMs! > 0.0) ||
+                                  (seekVal == maxDuration &&
+                                      _lastHapticCheckMs! < maxDuration)) {
                                 PulsrHaptics.selectionClick();
                               }
                               _checkHapticBoundaries(
@@ -419,45 +453,47 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                         opacity: _dragValue != null ? 1.0 : 0.0,
                                         duration: context.motionMs(150),
                                         child: AnimatedScale(
-                                          scale: _dragValue != null ? 1.0 : 0.85,
+                                          scale:
+                                              _dragValue != null ? 1.0 : 0.85,
                                           duration: context.motionMs(150),
                                           curve: Curves.easeOutBack,
                                           child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: AppSpacing.s8,
-                                            vertical: AppSpacing.s4),
-                                        decoration: BoxDecoration(
-                                          color: context
-                                              .palette.surfaceContainerHigh
-                                              .withValues(alpha: 0.90),
-                                          borderRadius: AppRadii.r12All,
-                                          border: Border.all(
-                                            color: context.palette.hairline
-                                                .withValues(alpha: 0.6),
-                                            width: 1.0,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black
-                                                  .withValues(alpha: 0.30),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 3),
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: AppSpacing.s8,
+                                                vertical: AppSpacing.s4),
+                                            decoration: BoxDecoration(
+                                              color: context
+                                                  .palette.surfaceContainerHigh
+                                                  .withValues(alpha: 0.90),
+                                              borderRadius: AppRadii.r12All,
+                                              border: Border.all(
+                                                color: context.palette.hairline
+                                                    .withValues(alpha: 0.6),
+                                                width: 1.0,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.30),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 3),
+                                                ),
+                                              ],
                                             ),
-                                          ],
-                                        ),
-                                        child: Text(
-                                          '${Formatters.formatDuration(currentDuration)} ($deltaStr)',
-                                          style: TextStyle(
-                                            color: context.palette.textPrimary,
-                                            fontSize: AppFontSize.caption,
-                                            fontWeight: FontWeight.w700,
-                                            fontFeatures: const [
-                                              FontFeature.tabularFigures()
-                                            ],
+                                            child: Text(
+                                              '${Formatters.formatDuration(currentDuration)} ($deltaStr)',
+                                              style: TextStyle(
+                                                color:
+                                                    context.palette.textPrimary,
+                                                fontSize: AppFontSize.caption,
+                                                fontWeight: FontWeight.w700,
+                                                fontFeatures: const [
+                                                  FontFeature.tabularFigures()
+                                                ],
+                                              ),
+                                            ),
                                           ),
                                         ),
-                                        ),
-                                      ),
                                       ),
                                     ),
                                   );
@@ -584,7 +620,7 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (samples.isEmpty) return;
+    if (samples.isEmpty || size.width <= 0 || size.height <= 0) return;
 
     final int totalCount = samples.length;
     if (totalCount < 2) {
@@ -604,14 +640,37 @@ class _WaveformPainter extends CustomPainter {
     if (startIndex >= endIndex || endIndex > totalCount) return;
     final int visible = endIndex - startIndex;
     final visibleSamples = samples.sublist(startIndex, endIndex);
+    if (visibleSamples.length < 2 || visible < 2) return;
 
-    final int count = visibleSamples.length;
-    // FIX-M8: Guard visible < 2 and count < 2 to prevent division by zero
-    if (count < 2 || visible < 2) return;
-    const double spacing = 2.5;
-    final double totalSpacing = spacing * (count - 1);
-    final double barWidth =
-        ((size.width - totalSpacing) / count).clamp(1.0, 12.0);
+    // AUDIT-FIX (P0-5a): Downsample dense windows to width ~/ 3 bars and derive
+    // spacing/barWidth from the drawn count so n*barWidth + (n-1)*spacing ==
+    // size.width without any minimum-width clamp overflowing the canvas.
+    final int maxBars = math.max(2, size.width ~/ 3);
+    final List<double> drawnSamples;
+    if (visibleSamples.length > maxBars) {
+      final step = visibleSamples.length / maxBars;
+      drawnSamples = List<double>.generate(maxBars, (i) {
+        final bucketStart = (i * step).floor();
+        final bucketEnd =
+            math.min(visibleSamples.length, ((i + 1) * step).ceil());
+        var peak = 0.0;
+        for (var j = bucketStart; j < bucketEnd; j++) {
+          final v = visibleSamples[j];
+          if (v > peak) peak = v;
+        }
+        return peak;
+      }, growable: false);
+    } else {
+      drawnSamples = visibleSamples;
+    }
+
+    final int count = drawnSamples.length;
+    double spacing = math.min(2.5, (size.width * 0.4) / (count - 1));
+    double barWidth = (size.width - spacing * (count - 1)) / count;
+    if (barWidth > 12.0) {
+      barWidth = 12.0;
+      spacing = (size.width - count * barWidth) / (count - 1);
+    }
     const double minBarHeight = 4.0;
 
     final Paint inactivePaint = Paint()
@@ -627,7 +686,7 @@ class _WaveformPainter extends CustomPainter {
         case WaveformVisualizerStyle.mirroredBars:
           for (int i = 0; i < count; i++) {
             final double barHeight =
-                (visibleSamples[i] * size.height * amplitudeScale)
+                (drawnSamples[i] * size.height * amplitudeScale)
                     .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing);
             final double y = (size.height - barHeight) / 2;
@@ -641,7 +700,7 @@ class _WaveformPainter extends CustomPainter {
         case WaveformVisualizerStyle.roundedTopBars:
           for (int i = 0; i < count; i++) {
             final double barHeight =
-                (visibleSamples[i] * size.height * amplitudeScale)
+                (drawnSamples[i] * size.height * amplitudeScale)
                     .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing);
             final double y = size.height - barHeight;
@@ -657,7 +716,7 @@ class _WaveformPainter extends CustomPainter {
           final topPath = Path();
           for (int i = 0; i < count; i++) {
             final double barHeight =
-                (visibleSamples[i] * size.height * amplitudeScale)
+                (drawnSamples[i] * size.height * amplitudeScale)
                     .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double topY = (size.height - barHeight) / 2;
@@ -671,7 +730,7 @@ class _WaveformPainter extends CustomPainter {
           combined.lineTo(size.width, size.height / 2);
           for (int i = count - 1; i >= 0; i--) {
             final double barHeight =
-                (visibleSamples[i] * size.height * amplitudeScale)
+                (drawnSamples[i] * size.height * amplitudeScale)
                     .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double bottomY = (size.height + barHeight) / 2;
@@ -684,7 +743,7 @@ class _WaveformPainter extends CustomPainter {
           final linePath = Path();
           for (int i = 0; i < count; i++) {
             final double barHeight =
-                (visibleSamples[i] * size.height * amplitudeScale)
+                (drawnSamples[i] * size.height * amplitudeScale)
                     .clamp(minBarHeight, size.height);
             final double x = i * (barWidth + spacing) + barWidth / 2;
             final double y = (size.height - barHeight) / 2;
