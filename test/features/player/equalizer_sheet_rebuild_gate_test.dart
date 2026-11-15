@@ -140,5 +140,26 @@ void main() {
           PlayerState(playback: PlaybackSlice(errorMessage: 'DSP error'));
       expect(dspSheetRebuildGate(stateA, stateB), isTrue);
     });
+
+    test('P0-8: triggers rebuild when eqPreset band count changes (10 -> 32)',
+        () {
+      final tenBand = PlayerState(
+        dsp: DspSlice(
+          eqPreset: EqPreset(
+            name: 'Custom',
+            gains: List<double>.filled(10, 0.0),
+          ),
+        ),
+      );
+      final thirtyTwoBand = PlayerState(
+        dsp: DspSlice(
+          eqPreset: EqPreset(
+            name: 'Custom',
+            gains: List<double>.filled(32, 0.0),
+          ),
+        ),
+      );
+      expect(dspSheetRebuildGate(tenBand, thirtyTwoBand), isTrue);
+    });
   });
 }

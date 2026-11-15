@@ -12,11 +12,16 @@
 // the fallback branch, the `show(...)` entry point, the State lifecycle
 // (initState -> `_loadHeadphoneProfiles` / `_listenForDspAutoDegrade`, dispose),
 // and asserts the Android-only shell controls are absent.
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
+import 'package:pulsr/domain/models/eq_preset.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
@@ -194,6 +199,65 @@ void main() {
       expect(find.byType(EqualizerSheet), findsNothing);
 
       EqualizerSheet.debugForceAndroidSurface = null;
+    });
+
+    testWidgets(
+        'P0-8: preamp clip-risk warning updates live when eqPreset gains change without triggering full-sheet rebuild',
+        (tester) async {
+      EqualizerSheet.debugForceAndroidSurface = true;
+      addTearDown(() => EqualizerSheet.debugForceAndroidSurface = null);
+
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      var currentState = PlayerState(
+        dsp: DspSlice(
+          isEqEnabled: true,
+          preampDb: 0.0,
+          eqPreset: EqPreset(
+            name: 'Custom',
+            gains: List<double>.filled(10, 0.0),
+          ),
+        ),
+      );
+      final cubit = stubPlayerCubit(state: currentState);
+      when(() => cubit.state).thenAnswer((_) => currentState);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        settingsCubit: stubSettingsCubit(
+            state: const SettingsState(
+                experienceMode: ExperienceMode.professional)),
+        child: const EqualizerSheet(),
+      ));
+      await tester.pump();
+
+      expect(find.text('Preamp'), findsOneWidget);
+      expect(find.byIcon(Icons.warning_amber_rounded), findsNothing);
+
+      // Emit a gains-only update (rejected by dspSheetRebuildGate, accepted by
+      // BlocSelector on eqPreset.gains).
+      currentState = currentState.copyWith(
+        dsp: currentState.dsp.copyWith(
+          eqPreset: currentState.dsp.eqPreset.copyWith(
+            gains: <double>[6.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+          ),
+        ),
+      );
+      controller.add(currentState);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+      expect(find.textContaining('+6.0 dB'), findsWidgets);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
     });
   });
 

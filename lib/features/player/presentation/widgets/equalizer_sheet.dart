@@ -81,8 +81,12 @@ bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
 
 bool _eqPresetRebuildEquals(EqPreset x, EqPreset y) {
   if (identical(x, y)) return true;
+  // AUDIT-FIX (P0-8): compare band count so 10 <-> 32/64 switches rebuild
+  // the sheet even when preset name and metadata match, while continuing to
+  // ignore per-band gain value churn during slider drags (F-10).
   return x.name == y.name &&
       x.bassBoost == y.bassBoost &&
+      x.gains.length == y.gains.length &&
       listEquals(x.customFrequencies, y.customFrequencies) &&
       listEquals(x.qFactors, y.qFactors) &&
       mapEquals(x.bandsMap, y.bandsMap);
@@ -157,8 +161,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
     _tabController = TabController(length: 3, vsync: this);
     try {
-      _activeComparisonSlot = _cachedEqualizerManager?.activeComparisonSlot ??
-          ComparisonSlot.slotA;
+      _activeComparisonSlot =
+          _cachedEqualizerManager?.activeComparisonSlot ?? ComparisonSlot.slotA;
     } catch (e, st) {
       _activeComparisonSlot = ComparisonSlot.slotA;
       ErrorLogger.log('Failed to read active EQ comparison slot',

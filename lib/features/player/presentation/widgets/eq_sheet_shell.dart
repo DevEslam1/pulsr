@@ -2217,7 +2217,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                                     _autoPreampEnabled = !_autoPreampEnabled;
                                     if (_autoPreampEnabled) {
                                       double maxBoost = 0.0;
-                                      for (final g in state.eqPreset.gains) {
+                                      for (final g
+                                          in cubit.state.eqPreset.gains) {
                                         if (g > maxBoost) maxBoost = g;
                                       }
                                       cubit.setPreamp(
@@ -2431,14 +2432,35 @@ extension _EqSheetShell on _EqualizerSheetState {
           const SizedBox(height: AppSpacing.md),
 
           // F-33: manual preamp / gain staging with clipping warning.
-          Builder(
-            builder: (context) => StatefulBuilder(
+          // AUDIT-FIX (P0-8): select live eqPreset.gains so clip-risk and
+          // max-boost update immediately during band slider drags despite
+          // dspSheetRebuildGate skipping full-sheet rebuilds.
+          BlocSelector<PlayerCubit, PlayerState, List<double>>(
+            selector: (s) => s.eqPreset.gains,
+            builder: (context, liveGains) => StatefulBuilder(
               builder: (context, setCardState) {
                 final currentPreamp = _preampPreview ?? state.dsp.preampDb;
-                final maxBoost = state.eqPreset.gains.isEmpty
+                final maxBoost = liveGains.isEmpty
                     ? 0.0
-                    : state.eqPreset.gains.reduce((a, b) => a > b ? a : b);
-                final clipRisk = currentPreamp + maxBoost > 0.0;
+                    : liveGains.reduce((a, b) => a > b ? a : b);
+                double autoHeadroomDb = 0.0;
+                if (state.dsp.isEqEnabled && maxBoost > 1.5) {
+                  double sumPosSq = 0.0;
+                  int posCount = 0;
+                  for (final g in liveGains) {
+                    if (g > 0.0) {
+                      sumPosSq += g * g;
+                      posCount++;
+                    }
+                  }
+                  final rmsBoost =
+                      posCount > 0 ? math.sqrt(sumPosSq / posCount) : maxBoost;
+                  final effectiveBoost = 0.65 * maxBoost + 0.35 * rmsBoost;
+                  autoHeadroomDb =
+                      -((effectiveBoost - 1.5) * 0.55).clamp(0.0, 6.0);
+                }
+                final clipRisk =
+                    currentPreamp + maxBoost + autoHeadroomDb > 0.0;
                 return Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md, vertical: AppSpacing.sm),
@@ -2493,6 +2515,15 @@ extension _EqSheetShell on _EqualizerSheetState {
                                       fontSize: AppFontSize.caption,
                                       color: p.textTertiary),
                                 ),
+                                if (autoHeadroomDb < -0.05)
+                                  Text(
+                                    'Auto-headroom: ${autoHeadroomDb.toStringAsFixed(1)} dB',
+                                    style: TextStyle(
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.warning,
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
