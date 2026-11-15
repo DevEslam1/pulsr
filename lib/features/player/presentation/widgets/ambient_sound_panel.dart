@@ -11,6 +11,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Icon for each ambient effect.
 IconData iconForEffect(AmbientSoundEffect effect) {
   switch (effect) {
@@ -440,11 +441,13 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
 
 // ─── Status badge ─────────────────────────────────────────────────────────────
 
+// AUDIT-FIX (P3-27): Strongly type palette fields across ambient panel helpers.
 class AmbientStatusBadge extends StatelessWidget {
   final bool isPlaying;
-  final dynamic palette;
+  final PulsrPalette palette;
 
-  const AmbientStatusBadge({super.key, required this.isPlaying, required this.palette});
+  const AmbientStatusBadge(
+      {super.key, required this.isPlaying, required this.palette});
 
   @override
   Widget build(BuildContext context) {
@@ -481,9 +484,10 @@ typedef _StatusBadge = AmbientStatusBadge;
 
 class AmbientActiveBadge extends StatelessWidget {
   final int count;
-  final dynamic palette;
+  final PulsrPalette palette;
 
-  const AmbientActiveBadge({super.key, required this.count, required this.palette});
+  const AmbientActiveBadge(
+      {super.key, required this.count, required this.palette});
 
   @override
   Widget build(BuildContext context) {
@@ -521,7 +525,7 @@ typedef _ActiveBadge = AmbientActiveBadge;
 class _MasterVolumeRow extends StatelessWidget {
   final String label;
   final double volume;
-  final dynamic palette;
+  final PulsrPalette palette;
   final ValueChanged<double> onChanged;
 
   const _MasterVolumeRow({
@@ -570,7 +574,7 @@ class _MasterVolumeRow extends StatelessWidget {
 class _VolumeRow extends StatelessWidget {
   final AmbientSoundEffect effect;
   final double volume;
-  final dynamic palette;
+  final PulsrPalette palette;
   final ValueChanged<double> onChanged;
 
   const _VolumeRow({
@@ -605,10 +609,8 @@ class _VolumeRow extends StatelessWidget {
             child: SliderTheme(
               data: SliderTheme.of(context).copyWith(
                 trackHeight: 3,
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape:
-                    const RoundSliderOverlayShape(overlayRadius: 14),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
               ),
               child: Slider(
                 value: volume,

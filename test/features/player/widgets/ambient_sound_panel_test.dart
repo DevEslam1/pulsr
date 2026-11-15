@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ambient_sound_service.dart';
+import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_switch.dart';
 import 'package:pulsr/features/player/presentation/widgets/ambient_sound_panel.dart';
 import 'package:pulsr/features/player/presentation/widgets/ambient_sound_sheet.dart';
@@ -107,7 +108,8 @@ void main() {
       expect(find.byType(Slider), findsNWidgets(2));
     });
 
-    testWidgets('shows paused badge when player is not playing', (tester) async {
+    testWidgets('shows paused badge when player is not playing',
+        (tester) async {
       final service = AmbientSoundService();
       await service.toggleEffect(AmbientSoundEffect.rain);
       service.onPlayerPlaybackStateChanged(false);
@@ -194,6 +196,38 @@ void main() {
 
       expect(service.isEnabled, isTrue);
       expect(service.isEffectActive(AmbientSoundEffect.ocean), isTrue);
+    });
+
+    testWidgets(
+        'P3-27: badge widgets accept typed PulsrPalette and render active volumes cleanly',
+        (tester) async {
+      final service = AmbientSoundService();
+      await service.toggleEffect(AmbientSoundEffect.rain);
+
+      late AmbientStatusBadge statusWidget;
+      late AmbientActiveBadge activeWidget;
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) {
+          final PulsrPalette p = context.palette;
+          statusWidget = AmbientStatusBadge(isPlaying: true, palette: p);
+          activeWidget = AmbientActiveBadge(count: 1, palette: p);
+          return Column(
+            children: [
+              statusWidget,
+              activeWidget,
+              const AmbientSoundPanel(),
+            ],
+          );
+        },
+      )));
+      await tester.pumpAndSettle();
+
+      // Compile-time PulsrPalette parameter pin (assignable to PulsrPalette without cast).
+      final PulsrPalette typedStatusPalette = statusWidget.palette;
+      final PulsrPalette typedActivePalette = activeWidget.palette;
+      expect(typedStatusPalette.accent, typedActivePalette.accent);
+      expect(find.byType(Slider), findsNWidgets(2));
+      await tester.pump(const Duration(milliseconds: 500));
     });
   });
 }
