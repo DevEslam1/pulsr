@@ -6076,6 +6076,9 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspFreqRange10To30k => 'يجب أن تبقى الترددات ضمن 10-30000 هرتز.';
 
   @override
+  String get dspFreqRange20To20k => 'يجب أن تبقى الترددات ضمن 20-20000 هرتز.';
+
+  @override
   String get dspFreqStrictlyAscending =>
       'يجب أن تكون الترددات تصاعدية بشكل صارم.';
 

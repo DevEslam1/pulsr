@@ -20,9 +20,19 @@ class ArbitraryEqSheet extends StatefulWidget {
   State<ArbitraryEqSheet> createState() => _ArbitraryEqSheetState();
 }
 
+enum _GraphicEqValidationError {
+  invalidEntry,
+  frequencyOutOfRange,
+  notStrictlyAscending,
+}
+
 class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
+  static const double _minFrequencyHz = 20.0;
+  static const double _maxFrequencyHz = 20000.0;
+
   late final TextEditingController _textController;
   late bool _linearPhase;
+  _GraphicEqValidationError? _validationError;
 
   static const Map<String, String> _presets = {
     'Harman Target Curve':
@@ -48,7 +58,11 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
   }
 
   void _onTextChanged() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _validationError = null;
+      });
+    }
   }
 
   @override
@@ -58,47 +72,124 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
     super.dispose();
   }
 
-  ({List<double> frequencies, List<double> gains}) _parseGraphicEq(
-      String text) {
+  // AUDIT-FIX: P3-30 — strictly validate GraphicEQ entries against the 20 Hz-
+  // 20 kHz audible range and strictly ascending frequencies instead of
+  // silently dropping invalid entries and applying a partial curve.
+  ({
+    List<double> frequencies,
+    List<double> gains,
+    _GraphicEqValidationError? error,
+  }) _parseGraphicEq(String text) {
     final clean = text
         .replaceFirst(RegExp(r'^GraphicEq:\s*', caseSensitive: false), '')
         .trim();
     if (clean.isEmpty) {
-      return (frequencies: <double>[], gains: <double>[]);
+      return (
+        frequencies: const <double>[],
+        gains: const <double>[],
+        error: _GraphicEqValidationError.invalidEntry,
+      );
     }
     final entries = clean.split(';');
     final freqs = <double>[];
     final gains = <double>[];
-    for (final entry in entries) {
-      final parts = entry.trim().split(RegExp(r'\s+'));
-      if (parts.length >= 2) {
-        final f = double.tryParse(parts[0]);
-        final g = double.tryParse(parts[1]);
-        if (f != null &&
-            g != null &&
-            f.isFinite &&
-            g.isFinite &&
-            f > 0 &&
-            g.abs() <= 30) {
-          freqs.add(f);
-          gains.add(g);
-        }
+    for (var i = 0; i < entries.length; i++) {
+      final trimmed = entries[i].trim();
+      if (trimmed.isEmpty) {
+        if (i == entries.length - 1) continue;
+        return (
+          frequencies: const <double>[],
+          gains: const <double>[],
+          error: _GraphicEqValidationError.invalidEntry,
+        );
       }
+      final parts = trimmed.split(RegExp(r'\s+'));
+      if (parts.length != 2) {
+        return (
+          frequencies: const <double>[],
+          gains: const <double>[],
+          error: _GraphicEqValidationError.invalidEntry,
+        );
+      }
+      final f = double.tryParse(parts[0]);
+      final g = double.tryParse(parts[1]);
+      if (f == null ||
+          g == null ||
+          !f.isFinite ||
+          !g.isFinite ||
+          g.abs() > 30) {
+        return (
+          frequencies: const <double>[],
+          gains: const <double>[],
+          error: _GraphicEqValidationError.invalidEntry,
+        );
+      }
+      if (f < _minFrequencyHz || f > _maxFrequencyHz) {
+        return (
+          frequencies: const <double>[],
+          gains: const <double>[],
+          error: _GraphicEqValidationError.frequencyOutOfRange,
+        );
+      }
+      if (freqs.isNotEmpty && f <= freqs.last) {
+        return (
+          frequencies: const <double>[],
+          gains: const <double>[],
+          error: _GraphicEqValidationError.notStrictlyAscending,
+        );
+      }
+      freqs.add(f);
+      gains.add(g);
     }
-    return (frequencies: freqs, gains: gains);
+    if (freqs.isEmpty) {
+      return (
+        frequencies: const <double>[],
+        gains: const <double>[],
+        error: _GraphicEqValidationError.invalidEntry,
+      );
+    }
+    return (frequencies: freqs, gains: gains, error: null);
+  }
+
+  String _localizedValidationError(
+      BuildContext context, _GraphicEqValidationError error) {
+    return switch (error) {
+      _GraphicEqValidationError.invalidEntry =>
+        context.l10n.dspEveryBandValidNumber,
+      _GraphicEqValidationError.frequencyOutOfRange =>
+        context.l10n.dspFreqRange20To20k,
+      _GraphicEqValidationError.notStrictlyAscending =>
+        context.l10n.dspFreqStrictlyAscending,
+    };
+  }
+
+  bool _validateBeforeEnable() {
+    final parsed = _parseGraphicEq(_textController.text);
+    if (parsed.error != null) {
+      setState(() {
+        _validationError = parsed.error;
+      });
+      return false;
+    }
+    if (_validationError != null) {
+      setState(() {
+        _validationError = null;
+      });
+    }
+    return true;
   }
 
   void _apply(BuildContext context) {
+    if (!_validateBeforeEnable()) return;
     final text = _textController.text.trim();
-    if (text.isNotEmpty) {
-      context.read<PlayerCubit>().setArbitraryEqEnabled(true,
-          eqString: text, linearPhase: _linearPhase);
-      PulsrToast.show(
-        context,
-        message: context.l10n.appliedGraphicEq,
-        icon: Icons.check_circle_rounded,
-      );
-    }
+    context
+        .read<PlayerCubit>()
+        .setArbitraryEqEnabled(true, eqString: text, linearPhase: _linearPhase);
+    PulsrToast.show(
+      context,
+      message: context.l10n.appliedGraphicEq,
+      icon: Icons.check_circle_rounded,
+    );
   }
 
   @override
@@ -157,6 +248,7 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                       value: state.isArbitraryEqEnabled,
                       activeThumbColor: p.primary,
                       onChanged: (val) {
+                        if (val && !_validateBeforeEnable()) return;
                         cubit.setArbitraryEqEnabled(val,
                             eqString: _textController.text.trim(),
                             linearPhase: _linearPhase);
@@ -299,6 +391,10 @@ class _ArbitraryEqSheetState extends State<ArbitraryEqSheet> {
                         ),
                         decoration: InputDecoration(
                           hintText: 'GraphicEq: 20 0; 1000 3; 20000 -2',
+                          errorText: _validationError != null
+                              ? _localizedValidationError(
+                                  context, _validationError!)
+                              : null,
                           hintStyle: TextStyle(
                             color: p.textTertiary,
                             fontFamily: 'monospace',

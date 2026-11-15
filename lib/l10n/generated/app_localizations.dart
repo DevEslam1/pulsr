@@ -10949,6 +10949,12 @@ abstract class AppLocalizations {
   /// **'Frequencies must stay within 10-30000 Hz.'**
   String get dspFreqRange10To30k;
 
+  /// No description provided for @dspFreqRange20To20k.
+  ///
+  /// In en, this message translates to:
+  /// **'Frequencies must stay within 20-20000 Hz.'**
+  String get dspFreqRange20To20k;
+
   /// No description provided for @dspFreqStrictlyAscending.
   ///
   /// In en, this message translates to:

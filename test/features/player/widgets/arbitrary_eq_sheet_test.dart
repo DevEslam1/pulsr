@@ -93,4 +93,83 @@ void main() {
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller!.text, 'GraphicEq: 500 3');
   });
+
+  testWidgets(
+      'rejects out-of-range frequencies outside 20-20000 Hz without applying',
+      (tester) async {
+    tester.view.physicalSize = const Size(900, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final cubit = buildCubit();
+    await tester.pumpWidget(sheetHost(
+      playerCubit: cubit,
+      child: const ArbitraryEqSheet(),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'GraphicEq: 10 0; 1000 3');
+    await tester.tap(find.text('Apply Curve'));
+    await tester.pump();
+
+    expect(
+        find.text('Frequencies must stay within 20-20000 Hz.'), findsOneWidget);
+    verifyNever(() => cubit.setArbitraryEqEnabled(
+          any(),
+          eqString: any(named: 'eqString'),
+          linearPhase: any(named: 'linearPhase'),
+        ));
+
+    await tester.enterText(find.byType(TextField), 'GraphicEq: 500 0; 25000 3');
+    await tester.tap(find.text('Apply Curve'));
+    await tester.pump();
+
+    expect(
+        find.text('Frequencies must stay within 20-20000 Hz.'), findsOneWidget);
+    verifyNever(() => cubit.setArbitraryEqEnabled(
+          any(),
+          eqString: any(named: 'eqString'),
+          linearPhase: any(named: 'linearPhase'),
+        ));
+  });
+
+  testWidgets(
+      'rejects duplicate, descending, or malformed entries instead of applying partial curve',
+      (tester) async {
+    tester.view.physicalSize = const Size(900, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final cubit = buildCubit();
+    await tester.pumpWidget(sheetHost(
+      playerCubit: cubit,
+      child: const ArbitraryEqSheet(),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'GraphicEq: 1000 0; 500 2');
+    await tester.tap(find.text('Apply Curve'));
+    await tester.pump();
+    expect(
+        find.text('Frequencies must be strictly ascending.'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'GraphicEq: 500 0; 500 2');
+    await tester.tap(find.text('Apply Curve'));
+    await tester.pump();
+    expect(
+        find.text('Frequencies must be strictly ascending.'), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField), 'GraphicEq: 20 0; bad');
+    await tester.tap(find.byType(Switch).first);
+    await tester.pump();
+    expect(find.text('Every band needs a valid number.'), findsOneWidget);
+
+    verifyNever(() => cubit.setArbitraryEqEnabled(
+          any(),
+          eqString: any(named: 'eqString'),
+          linearPhase: any(named: 'linearPhase'),
+        ));
+  });
 }

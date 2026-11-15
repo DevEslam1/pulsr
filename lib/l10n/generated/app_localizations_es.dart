@@ -6141,6 +6141,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Las frecuencias deben estar entre 10 y 30000 Hz.';
 
   @override
+  String get dspFreqRange20To20k =>
+      'Las frecuencias deben estar entre 20 y 20000 Hz.';
+
+  @override
   String get dspFreqStrictlyAscending =>
       'Las frecuencias deben ser estrictamente ascendentes.';
 

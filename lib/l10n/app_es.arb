@@ -3890,6 +3890,7 @@
   "dspFirLoaded": "FIR de corrección de sala cargado en la etapa de convolución.",
   "dspFirRejected": "El motor de audio rechazó la exportación FIR.",
   "dspFreqRange10To30k": "Las frecuencias deben estar entre 10 y 30000 Hz.",
+  "dspFreqRange20To20k": "Las frecuencias deben estar entre 20 y 20000 Hz.",
   "dspFreqStrictlyAscending": "Las frecuencias deben ser estrictamente ascendentes.",
   "dspHardwareEndpoint": "PUNTO FINAL DE HARDWARE",
   "dspHeadset": "Auriculares",

@@ -4428,6 +4428,7 @@
   "dspFirLoaded": "Room-correction FIR loaded into the convolution stage.",
   "dspFirRejected": "The audio engine rejected the FIR export.",
   "dspFreqRange10To30k": "Frequencies must stay within 10-30000 Hz.",
+  "dspFreqRange20To20k": "Frequencies must stay within 20-20000 Hz.",
   "dspFreqStrictlyAscending": "Frequencies must be strictly ascending.",
   "dspHardwareEndpoint": "HARDWARE ENDPOINT",
   "dspHeadset": "Headset",

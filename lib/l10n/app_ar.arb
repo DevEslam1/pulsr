@@ -3890,6 +3890,7 @@
   "dspFirLoaded": "تم تحميل FIR لتصحيح الغرفة في مرحلة الالتفاف.",
   "dspFirRejected": "رفض محرك الصوت تصدير FIR.",
   "dspFreqRange10To30k": "يجب أن تبقى الترددات ضمن 10-30000 هرتز.",
+  "dspFreqRange20To20k": "يجب أن تبقى الترددات ضمن 20-20000 هرتز.",
   "dspFreqStrictlyAscending": "يجب أن تكون الترددات تصاعدية بشكل صارم.",
   "dspHardwareEndpoint": "نقطة نهاية العتاد",
   "dspHeadset": "سماعة رأس",
