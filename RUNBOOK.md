@@ -10,7 +10,7 @@ This document covers (a) how to build and release the three Android flavors and 
 
 | Flavor | Application ID suffix | Contents |
 |---|---|---|
-| `dev` | `.plus` (Pulsr Plus) | Full YTM stack: `src/ytmEnabled` (NewPipeExtractor v0.26.5 + Cast SDK) |
+| `dev` | `.plus` (Pulsr Plus) | Full YTM stack: `src/ytmEnabled` (NewPipeExtractor v0.27.1 + Cast SDK) |
 | `prod` | _(none)_ (Pulsr Music / Pure) | Play-Store build: only `src/ytmDisabled` stubs; `src/prod/AndroidManifest.xml` removes `INTERNET`, `ACCESS_NETWORK_STATE`/`WIFI_STATE`, and `.DownloadService` |
 | `ytm` | `.ytm` | Off-Play distribution: identical to `prod` but compiles the extractor bridge |
 

@@ -1018,7 +1018,7 @@ dependencies {
     // GPL-3.0. Its presence is why Pulsr as a whole is GPL-3.0, and why it is
     // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which
     // solves YouTube's JS signature challenges on-device.
-    val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
+    val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.27.1"
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
 

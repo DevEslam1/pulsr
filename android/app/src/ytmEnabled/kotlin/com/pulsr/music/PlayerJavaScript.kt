@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Background: Modern YouTube players (2025/2026) use bytecode/VM structures and
  * an internal string array table ("Nu = '...'.split(';')") with XOR dynamic dispatch,
- * which older regex parsers (including NewPipeExtractor v0.26.5) fail to match, throwing
+ * which older regex-based parsers fail to match, throwing
  * "Could not parse deobfuscation function". This class handles modern, legacy, and pinned
  * player formats with zero-delay in-memory caching and persistent JsDecipherCache integration.
  */
@@ -357,8 +357,8 @@ internal object PlayerJavaScript {
 
         ensurePlayerUrl()
 
-        // Prefer the parser for the current player format over NewPipe 0.26.5's
-        // older heuristics. NewPipe is still used as a fallback when extraction
+        // Prefer the parser for the current player format over NewPipe's
+        // heuristics. NewPipe is still used as a fallback when extraction
         // fails, so a future player format can still resolve through its engine.
         val nativeSteps = parseAndCacheSteps()
         if (cachedStepsExtracted && nativeSteps.isNotEmpty()) {

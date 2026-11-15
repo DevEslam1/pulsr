@@ -174,7 +174,7 @@ dependencies {
     // GPL-3.0. Its presence is why Pulsr as a whole is GPL-3.0, and why it is
     // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which
     // solves YouTube's JS signature challenges on-device.
-    val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
+    val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.27.1"
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
 
@@ -203,6 +203,10 @@ dependencies {
 
 configurations.all {
     resolutionStrategy {
+        // NewPipeExtractor v0.27.1 requests protobuf-javalite 4.36.2, but Firebase
+        // Firestore's gRPC/protolite stack targets the 3.25.x runtime. The extractor's
+        // generated lite messages only use APIs present in 3.25.5 (round-trip verified),
+        // so stay on the Firebase-compatible runtime rather than upgrading Firestore.
         force("com.google.protobuf:protobuf-javalite:3.25.5")
     }
 }
