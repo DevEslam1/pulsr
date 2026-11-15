@@ -603,9 +603,8 @@ class PlayerViewSwitcher extends StatelessWidget {
                     p.surfaceContainer,
                 borderRadius: AppRadii.circular(barRadius),
                 border: Border.all(
-                  color: p.isDark
-                      ? AppColors.specularAt(borderAlpha)
-                      : p.hairline,
+                  color:
+                      p.isDark ? AppColors.specularAt(borderAlpha) : p.hairline,
                   width: 1.0,
                 ),
                 boxShadow: PulsrElevation.level1(context),
@@ -747,7 +746,6 @@ class PlayerBottomActionDock extends StatelessWidget {
         context.select<SettingsCubit, AudioOutputInfo?>(
             (c) => c.state.currentOutputDevice);
     final isUsb = outputDevice?.isUsbDac == true;
-    final isCast = CastService().sessionStatus.connected;
     final isEqActive = props.state.isEqEnabled;
     final speed = props.state.playbackSpeed;
     int? remainingTracks;
@@ -776,17 +774,15 @@ class PlayerBottomActionDock extends StatelessWidget {
     final barRadius = custom.active ? custom.radius : 24.0;
     final showCustomGlow = custom.active && custom.glow;
 
-    final IconData outputIcon = isCast
-        ? Icons.cast_connected_rounded
-        : (outputDevice == null
-            ? Icons.headphones_rounded
-            : (outputDevice.isUsb
-                ? Icons.usb_rounded
-                : (outputDevice.isBt
-                    ? Icons.bluetooth_audio_rounded
-                    : (outputDevice.isSpeaker
-                        ? Icons.speaker_rounded
-                        : Icons.headphones_rounded))));
+    final IconData deviceOutputIcon = outputDevice == null
+        ? Icons.headphones_rounded
+        : (outputDevice.isUsb
+            ? Icons.usb_rounded
+            : (outputDevice.isBt
+                ? Icons.bluetooth_audio_rounded
+                : (outputDevice.isSpeaker
+                    ? Icons.speaker_rounded
+                    : Icons.headphones_rounded)));
 
     final isInSplit = PlayerSplitViewScope.of(context);
     final double effectiveBarWidth = isInSplit
@@ -814,7 +810,8 @@ class PlayerBottomActionDock extends StatelessWidget {
           borderRadius: AppRadii.circular(barRadius),
           child: RepaintBoundary(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4.0, vertical: 3.0),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 4.0, vertical: 3.0),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -838,8 +835,8 @@ class PlayerBottomActionDock extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black
-                        .withValues(alpha: p.isDark ? 0.28 : 0.06),
+                    color:
+                        Colors.black.withValues(alpha: p.isDark ? 0.28 : 0.06),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -871,23 +868,34 @@ class PlayerBottomActionDock extends StatelessWidget {
                   ),
 
                   // 2. Audio Output & DAC
+                  // AUDIT-FIX (P3-24): Listen reactively to CastService so
+                  // CAST badge and icon update immediately on session changes.
                   Expanded(
-                    child: PlayerDockIconButton(
-                      icon: outputIcon,
-                      tooltip: isCast ? 'Google Cast' : l10n.audioOutputAndDac,
-                      badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
-                      isActive: isCast || isUsb,
-                      activeColor:
-                          isCast ? AppColors.accentCyan : AppColors.dacGold,
-                      inactiveColor: p.textSecondary,
-                      isTablet: isTablet,
-                      style: dockIconStyle,
-                      onTap: () {
-                        if (song != null) {
-                          PulsrHaptics.lightImpact();
-                          AudioQualitySheet.show(
-                              context, song, props.activeColor);
-                        }
+                    child: ValueListenableBuilder<CastSessionStatus>(
+                      valueListenable: CastService().sessionStatusListenable,
+                      builder: (context, castStatus, _) {
+                        final isCast = castStatus.connected;
+                        return PlayerDockIconButton(
+                          icon: isCast
+                              ? Icons.cast_connected_rounded
+                              : deviceOutputIcon,
+                          tooltip:
+                              isCast ? 'Google Cast' : l10n.audioOutputAndDac,
+                          badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
+                          isActive: isCast || isUsb,
+                          activeColor:
+                              isCast ? AppColors.accentCyan : AppColors.dacGold,
+                          inactiveColor: p.textSecondary,
+                          isTablet: isTablet,
+                          style: dockIconStyle,
+                          onTap: () {
+                            if (song != null) {
+                              PulsrHaptics.lightImpact();
+                              AudioQualitySheet.show(
+                                  context, song, props.activeColor);
+                            }
+                          },
+                        );
                       },
                     ),
                   ),
@@ -1564,9 +1572,8 @@ class PlayerTrackHeader extends StatelessWidget {
                         : p.surfaceContainer,
                     shape: CircleBorder(
                       side: BorderSide(
-                        color: p.isDark
-                            ? AppColors.specularAt(0.13)
-                            : p.hairline,
+                        color:
+                            p.isDark ? AppColors.specularAt(0.13) : p.hairline,
                         width: 1.0,
                       ),
                     ),

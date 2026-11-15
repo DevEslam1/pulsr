@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/data/services/cast_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -229,6 +230,121 @@ void main() {
 
       // Bookmark banner is rendered
       expect(find.byType(PlayerBookmarkPromptBanner), findsOneWidget);
+    });
+
+    testWidgets(
+        'P3-24: CleanPlayerTheme down bar updates Cast icon and CAST badge reactively',
+        (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.75;
+      addTearDown(tester.view.resetPhysicalSize);
+      CastService().debugSetSessionStatus(CastSessionStatus.unavailable);
+      addTearDown(
+        () =>
+            CastService().debugSetSessionStatus(CastSessionStatus.unavailable),
+      );
+
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.cast_connected_rounded), findsNothing);
+      expect(find.text('CAST'), findsNothing);
+      expect(find.byIcon(Icons.speaker_rounded), findsOneWidget);
+
+      CastService().debugSetSessionStatus(
+        const CastSessionStatus(
+          available: true,
+          connected: true,
+          deviceName: 'Living Room TV',
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(Icons.cast_connected_rounded), findsOneWidget);
+      expect(find.text('CAST'), findsOneWidget);
+
+      CastService().debugSetSessionStatus(
+        const CastSessionStatus(available: true, connected: false),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(Icons.cast_connected_rounded), findsNothing);
+      expect(find.text('CAST'), findsNothing);
+      expect(find.byIcon(Icons.speaker_rounded), findsOneWidget);
+    });
+
+    testWidgets(
+        'P3-24: PlayerBottomActionDock updates Cast icon and CAST badge reactively',
+        (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.75;
+      addTearDown(tester.view.resetPhysicalSize);
+      CastService().debugSetSessionStatus(CastSessionStatus.unavailable);
+      addTearDown(
+        () =>
+            CastService().debugSetSessionStatus(CastSessionStatus.unavailable),
+      );
+
+      final props = PlayerThemeProps(
+        state: mockPlayerCubit.state,
+        cubit: mockPlayerCubit,
+        activeColor: const Color(0xFFE50914),
+        bgColor: const Color(0xFF101010),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: MultiBlocProvider(
+            providers: [
+              BlocProvider<SettingsCubit>.value(value: mockSettingsCubit),
+              BlocProvider<PlayerCubit>.value(value: mockPlayerCubit),
+            ],
+            child: Scaffold(
+              body: Center(
+                child: PlayerBottomActionDock(
+                  props: props,
+                  barWidth: 360,
+                  barHeight: 60,
+                  isTablet: false,
+                  settingsState: mockSettingsCubit.state,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byIcon(Icons.cast_connected_rounded), findsNothing);
+      expect(find.text('CAST'), findsNothing);
+
+      CastService().debugSetSessionStatus(
+        const CastSessionStatus(
+          available: true,
+          connected: true,
+          deviceName: 'Bedroom Speaker',
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(Icons.cast_connected_rounded), findsOneWidget);
+      expect(find.text('CAST'), findsOneWidget);
+
+      CastService().debugSetSessionStatus(
+        const CastSessionStatus(available: true, connected: false),
+      );
+      await tester.pump();
+
+      expect(find.byIcon(Icons.cast_connected_rounded), findsNothing);
+      expect(find.text('CAST'), findsNothing);
     });
   });
 }

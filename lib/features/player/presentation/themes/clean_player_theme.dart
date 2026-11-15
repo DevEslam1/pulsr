@@ -170,30 +170,29 @@ class CleanPlayerTheme extends StatelessWidget {
           // Full-bleed edge-to-edge artwork fading into the background color
           // Uses lightweight gradient overlay and clamped size for 60/120fps minimization
           final artworkSize = (constraints.maxWidth * 1.5).clamp(360.0, 720.0);
-          final Widget artworkChild = (canvasEnabled &&
-                  !canvasAsBackdrop &&
-                  song != null)
-              ? CanvasBackdrop(
-                  song: song,
-                  isPlaying: state.isPlaying,
-                  isBackdropMode: false,
-                  fallbackArtwork: CachedArtwork(
-                    id: song.id,
-                    albumId: song.albumId,
-                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                    type: ArtworkType.AUDIO,
-                    size: artworkSize,
-                    borderRadius: 0,
-                  ),
-                )
-              : CachedArtwork(
-                  id: song?.id ?? 0,
-                  albumId: song?.albumId,
-                  remoteUrl: song?.remoteArtworkUrl ?? song?.artworkUri,
-                  type: ArtworkType.AUDIO,
-                  size: artworkSize,
-                  borderRadius: 0,
-                );
+          final Widget artworkChild =
+              (canvasEnabled && !canvasAsBackdrop && song != null)
+                  ? CanvasBackdrop(
+                      song: song,
+                      isPlaying: state.isPlaying,
+                      isBackdropMode: false,
+                      fallbackArtwork: CachedArtwork(
+                        id: song.id,
+                        albumId: song.albumId,
+                        remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                        type: ArtworkType.AUDIO,
+                        size: artworkSize,
+                        borderRadius: 0,
+                      ),
+                    )
+                  : CachedArtwork(
+                      id: song?.id ?? 0,
+                      albumId: song?.albumId,
+                      remoteUrl: song?.remoteArtworkUrl ?? song?.artworkUri,
+                      type: ArtworkType.AUDIO,
+                      size: artworkSize,
+                      borderRadius: 0,
+                    );
 
           upperStage = KeyedSubtree(
             key: const ValueKey('art_stage'),
@@ -251,23 +250,17 @@ class CleanPlayerTheme extends StatelessWidget {
           ),
         );
 
-        final isShort =
-            metrics.isShortHeight || (isInSplitView && constraints.maxHeight < 540);
-        final isVeryShort =
-            metrics.isVeryShortHeight || (isInSplitView && constraints.maxHeight < 460);
+        final isShort = metrics.isShortHeight ||
+            (isInSplitView && constraints.maxHeight < 540);
+        final isVeryShort = metrics.isVeryShortHeight ||
+            (isInSplitView && constraints.maxHeight < 460);
 
-        final spacingTrackToSeek = isVeryShort
-            ? 4.0
-            : (isShort ? 8.0 : 18.0);
-        final spacingSeekToControls = isVeryShort
-            ? 6.0
-            : (isShort ? 10.0 : 22.0);
-        final spacingControlsToDock = isVeryShort
-            ? 6.0
-            : (isShort ? 12.0 : 26.0);
-        final paddingBottom = isVeryShort
-            ? 4.0
-            : (isShort ? 8.0 : 12.0);
+        final spacingTrackToSeek = isVeryShort ? 4.0 : (isShort ? 8.0 : 18.0);
+        final spacingSeekToControls =
+            isVeryShort ? 6.0 : (isShort ? 10.0 : 22.0);
+        final spacingControlsToDock =
+            isVeryShort ? 6.0 : (isShort ? 12.0 : 26.0);
+        final paddingBottom = isVeryShort ? 4.0 : (isShort ? 8.0 : 12.0);
 
         final horizontalPadding =
             (constraints.maxWidth * 0.06).clamp(12.0, 24.0);
@@ -398,14 +391,13 @@ class CleanPlayerTheme extends StatelessWidget {
         );
 
         // Volume Bar for tablet / split-view
-        final Widget? volumeBar =
-            ((isInSplitView || context.isTablet) && !isVeryShort)
-                ? Padding(
-                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                    child:
-                        PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
-                  )
-                : null;
+        final Widget? volumeBar = ((isInSplitView || context.isTablet) &&
+                !isVeryShort)
+            ? Padding(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+              )
+            : null;
 
         // 5. Down Bar (Lyrics, EQ, Speed, Audio Output/Cast, Quran, Ambient, Timer, Queue)
         final downBar = _CleanDownBar(
@@ -934,9 +926,8 @@ class _CleanTransportControls extends StatelessWidget {
                 minHeight: sideIconSize + 8,
               ),
               icon: const Icon(Icons.fast_rewind_rounded),
-              color: hasPrev
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.35),
+              color:
+                  hasPrev ? Colors.white : Colors.white.withValues(alpha: 0.35),
               tooltip: context.l10n.previous,
               onPressed: hasPrev
                   ? () {
@@ -987,9 +978,8 @@ class _CleanTransportControls extends StatelessWidget {
                 minHeight: sideIconSize + 8,
               ),
               icon: const Icon(Icons.fast_forward_rounded),
-              color: hasNext
-                  ? Colors.white
-                  : Colors.white.withValues(alpha: 0.35),
+              color:
+                  hasNext ? Colors.white : Colors.white.withValues(alpha: 0.35),
               tooltip: context.l10n.next,
               onPressed: hasNext
                   ? () {
@@ -1189,7 +1179,6 @@ class _CleanDownBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = props.state;
     final cubit = props.cubit;
-    final isCast = CastService().sessionStatus.connected;
     final outputDevice = context.select<SettingsCubit, AudioOutputInfo?>(
       (c) => c.state.currentOutputDevice,
     );
@@ -1197,19 +1186,17 @@ class _CleanDownBar extends StatelessWidget {
     final splitTabCtrl = PlayerSplitViewScope.tabControllerOf(context);
 
     final isUsb = outputDevice?.isUsb == true;
-    final IconData outputIcon = isCast
-        ? Icons.cast_connected_rounded
-        : (outputDevice == null
-            ? Icons.airplay_rounded
-            : (outputDevice.isUsb
-                ? Icons.usb_rounded
-                : (outputDevice.isBt
-                    ? Icons.bluetooth_audio_rounded
-                    : (outputDevice.isSpeaker
-                        ? Icons.speaker_rounded
-                        : (outputDevice.isHeadphones
-                            ? Icons.headphones_rounded
-                            : Icons.airplay_rounded)))));
+    final IconData deviceOutputIcon = outputDevice == null
+        ? Icons.airplay_rounded
+        : (outputDevice.isUsb
+            ? Icons.usb_rounded
+            : (outputDevice.isBt
+                ? Icons.bluetooth_audio_rounded
+                : (outputDevice.isSpeaker
+                    ? Icons.speaker_rounded
+                    : (outputDevice.isHeadphones
+                        ? Icons.headphones_rounded
+                        : Icons.airplay_rounded))));
 
     int? remainingTracks;
     try {
@@ -1231,12 +1218,10 @@ class _CleanDownBar extends StatelessWidget {
     final speed = state.playbackSpeed;
 
     Widget buildBar(BuildContext context) {
-      final bool isLyricsActive = isInSplit
-          ? (splitTabCtrl?.index == 0)
-          : state.isLyricsVisible;
-      final bool isQueueActive = isInSplit
-          ? (splitTabCtrl?.index == 1)
-          : state.isQueueVisible;
+      final bool isLyricsActive =
+          isInSplit ? (splitTabCtrl?.index == 0) : state.isLyricsVisible;
+      final bool isQueueActive =
+          isInSplit ? (splitTabCtrl?.index == 1) : state.isQueueVisible;
 
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -1288,9 +1273,8 @@ class _CleanDownBar extends StatelessWidget {
                     _DownBarItem(
                       icon: Icons.speed_rounded,
                       isActive: speed != 1.0,
-                      badgeText: speed != 1.0
-                          ? '${speed.toStringAsFixed(1)}x'
-                          : null,
+                      badgeText:
+                          speed != 1.0 ? '${speed.toStringAsFixed(1)}x' : null,
                       activeColor: activeColor,
                       tooltip: context.l10n.playbackSpeed,
                       onTap: () {
@@ -1301,22 +1285,32 @@ class _CleanDownBar extends StatelessWidget {
                     const SizedBox(width: 4),
 
                     // 4. Audio Output / Cast / AirPlay Button
-                    _DownBarItem(
-                      icon: outputIcon,
-                      isActive: isCast || isUsb,
-                      badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
-                      activeColor: isCast
-                          ? AppColors.accentCyan
-                          : (isUsb ? AppColors.dacGold : activeColor),
-                      tooltip: isCast
-                          ? 'Google Cast'
-                          : context.l10n.audioOutputAndDac,
-                      onTap: () {
-                        PulsrHaptics.lightImpact();
-                        if (state.currentSong != null) {
-                          AudioQualitySheet.show(
-                              context, state.currentSong!, activeColor);
-                        }
+                    // AUDIT-FIX (P3-24): Listen reactively to CastService so
+                    // CAST badge and icon update immediately on session changes.
+                    ValueListenableBuilder<CastSessionStatus>(
+                      valueListenable: CastService().sessionStatusListenable,
+                      builder: (context, castStatus, _) {
+                        final isCast = castStatus.connected;
+                        return _DownBarItem(
+                          icon: isCast
+                              ? Icons.cast_connected_rounded
+                              : deviceOutputIcon,
+                          isActive: isCast || isUsb,
+                          badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
+                          activeColor: isCast
+                              ? AppColors.accentCyan
+                              : (isUsb ? AppColors.dacGold : activeColor),
+                          tooltip: isCast
+                              ? 'Google Cast'
+                              : context.l10n.audioOutputAndDac,
+                          onTap: () {
+                            PulsrHaptics.lightImpact();
+                            if (state.currentSong != null) {
+                              AudioQualitySheet.show(
+                                  context, state.currentSong!, activeColor);
+                            }
+                          },
+                        );
                       },
                     ),
                     const SizedBox(width: 4),
@@ -1338,8 +1332,7 @@ class _CleanDownBar extends StatelessWidget {
                     AnimatedBuilder(
                       animation: AmbientSoundService(),
                       builder: (context, _) {
-                        final isAmbientActive =
-                            AmbientSoundService().isEnabled;
+                        final isAmbientActive = AmbientSoundService().isEnabled;
                         return _DownBarItem(
                           icon: Icons.water_drop_rounded,
                           isActive: isAmbientActive,
@@ -1453,8 +1446,7 @@ class _DownBarItem extends StatelessWidget {
             children: [
               AnimatedContainer(
                 duration: context.motionMs(200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   color: isActive

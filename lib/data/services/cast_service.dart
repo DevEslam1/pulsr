@@ -1,5 +1,6 @@
 // lib/data/services/cast_service.dart
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
@@ -137,6 +138,10 @@ class CastService {
   StreamSubscription<dynamic>? _sessionSubscription;
   List<CastRoute> _currentRoutes = const [];
   CastSessionStatus _sessionStatus = CastSessionStatus.unavailable;
+  // AUDIT-FIX (P3-24): Expose reactive Cast session status so player chrome
+  // updates immediately when Cast connects or disconnects without polling.
+  final ValueNotifier<CastSessionStatus> _sessionStatusNotifier =
+      ValueNotifier<CastSessionStatus>(CastSessionStatus.unavailable);
   bool _sessionAvailable = false;
 
   Stream<List<CastDevice>> get devicesStream => _devices.stream;
@@ -147,6 +152,20 @@ class CastService {
 
   Stream<CastSessionStatus> get sessionStream => _session.stream;
   CastSessionStatus get sessionStatus => _sessionStatus;
+  ValueListenable<CastSessionStatus> get sessionStatusListenable =>
+      _sessionStatusNotifier;
+
+  void _setSessionStatus(CastSessionStatus status) {
+    _sessionStatus = status;
+    _sessionStatusNotifier.value = status;
+    if (!_session.isClosed) _session.add(status);
+  }
+
+  /// Injects a Cast session status in tests to drive reactive chrome listeners.
+  @visibleForTesting
+  void debugSetSessionStatus(CastSessionStatus status) {
+    _setSessionStatus(status);
+  }
 
   bool get sessionAvailable => _sessionAvailable;
 
@@ -183,9 +202,7 @@ class CastService {
             _currentRoutes = list;
             if (!_routes.isClosed) _routes.add(list);
           } else if (event['type'] == 'session') {
-            final status = CastSessionStatus.fromMap(event);
-            _sessionStatus = status;
-            if (!_session.isClosed) _session.add(status);
+            _setSessionStatus(CastSessionStatus.fromMap(event));
           } else if (event['type'] == 'error') {
             ErrorLogger.log('Cast session error: ${event['error']}',
                 category: 'Cast');
