@@ -30,6 +30,7 @@ class LyricsShareCardRenderer {
     required Color accentColor,
     ui.Image? artworkImage,
     bool showTranslation = false,
+    @visibleForTesting void Function(ui.Picture, ui.Image?)? debugOnDisposed,
   }) async {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(
@@ -49,10 +50,19 @@ class LyricsShareCardRenderer {
     // 4. Draw Footer (Artwork thumbnail, Title, Artist)
     _drawFooter(canvas, song, artworkImage, accentColor);
 
+    // AUDIT-FIX (P2-12): Always dispose native ui.Image and ui.Picture handles
+    // after encoding so repeated share-card renders cannot leak raster memory.
     final picture = recorder.endRecording();
-    final image = await picture.toImage(cardWidth.toInt(), cardHeight.toInt());
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
+    ui.Image? image;
+    try {
+      image = await picture.toImage(cardWidth.toInt(), cardHeight.toInt());
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      return byteData!.buffer.asUint8List();
+    } finally {
+      image?.dispose();
+      picture.dispose();
+      debugOnDisposed?.call(picture, image);
+    }
   }
 
   static void _drawBackdrop(
@@ -405,9 +415,11 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
   void initState() {
     super.initState();
     _showTranslation = widget.initialShowTranslation;
-    _selectedIndices = {
-      widget.initialLineIndex.clamp(0, widget.lyrics.length - 1)
-    };
+    // AUDIT-FIX (P2-12): Guard empty lyrics list so initState never calls
+    // clamp(0, -1), which throws ArgumentError.
+    _selectedIndices = widget.lyrics.isEmpty
+        ? <int>{}
+        : {widget.initialLineIndex.clamp(0, widget.lyrics.length - 1)};
   }
 
   void _toggleIndex(int idx) {
@@ -432,6 +444,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
   }
 
   Future<void> _shareImage() async {
+    if (_selectedIndices.isEmpty || _isGenerating) return;
     setState(() => _isGenerating = true);
     try {
       final sortedIndices = _selectedIndices.toList()..sort();
@@ -466,6 +479,7 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
   }
 
   Future<void> _saveImage() async {
+    if (_selectedIndices.isEmpty || _isGenerating) return;
     setState(() => _isGenerating = true);
     final messenger = ScaffoldMessenger.of(context);
     final l10n = context.l10n;
@@ -552,99 +566,112 @@ class _LyricsShareSheetState extends State<LyricsShareSheet> {
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            context.l10n.lyricsSharePickHint,
-            style: TextStyle(
-              fontSize: AppFontSize.bodySmall,
-              color: p.textSecondary,
+          if (widget.lyrics.isEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Text(
+              context.l10n.noLyricsFound,
+              style: TextStyle(
+                fontSize: AppFontSize.body,
+                color: p.textSecondary,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          // Selectable lines list
-          Expanded(
-            child: ListView.builder(
-              itemCount: widget.lyrics.length,
-              itemBuilder: (context, index) {
-                final line = widget.lyrics[index];
-                final isSelected = _selectedIndices.contains(index);
+            const SizedBox(height: AppSpacing.lg),
+          ] else ...[
+            Text(
+              context.l10n.lyricsSharePickHint,
+              style: TextStyle(
+                fontSize: AppFontSize.bodySmall,
+                color: p.textSecondary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // Selectable lines list
+            Expanded(
+              child: ListView.builder(
+                itemCount: widget.lyrics.length,
+                itemBuilder: (context, index) {
+                  final line = widget.lyrics[index];
+                  final isSelected = _selectedIndices.contains(index);
 
-                return CheckboxListTile(
-                  value: isSelected,
-                  activeColor: widget.activeColor,
-                  checkColor: Colors.black,
-                  contentPadding: EdgeInsets.zero,
-                  onChanged: (_) => _toggleIndex(index),
-                  title: Text(
-                    line.text,
-                    style: TextStyle(
-                      fontSize: AppFontSize.body,
-                      fontWeight:
-                          isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: isSelected ? p.textPrimary : p.textSecondary,
+                  return CheckboxListTile(
+                    value: isSelected,
+                    activeColor: widget.activeColor,
+                    checkColor: Colors.black,
+                    contentPadding: EdgeInsets.zero,
+                    onChanged: (_) => _toggleIndex(index),
+                    title: Text(
+                      line.text,
+                      style: TextStyle(
+                        fontSize: AppFontSize.body,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? p.textPrimary : p.textSecondary,
+                      ),
+                    ),
+                    subtitle: (_showTranslation &&
+                            (line.translation != null ||
+                                line.romanization != null))
+                        ? Text(
+                            line.translation ?? line.romanization!,
+                            style: TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontStyle: FontStyle.italic,
+                              color: widget.activeColor.withValues(alpha: 0.8),
+                            ),
+                          )
+                        : null,
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            // Actions: Save & Share
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isGenerating ? null : _saveImage,
+                    icon: const Icon(Icons.download_rounded, size: 20),
+                    label: Text(context.l10n.saveImage),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: widget.activeColor,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
                     ),
                   ),
-                  subtitle: (_showTranslation &&
-                          (line.translation != null ||
-                              line.romanization != null))
-                      ? Text(
-                          line.translation ?? line.romanization!,
-                          style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            fontStyle: FontStyle.italic,
-                            color: widget.activeColor.withValues(alpha: 0.8),
-                          ),
-                        )
-                      : null,
-                );
-              },
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _isGenerating ? null : _shareImage,
+                    icon: _isGenerating
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.share_rounded, size: 20),
+                    label: Text(context.l10n.share),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: widget.activeColor,
+                      foregroundColor: Colors.black,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                      shape:
+                          RoundedRectangleBorder(borderRadius: AppRadii.r12All),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          // Actions: Save & Share
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _isGenerating ? null : _saveImage,
-                  icon: const Icon(Icons.download_rounded, size: 20),
-                  label: Text(context.l10n.saveImage),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: widget.activeColor,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                    shape:
-                        RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _isGenerating ? null : _shareImage,
-                  icon: _isGenerating
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.share_rounded, size: 20),
-                  label: Text(context.l10n.share),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: widget.activeColor,
-                    foregroundColor: Colors.black,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-                    shape:
-                        RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.sm),
+          ],
         ],
       ),
     );
