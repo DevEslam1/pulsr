@@ -10531,4 +10531,76 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get badgePro => 'PRO';
+
+  @override
+  String get playbackPlayingAnnouncement => 'Reproduciendo';
+
+  @override
+  String get playbackPausedAnnouncement => 'Pausado';
+
+  @override
+  String queueSongRemoved(String title) {
+    return 'Se eliminó \"$title\" de la cola';
+  }
+
+  @override
+  String get commandPaletteTitle => 'Paleta de comandos';
+
+  @override
+  String get commandPaletteHint => 'Escribe un comando o busca...';
+
+  @override
+  String get commandPaletteNoResults =>
+      'No se encontraron comandos coincidentes';
+
+  @override
+  String get commandPaletteSectionRoutes => 'Navegación';
+
+  @override
+  String get commandPaletteSectionActions => 'Reproducción y acciones';
+
+  @override
+  String get commandPaletteSectionSettings => 'Configuración';
+
+  @override
+  String get commandPaletteSectionRecents => 'Pistas recientes';
+
+  @override
+  String get commandPaletteActionPlay => 'Reproducir / Pausar';
+
+  @override
+  String get commandPaletteActionShuffle => 'Reproducir todo aleatoriamente';
+
+  @override
+  String get commandPaletteActionSleepTimer => 'Temporizador de apagado';
+
+  @override
+  String get commandPaletteActionThemeSwitch => 'Cambiar tema';
+
+  @override
+  String get commandPaletteActionEqualizer => 'Abrir ecualizador';
+
+  @override
+  String get commandPaletteActionAudioQuality => 'Calidad de audio y salida';
+
+  @override
+  String get coachMarkDspTitle => 'DSP esencial y de estudio';
+
+  @override
+  String get coachMarkDspBody =>
+      'Alterna entre controles simples seleccionados y herramientas de masterización de estudio profesional.';
+
+  @override
+  String get coachMarkUsbDacTitle => 'Salida de audio Bit-Perfect';
+
+  @override
+  String get coachMarkUsbDacBody =>
+      'Transmisión directa por hardware activa. Se omite el remuestreador del sistema para una reproducción exacta.';
+
+  @override
+  String get coachMarkDockSwipeTitle => 'Estilos de base personalizables';
+
+  @override
+  String get coachMarkDockSwipeBody =>
+      'Desliza hacia arriba en el mini reproductor o mantén presionado para personalizar los modos de acoplamiento.';
 }

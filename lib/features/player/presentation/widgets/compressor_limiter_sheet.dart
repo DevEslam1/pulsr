@@ -647,6 +647,9 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     final p = context.palette;
     final isDefault =
         defaultValue != null && (value - defaultValue).abs() < 0.001;
+    final step = (max - min) / 20.0;
+    final nextVal = (value + step).clamp(min, max);
+    final prevVal = (value - step).clamp(min, max);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Column(
@@ -705,11 +708,22 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               thumbColor: p.primary,
               trackHeight: 4,
             ),
-            child: ThrottledSlider(
-              value: value.clamp(min, max),
-              min: min,
-              max: max,
-              onChanged: enabled ? onChanged : null,
+            child: Semantics(
+              slider: true,
+              excludeSemantics: true,
+              enabled: enabled,
+              label: title,
+              value: valueDisplay,
+              increasedValue: nextVal.toStringAsFixed(1),
+              decreasedValue: prevVal.toStringAsFixed(1),
+              onIncrease: enabled ? () => onChanged(nextVal) : null,
+              onDecrease: enabled ? () => onChanged(prevVal) : null,
+              child: ThrottledSlider(
+                value: value.clamp(min, max),
+                min: min,
+                max: max,
+                onChanged: enabled ? onChanged : null,
+              ),
             ),
           ),
         ],

@@ -261,7 +261,7 @@ class SettingsScreenState extends State<SettingsScreen>
             body: SafeArea(
               bottom: false,
               child: FocusTraversalGroup(
-                policy: ReadingOrderTraversalPolicy(),
+                policy: OrderedTraversalPolicy(),
                 child: isTabletView
                     ? _buildTabletLayout(
                         context, state, cubit, effectiveCategoryId)

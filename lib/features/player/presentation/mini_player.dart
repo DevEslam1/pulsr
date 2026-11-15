@@ -1316,31 +1316,41 @@ class _SwipeActionBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final motion = context.motionEnabled;
+    final badge = Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: thresholdCrossed
+            ? accentColor.withValues(alpha: 0.18)
+            : p.surfaceContainerHigh.withValues(alpha: 0.85),
+        border: Border.all(
+          color: thresholdCrossed
+              ? accentColor.withValues(alpha: 0.45)
+              : p.hairline,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        icon,
+        size: 17,
+        color: thresholdCrossed ? accentColor : p.textSecondary,
+      ),
+    );
+
+    if (!motion) {
+      return Opacity(
+        opacity: progress > 0 ? 1.0 : 0.0,
+        child: badge,
+      );
+    }
+
     return Opacity(
       opacity: progress,
       child: Transform.scale(
         scale: thresholdCrossed ? 1.12 : 0.92,
-        child: Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: thresholdCrossed
-                ? accentColor.withValues(alpha: 0.18)
-                : p.surfaceContainerHigh.withValues(alpha: 0.85),
-            border: Border.all(
-              color: thresholdCrossed
-                  ? accentColor.withValues(alpha: 0.45)
-                  : p.hairline,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            icon,
-            size: 17,
-            color: thresholdCrossed ? accentColor : p.textSecondary,
-          ),
-        ),
+        child: badge,
       ),
     );
   }

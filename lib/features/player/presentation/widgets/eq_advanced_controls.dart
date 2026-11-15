@@ -346,7 +346,25 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                         ),
                         child: Semantics(
                           slider: true,
+                          excludeSemantics: true,
                           label: context.l10n.width,
+                          value: '${(state.virtualizerStrength * 100).round()}%',
+                          increasedValue:
+                              '${((state.virtualizerStrength + 0.1).clamp(0.0, 1.0) * 100).round()}%',
+                          decreasedValue:
+                              '${((state.virtualizerStrength - 0.1).clamp(0.0, 1.0) * 100).round()}%',
+                          onIncrease: state.isVirtualizerEnabled &&
+                                  state.isVirtualizerSupported
+                              ? () => cubit.setVirtualizerStrength(
+                                  (state.virtualizerStrength + 0.1)
+                                      .clamp(0.0, 1.0))
+                              : null,
+                          onDecrease: state.isVirtualizerEnabled &&
+                                  state.isVirtualizerSupported
+                              ? () => cubit.setVirtualizerStrength(
+                                  (state.virtualizerStrength - 0.1)
+                                      .clamp(0.0, 1.0))
+                              : null,
                           child: ThrottledSlider(
                             value: state.virtualizerStrength.clamp(0.0, 1.0),
                             min: 0.0,
@@ -856,7 +874,19 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       ),
                       child: Semantics(
                         slider: true,
+                        excludeSemantics: true,
                         label: context.l10n.delayTime,
+                        value: '${state.crossfeedDelayUs.round()} µs',
+                        increasedValue:
+                            '${(state.crossfeedDelayUs + 50.0).clamp(200.0, 700.0).round()} µs',
+                        decreasedValue:
+                            '${(state.crossfeedDelayUs - 50.0).clamp(200.0, 700.0).round()} µs',
+                        onIncrease: () => cubit.setCrossfeed(true,
+                            delayUs: (state.crossfeedDelayUs + 50.0)
+                                .clamp(200.0, 700.0)),
+                        onDecrease: () => cubit.setCrossfeed(true,
+                            delayUs: (state.crossfeedDelayUs - 50.0)
+                                .clamp(200.0, 700.0)),
                         child: ThrottledSlider(
                           value: state.crossfeedDelayUs.clamp(200.0, 700.0),
                           min: 200.0,
@@ -921,7 +951,19 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       ),
                       child: Semantics(
                         slider: true,
+                        excludeSemantics: true,
                         label: context.l10n.oppositeEarBleed,
+                        value: '${state.crossfeedFeedDb.toStringAsFixed(1)} dB',
+                        increasedValue:
+                            '${(state.crossfeedFeedDb + 0.5).clamp(-15.0, -6.0).toStringAsFixed(1)} dB',
+                        decreasedValue:
+                            '${(state.crossfeedFeedDb - 0.5).clamp(-15.0, -6.0).toStringAsFixed(1)} dB',
+                        onIncrease: () => cubit.setCrossfeed(true,
+                            feedDb: (state.crossfeedFeedDb + 0.5)
+                                .clamp(-15.0, -6.0)),
+                        onDecrease: () => cubit.setCrossfeed(true,
+                            feedDb: (state.crossfeedFeedDb - 0.5)
+                                .clamp(-15.0, -6.0)),
                         child: ThrottledSlider(
                           value: state.crossfeedFeedDb.clamp(-15.0, -6.0),
                           min: -15.0,
@@ -1073,17 +1115,37 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       inactiveTrackColor: p.surface,
                       thumbColor: p.accent,
                     ),
-                    child: Semantics(
-                      slider: true,
-                      label: context.l10n.ceilingThreshold,
-                      child: ThrottledSlider(
-                        value: state.limiterThresholdDb.clamp(-6.0, 0.0),
-                        min: -6.0,
-                        max: 0.0,
-                        divisions: 60,
-                        onChanged: (val) =>
-                            cubit.setLookaheadLimiter(true, thresholdDb: val),
-                      ),
+                    child: Builder(
+                      builder: (context) {
+                        final limitThresh =
+                            state.limiterThresholdDb.clamp(-6.0, 0.0);
+                        final nextThresh =
+                            (limitThresh + 0.1).clamp(-6.0, 0.0);
+                        final prevThresh =
+                            (limitThresh - 0.1).clamp(-6.0, 0.0);
+                        return Semantics(
+                          slider: true,
+                          excludeSemantics: true,
+                          label: context.l10n.ceilingThreshold,
+                          value: '${limitThresh.toStringAsFixed(1)} dBFS',
+                          increasedValue:
+                              '${nextThresh.toStringAsFixed(1)} dBFS',
+                          decreasedValue:
+                              '${prevThresh.toStringAsFixed(1)} dBFS',
+                          onIncrease: () => cubit.setLookaheadLimiter(true,
+                              thresholdDb: nextThresh),
+                          onDecrease: () => cubit.setLookaheadLimiter(true,
+                              thresholdDb: prevThresh),
+                          child: ThrottledSlider(
+                            value: limitThresh,
+                            min: -6.0,
+                            max: 0.0,
+                            divisions: 60,
+                            onChanged: (val) => cubit.setLookaheadLimiter(true,
+                                thresholdDb: val),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   Row(
@@ -1136,17 +1198,33 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       inactiveTrackColor: p.surface,
                       thumbColor: p.accent,
                     ),
-                    child: Semantics(
-                      slider: true,
-                      label: context.l10n.releaseTime,
-                      child: ThrottledSlider(
-                        value: state.limiterReleaseMs.clamp(10.0, 200.0),
-                        min: 10.0,
-                        max: 200.0,
-                        divisions: 38,
-                        onChanged: (val) =>
-                            cubit.setLookaheadLimiter(true, releaseMs: val),
-                      ),
+                    child: Builder(
+                      builder: (context) {
+                        final limitRel =
+                            state.limiterReleaseMs.clamp(10.0, 200.0);
+                        final nextRel = (limitRel + 5.0).clamp(10.0, 200.0);
+                        final prevRel = (limitRel - 5.0).clamp(10.0, 200.0);
+                        return Semantics(
+                          slider: true,
+                          excludeSemantics: true,
+                          label: context.l10n.releaseTime,
+                          value: '${limitRel.round()} ms',
+                          increasedValue: '${nextRel.round()} ms',
+                          decreasedValue: '${prevRel.round()} ms',
+                          onIncrease: () => cubit.setLookaheadLimiter(true,
+                              releaseMs: nextRel),
+                          onDecrease: () => cubit.setLookaheadLimiter(true,
+                              releaseMs: prevRel),
+                          child: ThrottledSlider(
+                            value: limitRel,
+                            min: 10.0,
+                            max: 200.0,
+                            divisions: 38,
+                            onChanged: (val) =>
+                                cubit.setLookaheadLimiter(true, releaseMs: val),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1335,38 +1413,55 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                     : p.textSecondary))),
                   ],
                 ),
-                Semantics(
-                  slider: true,
-                  label: context.l10n.stereoBalanceMono,
-                  value: state.stereoBalance.abs() < 0.05
-                      ? context.l10n.roomPositionCenter
-                      : (state.stereoBalance < 0
-                          ? context.l10n.balanceLeftPercent(
-                              (-state.stereoBalance * 100).round())
-                          : context.l10n.balanceRightPercent(
-                              (state.stereoBalance * 100).round())),
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape:
-                          const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      activeTrackColor:
-                          dspBlocked != null ? p.textTertiary : p.accent,
-                      inactiveTrackColor: p.surface,
-                      thumbColor:
-                          dspBlocked != null ? p.textTertiary : p.accent,
-                    ),
-                    child: ThrottledSlider(
-                      value: state.stereoBalance.clamp(-1.0, 1.0),
-                      min: -1.0,
-                      max: 1.0,
-                      divisions: 40,
-                      onChanged:
-                          dspBlocked != null || !_nativePcmEffectsAvailable
-                              ? null
-                              : (val) => cubit.setStereoBalance(val),
-                    ),
-                  ),
+                Builder(
+                  builder: (context) {
+                    final bal = state.stereoBalance.clamp(-1.0, 1.0);
+                    final nextBal = (bal + 0.05).clamp(-1.0, 1.0);
+                    final prevBal = (bal - 0.05).clamp(-1.0, 1.0);
+                    final balEnabled =
+                        dspBlocked == null && _nativePcmEffectsAvailable;
+                    String formatBal(double b) => b.abs() < 0.05
+                        ? context.l10n.roomPositionCenter
+                        : (b < 0
+                            ? context.l10n.balanceLeftPercent((-b * 100).round())
+                            : context.l10n.balanceRightPercent((b * 100).round()));
+                    return Semantics(
+                      slider: true,
+                      excludeSemantics: true,
+                      enabled: balEnabled,
+                      label: context.l10n.stereoBalanceMono,
+                      value: formatBal(bal),
+                      increasedValue: formatBal(nextBal),
+                      decreasedValue: formatBal(prevBal),
+                      onIncrease: balEnabled
+                          ? () => cubit.setStereoBalance(nextBal)
+                          : null,
+                      onDecrease: balEnabled
+                          ? () => cubit.setStereoBalance(prevBal)
+                          : null,
+                      child: SliderTheme(
+                        data: SliderTheme.of(context).copyWith(
+                          trackHeight: 4,
+                          thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 6),
+                          activeTrackColor:
+                              dspBlocked != null ? p.textTertiary : p.accent,
+                          inactiveTrackColor: p.surface,
+                          thumbColor:
+                              dspBlocked != null ? p.textTertiary : p.accent,
+                        ),
+                        child: ThrottledSlider(
+                          value: bal,
+                          min: -1.0,
+                          max: 1.0,
+                          divisions: 40,
+                          onChanged: balEnabled
+                              ? (val) => cubit.setStereoBalance(val)
+                              : null,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -1531,15 +1626,34 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       inactiveTrackColor: p.surface,
                       thumbColor: p.accent,
                     ),
-                    child: Semantics(
-                      slider: true,
-                      label: context.l10n.wetDryMix,
-                      child: ThrottledSlider(
-                        value: state.reverbWetDry.clamp(0.0, 1.0),
-                        min: 0.0,
-                        max: 1.0,
-                        onChanged: (val) => cubit.setReverb(true, wetDry: val),
-                      ),
+                    child: Builder(
+                      builder: (context) {
+                        final wetDry = state.reverbWetDry.clamp(0.0, 1.0);
+                        final nextWetDry = (wetDry + 0.05).clamp(0.0, 1.0);
+                        final prevWetDry = (wetDry - 0.05).clamp(0.0, 1.0);
+                        return Semantics(
+                          slider: true,
+                          excludeSemantics: true,
+                          label: context.l10n.wetDryMix,
+                          value: context.l10n
+                              .dspWetPercent((wetDry * 100).round()),
+                          increasedValue: context.l10n
+                              .dspWetPercent((nextWetDry * 100).round()),
+                          decreasedValue: context.l10n
+                              .dspWetPercent((prevWetDry * 100).round()),
+                          onIncrease: () =>
+                              cubit.setReverb(true, wetDry: nextWetDry),
+                          onDecrease: () =>
+                              cubit.setReverb(true, wetDry: prevWetDry),
+                          child: ThrottledSlider(
+                            value: wetDry,
+                            min: 0.0,
+                            max: 1.0,
+                            onChanged: (val) =>
+                                cubit.setReverb(true, wetDry: val),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -1656,6 +1770,9 @@ extension _EqAdvancedControls on _EqualizerSheetState {
   }) {
     final isDefault =
         defaultValue != null && (value - defaultValue).abs() < 0.001;
+    final step = (max - min) / (divisions ?? 20);
+    final nextVal = (value + step).clamp(min, max);
+    final prevVal = (value - step).clamp(min, max);
     return Column(
       children: [
         Row(
@@ -1707,8 +1824,14 @@ extension _EqAdvancedControls on _EqualizerSheetState {
           ),
           child: Semantics(
             slider: true,
+            excludeSemantics: true,
+            enabled: enabled,
             label: label,
             value: valueText,
+            increasedValue: nextVal.toStringAsFixed(1),
+            decreasedValue: prevVal.toStringAsFixed(1),
+            onIncrease: enabled ? () => onChanged(nextVal) : null,
+            onDecrease: enabled ? () => onChanged(prevVal) : null,
             child: ThrottledSlider(
               value: value.clamp(min, max),
               min: min,

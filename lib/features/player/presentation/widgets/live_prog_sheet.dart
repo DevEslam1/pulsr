@@ -464,6 +464,10 @@ spl1 = spl1 + lp1 * amount;''',
     required ValueChanged<double> onChanged,
     required PulsrPalette p,
   }) {
+    final val = value.clamp(min, max);
+    final step = (max - min) / 20.0;
+    final nextVal = (val + step).clamp(min, max);
+    final prevVal = (val - step).clamp(min, max);
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.xs),
       padding: const EdgeInsets.symmetric(
@@ -485,7 +489,7 @@ spl1 = spl1 + lp1 * amount;''',
                     color: p.textSecondary, fontSize: AppFontSize.label),
               ),
               Text(
-                value.toStringAsFixed(2),
+                val.toStringAsFixed(2),
                 style: TextStyle(
                   color: p.textPrimary,
                   fontSize: AppFontSize.label,
@@ -504,11 +508,21 @@ spl1 = spl1 + lp1 * amount;''',
               inactiveTrackColor: p.hairline,
               thumbColor: p.primary,
             ),
-            child: Slider(
-              value: value.clamp(min, max),
-              min: min,
-              max: max,
-              onChanged: onChanged,
+            child: Semantics(
+              slider: true,
+              excludeSemantics: true,
+              label: label,
+              value: val.toStringAsFixed(2),
+              increasedValue: nextVal.toStringAsFixed(2),
+              decreasedValue: prevVal.toStringAsFixed(2),
+              onIncrease: () => onChanged(nextVal),
+              onDecrease: () => onChanged(prevVal),
+              child: Slider(
+                value: val,
+                min: min,
+                max: max,
+                onChanged: onChanged,
+              ),
             ),
           ),
         ],

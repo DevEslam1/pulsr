@@ -265,24 +265,33 @@ class PulsrBottomSheetContainer extends StatelessWidget {
 
     final parentScope = PulsrSheetScope.maybeOf(context);
     if (parentScope != null) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (headerTitle != null)
-            _buildHeader(
-              context,
-              p,
-              headerTitle,
-              effectiveIsDialog: parentScope.isDialog || isDialog,
+      return FocusTraversalGroup(
+        policy: OrderedTraversalPolicy(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (headerTitle != null)
+              FocusTraversalOrder(
+                order: const NumericFocusOrder(1.0),
+                child: _buildHeader(
+                  context,
+                  p,
+                  headerTitle,
+                  effectiveIsDialog: parentScope.isDialog || isDialog,
+                ),
+              ),
+            Flexible(
+              child: FocusTraversalOrder(
+                order: const NumericFocusOrder(2.0),
+                child: Material(
+                  color: Colors.transparent,
+                  child: child,
+                ),
+              ),
             ),
-          Flexible(
-            child: Material(
-              color: Colors.transparent,
-              child: child,
-            ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
@@ -364,44 +373,54 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                   bottom: !isDialog,
                   child: Material(
                     type: MaterialType.transparency,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (showDragHandle && !isDialog) ...[
-                          const SizedBox(height: AppSpacing.s10),
-                          Center(
-                            child: Semantics(
-                              label: context.l10n.sheetDragHandle,
-                              hint: context.l10n.sheetDragDownToDismiss,
-                              child: Container(
-                                width: AppSpacing.s40,
-                                height: 4.5,
-                                decoration: BoxDecoration(
-                                  color:
-                                      (p.isDark ? Colors.white : Colors.black)
-                                          .withValues(alpha: 0.24),
-                                  borderRadius: AppRadii.full,
+                    child: FocusTraversalGroup(
+                      policy: OrderedTraversalPolicy(),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (showDragHandle && !isDialog) ...[
+                            const SizedBox(height: AppSpacing.s10),
+                            Center(
+                              child: Semantics(
+                                label: context.l10n.sheetDragHandle,
+                                hint: context.l10n.sheetDragDownToDismiss,
+                                child: Container(
+                                  width: AppSpacing.s40,
+                                  height: 4.5,
+                                  decoration: BoxDecoration(
+                                    color: (p.isDark
+                                            ? Colors.white
+                                            : Colors.black)
+                                        .withValues(alpha: 0.24),
+                                    borderRadius: AppRadii.full,
+                                  ),
                                 ),
                               ),
                             ),
+                            const SizedBox(height: AppSpacing.s8),
+                          ],
+                          if (headerTitle != null)
+                            FocusTraversalOrder(
+                              order: const NumericFocusOrder(1.0),
+                              child: _buildHeader(
+                                context,
+                                p,
+                                headerTitle,
+                                effectiveIsDialog: isDialog,
+                              ),
+                            ),
+                          Flexible(
+                            child: FocusTraversalOrder(
+                              order: const NumericFocusOrder(2.0),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: child,
+                              ),
+                            ),
                           ),
-                          const SizedBox(height: AppSpacing.s8),
                         ],
-                        if (headerTitle != null)
-                          _buildHeader(
-                            context,
-                            p,
-                            headerTitle,
-                            effectiveIsDialog: isDialog,
-                          ),
-                        Flexible(
-                          child: Material(
-                            color: Colors.transparent,
-                            child: child,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

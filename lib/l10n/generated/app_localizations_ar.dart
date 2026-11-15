@@ -10374,4 +10374,75 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get badgePro => 'احترافي';
+
+  @override
+  String get playbackPlayingAnnouncement => 'قيد التشغيل';
+
+  @override
+  String get playbackPausedAnnouncement => 'متوقف مؤقتاً';
+
+  @override
+  String queueSongRemoved(String title) {
+    return 'تمت إزالة \"$title\" من قائمة الانتظار';
+  }
+
+  @override
+  String get commandPaletteTitle => 'لوحة الأوامر';
+
+  @override
+  String get commandPaletteHint => 'اكتب أمراً أو ابحث...';
+
+  @override
+  String get commandPaletteNoResults => 'لم يتم العثور على أوامر مطابقة';
+
+  @override
+  String get commandPaletteSectionRoutes => 'التنقل';
+
+  @override
+  String get commandPaletteSectionActions => 'التشغيل والإجراءات';
+
+  @override
+  String get commandPaletteSectionSettings => 'الإعدادات';
+
+  @override
+  String get commandPaletteSectionRecents => 'المقاطع الصوتية الأخيرة';
+
+  @override
+  String get commandPaletteActionPlay => 'تشغيل / إيقاف مؤقت';
+
+  @override
+  String get commandPaletteActionShuffle => 'خلط جميع الأغاني';
+
+  @override
+  String get commandPaletteActionSleepTimer => 'مؤقت النوم';
+
+  @override
+  String get commandPaletteActionThemeSwitch => 'تبديل المظهر';
+
+  @override
+  String get commandPaletteActionEqualizer => 'فتح المعادل';
+
+  @override
+  String get commandPaletteActionAudioQuality => 'جودة الصوت والإخراج';
+
+  @override
+  String get coachMarkDspTitle => 'معالجة الصوت الأساسية والاستوديو';
+
+  @override
+  String get coachMarkDspBody =>
+      'بدّل بين عناصر التحكم البسيطة وأدوات الماسترينغ الاحترافية.';
+
+  @override
+  String get coachMarkUsbDacTitle => 'إخراج صوتي فائق الدقة Bit-Perfect';
+
+  @override
+  String get coachMarkUsbDacBody =>
+      'البث المباشر للعتاد نشط. تم تجاوز معالج النظام لتشغيل صوتي مطابق للأصل تماماً.';
+
+  @override
+  String get coachMarkDockSwipeTitle => 'أنماط شريط التشغيل المخصصة';
+
+  @override
+  String get coachMarkDockSwipeBody =>
+      'اسحب لأعلى على المشغل المصغر أو اضغط مطولاً لتخصيص أوضاع التثبيت.';
 }

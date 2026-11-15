@@ -5387,7 +5387,7 @@ abstract class AppLocalizations {
   /// **'Scanning for Cast devices...'**
   String get scanningCastDevices;
 
-  /// tranche6 eq l10n
+  /// Confirmation button on coach marks
   ///
   /// In en, this message translates to:
   /// **'Got it'**
@@ -18361,6 +18361,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'PRO'**
   String get badgePro;
+
+  /// Accessibility announcement when playback begins or resumes
+  ///
+  /// In en, this message translates to:
+  /// **'Playing'**
+  String get playbackPlayingAnnouncement;
+
+  /// Accessibility announcement when playback pauses
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get playbackPausedAnnouncement;
+
+  /// Accessibility announcement when a song is removed from queue
+  ///
+  /// In en, this message translates to:
+  /// **'Removed \"{title}\" from queue'**
+  String queueSongRemoved(String title);
+
+  /// Title of the quick command palette
+  ///
+  /// In en, this message translates to:
+  /// **'Command Palette'**
+  String get commandPaletteTitle;
+
+  /// Search hint in the command palette
+  ///
+  /// In en, this message translates to:
+  /// **'Type a command or search...'**
+  String get commandPaletteHint;
+
+  /// Empty state in the command palette
+  ///
+  /// In en, this message translates to:
+  /// **'No matching commands found'**
+  String get commandPaletteNoResults;
+
+  /// Command palette section for app navigation
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation'**
+  String get commandPaletteSectionRoutes;
+
+  /// Command palette section for playback actions
+  ///
+  /// In en, this message translates to:
+  /// **'Playback & Actions'**
+  String get commandPaletteSectionActions;
+
+  /// Command palette section for settings deep links
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get commandPaletteSectionSettings;
+
+  /// Command palette section for recently played songs
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Tracks'**
+  String get commandPaletteSectionRecents;
+
+  /// Action to toggle playback
+  ///
+  /// In en, this message translates to:
+  /// **'Play / Pause'**
+  String get commandPaletteActionPlay;
+
+  /// Action to shuffle library
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle All Songs'**
+  String get commandPaletteActionShuffle;
+
+  /// Action to open sleep timer
+  ///
+  /// In en, this message translates to:
+  /// **'Sleep Timer'**
+  String get commandPaletteActionSleepTimer;
+
+  /// Action to open theme picker
+  ///
+  /// In en, this message translates to:
+  /// **'Switch Theme'**
+  String get commandPaletteActionThemeSwitch;
+
+  /// Action to open DSP equalizer sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Open Equalizer'**
+  String get commandPaletteActionEqualizer;
+
+  /// Action to open audio quality sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Quality & Output'**
+  String get commandPaletteActionAudioQuality;
+
+  /// Coach mark title for DSP mode
+  ///
+  /// In en, this message translates to:
+  /// **'Essential & Studio DSP'**
+  String get coachMarkDspTitle;
+
+  /// Coach mark body for DSP mode
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle between curated simple controls and professional studio mastering tools.'**
+  String get coachMarkDspBody;
+
+  /// Coach mark title for USB DAC bit-perfect output
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect Audio Output'**
+  String get coachMarkUsbDacTitle;
+
+  /// Coach mark body for USB DAC bit-perfect output
+  ///
+  /// In en, this message translates to:
+  /// **'Direct hardware stream active. Android system resampler bypassed for authentic bit-exact playback.'**
+  String get coachMarkUsbDacBody;
+
+  /// Coach mark title for dock styles
+  ///
+  /// In en, this message translates to:
+  /// **'Customizable Dock Styles'**
+  String get coachMarkDockSwipeTitle;
+
+  /// Coach mark body for dock styles
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe up on the mini player or long-press to customize docking modes.'**
+  String get coachMarkDockSwipeBody;
 }
 
 class _AppLocalizationsDelegate

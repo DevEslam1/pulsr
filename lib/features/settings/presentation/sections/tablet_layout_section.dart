@@ -43,8 +43,10 @@ mixin TabletLayoutSection
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Left Master Navigation Pane
-        SizedBox(
-          width: masterWidth,
+        FocusTraversalOrder(
+          order: const NumericFocusOrder(1.0),
+          child: SizedBox(
+            width: masterWidth,
           child: MediaQuery.withClampedTextScaling(
             maxScaleFactor: 1.5,
             child: Column(
@@ -162,6 +164,7 @@ mixin TabletLayoutSection
             ),
           ),
         ),
+      ),
 
         // Vertical hairline divider and foldable hinge
         Container(
@@ -174,10 +177,13 @@ mixin TabletLayoutSection
 
         // Right Detail Pane
         Expanded(
-          child: RepaintBoundary(
-            child: _searchQuery.isNotEmpty
-                ? _buildSearchResultsList(context, state, cubit)
-                : _buildDetailPane(context, state, cubit, effectiveActiveId),
+          child: FocusTraversalOrder(
+            order: const NumericFocusOrder(2.0),
+            child: RepaintBoundary(
+              child: _searchQuery.isNotEmpty
+                  ? _buildSearchResultsList(context, state, cubit)
+                  : _buildDetailPane(context, state, cubit, effectiveActiveId),
+            ),
           ),
         ),
       ],

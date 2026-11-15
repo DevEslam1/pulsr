@@ -725,6 +725,7 @@ class AuraTheme {
 
     return ThemeData(
       useMaterial3: true,
+      focusColor: p.accent.withValues(alpha: 0.20),
       // Android predictive-back page transitions; other platforms keep their
       // framework defaults.
       pageTransitionsTheme: const PageTransitionsTheme(

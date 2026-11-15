@@ -1548,7 +1548,7 @@
   },
   "gotIt": "Got it",
   "@gotIt": {
-    "description": "tranche6 eq l10n"
+    "description": "Confirmation button on coach marks"
   },
   "eqResetNotice": "All Equalizer & DSP settings restored to defaults",
   "@eqResetNotice": {
@@ -8218,5 +8218,98 @@
   "badgePro": "PRO",
   "@badgePro": {
     "description": "Short Pro feature badge label"
+  },
+  "playbackPlayingAnnouncement": "Playing",
+  "@playbackPlayingAnnouncement": {
+    "description": "Accessibility announcement when playback begins or resumes"
+  },
+  "playbackPausedAnnouncement": "Paused",
+  "@playbackPausedAnnouncement": {
+    "description": "Accessibility announcement when playback pauses"
+  },
+  "queueSongRemoved": "Removed \"{title}\" from queue",
+  "@queueSongRemoved": {
+    "description": "Accessibility announcement when a song is removed from queue",
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "commandPaletteTitle": "Command Palette",
+  "@commandPaletteTitle": {
+    "description": "Title of the quick command palette"
+  },
+  "commandPaletteHint": "Type a command or search...",
+  "@commandPaletteHint": {
+    "description": "Search hint in the command palette"
+  },
+  "commandPaletteNoResults": "No matching commands found",
+  "@commandPaletteNoResults": {
+    "description": "Empty state in the command palette"
+  },
+  "commandPaletteSectionRoutes": "Navigation",
+  "@commandPaletteSectionRoutes": {
+    "description": "Command palette section for app navigation"
+  },
+  "commandPaletteSectionActions": "Playback & Actions",
+  "@commandPaletteSectionActions": {
+    "description": "Command palette section for playback actions"
+  },
+  "commandPaletteSectionSettings": "Settings",
+  "@commandPaletteSectionSettings": {
+    "description": "Command palette section for settings deep links"
+  },
+  "commandPaletteSectionRecents": "Recent Tracks",
+  "@commandPaletteSectionRecents": {
+    "description": "Command palette section for recently played songs"
+  },
+  "commandPaletteActionPlay": "Play / Pause",
+  "@commandPaletteActionPlay": {
+    "description": "Action to toggle playback"
+  },
+  "commandPaletteActionShuffle": "Shuffle All Songs",
+  "@commandPaletteActionShuffle": {
+    "description": "Action to shuffle library"
+  },
+  "commandPaletteActionSleepTimer": "Sleep Timer",
+  "@commandPaletteActionSleepTimer": {
+    "description": "Action to open sleep timer"
+  },
+  "commandPaletteActionThemeSwitch": "Switch Theme",
+  "@commandPaletteActionThemeSwitch": {
+    "description": "Action to open theme picker"
+  },
+  "commandPaletteActionEqualizer": "Open Equalizer",
+  "@commandPaletteActionEqualizer": {
+    "description": "Action to open DSP equalizer sheet"
+  },
+  "commandPaletteActionAudioQuality": "Audio Quality & Output",
+  "@commandPaletteActionAudioQuality": {
+    "description": "Action to open audio quality sheet"
+  },
+  "coachMarkDspTitle": "Essential & Studio DSP",
+  "@coachMarkDspTitle": {
+    "description": "Coach mark title for DSP mode"
+  },
+  "coachMarkDspBody": "Toggle between curated simple controls and professional studio mastering tools.",
+  "@coachMarkDspBody": {
+    "description": "Coach mark body for DSP mode"
+  },
+  "coachMarkUsbDacTitle": "Bit-Perfect Audio Output",
+  "@coachMarkUsbDacTitle": {
+    "description": "Coach mark title for USB DAC bit-perfect output"
+  },
+  "coachMarkUsbDacBody": "Direct hardware stream active. Android system resampler bypassed for authentic bit-exact playback.",
+  "@coachMarkUsbDacBody": {
+    "description": "Coach mark body for USB DAC bit-perfect output"
+  },
+  "coachMarkDockSwipeTitle": "Customizable Dock Styles",
+  "@coachMarkDockSwipeTitle": {
+    "description": "Coach mark title for dock styles"
+  },
+  "coachMarkDockSwipeBody": "Swipe up on the mini player or long-press to customize docking modes.",
+  "@coachMarkDockSwipeBody": {
+    "description": "Coach mark body for dock styles"
   }
 }

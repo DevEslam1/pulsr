@@ -32,14 +32,24 @@ mixin PhoneLayoutSection
         constraints: PulsrLayoutMetrics.contentConstraints(context),
         child: Column(
           children: [
-            _buildTopHeader(context),
-            if (_searchQuery.isEmpty) _buildCategoryFilterBar(context, state),
+            FocusTraversalOrder(
+              order: const NumericFocusOrder(1.0),
+              child: _buildTopHeader(context),
+            ),
+            if (_searchQuery.isEmpty)
+              FocusTraversalOrder(
+                order: const NumericFocusOrder(2.0),
+                child: _buildCategoryFilterBar(context, state),
+              ),
             SizedBox(
                 height: context.isLandscape ? AppSpacing.xxs : AppSpacing.md),
             Expanded(
-              child: _searchQuery.isNotEmpty
-                  ? _buildSearchResultsList(context, state, cubit)
-                  : _buildPhoneCategoryView(context, state, cubit),
+              child: FocusTraversalOrder(
+                order: const NumericFocusOrder(3.0),
+                child: _searchQuery.isNotEmpty
+                    ? _buildSearchResultsList(context, state, cubit)
+                    : _buildPhoneCategoryView(context, state, cubit),
+              ),
             ),
           ],
         ),

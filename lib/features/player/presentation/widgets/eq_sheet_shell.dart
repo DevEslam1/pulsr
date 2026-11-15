@@ -1524,33 +1524,48 @@ extension _EqSheetShell on _EqualizerSheetState {
             ],
           ),
           const SizedBox(height: AppSpacing.xxs),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: accentColor,
-              thumbColor: Colors.white,
-              overlayColor: accentColor.withValues(alpha: 0.18),
-              trackHeight: 4,
-            ),
-            child: Semantics(
-              label: title,
-              value: gainText,
-              child: Slider(
-                value: value.clamp(-12.0, 12.0),
-                min: -12.0,
-                max: 12.0,
-                divisions: 48,
-                onChanged: (v) {
-                  // One tick per 0.5 dB step instead of every pixel; the slider
-                  // previously fired a haptic on every frame of a drag.
-                  final step = ((v + 12.0) * 2).round();
-                  if (step != _lastMacroHapticStep) {
-                    _lastMacroHapticStep = step;
-                    PulsrHaptics.selectionClick();
-                  }
-                  onChanged(v);
-                },
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final val = value.clamp(-12.0, 12.0);
+              final nextVal = (val + 0.5).clamp(-12.0, 12.0);
+              final prevVal = (val - 0.5).clamp(-12.0, 12.0);
+              return SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: accentColor,
+                  thumbColor: Colors.white,
+                  overlayColor: accentColor.withValues(alpha: 0.18),
+                  trackHeight: 4,
+                ),
+                child: Semantics(
+                  slider: true,
+                  excludeSemantics: true,
+                  label: title,
+                  value: gainText,
+                  increasedValue:
+                      '${nextVal > 0 ? '+' : ''}${nextVal.toStringAsFixed(1)} dB',
+                  decreasedValue:
+                      '${prevVal > 0 ? '+' : ''}${prevVal.toStringAsFixed(1)} dB',
+                  onIncrease: () => onChanged(nextVal),
+                  onDecrease: () => onChanged(prevVal),
+                  child: Slider(
+                    value: val,
+                    min: -12.0,
+                    max: 12.0,
+                    divisions: 48,
+                    onChanged: (v) {
+                      // One tick per 0.5 dB step instead of every pixel; the slider
+                      // previously fired a haptic on every frame of a drag.
+                      final step = ((v + 12.0) * 2).round();
+                      if (step != _lastMacroHapticStep) {
+                        _lastMacroHapticStep = step;
+                        PulsrHaptics.selectionClick();
+                      }
+                      onChanged(v);
+                    },
+                  ),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -2567,40 +2582,72 @@ extension _EqSheetShell on _EqualizerSheetState {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.s6),
-                      Semantics(
-                        slider: true,
-                        label: context.l10n.preampLabel,
-                        value:
-                            '${currentPreamp > 0 ? '+' : ''}${currentPreamp.toStringAsFixed(1)} dB',
-                        child: SliderTheme(
-                          data: SliderTheme.of(context).copyWith(
-                            trackHeight: 4,
-                            thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 6),
-                            overlayShape: const RoundSliderOverlayShape(
-                                overlayRadius: 14),
-                            activeTrackColor: clipRisk ? p.error : p.accent,
-                            inactiveTrackColor: p.surface,
-                            thumbColor: clipRisk ? p.error : p.accent,
-                          ),
-                          child: Slider(
-                            value: currentPreamp.clamp(-12.0, 12.0),
-                            min: -12.0,
-                            max: 12.0,
-                            divisions: 48,
-                            onChanged: dspBlocked != null
-                                ? null
-                                : (val) {
+                      Builder(
+                        builder: (context) {
+                          final pVal = currentPreamp.clamp(-12.0, 12.0);
+                          final nextPVal = (pVal + 0.5).clamp(-12.0, 12.0);
+                          final prevPVal = (pVal - 0.5).clamp(-12.0, 12.0);
+                          final pEnabled = dspBlocked == null;
+                          return Semantics(
+                            slider: true,
+                            excludeSemantics: true,
+                            enabled: pEnabled,
+                            label: context.l10n.preampLabel,
+                            value:
+                                '${pVal > 0 ? '+' : ''}${pVal.toStringAsFixed(1)} dB',
+                            increasedValue:
+                                '${nextPVal > 0 ? '+' : ''}${nextPVal.toStringAsFixed(1)} dB',
+                            decreasedValue:
+                                '${prevPVal > 0 ? '+' : ''}${prevPVal.toStringAsFixed(1)} dB',
+                            onIncrease: pEnabled
+                                ? () {
                                     if (!state.isEqEnabled) {
                                       cubit.setEqualizerEnabled(true);
                                     }
-                                    final rounded =
-                                        (val * 10).roundToDouble() / 10.0;
-                                    _schedulePreamp(cubit, rounded,
+                                    _schedulePreamp(cubit, nextPVal,
                                         () => setCardState(() {}));
-                                  },
-                          ),
-                        ),
+                                  }
+                                : null,
+                            onDecrease: pEnabled
+                                ? () {
+                                    if (!state.isEqEnabled) {
+                                      cubit.setEqualizerEnabled(true);
+                                    }
+                                    _schedulePreamp(cubit, prevPVal,
+                                        () => setCardState(() {}));
+                                  }
+                                : null,
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 4,
+                                thumbShape: const RoundSliderThumbShape(
+                                    enabledThumbRadius: 6),
+                                overlayShape: const RoundSliderOverlayShape(
+                                    overlayRadius: 14),
+                                activeTrackColor: clipRisk ? p.error : p.accent,
+                                inactiveTrackColor: p.surface,
+                                thumbColor: clipRisk ? p.error : p.accent,
+                              ),
+                              child: Slider(
+                                value: pVal,
+                                min: -12.0,
+                                max: 12.0,
+                                divisions: 48,
+                                onChanged: !pEnabled
+                                    ? null
+                                    : (val) {
+                                        if (!state.isEqEnabled) {
+                                          cubit.setEqualizerEnabled(true);
+                                        }
+                                        final rounded =
+                                            (val * 10).roundToDouble() / 10.0;
+                                        _schedulePreamp(cubit, rounded,
+                                            () => setCardState(() {}));
+                                      },
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       if (clipRisk)
                         Padding(
@@ -2780,26 +2827,53 @@ extension _EqSheetShell on _EqualizerSheetState {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s6),
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape:
-                        const RoundSliderOverlayShape(overlayRadius: 14),
-                    activeTrackColor: p.accent,
-                    inactiveTrackColor: p.surface,
-                    thumbColor: p.accent,
-                  ),
-                  child: Semantics(
-                    slider: true,
-                    label: context.l10n.bassEnhancer,
-                    child: Slider(
-                      value: preset.bassBoost.clamp(0.0, 1.0),
-                      min: 0.0,
-                      max: 1.0,
-                      onChanged:
-                          dspBlocked != null || !state.isBassBoostSupported
+                Builder(
+                  builder: (context) {
+                    final bVal = preset.bassBoost.clamp(0.0, 1.0);
+                    final nextBVal = (bVal + 0.05).clamp(0.0, 1.0);
+                    final prevBVal = (bVal - 0.05).clamp(0.0, 1.0);
+                    final bEnabled =
+                        dspBlocked == null && state.isBassBoostSupported;
+                    return SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        overlayShape:
+                            const RoundSliderOverlayShape(overlayRadius: 14),
+                        activeTrackColor: p.accent,
+                        inactiveTrackColor: p.surface,
+                        thumbColor: p.accent,
+                      ),
+                      child: Semantics(
+                        slider: true,
+                        excludeSemantics: true,
+                        enabled: bEnabled,
+                        label: context.l10n.bassEnhancer,
+                        value: '${(bVal * 100).round()}%',
+                        increasedValue: '${(nextBVal * 100).round()}%',
+                        decreasedValue: '${(prevBVal * 100).round()}%',
+                        onIncrease: bEnabled
+                            ? () {
+                                if (!state.isEqEnabled) {
+                                  cubit.setEqualizerEnabled(true);
+                                }
+                                cubit.setBassBoost(nextBVal);
+                              }
+                            : null,
+                        onDecrease: bEnabled
+                            ? () {
+                                if (!state.isEqEnabled) {
+                                  cubit.setEqualizerEnabled(true);
+                                }
+                                cubit.setBassBoost(prevBVal);
+                              }
+                            : null,
+                        child: Slider(
+                          value: bVal,
+                          min: 0.0,
+                          max: 1.0,
+                          onChanged: !bEnabled
                               ? null
                               : (val) {
                                   if (!state.isEqEnabled) {
@@ -2807,8 +2881,10 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   }
                                   cubit.setBassBoost(val);
                                 },
-                    ),
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 if (preset.bassBoost - state.effectiveBassBoost > 0.01)
                   Padding(
@@ -2963,26 +3039,53 @@ extension _EqSheetShell on _EqualizerSheetState {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.s6),
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 4,
-                    thumbShape:
-                        const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    overlayShape:
-                        const RoundSliderOverlayShape(overlayRadius: 14),
-                    activeTrackColor: isOverSafe ? p.error : p.accent,
-                    inactiveTrackColor: p.surface,
-                    thumbColor: isOverSafe ? p.error : p.accent,
-                  ),
-                  child: Semantics(
-                    slider: true,
-                    label: context.l10n.volumeBoost,
-                    child: Slider(
-                      value: state.volumeBoost.clamp(0.0, 1.0),
-                      min: 0.0,
-                      max: 1.0,
-                      onChanged:
-                          dspBlocked != null || !state.isVolumeBoostSupported
+                Builder(
+                  builder: (context) {
+                    final vVal = state.volumeBoost.clamp(0.0, 1.0);
+                    final nextVVal = (vVal + 0.05).clamp(0.0, 1.0);
+                    final prevVVal = (vVal - 0.05).clamp(0.0, 1.0);
+                    final vEnabled =
+                        dspBlocked == null && state.isVolumeBoostSupported;
+                    return SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape:
+                            const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        overlayShape:
+                            const RoundSliderOverlayShape(overlayRadius: 14),
+                        activeTrackColor: isOverSafe ? p.error : p.accent,
+                        inactiveTrackColor: p.surface,
+                        thumbColor: isOverSafe ? p.error : p.accent,
+                      ),
+                      child: Semantics(
+                        slider: true,
+                        excludeSemantics: true,
+                        enabled: vEnabled,
+                        label: context.l10n.volumeBoost,
+                        value: '${(vVal * 100).round()}%',
+                        increasedValue: '${(nextVVal * 100).round()}%',
+                        decreasedValue: '${(prevVVal * 100).round()}%',
+                        onIncrease: vEnabled
+                            ? () {
+                                if (!state.isEqEnabled) {
+                                  cubit.setEqualizerEnabled(true);
+                                }
+                                cubit.setVolumeBoost(nextVVal);
+                              }
+                            : null,
+                        onDecrease: vEnabled
+                            ? () {
+                                if (!state.isEqEnabled) {
+                                  cubit.setEqualizerEnabled(true);
+                                }
+                                cubit.setVolumeBoost(prevVVal);
+                              }
+                            : null,
+                        child: Slider(
+                          value: vVal,
+                          min: 0.0,
+                          max: 1.0,
+                          onChanged: !vEnabled
                               ? null
                               : (val) {
                                   if (!state.isEqEnabled) {
@@ -2990,8 +3093,10 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   }
                                   cubit.setVolumeBoost(val);
                                 },
-                    ),
-                  ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 if (isOverSafe)
                   Padding(

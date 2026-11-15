@@ -10451,4 +10451,75 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get badgePro => 'PRO';
+
+  @override
+  String get playbackPlayingAnnouncement => 'Playing';
+
+  @override
+  String get playbackPausedAnnouncement => 'Paused';
+
+  @override
+  String queueSongRemoved(String title) {
+    return 'Removed \"$title\" from queue';
+  }
+
+  @override
+  String get commandPaletteTitle => 'Command Palette';
+
+  @override
+  String get commandPaletteHint => 'Type a command or search...';
+
+  @override
+  String get commandPaletteNoResults => 'No matching commands found';
+
+  @override
+  String get commandPaletteSectionRoutes => 'Navigation';
+
+  @override
+  String get commandPaletteSectionActions => 'Playback & Actions';
+
+  @override
+  String get commandPaletteSectionSettings => 'Settings';
+
+  @override
+  String get commandPaletteSectionRecents => 'Recent Tracks';
+
+  @override
+  String get commandPaletteActionPlay => 'Play / Pause';
+
+  @override
+  String get commandPaletteActionShuffle => 'Shuffle All Songs';
+
+  @override
+  String get commandPaletteActionSleepTimer => 'Sleep Timer';
+
+  @override
+  String get commandPaletteActionThemeSwitch => 'Switch Theme';
+
+  @override
+  String get commandPaletteActionEqualizer => 'Open Equalizer';
+
+  @override
+  String get commandPaletteActionAudioQuality => 'Audio Quality & Output';
+
+  @override
+  String get coachMarkDspTitle => 'Essential & Studio DSP';
+
+  @override
+  String get coachMarkDspBody =>
+      'Toggle between curated simple controls and professional studio mastering tools.';
+
+  @override
+  String get coachMarkUsbDacTitle => 'Bit-Perfect Audio Output';
+
+  @override
+  String get coachMarkUsbDacBody =>
+      'Direct hardware stream active. Android system resampler bypassed for authentic bit-exact playback.';
+
+  @override
+  String get coachMarkDockSwipeTitle => 'Customizable Dock Styles';
+
+  @override
+  String get coachMarkDockSwipeBody =>
+      'Swipe up on the mini player or long-press to customize docking modes.';
 }
