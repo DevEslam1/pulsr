@@ -23,6 +23,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Bottom sheet entry point for Quran Mode.
 class QuranModeSheet extends StatelessWidget {
   const QuranModeSheet({super.key});
@@ -239,7 +240,8 @@ class _QuranModePanelState extends State<QuranModePanel> {
                       onChanged: _isApplying
                           ? null
                           : (v) => unawaited(
-                                _runQuranAction(() => cubit.setQuranModeEnabled(v)),
+                                _runQuranAction(
+                                    () => cubit.setQuranModeEnabled(v)),
                               ),
                     ),
                   ),
@@ -701,13 +703,18 @@ class _QuranModePanelState extends State<QuranModePanel> {
     // Valid Quran Metadata card
     final bm = _bookmark;
     final hasTimings = meta.ayahTimings.isNotEmpty;
+    Duration effectiveTimingEnd(Duration end) =>
+        state.duration > Duration.zero && end > state.duration
+            ? state.duration
+            : end;
     var repeatMode = QuranRepeatMode.off;
     if (state.abLoopEnabled && hasTimings) {
-      if (meta.ayahTimings
-          .any((t) => t.start == state.abPointA && t.end == state.abPointB)) {
+      if (meta.ayahTimings.any((t) =>
+          t.start == state.abPointA &&
+          effectiveTimingEnd(t.end) == state.abPointB)) {
         repeatMode = QuranRepeatMode.singleAyah;
       } else if (meta.ayahTimings.first.start == state.abPointA &&
-          meta.ayahTimings.last.end == state.abPointB) {
+          effectiveTimingEnd(meta.ayahTimings.last.end) == state.abPointB) {
         repeatMode = QuranRepeatMode.range;
       }
     }

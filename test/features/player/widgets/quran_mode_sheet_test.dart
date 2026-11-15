@@ -74,6 +74,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() {
+    registerFallbackValue(Duration.zero);
     registerFallbackValue(const QuranMetadata(
         surahNumber: 1,
         surahName: 'Al-Fatihah',
@@ -164,6 +165,74 @@ void main() {
       await tester.tap(find.text('Repeat Ayah'));
       verify(() => cubit.setAbLoopRange(
           const Duration(seconds: 5), const Duration(seconds: 10))).called(1);
+    });
+
+    testWidgets(
+        'P1-9: tapping Repeat Range highlights Repeat Range chip once abLoopEnabled state arrives',
+        (tester) async {
+      final repo = MockQuranRepository();
+      const meta = QuranMetadata(
+          surahNumber: 1,
+          surahName: 'Al-Fatihah',
+          ayahStart: 1,
+          ayahEnd: 7,
+          reciter: 'Reciter',
+          ayahTimings: [
+            QuranAyahTiming(
+                ayahNumber: 1, start: Duration.zero, end: Duration(seconds: 5)),
+            QuranAyahTiming(
+                ayahNumber: 2,
+                start: Duration(seconds: 5),
+                end: Duration(seconds: 12)),
+          ]);
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => meta);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      getIt.registerSingleton<QuranRepository>(repo);
+
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      var current = quranState().copyWith(
+        playback: const PlaybackSlice(
+          currentSong: testSong,
+          duration: Duration(seconds: 10),
+          position: Duration(seconds: 2),
+        ),
+      );
+      final cubit = quranCubit(current);
+      when(() => cubit.state).thenAnswer((_) => current);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+      when(() => cubit.setAbLoopRange(any(), any())).thenAnswer((inv) {
+        final s = inv.positionalArguments[0] as Duration;
+        final e = inv.positionalArguments[1] as Duration;
+        final clampedEnd =
+            current.duration > Duration.zero && e > current.duration
+                ? current.duration
+                : e;
+        current = current.copyWith(
+          playback: current.playback.copyWith(
+            abPointA: s,
+            abPointB: clampedEnd,
+            abLoopEnabled: true,
+          ),
+        );
+        controller.add(current);
+      });
+
+      await tester.pumpWidget(sheetHost(
+          playerCubit: cubit,
+          child: const SingleChildScrollView(child: QuranModePanel())));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Repeat Range'));
+      await tester.tap(find.text('Repeat Range'));
+      await tester.pump();
+      await tester.pump();
+
+      final rangeChip = tester.widget<ChoiceChip>(
+        find.ancestor(
+            of: find.text('Repeat Range'), matching: find.byType(ChoiceChip)),
+      );
+      expect(rangeChip.selected, isTrue);
     });
 
     testWidgets('browsing surahs never rewrites the playing track metadata',
@@ -382,7 +451,8 @@ void main() {
       expect(find.byType(QuranModePanel), findsOneWidget);
     });
 
-    testWidgets('shows custom speed chip when playback speed is outside {0.5, 0.75, 1.0}',
+    testWidgets(
+        'shows custom speed chip when playback speed is outside {0.5, 0.75, 1.0}',
         (tester) async {
       final cubit = quranCubit(quranState(enabled: true, speed: 0.85));
       await tester.pumpWidget(sheetHost(

@@ -24,9 +24,24 @@ extension PlayerPlaybackOptionsLyricsExtension
   }
 
   void setAbLoopRange(Duration start, Duration end) {
-    final songId = _getState().currentSong?.id;
-    _audioHandler.abLoopManager.setA(start, songId: songId);
-    _audioHandler.abLoopManager.setB(end, songId: songId);
+    // AUDIT-FIX (P1-9): validate start < end and clamp bounds to track
+    // duration before mutating A, so invalid bounds cannot clear an active
+    // loop. AbLoopManager.setB already sets _enabled = true (verified in
+    // ab_loop_manager.dart); keep a defensive toggle for non-standard doubles.
+    final s = _getState();
+    final clampedStart = start < Duration.zero ? Duration.zero : start;
+    final duration = s.duration;
+    final clampedEnd =
+        duration > Duration.zero && end > duration ? duration : end;
+    if (clampedEnd <= clampedStart) return;
+    final manager = _abLoopManagerOrNull;
+    if (manager == null) return;
+    final songId = s.currentSong?.id;
+    manager.setA(clampedStart, songId: songId);
+    manager.setB(clampedEnd, songId: songId);
+    if (!manager.isEnabled && manager.hasA && manager.hasB) {
+      manager.toggle();
+    }
     _syncAbLoopFromHandler();
   }
 

@@ -188,6 +188,43 @@ void main() {
       expect(state.abPointB, const Duration(seconds: 8));
       expect(state.abLoopEnabled, isTrue);
     });
+
+    test(
+        'P1-9: setAbLoopRange validates start < end, clamps to track duration, '
+        'and ensures abLoopEnabled is true', () {
+      final handler = _MockAudioHandler();
+      wireAbLoop(handler, songId: 7);
+      var state = PlayerState(
+        playback: PlaybackSlice(
+          currentSong: buildSong(7),
+          duration: const Duration(seconds: 30),
+        ),
+      );
+      final controller =
+          make(handler, getState: () => state, emit: (s) => state = s);
+
+      // Valid range sets and activates loop.
+      controller.setAbLoopRange(
+          const Duration(seconds: 5), const Duration(seconds: 12));
+      expect(state.abLoopEnabled, isTrue);
+      expect(state.abPointA, const Duration(seconds: 5));
+      expect(state.abPointB, const Duration(seconds: 12));
+
+      // Invalid range (end <= start) must be rejected without clearing the
+      // existing loop.
+      controller.setAbLoopRange(
+          const Duration(seconds: 20), const Duration(seconds: 10));
+      expect(state.abLoopEnabled, isTrue);
+      expect(state.abPointA, const Duration(seconds: 5));
+      expect(state.abPointB, const Duration(seconds: 12));
+
+      // End beyond track duration clamps B to track duration.
+      controller.setAbLoopRange(
+          const Duration(seconds: 20), const Duration(seconds: 45));
+      expect(state.abLoopEnabled, isTrue);
+      expect(state.abPointA, const Duration(seconds: 20));
+      expect(state.abPointB, const Duration(seconds: 30));
+    });
   });
 
   group('bookmarks', () {
@@ -384,17 +421,20 @@ void main() {
       expect(await controller.updateLyrics(lines), isFalse);
     });
 
-    test('0.4 expectedSongId mismatch returns false without mutating state', () async {
+    test('0.4 expectedSongId mismatch returns false without mutating state',
+        () async {
       final handler = _MockAudioHandler();
       var state = PlayerState(
         playback: PlaybackSlice(currentSong: buildSong(10, path: '/test.mp3')),
         lyricsSlice: const LyricsSlice(lyrics: []),
       );
       var emitted = false;
-      final controller = make(handler, getState: () => state, emit: (s) {
-        emitted = true;
-        state = s;
-      });
+      final controller = make(handler,
+          getState: () => state,
+          emit: (s) {
+            emitted = true;
+            state = s;
+          });
       final lines = [
         const LyricsLine(timestamp: Duration(seconds: 1), text: 'mismatch'),
       ];
