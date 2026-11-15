@@ -463,5 +463,69 @@ void main() {
 
       expect(find.text('0.85x'), findsOneWidget);
     });
+
+    testWidgets(
+        'P2-15: shows bookmark feedback and updates resume button when currentSong is replaced by enrichment with same id',
+        (tester) async {
+      final repo = MockQuranRepository();
+      const meta = QuranMetadata(
+        surahNumber: 1,
+        surahName: 'Al-Fatihah',
+        ayahStart: 1,
+        ayahEnd: 7,
+        reciter: 'Reciter',
+        ayahTimings: [
+          QuranAyahTiming(
+            ayahNumber: 1,
+            start: Duration.zero,
+            end: Duration(seconds: 5),
+          ),
+        ],
+      );
+      final saveCompleter = Completer<void>();
+      when(() => repo.getMetadataForTrack(any())).thenAnswer((_) async => meta);
+      when(() => repo.getBookmark(any())).thenAnswer((_) async => null);
+      when(() => repo.saveBookmark(any()))
+          .thenAnswer((_) => saveCompleter.future);
+      getIt.registerSingleton<QuranRepository>(repo);
+
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      var current = quranState().copyWith(
+        playback: const PlaybackSlice(
+          currentSong: testSong,
+          position: Duration(seconds: 2),
+        ),
+      );
+      final cubit = quranCubit(current);
+      when(() => cubit.state).thenAnswer((_) => current);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const SingleChildScrollView(child: QuranModePanel()),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Save Quran Bookmark'));
+      await tester.tap(find.text('Save Quran Bookmark'));
+      await tester.pump();
+
+      // Simulate background audio-quality/library enrichment replacing the
+      // SongsTableData instance while preserving the same track id.
+      current = current.copyWith(
+        playback: current.playback.copyWith(
+          currentSong: testSong.copyWith(isFavorite: true),
+        ),
+      );
+      controller.add(current);
+      await tester.pump();
+
+      saveCompleter.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SnackBar), findsOneWidget);
+      expect(find.textContaining('Al-Fatihah • Ayah 1'), findsOneWidget);
+    });
   });
 }

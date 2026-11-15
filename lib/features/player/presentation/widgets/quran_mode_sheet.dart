@@ -798,9 +798,13 @@ class _QuranModePanelState extends State<QuranModePanel> {
                         final saved = await _runBookmarkAction(
                             uri, () => repo.saveBookmark(newBookmark));
                         if (!saved) return;
+                        // AUDIT-FIX (P2-15): Enrichment can replace the SongsTableData
+                        // instance while keeping the same track id; compare ids
+                        // (together with trackUri above) rather than object equality.
                         if (mounted &&
                             _lastLoadedTrackUri == uri &&
-                            cubit.state.currentSong == state.currentSong) {
+                            cubit.state.currentSong?.id ==
+                                state.currentSong?.id) {
                           setState(() => _bookmark = newBookmark);
                           messenger.showSnackBar(
                             SnackBar(
