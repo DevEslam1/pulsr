@@ -17,6 +17,7 @@ import '../../cubit/player_state.dart';
 import 'audio_quality_badge.dart';
 import 'audio_quality_sheet.dart';
 import 'equalizer_sheet.dart';
+import '../themes/player_theme.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../../core/widgets/pulsr_dock_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -116,9 +117,9 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final (playerSliderStyle, currentOutputDevice) =
-        context.select<SettingsCubit, (PlayerSliderStyle, AudioOutputInfo?)>(
-      (c) => (c.state.playerSliderStyle, c.state.currentOutputDevice),
+    final (playerSliderStyle, currentOutputDevice, playerThemeMode) =
+        context.select<SettingsCubit, (PlayerSliderStyle, AudioOutputInfo?, PlayerThemeMode)>(
+      (c) => (c.state.playerSliderStyle, c.state.currentOutputDevice, c.state.playerThemeMode),
     );
     final mq = MediaQuery.of(context);
     final bottomInset = mq.padding.bottom;
@@ -273,22 +274,25 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   ? AppRadii.r8
                                                                   : AppRadii
                                                                       .r12),
-                                                      child: CachedArtwork(
-                                                        id: song.id,
-                                                        albumId: song.albumId,
-                                                        remoteUrl:
-                                                            song.remoteArtworkUrl ??
-                                                                song.artworkUri,
-                                                        type: ArtworkType.AUDIO,
-                                                        size: isShortHeight
-                                                            ? 40
-                                                            : (isCompactBar
-                                                                ? 42
-                                                                : 54),
-                                                        borderRadius:
-                                                            isShortHeight
-                                                                ? 8
-                                                                : 12,
+                                                      child: Hero(
+                                                        tag: nowPlayingArtHeroTag(playerThemeMode),
+                                                        child: CachedArtwork(
+                                                          id: song.id,
+                                                          albumId: song.albumId,
+                                                          remoteUrl:
+                                                              song.remoteArtworkUrl ??
+                                                                  song.artworkUri,
+                                                          type: ArtworkType.AUDIO,
+                                                          size: isShortHeight
+                                                              ? 40
+                                                              : (isCompactBar
+                                                                  ? 42
+                                                                  : 54),
+                                                          borderRadius:
+                                                              isShortHeight
+                                                                  ? 8
+                                                                  : 12,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),

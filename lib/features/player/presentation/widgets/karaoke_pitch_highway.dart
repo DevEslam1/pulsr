@@ -261,20 +261,20 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
                   vertical: 2,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.18),
+                  color: p.warning.withValues(alpha: 0.18),
                   borderRadius: AppRadii.r4All,
                   border: Border.all(
-                    color: Colors.amber.withValues(alpha: 0.45),
+                    color: p.warning.withValues(alpha: 0.45),
                     width: 0.8,
                   ),
                 ),
                 child: Text(
                   context.l10n.simulatedPitchBadge,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.8,
-                    color: Colors.amber,
+                    color: p.warning,
                   ),
                 ),
               ),

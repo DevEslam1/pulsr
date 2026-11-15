@@ -20,7 +20,6 @@ import 'visualizer/milkdrop_renderer.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 enum VisualizerStyle {
   off,
@@ -660,18 +659,22 @@ class AudioVisualizerState extends State<AudioVisualizer>
                   end: 6,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: AppColors.scrimAt(0.55),
+                      color: p.surfaceContainer.withValues(alpha: 0.85),
                       borderRadius: AppRadii.r8All,
+                      border: Border.all(
+                        color: p.warning.withValues(alpha: 0.45),
+                        width: 0.8,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                       child: Text(
                         context.l10n.visualizerCpuFallbackBadge,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: p.warning,
                           fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
@@ -689,16 +692,20 @@ class AudioVisualizerState extends State<AudioVisualizer>
                   start: 6,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: AppColors.scrimAt(0.55),
+                      color: p.surfaceContainer.withValues(alpha: 0.85),
                       borderRadius: AppRadii.r8All,
+                      border: Border.all(
+                        color: p.hairline,
+                        width: 0.8,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                       child: Text(
                         context.l10n.visualizerSimulationNotice,
-                        style: const TextStyle(
-                          color: Colors.white70,
+                        style: TextStyle(
+                          color: p.textSecondary,
                           fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600,
                         ),
