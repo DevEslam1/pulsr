@@ -60,6 +60,8 @@ mixin PlayerQueueOps on PulsrCubit<PlayerState> {
         initialPosition: initialPosition);
   }
 
+  /// Reorders the queue using **post-removal** `newIndex` semantics (`0..queue.length - 1`),
+  /// matching Flutter 3.41 `onReorderItem` and `PulsrAudioHandler.reorderQueue`.
   Future<void> reorderQueue(int oldIndex, int newIndex) =>
       queueController.reorderQueue(oldIndex, newIndex);
 

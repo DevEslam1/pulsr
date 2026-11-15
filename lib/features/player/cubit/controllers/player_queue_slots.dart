@@ -143,8 +143,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
                     .indexWhere((s) => _isSameTrack(s, targetOriginalSong));
               }
               if (safeIdx == -1) {
-                safeIdx =
-                    slotData.currentIndex.clamp(0, validSongs.length - 1);
+                safeIdx = slotData.currentIndex.clamp(0, validSongs.length - 1);
               }
               final song = validSongs[safeIdx];
               final s = _getState();
@@ -294,11 +293,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     _invalidateQueueSyncResolution();
     _audioHandler
         .loadQueue(
-      previousQueue,
-      initialIndex: validIndex,
-      initialPosition: restorePosition,
-      autoPlay: state.isPlaying,
-    )
+          previousQueue,
+          initialIndex: validIndex,
+          initialPosition: restorePosition,
+          autoPlay: state.isPlaying,
+        )
         .whenComplete(_invalidateQueueSyncResolution)
         .catchError((Object e, StackTrace st) {
       ErrorLogger.log('Failed to restore queue in audio handler',
@@ -306,23 +305,34 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     });
   }
 
+  /// Reorder the queue using **post-removal** target index semantics (`0..queue.length - 1`),
+  /// matching Flutter 3.41 `onReorderItem` and `PulsrAudioHandler.reorderQueue`.
+  ///
+  /// Do NOT pass classic `ReorderableListView.onReorder` pre-removal indices (`newIndex > oldIndex`
+  /// shifted by +1, or `newIndex == queue.length`); out-of-range indices are rejected without
+  /// coercion.
   Future<void> reorderQueue(int oldIndex, int newIndex) =>
       _queueMutex.protect(() => _reorderQueueLocked(oldIndex, newIndex));
 
   Future<void> _reorderQueueLocked(int oldIndex, int newIndex) async {
     final state = _getState();
-    var adjustedNewIndex = newIndex;
-    // In Flutter ReorderableListView, dragging to the end passes newIndex == queue.length.
-    if (adjustedNewIndex == state.queue.length) {
-      adjustedNewIndex = state.queue.length - 1;
-    }
+    // AUDIT-FIX (P1-11): Reject out-of-range indices (including classic
+    // ReorderableListView.onReorder's `newIndex == queue.length` sentinel)
+    // instead of coercing them; all callers use post-removal `0..length - 1`.
     if (oldIndex < 0 ||
         oldIndex >= state.queue.length ||
-        adjustedNewIndex < 0 ||
-        adjustedNewIndex >= state.queue.length) {
+        newIndex < 0 ||
+        newIndex >= state.queue.length) {
+      if (newIndex == state.queue.length && state.queue.isNotEmpty) {
+        ErrorLogger.log(
+          'reorderQueue rejected newIndex == queue.length ($newIndex); '
+          'callers must use post-removal 0..queue.length - 1 indices',
+          category: 'PlayerQueueController',
+        );
+      }
       return;
     }
-    final targetIndex = adjustedNewIndex;
+    final targetIndex = newIndex;
     if (oldIndex == targetIndex) return;
 
     final updatedQueue = List<SongsTableData>.from(state.queue);
@@ -512,7 +522,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
             trackTiers: state.trackTiers,
           ),
           playback: stillOnOptimisticNext ? state.playback : s.playback,
-          lyricsSlice: stillOnOptimisticNext ? state.lyricsSlice : s.lyricsSlice,
+          lyricsSlice:
+              stillOnOptimisticNext ? state.lyricsSlice : s.lyricsSlice,
         ));
       }
     }
@@ -695,13 +706,15 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         _bumpQueueVersion();
         _emit(state.copyWith(
           queueSlice: state.queueSlice.copyWith(
-            queue:
-                state.queue.map((s) => s.id == oldId ? safeNewSong : s).toList(),
+            queue: state.queue
+                .map((s) => s.id == oldId ? safeNewSong : s)
+                .toList(),
             trackTiers: updatedTiers,
           ),
           playback: state.playback.copyWith(
-            currentSong:
-                state.currentSong?.id == oldId ? safeNewSong : state.currentSong,
+            currentSong: state.currentSong?.id == oldId
+                ? safeNewSong
+                : state.currentSong,
           ),
         ));
         _updateWidgetThrottled(force: true);
@@ -762,10 +775,11 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       return;
     }
 
-    final isCurrent = (state.currentSong != null && _isSameTrack(state.currentSong, song)) ||
-        (state.currentIndex >= 0 &&
-            state.currentIndex < state.queue.length &&
-            _isSameTrack(state.queue[state.currentIndex], song));
+    final isCurrent =
+        (state.currentSong != null && _isSameTrack(state.currentSong, song)) ||
+            (state.currentIndex >= 0 &&
+                state.currentIndex < state.queue.length &&
+                _isSameTrack(state.queue[state.currentIndex], song));
     if (isCurrent) {
       return;
     }
