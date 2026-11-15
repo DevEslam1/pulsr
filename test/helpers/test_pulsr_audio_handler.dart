@@ -222,6 +222,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   bool get isCrossfeedEnabled => false;
   @override
+  bool get crossfeedEffectiveEnabled => isCrossfeedEnabled;
+  @override
   bool get crossfeedUserEnabled => isCrossfeedEnabled;
   @override
   double get crossfeedDelayUs => 350.0;
@@ -407,7 +409,11 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     double? lookaheadMs,
   }) async {}
   @override
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry, double? predelayMs, double? damping}) async {}
+  Future<void> setReverb(bool enabled,
+      {int? preset,
+      double? wetDry,
+      double? predelayMs,
+      double? damping}) async {}
   @override
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override

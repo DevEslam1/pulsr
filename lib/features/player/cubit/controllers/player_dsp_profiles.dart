@@ -360,8 +360,17 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     if (dspBlockedReason() != null) return; // bit-perfect owns the chain
     final effective =
         s.isCrossfeedEnabled && PlayerDspController.routeWantsCrossfeed(device);
-    // Avoid a redundant native round-trip when the engine already matches.
-    if (effective == _audioHandler.isCrossfeedEnabled) return;
+    // AUDIT-FIX (P1-10): compare desired effective state against the handler's
+    // explicit crossfeedEffectiveEnabled engine state (verified in
+    // audio_handler_dsp_bridge.dart / equalizer_effect_ops.dart), rather than
+    // ambiguous isCrossfeedEnabled when mocks or restore states diverge from pref.
+    var effectiveEngine = false;
+    try {
+      effectiveEngine = _audioHandler.crossfeedEffectiveEnabled;
+    } catch (_) {
+      effectiveEngine = _audioHandler.isCrossfeedEnabled;
+    }
+    if (effective == effectiveEngine) return;
     try {
       await _audioHandler.setCrossfeed(effective,
           delayUs: s.crossfeedDelayUs,

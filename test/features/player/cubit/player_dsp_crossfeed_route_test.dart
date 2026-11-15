@@ -14,10 +14,18 @@ import '../player_test_support.dart';
 /// that getter).
 class CrossfeedHandler extends RecordingAudioHandler {
   bool _xfeed = false;
+  bool _pref = false;
   bool? lastEnabled;
+  bool? lastPref;
 
   @override
   bool get isCrossfeedEnabled => _xfeed;
+
+  @override
+  bool get crossfeedUserEnabled => _pref;
+
+  @override
+  bool get crossfeedEffectiveEnabled => _xfeed;
 
   @override
   Future<void> setCrossfeed(bool enabled,
@@ -28,8 +36,26 @@ class CrossfeedHandler extends RecordingAudioHandler {
       bool? preferenceEnabled}) async {
     calls.add('setCrossfeed');
     lastEnabled = enabled;
+    lastPref = preferenceEnabled;
     _xfeed = enabled;
+    if (preferenceEnabled != null) _pref = preferenceEnabled;
   }
+}
+
+/// Simulates a handler whose legacy [isCrossfeedEnabled] mirrors preference
+/// while [crossfeedEffectiveEnabled] reflects the actual engine bypass state.
+class _PrefSkewedCrossfeedHandler extends CrossfeedHandler {
+  _PrefSkewedCrossfeedHandler(
+      {required bool initialPref, required bool initialEffective}) {
+    _pref = initialPref;
+    _xfeed = initialEffective;
+  }
+
+  @override
+  bool get isCrossfeedEnabled => _pref;
+
+  @override
+  bool get crossfeedEffectiveEnabled => _xfeed;
 }
 
 AudioOutputInfo device({
@@ -140,6 +166,52 @@ void main() {
 
       await controller.reevaluateCrossfeedForRoute(device(bluetooth: true));
       expect(handler.lastEnabled, isTrue); // restored on headphones
+    });
+
+    test(
+        'P1-10: reevaluateCrossfeedForRoute compares against crossfeedEffectiveEnabled '
+        'even when isCrossfeedEnabled reflects preference', () async {
+      final skewed = _PrefSkewedCrossfeedHandler(
+        initialPref: true,
+        initialEffective: false,
+      );
+      state = const PlayerState(dsp: DspSlice(isCrossfeedEnabled: true));
+      final localController = PlayerDspController(
+        audioHandler: skewed,
+        settingsCubit: settings,
+        getState: () => state,
+        emit: (s) => state = s,
+        syncAudioEffects: ({bool force = false}) {},
+        isClosed: () => false,
+      );
+      addTearDown(localController.dispose);
+
+      // Speaker route: effective wanted is false; engine is already bypassed
+      // (crossfeedEffectiveEnabled == false), so do NOT push redundantly even
+      // though isCrossfeedEnabled (preference) is true.
+      await localController
+          .reevaluateCrossfeedForRoute(device(type: 'builtin'));
+      expect(skewed.calls, isEmpty);
+      expect(state.isCrossfeedEnabled, isTrue);
+
+      // Headphone route: effective wanted is true, engine is false -> MUST
+      // push restore with preferenceEnabled: true!
+      await localController
+          .reevaluateCrossfeedForRoute(device(bluetooth: true));
+      expect(skewed.calls, ['setCrossfeed']);
+      expect(skewed.lastEnabled, isTrue);
+      expect(skewed.lastPref, isTrue);
+      expect(skewed.crossfeedEffectiveEnabled, isTrue);
+
+      // Returning to speaker now sees effectiveEngine == true != false -> bypasses
+      // while keeping preferenceEnabled == true.
+      skewed.calls.clear();
+      await localController
+          .reevaluateCrossfeedForRoute(device(type: 'builtin'));
+      expect(skewed.calls, ['setCrossfeed']);
+      expect(skewed.lastEnabled, isFalse);
+      expect(skewed.lastPref, isTrue);
+      expect(state.isCrossfeedEnabled, isTrue);
     });
   });
 

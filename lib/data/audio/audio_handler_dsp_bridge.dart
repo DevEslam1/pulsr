@@ -192,6 +192,9 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   // Native DSP features
   bool get isCrossfeedEnabled => _equalizerManager.isCrossfeedEnabled;
 
+  /// Effective engine state (route-gated); distinct from [crossfeedUserEnabled].
+  bool get crossfeedEffectiveEnabled => _equalizerManager.isCrossfeedEnabled;
+
   /// Persisted user intent (not route-gated); the UI toggle mirrors this.
   bool get crossfeedUserEnabled => _equalizerManager.crossfeedUserEnabled;
 
