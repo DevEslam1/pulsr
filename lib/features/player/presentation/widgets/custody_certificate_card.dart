@@ -1,4 +1,6 @@
 // lib/features/player/presentation/widgets/custody_certificate_card.dart
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path_provider/path_provider.dart';
@@ -11,6 +13,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/services/chain_of_custody_service.dart';
 import '../../../../core/services/custody_certificate_export.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/player_cubit.dart';
 
@@ -18,7 +21,14 @@ import '../../cubit/player_cubit.dart';
 /// certificate. Nothing here claims bit-exactness: the verdict comes from the
 /// digests the native engine measured during a real capture window.
 class CustodyCertificateCard extends StatefulWidget {
-  const CustodyCertificateCard({super.key});
+  const CustodyCertificateCard({
+    super.key,
+    this.service,
+    this.getTempDirectory,
+  });
+
+  final ChainOfCustodyService? service;
+  final Future<Directory> Function()? getTempDirectory;
 
   @override
   State<CustodyCertificateCard> createState() => _CustodyCertificateCardState();
@@ -30,6 +40,7 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
   String? _error;
 
   Future<void> _verify() async {
+    if (_busy) return;
     final cubit = context.read<PlayerCubit>();
     final song = cubit.state.currentSong;
     if (song == null) {
@@ -48,40 +59,81 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
       _error = null;
     });
 
-    final report = await ChainOfCustodyService().verifyChain(
-      trackId: song.id.toString(),
-      trackTitle: '${song.title} — ${song.artist}',
-      filePath: song.path,
-      decoderCodec: song.codec ?? 'Unknown',
-      sourceSampleRate: song.sampleRate ?? 44100,
-      sourceBitDepth: song.bitDepth ?? 16,
-    );
+    // AUDIT-FIX (P0-7): try/catch/finally ensures _busy always clears and
+    // platform/share failures surface cleanly instead of wedging the card.
+    try {
+      final report =
+          await (widget.service ?? ChainOfCustodyService()).verifyChain(
+        trackId: song.id.toString(),
+        trackTitle: '${song.title} — ${song.artist}',
+        filePath: song.path,
+        decoderCodec: song.codec ?? 'Unknown',
+        sourceSampleRate: song.sampleRate ?? 44100,
+        sourceBitDepth: song.bitDepth ?? 16,
+      );
 
-    if (!mounted) return;
-    setState(() {
-      _report = report;
-      _busy = false;
-    });
+      if (!mounted) return;
+      setState(() {
+        _report = report;
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Custody verification failed',
+          error: e, stackTrace: st, category: 'CustodyCertificateCard');
+      if (mounted) {
+        setState(() {
+          _error = context.l10n.somethingWentWrong;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
   }
 
   Future<void> _shareCertificate() async {
+    if (_busy) return;
     final report = _report;
     if (report == null) return;
-    final directory = await getTemporaryDirectory();
-    final artifact =
-        await exportCustodyCertificate(report, directory: directory);
-    final result = await SharePlus.instance.share(ShareParams(
-      text: artifact.jsonText,
-      subject: 'Pulsr chain-of-custody certificate',
-    ));
-    if (!mounted || result.status == ShareResultStatus.dismissed) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(context.l10n.custodyCertificateSaved),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      final directory =
+          await (widget.getTempDirectory ?? getTemporaryDirectory)();
+      final artifact =
+          await exportCustodyCertificate(report, directory: directory);
+      final result = await SharePlus.instance.share(ShareParams(
+        text: artifact.jsonText,
+        subject: 'Pulsr chain-of-custody certificate',
+      ));
+      if (!mounted || result.status == ShareResultStatus.dismissed) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.custodyCertificateSaved),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Custody certificate share failed',
+          error: e, stackTrace: st, category: 'CustodyCertificateCard');
+      if (mounted) {
+        setState(() {
+          _error = context.l10n.somethingWentWrong;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
   }
 
   String _verdictLabel(ChainOfCustodyReport report) {
@@ -140,14 +192,14 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
               ),
               IconButton(
                 onPressed: _busy ? null : _verify,
-                tooltip: _busy ? l10n.custodyVerifying : l10n.custodyVerifyTitle,
+                tooltip:
+                    _busy ? l10n.custodyVerifying : l10n.custodyVerifyTitle,
                 icon: Icon(
                   _busy ? Icons.hourglass_top_rounded : Icons.verified_outlined,
                   color: p.accent,
                   size: 20,
                 ),
-                constraints: const BoxConstraints(
-                    minWidth: 44, minHeight: 44),
+                constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               ),
             ],
           ),
@@ -157,7 +209,8 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: Text(
                 _error!,
-                style: TextStyle(fontSize: AppFontSize.label, color: p.textSecondary),
+                style: TextStyle(
+                    fontSize: AppFontSize.label, color: p.textSecondary),
               ),
             ),
           if (report != null) ...[
@@ -191,12 +244,14 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
                   : '${report.measurement!.frames} frames · '
                       '${report.measurement!.windowMs.toStringAsFixed(1)} ms · '
                       'in ${report.measurement!.inputSha256.substring(0, 12)}…',
-              style: TextStyle(fontSize: AppFontSize.tiny, color: p.textSecondary),
+              style:
+                  TextStyle(fontSize: AppFontSize.tiny, color: p.textSecondary),
             ),
             if (report.measurement != null)
               Text(
                 'out ${report.measurement!.outputSha256.substring(0, 12)}…',
-                style: TextStyle(fontSize: AppFontSize.tiny, color: p.textSecondary),
+                style: TextStyle(
+                    fontSize: AppFontSize.tiny, color: p.textSecondary),
               ),
             if (report.limitations.isNotEmpty)
               Padding(
@@ -211,7 +266,7 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
             Align(
               alignment: AlignmentDirectional.centerEnd,
               child: TextButton(
-                onPressed: _shareCertificate,
+                onPressed: _busy ? null : _shareCertificate,
                 child: Text(l10n.share),
               ),
             ),
