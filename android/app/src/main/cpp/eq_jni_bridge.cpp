@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -55,6 +56,55 @@ inline FilterType toFilterType(jint type) {
         return FilterType::Peaking;
     }
     return static_cast<FilterType>(type);
+}
+
+// Key DSD decoders by caller streamId in a bounded LRU map rather than thread_local
+// so decoder thread migrations (e.g. ExoPlayer worker pools) retain CIC/FIR state.
+std::atomic<uint64_t> gDsdResetGeneration{1};
+
+struct CachedDsdDecoder {
+    std::mutex mutex;
+    DsdDecoder decoder;
+    jlong streamId = 0;
+    jint dsdRate = -1;
+    jint targetRate = -1;
+    jint bitOrder = -1;
+    uint64_t lastResetGen = 0;
+    uint64_t lastUsedTick = 0;
+};
+
+constexpr size_t kMaxCachedDsdStreams = 8;
+std::mutex gDsdCacheMutex;
+std::vector<std::shared_ptr<CachedDsdDecoder>> gDsdDecoders;
+uint64_t gDsdCacheTick = 0;
+
+std::shared_ptr<CachedDsdDecoder> acquireDsdDecoder(jlong streamId) {
+    std::lock_guard<std::mutex> lock(gDsdCacheMutex);
+    const uint64_t tick = ++gDsdCacheTick;
+    for (const auto& entry : gDsdDecoders) {
+        if (entry && entry->streamId == streamId) {
+            entry->lastUsedTick = tick;
+            return entry;
+        }
+    }
+    if (gDsdDecoders.size() < kMaxCachedDsdStreams) {
+        auto entry = std::make_shared<CachedDsdDecoder>();
+        entry->streamId = streamId;
+        entry->lastUsedTick = tick;
+        gDsdDecoders.push_back(entry);
+        return entry;
+    }
+    size_t lruIdx = 0;
+    for (size_t i = 1; i < gDsdDecoders.size(); ++i) {
+        if (gDsdDecoders[i]->lastUsedTick < gDsdDecoders[lruIdx]->lastUsedTick) {
+            lruIdx = i;
+        }
+    }
+    auto entry = std::make_shared<CachedDsdDecoder>();
+    entry->streamId = streamId;
+    entry->lastUsedTick = tick;
+    gDsdDecoders[lruIdx] = entry;
+    return entry;
 }
 }  // namespace
 
@@ -496,27 +546,11 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerQuality(
     });
 }
 
-namespace {
-// Thread-local DSD decoder caches mean reset() must be broadcast through a
-// generation counter; resetting only the calling thread left every other
-// render thread with stale CIC/FIR/DC-blocker state.
-std::atomic<uint64_t> gDsdResetGeneration{1};
-
-struct CachedDsdDecoder {
-    DsdDecoder decoder;
-    jint dsdRate = -1;
-    jint targetRate = -1;
-    jint bitOrder = -1;
-    uint64_t lastResetGen = 0;
-};
-thread_local CachedDsdDecoder sDecoderCache;
-} // namespace
-
 JNIEXPORT jfloatArray JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         JNIEnv* env, jobject /* thiz */,
-        jbyteArray dsdL, jbyteArray dsdR, jint byteCount, jint dsdRate, jint targetPcmSampleRate, jint bitOrder,
-        jboolean resetState) {
+        jbyteArray dsdL, jbyteArray dsdR, jint byteCount, jint dsdRate,
+        jint targetPcmSampleRate, jint bitOrder, jboolean resetState, jlong streamId) {
     if (!dsdL || !dsdR || byteCount <= 0) return nullptr;
     constexpr int kMaxDsdByteCount = 16 * 1024 * 1024; // 16 MB max per chunk
     if (byteCount > kMaxDsdByteCount) return nullptr;
@@ -540,22 +574,25 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
     try {
         // bitOrder contract: 0 = LSB first (DSF), 1 = MSB first (DFF)
         auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
+        auto entry = acquireDsdDecoder(streamId);
+        std::lock_guard<std::mutex> entryLock(entry->mutex);
+
         const uint64_t resetGen = gDsdResetGeneration.load(std::memory_order_acquire);
-        if (sDecoderCache.dsdRate != dsdRate ||
-            sDecoderCache.targetRate != targetPcmSampleRate ||
-            sDecoderCache.bitOrder != bitOrder) {
-            sDecoderCache.decoder.configure(
+        if (entry->dsdRate != dsdRate ||
+            entry->targetRate != targetPcmSampleRate ||
+            entry->bitOrder != bitOrder) {
+            entry->decoder.configure(
                 static_cast<DsdDecoder::DsdRate>(dsdRate), targetPcmSampleRate, dsdBitOrder);
-            sDecoderCache.dsdRate = dsdRate;
-            sDecoderCache.targetRate = targetPcmSampleRate;
-            sDecoderCache.bitOrder = bitOrder;
-            sDecoderCache.lastResetGen = resetGen;
-        } else if (resetState || sDecoderCache.lastResetGen != resetGen) {
-            sDecoderCache.decoder.reset();
-            sDecoderCache.lastResetGen = resetGen;
+            entry->dsdRate = dsdRate;
+            entry->targetRate = targetPcmSampleRate;
+            entry->bitOrder = bitOrder;
+            entry->lastResetGen = resetGen;
+        } else if (resetState || entry->lastResetGen != resetGen) {
+            entry->decoder.reset();
+            entry->lastResetGen = resetGen;
         }
 
-        int maxOutFrames = sDecoderCache.decoder.getExpectedPcmFrames(byteCount);
+        int maxOutFrames = entry->decoder.getExpectedPcmFrames(byteCount);
         constexpr int kMaxPcmFrames = 4 * 1024 * 1024;
         if (maxOutFrames <= 0 || maxOutFrames > kMaxPcmFrames) {
             env->ReleaseByteArrayElements(dsdL, lData, JNI_ABORT);
@@ -565,7 +602,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
 
         std::vector<float> pcmOut(maxOutFrames * 2);
 
-        int actualFrames = sDecoderCache.decoder.decodeDsdBytes(
+        int actualFrames = entry->decoder.decodeDsdBytes(
                 reinterpret_cast<const uint8_t*>(lData),
                 reinterpret_cast<const uint8_t*>(rData),
                 byteCount,
@@ -592,7 +629,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeResetDsdDecoder(
         JNIEnv* /* env */, jobject /* thiz */) {
-    // Bump the generation so every thread-local cache resets on its next chunk.
+    // Bump the generation so all cached stream decoders reset on their next chunk.
     gDsdResetGeneration.fetch_add(1, std::memory_order_release);
 }
 
@@ -715,11 +752,11 @@ JNIEXPORT jdoubleArray JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetTelemetry(
         JNIEnv* env, jobject /* thiz */) {
     DspEngineRegistry::instance().drainRetireQueues();
-    double telemetry[17] = {};
-    DspEngineRegistry::instance().getTelemetry(telemetry, 17);
-    jdoubleArray result = env->NewDoubleArray(17);
+    double telemetry[19] = {};
+    DspEngineRegistry::instance().getTelemetry(telemetry, 19);
+    jdoubleArray result = env->NewDoubleArray(19);
     if (result) {
-        env->SetDoubleArrayRegion(result, 0, 17, telemetry);
+        env->SetDoubleArrayRegion(result, 0, 19, telemetry);
     }
     return result;
 }

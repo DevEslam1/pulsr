@@ -103,10 +103,11 @@ private:
 
     int getOrRegisterVar(const std::string& name);
     bool compileScript(const std::string& code);
-    void executeBytecode(const std::vector<Instruction>& program, std::vector<double>& memory);
+    void executeBytecode(const std::vector<Instruction>& program, std::vector<double>& memory, int maxFuel);
     void applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>& program, const double* initialSliders = nullptr);
 
     static constexpr int MAX_BYTECODE = 8192;
+    static constexpr int MAX_SAMPLE_FUEL = 2048;
     static constexpr int MAX_MEMORY = 2048;
 
     // Identity of the last published prepared program, for change detection.

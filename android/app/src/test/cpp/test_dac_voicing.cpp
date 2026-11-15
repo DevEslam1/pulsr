@@ -425,6 +425,33 @@ int main() {
         check(allFinite, "DacVoicing must sanitize NaN/Inf inputs cleanly");
     }
 
+    // --- Multichannel (>MAX_CHANNELS) stride preservation ---
+    {
+        DacVoicing dv;
+        dv.setSampleRate(48000.0);
+        dv.applyParams(voicingParams(true, DacVoicing::Sharp, 1.0));
+        dv.setEnabled(true);
+        const int frames = 64;
+        const int stride = 10; // > DacVoicing::MAX_CHANNELS (8)
+        std::vector<float> buf(frames * stride, 0.0f);
+        for (int f = 0; f < frames; ++f) {
+            for (int c = 0; c < 8; ++c) {
+                buf[f * stride + c] = 0.25f * std::sin(2.0f * static_cast<float>(M_PI) * 1000.0f * f / 48000.0f);
+            }
+            buf[f * stride + 8] = 0.777f;
+            buf[f * stride + 9] = -0.555f;
+        }
+        dv.processInterleaved(buf.data(), frames, stride);
+        bool preserved = true;
+        for (int f = 0; f < frames; ++f) {
+            if (buf[f * stride + 8] != 0.777f || buf[f * stride + 9] != -0.555f) {
+                preserved = false;
+                break;
+            }
+        }
+        check(preserved, "DacVoicing must preserve stride and leave channels >= MAX_CHANNELS untouched");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " DAC voicing check(s) failed." << std::endl;
         return 1;

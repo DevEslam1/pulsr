@@ -30,6 +30,7 @@ class DnsLiteralTest {
 
     @Test
     fun acceptsValidIpv6AndEmbeddedIpv4Literals() {
+        assertTrue(DnsOverHttpsResolver.isNumericIp("::"))
         assertTrue(DnsOverHttpsResolver.isNumericIp("::1"))
         assertTrue(DnsOverHttpsResolver.isNumericIp("2001:db8::1"))
         assertTrue(DnsOverHttpsResolver.isNumericIp("fe80::1ff:fe23:4567:890a"))
@@ -41,7 +42,6 @@ class DnsLiteralTest {
 
     @Test
     fun rejectsMalformedIpv6GroupCountsCompressionsAndEmbeddedIpv4() {
-        assertFalse(DnsOverHttpsResolver.isNumericIp("::"))
         assertFalse(DnsOverHttpsResolver.isNumericIp(":::"))
         assertFalse(DnsOverHttpsResolver.isNumericIp("1::2::3"))
         assertFalse(DnsOverHttpsResolver.isNumericIp("1:2:3:4:5:6:7:8:9"))

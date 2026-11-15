@@ -46,6 +46,7 @@ import 'position_crash_guard.dart';
 import 'ytm_resolving_source.dart';
 import '../../core/services/ytm_cache_manager.dart';
 import '../../core/utils/l10n_holder.dart';
+import '../../core/utils/platform_capabilities.dart';
 import 'adaptive_buffer_engine.dart';
 import 'audio_memory_manager.dart';
 import 'battery_aware_playback.dart';
@@ -585,6 +586,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   bool _isBitPerfectBypassEnabled() {
+    final transport = _bitPerfectTransportBypass;
+    if (transport != null) return transport;
     final prefs = _cachedPrefs;
     return (prefs?.getBool(PrefsKeys.strictBitPerfect) ?? false) ||
         ((prefs?.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
@@ -830,6 +833,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
         unawaited(_refreshBluetoothRoute());
         unawaited(_recordSessionRouteChange());
+        // STREAM_MUSIC volume is per-route on Android; re-seed so a bypassed
+        // (bit-perfect / AAudio / USB) output does not keep the old route's gain.
+        unawaited(_refreshLoudnessContourFromSystemVolume());
       },
     );
     if (getIt.isRegistered<EqualizerManager>()) {
@@ -1275,6 +1281,11 @@ class PulsrAudioHandler extends BaseAudioHandler
           _playerA.setSkipSilenceEnabled(false),
           _playerB.setSkipSilenceEnabled(false),
         ]);
+        // Entering bypass shifts output gain ownership from the Android
+        // STREAM_MUSIC mixer to the app/DAC path; seed [_volume] from the
+        // system level immediately so playback cannot start at unity (1.0).
+        final volumeSync = _syncOutputVolumeBeforeLoad();
+        if (volumeSync != null) await volumeSync;
       } else if (previous == true) {
         await restorePersistedSpeed();
         final skip = silenceSkipController.enabled;
@@ -1321,7 +1332,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// system reading is available yet.
   Future<void> _feedLoudnessContourVolume() async {
     double ratio = _volume; // software fallback
-    if (Platform.isAndroid && _equalizerManager.isLoudnessContourEnabled) {
+    if (PlatformCapabilities.isAndroid && _equalizerManager.isLoudnessContourEnabled) {
       final sys = _lastSystemVolumeRatio;
       if (sys != null && sys.isFinite && sys >= 0.0) {
         ratio = sys;
@@ -1339,8 +1350,56 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// loudness contour (used on cold start and track start). Only queries while
   /// the contour is engaged on Android; otherwise defers to the software
   /// fallback in [_feedLoudnessContourVolume].
-  Future<void> _refreshLoudnessContourFromSystemVolume() async {
-    if (Platform.isAndroid && _equalizerManager.isLoudnessContourEnabled) {
+  /// Awaited before a queue/track load so a bypassed output (bit-perfect,
+  /// AAudio, direct USB) never starts a track on a stale in-app volume.
+  /// Bounded so a slow platform channel cannot delay playback noticeably.
+  /// Whether [PulsrAudioHandler] should seed [_volume] from Android's system
+  /// STREAM_MUSIC level before starting or switching into a bypassed output.
+  @visibleForTesting
+  static bool shouldSeedSystemVolume({
+    required bool isAndroid,
+    required bool dvcEnabled,
+    required bool hardwareVolumeOwnsOutput,
+    required bool forwardSystemVolume,
+    bool forceUsbHardwareSeed = false,
+    bool externalHardwareVolumeSet = false,
+  }) {
+    if (!isAndroid || dvcEnabled || !forwardSystemVolume) return false;
+    if (!hardwareVolumeOwnsOutput) return true;
+    return forceUsbHardwareSeed && !externalHardwareVolumeSet;
+  }
+
+  @override
+  Future<void>? _syncOutputVolumeBeforeLoad() {
+    final shouldSeed = shouldSeedSystemVolume(
+      isAndroid: PlatformCapabilities.isAndroid,
+      dvcEnabled: _dvcEnabled,
+      hardwareVolumeOwnsOutput: _hardwareVolumeOwnsOutput(),
+      forwardSystemVolume: _shouldForwardSystemVolumeToOutput(),
+    );
+    if (!shouldSeed) {
+      return null;
+    }
+    return _refreshLoudnessContourFromSystemVolume()
+        .timeout(const Duration(milliseconds: 400))
+        .catchError((Object _) {
+      // Best effort: the track-start / volume-event paths still correct it.
+    });
+  }
+
+  Future<void> _refreshLoudnessContourFromSystemVolume({
+    bool forceUsbHardwareSeed = false,
+  }) async {
+    final shouldSeed = shouldSeedSystemVolume(
+      isAndroid: PlatformCapabilities.isAndroid,
+      dvcEnabled: _dvcEnabled,
+      hardwareVolumeOwnsOutput: _hardwareVolumeOwnsOutput(),
+      forwardSystemVolume: _shouldForwardSystemVolumeToOutput(),
+      forceUsbHardwareSeed: forceUsbHardwareSeed,
+      externalHardwareVolumeSet: _externalHardwareVolumeSet,
+    );
+    if (PlatformCapabilities.isAndroid &&
+        (_equalizerManager.isLoudnessContourEnabled || shouldSeed)) {
       try {
         final sys = await AudioEffectsChannel().getSystemMusicVolume();
         if (sys.isFinite && sys >= 0.0) {
@@ -1350,6 +1409,20 @@ class PulsrAudioHandler extends BaseAudioHandler
         ErrorLogger.log('Failed to query system music volume for loudness',
             error: e, stackTrace: st, category: 'AudioHandler');
       }
+    }
+    // Bit-perfect / AAudio / direct-USB bypass Android's mixer, so the output
+    // gain IS the system volume. [_volume] defaults to 1.0 and was only ever
+    // updated by volume-key events, so the first track after launch (or after
+    // enabling bit-perfect) played at full scale. Seed it from the system level.
+    final sys = _lastSystemVolumeRatio;
+    if (shouldSeed && sys != null && (sys - _volume).abs() > 1e-4) {
+      _volume = sys;
+      if (!_volumeSubject.isClosed) _volumeSubject.add(_volume);
+      _volumeController?.updateSettings(userVolume: _volume);
+      await Future.wait([
+        _pushUsbHardwareVolume(),
+        _reapplyActiveVolume(),
+      ]);
     }
     await _feedLoudnessContourVolume();
   }
@@ -1375,6 +1448,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   bool _hardwareVolumeOwned = false;
   bool? _usbHardwareVolumeOverride;
+  bool _externalHardwareVolumeSet = false;
   double _lastDirectUsbVolume = -1.0;
 
   bool _isUsbHardwareVolumeEnabled() =>
@@ -1393,6 +1467,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     return bitPerfectBypass || aaudioOutputEnabled || directUsbStreaming;
   }
 
+  @override
   bool _shouldForwardSystemVolumeToOutput() {
     final prefs = _cachedPrefs;
     return shouldForwardSystemVolumeToOutput(
@@ -1402,8 +1477,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
   }
 
-  Future<void> _syncDirectUsbVolume(double appliedPlayerVolume) async {
-    if (!Platform.isAndroid) return;
+  Future<void> _syncDirectUsbVolume(
+    double appliedPlayerVolume, {
+    SongsTableData? song,
+  }) async {
+    if (!PlatformCapabilities.isAndroid) return;
     final streamingUsb = UsbExclusiveService().lastStatus.streamingActive;
     if (!streamingUsb) {
       if (_lastDirectUsbVolume >= 0.0 &&
@@ -1414,7 +1492,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       return;
     }
     final directGain =
-        (!_hardwareVolumeOwnsOutput() && !_isSongDopActive(currentSong))
+        (!_hardwareVolumeOwnsOutput() && !_isSongDopActive(song ?? currentSong))
             ? appliedPlayerVolume.clamp(0.0, 1.0)
             : 1.0;
     if (_lastDirectUsbVolume >= 0.0 &&
@@ -1423,6 +1501,44 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _lastDirectUsbVolume = directGain;
     await AudioEffectsChannel().setDirectUsbVolume(directGain);
+  }
+
+  /// Applies [targetVolume] (scaled by [_sleepFadeFactor]) to both [player]
+  /// and the native Direct USB gain stage so track starts, gapless transitions,
+  /// and live volume updates never diverge.
+  @override
+  Future<void> _applyPlayerOutputVolume(
+    AudioPlayer player,
+    double targetVolume, {
+    SongsTableData? song,
+  }) async {
+    final applied = (targetVolume * _sleepFadeFactor).clamp(0.0, 1.0);
+    await Future.wait([
+      _syncDirectUsbVolume(applied, song: song),
+      player.setVolume(applied),
+    ]);
+  }
+
+  Future<void> _onDirectUsbStreamingStarted(UsbExclusiveStatus status) async {
+    if (_disposed) return;
+    // Seed [_volume] from Android STREAM_MUSIC before pushing hardware or
+    // Direct USB software gain so a freshly opened stream (cold start,
+    // follow-track rate change, or toggle) never starts at unity (1.0).
+    if (!_dvcEnabled) {
+      await _refreshLoudnessContourFromSystemVolume(
+        forceUsbHardwareSeed: true,
+      );
+    }
+    if (_disposed) return;
+    if (_isUsbHardwareVolumeEnabled() && !status.hardwareVolumeApplied) {
+      await _pushUsbHardwareVolume();
+    }
+    if (_disposed) return;
+    // Always sync the freshly opened Direct USB stream (unless hardware volume
+    // already owns output, in which case _syncDirectUsbVolume resets to 1.0)
+    // so DACs without UAC2 volume control attenuate immediately.
+    _lastDirectUsbVolume = -1.0;
+    await _reapplyActiveVolume();
   }
 
   /// Software gain may only be released when the DAC itself is holding the
@@ -1657,7 +1773,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// when software gain is released. Latest-wins: at most one control transfer
   /// is in flight and a drag collapses to its final value.
   Future<void> _pushUsbHardwareVolume() async {
-    if (!Platform.isAndroid) return;
+    if (!PlatformCapabilities.isAndroid) return;
     if (!_isUsbHardwareVolumeEnabled()) {
       return;
     }
@@ -1695,10 +1811,18 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Unit to 0 dB and restores Direct USB/software attenuation without a jump.
   Future<void> syncUsbHardwareVolumeState(bool enabled) async {
     _usbHardwareVolumeOverride = enabled;
-    if (!enabled && Platform.isAndroid) {
-      await UsbExclusiveService().resetHardwareVolume();
+    if (!enabled) {
+      _externalHardwareVolumeSet = false;
+      if (PlatformCapabilities.isAndroid) {
+        await UsbExclusiveService().resetHardwareVolume();
+      }
     }
     if (enabled) {
+      if (!_dvcEnabled) {
+        await _refreshLoudnessContourFromSystemVolume(
+          forceUsbHardwareSeed: true,
+        );
+      }
       await _pushUsbHardwareVolume();
     }
     _hardwareVolumeOwned = _hardwareVolumeOwnsOutput();
@@ -1719,6 +1843,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       maxDb: maxDb,
     );
     if (!linear.isFinite) return;
+    _externalHardwareVolumeSet = true;
     _volume = linear.clamp(0.0, 1.0);
     if (!_volumeSubject.isClosed) {
       _volumeSubject.add(_volume);
@@ -1727,6 +1852,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> setVolume(double volume) async {    // NaN.clamp() returns NaN, which would poison every composed gain after it.
+    _externalHardwareVolumeSet = false;
     _volume = volume.isFinite ? volume.clamp(0.0, 1.0) : _volume;
     if (!_volumeSubject.isClosed) {
       _volumeSubject.add(_volume);
@@ -1755,9 +1881,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           error: e, stackTrace: st, category: 'AudioHandler');
     }
     if (!_crossfadeManager.isCrossfading) {
-      final applied = (target * _sleepFadeFactor).clamp(0.0, 1.0);
-      unawaited(_syncDirectUsbVolume(applied));
-      await _activePlayer.setVolume(applied);
+      await _applyPlayerOutputVolume(_activePlayer, target, song: song);
     }
   }
 
@@ -1771,13 +1895,13 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// No-op while a crossfade is running: the CrossfadeManager owns both
   /// players' live volume ramps then (same contract the duck-end guard uses),
   /// so this must not fight it.
+  @override
   Future<void> _reapplyActiveVolume() async {
     if (_crossfadeManager.isCrossfading) return;
-    final target = _calculateReplayGainVolume(currentSong);
+    final song = currentSong;
+    final target = _calculateReplayGainVolume(song);
     try {
-      final applied = (target * _sleepFadeFactor).clamp(0.0, 1.0);
-      unawaited(_syncDirectUsbVolume(applied));
-      await _activePlayer.setVolume(applied);
+      await _applyPlayerOutputVolume(_activePlayer, target, song: song);
     } catch (e, st) {
       ErrorLogger.log('Failed to re-apply active player volume',
           error: e, stackTrace: st, category: 'AudioHandler');
@@ -1827,6 +1951,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       _dvcEnabled = false;
       _volumeController?.setDvcEnabled(false);
       await AudioEffectsChannel().setDvcEnabled(false);
+      if (_shouldForwardSystemVolumeToOutput() && (_volume - 1.0).abs() < 1e-4) {
+        final volumeSync = _syncOutputVolumeBeforeLoad();
+        if (volumeSync != null) await volumeSync;
+      }
     }
     // Re-apply the current volume so the new gain stage takes effect now.
     await setVolume(_volume);
@@ -2089,15 +2217,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (_disposed) return;
       final startedStreaming = !wasDirectStreaming && status.streamingActive;
       wasDirectStreaming = status.streamingActive;
+      if (!status.streamingActive) {
+        _externalHardwareVolumeSet = false;
+        _lastDirectUsbVolume = -1.0;
+      }
       if (startedStreaming) {
-        if (_isUsbHardwareVolumeEnabled() && !status.hardwareVolumeApplied) {
-          unawaited(_pushUsbHardwareVolume());
-        } else {
-          // Force the active target onto a freshly opened Direct USB stream
-          // instead of leaving its native gain initialized to full scale (1.0).
-          _lastDirectUsbVolume = -1.0;
-          unawaited(_reapplyActiveVolume());
-        }
+        unawaited(_onDirectUsbStreamingStarted(status));
       }
       final owned = _hardwareVolumeOwnsOutput();
       if (owned == _hardwareVolumeOwned) return;
@@ -2879,6 +3004,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
         final forwardToOutput = _shouldForwardSystemVolumeToOutput();
         if (forwardToOutput && clamped != null) {
+          _externalHardwareVolumeSet = false;
           _volume = clamped;
           if (!_volumeSubject.isClosed) {
             _volumeSubject.add(_volume);

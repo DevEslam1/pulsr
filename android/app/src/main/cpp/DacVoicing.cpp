@@ -235,6 +235,7 @@ void DacVoicing::reset() {
 
 void DacVoicing::processInterleaved(float* buffer, int frames, int channels) {
     if (!buffer || frames <= 0 || channels <= 0) return;
+    const int stride = channels;
     channels = std::min(channels, MAX_CHANNELS);
 
     // Fully bypassed: bit-exact passthrough (the engine may still call the
@@ -259,7 +260,7 @@ void DacVoicing::processInterleaved(float* buffer, int frames, int channels) {
         const float voicing = smoothedVoicing_;
 
         for (int ch = 0; ch < channels; ++ch) {
-            float in = buffer[f * channels + ch];
+            float in = buffer[f * stride + ch];
             if (!std::isfinite(in)) in = 0.0f;
 
             const int dryRead = (dryPos_ - delayBase_ + MAX_DELAY * 2) % MAX_DELAY;
@@ -310,7 +311,7 @@ void DacVoicing::processInterleaved(float* buffer, int frames, int channels) {
                 wet = delayed;
             }
 
-            buffer[f * channels + ch] = s * wet + (1.0f - s) * dryOut;
+            buffer[f * stride + ch] = s * wet + (1.0f - s) * dryOut;
         }
 
         decimIdx_ = (decimIdx_ + OVERSAMPLE) % FIR_TAPS;

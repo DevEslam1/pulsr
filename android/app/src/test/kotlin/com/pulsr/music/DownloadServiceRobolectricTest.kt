@@ -128,5 +128,21 @@ class DownloadServiceRobolectricTest {
 
         service.onStartCommand(updateIntent(service, "v2", 100), 0, 6)
         assertEquals(listOf("v2"), completed)
+        service.onDestroy()
+    }
+
+    @Test
+    fun updateProgressDispatchesInProcessToLiveServiceWithoutStartService() {
+        val controller = Robolectric.buildService(DownloadService::class.java).create()
+        val service = controller.get()
+        val context = RuntimeEnvironment.getApplication()
+        service.onStartCommand(startIntent(service, "v-live"), 0, 1)
+
+        DownloadService.updateProgress(context, "v-live", "Track v-live", 100)
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+
+        assertEquals(listOf("v-live"), completed)
+        assertEquals(null, org.robolectric.Shadows.shadowOf(context).nextStartedService)
+        controller.destroy()
     }
 }

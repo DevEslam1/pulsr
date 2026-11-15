@@ -818,6 +818,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         if (tunnelingEnabled) sink.enableTunnelingV21();
     }
 
+    @SuppressWarnings("deprecation")
     private Inner createInner(Mode requested) {
         if (innerFactory != null) {
             return innerFactory.create(requested == Mode.AAUDIO, requested == Mode.FLOAT);

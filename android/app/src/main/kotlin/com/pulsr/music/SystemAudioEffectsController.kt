@@ -103,11 +103,32 @@ class SystemAudioEffectsController(private val context: Context) {
         }
     }
 
+    internal interface ManagedEffectHandle {
+        fun hasControl(): Boolean
+        var enabled: Boolean
+        fun release()
+    }
+
+    private data class ManagedEffect(
+        val handle: ManagedEffectHandle,
+        val priorEnabled: Boolean,
+    )
+
+    private fun AudioEffect.asHandle(): ManagedEffectHandle = object : ManagedEffectHandle {
+        override fun hasControl(): Boolean = this@asHandle.hasControl()
+        override var enabled: Boolean
+            get() = this@asHandle.enabled
+            set(value) {
+                this@asHandle.enabled = value
+            }
+        override fun release() = this@asHandle.release()
+    }
+
     private var currentStatus: Status = Status.UNKNOWN
     private var currentPolicy: Policy = Policy.AUTO
     private var detectedBundles: MutableList<String> = mutableListOf()
     private var partiallyBypassedEffects: MutableList<String> = mutableListOf()
-    private var managedEffects: MutableList<AudioEffect> = mutableListOf()
+    private var managedEffects: MutableList<ManagedEffect> = mutableListOf()
 
     fun getStatus(): Status = currentStatus
     fun getDetectedBundles(): List<String> = detectedBundles.toList()
@@ -211,9 +232,10 @@ class SystemAudioEffectsController(private val context: Context) {
                     try {
                         val effect = createEffectSafely(desc.type, desc.uuid, 0, 0)
                         if (effect != null && effect.hasControl()) {
+                            val priorEnabled = try { effect.enabled } catch (_: Exception) { false }
                             effect.enabled = false
                             if (!effect.enabled) {
-                                managedEffects.add(effect)
+                                managedEffects.add(ManagedEffect(effect.asHandle(), priorEnabled))
                                 silencedDescriptors++
                             } else {
                                 // Still processing: this is the honest content of
@@ -295,10 +317,19 @@ class SystemAudioEffectsController(private val context: Context) {
         }
     }
 
+    internal fun registerManagedEffectForTesting(handle: ManagedEffectHandle, priorEnabled: Boolean) {
+        managedEffects.add(ManagedEffect(handle, priorEnabled))
+    }
+
     private fun releaseManagedEffects() {
-        for (effect in managedEffects) {
+        for (managed in managedEffects) {
             try {
-                effect.release()
+                if (managed.priorEnabled && managed.handle.hasControl()) {
+                    managed.handle.enabled = true
+                }
+            } catch (_: Exception) {}
+            try {
+                managed.handle.release()
             } catch (_: Exception) {}
         }
         managedEffects.clear()

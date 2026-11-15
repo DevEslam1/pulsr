@@ -246,6 +246,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void configure(Format format, int bufferSize, int[] outputChannels)
             throws ConfigurationException {
         if (pendingInput != null) {
@@ -570,6 +571,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     public void flush() {
         eosQueued = false;
         if (frameEditor != null) frameEditor.flush();

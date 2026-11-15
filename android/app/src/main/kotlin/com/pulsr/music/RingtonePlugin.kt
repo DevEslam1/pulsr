@@ -213,8 +213,20 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
         val fileName = displayName
         val mimeType = normalizeMime(sourceMime, fileName)
 
-        // 1. Try querying MediaStore by DISPLAY_NAME and SIZE to prevent wrong file collision
-        val projection = arrayOf(MediaStore.Audio.Media._ID)
+        val relativeFolder = when (ringtoneType) {
+            RingtoneManager.TYPE_NOTIFICATION -> "${Environment.DIRECTORY_NOTIFICATIONS}/"
+            RingtoneManager.TYPE_ALARM -> "${Environment.DIRECTORY_ALARMS}/"
+            else -> "${Environment.DIRECTORY_RINGTONES}/"
+        }
+
+        // 1. Try querying MediaStore by DISPLAY_NAME and SIZE, then verify the
+        // actual underlying bytes/path match so distinct files sharing name+size
+        // cannot collide.
+        @Suppress("DEPRECATION")
+        val projection = arrayOf(
+            MediaStore.Audio.Media._ID,
+            MediaStore.Audio.Media.DATA,
+        )
         val selection = "${MediaStore.Audio.Media.DISPLAY_NAME}=? AND ${MediaStore.Audio.Media.SIZE}=? AND ${MediaStore.Audio.Media.MIME_TYPE} LIKE 'audio/%'"
         val selectionArgs = arrayOf(fileName, file.length().toString())
 
@@ -228,10 +240,19 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
 
         var uri: Uri? = null
         cursor?.use {
-            if (it.moveToFirst()) {
-                val idIndex = it.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+            val idIndex = it.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
+            val dataIndex = it.getColumnIndex(MediaStore.Audio.Media.DATA)
+            while (it.moveToNext()) {
                 val id = it.getLong(idIndex)
-                uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+                val dataPath = if (dataIndex >= 0) it.getString(dataIndex) else null
+                val candidateUri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
+                val samePath = dataPath != null && runCatching {
+                    File(dataPath).canonicalPath == file.canonicalPath
+                }.getOrDefault(false)
+                if (samePath || mediaContentMatchesFile(context, candidateUri, file)) {
+                    uri = candidateUri
+                    break
+                }
             }
         }
 
@@ -240,11 +261,6 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
         }
 
         // 2. Insert into MediaStore safely supporting Android 10+ Scoped Storage
-        val relativeFolder = when (ringtoneType) {
-            RingtoneManager.TYPE_NOTIFICATION -> "${Environment.DIRECTORY_NOTIFICATIONS}/"
-            RingtoneManager.TYPE_ALARM -> "${Environment.DIRECTORY_ALARMS}/"
-            else -> "${Environment.DIRECTORY_RINGTONES}/"
-        }
 
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
@@ -335,6 +351,48 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
             lower.contains("ogg") || lower.contains("opus") || lower.contains("vorbis") -> "audio/ogg"
             lower.contains("wma") -> "audio/x-ms-wma"
             else -> getMimeType(fileName)
+        }
+    }
+
+    private fun mediaContentMatchesFile(context: Context, candidateUri: Uri, file: File): Boolean {
+        return try {
+            val expectedLen = file.length()
+            context.contentResolver.openInputStream(candidateUri)?.use { candidateStream ->
+                file.inputStream().use { sourceStream ->
+                    val bufA = ByteArray(8192)
+                    val bufB = ByteArray(8192)
+                    var total = 0L
+                    var matched = true
+                    while (true) {
+                        val readA = sourceStream.read(bufA)
+                        if (readA < 0) {
+                            matched = candidateStream.read() < 0 && total == expectedLen
+                            break
+                        }
+                        var off = 0
+                        while (off < readA) {
+                            val readB = candidateStream.read(bufB, off, readA - off)
+                            if (readB <= 0) {
+                                matched = false
+                                break
+                            }
+                            off += readB
+                        }
+                        if (!matched) break
+                        for (i in 0 until readA) {
+                            if (bufA[i] != bufB[i]) {
+                                matched = false
+                                break
+                            }
+                        }
+                        if (!matched) break
+                        total += readA
+                    }
+                    matched
+                }
+            } ?: false
+        } catch (_: Exception) {
+            false
         }
     }
 

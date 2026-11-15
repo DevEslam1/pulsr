@@ -116,4 +116,48 @@ class AudioEffectsPluginDispatchTest {
         assertNotNull(resetCaptor.value["error"])
         assertFalse(resetCaptor.value.isEmpty())
     }
+
+    @Test
+    fun custodyReportAndTelemetryFallbackReportHonestZeroAndNineteenSlots() {
+        val plugin = AudioEffectsPlugin()
+
+        val custodyResult = mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("getChainOfCustodyReport", null), custodyResult)
+        val custodyCaptor = ArgumentCaptor.forClass(Map::class.java)
+        verify(custodyResult).success(custodyCaptor.capture())
+        assertEquals(0, custodyCaptor.value["bufferSize"])
+
+        val telemetryResult = mock(MethodChannel.Result::class.java)
+        plugin.onMethodCall(MethodCall("getTelemetry", null), telemetryResult)
+        val telemetryCaptor = ArgumentCaptor.forClass(List::class.java)
+        verify(telemetryResult).success(telemetryCaptor.capture())
+        assertEquals(19, telemetryCaptor.value.size)
+    }
+
+    @Test
+    fun systemAudioEffectsControllerRestoresPriorEnabledStateOnRelease() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val controller = SystemAudioEffectsController(ctx)
+
+        class FakeHandle(override var enabled: Boolean) : SystemAudioEffectsController.ManagedEffectHandle {
+            var released = false
+            override fun hasControl(): Boolean = true
+            override fun release() {
+                released = true
+            }
+        }
+
+        val wasEnabledEffect = FakeHandle(enabled = false)
+        val wasDisabledEffect = FakeHandle(enabled = false)
+
+        controller.registerManagedEffectForTesting(wasEnabledEffect, priorEnabled = true)
+        controller.registerManagedEffectForTesting(wasDisabledEffect, priorEnabled = false)
+
+        controller.release()
+
+        assertEquals(true, wasEnabledEffect.enabled)
+        assertEquals(true, wasEnabledEffect.released)
+        assertEquals(false, wasDisabledEffect.enabled)
+        assertEquals(true, wasDisabledEffect.released)
+    }
 }

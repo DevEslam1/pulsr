@@ -24,6 +24,25 @@ void main() {
       expect(telemetry.autoDegradedStages, 3);
       expect(telemetry.weeklyDose, 0.85);
       expect(telemetry.safetyAttenuationActive, isTrue);
+      expect(telemetry.loudnessDeltaDb, 0.0);
+      expect(telemetry.eqAutoHeadroomDb, 0.0);
+    });
+
+    test('parses 19-slot payload including loudnessDeltaDb and eqAutoHeadroomDb', () {
+      final list = <dynamic>[
+        -1.0,
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0, 0.0,
+        0.2,
+        0,
+        0.1,
+        0.0,
+        2.75,
+        -4.5,
+      ];
+      final telemetry = DspTelemetry.fromNativeList(list);
+      expect(telemetry.loudnessDeltaDb, 2.75);
+      expect(telemetry.eqAutoHeadroomDb, -4.5);
     });
 
     test('tolerates short, foreign and non-finite values', () {

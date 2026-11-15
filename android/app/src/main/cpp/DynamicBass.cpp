@@ -22,6 +22,8 @@ void DynamicBass::reset() {
     yLpMid_.reset();
     yLpSide_.reset();
     xLpBass_.reset();
+    xHpHarmonic_.reset();
+    xLpHarmonic_.reset();
     envelope_ = 0.0;
     smoothedStrength_ = enabled_ ? strength_ : 0.0;
 }
@@ -84,6 +86,11 @@ void DynamicBass::updateFilters() {
     yLpSide_.setLowPass(sampleRate_, static_cast<double>(yHigh_), q);
     xLpBass_.setLowPass(sampleRate_, std::max<double>(static_cast<double>(xHigh_),
                                                       static_cast<double>(yHigh_)), q);
+    xHpHarmonic_.setHighPass(sampleRate_, static_cast<double>(xLow_), q);
+    xLpHarmonic_.setLowPass(
+        sampleRate_,
+        static_cast<double>(std::max(xHigh_, xLow_ + 100)),
+        q);
 }
 
 void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
@@ -114,6 +121,8 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
             yLpMid_.reset();
             yLpSide_.reset();
             xLpBass_.reset();
+            xHpHarmonic_.reset();
+            xLpHarmonic_.reset();
             envelope_ = 0.0;
         }
         paramsChanged_.store(false, std::memory_order_release);
@@ -175,11 +184,12 @@ void DynamicBass::processInterleaved(float* buffer, int frames, int channels) {
         const double dynamicGain = currentStr / (1.0 + 1.8 * envelope_);
         double bassBoost = midY * dynamicGain;
 
-        // Psychoacoustic harmonic excitation for earphone reproduction. Uses a
-        // sign-preserving (odd) nonlinearity so it enriches harmonics WITHOUT
-        // the DC offset / envelope pumping of the previous x^2 term.
-        const double harmonicExcitation = 0.15 * bassBoost * std::abs(bassBoost);
-        bassBoost = std::tanh(bassBoost + harmonicExcitation);
+        // Psychoacoustic harmonic excitation shaped to the X-band [xLow, xHigh].
+        // Uses a sign-preserving (odd) nonlinearity so it enriches harmonics
+        // inside [xLow, xHigh] WITHOUT DC offset or envelope pumping.
+        const double harmonicRaw = 0.15 * bassBoost * std::abs(bassBoost);
+        const double harmonicX = xLpHarmonic_.process(xHpHarmonic_.process(harmonicRaw));
+        bassBoost = std::tanh(bassBoost + harmonicX);
 
         // 5. Sub-band Side Spatial Imaging:
         //    Extract low frequencies of side channel and scale by sideGainLow (mono bass)

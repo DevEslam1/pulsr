@@ -29,6 +29,11 @@ class MarqueeText extends StatefulWidget {
   /// naturally in RTL, or LTR for English/Latin content.
   final TextDirection? textDirection;
 
+  /// Whether to wrap non-scrolling static text in a [Tooltip]. Set to `false`
+  /// when a parent widget handles `onLongPress` so the tooltip does not intercept
+  /// the long-press gesture.
+  final bool showTooltip;
+
   /// When running in test environments, continuous auto-scrolling is disabled
   /// by default so that [WidgetTester.pumpAndSettle] does not time out.
   @visibleForTesting
@@ -46,6 +51,7 @@ class MarqueeText extends StatefulWidget {
     this.pauseOnHover = true,
     this.allowUserPause = true,
     this.textDirection,
+    this.showTooltip = true,
   });
 
   @override
@@ -249,25 +255,28 @@ class _MarqueeTextState extends State<MarqueeText> {
             !availableWidth.isFinite) {
           _stopScrolling();
           _currentMaxScroll = 0;
+          final staticText = SizedBox(
+            width: availableWidth.isFinite ? availableWidth : null,
+            child: Text(
+              widget.text,
+              style: effectiveStyle,
+              textAlign: widget.textAlign,
+              textDirection: effectiveDirection,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          );
           return Directionality(
             textDirection: effectiveDirection,
-            child: Tooltip(
-              message: widget.text,
-              // Respect the incoming width even in the static branch: without
-              // this, a long title inside a constrained Row overflows when
-              // Reduce Motion swaps the marquee for plain text.
-              child: SizedBox(
-                width: availableWidth.isFinite ? availableWidth : null,
-                child: Text(
-                  widget.text,
-                  style: effectiveStyle,
-                  textAlign: widget.textAlign,
-                  textDirection: effectiveDirection,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
+            child: widget.showTooltip
+                ? Tooltip(
+                    message: widget.text,
+                    // Respect the incoming width even in the static branch: without
+                    // this, a long title inside a constrained Row overflows when
+                    // Reduce Motion swaps the marquee for plain text.
+                    child: staticText,
+                  )
+                : staticText,
           );
         }
 

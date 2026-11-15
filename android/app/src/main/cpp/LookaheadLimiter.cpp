@@ -55,7 +55,7 @@ void LookaheadLimiter::setSampleRate(double sampleRate) {
 }
 
 void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double releaseMs, bool truePeakMode) {
-    lookaheadMs_ = std::clamp(lookaheadMs, 0.5, 20.0);
+    lookaheadMs_ = std::clamp(lookaheadMs, 0.1, 20.0);
     // Match the Dart contract (DspParamRanges.limiterThresholdDb) and the
     // snapshot sanitizer (-60..0) so a valid UI value is not silently clamped.
     // The shared class also serves the headphone-safety limiter, whose ceiling
@@ -87,7 +87,13 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
     slowReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (releaseMs_ * 0.001 * sampleRate_)));
 
     if (lookaheadChanged) {
-        reset();
+        if (processingActive_ && enabled_) {
+            // Re-prime delay line & deque click-free without resetting
+            // processingActive_ / bypassMix_ to unity (which caused mid-stream dropouts).
+            beginEnableTransition();
+        } else {
+            reset();
+        }
     }
 }
 

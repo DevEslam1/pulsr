@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/services/radio_station_store.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -26,12 +27,18 @@ void main() {
   });
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    RadioStationStore.resetForTesting();
     playerCubit = _MockPlayerCubit();
     when(() => playerCubit.state).thenReturn(const PlayerState());
     when(() => playerCubit.stream)
         .thenAnswer((_) => const Stream<PlayerState>.empty());
     when(() => playerCubit.playRadioStation(any())).thenAnswer((_) async {});
     when(() => playerCubit.togglePlayPause()).thenAnswer((_) async {});
+  });
+
+  tearDown(() {
+    RadioStationStore.resetForTesting();
   });
 
   Widget buildHarness({
@@ -217,5 +224,127 @@ void main() {
       findsWidgets,
     );
     expect(find.text('Listen Now'), findsWidgets);
+    // Windowed dot indicator caps visible dots at 7 even for 11+ stations.
+    expect(find.byType(AnimatedContainer), findsNWidgets(7));
+  });
+
+  test('buildMergedHeroItem localizes curated stations without Custom Station badge',
+      () {
+    const curatedMurattal = RadioStation(
+      id: 'cur-quran-minshawi-murattal',
+      name: 'إذاعة الشيخ محمد صديق المنشاوي (مرتل)',
+      url: 'https://backup.qurango.net/radio/mohammed_siddiq_alminshawi',
+      genre: 'Quran',
+    );
+    final curatedItem =
+        QuranRadioHeroCarousel.buildMergedHeroItem(curatedMurattal);
+    expect(
+      curatedItem.getReciterTitle(false),
+      'Sheikh Mohamed Siddiq El-Minshawi (Murattal)',
+    );
+    expect(curatedItem.getBadgeText(false), 'Murattal');
+    expect(curatedItem.getSubtitle(false), 'Holy Quran • Murattal Recitation');
+
+    const userStation = RadioStation(
+      id: 'user-123',
+      name: 'My Local Quran Stream',
+      url: 'https://example.com/quran.mp3',
+      genre: 'Quran',
+    );
+    final customItem = QuranRadioHeroCarousel.buildMergedHeroItem(userStation);
+    expect(customItem.getBadgeText(false), 'Custom Station');
+    expect(customItem.getReciterTitle(false), 'My Local Quran Stream');
+  });
+
+  testWidgets('long-press opens Pin to First and Sorting options',
+      (tester) async {
+    await tester.pumpWidget(
+      buildHarness(
+        locale: const Locale('en'),
+        child: QuranRadioHeroCarousel(playerCubit: playerCubit),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Swipe to page 2 (Holy Quran Radio - Cairo or Rare Khashia Recitations)
+    await tester.fling(
+      find.byType(PageView),
+      const Offset(-400, 0),
+      1000,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('2/11'), findsOneWidget);
+
+    // Long-press the 2nd card to open options sheet
+    await tester.longPress(find.text('Rare Khashia Recitations Radio'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pin to First'), findsOneWidget);
+    expect(find.text('Sort Order'), findsOneWidget);
+    expect(find.text('Default'), findsOneWidget);
+    expect(find.text('A–Z'), findsOneWidget);
+    expect(find.text('Recent'), findsOneWidget);
+    expect(find.text('Hide Radio Cards from Home'), findsOneWidget);
+
+    // Pin the 2nd card to first
+    await tester.tap(find.text('Pin to First'));
+    await tester.pumpAndSettle();
+
+    // Carousel jumps to page 1/11 and shows the pinned card with pin icon
+    expect(find.text('1/11'), findsOneWidget);
+    expect(find.byIcon(Icons.push_pin_rounded), findsWidgets);
+    expect(
+      RadioStationStore.heroPinnedUrls.value,
+      contains('https://backup.qurango.net/radio/salma'),
+    );
+
+    // Long-press again and unpin
+    await tester.longPress(find.text('Rare Khashia Recitations Radio').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Unpin'), findsOneWidget);
+    await tester.tap(find.text('Unpin'));
+    await tester.pumpAndSettle();
+
+    expect(RadioStationStore.heroPinnedUrls.value, isEmpty);
+
+    // Wait for the unpin toast overlay to dismiss before re-opening the sheet
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // Long-press and switch sort order to A-Z
+    await tester.longPress(find.text('Sheikh Mohamed Siddiq El-Minshawi').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('A–Z'));
+    await tester.pumpAndSettle();
+
+    expect(RadioStationStore.heroSortMode.value, QuranHeroSortMode.alphabetical);
+    expect(find.text('Holy Quran Radio - Cairo'), findsWidgets);
+  });
+
+  test('sortAndPinItems respects pinned priority and sort modes', () {
+    final base = QuranRadioHeroCarousel.defaultQuranStations();
+    final cairoUrl = base[3].station.url; // Holy Quran Radio - Cairo
+    final minshawiUrl = base[0].station.url;
+
+    final sortedAlpha = QuranRadioHeroCarousel.sortAndPinItems(
+      base,
+      pinnedUrls: [minshawiUrl],
+      sortMode: QuranHeroSortMode.alphabetical,
+      isArabic: false,
+    );
+    expect(sortedAlpha.first.station.url, minshawiUrl);
+    expect(
+      sortedAlpha[1].getReciterTitle(false),
+      'Holy Quran Radio - Cairo',
+    );
+
+    final sortedRecent = QuranRadioHeroCarousel.sortAndPinItems(
+      base,
+      pinnedUrls: const [],
+      sortMode: QuranHeroSortMode.recentlyPlayed,
+      isArabic: false,
+      lastPlayedByUrl: {cairoUrl: 999999},
+    );
+    expect(sortedRecent.first.station.url, cairoUrl);
   });
 }

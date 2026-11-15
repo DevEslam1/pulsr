@@ -24,7 +24,7 @@ void Crossfeed::setSampleRate(double sampleRate) {
 
 void Crossfeed::initBs2b(double fcut, double feedDb) {
     double level = std::abs(feedDb);
-    if (level < 1.0) level = 1.0;
+    if (level < 0.0) level = 0.0;
     if (level > 15.0) level = 15.0;
 
     double Fc_lo = std::clamp(fcut, 300.0, 2000.0);
@@ -155,17 +155,18 @@ void Crossfeed::setEnabled(bool enabled) {
 void Crossfeed::applyParams(const CrossfeedParamSet& params) {
     enabled_ = params.enabled;
     const CrossfeedMode requested = static_cast<CrossfeedMode>(params.mode);
-    if (requested == CrossfeedMode::Custom) {
-        const CrossfeedMode previousMode = mode_;
-        mode_ = CrossfeedMode::Custom;
+    const CrossfeedMode previousMode = mode_;
+    // Route Custom transitions through setMode() too so switching from a BS2B
+    // preset into Custom preserves the 15 ms output crossfade and clears Custom
+    // state cleanly instead of hard-jumping.
+    setMode(requested);
+    if (mode_ == CrossfeedMode::Custom) {
         configure(params.delayUs, params.feedDb, params.fcut);
-        // Entering Custom from a preset leaves the delay line holding stale
-        // audio; clear it just like setMode() does for a preset transition.
-        if (mode_ != previousMode) clearCustomState();
-    } else {
-        // Let setMode() observe the old mode so a preset change still resets
-        // the BS2B/custom state. Assigning mode_ before the call prevented it.
-        setMode(requested);
+        if (previousMode != CrossfeedMode::Custom && modeCrossfadeTotal_ == 0) {
+            smoothedDelaySamples_ = targetDelaySamples_;
+            smoothedFeedLevel_ = targetFeedLevel_;
+            smoothedLpCoeff_ = targetLpCoeff_;
+        }
     }
 }
 

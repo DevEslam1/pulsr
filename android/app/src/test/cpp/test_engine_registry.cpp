@@ -172,6 +172,31 @@ int main() {
         }
     }
 
+    // Concurrent multi-renderer hazard protection + retire overflow > kRetireQueueSize
+    {
+        auto engine = std::make_unique<AudioDspEngine>();
+        engine->setSampleRate(48000.0);
+        std::atomic<bool> stop{false};
+        std::vector<std::thread> readers;
+        for (int r = 0; r < 4; ++r) {
+            readers.emplace_back([&]() {
+                std::vector<float> buf(256 * 2, 0.05f);
+                while (!stop.load(std::memory_order_acquire)) {
+                    engine->processInterleaved(buf.data(), 256, 2);
+                }
+            });
+        }
+        for (int p = 0; p < 64; ++p) {
+            engine->updateParams([p](DspParamSnapshot& s) {
+                s.eq.preampDb = (p % 10) * 0.1;
+            });
+        }
+        stop.store(true, std::memory_order_release);
+        for (auto& t : readers) t.join();
+        engine->drainRetireQueue();
+        check(true, "multi-renderer concurrent hazard & retire overflow completed safely");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " registry check(s) failed." << std::endl;
         return 1;

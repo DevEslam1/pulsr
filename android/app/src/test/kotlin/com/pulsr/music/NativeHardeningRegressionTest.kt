@@ -191,6 +191,16 @@ class NativeHardeningRegressionTest {
             mapOf("genre" to "", "lyrics" to null),
         )
         assertTrue(clearedOk.verified)
+
+        val normalizedNumericOk = TagEditorPlugin.verifyWrittenTags(
+            mapOf("trackNumber" to "03", "discNumber" to "01/02", "year" to "2024"),
+            mapOf("trackNumber" to "3", "discNumber" to "1/2", "year" to "2024-05-01"),
+        )
+        assertTrue(normalizedNumericOk.verified)
+        assertEquals(
+            mapOf("trackNumber" to true, "discNumber" to true, "year" to true),
+            normalizedNumericOk.verifiedFields,
+        )
     }
 
     // ---- ProxyPool stableOrderedAlive with mixed ewma & latency ----
@@ -228,5 +238,19 @@ class NativeHardeningRegressionTest {
             listOf("res", "fast", "slow", "unprobed", "degraded", "dc"),
             orderedIds,
         )
+    }
+
+    @Test
+    fun proxyPoolNonActiveFailureDoesNotRotateActivePath() {
+        val active = ProxyPool.ProxyNode("p1", Proxy.Type.HTTP, "10.0.0.1", 8080)
+        val background = ProxyPool.ProxyNode("p2", Proxy.Type.HTTP, "10.0.0.2", 8080)
+        ProxyPool.setAutoRotate(true)
+        ProxyPool.setProxies(listOf(active, background))
+        assertTrue(ProxyPool.getActiveProxy() != null)
+
+        assertEquals("HTTP:10.0.0.1:8080", ProxyPool.currentPathLabel)
+        ProxyPool.onPathFailed(failedHostOrId = "p2")
+        assertEquals("HTTP:10.0.0.1:8080", ProxyPool.currentPathLabel)
+        assertEquals("p1", ProxyPool.getActiveNode()?.id)
     }
 }

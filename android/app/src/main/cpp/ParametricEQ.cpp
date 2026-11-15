@@ -222,6 +222,7 @@ void ParametricEQ::reset() {
     coeffsStale_ = false;
     fadeOutActive_ = false;
     fadeOutFrames_ = 0;
+    autoHeadroomDb_.store(0.0, std::memory_order_relaxed);
     smoothedPreampDb_ = targetPreampDb_;
     preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
     for (int i = 0; i < bandCount_; ++i) {
@@ -372,7 +373,10 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // A disabled EQ is a true bypass: the preamp is part of the EQ and must not
     // leak gain while the stage is off. While a disable fade-out is still in
     // flight (fadeOutActive_) we keep processing so the gains can ramp to unity.
-    if (!enabled_ && !fadeOutActive_) return;
+    if (!enabled_ && !fadeOutActive_) {
+        autoHeadroomDb_.store(0.0, std::memory_order_relaxed);
+        return;
+    }
     if (!buffer || frames <= 0) return;
 
     // Keep the real interleave stride; clamp only how many channels we process.
@@ -405,6 +409,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             autoHeadroomDb = -std::clamp((effectiveBoost - 1.5) * 0.55, 0.0, 6.0);
         }
     }
+    autoHeadroomDb_.store(autoHeadroomDb, std::memory_order_relaxed);
 
     // Check if any band is soloed
     bool hasSolo = false;

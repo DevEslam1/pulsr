@@ -66,7 +66,7 @@ class QuranRadioHeroCarousel extends StatefulWidget {
   const QuranRadioHeroCarousel({
     super.key,
     this.playerCubit,
-    this.height = 142.0,
+    this.height = 152.0,
     this.onMoreStations,
   });
 
@@ -255,6 +255,135 @@ class QuranRadioHeroCarousel extends StatefulWidget {
     ];
   }
 
+  /// Builds a [QuranHeroItem] for a station loaded dynamically from [RadioStationStore].
+  @visibleForTesting
+  static QuranHeroItem buildMergedHeroItem(RadioStation station) {
+    final isCurated = station.id.startsWith('cur-');
+    final lowerId = station.id.toLowerCase();
+    final lowerName = station.name.toLowerCase();
+    final titleAr = RadioStationStore.localizedStationName(station, 'ar');
+    final titleEn = RadioStationStore.localizedStationName(station, 'en');
+    final homeCard = RadioStationStore.resolveHomeCardForStation(
+      id: station.id,
+      name: station.name,
+      url: station.url,
+    );
+
+    late final String subtitleAr;
+    late final String subtitleEn;
+    late final String badgeAr;
+    late final String badgeEn;
+
+    if (!isCurated) {
+      final genre = station.genre?.trim();
+      subtitleAr =
+          genre != null && genre.isNotEmpty ? genre : 'إذاعة القرآن الكريم';
+      subtitleEn =
+          genre != null && genre.isNotEmpty ? genre : 'Holy Quran Radio';
+      badgeAr = 'إذاعة مخصصة';
+      badgeEn = 'Custom Station';
+    } else if (lowerId.contains('murattal') || lowerName.contains('مرتل')) {
+      subtitleAr = 'المصحف المرتل • تلاوة خاشعة';
+      subtitleEn = 'Holy Quran • Murattal Recitation';
+      badgeAr = 'المصحف المرتل';
+      badgeEn = 'Murattal';
+    } else if (lowerId.contains('mojawwad') || lowerName.contains('مجود')) {
+      subtitleAr = 'المصحف المجود • تلاوة خاشعة';
+      subtitleEn = 'Holy Quran • Mujawwad Recitation';
+      badgeAr = 'المصحف المجود';
+      badgeEn = 'Mujawwad';
+    } else if (lowerId.contains('makkah')) {
+      subtitleAr = 'بث مباشر من المسجد الحرام';
+      subtitleEn = 'Live from Masjid al-Haram';
+      badgeAr = 'الحرم المكي';
+      badgeEn = 'Mecca Live';
+    } else if (lowerId.contains('sakeenah')) {
+      subtitleAr = 'تلاوات هادئة للسكينة والطمأنينة';
+      subtitleEn = 'Calm Recitations for Peace';
+      badgeAr = 'آيات السكينة';
+      badgeEn = 'Serenity';
+    } else {
+      subtitleAr = 'إذاعة القرآن الكريم • بث متواصل';
+      subtitleEn = 'Holy Quran Radio • 24/7 Stream';
+      badgeAr = 'إذاعة القرآن';
+      badgeEn = 'Quran Radio';
+    }
+
+    return QuranHeroItem(
+      station: station,
+      reciterTitleAr: titleAr,
+      reciterTitleEn: titleEn,
+      subtitleAr: subtitleAr,
+      subtitleEn: subtitleEn,
+      artworkAsset:
+          homeCard ?? station.artworkUrl ?? RadioStationStore.minshawiHomeCard,
+      badgeTextAr: badgeAr,
+      badgeTextEn: badgeEn,
+    );
+  }
+
+  /// Orders [baseItems] with [pinnedUrls] first (preserving pinned priority)
+  /// and sorts the remaining items according to [sortMode].
+  @visibleForTesting
+  static List<QuranHeroItem> sortAndPinItems(
+    List<QuranHeroItem> baseItems, {
+    required List<String> pinnedUrls,
+    required QuranHeroSortMode sortMode,
+    required bool isArabic,
+    Map<String, int> lastPlayedByUrl = const {},
+  }) {
+    if (baseItems.isEmpty) return const [];
+
+    final byUrl = <String, QuranHeroItem>{};
+    final indexByUrl = <String, int>{};
+    for (var i = 0; i < baseItems.length; i++) {
+      final item = baseItems[i];
+      byUrl[item.station.url] = item;
+      indexByUrl[item.station.url] = i;
+    }
+
+    final pinnedSet = <String>{};
+    final pinned = <QuranHeroItem>[];
+    for (final url in pinnedUrls) {
+      final match = byUrl[url];
+      if (match != null && pinnedSet.add(url)) {
+        pinned.add(match);
+      }
+    }
+
+    final unpinned = baseItems
+        .where((item) => !pinnedSet.contains(item.station.url))
+        .toList();
+
+    switch (sortMode) {
+      case QuranHeroSortMode.curated:
+        break;
+      case QuranHeroSortMode.alphabetical:
+        unpinned.sort((a, b) {
+          final cmp = a
+              .getReciterTitle(isArabic)
+              .toLowerCase()
+              .compareTo(b.getReciterTitle(isArabic).toLowerCase());
+          if (cmp != 0) return cmp;
+          return (indexByUrl[a.station.url] ?? 0)
+              .compareTo(indexByUrl[b.station.url] ?? 0);
+        });
+      case QuranHeroSortMode.recentlyPlayed:
+        unpinned.sort((a, b) {
+          final aPlayed =
+              lastPlayedByUrl[a.station.url] ?? a.station.lastPlayed ?? 0;
+          final bPlayed =
+              lastPlayedByUrl[b.station.url] ?? b.station.lastPlayed ?? 0;
+          final cmp = bPlayed.compareTo(aPlayed);
+          if (cmp != 0) return cmp;
+          return (indexByUrl[a.station.url] ?? 0)
+              .compareTo(indexByUrl[b.station.url] ?? 0);
+        });
+    }
+
+    return [...pinned, ...unpinned];
+  }
+
   @override
   State<QuranRadioHeroCarousel> createState() =>
       _QuranRadioHeroCarouselState();
@@ -263,61 +392,104 @@ class QuranRadioHeroCarousel extends StatefulWidget {
 class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
   late final PageController _pageController;
   int _currentPage = 0;
+  late List<QuranHeroItem> _baseItems;
+  Map<String, int> _lastPlayedByUrl = const {};
   List<QuranHeroItem> _stations = const [];
+  bool _isArabic = false;
 
   @override
   void initState() {
     super.initState();
     final curated = QuranRadioHeroCarousel.defaultQuranStations();
+    _baseItems = curated;
     _stations = curated;
     _pageController = PageController(
       initialPage: 0,
       viewportFraction: 0.93,
     );
 
+    RadioStationStore.heroPinnedUrls.addListener(_onOrderPrefsChanged);
+    RadioStationStore.heroSortMode.addListener(_onOrderPrefsChanged);
+
     // Merge any custom user stations dynamically
     final store = RadioStationStore();
     store.ready.then((_) {
       if (!mounted) return;
+      final lastPlayedMap = <String, int>{};
+      for (final s in store.list) {
+        if (s.lastPlayed != null && s.lastPlayed! > 0) {
+          lastPlayedMap[s.url] = s.lastPlayed!;
+        }
+      }
       final storeList = store.list.where(RadioStationStore.isQuranStation);
       final existingUrls = curated.map((c) => c.station.url).toSet();
       final extraItems = <QuranHeroItem>[];
       for (final s in storeList) {
         if (!existingUrls.contains(s.url)) {
           existingUrls.add(s.url);
-          final fallbackGenre = s.genre?.isNotEmpty == true ? s.genre! : null;
-          final homeCard = RadioStationStore.resolveHomeCardForStation(
-            id: s.id,
-            name: s.name,
-            url: s.url,
-          );
-          extraItems.add(
-            QuranHeroItem(
-              station: s,
-              reciterTitleAr: s.name,
-              reciterTitleEn: s.name,
-              subtitleAr: fallbackGenre ?? 'إذاعة القرآن الكريم',
-              subtitleEn: fallbackGenre ?? 'Holy Quran Radio',
-              artworkAsset:
-                  homeCard ?? s.artworkUrl ?? RadioStationStore.minshawiHomeCard,
-              badgeTextAr: 'إذاعة مخصصة',
-              badgeTextEn: 'Custom Station',
-            ),
-          );
+          extraItems.add(QuranRadioHeroCarousel.buildMergedHeroItem(s));
         }
       }
-      if (extraItems.isNotEmpty && mounted) {
-        setState(() {
-          _stations = [...curated, ...extraItems];
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _lastPlayedByUrl = lastPlayedMap;
+        _baseItems = extraItems.isEmpty ? curated : [...curated, ...extraItems];
+        _rebuildOrderedStations();
+      });
     });
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    if (isArabic != _isArabic || _stations.isEmpty) {
+      _isArabic = isArabic;
+      _rebuildOrderedStations();
+    }
+  }
+
+  @override
   void dispose() {
+    RadioStationStore.heroPinnedUrls.removeListener(_onOrderPrefsChanged);
+    RadioStationStore.heroSortMode.removeListener(_onOrderPrefsChanged);
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _onOrderPrefsChanged() {
+    if (!mounted) return;
+    setState(() {
+      _rebuildOrderedStations();
+    });
+  }
+
+  void _rebuildOrderedStations() {
+    _stations = QuranRadioHeroCarousel.sortAndPinItems(
+      _baseItems,
+      pinnedUrls: RadioStationStore.heroPinnedUrls.value,
+      sortMode: RadioStationStore.heroSortMode.value,
+      isArabic: _isArabic,
+      lastPlayedByUrl: _lastPlayedByUrl,
+    );
+    if (_currentPage >= _stations.length && _stations.isNotEmpty) {
+      _currentPage = 0;
+    }
+  }
+
+  void _jumpToFirstPage() {
+    if (!_pageController.hasClients) return;
+    setState(() => _currentPage = 0);
+    final dur = context.motion(PulsrMotion.page);
+    if (dur == Duration.zero) {
+      _pageController.jumpToPage(0);
+    } else {
+      _pageController.animateToPage(
+        0,
+        duration: dur,
+        curve: context.motionCurve(PulsrMotion.enter),
+      );
+    }
   }
 
   PlayerCubit _resolvePlayerCubit(BuildContext context) {
@@ -389,8 +561,8 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   padding: const EdgeInsets.symmetric(horizontal: 4.0),
                   child: _QuranHeroCard(
                     item: item,
-                    index: index,
-                    total: total,
+                    isPinned: RadioStationStore.heroPinnedUrls.value
+                        .contains(item.station.url),
                     onTap: () {
                       final player = _resolvePlayerCubit(context);
                       final isCurrent =
@@ -399,6 +571,10 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                     },
                     onPlayPressed: (isCurrent) =>
                         _onPlayStation(item, isCurrent),
+                    onLongPress: () {
+                      PulsrHaptics.heavyImpact();
+                      _showCardOptionsSheet(context, item);
+                    },
                   ),
                 ),
               );
@@ -406,59 +582,58 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
           ),
         ),
 
-        const SizedBox(height: AppSpacing.s8),
+        const SizedBox(height: AppSpacing.s10),
 
-        // Indicator strip: Smooth expanding dot indicator + Quick Radio chip
+        // Indicator strip: Windowed dot indicator + tabular counter + Quick Radio chip
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6.0),
           child: Row(
             children: [
-              // Pagination Dots
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(total, (i) {
-                  final isActive = i == _currentPage;
-                  return GestureDetector(
-                    onTap: () {
-                      PulsrHaptics.selectionClick();
-                      final dur = context.motion(PulsrMotion.page);
-                      if (dur == Duration.zero) {
-                        _pageController.jumpToPage(i);
-                      } else {
-                        _pageController.animateToPage(
-                          i,
-                          duration: dur,
-                          curve: context.motionCurve(PulsrMotion.enter),
-                        );
-                      }
-                    },
-                    child: Container(
-                      margin: const EdgeInsetsDirectional.only(end: 4.5),
-                      padding: const EdgeInsets.symmetric(vertical: 4.0),
-                      child: AnimatedContainer(
-                        duration: context.motion(PulsrMotion.layout),
-                        curve: context.motionCurve(PulsrMotion.enter),
-                        width: isActive ? 20.0 : 5.5,
-                        height: 5.5,
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? p.accent
-                              : p.textTertiary.withValues(alpha: 0.32),
-                          borderRadius: BorderRadius.circular(3.0),
-                          boxShadow: isActive
-                              ? [
-                                  BoxShadow(
-                                    color: p.accent.withValues(alpha: 0.40),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ]
-                              : null,
-                        ),
-                      ),
-                    ),
-                  );
-                }),
+              _CarouselWindowedDots(
+                total: total,
+                currentPage: _currentPage,
+                onDotTap: (i) {
+                  PulsrHaptics.selectionClick();
+                  final dur = context.motion(PulsrMotion.page);
+                  if (dur == Duration.zero) {
+                    _pageController.jumpToPage(i);
+                  } else {
+                    _pageController.animateToPage(
+                      i,
+                      duration: dur,
+                      curve: context.motionCurve(PulsrMotion.enter),
+                    );
+                  }
+                },
+              ),
+
+              const SizedBox(width: AppSpacing.xs),
+
+              // Compact tabular page counter (e.g. 1/11, 12/31)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6.0,
+                  vertical: 2.0,
+                ),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.9),
+                  borderRadius: AppRadii.r6All,
+                  border: Border.all(
+                    color: p.hairline.withValues(alpha: 0.8),
+                    width: 0.7,
+                  ),
+                ),
+                child: Text(
+                  '${_currentPage + 1}/$total',
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [
+                      FontFeature.tabularFigures(),
+                    ],
+                  ),
+                ),
               ),
 
               const Spacer(),
@@ -472,10 +647,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   child: Builder(
                     builder: (context) {
                       final isCapsule = context.isCapsuleButtons;
-                      final radius = context.buttonRadius(rectRadius: 6.0);
-                      final fg = isCapsule
-                          ? PulsrCapsuleStyle.foregroundColor(p)
-                          : p.accent;
+                      final radius = context.buttonRadius(rectRadius: 10.0);
                       return InkWell(
                         borderRadius: radius,
                         onTap: widget.onMoreStations ??
@@ -485,36 +657,34 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                             },
                         child: Container(
                           padding: const EdgeInsetsDirectional.fromSTEB(
-                            8.0,
-                            3.0,
-                            5.0,
-                            3.0,
+                            9.0,
+                            4.5,
+                            6.0,
+                            4.5,
                           ),
-                          decoration: isCapsule
-                              ? PulsrCapsuleStyle.decoration(p,
-                                  borderRadius: radius)
-                              : BoxDecoration(
-                                  color: p.accent.withValues(alpha: 0.10),
-                                  borderRadius: AppRadii.circular(999),
-                                  border: Border.all(
-                                    color: p.accent.withValues(alpha: 0.24),
-                                    width: 0.8,
-                                  ),
-                                ),
+                          decoration: BoxDecoration(
+                            color: p.accent.withValues(alpha: 0.12),
+                            borderRadius:
+                                isCapsule ? radius : AppRadii.circular(999),
+                            border: Border.all(
+                              color: p.accent.withValues(alpha: 0.28),
+                              width: 0.8,
+                            ),
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.radio_rounded,
-                                size: 12.0,
-                                color: fg,
+                                size: 12.5,
+                                color: p.accent,
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 4.5),
                               Text(
                                 context.l10n.radioTitle,
                                 style: TextStyle(
-                                  color: fg,
-                                  fontSize: 10.5,
+                                  color: p.accent,
+                                  fontSize: 11.0,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.2,
                                 ),
@@ -523,9 +693,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                               Icon(
                                 Icons.chevron_right_rounded,
                                 size: 14,
-                                color: isCapsule
-                                    ? PulsrCapsuleStyle.secondaryForegroundColor(p)
-                                    : p.accent,
+                                color: p.accent.withValues(alpha: 0.85),
                               ),
                             ],
                           ),
@@ -541,12 +709,12 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
       ],
     );
   }
-}
-
-/// The individual stylized hero card for a single Quran station.
-class _QuranHeroCard extends StatelessWidget {
-  void _showHideOptionSheet(BuildContext context) {
+  void _showCardOptionsSheet(BuildContext context, QuranHeroItem item) {
     final p = context.palette;
+    final isArabic = Localizations.localeOf(context).languageCode == 'ar';
+    final stationTitle = item.getReciterTitle(isArabic);
+    final stationUrl = item.station.url;
+
     PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       builder: (sheetContext) => SafeArea(
@@ -555,109 +723,391 @@ class _QuranHeroCard extends StatelessWidget {
             horizontal: AppSpacing.md,
             vertical: AppSpacing.sm,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.12),
-                      borderRadius: AppRadii.r12All,
-                    ),
-                    child: Icon(
-                      Icons.radio_rounded,
-                      color: p.accent,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.radioCardsTitle,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.title,
-                            fontWeight: FontWeight.w800,
+          child: ValueListenableBuilder<List<String>>(
+            valueListenable: RadioStationStore.heroPinnedUrls,
+            builder: (context, pinnedUrls, _) {
+              return ValueListenableBuilder<QuranHeroSortMode>(
+                valueListenable: RadioStationStore.heroSortMode,
+                builder: (context, activeSort, _) {
+                  final isPinned = pinnedUrls.contains(stationUrl);
+                  final isPinnedFirst =
+                      pinnedUrls.isNotEmpty && pinnedUrls.first == stationUrl;
+                  final hasCustomOrder = pinnedUrls.isNotEmpty ||
+                      activeSort != QuranHeroSortMode.curated;
+
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.12),
+                              borderRadius: AppRadii.r12All,
+                            ),
+                            child: Icon(
+                              Icons.radio_rounded,
+                              color: p.accent,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.l10n.radioCardsTitle,
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.title,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  stationTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.caption,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: AppSpacing.md),
+
+                      // Pin to First / Unpin Action
+                      ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.r14All,
+                          side: BorderSide(
+                            color: p.accent.withValues(alpha: 0.25),
+                            width: 0.8,
                           ),
                         ),
-                        Text(
+                        tileColor: p.accent.withValues(alpha: 0.10),
+                        leading: Icon(
+                          isPinnedFirst
+                              ? Icons.push_pin_outlined
+                              : Icons.push_pin_rounded,
+                          color: p.accent,
+                          size: 22,
+                        ),
+                        title: Text(
+                          isPinnedFirst
+                              ? context.l10n.unpinRadioCard
+                              : context.l10n.pinRadioCardToFirst,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          isPinnedFirst
+                              ? context.l10n.unpinRadioCardSubtitle
+                              : context.l10n.pinRadioCardToFirstSubtitle,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.tiny,
+                          ),
+                        ),
+                        trailing: (isPinned && !isPinnedFirst)
+                            ? TextButton(
+                                onPressed: () async {
+                                  PulsrHaptics.selectionClick();
+                                  Navigator.of(sheetContext).pop();
+                                  await RadioStationStore.unpinHeroCard(
+                                      stationUrl);
+                                  if (context.mounted) {
+                                    PulsrToast.show(
+                                      context,
+                                      message:
+                                          context.l10n.radioCardUnpinnedToast,
+                                      isSuccess: true,
+                                    );
+                                  }
+                                },
+                                child: Text(
+                                  context.l10n.unpinRadioCard,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              )
+                            : null,
+                        onTap: () async {
+                          PulsrHaptics.selectionClick();
+                          Navigator.of(sheetContext).pop();
+                          if (isPinnedFirst) {
+                            await RadioStationStore.unpinHeroCard(stationUrl);
+                            if (mounted) _jumpToFirstPage();
+                            if (context.mounted) {
+                              PulsrToast.show(
+                                context,
+                                message: context.l10n.radioCardUnpinnedToast,
+                                isSuccess: true,
+                              );
+                            }
+                          } else {
+                            await RadioStationStore.pinHeroCardFirst(
+                                stationUrl);
+                            if (mounted) _jumpToFirstPage();
+                            if (context.mounted) {
+                              PulsrToast.show(
+                                context,
+                                message: context.l10n.radioCardPinnedToast,
+                                isSuccess: true,
+                              );
+                            }
+                          }
+                        },
+                      ),
+
+                      const SizedBox(height: AppSpacing.md),
+
+                      // Sort Order Header + Optional Reset
+                      Row(
+                        children: [
+                          Text(
+                            context.l10n.sortRadioCardsTitle,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (hasCustomOrder)
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                              ),
+                              onPressed: () async {
+                                PulsrHaptics.selectionClick();
+                                await RadioStationStore.resetHeroCardOrder();
+                                if (mounted) _jumpToFirstPage();
+                                if (context.mounted) {
+                                  PulsrToast.show(
+                                    context,
+                                    message:
+                                        context.l10n.radioCardOrderResetToast,
+                                    isSuccess: true,
+                                  );
+                                }
+                              },
+                              icon: Icon(
+                                Icons.restart_alt_rounded,
+                                size: 15,
+                                color: p.accent,
+                              ),
+                              label: Text(
+                                context.l10n.resetRadioCardOrder,
+                                style: TextStyle(
+                                  color: p.accent,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+
+                      const SizedBox(height: AppSpacing.xs),
+
+                      // Sort Mode Selector Row
+                      Row(
+                        children: [
+                          _SortOptionChip(
+                            icon: Icons.auto_awesome_rounded,
+                            label: context.l10n.sortRadioCardsDefault,
+                            selected: activeSort == QuranHeroSortMode.curated,
+                            onTap: () async {
+                              PulsrHaptics.selectionClick();
+                              await RadioStationStore.setHeroSortMode(
+                                  QuranHeroSortMode.curated);
+                              if (mounted) _jumpToFirstPage();
+                            },
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          _SortOptionChip(
+                            icon: Icons.sort_by_alpha_rounded,
+                            label: context.l10n.sortRadioCardsAlphabetical,
+                            selected:
+                                activeSort == QuranHeroSortMode.alphabetical,
+                            onTap: () async {
+                              PulsrHaptics.selectionClick();
+                              await RadioStationStore.setHeroSortMode(
+                                  QuranHeroSortMode.alphabetical);
+                              if (mounted) _jumpToFirstPage();
+                            },
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          _SortOptionChip(
+                            icon: Icons.history_rounded,
+                            label: context.l10n.sortRadioCardsRecent,
+                            selected:
+                                activeSort == QuranHeroSortMode.recentlyPlayed,
+                            onTap: () async {
+                              PulsrHaptics.selectionClick();
+                              await RadioStationStore.setHeroSortMode(
+                                  QuranHeroSortMode.recentlyPlayed);
+                              if (mounted) _jumpToFirstPage();
+                            },
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: AppSpacing.md),
+
+                      // Hide Action
+                      ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.r14All,
+                        ),
+                        tileColor:
+                            p.surfaceContainerHigh.withValues(alpha: 0.5),
+                        leading: Icon(
+                          Icons.visibility_off_rounded,
+                          color: p.favorite,
+                          size: 22,
+                        ),
+                        title: Text(
+                          context.l10n.hideRadioCardsFromHome,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
                           context.l10n.radioCardsRestoreHint,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: AppFontSize.caption,
+                            fontSize: AppFontSize.tiny,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              // Hide Action
-              ListTile(
-                shape: RoundedRectangleBorder(
-                  borderRadius: AppRadii.r14All,
-                ),
-                tileColor: p.surfaceContainerHigh.withValues(alpha: 0.5),
-                leading: Icon(
-                  Icons.visibility_off_rounded,
-                  color: p.favorite,
-                  size: 22,
-                ),
-                title: Text(
-                  context.l10n.hideRadioCardsFromHome,
-                  style: TextStyle(
-                    color: p.textPrimary,
-                    fontSize: AppFontSize.bodySmall,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                subtitle: Text(
-                  context.l10n.hideRadioCardsSubtitle,
-                  style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: AppFontSize.tiny,
-                  ),
-                ),
-                onTap: () async {
-                  Navigator.of(sheetContext).pop();
-                  await RadioStationStore.setHeroCardsVisible(false);
-                  if (context.mounted) {
-                    PulsrToast.show(
-                      context,
-                      message: context.l10n.radioCardsHiddenToast,
-                      isSuccess: true,
-                    );
-                  }
+                        onTap: () async {
+                          Navigator.of(sheetContext).pop();
+                          await RadioStationStore.setHeroCardsVisible(false);
+                          if (context.mounted) {
+                            PulsrToast.show(
+                              context,
+                              message: context.l10n.radioCardsHiddenToast,
+                              isSuccess: true,
+                            );
+                          }
+                        },
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                    ],
+                  );
                 },
-              ),
-              const SizedBox(height: AppSpacing.xs),
-            ],
+              );
+            },
           ),
         ),
       ),
     );
   }
+}
 
+/// Tactile pill selector for radio card sorting options inside the long-press sheet.
+class _SortOptionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SortOptionChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadii.r12All,
+        child: InkWell(
+          borderRadius: AppRadii.r12All,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: context.motion(PulsrMotion.layout),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? p.accent.withValues(alpha: 0.16)
+                  : p.surfaceContainerHigh.withValues(alpha: 0.55),
+              borderRadius: AppRadii.r12All,
+              border: Border.all(
+                color: selected
+                    ? p.accent.withValues(alpha: 0.60)
+                    : p.hairline.withValues(alpha: 0.7),
+                width: selected ? 1.2 : 0.8,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? p.accent : p.textSecondary,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? p.accent : p.textPrimary,
+                    fontSize: AppFontSize.tiny,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The individual stylized hero card for a single Quran station.
+class _QuranHeroCard extends StatelessWidget {
   final QuranHeroItem item;
-  final int index;
-  final int total;
+  final bool isPinned;
   final VoidCallback onTap;
   final void Function(bool isCurrent) onPlayPressed;
+  final VoidCallback onLongPress;
 
   const _QuranHeroCard({
     required this.item,
-    required this.index,
-    required this.total,
+    required this.isPinned,
     required this.onTap,
     required this.onPlayPressed,
+    required this.onLongPress,
   });
 
   @override
@@ -690,14 +1140,20 @@ class _QuranHeroCard extends StatelessWidget {
         final badgeText = item.getBadgeText(isArabic);
         final defaultBadge = context.l10n.holyQuranRadio;
 
-        final baseSurface = p.surfaceContainer;
-        final elevatedSurface = Color.alphaBlend(
-          p.accent.withValues(alpha: p.isDark ? 0.05 : 0.03),
+        final surfaceStart = Color.alphaBlend(
+          p.accent.withValues(alpha: p.isDark ? 0.09 : 0.06),
           p.surfaceContainerHigh,
+        );
+        final surfaceEnd = Color.alphaBlend(
+          p.accent.withValues(alpha: p.isDark ? 0.03 : 0.015),
+          p.surfaceContainer,
         );
 
         final isHomeCard = item.artworkAsset.contains('home card') ||
             item.artworkAsset.contains('home_card');
+        final ctaRadius = isCapsule
+            ? context.buttonRadius(rectRadius: 12.0)
+            : AppRadii.circular(999);
 
         return Semantics(
           button: true,
@@ -709,10 +1165,7 @@ class _QuranHeroCard extends StatelessWidget {
             child: InkWell(
               borderRadius: AppRadii.r24All,
               onTap: onTap,
-              onLongPress: () {
-                PulsrHaptics.heavyImpact();
-                _showHideOptionSheet(context);
-              },
+              onLongPress: onLongPress,
               child: Container(
                 clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
@@ -720,21 +1173,15 @@ class _QuranHeroCard extends StatelessWidget {
                     begin: AlignmentDirectional.topStart,
                     end: AlignmentDirectional.bottomEnd,
                     colors: [
-                      elevatedSurface,
-                      baseSurface,
+                      surfaceStart,
+                      surfaceEnd,
                     ],
                   ),
                   borderRadius: AppRadii.r24All,
-                  border: Border.all(
-                    color: isPlaying
-                        ? p.accent.withValues(alpha: 0.70)
-                        : p.accent.withValues(alpha: 0.24),
-                    width: isPlaying ? 1.5 : 1.0,
-                  ),
                   boxShadow: isPlaying
                       ? [
                           BoxShadow(
-                            color: p.accent.withValues(alpha: 0.22),
+                            color: p.accent.withValues(alpha: 0.24),
                             blurRadius: 22,
                             spreadRadius: -2,
                             offset: const Offset(0, 6),
@@ -743,556 +1190,548 @@ class _QuranHeroCard extends StatelessWidget {
                         ]
                       : PulsrElevation.level2(context),
                 ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (isHomeCard) ...[
-                      // Full-bleed panoramic Home Card artwork (2172x724 banner)
-                      Positioned.fill(
-                        child: Image.asset(
-                          item.artworkAsset,
-                          fit: BoxFit.cover,
-                          alignment: Alignment.center,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: p.surfaceContainerHigh,
-                            child: Icon(
-                              Icons.radio_rounded,
-                              size: 48,
-                              color: p.accent.withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Smooth gradient scrim on text side (start side) for high contrast and readability
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: AlignmentDirectional.centerStart,
-                              end: AlignmentDirectional.centerEnd,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.82),
-                                Colors.black.withValues(alpha: 0.58),
-                                Colors.black.withValues(alpha: 0.20),
-                                Colors.transparent,
-                              ],
-                              stops: const [0.0, 0.40, 0.72, 1.0],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Soft vertical vignette for top and bottom controls
-                      Positioned.fill(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withValues(alpha: 0.30),
-                                Colors.transparent,
-                                Colors.black.withValues(alpha: 0.35),
-                              ],
-                              stops: const [0.0, 0.50, 1.0],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      // Ambient radial glow behind the reciter portrait stage
-                      PositionedDirectional(
-                        end: -10,
-                        top: -10,
-                        bottom: -10,
-                        width: 210,
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: RadialGradient(
-                                colors: [
-                                  p.accent.withValues(
-                                      alpha: isPlaying ? 0.20 : 0.10),
-                                  Colors.transparent,
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final portraitWidth =
+                        (constraints.maxWidth * 0.50).clamp(155.0, 240.0);
+                    final trailingReserved =
+                        (constraints.maxWidth * 0.37).clamp(120.0, 175.0);
+                    final isNetwork =
+                        item.artworkAsset.startsWith('http://') ||
+                            item.artworkAsset.startsWith('https://');
 
-                      // Reciter Ambient Artwork (Wide cinematic alignment with smooth theme-aware fade)
-                      PositionedDirectional(
-                        end: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 195,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isNetwork =
-                                item.artworkAsset.startsWith('http://') ||
-                                    item.artworkAsset.startsWith('https://');
-
-                            return Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                if (isNetwork)
-                                  CachedArtwork(
-                                    id: 0,
-                                    remoteUrl: item.artworkAsset,
-                                    size: 195,
-                                    fallbackIcon: Icons.radio_rounded,
-                                  )
-                                else
-                                  Image.asset(
-                                    item.artworkAsset,
-                                    fit: BoxFit.cover,
-                                    alignment: Alignment.centerRight,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: p.accentContainer
-                                          .withValues(alpha: 0.2),
-                                      child: Icon(
-                                        Icons.radio_rounded,
-                                        size: 48,
-                                        color: p.accent.withValues(alpha: 0.3),
-                                      ),
-                                    ),
-                                  ),
-                                // Smooth multi-stop fade from card surface into the portrait
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: AlignmentDirectional.centerStart,
-                                      end: AlignmentDirectional.centerEnd,
-                                      colors: [
-                                        baseSurface,
-                                        baseSurface.withValues(alpha: 0.96),
-                                        baseSurface.withValues(alpha: 0.72),
-                                        baseSurface.withValues(alpha: 0.25),
-                                        Colors.transparent,
-                                      ],
-                                      stops: const [0.0, 0.20, 0.45, 0.75, 1.0],
-                                    ),
-                                  ),
-                                ),
-                                // Subtle vertical soft blend
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Colors.transparent,
-                                        baseSurface.withValues(alpha: p.isDark ? 0.25 : 0.12),
-                                      ],
-                                      stops: const [0.70, 1.0],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-
-                    // Top inner specular highlight hairline
-                    PositionedDirectional(
-                      top: 0,
-                      start: 16,
-                      end: 16,
-                      child: IgnorePointer(
-                        child: Container(
-                          height: 1.2,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.transparent,
-                                (p.isDark ? Colors.white : Colors.black)
-                                    .withValues(alpha: p.isDark ? 0.20 : 0.08),
-                                p.accent.withValues(alpha: isPlaying ? 0.40 : 0.15),
-                                (p.isDark ? Colors.white : Colors.black)
-                                    .withValues(alpha: p.isDark ? 0.20 : 0.08),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Decorative background Islamic/Quran waveform watermark
-                    PositionedDirectional(
-                      start: -12,
-                      bottom: -16,
-                      child: ExcludeSemantics(
-                        child: Icon(
-                          Icons.graphic_eq_rounded,
-                          size: 100,
-                          color: p.accent
-                              .withValues(alpha: isPlaying ? 0.08 : 0.045),
-                        ),
-                      ),
-                    ),
-
-                    // Foreground Content Layer (Leaves trailing side open for portrait)
-                    Padding(
-                      padding: const EdgeInsetsDirectional.fromSTEB(
-                        AppSpacing.md,
-                        10,
-                        130,
-                        10,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Top Overline: Status / Reciter Pill Badge + Counter Chip
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: isCapsule
-                                      ? PulsrCapsuleStyle.decoration(p)
-                                      : BoxDecoration(
-                                          color: isPlaying
-                                              ? p.accent.withValues(alpha: 0.16)
-                                              : p.accent.withValues(alpha: 0.14),
-                                          borderRadius: AppRadii.circular(999),
-                                          border: Border.all(
-                                            color: isPlaying
-                                                ? p.accent.withValues(alpha: 0.40)
-                                                : p.accent.withValues(alpha: 0.30),
-                                            width: 0.8,
-                                          ),
-                                        ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (isPlaying) ...[
-                                        const _PulsingLiveDot(),
-                                        const SizedBox(width: 4.5),
-                                        Flexible(
-                                          child: Text(
-                                            context.l10n.radioLiveOnAirBadge,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: isCapsule
-                                                  ? PulsrCapsuleStyle.foregroundColor(p)
-                                                  : p.accent,
-                                              fontSize: AppFontSize.tiny,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.5,
-                                            ),
-                                          ),
-                                        ),
-                                      ] else ...[
-                                        Icon(
-                                          Icons.radio_rounded,
-                                          size: 11,
-                                          color: isCapsule
-                                              ? PulsrCapsuleStyle.foregroundColor(p)
-                                              : p.accent,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Flexible(
-                                          child: Text(
-                                            badgeText ?? defaultBadge,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: isCapsule
-                                                  ? PulsrCapsuleStyle.foregroundColor(p)
-                                                  : p.accent,
-                                              fontSize: AppFontSize.tiny,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.4,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              // Station count micro-pill
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 5.5,
-                                  vertical: 1.5,
-                                ),
-                                decoration: isCapsule
-                                    ? PulsrCapsuleStyle.decoration(p,
-                                        borderRadius: AppRadii.r6All)
-                                    : BoxDecoration(
-                                        color: p.surfaceContainerHighest
-                                            .withValues(alpha: 0.65),
-                                        borderRadius: AppRadii.r6All,
-                                        border: Border.all(
-                                          color: p.hairline.withValues(alpha: 0.6),
-                                          width: 0.6,
-                                        ),
-                                      ),
-                                child: Text(
-                                  '${index + 1}/$total',
-                                  style: TextStyle(
-                                    color: isCapsule
-                                        ? PulsrCapsuleStyle.foregroundColor(p)
-                                        : p.textSecondary,
-                                    fontSize: AppFontSize.tiny,
-                                    fontWeight: FontWeight.w700,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 5),
-
-                          // Station/Reciter Title
-                          MarqueeText(
-                            text: reciterTitle,
-                            textAlign: TextAlign.start,
-                            allowUserPause: false,
-                            velocity: 28.0,
-                            blankSpace: 36.0,
-                            style: TextStyle(
-                              color: isHomeCard ? Colors.white : p.textPrimary,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w800,
-                              height: 1.15,
-                              letterSpacing: -0.2,
-                              shadows: isHomeCard
-                                  ? const [
-                                      Shadow(
-                                        color: Colors.black87,
-                                        blurRadius: 8,
-                                        offset: Offset(0, 1),
-                                      ),
-                                    ]
-                                  : null,
-                            ),
-                          ),
-
-                          const SizedBox(height: 2),
-
-                          // Subtitle / Live ICY surah info
-                          Row(
-                            children: [
-                              if (isPlaying)
-                                Padding(
-                                  padding: const EdgeInsetsDirectional.only(
-                                      end: 4.0),
-                                  child: Icon(
-                                    Icons.graphic_eq_rounded,
-                                    size: 13,
-                                    color: p.accent,
-                                  ),
-                                ),
-                              Expanded(
-                                child: MarqueeText(
-                                  text: displaySubtitle,
-                                  textAlign: TextAlign.start,
-                                  allowUserPause: false,
-                                  velocity: 24.0,
-                                  blankSpace: 32.0,
-                                  style: TextStyle(
-                                    color: isPlaying
-                                        ? p.accent
-                                        : (isHomeCard
-                                            ? Colors.white.withValues(alpha: 0.90)
-                                            : p.textSecondary),
-                                    fontSize: 11.5,
-                                    fontWeight: isPlaying
-                                        ? FontWeight.w700
-                                        : FontWeight.w500,
-                                    shadows: isHomeCard
-                                        ? const [
-                                            Shadow(
-                                              color: Colors.black87,
-                                              blurRadius: 6,
-                                              offset: Offset(0, 1),
-                                            ),
-                                          ]
-                                        : null,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 8),
-
-                          // Bottom Action Row: Tactile Play/Pause Button + Status Capsule
-                          Row(
-                            children: [
-                              ExcludeSemantics(
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: AppRadii.circular(999),
-                                    onTap: () => onPlayPressed(isCurrent),
-                                    child: Container(
-                                      width: 38,
-                                      height: 38,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: [
-                                            Color.alphaBlend(
-                                              Colors.white
-                                                  .withValues(alpha: 0.16),
-                                              p.accent,
-                                            ),
-                                            p.accent,
-                                          ],
-                                        ),
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          ...PulsrElevation.level2(context),
-                                          BoxShadow(
-                                            color: p.accent.withValues(
-                                              alpha: isPlaying ? 0.34 : 0.18,
-                                            ),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 3),
-                                          ),
-                                        ],
-                                        border: Border.all(
-                                          color: p.onAccent.withValues(
-                                            alpha: isPlaying ? 0.38 : 0.18,
-                                          ),
-                                          width: isPlaying ? 1.5 : 1.0,
-                                        ),
-                                      ),
-                                      child: Center(
-                                        child: isBuffering
-                                            ? SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  strokeWidth: 2.0,
-                                                  color: p.onAccent,
-                                                ),
-                                              )
-                                            : Icon(
-                                                isPlaying
-                                                    ? Icons.pause_rounded
-                                                    : Icons.play_arrow_rounded,
-                                                color: p.onAccent,
-                                                size: isPlaying ? 22 : 25,
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8.5,
-                                  vertical: 4.5,
-                                ),
-                                decoration: isCapsule
-                                    ? PulsrCapsuleStyle.decoration(p)
-                                    : BoxDecoration(
-                                        color: isPlaying
-                                            ? p.accent.withValues(alpha: 0.14)
-                                            : p.surfaceContainerHighest
-                                                .withValues(alpha: 0.55),
-                                        borderRadius: AppRadii.circular(999),
-                                        border: Border.all(
-                                          color: isPlaying
-                                              ? p.accent.withValues(alpha: 0.38)
-                                              : p.hairline.withValues(alpha: 0.65),
-                                          width: 0.75,
-                                        ),
-                                      ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (isPlaying) ...[
-                                      _MiniEqualizerBars(
-                                        isPlaying: true,
-                                        color: isCapsule
-                                            ? PulsrCapsuleStyle.foregroundColor(p)
-                                            : p.accent,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        context.l10n.radioLiveShortBadge,
-                                        style: TextStyle(
-                                          color: isCapsule
-                                              ? PulsrCapsuleStyle.foregroundColor(p)
-                                              : p.accent,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.3,
-                                        ),
-                                      ),
-                                    ] else ...[
-                                      Icon(
-                                        Icons.volume_up_rounded,
-                                        size: 13,
-                                        color: isCapsule
-                                            ? PulsrCapsuleStyle.foregroundColor(p)
-                                            : p.textSecondary,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        context.l10n.radioListenNow,
-                                        style: TextStyle(
-                                          color: isCapsule
-                                              ? PulsrCapsuleStyle.foregroundColor(p)
-                                              : p.textSecondary,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Subtle warm ambient aura behind the trailing visual stage
+                        PositionedDirectional(
+                          end: -12,
+                          top: -12,
+                          bottom: -12,
+                          width: portraitWidth + 24,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: RadialGradient(
+                                  colors: [
+                                    p.accent.withValues(
+                                        alpha: isPlaying ? 0.22 : 0.11),
+                                    Colors.transparent,
                                   ],
                                 ),
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Top-level crisp border overlay guaranteeing right corners and edges
-                    // are never obscured or clipped by child artwork or gradients
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: AppRadii.r24All,
-                            border: Border.all(
-                              color: isPlaying
-                                  ? p.accent.withValues(alpha: 0.85)
-                                  : p.accent.withValues(alpha: 0.28),
-                              width: isPlaying ? 1.5 : 1.0,
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
+
+                        // Trailing Visual Stage:
+                        // Panoramic 'home card' assets place the reciter/mosque scene
+                        // on the right half and calligraphy on the left; Alignment.centerRight
+                        // frames ONLY the clean scene so typography never collides with text.
+                        PositionedDirectional(
+                          end: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: portraitWidth,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              if (isNetwork)
+                                CachedArtwork(
+                                  id: 0,
+                                  remoteUrl: item.artworkAsset,
+                                  size: portraitWidth,
+                                  fallbackIcon: Icons.radio_rounded,
+                                )
+                              else
+                                Image.asset(
+                                  item.artworkAsset,
+                                  fit: BoxFit.cover,
+                                  alignment: isHomeCard
+                                      ? Alignment.centerRight
+                                      : const Alignment(0.0, -0.15),
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color:
+                                        p.accentContainer.withValues(alpha: 0.2),
+                                    child: Icon(
+                                      Icons.radio_rounded,
+                                      size: 48,
+                                      color: p.accent.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                ),
+
+                              // Silky multi-stop fade from card editorial surface into artwork
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: AlignmentDirectional.centerStart,
+                                    end: AlignmentDirectional.centerEnd,
+                                    colors: [
+                                      surfaceStart,
+                                      surfaceStart.withValues(alpha: 0.96),
+                                      surfaceStart.withValues(alpha: 0.64),
+                                      surfaceStart.withValues(alpha: 0.18),
+                                      Colors.transparent,
+                                    ],
+                                    stops: const [0.0, 0.20, 0.44, 0.74, 1.0],
+                                  ),
+                                ),
+                              ),
+
+                              // Soft top/bottom vignette to harmonize portrait edges
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      surfaceStart.withValues(
+                                          alpha: p.isDark ? 0.22 : 0.10),
+                                      Colors.transparent,
+                                      surfaceEnd.withValues(
+                                          alpha: p.isDark ? 0.38 : 0.14),
+                                    ],
+                                    stops: const [0.0, 0.55, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Top inner specular highlight hairline
+                        PositionedDirectional(
+                          top: 0,
+                          start: 18,
+                          end: 18,
+                          child: IgnorePointer(
+                            child: Container(
+                              height: 1.0,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.transparent,
+                                    (p.isDark ? Colors.white : Colors.black)
+                                        .withValues(
+                                            alpha: p.isDark ? 0.16 : 0.06),
+                                    p.accent.withValues(
+                                        alpha: isPlaying ? 0.45 : 0.18),
+                                    (p.isDark ? Colors.white : Colors.black)
+                                        .withValues(
+                                            alpha: p.isDark ? 0.16 : 0.06),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Subtle background audio-wave watermark on leading bottom corner
+                        PositionedDirectional(
+                          start: -10,
+                          bottom: -14,
+                          child: ExcludeSemantics(
+                            child: Icon(
+                              Icons.graphic_eq_rounded,
+                              size: 88,
+                              color: p.accent
+                                  .withValues(alpha: isPlaying ? 0.07 : 0.035),
+                            ),
+                          ),
+                        ),
+
+                        // Clean Editorial Content Column (never overlaps portrait or calligraphy)
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                            AppSpacing.md,
+                            12,
+                            trailingReserved,
+                            12,
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Overline Row: Live On-Air or Station Category + Pin indicator
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isPlaying
+                                            ? p.accent.withValues(alpha: 0.18)
+                                            : p.accent.withValues(alpha: 0.11),
+                                        borderRadius: AppRadii.circular(999),
+                                        border: Border.all(
+                                          color: p.accent.withValues(
+                                            alpha: isPlaying ? 0.45 : 0.24,
+                                          ),
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isPlaying) ...[
+                                            const _PulsingLiveDot(),
+                                            const SizedBox(width: 5),
+                                            Flexible(
+                                              child: Text(
+                                                context
+                                                    .l10n.radioLiveOnAirBadge,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: p.accent,
+                                                  fontSize: AppFontSize.tiny,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: 0.45,
+                                                ),
+                                              ),
+                                            ),
+                                          ] else ...[
+                                            Icon(
+                                              Icons.sensors_rounded,
+                                              size: 11.5,
+                                              color: p.accent,
+                                            ),
+                                            const SizedBox(width: 4.5),
+                                            Flexible(
+                                              child: Text(
+                                                badgeText ?? defaultBadge,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: p.accent,
+                                                  fontSize: AppFontSize.tiny,
+                                                  fontWeight: FontWeight.w700,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  if (isPinned) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.all(4),
+                                      decoration: BoxDecoration(
+                                        color: p.accent.withValues(alpha: 0.14),
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color:
+                                              p.accent.withValues(alpha: 0.30),
+                                          width: 0.7,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.push_pin_rounded,
+                                        size: 10,
+                                        color: p.accent,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+
+                              const SizedBox(height: 7),
+
+                              // Station / Reciter Title
+                              MarqueeText(
+                                text: reciterTitle,
+                                textAlign: TextAlign.start,
+                                allowUserPause: false,
+                                showTooltip: false,
+                                velocity: 28.0,
+                                blankSpace: 36.0,
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: 16.5,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.2,
+                                  letterSpacing: -0.25,
+                                ),
+                              ),
+
+                              const SizedBox(height: 3),
+
+                              // Subtitle / Live ICY surah info
+                              Row(
+                                children: [
+                                  if (isPlaying)
+                                    Padding(
+                                      padding: const EdgeInsetsDirectional.only(
+                                          end: 4.5),
+                                      child: Icon(
+                                        Icons.graphic_eq_rounded,
+                                        size: 13,
+                                        color: p.accent,
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: MarqueeText(
+                                      text: displaySubtitle,
+                                      textAlign: TextAlign.start,
+                                      allowUserPause: false,
+                                      showTooltip: false,
+                                      velocity: 24.0,
+                                      blankSpace: 32.0,
+                                      style: TextStyle(
+                                        color: isPlaying
+                                            ? p.accent
+                                            : p.textSecondary,
+                                        fontSize: 12.0,
+                                        fontWeight: isPlaying
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 10),
+
+                              // Unified Tactile Action Row
+                              Row(
+                                children: [
+                                  ExcludeSemantics(
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: ctaRadius,
+                                        onTap: () => onPlayPressed(isCurrent),
+                                        child: Container(
+                                          height: 34,
+                                          padding: EdgeInsetsDirectional.fromSTEB(
+                                            isPlaying ? 11 : 10,
+                                            0,
+                                            isPlaying ? 11 : 13,
+                                            0,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              begin: Alignment.topLeft,
+                                              end: Alignment.bottomRight,
+                                              colors: [
+                                                Color.alphaBlend(
+                                                  Colors.white
+                                                      .withValues(alpha: 0.16),
+                                                  p.accent,
+                                                ),
+                                                p.accent,
+                                              ],
+                                            ),
+                                            borderRadius: ctaRadius,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: p.accent.withValues(
+                                                  alpha: isPlaying ? 0.34 : 0.22,
+                                                ),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                            border: Border.all(
+                                              color: p.onAccent.withValues(
+                                                alpha: isPlaying ? 0.32 : 0.16,
+                                              ),
+                                              width: 0.9,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (isBuffering)
+                                                SizedBox(
+                                                  width: 14,
+                                                  height: 14,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2.0,
+                                                    color: p.onAccent,
+                                                  ),
+                                                )
+                                              else
+                                                Icon(
+                                                  isPlaying
+                                                      ? Icons.pause_rounded
+                                                      : Icons.play_arrow_rounded,
+                                                  color: p.onAccent,
+                                                  size: 19,
+                                                ),
+                                              if (!isPlaying) ...[
+                                                const SizedBox(width: 5),
+                                                Text(
+                                                  context.l10n.radioListenNow,
+                                                  style: TextStyle(
+                                                    color: p.onAccent,
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w800,
+                                                    letterSpacing: 0.1,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (isPlaying) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      height: 34,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: p.accent.withValues(alpha: 0.14),
+                                        borderRadius: ctaRadius,
+                                        border: Border.all(
+                                          color: p.accent.withValues(alpha: 0.35),
+                                          width: 0.85,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _MiniEqualizerBars(
+                                            isPlaying: true,
+                                            color: p.accent,
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            context.l10n.radioLiveShortBadge,
+                                            style: TextStyle(
+                                              color: p.accent,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Crisp outer border overlay never obscured by child artwork
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: AppRadii.r24All,
+                                border: Border.all(
+                                  color: isPlaying
+                                      ? p.accent.withValues(alpha: 0.78)
+                                      : p.accent.withValues(alpha: 0.22),
+                                  width: isPlaying ? 1.5 : 1.0,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Bounded sliding-window dot indicator so large station lists stay clean.
+class _CarouselWindowedDots extends StatelessWidget {
+  final int total;
+  final int currentPage;
+  final ValueChanged<int> onDotTap;
+
+  const _CarouselWindowedDots({
+    required this.total,
+    required this.currentPage,
+    required this.onDotTap,
+  });
+
+  static const int _maxVisible = 7;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    if (total <= 0) return const SizedBox.shrink();
+
+    final visibleCount = math.min(total, _maxVisible);
+    final half = visibleCount ~/ 2;
+    final start = total <= _maxVisible
+        ? 0
+        : (currentPage - half).clamp(0, total - visibleCount);
+    final end = start + visibleCount;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (int i = start; i < end; i++)
+          Builder(
+            builder: (context) {
+              final isActive = i == currentPage;
+              final isEdgeClipped =
+                  (i == start && start > 0) || (i == end - 1 && end < total);
+              final dotHeight = isEdgeClipped ? 3.5 : 5.5;
+              final dotWidth = isActive
+                  ? 18.0
+                  : isEdgeClipped
+                      ? 3.5
+                      : 5.5;
+
+              return GestureDetector(
+                onTap: () => onDotTap(i),
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(0, 6, 4.5, 6),
+                  child: AnimatedContainer(
+                    duration: context.motion(PulsrMotion.layout),
+                    curve: context.motionCurve(PulsrMotion.enter),
+                    width: dotWidth,
+                    height: dotHeight,
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? p.accent
+                          : p.textTertiary
+                              .withValues(alpha: isEdgeClipped ? 0.22 : 0.36),
+                      borderRadius: BorderRadius.circular(3.0),
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: p.accent.withValues(alpha: 0.40),
+                                blurRadius: 6,
+                                offset: const Offset(0, 1),
+                              ),
+                            ]
+                          : null,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+      ],
     );
   }
 }

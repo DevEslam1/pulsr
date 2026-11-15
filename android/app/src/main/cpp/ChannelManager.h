@@ -53,6 +53,8 @@ private:
 
     int delaySamples_[MAX_CHANNELS] = {};
     float smoothedDelaySamples_[MAX_CHANNELS] = {};
+    float delayRampStep_[MAX_CHANNELS] = {};
+    int delayRampRemaining_[MAX_CHANNELS] = {};
     int maxDelaySamples_ = 1;
     std::array<std::vector<float>, MAX_CHANNELS> delayLines_;
     std::array<int, MAX_CHANNELS> writeIndex_{};

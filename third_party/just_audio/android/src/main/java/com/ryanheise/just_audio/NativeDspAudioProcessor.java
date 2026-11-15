@@ -770,6 +770,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
     protected void onFlush() {
         directUsbBackpressured = false;
         releaseUsbProducer();

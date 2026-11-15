@@ -101,9 +101,9 @@ object DnsOverHttpsResolver {
         val rightGroups = if (halves[1].isEmpty()) emptyList() else halves[1].split(':')
         if (!rightGroups.all { IPV6_GROUP_REGEX.matches(it) }) return false
         val totalGroups = leftGroups.size + rightGroups.size
-        // "::" must elide at least one group, and "::" alone (0 explicit groups)
-        // is rejected alongside > 7 explicit groups around compression.
-        return totalGroups in 1..7
+        // "::" must elide at least one group (0 explicit groups is the valid
+        // unspecified IPv6 address "::", max 7 explicit groups with "::").
+        return totalGroups in 0..7
     }
 
     private fun cached(hostname: String): CacheEntry? {

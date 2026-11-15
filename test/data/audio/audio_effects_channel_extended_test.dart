@@ -318,7 +318,7 @@ void main() {
 
     // Force the chunked path (payload larger than the 64 KB chunk size).
     final big = Uint8List(70 * 1024);
-    final decoded = await effects.decodeDsd(big, big);
+    final decoded = await effects.decodeDsd(big, big, streamId: 42, resetState: true);
     expect(decoded, isNotNull);
     expect(decoded, hasLength(6));
   });

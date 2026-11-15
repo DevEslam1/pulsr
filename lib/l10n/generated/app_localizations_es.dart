@@ -9289,6 +9289,44 @@ class AppLocalizationsEs extends AppLocalizations {
       'Tarjetas de radio restauradas en la pantalla de Inicio';
 
   @override
+  String get pinRadioCardToFirst => 'Fijar al inicio';
+
+  @override
+  String get pinRadioCardToFirstSubtitle =>
+      'Mantener esta emisora al principio del carrusel';
+
+  @override
+  String get unpinRadioCard => 'Desfijar';
+
+  @override
+  String get unpinRadioCardSubtitle =>
+      'Devolver esta emisora a su posición ordenada';
+
+  @override
+  String get radioCardPinnedToast => 'Emisora fijada al principio';
+
+  @override
+  String get radioCardUnpinnedToast => 'Emisora desfijada';
+
+  @override
+  String get sortRadioCardsTitle => 'Orden';
+
+  @override
+  String get sortRadioCardsDefault => 'Predeterminado';
+
+  @override
+  String get sortRadioCardsAlphabetical => 'A–Z';
+
+  @override
+  String get sortRadioCardsRecent => 'Recientes';
+
+  @override
+  String get resetRadioCardOrder => 'Restablecer';
+
+  @override
+  String get radioCardOrderResetToast => 'Orden de tarjetas restablecido';
+
+  @override
   String get radioShowAction => 'Mostrar';
 
   @override

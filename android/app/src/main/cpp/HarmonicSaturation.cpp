@@ -93,6 +93,7 @@ void HarmonicSaturation::reset() {
     std::memset(dcY_, 0, sizeof(dcY_));
     std::memset(decimHistory_, 0, sizeof(decimHistory_));
     decimIdx_ = 0;
+    wasDriveActive_ = false;
     std::memset(dryDelay_, 0, sizeof(dryDelay_));
     dryDelayPos_ = 0;
     for (int c = 0; c < MAX_CHANNELS / 2; ++c) {
@@ -267,10 +268,6 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
             decimHistory_[1][dIdx] = shR;
         }
         decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
-        if (modeCrossfadeProgress_ < 1.0f) {
-            const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
-            modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
-        }
 
         wetL = 0.0f;
         wetR = 0.0f;
@@ -346,6 +343,11 @@ inline void HarmonicSaturation::processFrameStereo(float inL, float inR, float& 
         subTapR = delayedSubR * multibandMix;
     }
 
+    if (modeCrossfadeProgress_ < 1.0f) {
+        const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+        modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
+    }
+
     if (!std::isfinite(wetL)) wetL = 0.0f;
     if (!std::isfinite(wetR)) wetR = 0.0f;
 
@@ -400,6 +402,16 @@ void HarmonicSaturation::process(float* L, float* R, int frames) {
 
     smoothParameters(frames);
     const double k = smoothedDrive_ * kMaxDrive;
+    const bool driveActive = k > 1e-9;
+    if (driveActive && !wasDriveActive_) {
+        // Clear stale decimation/DC/tilt history before re-entering saturation.
+        std::memset(decimHistory_, 0, sizeof(decimHistory_));
+        std::memset(dcX_, 0, sizeof(dcX_));
+        std::memset(dcY_, 0, sizeof(dcY_));
+        std::memset(hpState_, 0, sizeof(hpState_));
+        decimIdx_ = 0;
+    }
+    wasDriveActive_ = driveActive;
     const float mix = static_cast<float>(smoothedMix_);
     const float tilt = static_cast<float>(smoothedTilt_);
     const float hpCoeff = tiltHpCoeff_;
@@ -445,8 +457,17 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
     float currentMbMix = startMbMix;
 
     smoothParameters(frames);
+    const double k = smoothedDrive_ * kMaxDrive;
+    const bool driveActive = k > 1e-9;
+    if (driveActive && !wasDriveActive_) {
+        std::memset(decimHistory_, 0, sizeof(decimHistory_));
+        std::memset(dcX_, 0, sizeof(dcX_));
+        std::memset(dcY_, 0, sizeof(dcY_));
+        std::memset(hpState_, 0, sizeof(hpState_));
+        decimIdx_ = 0;
+    }
+    wasDriveActive_ = driveActive;
     if (stride == 2) {
-        const double k = smoothedDrive_ * kMaxDrive;
         const float mix = static_cast<float>(smoothedMix_);
         const float tilt = static_cast<float>(smoothedTilt_);
         const float hpCoeff = tiltHpCoeff_;
@@ -465,7 +486,6 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
         return;
     }
 
-    const double k = smoothedDrive_ * kMaxDrive;
     const float mix = static_cast<float>(smoothedMix_);
     const float tilt = static_cast<float>(smoothedTilt_);
     const float hpCoeff = tiltHpCoeff_;
@@ -557,10 +577,6 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
                 // Only advance decimIdx_ once per frame (after all channels processed)
                 if (ch == channels - 1) {
                     decimIdx_ = (decimIdx_ + OVERSAMPLE_FACTOR) % DECIM_HISTORY_LEN;
-                    if (modeCrossfadeProgress_ < 1.0f) {
-                        const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
-                        modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
-                    }
                 }
 
                 // Polyphase FIR decimation
@@ -620,6 +636,10 @@ void HarmonicSaturation::processInterleaved(float* buffer, int frames, int chann
         }
         currentEnabledMix += mixStep;
         currentMbMix += mbStep;
+        if (modeCrossfadeProgress_ < 1.0f) {
+            const float modeCrossfadeStep = 1.0f / static_cast<float>(sampleRate_ * 0.020);
+            modeCrossfadeProgress_ = std::min(1.0f, modeCrossfadeProgress_ + modeCrossfadeStep);
+        }
         // FIX M-13: advance the shared dry-delay position once per frame.
         dryDelayPos_ = (dryDelayPos_ + 1) % DRY_DELAY;
     }

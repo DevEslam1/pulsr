@@ -132,5 +132,37 @@ int main() {
         std::cout << "  [PASS] Room preset history footprint: " << roomBytes << " bytes ("
                   << roomPartitions << " partitions) vs MAX_PREALLOC " << maxPreallocBytes << " bytes." << std::endl;
     }
+
+    // 3. Cross-partition-count IR crossfade alignment & overflow retire ring safety
+    {
+        auto rev = std::make_unique<ConvolutionReverb>();
+        rev->setSampleRate(48000.0);
+        rev->setEnabled(true);
+        rev->setWetDry(0.8);
+        rev->setPreset(ReverbPreset::Cathedral); // large partition count first so ring covers max
+
+        std::vector<float> blkL(512, 0.0f), blkR(512, 0.0f);
+        std::vector<float> outL(512, 0.0f), outR(512, 0.0f);
+        for (int i = 0; i < 512; ++i) {
+            blkL[i] = 0.25f * std::sin(2.0f * 3.14159265f * 440.0f * i / 48000.0f);
+            blkR[i] = blkL[i];
+        }
+        for (int b = 0; b < 6; ++b) {
+            rev->process(blkL.data(), blkR.data(), outL.data(), outR.data(), 512);
+        }
+        rev->setPreset(ReverbPreset::Studio); // switch to fewer partitions while historyHead_ wraps on Cathedral
+        for (int b = 0; b < 4; ++b) {
+            rev->process(blkL.data(), blkR.data(), outL.data(), outR.data(), 512);
+            for (int i = 0; i < 512; ++i) {
+                assert(std::isfinite(outL[i]) && std::isfinite(outR[i]));
+            }
+        }
+        // Overflow retireIr beyond kMaxRetired without draining, then drain cleanly
+        for (int k = 0; k < 600; ++k) {
+            rev->setPreset((k % 2 == 0) ? ReverbPreset::Room : ReverbPreset::Chamber);
+        }
+        rev->drainRetiredIrs();
+        std::cout << "  [PASS] Cross-partition crossfade & >512 retired-IR overflow drain verified." << std::endl;
+    }
     return 0;
 }

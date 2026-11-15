@@ -325,11 +325,15 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
         ~WriterGuard() { ref.fetch_sub(1, std::memory_order_release); }
     } guard{activeWriters_};
 
-    if (releasing_.load(std::memory_order_acquire)) return -1;
+    if (releasing_.load(std::memory_order_acquire) ||
+        flushing_.load(std::memory_order_acquire)) {
+        return 0;
+    }
 
     if (recovery_.isDisconnected()) {
         std::unique_lock<std::mutex> lock(streamMutex_, std::try_to_lock);
-        if (!lock.owns_lock() || releasing_.load(std::memory_order_acquire)) {
+        if (!lock.owns_lock() || releasing_.load(std::memory_order_acquire) ||
+            flushing_.load(std::memory_order_acquire)) {
             return -1;
         }
         const auto now = std::chrono::steady_clock::now();
@@ -347,8 +351,15 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
         recoveryAttempts_ = 0;
     }
 
+    // Serialize concurrent Write()/Flush() access to shared volumeScratch_, sinkDither_,
+    // and framesWritten_ / Flush() rebase synchronization.
+    std::lock_guard<std::mutex> writeLock(writeMutex_);
+
     AAudioStream* st = stream_.load(std::memory_order_acquire);
-    if (st == nullptr || releasing_.load(std::memory_order_acquire)) return -1;
+    if (st == nullptr || releasing_.load(std::memory_order_acquire) ||
+        flushing_.load(std::memory_order_acquire)) {
+        return -1;
+    }
 
     const float curVol = volume_.load(std::memory_order_relaxed);
     // At unity (1.0f, including all DoP and hardware-volume playback) samples
@@ -379,7 +390,11 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     constexpr int kMaxRetries = 3;
 
     while (framesLeft > 0) {
-        if (releasing_.load(std::memory_order_acquire) || stream_.load(std::memory_order_acquire) == nullptr) break;
+        if (releasing_.load(std::memory_order_acquire) ||
+            flushing_.load(std::memory_order_acquire) ||
+            stream_.load(std::memory_order_acquire) == nullptr) {
+            break;
+        }
 
         const uint8_t* writeSrc = inCursor;
         int32_t framesToWrite = framesLeft;
@@ -453,19 +468,26 @@ void AAudioSink::Pause() {
 }
 
 void AAudioSink::Flush() {
+    flushing_.store(true, std::memory_order_release);
     std::lock_guard<std::mutex> lock(streamMutex_);
     AAudioStream* st = stream_.load(std::memory_order_acquire);
-    if (st == nullptr) return;
-    AAudioStream_requestPause(st);
-    aaudio_stream_state_t nextState = AAUDIO_STREAM_STATE_UNINITIALIZED;
-    AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_PAUSING, &nextState, 100000000LL);
-    // requestFlush is unsupported on some MMAP streams; ignore the result.
-    if (AAudioStream_requestFlush(st) == AAUDIO_OK) {
-        AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_FLUSHING, &nextState, 50000000LL);
+    if (st != nullptr) {
+        AAudioStream_requestPause(st);
+        aaudio_stream_state_t nextState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+        AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_PAUSING, &nextState, 100000000LL);
+        // requestFlush is unsupported on some MMAP streams; ignore the result.
+        if (AAudioStream_requestFlush(st) == AAUDIO_OK) {
+            AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_FLUSHING, &nextState, 50000000LL);
+        }
     }
-    readBase_ = AAudioStream_getFramesRead(st);
-    readOffset_ = 0;
-    framesWrittenBase_ = framesWritten_.load(std::memory_order_relaxed);
+    // Wait for any in-flight writer holding writeMutex_ to exit before rebasing counters.
+    std::lock_guard<std::mutex> writeLock(writeMutex_);
+    if (st != nullptr) {
+        readBase_ = AAudioStream_getFramesRead(st);
+        readOffset_ = 0;
+        framesWrittenBase_ = framesWritten_.load(std::memory_order_relaxed);
+    }
+    flushing_.store(false, std::memory_order_release);
 }
 
 void AAudioSink::SetVolume(float volume) {

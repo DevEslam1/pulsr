@@ -764,7 +764,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                         Expanded(
                           flex: 11,
                           child: QuranRadioHeroCarousel(
-                            height: 148,
+                            height: 158,
                             playerCubit: playerCubit,
                           ),
                         ),
@@ -786,7 +786,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                   return Column(
                     children: [
                       QuranRadioHeroCarousel(
-                        height: 142,
+                        height: 152,
                         playerCubit: playerCubit,
                       ),
                       const SizedBox(height: AppSpacing.s10),

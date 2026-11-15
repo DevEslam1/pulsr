@@ -2,7 +2,7 @@ part of 'audio_handler.dart';
 
 mixin PulsrAudioTransport on BaseAudioHandler {
   @override
-  Future<void> play() {
+  Future<void> play() async {
     _resumePositionSaving();
     // A user/system-initiated play clears the becoming-noisy auto-resume
     // arming so only a becoming-noisy pause keeps it armed (item 2).
@@ -27,6 +27,16 @@ mixin PulsrAudioTransport on BaseAudioHandler {
         return _loadGaplessQueue(initialPosition: pending, preload: true);
       }
     }
+    final volumeSync = _syncOutputVolumeBeforeLoad();
+    if (volumeSync != null || _shouldForwardSystemVolumeToOutput()) {
+      final startGen = _playGeneration;
+      _pendingPlaybackStart = true;
+      if (volumeSync != null) await volumeSync;
+      if (startGen != _playGeneration || !_pendingPlaybackStart) return;
+      await _reapplyActiveVolume();
+      if (startGen != _playGeneration || !_pendingPlaybackStart) return;
+      _pendingPlaybackStart = false;
+    }
     final player = _activePlayer;
     try {
       player.dspClearGainCurve().catchError((_) => false);
@@ -38,30 +48,29 @@ mixin PulsrAudioTransport on BaseAudioHandler {
     // widget play button — replays it instead of no-opping in `completed`.
     // A merely paused (ready) track is untouched, so it still resumes in place.
     if (player.processingState == ProcessingState.completed) {
-      return () async {
-        try {
-          if (_songs.isNotEmpty) {
-            await player.seek(Duration.zero, index: 0);
-            _lastGaplessIndex = 0;
-            _currentIndex = 0;
-            _savedQueueIndex = 0;
-            final song = _songs[0];
-            final fastArtUri =
-                song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
-            mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
-            _notifyTrackChanged(song);
-          } else {
-            await player.seek(Duration.zero);
-          }
-        } catch (_) {}
-        final f = player.play();
-        _broadcastState(player.playbackEvent);
-        await f;
-      }();
+      try {
+        if (_songs.isNotEmpty) {
+          await player.seek(Duration.zero, index: 0);
+          _lastGaplessIndex = 0;
+          _currentIndex = 0;
+          _savedQueueIndex = 0;
+          final song = _songs[0];
+          final fastArtUri =
+              song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+          mediaItem.add(PulsrAudioHandler._songToMediaItem(song, fastArtUri));
+          _notifyTrackChanged(song);
+        } else {
+          await player.seek(Duration.zero);
+        }
+      } catch (_) {}
+      final f = player.play();
+      _broadcastState(player.playbackEvent);
+      await f;
+      return;
     }
     final playFuture = player.play();
     _broadcastState(player.playbackEvent);
-    return playFuture;
+    await playFuture;
   }
 
   @override
@@ -993,6 +1002,12 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   Future<void> _loadGaplessQueue(
       {Duration? initialPosition, bool preload = true});
+
+  Future<void>? _syncOutputVolumeBeforeLoad();
+
+  bool _shouldForwardSystemVolumeToOutput();
+
+  Future<void> _reapplyActiveVolume();
 
   Future<AudioSource> _resolveAudioSource(SongsTableData song, MediaItem tag);
 

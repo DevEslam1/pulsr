@@ -197,6 +197,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Divider(height: 12, color: p.hairline),
+          _buildEqAutoHeadroomRow(p, telemetry.eqAutoHeadroomDb),
+          const SizedBox(height: AppSpacing.sm),
           _buildLimiterMeter(context, p, telemetry.limiterGrDb),
           const SizedBox(height: AppSpacing.sm),
           _buildMultibandMeter(context, p, telemetry.multibandGrDb),
@@ -205,6 +207,31 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
           const SizedBox(height: AppSpacing.xs),
         ],
       ),
+    );
+  }
+
+  Widget _buildEqAutoHeadroomRow(PulsrPalette p, double autoHeadroomDb) {
+    final active = autoHeadroomDb < -0.05;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'EQ Auto-Headroom',
+          style: TextStyle(
+            color: p.textSecondary,
+            fontSize: AppFontSize.caption,
+          ),
+        ),
+        Text(
+          '${autoHeadroomDb.toStringAsFixed(1)} dB',
+          style: TextStyle(
+            color: active ? p.warning : p.textSecondary,
+            fontSize: AppFontSize.caption,
+            fontFeatures: const [FontFeature.tabularFigures()],
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 

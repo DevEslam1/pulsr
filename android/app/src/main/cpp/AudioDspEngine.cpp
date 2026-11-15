@@ -316,41 +316,51 @@ void AudioDspEngine::swapCurrentLocked(const std::shared_ptr<const DspParamSnaps
     //    retireAndDrain()'s seq_cst load of audioHazardPtr_, so a render thread
     //    that has already hazarded `old` is guaranteed to be observed there.
     currentParamsPtr_.store(snap.get(), std::memory_order_seq_cst);
+    publishEpoch_.fetch_add(1, std::memory_order_seq_cst);
     // 4) Reclaim prior retirees and defer-free the previous owner.
     retireAndDrain(std::move(old));
 }
 
 void AudioDspEngine::retireAndDrain(std::shared_ptr<const DspParamSnapshot> old) {
+    std::vector<std::shared_ptr<const DspParamSnapshot>> toFree;
     {
         std::lock_guard<std::mutex> lock(retireMutex_);
-        // seq_cst completes the StoreLoad handshake begun by the render thread
-        // (hazard store, then re-read of currentParamsPtr_) and by
-        // swapCurrentLocked (currentParamsPtr_ store, then this load). If a
-        // render thread confirmed `old` as current AFTER hazarding it, we are
-        // guaranteed to read that hazard here and must not free `old`. If instead
-        // we free it (hazard not yet set), the render thread's re-read observes
-        // the newer pointer and retries, so it never dereferences freed memory.
-        const DspParamSnapshot* hz = audioHazardPtr_.load(std::memory_order_seq_cst);
-        // Reclaim every parked snapshot the render thread has moved off of.
+        // Reclaim every parked snapshot no render thread's hazard slot protects.
         for (auto& slot : retireQueue_) {
-            if (slot && slot.get() != hz) {
-                slot.reset();
+            if (slot && !isSnapshotHazardedLocked(slot.get())) {
+                toFree.push_back(std::move(slot));
             }
         }
-        // Park the previous owner only while the render thread may still be
-        // mid-block on it (its hazard still points at it). The reclaim above
-        // frees all but that single hazarded snapshot, so a free slot always
-        // exists. If `old` is not hazarded it is unreferenced and is freed below,
-        // off the audio thread, when `old` leaves scope.
-        if (old && old.get() == hz) {
+        for (size_t i = 0; i < retireOverflow_.size();) {
+            if (!retireOverflow_[i] ||
+                !isSnapshotHazardedLocked(retireOverflow_[i].get())) {
+                if (retireOverflow_[i]) {
+                    toFree.push_back(std::move(retireOverflow_[i]));
+                }
+                retireOverflow_[i] = std::move(retireOverflow_.back());
+                retireOverflow_.pop_back();
+            } else {
+                ++i;
+            }
+        }
+        // Park the previous owner whenever any render thread may still be
+        // mid-block on it. If the fixed pool is full, keep it alive in
+        // retireOverflow_ rather than dropping it while still hazarded.
+        if (old && isSnapshotHazardedLocked(old.get())) {
+            bool parked = false;
             for (auto& slot : retireQueue_) {
                 if (!slot) {
                     slot = std::move(old);
+                    parked = true;
                     break;
                 }
             }
+            if (!parked && old) {
+                retireOverflow_.push_back(std::move(old));
+            }
         }
     }
+    toFree.clear();
     // Outside retireMutex_: keep reverb's retired-IR reclamation in exactly the
     // lock context it had before (publishMutex_ / registry mutex_, never the new
     // retire lock), and let any `old` deletion happen off the retire lock.
@@ -411,9 +421,13 @@ bool DspEngineRegistry::registerEngine(AudioDspEngine* engine) {
     engine->setPerformanceProfile(tmpl.getPerformanceProfile());
     engine->setThermalLevel(tmpl.getThermalLevel());
     engine->setReverbThreadingMode(tmpl.getReverbThreadingMode());
-    const uint32_t deg = tmpl.getAutoDegradedStages();
-    if (deg != 0) {
-        engine->triggerStageAutoDegrade(deg);
+    const uint32_t nativeDeg = tmpl.getNativeAutoDegradedStages();
+    if (nativeDeg != 0) {
+        engine->triggerStageAutoDegrade(nativeDeg);
+    }
+    const uint32_t extDeg = tmpl.getExternalDegradedStages();
+    if (extDeg != 0) {
+        engine->triggerExternalDegrade(extDeg);
     }
     slots_[slot].engine.store(engine, std::memory_order_release);
     return true;
@@ -639,20 +653,20 @@ uint32_t DspEngineRegistry::getAutoDegradedStages() {
 
 void DspEngineRegistry::triggerStageAutoDegrade(uint32_t stageBitmask) {
     std::lock_guard<std::mutex> lock(mutex_);
-    AudioDspEngine::instance().triggerStageAutoDegrade(stageBitmask);
+    AudioDspEngine::instance().triggerExternalDegrade(stageBitmask);
     for (auto* engine : engines_) {
         if (engine) {
-            engine->triggerStageAutoDegrade(stageBitmask);
+            engine->triggerExternalDegrade(stageBitmask);
         }
     }
 }
 
 void DspEngineRegistry::recoverStageAutoDegrade(uint32_t stageBitmask) {
     std::lock_guard<std::mutex> lock(mutex_);
-    AudioDspEngine::instance().recoverStageAutoDegrade(stageBitmask);
+    AudioDspEngine::instance().recoverExternalDegrade(stageBitmask);
     for (auto* engine : engines_) {
         if (engine) {
-            engine->recoverStageAutoDegrade(stageBitmask);
+            engine->recoverExternalDegrade(stageBitmask);
         }
     }
 }
@@ -687,6 +701,9 @@ void DspEngineRegistry::getTelemetry(double* outArray, int size) {
     }
     if (size >= 18) {
         outArray[17] = eng->getLoudnessDeltaDb();
+    }
+    if (size >= 19) {
+        outArray[18] = eng->getEqAutoHeadroomDb();
     }
 }
 
@@ -1210,19 +1227,47 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // The loop is wait-free in practice: it only retries while a concurrent
     // publish is changing currentParamsPtr_, which is bounded. The audio thread
     // never touches a shared_ptr control block and never allocates or locks.
-    const DspParamSnapshot* snapshot = currentParamsPtr_.load(std::memory_order_acquire);
+    // Claim a dedicated per-renderer hazard slot so multiple concurrent readers
+    // (e.g. DspEngineRegistry::acquireForRender) cannot overwrite each other's
+    // protected snapshot pointer, and pair with publishEpoch_ to close pointer
+    // address ABA after allocator reuse.
+    thread_local int tlsHazardHint = 0;
+    int hazardSlotIdx = -1;
     for (;;) {
-        audioHazardPtr_.store(snapshot, std::memory_order_seq_cst);
-        const DspParamSnapshot* confirm = currentParamsPtr_.load(std::memory_order_seq_cst);
-        if (confirm == snapshot) break;
-        snapshot = confirm;
+        for (int attempt = 0; attempt < kMaxHazardSlots; ++attempt) {
+            const int idx = (tlsHazardHint + attempt) % kMaxHazardSlots;
+            bool expected = false;
+            if (hazardSlots_[idx].inUse.compare_exchange_strong(
+                    expected, true, std::memory_order_acquire,
+                    std::memory_order_relaxed)) {
+                hazardSlotIdx = idx;
+                tlsHazardHint = idx;
+                break;
+            }
+        }
+        if (hazardSlotIdx >= 0) break;
+        std::this_thread::yield();
     }
     struct HazardGuard {
-        std::atomic<const DspParamSnapshot*>& hz;
+        HazardSlot& slot;
         ~HazardGuard() {
-            hz.store(nullptr, std::memory_order_release);
+            slot.ptr.store(nullptr, std::memory_order_seq_cst);
+            slot.inUse.store(false, std::memory_order_release);
         }
-    } hazardGuard{audioHazardPtr_};
+    } hazardGuard{hazardSlots_[hazardSlotIdx]};
+
+    const DspParamSnapshot* snapshot = nullptr;
+    for (;;) {
+        const uint64_t epochBefore = publishEpoch_.load(std::memory_order_acquire);
+        const DspParamSnapshot* candidate = currentParamsPtr_.load(std::memory_order_seq_cst);
+        hazardSlots_[hazardSlotIdx].ptr.store(candidate, std::memory_order_seq_cst);
+        const DspParamSnapshot* confirm = currentParamsPtr_.load(std::memory_order_seq_cst);
+        const uint64_t epochAfter = publishEpoch_.load(std::memory_order_seq_cst);
+        if (confirm == candidate && epochAfter == epochBefore) {
+            snapshot = candidate;
+            break;
+        }
+    }
     lastBlockBitPerfect_.store(snapshot && snapshot->bitPerfect.enabled, std::memory_order_relaxed);
     if (!snapshot) {
         effectiveLatencyFrames_.store(0, std::memory_order_release);
@@ -1231,8 +1276,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         return frames;
     }
 
+    const uint32_t initialDegraded = getAutoDegradedStages();
     const bool crossfeedEnabled = !snapshot->bitPerfect.enabled &&
-        (snapshot->activeStages & ~autoDegradedStages_.load(std::memory_order_relaxed) & STAGE_CROSSFEED) &&
+        (snapshot->activeStages & ~initialDegraded & STAGE_CROSSFEED) &&
         snapshot->crossfeed.enabled;
     crossfeed_.setEnabled(crossfeedEnabled);
     const uint64_t resetGeneration = resetRequestGeneration_.load(std::memory_order_acquire);
@@ -1248,8 +1294,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // claim rests on.
     CustodyCaptureGuard custodyGuard{&custody_, buffer, frames, channels,
                                      snapshot->generation,
-                                     snapshot->activeStages &
-                                         ~autoDegradedStages_.load(std::memory_order_relaxed)};
+                                     snapshot->activeStages & ~initialDegraded};
     int blockLatency = 0;
     limiterActive_.store(false, std::memory_order_relaxed);
 
@@ -1472,7 +1517,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
 
     // Net gain check for conditional limiter insertion
     const uint32_t rawStages = snapshot->activeStages;
-    const uint32_t degraded = autoDegradedStages_.load();
+    const uint32_t degraded = getAutoDegradedStages();
     const uint32_t stages = rawStages & ~degraded;
 
     eq_.setEnabled((stages & STAGE_EQ) && snapshot->eq.enabled);
@@ -1907,7 +1952,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             const float avgRtf = sum / static_cast<float>(kRtfWindowSize);
             rollingRtf_.store(avgRtf, std::memory_order_relaxed);
 
-            const uint32_t currentDegraded = autoDegradedStages_.load(std::memory_order_relaxed);
+            const uint32_t nativeDegraded = autoDegradedStages_.load(std::memory_order_relaxed);
+            const uint32_t currentDegraded =
+                nativeDegraded | externalDegradedStages_.load(std::memory_order_relaxed);
 
             const auto profile = performanceProfile_.load(std::memory_order_relaxed);
             const int thermal = thermalLevel_.load(std::memory_order_relaxed);
@@ -2008,39 +2055,41 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
                 }
-            } else if (avgRtf < recoveryThreshold && currentDegraded != 0) {
-                // Recovery: sustained low load (RTF < recoveryThreshold) over kRtfRecoveryWindowSize blocks
+            } else if (avgRtf < recoveryThreshold && nativeDegraded != 0) {
+                // Recovery: sustained low load (RTF < recoveryThreshold) over kRtfRecoveryWindowSize blocks.
+                // Native recovery only clears bits that native RTF monitoring itself degraded
+                // (never externalDegradedStages_ set by the host Kotlin RTF/thermal governor).
                 recoveryConsecutiveBlocks_++;
                 if (recoveryConsecutiveBlocks_ >= kRtfRecoveryWindowSize) {
                     recoveryConsecutiveBlocks_ = 0;
                     // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> VIPER_DDC -> SATURATION -> DYNAMIC_BASS -> MULTIBAND_COMPRESSOR -> ARBITRARY_EQ -> LIVE_PROG -> REVERB
-                    if (currentDegraded & STAGE_EQ) {
+                    if (nativeDegraded & STAGE_EQ) {
                         recoverStageAutoDegrade(STAGE_EQ);
-                    } else if (currentDegraded & STAGE_PANNER) {
+                    } else if (nativeDegraded & STAGE_PANNER) {
                         recoverStageAutoDegrade(STAGE_PANNER);
-                    } else if (currentDegraded & STAGE_CROSSFEED) {
+                    } else if (nativeDegraded & STAGE_CROSSFEED) {
                         recoverStageAutoDegrade(STAGE_CROSSFEED);
-                    } else if (currentDegraded & STAGE_WIDTH) {
+                    } else if (nativeDegraded & STAGE_WIDTH) {
                         recoverStageAutoDegrade(STAGE_WIDTH);
-                    } else if (currentDegraded & STAGE_CROSSOVER) {
+                    } else if (nativeDegraded & STAGE_CROSSOVER) {
                         recoverStageAutoDegrade(STAGE_CROSSOVER);
-                    } else if (currentDegraded & STAGE_DYNEQ) {
+                    } else if (nativeDegraded & STAGE_DYNEQ) {
                         recoverStageAutoDegrade(STAGE_DYNEQ);
-                    } else if (currentDegraded & STAGE_VIPER_DDC) {
+                    } else if (nativeDegraded & STAGE_VIPER_DDC) {
                         recoverStageAutoDegrade(STAGE_VIPER_DDC);
-                    } else if (currentDegraded & STAGE_DAC_VOICING) {
+                    } else if (nativeDegraded & STAGE_DAC_VOICING) {
                         recoverStageAutoDegrade(STAGE_DAC_VOICING);
-                    } else if (currentDegraded & STAGE_SATURATION) {
+                    } else if (nativeDegraded & STAGE_SATURATION) {
                         recoverStageAutoDegrade(STAGE_SATURATION);
-                    } else if (currentDegraded & STAGE_DYNAMIC_BASS) {
+                    } else if (nativeDegraded & STAGE_DYNAMIC_BASS) {
                         recoverStageAutoDegrade(STAGE_DYNAMIC_BASS);
-                    } else if (currentDegraded & STAGE_MULTIBAND_COMPRESSOR) {
+                    } else if (nativeDegraded & STAGE_MULTIBAND_COMPRESSOR) {
                         recoverStageAutoDegrade(STAGE_MULTIBAND_COMPRESSOR);
-                    } else if (currentDegraded & STAGE_ARBITRARY_EQ) {
+                    } else if (nativeDegraded & STAGE_ARBITRARY_EQ) {
                         recoverStageAutoDegrade(STAGE_ARBITRARY_EQ);
-                    } else if (currentDegraded & STAGE_LIVE_PROG) {
+                    } else if (nativeDegraded & STAGE_LIVE_PROG) {
                         recoverStageAutoDegrade(STAGE_LIVE_PROG);
-                    } else if (currentDegraded & STAGE_REVERB) {
+                    } else if (nativeDegraded & STAGE_REVERB) {
                         recoverStageAutoDegrade(STAGE_REVERB);
                     }
                     rtfCount_ = 0;

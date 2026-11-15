@@ -7,6 +7,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/radio_station.dart';
 import '../utils/error_logger.dart';
 
+/// Sort modes for the homescreen Quran radio hero carousel.
+enum QuranHeroSortMode {
+  curated,
+  alphabetical,
+  recentlyPlayed;
+
+  static QuranHeroSortMode fromStorage(String? raw) {
+    for (final mode in values) {
+      if (mode.name == raw) return mode;
+    }
+    return QuranHeroSortMode.curated;
+  }
+}
+
 /// Persists the user's internet radio stations as a JSON list in [SharedPreferences].
 ///
 /// **Design Note:**
@@ -20,10 +34,22 @@ class RadioStationStore {
   static const String prefsKey = 'radio_stations_v1';
   static const String prefsKeyHeroCardsVisible =
       'setting_radio_hero_cards_visible_v1';
+  static const String prefsKeyHeroPinnedUrls =
+      'setting_radio_hero_pinned_urls_v1';
+  static const String prefsKeyHeroSortMode =
+      'setting_radio_hero_sort_mode_v1';
   static const int maxEntries = 500;
 
   /// Global reactive visibility notifier for homescreen radio hero cards.
   static final ValueNotifier<bool> heroCardsVisible = ValueNotifier<bool>(true);
+
+  /// Ordered list of station URLs pinned to the front of the hero carousel.
+  static final ValueNotifier<List<String>> heroPinnedUrls =
+      ValueNotifier<List<String>>(const []);
+
+  /// Active sort mode for unpinned cards in the homescreen radio hero carousel.
+  static final ValueNotifier<QuranHeroSortMode> heroSortMode =
+      ValueNotifier<QuranHeroSortMode>(QuranHeroSortMode.curated);
 
   /// Toggles and persists whether the homescreen radio hero carousel is visible.
   static Future<void> setHeroCardsVisible(bool visible) async {
@@ -31,6 +57,51 @@ class RadioStationStore {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(prefsKeyHeroCardsVisible, visible);
+    } catch (_) {}
+  }
+
+  /// Pins [stationUrl] to index 0 of the hero carousel and persists the list.
+  static Future<void> pinHeroCardFirst(String stationUrl) async {
+    final next = List<String>.unmodifiable([
+      stationUrl,
+      ...heroPinnedUrls.value.where((u) => u != stationUrl),
+    ]);
+    heroPinnedUrls.value = next;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(prefsKeyHeroPinnedUrls, next);
+    } catch (_) {}
+  }
+
+  /// Removes [stationUrl] from the pinned hero cards list and persists.
+  static Future<void> unpinHeroCard(String stationUrl) async {
+    final next = List<String>.unmodifiable(
+      heroPinnedUrls.value.where((u) => u != stationUrl),
+    );
+    heroPinnedUrls.value = next;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(prefsKeyHeroPinnedUrls, next);
+    } catch (_) {}
+  }
+
+  /// Sets and persists the hero carousel sort mode.
+  static Future<void> setHeroSortMode(QuranHeroSortMode mode) async {
+    heroSortMode.value = mode;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(prefsKeyHeroSortMode, mode.name);
+    } catch (_) {}
+  }
+
+  /// Clears all pinned hero cards and resets sort order back to curated default.
+  static Future<void> resetHeroCardOrder() async {
+    heroPinnedUrls.value = const [];
+    heroSortMode.value = QuranHeroSortMode.curated;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(prefsKeyHeroPinnedUrls);
+      await prefs.remove(prefsKeyHeroSortMode);
     } catch (_) {}
   }
 
@@ -693,6 +764,8 @@ class RadioStationStore {
   static void resetForTesting() {
     _stations.clear();
     heroCardsVisible.value = true;
+    heroPinnedUrls.value = const [];
+    heroSortMode.value = QuranHeroSortMode.curated;
     _instance = null;
     _sharedReady = null;
     _loadFailed = false;
@@ -836,6 +909,14 @@ class RadioStationStore {
       final storedHeroVisible = prefs.getBool(prefsKeyHeroCardsVisible);
       if (storedHeroVisible != null) {
         heroCardsVisible.value = storedHeroVisible;
+      }
+      final storedPinned = prefs.getStringList(prefsKeyHeroPinnedUrls);
+      if (storedPinned != null) {
+        heroPinnedUrls.value = List<String>.unmodifiable(storedPinned);
+      }
+      final storedSort = prefs.getString(prefsKeyHeroSortMode);
+      if (storedSort != null) {
+        heroSortMode.value = QuranHeroSortMode.fromStorage(storedSort);
       }
       final raw = prefs.getString(prefsKey);
       // The station list is process-static, so an empty/missing store must

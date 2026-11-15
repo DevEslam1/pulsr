@@ -72,7 +72,9 @@ private:
     Biquad yLpSide_;
 
     // Filter for X-band acoustic response range [xLow, xHigh] Hz
-    Biquad xLpBass_;   // low-pass at xHigh
+    Biquad xLpBass_;     // low-pass at max(xHigh, yHigh)
+    Biquad xHpHarmonic_; // high-pass at xLow for harmonic excitation band
+    Biquad xLpHarmonic_; // low-pass at xHigh for harmonic excitation band
 
     // Dynamic envelope follower
     double envelope_ = 0.0;

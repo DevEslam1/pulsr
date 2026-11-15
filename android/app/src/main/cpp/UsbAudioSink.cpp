@@ -239,17 +239,33 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     frameAccumulator_ = 0;
     feedbackRatePerSec_ = sampleRate_;  // nominal until a feedback sample arrives
 
-    // Power-of-two ring buffer capacity for mask-based indexing (at least 1000ms
-    // slack so Media3's AudioTrack prefill burst and clock drift never drop blocks).
-    const size_t targetRingBytes = std::max(
-        static_cast<size_t>(bytesPerUrb_) * 32,
-        static_cast<size_t>(sampleRate_) * static_cast<size_t>(channels_) *
-            static_cast<size_t>(bytesPerSample_));
-    size_t cap = 2048;
-    while (cap < targetRingBytes) cap <<= 1;
-    ring_.assign(cap, 0);
-    ringRawDepth_.assign(cap, 0);
-    ringMask_ = cap - 1;
+    // Power-of-two frame capacity for mask-based frame & raw-depth indexing
+    // (~1000 ms slack on standard devices; capped on <= 3 GiB RAM devices).
+    const size_t minRingFrames = std::max(
+        static_cast<size_t>(packetsPerUrb_ * maxFramesPerPacket_) * 8,
+        static_cast<size_t>(256));
+    size_t targetRingFrames = std::max(
+        static_cast<size_t>(packetsPerUrb_ * maxFramesPerPacket_) * 32,
+        static_cast<size_t>(sampleRate_));
+#if defined(__linux__) || defined(__ANDROID__)
+    const long physPages = sysconf(_SC_PHYS_PAGES);
+    const long pageSize = sysconf(_SC_PAGESIZE);
+    if (physPages > 0 && pageSize > 0) {
+        const uint64_t totalRamBytes =
+            static_cast<uint64_t>(physPages) * static_cast<uint64_t>(pageSize);
+        if (totalRamBytes <= 3ULL * 1024ULL * 1024ULL * 1024ULL && frameBytes > 0) {
+            constexpr size_t kLowRamMaxRingBytes = 4ULL * 1024ULL * 1024ULL;
+            const size_t maxFramesByRam =
+                std::max(minRingFrames, kLowRamMaxRingBytes / static_cast<size_t>(frameBytes));
+            targetRingFrames = std::min(targetRingFrames, maxFramesByRam);
+        }
+    }
+#endif
+    size_t capFrames = 256;
+    while (capFrames < targetRingFrames) capFrames <<= 1;
+    ring_.assign(capFrames * static_cast<size_t>(frameBytes), 0);
+    ringRawDepth_.assign(capFrames, 0);
+    ringFrameMask_ = capFrames - 1;
     ringRead_.store(0, std::memory_order_relaxed);
     ringWrite_.store(0, std::memory_order_relaxed);
 
@@ -569,7 +585,7 @@ void UsbAudioSink::releaseResources() {
     ring_.shrink_to_fit();
     ringRawDepth_.clear();
     ringRawDepth_.shrink_to_fit();
-    ringMask_ = 0;
+    ringFrameMask_ = 0;
     if (claimed_ && fd_ >= 0) {
         int iface = interfaceNumber_;
         ioctl(fd_, USBDEVFS_RELEASEINTERFACE, &iface);
@@ -609,6 +625,92 @@ int UsbAudioSink::completionError(const void* raw, bool feedback, int packets, i
     return 0;
 }
 
+size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
+                                          size_t& readFrame, int& rawDepth,
+                                          uint64_t& deliveryEpoch) {
+    const size_t frameBytes =
+        static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
+    const size_t pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
+    if (pktLen == 0) return 0;
+
+    const size_t w = ringWrite_.load(std::memory_order_acquire);
+    const size_t availFrames = w - readFrame; // unsigned arithmetic survives counter wrap
+    const size_t copyFrames = std::min(availFrames, static_cast<size_t>(framesInPacket));
+    bool packetRaw = false;
+
+    if (copyFrames > 0) {
+        const size_t mask = ringFrameMask_;
+        for (size_t f = 0; f < copyFrames; ++f) {
+            const size_t slot = (readFrame + f) & mask;
+            const uint8_t* src = ring_.data() + slot * frameBytes;
+            std::memcpy(dst + f * frameBytes, src, frameBytes);
+            const int depth = ringRawDepth_[slot];
+            packetRaw = packetRaw || depth != 0;
+            if (rawDepth == -1) rawDepth = depth;
+            else if (rawDepth != depth) rawDepth = 0;
+        }
+        readFrame += copyFrames;
+    }
+
+    const size_t realBytes = copyFrames * frameBytes;
+    if (copyFrames == static_cast<size_t>(framesInPacket)) {
+        if (packetRaw) {
+            // Raw/DoP packets must stay bit-identical across underrun recovery:
+            // never run gapFader_ or RequantizePcmValidBits on raw samples.
+            gapFader_.reset();
+        } else {
+            if (gapFader_.recovering()) {
+                rawDepth = 0;
+            }
+            gapFader_.applyReal(dst, framesInPacket, workerDither_);
+            if (validBitDepth_ < bytesPerSample_ * 8) {
+                for (size_t sample = 0; sample < pktLen; sample += bytesPerSample_) {
+                    RequantizePcmValidBits(dst + sample, bytesPerSample_,
+                                           validBitDepth_, workerDither_);
+                }
+            }
+        }
+    } else {
+        // Partial or complete underrun: salvage any available real frames at the
+        // packet head rather than discarding up to a full packet of buffered audio.
+        const int missingFrames = framesInPacket - static_cast<int>(copyFrames);
+        if (copyFrames > 0) {
+            if (packetRaw || producerRawDepth_.load(std::memory_order_acquire) != 0) {
+                std::memset(dst + realBytes, 0, pktLen - realBytes);
+                gapFader_.reset();
+            } else {
+                gapFader_.applyReal(dst, static_cast<int>(copyFrames), workerDither_);
+                gapFader_.fillGap(dst + realBytes, missingFrames, workerDither_);
+                if (validBitDepth_ < bytesPerSample_ * 8) {
+                    for (size_t sample = 0; sample < pktLen; sample += bytesPerSample_) {
+                        RequantizePcmValidBits(dst + sample, bytesPerSample_,
+                                               validBitDepth_, workerDither_);
+                    }
+                }
+            }
+        } else {
+            // Raw/DoP gaps must be silence, not synthesized marker/audio bytes.
+            if (producerRawDepth_.load(std::memory_order_acquire) != 0) {
+                std::memset(dst, 0, pktLen);
+                gapFader_.reset();
+            } else {
+                gapFader_.fillGap(dst, framesInPacket, workerDither_);
+                if (validBitDepth_ < bytesPerSample_ * 8) {
+                    for (size_t sample = 0; sample < pktLen; sample += bytesPerSample_) {
+                        RequantizePcmValidBits(dst + sample, bytesPerSample_,
+                                               validBitDepth_, workerDither_);
+                    }
+                }
+            }
+        }
+        rawDepth = 0;
+        deliveryEpoch = deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel) + 1;
+        underrunCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    return pktLen;
+}
+
 void UsbAudioSink::workerLoop() {
 #if defined(__linux__) || defined(__ANDROID__)
     // Java's Process.THREAD_PRIORITY_URGENT_AUDIO is nice -19. usbfs URB
@@ -616,7 +718,6 @@ void UsbAudioSink::workerLoop() {
     // some kernels refuse the negative nice for app threads.
     setpriority(PRIO_PROCESS, 0, -19);
 #endif
-    const int frameBytes = channels_ * bytesPerSample_;
     int repeatedReadyPolls = 0;
     while (running_.load(std::memory_order_acquire)) {
         struct usbdevfs_urb* urb = nullptr;
@@ -702,14 +803,14 @@ void UsbAudioSink::workerLoop() {
         // accumulator stepped by the current (feedback-adjusted) rate, clamped
         // to maxFramesPerPacket_ so the preallocated buffer can never overflow.
         uint8_t* buf = reinterpret_cast<uint8_t*>(urb->buffer);
-        const size_t mask = ringMask_;
-        size_t readPos = ringRead_.load(std::memory_order_relaxed);
+        const size_t ringFrames = ringRawDepth_.size();
+        size_t readFrame = ringRead_.load(std::memory_order_relaxed);
         uint8_t* dst = buf;
         int urbTotalBytes = 0;
         if (feedbackEndpoint_ == 0) {
             const size_t wNow = ringWrite_.load(std::memory_order_acquire);
             feedbackRatePerSec_ = SteerPacketRateForRingFill(
-                feedbackRatePerSec_, sampleRate_, wNow - readPos, ring_.size());
+                feedbackRatePerSec_, sampleRate_, wNow - readFrame, ringFrames);
         }
         const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
         int rawDepth = -1;
@@ -717,49 +818,8 @@ void UsbAudioSink::workerLoop() {
         for (int p = 0; p < urb->number_of_packets; ++p) {
             const int framesInPacket = NextPacketFrames(
                 frameAccumulator_, ratePerSec, serviceIntervalUs_, maxFramesPerPacket_);
-            const size_t pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
-
-            const size_t w = ringWrite_.load(std::memory_order_acquire);
-            const size_t avail = w - readPos; // unsigned sequence arithmetic also survives counter wrap
-            if (pktLen > 0 && avail >= pktLen) {
-                for (size_t i = 0; i < pktLen; ++i) {
-                    dst[i] = ring_[(readPos + i) & mask];
-                }
-                bool packetRaw = false;
-                for (int f = 0; f < framesInPacket; ++f) {
-                    const int depth = ringRawDepth_[(readPos + static_cast<size_t>(f) * frameBytes) & mask];
-                    packetRaw = packetRaw || depth != 0;
-                    if (rawDepth == -1) rawDepth = depth;
-                    else if (rawDepth != depth) rawDepth = 0;
-                }
-                readPos += pktLen;
-                if (packetRaw) {
-                    // A recovery ramp must never requantize raw S32 (or DoP).
-                    gapFader_.reset();
-                } else if (gapFader_.recovering()) {
-                    rawDepth = 0;
-                }
-                gapFader_.applyReal(dst, framesInPacket, workerDither_);
-            } else if (pktLen > 0) {
-                // Raw/DoP gaps must be silence, not synthesized marker/audio
-                // bytes. Processed PCM retains the existing click-reducing fade.
-                if (producerRawDepth_.load(std::memory_order_acquire) != 0) {
-                    std::memset(dst, 0, pktLen);
-                    gapFader_.reset();
-                } else {
-                    gapFader_.fillGap(dst, framesInPacket, workerDither_);
-                }
-                rawDepth = 0;
-                deliveryEpoch = deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel) + 1;
-                underrunCount_.fetch_add(1, std::memory_order_relaxed);
-            }
-            // Fades work in the subslot grid. Requantize to valid bits instead
-            // of biased low-byte truncation; already-on-grid/raw PCM stays exact.
-            if (validBitDepth_ < bytesPerSample_ * 8) {
-                for (size_t sample = 0; sample < pktLen; sample += bytesPerSample_) {
-                    RequantizePcmValidBits(dst + sample, bytesPerSample_, validBitDepth_, workerDither_);
-                }
-            }
+            const size_t pktLen = fillPacketFromRing(
+                dst, framesInPacket, readFrame, rawDepth, deliveryEpoch);
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktLen);
             urb->iso_frame_desc[p].actual_length = 0;
             urb->iso_frame_desc[p].status = 0;
@@ -772,7 +832,7 @@ void UsbAudioSink::workerLoop() {
         urb->error_count = 0;
         urbRawDepth_[urbIndex] = std::max(rawDepth, 0);
         urbDeliveryEpoch_[urbIndex] = deliveryEpoch;
-        ringRead_.store(readPos, std::memory_order_release);
+        ringRead_.store(readFrame, std::memory_order_release);
 
         if (!submitUrb(urb, false, urbIndex)) {
             ReportWriteError(errno);
@@ -861,20 +921,22 @@ bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frame
         ReportWriteError(ERANGE);
         return false; // no implicit SRC or lossy valid-depth reduction
     }
-    const size_t cap = ring_.size();
+    const size_t capFrames = ringRawDepth_.size();
     const size_t frameBytes = static_cast<size_t>(channels_) * bytesPerSample_;
     size_t w = ringWrite_.load(std::memory_order_relaxed);
     const size_t r = ringRead_.load(std::memory_order_acquire);
-    const size_t occupied = w - r;
-    const size_t space = cap > occupied ? cap - occupied - 1 : 0;
-    if (cap == 0 || static_cast<size_t>(frames) > space / frameBytes) {
+    const size_t occupiedFrames = w - r;
+    const size_t freeFrames = capFrames > occupiedFrames ? capFrames - occupiedFrames - 1 : 0;
+    if (capFrames == 0 || static_cast<size_t>(frames) > freeFrames) {
         overrunCount_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
         ReportWriteError(ENOSPC);
         return false; // all-or-nothing: never report a partially delivered block
     }
     const int sourceBytes = sourceBitDepth / 8;
     for (int f = 0; f < frames; ++f) {
-        ringRawDepth_[w & ringMask_] = static_cast<uint8_t>(sourceBitDepth);
+        const size_t slot = w & ringFrameMask_;
+        ringRawDepth_[slot] = static_cast<uint8_t>(sourceBitDepth);
+        uint8_t* frameDst = ring_.data() + slot * frameBytes;
         for (int c = 0; c < channels_; ++c) {
             const size_t sample = static_cast<size_t>(f) * channels_ + c;
             uint8_t packed[4];
@@ -884,9 +946,11 @@ bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frame
             } else {
                 PackPcmSample(floats[sample], packed, bytesPerSample_, producerDither_, validBitDepth_);
             }
-            for (int b = 0; b < bytesPerSample_; ++b) ring_[(w + b) & ringMask_] = packed[b];
-            w += bytesPerSample_;
+            for (int b = 0; b < bytesPerSample_; ++b) {
+                frameDst[static_cast<size_t>(c) * bytesPerSample_ + b] = packed[b];
+            }
         }
+        ++w;
     }
     producerRawDepth_.store(sourceBitDepth, std::memory_order_release);
     if (sourceBitDepth == 0) deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
@@ -899,11 +963,9 @@ double UsbAudioSink::GetBufferedMs() {
     if (!active_.load(std::memory_order_acquire)) return 0.0;
     const size_t w = ringWrite_.load(std::memory_order_acquire);
     const size_t r = ringRead_.load(std::memory_order_acquire);
-    const size_t count = w - r;
-    const int frameBytes = channels_ * bytesPerSample_;
-    const double ringMs = frameBytes > 0 && sampleRate_ > 0
-        ? static_cast<double>(count) * 1000.0 /
-            (static_cast<double>(frameBytes) * static_cast<double>(sampleRate_))
+    const size_t countFrames = w - r;
+    const double ringMs = sampleRate_ > 0
+        ? static_cast<double>(countFrames) * 1000.0 / static_cast<double>(sampleRate_)
         : 0.0;
     const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_) * serviceIntervalUs_ / 1000.0;
     return ringMs + urbMs;
@@ -921,18 +983,17 @@ int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
         int status = -1;
         if (exclusive_.load(std::memory_order_acquire) &&
             active_.load(std::memory_order_acquire)) {
-            const size_t cap = ring_.size();
-            const size_t frameBytes =
-                static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
-            if (cap > 1 && frameBytes > 0) {
+            const size_t capFrames = ringRawDepth_.size();
+            if (capFrames > 1) {
                 const size_t neededFrames = static_cast<size_t>(frames);
-                const size_t maxFitFrames = (cap - 1) / frameBytes;
+                const size_t maxFitFrames = capFrames - 1;
                 if (neededFrames <= maxFitFrames) {
                     const size_t w = ringWrite_.load(std::memory_order_relaxed);
                     const size_t r = ringRead_.load(std::memory_order_acquire);
-                    const size_t occupied = w - r;
-                    const size_t space = cap > occupied ? cap - occupied - 1 : 0;
-                    status = (neededFrames <= space / frameBytes) ? 0 : 1;
+                    const size_t occupiedFrames = w - r;
+                    const size_t freeFrames =
+                        capFrames > occupiedFrames ? capFrames - occupiedFrames - 1 : 0;
+                    status = (neededFrames <= freeFrames) ? 0 : 1;
                 }
             }
         }

@@ -203,7 +203,13 @@ OutputFormatDecision negotiateOutputFormat({
   var chosenDepth =
       desiredDepth <= 0 ? maxDepth : math.min(desiredDepth, maxDepth);
   if (chosenDepth != 16 && chosenDepth != 24 && chosenDepth != 32) {
-    chosenDepth = 16;
+    // Odd container depths (8, 12, 20, 18...) must widen to the next real
+    // output depth: collapsing 20-bit to 16 would silently truncate it.
+    final widened = chosenDepth <= 16 ? 16 : (chosenDepth <= 24 ? 24 : 32);
+    chosenDepth = widened > maxDepth && maxDepth >= 16 ? maxDepth : widened;
+    if (chosenDepth != 16 && chosenDepth != 24 && chosenDepth != 32) {
+      chosenDepth = 16;
+    }
   }
 
   return OutputFormatDecision(

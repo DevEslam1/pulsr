@@ -49,4 +49,82 @@ void main() {
       isTrue,
     );
   });
+
+  group('shouldSeedSystemVolume', () {
+    test('skips when not on Android, when DVC owns gain, or when OS mixer owns output', () {
+      expect(
+        PulsrAudioHandler.shouldSeedSystemVolume(
+          isAndroid: false,
+          dvcEnabled: false,
+          hardwareVolumeOwnsOutput: false,
+          forwardSystemVolume: true,
+        ),
+        isFalse,
+      );
+      expect(
+        PulsrAudioHandler.shouldSeedSystemVolume(
+          isAndroid: true,
+          dvcEnabled: true,
+          hardwareVolumeOwnsOutput: false,
+          forwardSystemVolume: true,
+        ),
+        isFalse,
+      );
+      expect(
+        PulsrAudioHandler.shouldSeedSystemVolume(
+          isAndroid: true,
+          dvcEnabled: false,
+          hardwareVolumeOwnsOutput: false,
+          forwardSystemVolume: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('seeds on Android when output bypasses OS mixer and DAC hardware volume does not own gain', () {
+      expect(
+        PulsrAudioHandler.shouldSeedSystemVolume(
+          isAndroid: true,
+          dvcEnabled: false,
+          hardwareVolumeOwnsOutput: false,
+          forwardSystemVolume: true,
+        ),
+        isTrue,
+      );
+    });
+
+    test('preserves external USB hardware slider across normal loads, but seeds fresh stream startup', () {
+      expect(
+        PulsrAudioHandler.shouldSeedSystemVolume(
+          isAndroid: true,
+          dvcEnabled: false,
+          hardwareVolumeOwnsOutput: true,
+          forwardSystemVolume: true,
+        ),
+        isFalse,
+      );
+      expect(
+        PulsrAudioHandler.shouldSeedSystemVolume(
+          isAndroid: true,
+          dvcEnabled: false,
+          hardwareVolumeOwnsOutput: true,
+          forwardSystemVolume: true,
+          forceUsbHardwareSeed: true,
+          externalHardwareVolumeSet: false,
+        ),
+        isTrue,
+      );
+      expect(
+        PulsrAudioHandler.shouldSeedSystemVolume(
+          isAndroid: true,
+          dvcEnabled: false,
+          hardwareVolumeOwnsOutput: true,
+          forwardSystemVolume: true,
+          forceUsbHardwareSeed: true,
+          externalHardwareVolumeSet: true,
+        ),
+        isFalse,
+      );
+    });
+  });
 }

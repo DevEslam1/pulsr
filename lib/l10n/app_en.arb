@@ -6683,6 +6683,54 @@
   "@radioCardsRestoredToast": {
     "description": "Toast after restoring the home radio carousel"
   },
+  "pinRadioCardToFirst": "Pin to First",
+  "@pinRadioCardToFirst": {
+    "description": "Action to pin the selected radio card to the first carousel position"
+  },
+  "pinRadioCardToFirstSubtitle": "Keep this station at the front of the carousel",
+  "@pinRadioCardToFirstSubtitle": {
+    "description": "Subtitle explaining pinning a radio card first"
+  },
+  "unpinRadioCard": "Unpin",
+  "@unpinRadioCard": {
+    "description": "Action to unpin a pinned radio card"
+  },
+  "unpinRadioCardSubtitle": "Return this station to its sorted position",
+  "@unpinRadioCardSubtitle": {
+    "description": "Subtitle explaining unpinning a radio card"
+  },
+  "radioCardPinnedToast": "Pinned to first position",
+  "@radioCardPinnedToast": {
+    "description": "Toast shown when a radio card is pinned first"
+  },
+  "radioCardUnpinnedToast": "Station unpinned",
+  "@radioCardUnpinnedToast": {
+    "description": "Toast shown when a radio card is unpinned"
+  },
+  "sortRadioCardsTitle": "Sort Order",
+  "@sortRadioCardsTitle": {
+    "description": "Section title for radio card sorting options"
+  },
+  "sortRadioCardsDefault": "Default",
+  "@sortRadioCardsDefault": {
+    "description": "Curated default radio card order"
+  },
+  "sortRadioCardsAlphabetical": "A–Z",
+  "@sortRadioCardsAlphabetical": {
+    "description": "Alphabetical radio card sort order"
+  },
+  "sortRadioCardsRecent": "Recent",
+  "@sortRadioCardsRecent": {
+    "description": "Recently played radio card sort order"
+  },
+  "resetRadioCardOrder": "Reset",
+  "@resetRadioCardOrder": {
+    "description": "Action to reset pinned cards and sort order"
+  },
+  "radioCardOrderResetToast": "Radio card order reset to default",
+  "@radioCardOrderResetToast": {
+    "description": "Toast shown after resetting radio card order"
+  },
   "radioShowAction": "Show",
   "@radioShowAction": {
     "description": "Button that restores the hidden radio cards"

@@ -1040,6 +1040,116 @@ void testSubCrossoverNanGuard() {
     std::cout << "PASS: SubCrossover NaN/Inf sanitization & recovery verified." << std::endl;
 }
 
+void testMediumCspFixes() {
+    // 1. Crossfeed: 0 dB floor honored & preset->Custom crossfades cleanly
+    {
+        Crossfeed cf;
+        cf.setSampleRate(48000.0);
+        cf.setEnabled(true);
+        cf.setMode(CrossfeedMode::Bs2bDefault);
+        float l[512], r[512];
+        for (int b = 0; b < 8; ++b) {
+            for (int i = 0; i < 512; ++i) {
+                l[i] = 0.3f * std::sin(2.0f * 3.14159265f * 500.0f * (b * 512 + i) / 48000.0f);
+                r[i] = 0.0f;
+            }
+            cf.process(l, r, 512);
+        }
+        const float lastL = l[511];
+        CrossfeedParamSet custom{};
+        custom.enabled = true;
+        custom.mode = CrossfeedMode::Custom;
+        custom.delayUs = 300.0;
+        custom.feedDb = 0.0;
+        custom.fcut = 650.0;
+        cf.applyParams(custom);
+        for (int i = 0; i < 512; ++i) {
+            l[i] = 0.3f * std::sin(2.0f * 3.14159265f * 500.0f * (8 * 512 + i) / 48000.0f);
+            r[i] = 0.0f;
+        }
+        cf.process(l, r, 512);
+        assert(std::abs(l[0] - lastL) < 0.08f && "Crossfeed preset->Custom transition must crossfade click-free");
+        cf.configure(300.0, -0.2, 650.0);
+        const double g02 = cf.getBs2bA0Lo();
+        cf.configure(300.0, -3.0, 650.0);
+        const double g30 = cf.getBs2bA0Lo();
+        assert(g02 != g30 && "Crossfeed initBs2b must honor <1 dB feed settings");
+    }
+
+    // 2. LookaheadLimiter: 0.1 ms min & active lookahead change does not kill bypassMix_
+    {
+        LookaheadLimiter lim;
+        lim.setSampleRate(48000.0);
+        lim.setEnabled(true);
+        lim.configure(5.0, -3.0, 50.0, true);
+        lim.setProcessingActive(true);
+        std::vector<float> buf(512 * 2, 0.25f);
+        for (int b = 0; b < 8; ++b) {
+            lim.processInterleaved(buf.data(), 512, 2);
+        }
+        lim.configure(0.1, -3.0, 50.0, true);
+        assert(lim.getLatencyFrames() < static_cast<int>(0.002 * 48000.0) + LookaheadLimiter::FILTER_DELAY + 2 &&
+               "LookaheadLimiter must accept 0.1 ms lookahead without 0.5 ms clamp");
+        std::fill(buf.begin(), buf.end(), 0.25f);
+        lim.processInterleaved(buf.data(), 512, 2);
+        bool allFinite = true;
+        for (float s : buf) allFinite &= std::isfinite(s);
+        assert(allFinite && "LookaheadLimiter lookahead change must remain finite");
+    }
+
+    // 3. HarmonicSaturation: drive 0->positive clears history; mode crossfade completes at drive=0
+    {
+        HarmonicSaturation sat;
+        sat.setSampleRate(48000.0);
+        SaturationParamSet p{};
+        p.enabled = true;
+        p.drive = 0.8;
+        p.mix = 1.0;
+        p.mode = 0;
+        sat.applyParams(p);
+        std::vector<float> sig(512 * 2, 0.4f);
+        sat.processInterleaved(sig.data(), 512, 2);
+        p.drive = 0.0;
+        p.mode = 1;
+        sat.applyParams(p);
+        std::vector<float> zero(512 * 2, 0.0f);
+        for (int b = 0; b < 32; ++b) {
+            std::fill(zero.begin(), zero.end(), 0.0f);
+            sat.processInterleaved(zero.data(), 512, 2);
+        }
+        p.drive = 0.5;
+        sat.applyParams(p);
+        std::fill(zero.begin(), zero.end(), 0.0f);
+        sat.processInterleaved(zero.data(), 512, 2);
+        float maxLeak = 0.0f;
+        for (float v : zero) maxLeak = std::max(maxLeak, std::abs(v));
+        assert(maxLeak < 1e-4f && "HarmonicSaturation 0->positive drive must not replay stale decimHistory");
+    }
+
+    // 4. DynamicBass: xLow affects harmonic exciter output
+    {
+        auto runWithXLow = [](int xLow) {
+            DynamicBass db;
+            db.prepare(48000.0);
+            db.setParams(true, 4.0, xLow, 5600, 40, 90, 0.1, 0.5, 0);
+            std::vector<float> buf(2048 * 2);
+            for (int f = 0; f < 2048; ++f) {
+                const float s = 0.6f * std::sin(2.0f * 3.14159265f * 60.0f * f / 48000.0f);
+                buf[f * 2] = s;
+                buf[f * 2 + 1] = s;
+            }
+            db.processInterleaved(buf.data(), 2048, 2);
+            double e = 0.0;
+            for (float v : buf) e += static_cast<double>(v) * v;
+            return e;
+        };
+        const double eLow = runWithXLow(100);
+        const double eHigh = runWithXLow(2000);
+        assert(std::abs(eLow - eHigh) > 1e-4 && "DynamicBass xLow must affect harmonic exciter output");
+    }
+    std::cout << "PASS: Medium C++ DSP fixes (Crossfeed/Limiter/Saturation/DynamicBass) verified." << std::endl;
+}
+
 int main() {
     std::cout << "Running DSP effects C++ unit tests..." << std::endl;
     testConvolutionReverbUnityGain();
@@ -1062,6 +1172,7 @@ int main() {
     testHarmonicSaturationDcClearAndNan();
     testDynamicBassNanGuard();
     testSubCrossoverNanGuard();
+    testMediumCspFixes();
     std::cout << "All DSP effects C++ tests passed successfully!" << std::endl;
     return 0;
 }

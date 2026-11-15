@@ -21,7 +21,7 @@
          system trust anchors for TLS and allow cleartext so user-added stream
          URLs actually play; all first-party and known third-party APIs above
          have cleartext strictly disabled. -->
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

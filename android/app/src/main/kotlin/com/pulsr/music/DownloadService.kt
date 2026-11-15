@@ -85,6 +85,10 @@ class DownloadService : Service() {
         @Volatile var onDownloadResumedListener: ((String) -> Unit)? = null
         @Volatile var onDownloadCompletedListener: ((String) -> Unit)? = null
 
+        @Volatile
+        private var activeInstance: DownloadService? = null
+        private val companionHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
         /**
          * C-9: raised when foreground coverage could not be obtained or kept, so
          * the transfer continues without FGS protection. Forwarded by
@@ -250,6 +254,15 @@ class DownloadService : Service() {
             downloadedBytes: Long = -1L,
             totalBytes: Long = -1L
         ) {
+            val live = activeInstance
+            if (live != null) {
+                companionHandler.post {
+                    if (activeInstance === live) {
+                        live.handleProgressUpdate(videoId, title, progress, downloadedBytes)
+                    }
+                }
+                return
+            }
             val appContext = context.applicationContext ?: context
             val intent = Intent(appContext, DownloadService::class.java).apply {
                 action = ACTION_UPDATE
@@ -260,15 +273,28 @@ class DownloadService : Service() {
                 if (totalBytes >= 0L) putExtra(EXTRA_TOTAL_BYTES, totalBytes)
             }
             try {
-                appContext.startService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    appContext.startForegroundService(intent)
+                } else {
+                    appContext.startService(intent)
+                }
             } catch (_: IllegalStateException) {
-                // Background start blocked (Android 8+ background execution limits) — drop the update.
+                // Background start blocked when service isn't live; drop safely.
             } catch (_: SecurityException) {
             }
         }
 
         /** C-7: mirror an in-app pause/resume into the ongoing notification. */
         fun setPaused(context: Context, videoId: String, paused: Boolean) {
+            val live = activeInstance
+            if (live != null) {
+                companionHandler.post {
+                    if (activeInstance === live) {
+                        live.handleSetPaused(videoId, paused)
+                    }
+                }
+                return
+            }
             val appContext = context.applicationContext ?: context
             val intent = Intent(appContext, DownloadService::class.java).apply {
                 action = ACTION_SET_PAUSED
@@ -281,6 +307,15 @@ class DownloadService : Service() {
         }
 
         fun stop(context: Context) {
+            val live = activeInstance
+            if (live != null) {
+                companionHandler.post {
+                    if (activeInstance === live) {
+                        live.handleStop(null)
+                    }
+                }
+                return
+            }
             val appContext = context.applicationContext ?: context
             val intent = Intent(appContext, DownloadService::class.java).apply {
                 action = ACTION_STOP
@@ -320,6 +355,7 @@ class DownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        activeInstance = this
         createChannel()
         // Restore timeout-paused marks wiped with the previous instance.
         pausedDownloads.addAll(timeoutPausedIds)
@@ -327,6 +363,85 @@ class DownloadService : Service() {
             DownloadChunkStateStore.purgeExpired(this)
         } catch (_: Exception) {
         }
+    }
+
+    private fun handleProgressUpdate(
+        vid: String,
+        rawTitle: String?,
+        rawProgress: Int,
+        downloadedBytes: Long,
+    ) {
+        if (isTombstoned(vid)) {
+            if (activeDownloads.isEmpty()) scheduleIdleStop()
+            return
+        }
+        val title = rawTitle?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.download_notification_default_title)
+        val progress = rawProgress.coerceIn(0, 100)
+        activeDownloads[vid] = progress
+        downloadTitles[vid] = title
+        if (downloadedBytes >= 0L) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            val state = speedStates[vid]
+            if (state == null || now <= state.lastAt) {
+                speedStates[vid] = SpeedState(downloadedBytes, now, 0.0)
+            } else {
+                val deltaBytes = downloadedBytes - state.lastBytes
+                if (deltaBytes >= 0L) {
+                    val instant = deltaBytes * 1000.0 / (now - state.lastAt).toDouble()
+                    state.bytesPerSecond = if (state.bytesPerSecond <= 0.0) {
+                        instant
+                    } else {
+                        0.30 * instant + 0.70 * state.bytesPerSecond
+                    }
+                }
+                state.lastBytes = downloadedBytes
+                state.lastAt = now
+            }
+        }
+        if (progress >= 100) {
+            recordTombstone(vid)
+            try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
+            speedStates.remove(vid)
+            activeDownloads.remove(vid)
+            downloadTitles.remove(vid)
+            pausedDownloads.remove(vid)
+            timeoutPausedIds.remove(vid)
+            dispatchListener(onDownloadCompletedListener, completedListeners, vid)
+        }
+        if (activeDownloads.isEmpty()) {
+            scheduleIdleStop()
+        } else {
+            renderCurrentNotification(vid)
+        }
+    }
+
+    private fun handleSetPaused(vid: String?, paused: Boolean) {
+        if (vid != null && !isTombstoned(vid)) {
+            if (paused) {
+                pausedDownloads.add(vid)
+                speedStates.remove(vid)
+                runCatching { DownloadChunkStateStore.flushPending(this) }
+            } else {
+                pausedDownloads.remove(vid)
+                timeoutPausedIds.remove(vid)
+            }
+            renderCurrentNotification(vid)
+        }
+    }
+
+    private fun handleStop(videoId: String?) {
+        cancelIdleStop()
+        videoId?.let { recordTombstone(it) }
+        for (id in activeDownloads.keys.toList()) {
+            recordTombstone(id)
+        }
+        activeDownloads.clear()
+        downloadTitles.clear()
+        pausedDownloads.clear()
+        speedStates.clear()
+        timeoutPausedIds.clear()
+        stopForegroundAndSelf()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -353,54 +468,10 @@ class DownloadService : Service() {
             }
             ACTION_UPDATE -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
-                if (isTombstoned(vid)) {
-                    if (activeDownloads.isEmpty()) scheduleIdleStop()
-                    return START_NOT_STICKY
-                }
-                val title = intent.getStringExtra(EXTRA_TITLE)?.takeIf { it.isNotBlank() }
-                    ?: getString(R.string.download_notification_default_title)
-                val progress = intent.getIntExtra(EXTRA_PROGRESS, 0).coerceIn(0, 100)
-                activeDownloads[vid] = progress
-                downloadTitles[vid] = title
+                val title = intent.getStringExtra(EXTRA_TITLE)
+                val progress = intent.getIntExtra(EXTRA_PROGRESS, 0)
                 val downloadedBytes = intent.getLongExtra(EXTRA_DOWNLOADED_BYTES, -1L)
-                if (downloadedBytes >= 0L) {
-                    // Exponential moving average over successive progress
-                    // reports so the notification shows a stable transfer rate
-                    // instead of jittering with each buffer.
-                    val now = android.os.SystemClock.elapsedRealtime()
-                    val state = speedStates[vid]
-                    if (state == null || now <= state.lastAt) {
-                        speedStates[vid] = SpeedState(downloadedBytes, now, 0.0)
-                    } else {
-                        val deltaBytes = downloadedBytes - state.lastBytes
-                        if (deltaBytes >= 0L) {
-                            val instant = deltaBytes * 1000.0 / (now - state.lastAt).toDouble()
-                            state.bytesPerSecond = if (state.bytesPerSecond <= 0.0) {
-                                instant
-                            } else {
-                                0.30 * instant + 0.70 * state.bytesPerSecond
-                            }
-                        }
-                        state.lastBytes = downloadedBytes
-                        state.lastAt = now
-                    }
-                }
-                // Remove completed ones
-                if (progress >= 100) {
-                    recordTombstone(vid)
-                    try { DownloadChunkStateStore.clearChunksForVideo(this, vid) } catch (_: Exception) {}
-                    speedStates.remove(vid)
-                    activeDownloads.remove(vid)
-                    downloadTitles.remove(vid)
-                    pausedDownloads.remove(vid)
-                    timeoutPausedIds.remove(vid)
-                    dispatchListener(onDownloadCompletedListener, completedListeners, vid)
-                }
-                if (activeDownloads.isEmpty()) {
-                    scheduleIdleStop()
-                } else {
-                    renderCurrentNotification(vid)
-                }
+                handleProgressUpdate(vid, title, progress, downloadedBytes)
             }
             ACTION_CANCEL -> {
                 if (intent.getBooleanExtra(EXTRA_CANCEL_ALL, false)) {
@@ -720,6 +791,9 @@ class DownloadService : Service() {
     }
 
     override fun onDestroy() {
+        if (activeInstance === this) {
+            activeInstance = null
+        }
         super.onDestroy()
         // Flush coalesced chunk offsets before the process may go away.
         runCatching { DownloadChunkStateStore.flushPending(this) }

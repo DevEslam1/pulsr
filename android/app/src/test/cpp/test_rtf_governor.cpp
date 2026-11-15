@@ -74,6 +74,40 @@ int main() {
         check(engine->getAutoDegradedStages() == 0,
               "ambience did not recover after sustained healthy load");
     }
+    {
+        // External (Kotlin/thermal) degraded bits must NOT be cleared by native
+        // recovery when native RTF stays healthy, eliminating governor flapping.
+        auto engine = std::make_unique<AudioDspEngine>();
+        enableQuranAmbience(*engine);
+        engine->triggerExternalDegrade(STAGE_REVERB);
+        process(*engine, 0.1, 100);
+        check((engine->getAutoDegradedStages() & STAGE_REVERB) != 0,
+              "native RTF recovery cleared externally degraded stage");
+        engine->recoverExternalDegrade(STAGE_REVERB);
+        check(engine->getAutoDegradedStages() == 0,
+              "recoverExternalDegrade failed to restore stage");
+    }
+    {
+        // Telemetry index 18 exposes ParametricEQ auto-headroom (<= 0 dB down to -6 dB).
+        DspEngineRegistry::instance().registerEngine(&AudioDspEngine::instance());
+        AudioDspEngine::instance().setSampleRate(48000);
+        AudioDspEngine::instance().updateParams([](DspParamSnapshot& params) {
+            params.activeStages = STAGE_EQ;
+            params.eq.enabled = true;
+            params.eq.bandCount = 5;
+            params.eq.preampDb = 0.0;
+            for (int b = 0; b < 5; ++b) {
+                params.eq.bands[b].enabled = true;
+                params.eq.bands[b].gainDb = 12.0;
+            }
+        });
+        std::vector<float> audio(512 * 2, 0.05f);
+        AudioDspEngine::instance().processInterleaved(audio.data(), 512, 2);
+        double tel[19] = {};
+        DspEngineRegistry::instance().getTelemetry(tel, 19);
+        check(tel[18] < -1.0 && tel[18] >= -6.0,
+              "telemetry[18] must report EQ auto-headroom attenuation");
+    }
     if (failures) return 1;
     std::cout << "RTF governor transient, sustained-load and recovery checks passed\n";
     return 0;

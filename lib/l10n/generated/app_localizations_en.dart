@@ -9214,6 +9214,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get radioCardsRestoredToast => 'Radio cards restored to Home screen';
 
   @override
+  String get pinRadioCardToFirst => 'Pin to First';
+
+  @override
+  String get pinRadioCardToFirstSubtitle =>
+      'Keep this station at the front of the carousel';
+
+  @override
+  String get unpinRadioCard => 'Unpin';
+
+  @override
+  String get unpinRadioCardSubtitle =>
+      'Return this station to its sorted position';
+
+  @override
+  String get radioCardPinnedToast => 'Pinned to first position';
+
+  @override
+  String get radioCardUnpinnedToast => 'Station unpinned';
+
+  @override
+  String get sortRadioCardsTitle => 'Sort Order';
+
+  @override
+  String get sortRadioCardsDefault => 'Default';
+
+  @override
+  String get sortRadioCardsAlphabetical => 'A–Z';
+
+  @override
+  String get sortRadioCardsRecent => 'Recent';
+
+  @override
+  String get resetRadioCardOrder => 'Reset';
+
+  @override
+  String get radioCardOrderResetToast => 'Radio card order reset to default';
+
+  @override
   String get radioShowAction => 'Show';
 
   @override

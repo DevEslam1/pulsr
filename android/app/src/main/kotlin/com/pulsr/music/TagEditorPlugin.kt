@@ -31,6 +31,16 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile
     private var backgroundExecutor: java.util.concurrent.ExecutorService = newExecutor()
     private val executorLock = Any()
+    private val pathLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    private fun lockForPath(path: String): Any {
+        val key = if (path.startsWith("content:")) {
+            path
+        } else {
+            runCatching { File(path).canonicalPath }.getOrDefault(path)
+        }
+        return pathLocks.computeIfAbsent(key) { Any() }
+    }
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/tag_editor"
@@ -83,6 +93,35 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
         private val VERIFIABLE_TEXT_FIELDS =
             TEXT_FIELD_KEYS.map { it.first } + listOf("lyrics", "comment")
 
+        private fun normalizeSlashInt(raw: String): String {
+            val parts = raw.split('/')
+            if (parts.size > 2) return raw.trim()
+            val normalized = parts.map { part ->
+                val trimmed = part.trim()
+                trimmed.toIntOrNull()?.toString() ?: trimmed
+            }
+            return normalized.joinToString("/")
+        }
+
+        private fun tagFieldMatches(field: String, expected: String, actual: String?): Boolean {
+            if (expected.isEmpty()) return actual.isNullOrBlank()
+            if (actual == null) return false
+            if (actual == expected) return true
+            return when (field) {
+                "trackNumber", "discNumber" -> normalizeSlashInt(expected) == normalizeSlashInt(actual)
+                "year" -> {
+                    val expTrim = expected.trim()
+                    val actTrim = actual.trim()
+                    val expInt = expTrim.toIntOrNull()?.toString() ?: expTrim
+                    val actInt = actTrim.toIntOrNull()?.toString() ?: actTrim
+                    expInt == actInt ||
+                        (expInt.length == 4 && actTrim.startsWith("$expInt-")) ||
+                        (actInt.length == 4 && expTrim.startsWith("$actInt-"))
+                }
+                else -> false
+            }
+        }
+
         internal fun verifyWrittenTags(
             requestedTags: Map<String, Any?>,
             rereadTags: Map<String, Any?>?,
@@ -99,11 +138,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                 if (!provided) continue
                 val expected = requestedTags[field]?.toString() ?: ""
                 val actual = rereadTags[field]?.toString()
-                verifiedFields[field] = if (expected.isEmpty()) {
-                    actual.isNullOrBlank()
-                } else {
-                    actual == expected
-                }
+                verifiedFields[field] = tagFieldMatches(field, expected, actual)
             }
             val hasArtworkWrite =
                 ((requestedTags["artworkBytes"] as? ByteArray)?.isNotEmpty() == true) ||
@@ -204,6 +239,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
                 ensureExecutor().execute {
+                    synchronized(lockForPath(path)) {
                     var tempFile: java.io.File? = null
                     try {
                         val file = if (path.startsWith("content:")) {
@@ -302,6 +338,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     } finally {
                         tempFile?.let { runCatching { it.delete() } }
                     }
+                    }
                 }
             }
 
@@ -315,6 +352,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 ensureExecutor().execute {
+                    synchronized(lockForPath(path)) {
                     val isContentUri = path.startsWith("content:")
                     var tempFile: java.io.File? = null
                     var backupFile: java.io.File? = null
@@ -343,7 +381,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
                                 result.error("FILE_NOT_FOUND", "File does not exist at $path", null)
                             }
-                            return@execute
+                            return@synchronized
                         }
 
                         val audioFile = AudioFileIO.read(file)
@@ -611,6 +649,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                                 } catch (_: Exception) {}
                             }
                         }
+                    }
                     }
                 }
             }

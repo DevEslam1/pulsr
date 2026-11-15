@@ -4994,6 +4994,54 @@
   "@radioCardsRestoredToast": {
     "description": "Toast after restoring the home radio carousel"
   },
+  "pinRadioCardToFirst": "تثبيت في المقدمة",
+  "@pinRadioCardToFirst": {
+    "description": "Action to pin the selected radio card to the first carousel position"
+  },
+  "pinRadioCardToFirstSubtitle": "إبقاء هذه الإذاعة في أول بطاقة",
+  "@pinRadioCardToFirstSubtitle": {
+    "description": "Subtitle explaining pinning a radio card first"
+  },
+  "unpinRadioCard": "إلغاء التثبيت",
+  "@unpinRadioCard": {
+    "description": "Action to unpin a pinned radio card"
+  },
+  "unpinRadioCardSubtitle": "إرجاع هذه الإذاعة لترتيبها الطبيعي",
+  "@unpinRadioCardSubtitle": {
+    "description": "Subtitle explaining unpinning a radio card"
+  },
+  "radioCardPinnedToast": "تم تثبيت الإذاعة في المقدمة",
+  "@radioCardPinnedToast": {
+    "description": "Toast shown when a radio card is pinned first"
+  },
+  "radioCardUnpinnedToast": "تم إلغاء تثبيت الإذاعة",
+  "@radioCardUnpinnedToast": {
+    "description": "Toast shown when a radio card is unpinned"
+  },
+  "sortRadioCardsTitle": "ترتيب البطاقات",
+  "@sortRadioCardsTitle": {
+    "description": "Section title for radio card sorting options"
+  },
+  "sortRadioCardsDefault": "الافتراضي",
+  "@sortRadioCardsDefault": {
+    "description": "Curated default radio card order"
+  },
+  "sortRadioCardsAlphabetical": "أبجدي",
+  "@sortRadioCardsAlphabetical": {
+    "description": "Alphabetical radio card sort order"
+  },
+  "sortRadioCardsRecent": "الأحدث تشغيلًا",
+  "@sortRadioCardsRecent": {
+    "description": "Recently played radio card sort order"
+  },
+  "resetRadioCardOrder": "إعادة ضبط",
+  "@resetRadioCardOrder": {
+    "description": "Action to reset pinned cards and sort order"
+  },
+  "radioCardOrderResetToast": "تمت إعادة ترتيب البطاقات للافتراضي",
+  "@radioCardOrderResetToast": {
+    "description": "Toast shown after resetting radio card order"
+  },
   "radioShowAction": "إظهار",
   "@radioShowAction": {
     "description": "Button that restores the hidden radio cards"

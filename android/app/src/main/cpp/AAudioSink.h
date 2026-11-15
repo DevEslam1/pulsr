@@ -97,9 +97,11 @@ private:
     Config config_{};
     std::atomic<AAudioStream*> stream_{nullptr};
     std::mutex streamMutex_;
+    std::mutex writeMutex_;
     mutable std::atomic<int32_t> activeReaders_{0};
     mutable std::atomic<int32_t> activeWriters_{0};
     std::atomic<bool> releasing_{false};
+    std::atomic<bool> flushing_{false};
     AAudioRecoveryState recovery_;
     std::atomic<bool> exclusive_{false};
     bool bitPerfect_ = false;           // exclusive/DoP: unity gain, no fallback

@@ -42,6 +42,10 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
     private var isScrobblerPresent = false
     private val scrobblerCheckTtlMs = 60_000L // Re-check every 60s if not present
 
+    private data class CachedReceivers(val packages: Set<String>, val expiresAtMs: Long)
+    private val receiverCache = java.util.concurrent.ConcurrentHashMap<String, CachedReceivers>()
+    private val receiverCacheTtlMs = 60_000L
+
     private var lastTrackKey: String? = null
     private var lastPlaying: Boolean? = null
     private var lastPosition: Long = -1L
@@ -162,6 +166,12 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
     }
 
     private fun resolveReceivers(action: String): Set<String> {
+        val now = System.currentTimeMillis()
+        val cached = receiverCache[action]
+        if (cached != null && now < cached.expiresAtMs) {
+            return cached.packages
+        }
+
         val packages = LinkedHashSet<String>()
         val pm = context.packageManager
         try {
@@ -192,7 +202,9 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
         for (pkg in knownScrobblerPackages) {
             if (isPackageInstalled(pkg)) packages.add(pkg)
         }
-        return packages
+        val snapshot = java.util.Collections.unmodifiableSet(packages)
+        receiverCache[action] = CachedReceivers(snapshot, now + receiverCacheTtlMs)
+        return snapshot
     }
 
     private fun isPackageInstalled(pkg: String): Boolean = try {

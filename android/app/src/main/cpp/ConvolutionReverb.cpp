@@ -552,6 +552,7 @@ ConvolutionReverb::ConvolutionReverb() {
     smoothedEnabledMix_ = 0.0f;
     irCrossfadeSamples_ = 0;
     irCrossfadeTotal_ = 0;
+    retiredOverflow_.reserve(kMaxRetired * 4);
 
     ensureScratchCapacity(32768);
     reset();
@@ -585,15 +586,15 @@ void ConvolutionReverb::accumulatePartitionLeft(
     if (!ir) return;
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
-    if (effectivePartitions <= 0) return;
-    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
+    if (effectivePartitions <= 0 || allocated <= 0) return;
+    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
 
     const auto& irFreqL = ir->irFreqL;
     std::fill(accum.begin(), accum.end(), FftUtil::Complex(0.0f, 0.0f));
 
     for (int p = 0; p < effectivePartitions; ++p) {
-        int histIdx = (historyHead_ - p) % effectivePartitions;
-        if (histIdx < 0) histIdx += effectivePartitions;
+        int histIdx = (historyHead_ - p) % allocated;
+        if (histIdx < 0) histIdx += allocated;
 
         const auto& inFreqL = inputHistoryFreqL_[histIdx];
         const auto& irBlockL = irFreqL[p];
@@ -648,15 +649,15 @@ void ConvolutionReverb::accumulatePartitionRight(
     if (!ir) return;
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
-    if (effectivePartitions <= 0) return;
-    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
+    if (effectivePartitions <= 0 || allocated <= 0) return;
+    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
 
     const auto& irFreqR = ir->irFreqR;
     std::fill(accum.begin(), accum.end(), FftUtil::Complex(0.0f, 0.0f));
 
     for (int p = 0; p < effectivePartitions; ++p) {
-        int histIdx = (historyHead_ - p) % effectivePartitions;
-        if (histIdx < 0) histIdx += effectivePartitions;
+        int histIdx = (historyHead_ - p) % allocated;
+        if (histIdx < 0) histIdx += allocated;
 
         const auto& inFreqR = inputHistoryFreqR_[histIdx];
         const auto& irBlockR = irFreqR[p];
@@ -709,8 +710,8 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
     if (!preparedIr_) return;
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
-    if (effectivePartitions <= 0) return;
-    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
+    if (effectivePartitions <= 0 || allocated <= 0) return;
+    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
 
     FftUtil::fft(fftWorkL_);
     inputHistoryFreqL_[historyHead_] = fftWorkL_;
@@ -731,8 +732,8 @@ void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
     if (!preparedIr_) return;
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
-    if (effectivePartitions <= 0) return;
-    if (historyHead_ >= effectivePartitions) historyHead_ = 0;
+    if (effectivePartitions <= 0 || allocated <= 0) return;
+    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
 
     FftUtil::fft(fftWorkR_);
     inputHistoryFreqR_[historyHead_] = fftWorkR_;
@@ -750,12 +751,23 @@ void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
 }
 
 void ConvolutionReverb::drainRetiredIrs() {
-    int tail = retiredTail_.load(std::memory_order_relaxed);
-    while (tail != retiredHead_.load(std::memory_order_acquire)) {
-        retiredRing_[tail].reset();
-        tail = (tail + 1) % kMaxRetired;
+    std::vector<std::shared_ptr<const PreparedIr>> overflowBatch;
+    {
+        std::lock_guard<std::mutex> drainLock(drainMutex_);
+        int tail = retiredTail_.load(std::memory_order_relaxed);
+        while (tail != retiredHead_.load(std::memory_order_acquire)) {
+            retiredRing_[tail].reset();
+            tail = (tail + 1) % kMaxRetired;
+        }
+        retiredTail_.store(tail, std::memory_order_release);
+
+        std::lock_guard<std::mutex> ovLock(overflowMutex_);
+        if (!retiredOverflow_.empty()) {
+            overflowBatch.swap(retiredOverflow_);
+            retiredOverflow_.reserve(kMaxRetired * 4);
+        }
     }
-    retiredTail_.store(tail, std::memory_order_release);
+    overflowBatch.clear();
 }
 
 void ConvolutionReverb::ensurePredelayCapacity() {
@@ -874,9 +886,21 @@ void ConvolutionReverb::retireIr(std::shared_ptr<const PreparedIr> ir) {
     if (!ir) return;
     const int head = retiredHead_.load(std::memory_order_relaxed);
     const int nextHead = (head + 1) % kMaxRetired;
-    if (nextHead != retiredTail_.load(std::memory_order_acquire)) {
+    if (nextHead != retiredTail_.load(std::memory_order_acquire) &&
+        !retiredRing_[head]) {
         retiredRing_[head] = std::move(ir);
         retiredHead_.store(nextHead, std::memory_order_release);
+        return;
+    }
+    // Ring full: defer to control-thread overflow vector without freeing on RT thread.
+    std::unique_lock<std::mutex> lock(overflowMutex_, std::try_to_lock);
+    if (lock.owns_lock()) {
+        retiredOverflow_.push_back(std::move(ir));
+    } else {
+        // Control thread only holds overflowMutex_ for a pointer swap; brief
+        // fallback lock guarantees ir is never destroyed on the audio thread.
+        lock.lock();
+        retiredOverflow_.push_back(std::move(ir));
     }
 }
 
@@ -1039,9 +1063,8 @@ void ConvolutionReverb::preparePartitions() {
 
     // Preserving active audio buffers (inputBlock, prevBlock, accumFreq) during live playback
     // ensures seamless, click-free continuity across IR preset switches.
-    const int usedPartitions = std::min(
-        preparedIr_->numPartitions, historyPartitionCount_.load(std::memory_order_acquire));
-    if (usedPartitions > 0 && historyHead_ >= usedPartitions) {
+    const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
+    if (allocated > 0 && (historyHead_ < 0 || historyHead_ >= allocated)) {
         historyHead_ = 0;
     }
 }
@@ -1082,9 +1105,8 @@ void ConvolutionReverb::reset() {
         std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
         std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
         std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
-        const int usedPartitions = std::min(
-            preparedIr_->numPartitions, historyPartitionCount_.load(std::memory_order_acquire));
-        for (int p = 0; p < usedPartitions; ++p) {
+        const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
+        for (int p = 0; p < allocated; ++p) {
             std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
             std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
         }
@@ -1485,8 +1507,9 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             std::copy(inputBlockL_.begin(), inputBlockL_.end(), prevBlockL_.begin());
             std::copy(inputBlockR_.begin(), inputBlockR_.end(), prevBlockR_.begin());
 
-            if (numPartitions > 0) {
-                historyHead_ = (historyHead_ + 1) % numPartitions;
+            const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
+            if (allocated > 0) {
+                historyHead_ = (historyHead_ + 1) % allocated;
             }
             inputBlockPos_ = 0;
         }

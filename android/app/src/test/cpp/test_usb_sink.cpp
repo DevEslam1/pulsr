@@ -51,17 +51,23 @@ using pulsr::UsbAudioSink;
 namespace pulsr {
 struct UsbAudioSinkTestAccess {
     static void prepare(UsbAudioSink& sink, int bytes = 4, int bits = 32,
-                        size_t capacity = 128, size_t position = 0) {
+                        size_t capacityBytes = 128, size_t positionBytes = 0) {
         sink.Close();
         sink.sampleRate_ = 48000;
         sink.channels_ = 2;
         sink.bytesPerSample_ = bytes;
         sink.validBitDepth_ = bits;
-        sink.ring_.assign(capacity, 0xAA);
-        sink.ringRawDepth_.assign(capacity, 0);
-        sink.ringMask_ = capacity - 1;
-        sink.ringRead_.store(position);
-        sink.ringWrite_.store(position);
+        const size_t frameBytes =
+            static_cast<size_t>(sink.channels_) * static_cast<size_t>(sink.bytesPerSample_);
+        const size_t capFrames = std::max<size_t>(2, capacityBytes / frameBytes);
+        const size_t posFrames = positionBytes / frameBytes;
+        sink.ring_.assign(capFrames * frameBytes, 0xAA);
+        sink.ringRawDepth_.assign(capFrames, 0);
+        sink.ringFrameMask_ = capFrames - 1;
+        sink.ringRead_.store(posFrames);
+        sink.ringWrite_.store(posFrames);
+        sink.gapFader_.reset();
+        sink.underrunCount_.store(0);
         sink.producerOwner_.store(0);
         sink.producerRawDepth_.store(0);
         sink.lastError_.store(0);
@@ -70,12 +76,27 @@ struct UsbAudioSinkTestAccess {
         sink.active_.store(true);
         sink.writerGate_.store(0);
     }
-    static size_t written(UsbAudioSink& sink) { return sink.ringWrite_.load(); }
-    static std::vector<uint8_t> bytes(UsbAudioSink& sink, size_t start, size_t count) {
+    static size_t written(UsbAudioSink& sink) {
+        const size_t frameBytes =
+            static_cast<size_t>(sink.channels_) * static_cast<size_t>(sink.bytesPerSample_);
+        return sink.ringWrite_.load() * frameBytes;
+    }
+    static std::vector<uint8_t> bytes(UsbAudioSink& sink, size_t startByte, size_t count) {
+        const size_t capBytes = sink.ring_.size();
         std::vector<uint8_t> out(count);
-        for (size_t i = 0; i < count; ++i) out[i] = sink.ring_[(start + i) & sink.ringMask_];
+        for (size_t i = 0; i < count; ++i) out[i] = sink.ring_[(startByte + i) % capBytes];
         return out;
     }
+    static size_t fillPacket(UsbAudioSink& sink, uint8_t* dst, int framesInPacket,
+                             int& rawDepth, uint64_t& deliveryEpoch) {
+        size_t r = sink.ringRead_.load(std::memory_order_relaxed);
+        const size_t writtenBytes =
+            sink.fillPacketFromRing(dst, framesInPacket, r, rawDepth, deliveryEpoch);
+        sink.ringRead_.store(r, std::memory_order_release);
+        return writtenBytes;
+    }
+    static size_t ringRawDepthBytes(const UsbAudioSink& sink) { return sink.ringRawDepth_.size(); }
+    static uint64_t underrunCount(const UsbAudioSink& sink) { return sink.underrunCount_.load(); }
     static bool enter(UsbAudioSink& sink, int64_t id) { return sink.beginWrite(id); }
     static void leave(UsbAudioSink& sink) { sink.endWrite(); }
     static bool closed(UsbAudioSink& sink) { return (sink.writerGate_.load() & sink.kWriterClosed) != 0; }
@@ -105,9 +126,11 @@ struct UsbAudioSinkTestAccess {
     }
     static void setWrappedFill(UsbAudioSink& sink, size_t occupiedBytes) {
         prepare(sink, 4, 32, 65536, 0);
-        const size_t readPos = std::numeric_limits<size_t>::max() - 1023;
-        sink.ringRead_.store(readPos);
-        sink.ringWrite_.store(readPos + occupiedBytes);
+        const size_t frameBytes =
+            static_cast<size_t>(sink.channels_) * static_cast<size_t>(sink.bytesPerSample_);
+        const size_t readFrame = std::numeric_limits<size_t>::max() - 1023;
+        sink.ringRead_.store(readFrame);
+        sink.ringWrite_.store(readFrame + occupiedBytes / frameBytes);
         sink.numUrbs_ = 0;
         sink.packetsPerUrb_ = 0;
         sink.serviceIntervalUs_ = 1000;
@@ -726,6 +749,64 @@ int main() {
         check(Access::completion(urb, true) != 0, "feedback packet length above submitted capacity must reject");
         urb->number_of_packets = 200;
         check(Access::completion(urb, false) != 0, "invalid completion packet count must reject before descriptor access");
+    }
+
+    // ---- Underrun -> Raw 24-in-32 custody & partial packet salvage ---------
+    {
+        using Access = pulsr::UsbAudioSinkTestAccess;
+        auto& sink = UsbAudioSink::instance();
+        // 24-valid-in-32 subslot: verify ringRawDepth_ is 1 byte/frame and
+        // raw 24-bit packets after an underrun are never touched by gapFader_ or
+        // RequantizePcmValidBits.
+        Access::prepare(sink, 4, 24, 512, 0);
+        check(Access::ringRawDepthBytes(sink) == 512 / 8,
+              "ringRawDepth_ must store one depth byte per frame, not per byte");
+
+        int rawDepth = -1;
+        uint64_t epoch = Access::epoch(sink);
+        std::vector<uint8_t> pkt(4 * 8, 0xAA);
+        // 1) Force an underrun first (empty ring -> gapFader_ or silence + underrun count)
+        Access::fillPacket(sink, pkt.data(), 4, rawDepth, epoch);
+        check(Access::underrunCount(sink) == 1 && rawDepth == 0,
+              "empty ring must record underrun and clear rawDepth");
+
+        // 2) Push a 4-frame raw 24-bit packet with distinct LSBs (0x01, 0x7F, ...)
+        const std::vector<uint8_t> s24Block = {
+            0x01,0x23,0x45,  0x81,0x80,0x7F,
+            0x55,0xAA,0x10,  0xFE,0xFF,0x80,
+            0x13,0x37,0x42,  0x00,0x00,0x7F,
+            0x09,0x08,0x07,  0x01,0x00,0x80,
+        };
+        const std::vector<uint8_t> expectedWire = {
+            0,0x01,0x23,0x45, 0,0x81,0x80,0x7F,
+            0,0x55,0xAA,0x10, 0,0xFE,0xFF,0x80,
+            0,0x13,0x37,0x42, 0,0x00,0x00,0x7F,
+            0,0x09,0x08,0x07, 0,0x01,0x00,0x80,
+        };
+        check(sink.WritePcm(s24Block.data(), 4, 2, 24, 48000, 101),
+              "raw S24 resume write after underrun must succeed");
+        rawDepth = -1;
+        Access::fillPacket(sink, pkt.data(), 4, rawDepth, epoch);
+        check(rawDepth == 24 && pkt == expectedWire,
+              "raw 24-in-32 resume after underrun must remain bit-exact without gapFader or dither");
+
+        // 3) Partial packet salvage: 2 frames available for a 4-frame packet
+        const std::vector<uint8_t> partialS24(s24Block.begin(), s24Block.begin() + 12);
+        check(sink.WritePcm(partialS24.data(), 2, 2, 24, 48000, 101),
+              "partial packet write must accept 2 frames");
+        pkt.assign(32, 0xAA);
+        rawDepth = -1;
+        Access::fillPacket(sink, pkt.data(), 4, rawDepth, epoch);
+        const std::vector<uint8_t> expectedPartialWire = {
+            0,0x01,0x23,0x45, 0,0x81,0x80,0x7F,
+            0,0x55,0xAA,0x10, 0,0xFE,0xFF,0x80,
+            0,0,0,0, 0,0,0,0,
+            0,0,0,0, 0,0,0,0,
+        };
+        check(pkt == expectedPartialWire && rawDepth == 0 &&
+              Access::underrunCount(sink) == 2,
+              "partial packet must copy available frames verbatim and zero-fill missing tail");
+        sink.Close();
     }
 
     if (gFailures != 0) {

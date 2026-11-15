@@ -135,6 +135,8 @@ private:
     UsbAudioSink& operator=(const UsbAudioSink&) = delete;
 
     void workerLoop();
+    size_t fillPacketFromRing(uint8_t* dst, int framesInPacket, size_t& readFrame,
+                              int& rawDepth, uint64_t& deliveryEpoch);
     using UrbSubmit = int (*)(int fd, void* urb);
     static int submitUsbfsUrb(int fd, void* urb);
     // Establishes startup exclusivity before submitting; injectable syscall for
@@ -246,14 +248,14 @@ private:
     size_t urbStride_ = 0;
     int numUrbs_ = 0;
 
-    // Lock-free single-producer single-consumer (SPSC) byte ring buffer.
+    // Lock-free single-producer single-consumer (SPSC) frame ring buffer.
     // Audio thread produces; USB worker thread consumes. Wait-free for audio thread.
     std::vector<uint8_t> ring_;
-    // Depth at each frame's first byte, published with ringWrite_. 0 = float.
+    // Source bit depth per frame (1 byte per frame, 1/frameBytes memory vs byte ring). 0 = float.
     std::vector<uint8_t> ringRawDepth_;
-    size_t ringMask_ = 0;
-    alignas(64) std::atomic<size_t> ringWrite_{0};
-    alignas(64) std::atomic<size_t> ringRead_{0};
+    size_t ringFrameMask_ = 0;
+    alignas(64) std::atomic<size_t> ringWrite_{0}; // cumulative frame write count
+    alignas(64) std::atomic<size_t> ringRead_{0};  // cumulative frame read count
 };
 
 } // namespace pulsr

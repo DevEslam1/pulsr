@@ -36,6 +36,8 @@ void ChannelManager::resetChannelState(int channel) {
     std::fill(delayLines_[channel].begin(), delayLines_[channel].end(), 0.0f);
     writeIndex_[channel] = 0;
     smoothedDelaySamples_[channel] = static_cast<float>(delaySamples_[channel]);
+    delayRampStep_[channel] = 0.0f;
+    delayRampRemaining_[channel] = 0;
 }
 
 void ChannelManager::reset() {
@@ -47,6 +49,8 @@ void ChannelManager::reset() {
         rampRemaining_[ch] = 0;
         delaySamples_[ch] = 0;
         smoothedDelaySamples_[ch] = 0.0f;
+        delayRampStep_[ch] = 0.0f;
+        delayRampRemaining_[ch] = 0;
         std::fill(delayLines_[ch].begin(), delayLines_[ch].end(), 0.0f);
         writeIndex_[ch] = 0;
     }
@@ -78,6 +82,16 @@ void ChannelManager::applyParams(const ChannelManagerParamSet& params) {
                     gainStep_[ch] = 0.0f;
                     rampRemaining_[ch] = 0;
                 }
+                delaySamples_[ch] = 0;
+                if (smoothedDelaySamples_[ch] > 1e-3f) {
+                    delayRampStep_[ch] = -smoothedDelaySamples_[ch] / static_cast<float>(rampFrames);
+                    delayRampRemaining_[ch] = rampFrames;
+                    anyRamp = true;
+                } else {
+                    smoothedDelaySamples_[ch] = 0.0f;
+                    delayRampStep_[ch] = 0.0f;
+                    delayRampRemaining_[ch] = 0;
+                }
             }
             rampingDown_ = anyRamp;
             if (!rampingDown_) {
@@ -87,6 +101,10 @@ void ChannelManager::applyParams(const ChannelManagerParamSet& params) {
         return;
     }
     rampingDown_ = false;
+    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+        delayRampStep_[ch] = 0.0f;
+        delayRampRemaining_[ch] = 0;
+    }
 
     const bool justEnabled = (!wasEnabled && params_.enabled);
     const int rampFrames = std::max(
@@ -151,9 +169,17 @@ void ChannelManager::processInterleaved(float* buffer, int frames, int channels)
             if (ch < declaredChannels) {
                 const float targetDelay = static_cast<float>(delaySamples_[ch]);
                 float& smoothDelay = smoothedDelaySamples_[ch];
-                smoothDelay += delaySmoothCoeff * (targetDelay - smoothDelay);
-                if (std::abs(smoothDelay - targetDelay) < 1e-4f) {
-                    smoothDelay = targetDelay;
+                if (delayRampRemaining_[ch] > 0) {
+                    smoothDelay = std::max(0.0f, smoothDelay + delayRampStep_[ch]);
+                    --delayRampRemaining_[ch];
+                    if (delayRampRemaining_[ch] == 0) {
+                        smoothDelay = targetDelay;
+                    }
+                } else {
+                    smoothDelay += delaySmoothCoeff * (targetDelay - smoothDelay);
+                    if (std::abs(smoothDelay - targetDelay) < 1e-4f) {
+                        smoothDelay = targetDelay;
+                    }
                 }
                 const float d = smoothDelay;
                 auto& line = delayLines_[ch];
@@ -188,7 +214,7 @@ void ChannelManager::processInterleaved(float* buffer, int frames, int channels)
     if (rampingDown_) {
         bool stillRamping = false;
         for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-            if (rampRemaining_[ch] > 0) {
+            if (rampRemaining_[ch] > 0 || delayRampRemaining_[ch] > 0) {
                 stillRamping = true;
                 break;
             }

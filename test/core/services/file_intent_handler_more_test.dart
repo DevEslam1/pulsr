@@ -259,7 +259,66 @@ void main() {
       await handler.checkInitialUri();
     });
 
-    test('incoming onAudioFileOpened is handled', () async {
+    test('checkInitialUri plays initial URI and queues remaining SEND_MULTIPLE URIs', () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'getInitialAudioUris') {
+          return ['/music/init.mp3', '/music/second.mp3'];
+        }
+        return null;
+      });
+      const secondSong = SongsTableData(
+        id: 2,
+        title: 'Second',
+        artist: 'A',
+        album: 'B',
+        durationMs: 1000,
+        path: '/music/second.mp3',
+        uri: '/music/second.mp3',
+        source: SongSource.local,
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      when(() => repository.getSongByPath('/music/init.mp3'))
+          .thenAnswer((_) async => const Right(existingSong));
+      when(() => repository.getSongByPath('/music/second.mp3'))
+          .thenAnswer((_) async => const Right(secondSong));
+      when(() => playerCubit.addAllToQueue(any())).thenAnswer((_) async {});
+
+      await handler.checkInitialUri();
+
+      verify(() => playerCubit.playSong(existingSong)).called(1);
+      verify(() => playerCubit.addAllToQueue([secondSong])).called(1);
+    });
+
+    test('incoming onAudioFileOpened drains remaining pending URIs', () async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'getInitialAudioUris') {
+          return ['/music/queued.mp3'];
+        }
+        return null;
+      });
+      const queuedSong = SongsTableData(
+        id: 3,
+        title: 'Queued',
+        artist: 'A',
+        album: 'B',
+        durationMs: 1000,
+        path: '/music/queued.mp3',
+        uri: '/music/queued.mp3',
+        source: SongSource.local,
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      when(() => repository.getSongByPath('/music/queued.mp3'))
+          .thenAnswer((_) async => const Right(queuedSong));
+      when(() => playerCubit.addAllToQueue(any())).thenAnswer((_) async {});
+
       await messenger.handlePlatformMessage(
         PulsrChannels.fileOpener,
         const StandardMethodCodec().encodeMethodCall(
@@ -267,6 +326,7 @@ void main() {
         (_) {},
       );
       verify(() => repository.getSongByPath('/music/x.mp3')).called(1);
+      verify(() => playerCubit.addAllToQueue([queuedSong])).called(1);
     });
 
     test('incoming onVoiceSearch is handled', () async {

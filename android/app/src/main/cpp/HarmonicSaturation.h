@@ -100,6 +100,7 @@ private:
     static constexpr int DECIM_HISTORY_LEN = FIR_TAPS;  // 32
     float decimHistory_[MAX_CHANNELS][DECIM_HISTORY_LEN] = {};
     int decimIdx_ = 0;
+    bool wasDriveActive_ = false;
 
     // FIX M-13: dry-path delay line. The wet signal is delayed by the up+down
     // oversampling FIR group delay (the interpolation prototype convolved with

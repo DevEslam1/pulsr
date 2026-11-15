@@ -715,9 +715,19 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                           onTap: _busy
                               ? null
                               : () async {
+                                  final messenger =
+                                      ScaffoldMessenger.maybeOf(context);
                                   setState(() => _busy = true);
                                   try {
-                                    await _service.castTo(_devices[i].id);
+                                    final deviceName = _devices[i].name;
+                                    final res = await _service.castTo(_devices[i].id);
+                                    if (!mounted) return;
+                                    final msg = res.success
+                                        ? l10n.settingsCastingTo(deviceName)
+                                        : (res.message ?? l10n.settingsCastFailed);
+                                    messenger?.showSnackBar(
+                                      SnackBar(content: Text(msg)),
+                                    );
                                   } finally {
                                     if (mounted) {
                                       setState(() => _busy = false);
@@ -726,6 +736,34 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 },
                         ),
                       ],
+                      Container(
+                        margin: const EdgeInsets.all(AppSpacing.sm),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.sm, vertical: AppSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainerHigh.withValues(alpha: 0.4),
+                          borderRadius: AppRadii.r10All,
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                size: 15, color: p.textTertiary),
+                            const SizedBox(width: AppSpacing.xs),
+                            Expanded(
+                              child: Text(
+                                l10n.settingsCastNoSdkDesc,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.label,
+                                  color: p.textTertiary,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ],
                 ),

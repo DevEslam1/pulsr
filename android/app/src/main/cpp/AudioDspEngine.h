@@ -176,11 +176,23 @@ public:
     }
 
     // Auto-Degrade Safety Net: tracks stages bypassed due to budget exhaustion
-    uint32_t getAutoDegradedStages() const { return autoDegradedStages_.load(); }
+    uint32_t getAutoDegradedStages() const {
+        return autoDegradedStages_.load(std::memory_order_relaxed) |
+               externalDegradedStages_.load(std::memory_order_relaxed);
+    }
+    uint32_t getNativeAutoDegradedStages() const {
+        return autoDegradedStages_.load(std::memory_order_relaxed);
+    }
+    uint32_t getExternalDegradedStages() const {
+        return externalDegradedStages_.load(std::memory_order_relaxed);
+    }
     void triggerStageAutoDegrade(uint32_t stageBitmask) { autoDegradedStages_.fetch_or(stageBitmask); }
     void recoverStageAutoDegrade(uint32_t stageBitmask) { autoDegradedStages_.fetch_and(~stageBitmask); }
+    void triggerExternalDegrade(uint32_t stageBitmask) { externalDegradedStages_.fetch_or(stageBitmask); }
+    void recoverExternalDegrade(uint32_t stageBitmask) { externalDegradedStages_.fetch_and(~stageBitmask); }
     void clearAutoDegradedStages() {
         autoDegradedStages_.store(0);
+        externalDegradedStages_.store(0);
         degradeConsecutiveBlocks_ = 0;
         recoveryConsecutiveBlocks_ = 0;
         rtfCount_ = 0;
@@ -202,6 +214,9 @@ public:
     // applies its inverse (output/input) to the dry path. Also exposed as
     // telemetry index 17 when the caller provides an 18-slot array.
     double getLoudnessDeltaDb() const { return shortTermLoudnessDeltaDb_.load(std::memory_order_relaxed); }
+    // Current crest-aware EQ auto-headroom attenuation in dB (<= 0.0, down to -6.0 dB).
+    // Exposed as telemetry index 18 when the caller provides a 19-slot array.
+    double getEqAutoHeadroomDb() const { return eq_.getAutoHeadroomDb(); }
     float getDynEqGrDb(int band) const {
         if (band >= 0 && band < DynamicEqParamSet::MAX_BANDS) {
             return dynEqGrDb_[band].load(std::memory_order_relaxed);
@@ -256,21 +271,34 @@ public:
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
     void drainRetireQueue() {
+        std::vector<std::shared_ptr<const DspParamSnapshot>> toFree;
         {
-            // Control-threads-only reclamation. The audio render thread never
-            // touches retireQueue_/retireMutex_ (it reads only the raw
-            // currentParamsPtr_), so this lock has no RT impact. Free every
-            // retired snapshot EXCEPT the one the render thread's hazard pointer
-            // currently protects; that one is freed on a later drain once the
-            // render thread has moved on (its hazard advances).
+            // Control-threads-only reclamation. The audio render threads never
+            // touch retireQueue_/retireOverflow_/retireMutex_ (they read only
+            // the raw currentParamsPtr_), so this lock has no RT impact. Free
+            // every retired snapshot EXCEPT those protected by any active
+            // renderer's hazard slot; those are freed on a later drain once all
+            // render threads have moved on.
             std::lock_guard<std::mutex> lock(retireMutex_);
-            const DspParamSnapshot* hz = audioHazardPtr_.load(std::memory_order_seq_cst);
             for (auto& slot : retireQueue_) {
-                if (slot && slot.get() != hz) {
-                    slot.reset();
+                if (slot && !isSnapshotHazardedLocked(slot.get())) {
+                    toFree.push_back(std::move(slot));
+                }
+            }
+            for (size_t i = 0; i < retireOverflow_.size();) {
+                if (!retireOverflow_[i] ||
+                    !isSnapshotHazardedLocked(retireOverflow_[i].get())) {
+                    if (retireOverflow_[i]) {
+                        toFree.push_back(std::move(retireOverflow_[i]));
+                    }
+                    retireOverflow_[i] = std::move(retireOverflow_.back());
+                    retireOverflow_.pop_back();
+                } else {
+                    ++i;
                 }
             }
         }
+        toFree.clear();
         reverb_.drainRetiredIrs();
     }
 
@@ -285,10 +313,19 @@ private:
     // Publishes `snap` as the live snapshot and retires the previous owner.
     // MUST be called with publishMutex_ held.
     void swapCurrentLocked(const std::shared_ptr<const DspParamSnapshot>& snap);
-    // Reclaims retired snapshots the render thread has moved off and parks the
-    // just-replaced owner for deferred release if the render thread may still be
+    // Reclaims retired snapshots no render thread is protecting and parks the
+    // just-replaced owner for deferred release if any render thread may still be
     // reading it this block. Control threads only.
     void retireAndDrain(std::shared_ptr<const DspParamSnapshot> old);
+    bool isSnapshotHazardedLocked(const DspParamSnapshot* ptr) const {
+        if (!ptr) return false;
+        for (const auto& slot : hazardSlots_) {
+            if (slot.ptr.load(std::memory_order_seq_cst) == ptr) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     std::atomic<double> sampleRate_{48000.0};
     std::atomic<int> sinkBitDepth_{0};
@@ -305,20 +342,18 @@ private:
     std::atomic<uint64_t> lastBroadcastGeneration_{0};
     std::atomic<uint64_t> lastAppliedGeneration_{0};
     std::atomic<uint32_t> autoDegradedStages_{0};
+    std::atomic<uint32_t> externalDegradedStages_{0};
 
-    // Deferred reclamation pool for retired parameter snapshots. The audio
-    // render thread never touches a shared_ptr control block (it reads only the
-    // raw currentParamsPtr_), so every snapshot it may still be reading is kept
-    // alive here, on the publish side, until the single-reader hazard pointer
-    // (audioHazardPtr_) shows the render thread has moved on. Freed EXCLUSIVELY
-    // off the audio thread. Guarded by retireMutex_ (control threads only), which
-    // also serialises the previously-latent two-consumer drain race between the
-    // publish paths and DspEngineRegistry::drainRetireQueues(). Used as an
-    // unordered fixed pool, not a ring: reclamation frees all-but-the-hazarded
-    // slot out of order, so with a single reader at most one slot stays occupied
-    // and kRetireQueueSize is never exhausted.
+    // Deferred reclamation pool for retired parameter snapshots. Render threads
+    // never touch a shared_ptr control block (they read only currentParamsPtr_),
+    // so every snapshot still protected by any active per-renderer hazard slot
+    // is kept alive here until all readers move off it. Freed EXCLUSIVELY off
+    // audio threads. If the fixed pool fills (e.g. many slow concurrent renders),
+    // retireOverflow_ acts as an unbounded keep-alive list so no hazarded
+    // snapshot is ever destroyed while a render thread holds it.
     static constexpr int kRetireQueueSize = 16;
     std::array<std::shared_ptr<const DspParamSnapshot>, kRetireQueueSize> retireQueue_;
+    std::vector<std::shared_ptr<const DspParamSnapshot>> retireOverflow_;
     std::mutex retireMutex_;
 
     // Rolling RTF monitor (zero heap allocation, preallocated fixed ring buffer)
@@ -351,15 +386,16 @@ private:
     std::atomic<const DspParamSnapshot*> currentParamsPtr_{nullptr};
     std::atomic<bool> lastBlockBitPerfect_{false};
 
-    // Single-reader hazard pointer. The render thread publishes the snapshot it
-    // is about to read here (seq_cst) and then re-validates currentParamsPtr_
-    // before using it; the control-side reclaimer loads it (seq_cst) and refuses
-    // to free whatever it points at. The seq_cst StoreLoad on both sides is the
-    // correctness crux — see the argument in processInterleaved(). There is at
-    // most one render thread per engine (concurrent processInterleaved on one
-    // engine would already corrupt the stateful stage objects), so a single
-    // hazard slot suffices.
-    std::atomic<const DspParamSnapshot*> audioHazardPtr_{nullptr};
+    // Per-renderer hazard slots plus a monotonic publishEpoch_ counter to prevent
+    // pointer-address ABA across snapshot reallocations and concurrent
+    // DspEngineRegistry::acquireForRender() readers.
+    static constexpr int kMaxHazardSlots = 64;
+    struct HazardSlot {
+        std::atomic<bool> inUse{false};
+        std::atomic<const DspParamSnapshot*> ptr{nullptr};
+    };
+    std::array<HazardSlot, kMaxHazardSlots> hazardSlots_;
+    std::atomic<uint64_t> publishEpoch_{0};
 
     mutable std::mutex publishMutex_;
 

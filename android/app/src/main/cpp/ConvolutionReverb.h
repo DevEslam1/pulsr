@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <atomic>
+#include <mutex>
 // FIX M-15: <thread>/<condition_variable> removed with the dead worker thread.
 
 enum class ReverbPreset {
@@ -88,6 +89,9 @@ private:
     std::shared_ptr<const PreparedIr> retiredRing_[kMaxRetired];
     std::atomic<int> retiredHead_{0};
     std::atomic<int> retiredTail_{0};
+    std::mutex overflowMutex_;
+    std::vector<std::shared_ptr<const PreparedIr>> retiredOverflow_;
+    std::mutex drainMutex_;
 
     void updatePreparedIr();
     void setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir);

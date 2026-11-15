@@ -687,7 +687,10 @@ class AudioQualitySheet extends StatelessWidget {
       sourceLossy: source.source == SongSource.radio || codec == AudioSourceCodecState.lossy,
       sourceCodecUnconfirmed: codec == AudioSourceCodecState.unknown,
       channelsAltered: direct && usb.channelMismatchFrames > 0,
-      digitalVolumeAttenuated: !direct && gain < 1.0,
+      // Direct USB applies the player gain natively (_syncDirectUsbVolume), so
+      // attenuation is real on that path too; only a DAC-owned volume keeps the
+      // player gain at unity.
+      digitalVolumeAttenuated: gain < 1.0,
       rateVerified: !direct || usb.rateVerified,
       failureReason: outputDevice?.bitPerfectFailureReason,
     );

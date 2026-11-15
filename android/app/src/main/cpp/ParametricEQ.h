@@ -2,6 +2,7 @@
 #pragma once
 
 #include "DspParams.h"
+#include <atomic>
 #include <cmath>
 #include <vector>
 #include <algorithm>
@@ -47,6 +48,7 @@ public:
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
     bool isRamping() const { return fadeOutActive_; }
+    double getAutoHeadroomDb() const { return autoHeadroomDb_.load(std::memory_order_relaxed); }
     void applyParams(const EqParamSet& params);
     void reset();
 
@@ -71,6 +73,7 @@ private:
     double targetPreampDb_ = 0.0;
     double smoothedPreampDb_ = 0.0;
     double preampLinear_ = 1.0;
+    std::atomic<double> autoHeadroomDb_{0.0};
     bool enabled_ = true;
 
     // Disable fade-out state (symmetric to beginEnableRamp). While fadeOutActive_

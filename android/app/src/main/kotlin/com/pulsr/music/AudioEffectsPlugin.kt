@@ -589,7 +589,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetDitherBluetoothAllowed(allowed: Boolean)
     private external fun nativeSetBitPerfectParams(enabled: Boolean, isDop: Boolean)
     private external fun nativeSetDirectUsbVolume(gainLinear: Double)
-    private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int, resetState: Boolean): FloatArray?
+    private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int, resetState: Boolean, streamId: Long): FloatArray?
     private external fun nativeResetDsdDecoder()
     private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeSetChannelManagerEnabled(enabled: Boolean, channelCount: Int)
@@ -992,7 +992,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return mapOf(
             "nativeEngineLoaded" to isNativeDspLoaded,
             "sampleRate" to appliedSampleRate,
-            "bufferSize" to (if (latencyFrames > 0) latencyFrames else 512),
+            "bufferSize" to (if (latencyFrames > 0) latencyFrames else 0),
             "activeStagesBitmask" to activeDspStages,
             "activeStages" to activeStagesList,
             "halStagesActive" to halColoring,
@@ -2649,6 +2649,21 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         currentAudioSessionId = sessionId
                         if (changed) {
                             recreateEffects()
+                            if (isBitPerfectBypassActive) {
+                                recalculateActiveStages()
+                                if (isNativeDspLoaded) {
+                                    safeCall(TAG, "restoreBitPerfectSessionAttach") {
+                                        nativeSetBitPerfectParams(true, isDopActive)
+                                    }
+                                }
+                            } else {
+                                restoreNativeStateAfterBypass()
+                                if (isBypassCompareActive && isNativeDspLoaded) {
+                                    safeCall(TAG, "restoreBypassCompareSessionAttach") {
+                                        nativeSetBypassCompare(true, bypassCompareGainCompensationDb)
+                                    }
+                                }
+                            }
                         }
                         // stage configuration wants actually exists on it.
                         result.success(isEffectPipelineAttached())
@@ -3267,14 +3282,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             if (telemetry != null) {
                                 result.success(telemetry.toList())
                             } else {
-                                result.success(DoubleArray(17).toList())
+                                result.success(DoubleArray(19).toList())
                             }
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeGetTelemetry failed: ${e.message}")
-                            result.success(DoubleArray(17).toList())
+                            result.success(DoubleArray(19).toList())
                         }
                     } else {
-                        result.success(DoubleArray(17).toList())
+                        result.success(DoubleArray(19).toList())
                     }
                 }
 
@@ -4133,7 +4148,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     if (isNativeDspLoaded) {
                         try {
                             val resetState = call.argument<Boolean>("resetState") ?: false
-                            val pcmFloats = nativeDecodeDsd(dsdL, dsdR, byteCount, dsdRate, targetRate, bitOrder, resetState)
+                            val streamId = (call.argument<Number>("streamId"))?.toLong() ?: 0L
+                            val pcmFloats = nativeDecodeDsd(dsdL, dsdR, byteCount, dsdRate, targetRate, bitOrder, resetState, streamId)
                             result.success(pcmFloats)
                         } catch (e: Exception) {
                             result.error("DSD_DECODE_ERROR", e.message, null)

@@ -4994,6 +4994,54 @@
   "@radioCardsRestoredToast": {
     "description": "Toast after restoring the home radio carousel"
   },
+  "pinRadioCardToFirst": "Fijar al inicio",
+  "@pinRadioCardToFirst": {
+    "description": "Action to pin the selected radio card to the first carousel position"
+  },
+  "pinRadioCardToFirstSubtitle": "Mantener esta emisora al principio del carrusel",
+  "@pinRadioCardToFirstSubtitle": {
+    "description": "Subtitle explaining pinning a radio card first"
+  },
+  "unpinRadioCard": "Desfijar",
+  "@unpinRadioCard": {
+    "description": "Action to unpin a pinned radio card"
+  },
+  "unpinRadioCardSubtitle": "Devolver esta emisora a su posición ordenada",
+  "@unpinRadioCardSubtitle": {
+    "description": "Subtitle explaining unpinning a radio card"
+  },
+  "radioCardPinnedToast": "Emisora fijada al principio",
+  "@radioCardPinnedToast": {
+    "description": "Toast shown when a radio card is pinned first"
+  },
+  "radioCardUnpinnedToast": "Emisora desfijada",
+  "@radioCardUnpinnedToast": {
+    "description": "Toast shown when a radio card is unpinned"
+  },
+  "sortRadioCardsTitle": "Orden",
+  "@sortRadioCardsTitle": {
+    "description": "Section title for radio card sorting options"
+  },
+  "sortRadioCardsDefault": "Predeterminado",
+  "@sortRadioCardsDefault": {
+    "description": "Curated default radio card order"
+  },
+  "sortRadioCardsAlphabetical": "A–Z",
+  "@sortRadioCardsAlphabetical": {
+    "description": "Alphabetical radio card sort order"
+  },
+  "sortRadioCardsRecent": "Recientes",
+  "@sortRadioCardsRecent": {
+    "description": "Recently played radio card sort order"
+  },
+  "resetRadioCardOrder": "Restablecer",
+  "@resetRadioCardOrder": {
+    "description": "Action to reset pinned cards and sort order"
+  },
+  "radioCardOrderResetToast": "Orden de tarjetas restablecido",
+  "@radioCardOrderResetToast": {
+    "description": "Toast shown after resetting radio card order"
+  },
   "radioShowAction": "Mostrar",
   "@radioShowAction": {
     "description": "Button that restores the hidden radio cards"

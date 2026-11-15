@@ -273,7 +273,10 @@ object ProxyPool {
                 }
             }
 
-            if (autoRotateEnabled) {
+            val targetsActivePath =
+                (failedHostOrId == null) || (activeProxyId != null && failing?.id == activeProxyId)
+
+            if (autoRotateEnabled && targetsActivePath) {
                 val remainingAlive = stableOrderedAlive()
                 if (remainingAlive.isNotEmpty()) {
                     val aliveIds = remainingAlive.map { it.id }.toSet()
@@ -392,11 +395,19 @@ object ProxyPool {
             }
             decided.set(true)
             val winner = winnerRef.get()
+            var winnerLabelToNotify: String? = null
             if (winner != null) {
                 synchronized(lock) {
                     activeProxyId = winner.id
-                    currentPathLabel = "${winner.type.name}:${winner.host}:${winner.port}"
+                    val newLabel = "${winner.type.name}:${winner.host}:${winner.port}"
+                    if (newLabel != currentPathLabel) {
+                        currentPathLabel = newLabel
+                        winnerLabelToNotify = newLabel
+                    }
                 }
+            }
+            winnerLabelToNotify?.let { label ->
+                onPathChangeListener?.invoke(label)
             }
             callback(winner)
         }

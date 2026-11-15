@@ -2,6 +2,12 @@ part of 'audio_handler.dart';
 
 mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   Future<void> get effectsReady;
+  Future<void>? _syncOutputVolumeBeforeLoad();
+  Future<void> _applyPlayerOutputVolume(
+    AudioPlayer player,
+    double targetVolume, {
+    SongsTableData? song,
+  });
   Future<Map<String, dynamic>?> _readCrashPositionRecovery();
 
   Future<void> restoreLastPlaybackSession() async {
@@ -854,12 +860,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     try {
       await _activePlayer.pause();
     } catch (_) {}
+    final volumeSync = _syncOutputVolumeBeforeLoad();
+    if (volumeSync != null) await volumeSync;
+    if (await _isGenerationCancelled(generation)) return;
 
     final targetVolume = _calculateReplayGainVolume(song);
     try {
       await _activePlayer.dspClearGainCurve();
     } catch (_) {}
-    await _activePlayer.setVolume(targetVolume);
+    await _applyPlayerOutputVolume(_activePlayer, targetVolume, song: song);
 
     if (song.source == SongSource.youtube &&
         (song.remoteId?.isNotEmpty ?? false) &&
@@ -887,6 +896,8 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     final loadGen = ++_loadQueueGeneration;
     _pendingPlaybackStart = songs.isNotEmpty && autoPlay;
     await effectsReady;
+    final volumeSync = _syncOutputVolumeBeforeLoad();
+    if (volumeSync != null) await volumeSync;
     if (loadGen != _loadQueueGeneration) return;
     if (songs.isNotEmpty && autoPlay && !_pendingPlaybackStart) return;
     if (songs.isEmpty) {
@@ -973,7 +984,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       try {
         await _activePlayer.dspClearGainCurve();
       } catch (_) {}
-      await _activePlayer.setVolume(targetVolume);
+      await _applyPlayerOutputVolume(_activePlayer, targetVolume, song: song);
       if (autoPlay) {
         unawaited(_activePlayer.play());
       } else {
@@ -1112,6 +1123,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     _gaplessStopwatch
       ..reset()
       ..start();
+    final volumeSync = _syncOutputVolumeBeforeLoad();
+    if (volumeSync != null) await volumeSync;
+    if (await _isGenerationCancelled(generation)) return;
 
     final song = songsSnapshot[targetIndex];
     final fastArtUri = song.artworkUri != null
@@ -1209,14 +1223,14 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       if (!preload) {
         // Restored queue, not playing yet: park the correct level so a later
         // play() doesn't inherit a faded-out 0 from a previous switch.
-        await _activePlayer.setVolume(targetVolume);
+        await _applyPlayerOutputVolume(_activePlayer, targetVolume, song: song);
         if (_playGeneration != generation) return;
         _broadcastState(_activePlayer.playbackEvent);
         if (initialPosition != null) {
           _emitPosition(initialPosition);
         }
       } else {
-        await _activePlayer.setVolume(targetVolume);
+        await _applyPlayerOutputVolume(_activePlayer, targetVolume, song: song);
         // FIX-#2b: Re-check generation after the async setVolume — same race
         // condition as playSongAt (see FIX-#2).
         if (_playGeneration != generation) return;
@@ -1357,7 +1371,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     try {
       await _activePlayer.dspClearGainCurve();
     } catch (_) {}
-    await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+    await _applyPlayerOutputVolume(
+      _activePlayer,
+      _calculateReplayGainVolume(song),
+      song: song,
+    );
     if (_activePlayer.playing) {
       _repository.recordPlayHistory(song.id);
     }
@@ -1485,7 +1503,11 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       // handover against any preload/crossfade on the inactive player, and a
       // bump would cancel a user tap that landed in the same boundary window
       // (playSongAt checks its token after every await).
-      await incoming.setVolume(_calculateReplayGainVolume(song));
+      await _applyPlayerOutputVolume(
+        incoming,
+        _calculateReplayGainVolume(song),
+        song: song,
+      );
       // just_audio's play() future only completes on the next pause/stop, so
       // awaiting it would park the handover for the whole track.
       unawaited(incoming.play());
@@ -1575,6 +1597,9 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
     _pendingPlaybackStart = true;
+    final volumeSync = _syncOutputVolumeBeforeLoad();
+    if (volumeSync != null) await volumeSync;
+    if (index >= _songs.length) return;
     cancelPrefetches();
     // playSongAt takes over the active player with a single source; clear any
     // in-flight gapless load target so a stalled one cannot keep
@@ -1673,7 +1698,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
       try {
         await _activePlayer.dspClearGainCurve();
       } catch (_) {}
-      await _activePlayer.setVolume(targetVolume);
+      await _applyPlayerOutputVolume(_activePlayer, targetVolume, song: song);
       // FIX-#2: Re-check generation after the async setVolume — a rapid skip
       // during the await can load a new source, and calling play() here would
       // inadvertently start the wrong track.

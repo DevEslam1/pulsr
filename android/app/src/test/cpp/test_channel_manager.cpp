@@ -139,6 +139,34 @@ int main() {
         std::cout << "  positive gain query follows ramp and layout boundaries." << std::endl;
     }
 
+    // 6. Disabling with nonzero delay (and unity gain) ramps delay smoothly to 0
+    //    instead of snapping mid-stream.
+    {
+        ChannelManager manager;
+        manager.setSampleRate(48000.0);
+        ChannelManagerParamSet params;
+        params.enabled = true;
+        params.channelCount = 2;
+        params.trimDb[0] = 0.0f;
+        params.trimDb[1] = 0.0f;
+        params.delayMs[1] = 10.0f; // 480 samples
+        manager.applyParams(params);
+
+        std::vector<float> buf(64 * 2, 0.5f);
+        manager.processInterleaved(buf.data(), 64, 2);
+
+        params.enabled = false;
+        manager.applyParams(params);
+        assert(manager.isRamping() && "ChannelManager must keep ramping while nonzero delay drains to 0");
+        for (int b = 0; b < 32; ++b) {
+            std::fill(buf.begin(), buf.end(), 0.5f);
+            manager.processInterleaved(buf.data(), 64, 2);
+            for (float v : buf) assert(std::isfinite(v));
+        }
+        assert(!manager.isRamping() && "ChannelManager must settle after delay ramp finishes");
+        std::cout << "  ✓ ChannelManager delay disable ramp verified." << std::endl;
+    }
+
     std::cout << "[PASS] ChannelManager tests passed." << std::endl;
     return 0;
 }

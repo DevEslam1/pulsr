@@ -1051,8 +1051,9 @@ class NowPlayingWidget : AppWidgetProvider() {
                     rawBitmap
                 }
 
-                val density = context.resources.displayMetrics.density
-                val cornerRadiusPx = 16f * density
+                // Scale radius proportionally to the fixed bitmap dimension so
+                // high-DPI screens do not over-round the 192px widget artwork.
+                val cornerRadiusPx = targetPx * (16f / 192f)
                 val rounded = getRoundedCornerBitmap(scaled, cornerRadiusPx)
                 if (rounded !== scaled) scaled.recycle()
 

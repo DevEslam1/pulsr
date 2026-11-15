@@ -233,6 +233,16 @@ BitPerfectChainAssessment assessBitPerfectChain({
 
   // Direct Native DSD (Raw Bitstream): 1-bit DSD without PCM markers or downsampling.
   if (isDsdNative) {
+    if (digitalVolumeAttenuated) {
+      return BitPerfectChainAssessment(
+        verdict: BitPerfectChainVerdict.unverified,
+        sourceSampleRate: sourceSampleRate,
+        sourceBitDepth: sourceBitDepth,
+        outputSampleRate: outputSampleRate,
+        outputBitDepth: outputBitDepth,
+        reasonCode: 'digital_volume_attenuation',
+      );
+    }
     return BitPerfectChainAssessment(
       verdict: BitPerfectChainVerdict.verified,
       sourceSampleRate: sourceSampleRate,

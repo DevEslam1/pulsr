@@ -10,6 +10,8 @@ class DspTelemetry {
   final int autoDegradedStages;
   final double weeklyDose;
   final bool safetyAttenuationActive;
+  final double loudnessDeltaDb;
+  final double eqAutoHeadroomDb;
 
   const DspTelemetry({
     required this.limiterGrDb,
@@ -19,6 +21,8 @@ class DspTelemetry {
     required this.autoDegradedStages,
     this.weeklyDose = 0.0,
     this.safetyAttenuationActive = false,
+    this.loudnessDeltaDb = 0.0,
+    this.eqAutoHeadroomDb = 0.0,
   });
 
   const DspTelemetry.zero()
@@ -28,7 +32,9 @@ class DspTelemetry {
         rollingRtf = 0.0,
         autoDegradedStages = 0,
         weeklyDose = 0.0,
-        safetyAttenuationActive = false;
+        safetyAttenuationActive = false,
+        loudnessDeltaDb = 0.0,
+        eqAutoHeadroomDb = 0.0;
 
   /// Tolerant numeric reader: the platform channel is untyped at runtime, so a
   /// malformed/legacy payload must not throw (the cubit would treat it as a
@@ -70,6 +76,8 @@ class DspTelemetry {
     final degraded = _readInt(list, 14);
     final dose = _readDouble(list, 15).clamp(0.0, 100.0).toDouble();
     final attenuation = _readDouble(list, 16) > 0.5;
+    final loudnessDelta = _readDouble(list, 17).clamp(-36.0, 36.0).toDouble();
+    final eqAutoHeadroom = _readDouble(list, 18).clamp(-12.0, 0.0).toDouble();
 
     return DspTelemetry(
       limiterGrDb: limiter,
@@ -79,6 +87,8 @@ class DspTelemetry {
       autoDegradedStages: degraded,
       weeklyDose: dose,
       safetyAttenuationActive: attenuation,
+      loudnessDeltaDb: loudnessDelta,
+      eqAutoHeadroomDb: eqAutoHeadroom,
     );
   }
 
@@ -101,7 +111,9 @@ class DspTelemetry {
           rollingRtf == other.rollingRtf &&
           autoDegradedStages == other.autoDegradedStages &&
           weeklyDose == other.weeklyDose &&
-          safetyAttenuationActive == other.safetyAttenuationActive;
+          safetyAttenuationActive == other.safetyAttenuationActive &&
+          loudnessDeltaDb == other.loudnessDeltaDb &&
+          eqAutoHeadroomDb == other.eqAutoHeadroomDb;
 
   @override
   int get hashCode => Object.hash(
@@ -112,5 +124,7 @@ class DspTelemetry {
         autoDegradedStages,
         weeklyDose,
         safetyAttenuationActive,
+        loudnessDeltaDb,
+        eqAutoHeadroomDb,
       );
 }

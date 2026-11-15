@@ -48,6 +48,7 @@ class FileIntentHandler {
           final uri = call.arguments as String?;
           if (uri != null) {
             await handleAudioUri(uri);
+            await _drainPendingAudioUris();
           }
         } else if (call.method == 'onVoiceSearch') {
           final query = call.arguments as String?;
@@ -72,6 +73,12 @@ class FileIntentHandler {
 
   Future<void> checkInitialUri() async {
     try {
+      final List<String> initialUris = await _invokeInitialAudioUris();
+      if (initialUris.isNotEmpty) {
+        await handleAudioUri(initialUris.first);
+        await _enqueueAdditionalUris(initialUris.skip(1));
+        return;
+      }
       final initialUri =
           await _channel.invokeMethod<String>('getInitialAudioUri');
       if (initialUri != null) {
@@ -80,6 +87,40 @@ class FileIntentHandler {
     } catch (e, st) {
       ErrorLogger.log('Failed to check initial audio URI',
           error: e, stackTrace: st, category: 'FileIntentHandler');
+    }
+  }
+
+  Future<List<String>> _invokeInitialAudioUris() async {
+    try {
+      final list = await _channel.invokeListMethod<String>('getInitialAudioUris');
+      if (list != null && list.isNotEmpty) {
+        return list.where((u) => u.isNotEmpty).toList();
+      }
+    } on MissingPluginException {
+      // Fall back to legacy single-URI channel method in tests/older hosts.
+    } catch (_) {
+      // Ignore mocked handlers that only implement getInitialAudioUri.
+    }
+    return const <String>[];
+  }
+
+  Future<void> _drainPendingAudioUris() async {
+    final pending = await _invokeInitialAudioUris();
+    if (pending.isNotEmpty) {
+      await _enqueueAdditionalUris(pending);
+    }
+  }
+
+  Future<void> _enqueueAdditionalUris(Iterable<String> uris) async {
+    final songs = <SongsTableData>[];
+    for (final raw in uris) {
+      final song = await _resolveSongForUri(raw);
+      if (song != null) {
+        songs.add(song);
+      }
+    }
+    if (songs.isNotEmpty) {
+      await _playerCubit.addAllToQueue(songs);
     }
   }
 
@@ -255,146 +296,10 @@ class FileIntentHandler {
         return;
       }
 
-      String cleanPath;
-      try {
-        cleanPath = Uri.decodeFull(uriOrPath);
-      } catch (_) {
-        cleanPath = uriOrPath;
-      }
-      if (cleanPath.startsWith('file://')) {
-        try {
-          final parsed = Uri.parse(cleanPath);
-          if (parsed.scheme == 'file' && parsed.path.isNotEmpty) {
-            cleanPath = parsed.path;
-          } else {
-            cleanPath = cleanPath.replaceFirst('file://', '');
-          }
-        } catch (_) {
-          cleanPath = cleanPath.replaceFirst('file://', '');
-        }
-      }
+      final song = await _resolveSongForUri(uriOrPath, showUnsupportedToast: true);
+      if (song == null) return;
 
-      // 2. Determine whether this is a proxy/text payload (only relevant when
-      // it isn't a recognized audio file).
-      final isTextExt = cleanPath.toLowerCase().endsWith('.txt') ||
-          cleanPath.toLowerCase().endsWith('.list') ||
-          cleanPath.toLowerCase().endsWith('.conf') ||
-          cleanPath.toLowerCase().endsWith('.csv');
-      // Android's VIEW/SEND intent filters only route audio/* content:// URIs
-      // here, and such URIs frequently carry no file extension in their last
-      // path segment. Treat an extension-less (non-text) content URI as audio
-      // instead of rejecting it as "format not supported".
-      final isContentUri = uriOrPath.startsWith('content://');
-
-      // 1. Check if it's a PLAYABLE audio file FIRST (fast-path)
-      if (AudioFormats.isSupportedExtension(cleanPath) ||
-          (isContentUri && !isTextExt)) {
-        // Proceed directly to audio handling below
-      } else {
-        if (isTextExt) {
-          try {
-            final file = File(cleanPath);
-            if (await file.exists()) {
-              final content = await file.readAsString();
-              final proxies = ProxyEntry.parseList(content);
-              if (proxies.isNotEmpty) {
-                final navCtx = rootNavigatorKey.currentContext;
-                if (navCtx != null && navCtx.mounted) {
-                  navCtx.push('/proxy-settings', extra: content);
-                }
-                return;
-              }
-            }
-          } catch (_) {}
-        } else {
-          final parsedProxies = ProxyEntry.parseList(uriOrPath);
-          if (parsedProxies.isNotEmpty) {
-            final navCtx = rootNavigatorKey.currentContext;
-            if (navCtx != null && navCtx.mounted) {
-              navCtx.push('/proxy-settings', extra: uriOrPath);
-            }
-            return;
-          }
-        }
-
-        final context = rootNavigatorKey.currentContext;
-        if (context != null && context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(context.l10n.formatNotSupported),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-        return;
-      }
-
-      // 1. Fast indexed check if song already exists in library database (Issue #19)
-      final pathMatchRes = await _repository.getSongByPath(cleanPath);
-      var match = pathMatchRes.fold((l) => null, (r) => r);
-
-      if (match == null && uriOrPath != cleanPath) {
-        final uriMatchRes = await _repository.getSongByUri(uriOrPath);
-        match = uriMatchRes.fold((l) => null, (r) => r);
-      }
-
-      if (match != null) {
-        await _playerCubit.playSong(match);
-        final navCtx = rootNavigatorKey.currentContext;
-        if (navCtx != null && navCtx.mounted) {
-          navCtx.push('/now-playing');
-        }
-        return;
-      }
-
-      // 2. If not yet indexed in database, build standalone playable SongsTableData
-      // Use negative ID to guarantee zero collision with positive MediaStore database IDs
-      final isContentScheme = uriOrPath.startsWith('content://');
-      String title = L10nHolder.current?.fileIntentAudioFile ?? 'Audio File';
-      int? fileSize;
-
-      if (isContentScheme) {
-        final parsedUri = Uri.tryParse(uriOrPath);
-        final segment = parsedUri?.pathSegments.isNotEmpty == true
-            ? parsedUri!.pathSegments.last
-            : null;
-        if (segment != null && segment.isNotEmpty) {
-          final decoded = Uri.decodeComponent(segment);
-          title = p.withoutExtension(decoded);
-        }
-      } else {
-        final file = File(cleanPath);
-        final filename = file.uri.pathSegments.isNotEmpty
-            ? file.uri.pathSegments.last
-            : 'Audio File';
-        title = p.withoutExtension(filename);
-        try {
-          if (await file.exists()) {
-            fileSize = await file.length();
-          }
-        } catch (_) {}
-      }
-
-      final tempSong = SongsTableData(
-        id: _getNextTempId(),
-        title: title.isNotEmpty
-            ? title
-            : (L10nHolder.current?.fileIntentExternalAudio ?? 'External Audio'),
-        artist: L10nHolder.current?.fileIntentExternalAudio ?? 'External Audio',
-        album: L10nHolder.current?.fileIntentFilesAlbum ?? 'Files',
-        durationMs: 0,
-        path: cleanPath,
-        uri: uriOrPath,
-        source: SongSource.local,
-        fileSize: fileSize,
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-      );
-
-      await _playerCubit.playSong(tempSong);
+      await _playerCubit.playSong(song);
       final navCtx = rootNavigatorKey.currentContext;
       if (navCtx != null && navCtx.mounted) {
         navCtx.push('/now-playing');
@@ -412,5 +317,134 @@ class FileIntentHandler {
       ErrorLogger.log('Failed to handle external audio URI: $uriOrPath',
           error: e, stackTrace: st, category: 'FileIntentHandler');
     }
+  }
+
+  Future<SongsTableData?> _resolveSongForUri(
+    String uriOrPath, {
+    bool showUnsupportedToast = false,
+  }) async {
+    String cleanPath;
+    try {
+      cleanPath = Uri.decodeFull(uriOrPath);
+    } catch (_) {
+      cleanPath = uriOrPath;
+    }
+    if (cleanPath.startsWith('file://')) {
+      try {
+        final parsed = Uri.parse(cleanPath);
+        if (parsed.scheme == 'file' && parsed.path.isNotEmpty) {
+          cleanPath = parsed.path;
+        } else {
+          cleanPath = cleanPath.replaceFirst('file://', '');
+        }
+      } catch (_) {
+        cleanPath = cleanPath.replaceFirst('file://', '');
+      }
+    }
+
+    // Determine whether this is a proxy/text payload (only relevant when it
+    // isn't a recognized audio file).
+    final isTextExt = cleanPath.toLowerCase().endsWith('.txt') ||
+        cleanPath.toLowerCase().endsWith('.list') ||
+        cleanPath.toLowerCase().endsWith('.conf') ||
+        cleanPath.toLowerCase().endsWith('.csv');
+    final isContentUri = uriOrPath.startsWith('content://');
+
+    if (!(AudioFormats.isSupportedExtension(cleanPath) ||
+        (isContentUri && !isTextExt))) {
+      if (showUnsupportedToast) {
+        if (isTextExt) {
+          try {
+            final file = File(cleanPath);
+            if (await file.exists()) {
+              final content = await file.readAsString();
+              final proxies = ProxyEntry.parseList(content);
+              if (proxies.isNotEmpty) {
+                final navCtx = rootNavigatorKey.currentContext;
+                if (navCtx != null && navCtx.mounted) {
+                  navCtx.push('/proxy-settings', extra: content);
+                }
+                return null;
+              }
+            }
+          } catch (_) {}
+        } else {
+          final parsedProxies = ProxyEntry.parseList(uriOrPath);
+          if (parsedProxies.isNotEmpty) {
+            final navCtx = rootNavigatorKey.currentContext;
+            if (navCtx != null && navCtx.mounted) {
+              navCtx.push('/proxy-settings', extra: uriOrPath);
+            }
+            return null;
+          }
+        }
+
+        final context = rootNavigatorKey.currentContext;
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(context.l10n.formatNotSupported),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+      return null;
+    }
+
+    final pathMatchRes = await _repository.getSongByPath(cleanPath);
+    var match = pathMatchRes.fold((l) => null, (r) => r);
+
+    if (match == null && uriOrPath != cleanPath) {
+      final uriMatchRes = await _repository.getSongByUri(uriOrPath);
+      match = uriMatchRes.fold((l) => null, (r) => r);
+    }
+
+    if (match != null) return match;
+
+    final isContentScheme = uriOrPath.startsWith('content://');
+    String title = L10nHolder.current?.fileIntentAudioFile ?? 'Audio File';
+    int? fileSize;
+
+    if (isContentScheme) {
+      final parsedUri = Uri.tryParse(uriOrPath);
+      final segment = parsedUri?.pathSegments.isNotEmpty == true
+          ? parsedUri!.pathSegments.last
+          : null;
+      if (segment != null && segment.isNotEmpty) {
+        final decoded = Uri.decodeComponent(segment);
+        title = p.withoutExtension(decoded);
+      }
+    } else {
+      final file = File(cleanPath);
+      final filename = file.uri.pathSegments.isNotEmpty
+          ? file.uri.pathSegments.last
+          : 'Audio File';
+      title = p.withoutExtension(filename);
+      try {
+        if (await file.exists()) {
+          fileSize = await file.length();
+        }
+      } catch (_) {}
+    }
+
+    return SongsTableData(
+      id: _getNextTempId(),
+      title: title.isNotEmpty
+          ? title
+          : (L10nHolder.current?.fileIntentExternalAudio ?? 'External Audio'),
+      artist: L10nHolder.current?.fileIntentExternalAudio ?? 'External Audio',
+      album: L10nHolder.current?.fileIntentFilesAlbum ?? 'Files',
+      durationMs: 0,
+      path: cleanPath,
+      uri: uriOrPath,
+      source: SongSource.local,
+      fileSize: fileSize,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
+    );
   }
 }

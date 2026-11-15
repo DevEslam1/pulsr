@@ -9159,6 +9159,42 @@ class AppLocalizationsAr extends AppLocalizations {
       'تمت استعادة بطاقات الراديو في الشاشة الرئيسية';
 
   @override
+  String get pinRadioCardToFirst => 'تثبيت في المقدمة';
+
+  @override
+  String get pinRadioCardToFirstSubtitle => 'إبقاء هذه الإذاعة في أول بطاقة';
+
+  @override
+  String get unpinRadioCard => 'إلغاء التثبيت';
+
+  @override
+  String get unpinRadioCardSubtitle => 'إرجاع هذه الإذاعة لترتيبها الطبيعي';
+
+  @override
+  String get radioCardPinnedToast => 'تم تثبيت الإذاعة في المقدمة';
+
+  @override
+  String get radioCardUnpinnedToast => 'تم إلغاء تثبيت الإذاعة';
+
+  @override
+  String get sortRadioCardsTitle => 'ترتيب البطاقات';
+
+  @override
+  String get sortRadioCardsDefault => 'الافتراضي';
+
+  @override
+  String get sortRadioCardsAlphabetical => 'أبجدي';
+
+  @override
+  String get sortRadioCardsRecent => 'الأحدث تشغيلًا';
+
+  @override
+  String get resetRadioCardOrder => 'إعادة ضبط';
+
+  @override
+  String get radioCardOrderResetToast => 'تمت إعادة ترتيب البطاقات للافتراضي';
+
+  @override
   String get radioShowAction => 'إظهار';
 
   @override

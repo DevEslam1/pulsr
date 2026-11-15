@@ -16309,6 +16309,78 @@ abstract class AppLocalizations {
   /// **'Radio cards restored to Home screen'**
   String get radioCardsRestoredToast;
 
+  /// Action to pin the selected radio card to the first carousel position
+  ///
+  /// In en, this message translates to:
+  /// **'Pin to First'**
+  String get pinRadioCardToFirst;
+
+  /// Subtitle explaining pinning a radio card first
+  ///
+  /// In en, this message translates to:
+  /// **'Keep this station at the front of the carousel'**
+  String get pinRadioCardToFirstSubtitle;
+
+  /// Action to unpin a pinned radio card
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get unpinRadioCard;
+
+  /// Subtitle explaining unpinning a radio card
+  ///
+  /// In en, this message translates to:
+  /// **'Return this station to its sorted position'**
+  String get unpinRadioCardSubtitle;
+
+  /// Toast shown when a radio card is pinned first
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned to first position'**
+  String get radioCardPinnedToast;
+
+  /// Toast shown when a radio card is unpinned
+  ///
+  /// In en, this message translates to:
+  /// **'Station unpinned'**
+  String get radioCardUnpinnedToast;
+
+  /// Section title for radio card sorting options
+  ///
+  /// In en, this message translates to:
+  /// **'Sort Order'**
+  String get sortRadioCardsTitle;
+
+  /// Curated default radio card order
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get sortRadioCardsDefault;
+
+  /// Alphabetical radio card sort order
+  ///
+  /// In en, this message translates to:
+  /// **'A–Z'**
+  String get sortRadioCardsAlphabetical;
+
+  /// Recently played radio card sort order
+  ///
+  /// In en, this message translates to:
+  /// **'Recent'**
+  String get sortRadioCardsRecent;
+
+  /// Action to reset pinned cards and sort order
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get resetRadioCardOrder;
+
+  /// Toast shown after resetting radio card order
+  ///
+  /// In en, this message translates to:
+  /// **'Radio card order reset to default'**
+  String get radioCardOrderResetToast;
+
   /// Button that restores the hidden radio cards
   ///
   /// In en, this message translates to:

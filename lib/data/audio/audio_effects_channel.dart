@@ -1659,6 +1659,8 @@ class AudioEffectsChannel {
 
   // --- DSD DECODING ---
 
+  static int _nextDsdStreamId = 1;
+
   Future<List<double>?> decodeDsd(
     Uint8List dsdL,
     Uint8List dsdR, {
@@ -1668,12 +1670,15 @@ class AudioEffectsChannel {
     // (the native decodeDsd contract maps 0 -> LSB_FIRST). DSF, the common
     // format, is LSB-first, so the default 0 is correct.
     int bitOrder = 0,
+    int? streamId,
+    bool resetState = false,
   }) async {
     if (!_isAndroid) return null;
     try {
       final int totalBytes = dsdL.length;
       if (totalBytes != dsdR.length) return null;
       if (totalBytes == 0) return <double>[];
+      final int effectiveStreamId = streamId ?? (_nextDsdStreamId++);
 
       const int maxChunkBytes =
           64 * 1024; // 64 KB chunking prevents UI thread stalls
@@ -1685,6 +1690,8 @@ class AudioEffectsChannel {
           'dsdRate': dsdRate,
           'targetSampleRate': targetSampleRate,
           'bitOrder': bitOrder,
+          'streamId': effectiveStreamId,
+          'resetState': streamId == null || resetState,
         }).timeout(const Duration(seconds: 10));
         if (res is Float32List) return res;
         if (res is List) {
@@ -1714,6 +1721,8 @@ class AudioEffectsChannel {
           'dsdRate': dsdRate,
           'targetSampleRate': targetSampleRate,
           'bitOrder': bitOrder,
+          'streamId': effectiveStreamId,
+          'resetState': offset == 0 ? (streamId == null || resetState) : false,
         }).timeout(const Duration(seconds: 10));
 
         if (res is Float32List) {

@@ -281,7 +281,7 @@ void LiveProg::reset() {
         memory_[idxSrate_] = sampleRate_;
     }
     if (!initBytecode_.empty()) {
-        executeBytecode(initBytecode_, memory_);
+        executeBytecode(initBytecode_, memory_, MAX_BYTECODE * 4);
     }
 }
 
@@ -448,7 +448,7 @@ void LiveProg::applyPreparedProgram(const std::shared_ptr<const LiveProgProgram>
         }
     }
     if (!initBytecode_.empty()) {
-        executeBytecode(initBytecode_, memory_);
+        executeBytecode(initBytecode_, memory_, MAX_BYTECODE * 4);
     }
 }
 
@@ -830,13 +830,13 @@ bool LiveProg::compileScript(const std::string& code) {
     return true;
 }
 
-void LiveProg::executeBytecode(const std::vector<Instruction>& program, std::vector<double>& memory) {
+void LiveProg::executeBytecode(const std::vector<Instruction>& program, std::vector<double>& memory, int maxFuel) {
     double stack[128];
     int sp = 0;
 
     int pc = 0;
     const int len = static_cast<int>(program.size());
-    int fuel = MAX_BYTECODE * 4;
+    int fuel = maxFuel;
 
     while (pc < len && --fuel >= 0) {
         const auto& instr = program[pc++];
@@ -979,7 +979,7 @@ void LiveProg::process(float* L, float* R, int frames) {
 
         memory_[idxSpl0_] = static_cast<double>(inL);
         memory_[idxSpl1_] = static_cast<double>(inR);
-        executeBytecode(sampleBytecode_, memory_);
+        executeBytecode(sampleBytecode_, memory_, MAX_SAMPLE_FUEL);
 
         double curL = memory_[idxSpl0_];
         double curR = memory_[idxSpl1_];
@@ -991,7 +991,7 @@ void LiveProg::process(float* L, float* R, int frames) {
         if (canRunPrev) {
             prevMemory_[prevIdxSpl0_] = static_cast<double>(inL);
             prevMemory_[prevIdxSpl1_] = static_cast<double>(inR);
-            executeBytecode(prevSampleBytecode_, prevMemory_);
+            executeBytecode(prevSampleBytecode_, prevMemory_, MAX_SAMPLE_FUEL);
 
             double oldL = prevMemory_[prevIdxSpl0_];
             double oldR = prevMemory_[prevIdxSpl1_];
@@ -1067,7 +1067,7 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
 
         memory_[idxSpl0_] = static_cast<double>(inL);
         memory_[idxSpl1_] = static_cast<double>(inR);
-        executeBytecode(sampleBytecode_, memory_);
+        executeBytecode(sampleBytecode_, memory_, MAX_SAMPLE_FUEL);
 
         double curL = memory_[idxSpl0_];
         double curR = memory_[idxSpl1_];
@@ -1079,7 +1079,7 @@ void LiveProg::processInterleaved(float* buffer, int frames, int channels) {
         if (canRunPrev) {
             prevMemory_[prevIdxSpl0_] = static_cast<double>(inL);
             prevMemory_[prevIdxSpl1_] = static_cast<double>(inR);
-            executeBytecode(prevSampleBytecode_, prevMemory_);
+            executeBytecode(prevSampleBytecode_, prevMemory_, MAX_SAMPLE_FUEL);
 
             double oldL = prevMemory_[prevIdxSpl0_];
             double oldR = prevMemory_[prevIdxSpl1_];

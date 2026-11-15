@@ -402,9 +402,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           applied = res.isOk;
           _lastDirectUsbFailure = applied ? null : res.toUserMessage();
         } else {
+          final targetDepth = sourceDepth > 0 ? sourceDepth : bitDepth;
           applied =
               await _hiResAudioService.setTargetOutputFormat(
-                  sampleRate: sampleRate, bitDepth: bitDepth);
+                  sampleRate: sampleRate, bitDepth: targetDepth);
         }
         if (applied) {
           _lastDirectUsbFailure = null;
@@ -418,7 +419,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           return true;
         }
         final detail = _lastDirectUsbFailure;
-        final message = 'This output refused $sampleRate Hz / $bitDepth-bit'
+        final reportedDepth = sourceDepth > 0 ? sourceDepth : bitDepth;
+        final message = 'This output refused $sampleRate Hz / $reportedDepth-bit'
             '${detail == null ? '' : ': $detail'}';
         if (state.strictBitPerfect) {
           // Strict promised this track unchanged; the same rule for direct and
@@ -643,15 +645,40 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // Transport reconciliation is performed by _pushBitPerfectBypass on every
     // transition, including strict and bypass changes; saved choices survive.
     await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
+    bool? restoredBypass;
+    bool? restoredFollowRate;
     if (!enabled) {
       markDirty('strictBitPerfect');
       await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+      if (state.strictBitPerfect) {
+        final preBypass = _preStrictBypass ??
+            (prefs.containsKey(PrefsKeys.preStrictBypass)
+                ? prefs.getBool(PrefsKeys.preStrictBypass)
+                : null);
+        final preFollow = _preStrictFollowRate ??
+            (prefs.containsKey(PrefsKeys.preStrictFollowRate)
+                ? prefs.getBool(PrefsKeys.preStrictFollowRate)
+                : null);
+        _preStrictBypass = null;
+        _preStrictFollowRate = null;
+        await prefs.remove(PrefsKeys.preStrictBypass);
+        await prefs.remove(PrefsKeys.preStrictFollowRate);
+        if (preBypass != null && preFollow != null) {
+          restoredBypass = preBypass;
+          restoredFollowRate = preFollow;
+          await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, preBypass);
+          await prefs.setBool(PrefsKeys.followTrackSampleRate, preFollow);
+        }
+      }
     }
     if (!isClosed) {
       safeEmit(
         state.copyWith(
           bitPerfectOutput: enabled,
           strictBitPerfect: enabled && state.strictBitPerfect,
+          bypassDspOnBitPerfect: restoredBypass ?? state.bypassDspOnBitPerfect,
+          followTrackSampleRate:
+              restoredFollowRate ?? state.followTrackSampleRate,
           errorMessage: null,
         ),
       );
@@ -661,6 +688,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     // Wire bypass: when bit-perfect enabled and user wants bypass, force DSP off via native
     if (enabled && state.bypassDspOnBitPerfect) {
+      if (state.dvcEnabled) await setDvcEnabled(false);
       // Also force ReplayGain off — software gain breaks bit-perfect
       if (state.replayGainMode != ReplayGainMode.off) {
         await prefs.setString(
@@ -700,6 +728,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(bypassDspOnBitPerfect: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, enabled);
+    if (enabled && state.bitPerfectOutput && state.dvcEnabled) {
+      await setDvcEnabled(false);
+    }
     await refreshOutputDevice();
   }
 
@@ -948,6 +979,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     }
     // Software gain would alter the bitstream; turn it off like the normal
     // Bit-Perfect path does.
+    if (state.dvcEnabled) await setDvcEnabled(false);
     if (state.replayGainMode != ReplayGainMode.off) {
       await prefs.setString(
           SettingsCubit._keyReplayGainMode, ReplayGainMode.off.name);
