@@ -4,6 +4,7 @@
 // line rendering and tap-to-seek, pitch/font/practice controls, the tap-rhythm
 // score, lifecycle chrome and the landscape layout.
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -45,6 +46,7 @@ void main() {
     Duration position = const Duration(seconds: 5),
     Duration duration = const Duration(minutes: 3),
     bool isPlaying = true,
+    double playbackPitch = 1.0,
   }) {
     return PlayerState(
       playback: PlaybackSlice(
@@ -52,6 +54,7 @@ void main() {
         isPlaying: isPlaying,
         position: position,
         duration: duration,
+        playbackPitch: playbackPitch,
       ),
       queueSlice: const QueueSlice(
         queue: [testSong, testSong],
@@ -247,5 +250,31 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'P2-14 initializes _pitchSemitones from entry playbackPitch and steps from it',
+      (tester) async {
+    final entryPitch = math.pow(2.0, 2 / 12.0).toDouble();
+    final cubit = stubTransport(
+      stateWith(lines: lyrics, playbackPitch: entryPitch),
+    );
+    await pumpKaraoke(tester, cubit);
+
+    expect(find.text('+2 st'), findsOneWidget);
+
+    final upBtn = tester.widget<IconButton>(
+      find.widgetWithIcon(IconButton, Icons.add_circle_outline_rounded),
+    );
+    upBtn.onPressed!();
+    await tester.pump();
+
+    expect(find.text('+3 st'), findsOneWidget);
+    final captured =
+        verify(() => cubit.setPlaybackPitch(captureAny())).captured;
+    expect(
+      captured.single as double,
+      closeTo(math.pow(2.0, 3 / 12.0).toDouble(), 1e-6),
+    );
   });
 }

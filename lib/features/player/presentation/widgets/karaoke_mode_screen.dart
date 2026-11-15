@@ -20,6 +20,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/error_logger.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 class KaraokeModeScreen extends StatefulWidget {
   const KaraokeModeScreen({super.key});
 
@@ -74,7 +75,17 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     super.didChangeDependencies();
     try {
       _playerCubit ??= context.read<PlayerCubit>();
-      _initialPitch ??= _playerCubit!.state.playbackPitch;
+      if (_initialPitch == null) {
+        final entryPitch = _playerCubit!.state.playbackPitch;
+        _initialPitch = entryPitch;
+        // AUDIT-FIX (P2-14): Derive initial semitone offset from the live entry
+        // pitch so +/- steps increment from the actual pitch instead of 0 st.
+        if (entryPitch > 0) {
+          _pitchSemitones = (12.0 * (math.log(entryPitch) / math.ln2))
+              .round()
+              .clamp(_minPitchSemitones, _maxPitchSemitones);
+        }
+      }
     } catch (e, st) {
       ErrorLogger.log('Karaoke pitch state unavailable',
           error: e, stackTrace: st, category: 'Karaoke');
