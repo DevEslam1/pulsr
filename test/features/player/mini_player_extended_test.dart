@@ -1,4 +1,5 @@
 // test/features/player/mini_player_extended_test.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -149,5 +150,89 @@ void main() {
     await tester.tap(find.byIcon(Icons.skip_next_rounded));
     await tester.pump();
     verify(() => cubit.next()).called(1);
+  });
+
+  testWidgets(
+      'P3-28: optimistic seek clears via BlocListener cleanly without mutating during build',
+      (tester) async {
+    final controller = StreamController<PlayerState>.broadcast();
+    addTearDown(controller.close);
+    var current = playingState();
+    final cubit = stubTransport();
+    when(() => cubit.state).thenAnswer((_) => current);
+    when(() => cubit.stream).thenAnswer((_) => controller.stream);
+
+    await tester.pumpWidget(sheetHost(
+      playerCubit: cubit,
+      settingsCubit: stubSettingsCubit(),
+      child: MiniPlayer(onTap: () {}),
+    ));
+    await tester.pumpAndSettle();
+
+    final progressFinder = find.byWidgetPredicate(
+      (w) => w.runtimeType.toString() == '_MiniPlayerProgressBar',
+    );
+    expect(progressFinder, findsOneWidget);
+
+    final handle = tester.ensureSemantics();
+    try {
+      // Tap center (~90s out of 180s) to record an optimistic seek target.
+      await tester.tapAt(tester.getCenter(progressFinder));
+      await tester.pump();
+      verify(() => cubit.seek(any())).called(1);
+
+      // A slightly stale tick inside 350ms keeps displaying the optimistic ~1:30.
+      current = current.copyWith(
+        playback:
+            current.playback.copyWith(position: const Duration(seconds: 31)),
+      );
+      controller.add(current);
+      await tester.pump();
+      await tester.pump();
+      final seekSemantics = find.ancestor(
+        of: progressFinder,
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.slider == true,
+        ),
+      );
+      final duringHold = find.descendant(
+        of: progressFinder,
+        matching: find.byWidgetPredicate(
+          (w) => w is Semantics && w.properties.slider == true,
+        ),
+      );
+      final semanticsFinder =
+          seekSemantics.evaluate().isNotEmpty ? seekSemantics : duringHold;
+      expect(semanticsFinder, findsOneWidget);
+      expect(
+        tester.getSemantics(semanticsFinder.first).value,
+        startsWith('1:30 / 3:00'),
+      );
+
+      // Engine catches up to ~90s -> BlocListener clears optimistic hold cleanly.
+      current = current.copyWith(
+        playback:
+            current.playback.copyWith(position: const Duration(seconds: 90)),
+      );
+      controller.add(current);
+      await tester.pump();
+      await tester.pump();
+
+      // Next tick advances normally rather than snapping back to an uncleared hold.
+      current = current.copyWith(
+        playback:
+            current.playback.copyWith(position: const Duration(seconds: 95)),
+      );
+      controller.add(current);
+      await tester.pump();
+      await tester.pump();
+      expect(
+        tester.getSemantics(semanticsFinder.first).value,
+        startsWith('1:35 / 3:00'),
+      );
+      expect(tester.takeException(), isNull);
+    } finally {
+      handle.dispose();
+    }
   });
 }

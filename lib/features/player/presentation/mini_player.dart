@@ -97,9 +97,7 @@ class MiniPlayerState extends State<MiniPlayer> {
       case MiniPlayerSwipeAction.prev:
         return Icons.skip_previous_rounded;
       case MiniPlayerSwipeAction.volume:
-        return swipedLeft
-            ? Icons.volume_down_rounded
-            : Icons.volume_up_rounded;
+        return swipedLeft ? Icons.volume_down_rounded : Icons.volume_up_rounded;
       case MiniPlayerSwipeAction.none:
         return null;
     }
@@ -570,8 +568,8 @@ class MiniPlayerState extends State<MiniPlayer> {
                           offset: const Offset(0, 8),
                         ),
                         BoxShadow(
-                          color: activeAccent
-                              .withValues(alpha: p.isDark ? 0.08 : 0.04),
+                          color: activeAccent.withValues(
+                              alpha: p.isDark ? 0.08 : 0.04),
                           blurRadius: 16,
                           spreadRadius: -4,
                           offset: const Offset(0, 4),
@@ -630,8 +628,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Padding(
-                                  padding:
-                                      const EdgeInsetsDirectional.fromSTEB(
+                                  padding: const EdgeInsetsDirectional.fromSTEB(
                                     AppSpacing.s10,
                                     AppSpacing.s6,
                                     AppSpacing.xxs,
@@ -728,8 +725,8 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                   borderRadius:
                                                                       AppRadii
                                                                           .r12All,
-                                                                  border:
-                                                                      Border.all(
+                                                                  border: Border
+                                                                      .all(
                                                                     color: p
                                                                         .hairline,
                                                                     width: 0.75,
@@ -793,8 +790,9 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                     borderRadius:
                                                                         AppRadii
                                                                             .r4All,
-                                                                    border: Border
-                                                                        .all(
+                                                                    border:
+                                                                        Border
+                                                                            .all(
                                                                       color: Colors
                                                                           .white
                                                                           .withValues(
@@ -830,9 +828,10 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                 offset: Offset(
                                                                   _horizontalDragDx !=
                                                                           0.0
-                                                                      ? math.pow(_horizontalDragDx.abs(), 0.78) *
-                                                                          _horizontalDragDx
-                                                                              .sign
+                                                                      ? math.pow(
+                                                                              _horizontalDragDx.abs(),
+                                                                              0.78) *
+                                                                          _horizontalDragDx.sign
                                                                       : 0.0,
                                                                   0,
                                                                 ),
@@ -966,8 +965,7 @@ class MiniPlayerState extends State<MiniPlayer> {
                                         child: IconButton(
                                           padding: EdgeInsets.zero,
                                           constraints: const BoxConstraints(
-                                            minWidth:
-                                                AppSpacing.minTouchTarget,
+                                            minWidth: AppSpacing.minTouchTarget,
                                             minHeight:
                                                 AppSpacing.minTouchTarget,
                                           ),
@@ -1261,6 +1259,10 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
         oldWidget.isBuffering != widget.isBuffering) {
       _syncWave();
     }
+    if (_optimisticSeekPosition != null &&
+        _optimisticClock.elapsed.inMilliseconds >= 350) {
+      _clearOptimisticSeek();
+    }
   }
 
   @override
@@ -1279,250 +1281,267 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
     widget.onSeek(target);
   }
 
-  Duration _resolveEffectivePosition(Duration enginePosition) {
-    if (_optimisticSeekPosition != null && _optimisticSeekTime != null) {
-      final elapsed = _optimisticClock.elapsed;
-      final diff = (enginePosition - _optimisticSeekPosition!).abs();
-      if (elapsed.inMilliseconds < 350 && diff.inMilliseconds > 400) {
-        return _optimisticSeekPosition!;
-      } else {
-        _optimisticSeekPosition = null;
-        _optimisticSeekTime = null;
-        _optimisticClock.stop();
-      }
-    }
-    return enginePosition;
+  void _clearOptimisticSeek() {
+    _optimisticSeekPosition = null;
+    _optimisticSeekTime = null;
+    _optimisticClock.stop();
   }
+
+  bool _shouldHoldOptimisticSeek(Duration enginePosition) {
+    final target = _optimisticSeekPosition;
+    if (target == null || _optimisticSeekTime == null) return false;
+    final elapsed = _optimisticClock.elapsed;
+    final diff = (enginePosition - target).abs();
+    return elapsed.inMilliseconds < 350 && diff.inMilliseconds > 400;
+  }
+
+  // AUDIT-FIX (P3-28): Keep build pure — never mutate _optimistic* fields inside
+  // _resolveEffectivePosition; clear via BlocListener or didUpdateWidget instead.
+  Duration _resolveEffectivePosition(Duration enginePosition) =>
+      _shouldHoldOptimisticSeek(enginePosition)
+          ? _optimisticSeekPosition!
+          : enginePosition;
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return RepaintBoundary(
-      child: Directionality(
-        textDirection: Directionality.of(context),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final trackWidth = constraints.maxWidth;
-            return BlocSelector<PlayerCubit, PlayerState, Duration>(
-              selector: (s) => s.position,
-              builder: (context, rawPosition) {
-                final position = _resolveEffectivePosition(rawPosition);
-                final progress = _dragProgress ??
-                    (widget.duration.inMilliseconds > 0
-                        ? (position.inMilliseconds /
-                                widget.duration.inMilliseconds)
-                            .clamp(0.0, 1.0)
-                        : 0.0);
-                final currentDuration = _dragProgress != null
-                    ? Duration(
-                        milliseconds:
-                            (widget.duration.inMilliseconds * _dragProgress!)
-                                .round())
-                    : position;
-                final valueLabel =
-                    '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
+    return BlocListener<PlayerCubit, PlayerState>(
+      listenWhen: (prev, curr) =>
+          _optimisticSeekPosition != null &&
+          (prev.position != curr.position ||
+              prev.currentSong?.id != curr.currentSong?.id),
+      listener: (context, state) {
+        if (!_shouldHoldOptimisticSeek(state.position)) {
+          _clearOptimisticSeek();
+        }
+      },
+      child: RepaintBoundary(
+        child: Directionality(
+          textDirection: Directionality.of(context),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final trackWidth = constraints.maxWidth;
+              return BlocSelector<PlayerCubit, PlayerState, Duration>(
+                selector: (s) => s.position,
+                builder: (context, rawPosition) {
+                  final position = _resolveEffectivePosition(rawPosition);
+                  final progress = _dragProgress ??
+                      (widget.duration.inMilliseconds > 0
+                          ? (position.inMilliseconds /
+                                  widget.duration.inMilliseconds)
+                              .clamp(0.0, 1.0)
+                          : 0.0);
+                  final currentDuration = _dragProgress != null
+                      ? Duration(
+                          milliseconds:
+                              (widget.duration.inMilliseconds * _dragProgress!)
+                                  .round())
+                      : position;
+                  final valueLabel =
+                      '${Formatters.formatDuration(currentDuration)} / ${Formatters.formatDuration(widget.duration)}';
 
-                Duration clampDuration(Duration d) {
-                  if (d < Duration.zero) return Duration.zero;
-                  if (d > widget.duration) return widget.duration;
-                  return d;
-                }
+                  Duration clampDuration(Duration d) {
+                    if (d < Duration.zero) return Duration.zero;
+                    if (d > widget.duration) return widget.duration;
+                    return d;
+                  }
 
-                String labelFor(Duration d) =>
-                    '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
-                final increasedLabel = labelFor(clampDuration(
-                    currentDuration + const Duration(seconds: 10)));
-                final decreasedLabel = labelFor(clampDuration(
-                    currentDuration - const Duration(seconds: 10)));
+                  String labelFor(Duration d) =>
+                      '${Formatters.formatDuration(d)} / ${Formatters.formatDuration(widget.duration)}';
+                  final increasedLabel = labelFor(clampDuration(
+                      currentDuration + const Duration(seconds: 10)));
+                  final decreasedLabel = labelFor(clampDuration(
+                      currentDuration - const Duration(seconds: 10)));
 
-                final isDragging = _dragProgress != null;
-                final thumbAlignX = (progress * 2 - 1).clamp(-0.94, 0.94);
+                  final isDragging = _dragProgress != null;
+                  final thumbAlignX = (progress * 2 - 1).clamp(-0.94, 0.94);
 
-                return Semantics(
-                  slider: true,
-                  label: context.l10n.seekLabel,
-                  value: valueLabel,
-                  increasedValue: increasedLabel,
-                  decreasedValue: decreasedLabel,
-                  onIncrease: widget.isBuffering
-                      ? null
-                      : () => _recordSeek(clampDuration(
-                          currentDuration + const Duration(seconds: 10))),
-                  onDecrease: widget.isBuffering
-                      ? null
-                      : () => _recordSeek(clampDuration(
-                          currentDuration - const Duration(seconds: 10))),
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTapUp: widget.isBuffering
+                  return Semantics(
+                    slider: true,
+                    label: context.l10n.seekLabel,
+                    value: valueLabel,
+                    increasedValue: increasedLabel,
+                    decreasedValue: decreasedLabel,
+                    onIncrease: widget.isBuffering
                         ? null
-                        : (details) {
-                            if (trackWidth > 0 &&
-                                widget.duration.inMilliseconds > 0) {
-                              PulsrHaptics.selectionClick();
-                              final ratio =
-                                  (details.localPosition.dx / trackWidth)
-                                      .clamp(0.0, 1.0);
+                        : () => _recordSeek(clampDuration(
+                            currentDuration + const Duration(seconds: 10))),
+                    onDecrease: widget.isBuffering
+                        ? null
+                        : () => _recordSeek(clampDuration(
+                            currentDuration - const Duration(seconds: 10))),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapUp: widget.isBuffering
+                          ? null
+                          : (details) {
+                              if (trackWidth > 0 &&
+                                  widget.duration.inMilliseconds > 0) {
+                                PulsrHaptics.selectionClick();
+                                final ratio =
+                                    (details.localPosition.dx / trackWidth)
+                                        .clamp(0.0, 1.0);
+                                setState(() => _dragProgress = null);
+                                final seekMs =
+                                    (widget.duration.inMilliseconds * ratio)
+                                        .round();
+                                _recordSeek(Duration(milliseconds: seekMs));
+                              }
+                            },
+                      onHorizontalDragStart: widget.isBuffering
+                          ? null
+                          : (details) {
+                              if (trackWidth > 0 &&
+                                  widget.duration.inMilliseconds > 0) {
+                                PulsrHaptics.selectionClick();
+                                final ratio =
+                                    (details.localPosition.dx / trackWidth)
+                                        .clamp(0.0, 1.0);
+                                setState(() => _dragProgress = ratio);
+                              }
+                            },
+                      onHorizontalDragUpdate: widget.isBuffering
+                          ? null
+                          : (details) {
+                              if (trackWidth > 0 &&
+                                  widget.duration.inMilliseconds > 0) {
+                                final ratio =
+                                    (details.localPosition.dx / trackWidth)
+                                        .clamp(0.0, 1.0);
+                                setState(() => _dragProgress = ratio);
+                              }
+                            },
+                      onHorizontalDragEnd: widget.isBuffering
+                          ? null
+                          : (_) {
+                              if (_dragProgress != null &&
+                                  widget.duration.inMilliseconds > 0) {
+                                final seekMs = (widget.duration.inMilliseconds *
+                                        _dragProgress!)
+                                    .round();
+                                _recordSeek(Duration(milliseconds: seekMs));
+                                setState(() => _dragProgress = null);
+                              }
+                            },
+                      onHorizontalDragCancel: widget.isBuffering
+                          ? null
+                          : () {
                               setState(() => _dragProgress = null);
-                              final seekMs =
-                                  (widget.duration.inMilliseconds * ratio)
-                                      .round();
-                              _recordSeek(Duration(milliseconds: seekMs));
-                            }
-                          },
-                    onHorizontalDragStart: widget.isBuffering
-                        ? null
-                        : (details) {
-                            if (trackWidth > 0 &&
-                                widget.duration.inMilliseconds > 0) {
-                              PulsrHaptics.selectionClick();
-                              final ratio =
-                                  (details.localPosition.dx / trackWidth)
-                                      .clamp(0.0, 1.0);
-                              setState(() => _dragProgress = ratio);
-                            }
-                          },
-                    onHorizontalDragUpdate: widget.isBuffering
-                        ? null
-                        : (details) {
-                            if (trackWidth > 0 &&
-                                widget.duration.inMilliseconds > 0) {
-                              final ratio =
-                                  (details.localPosition.dx / trackWidth)
-                                      .clamp(0.0, 1.0);
-                              setState(() => _dragProgress = ratio);
-                            }
-                          },
-                    onHorizontalDragEnd: widget.isBuffering
-                        ? null
-                        : (_) {
-                            if (_dragProgress != null &&
-                                widget.duration.inMilliseconds > 0) {
-                              final seekMs = (widget.duration.inMilliseconds *
-                                      _dragProgress!)
-                                  .round();
-                              _recordSeek(Duration(milliseconds: seekMs));
-                              setState(() => _dragProgress = null);
-                            }
-                          },
-                    onHorizontalDragCancel: widget.isBuffering
-                        ? null
-                        : () {
-                            setState(() => _dragProgress = null);
-                          },
-                    // Generous hit area so the thin wavy bar is easy to grab; the
-                    // wave amplitude stays small so the card never grows.
-                    child: SizedBox(
-                      height: AppSpacing.s24,
-                      width: double.infinity,
-                      child: AnimatedBuilder(
-                        animation: _waveController,
-                        builder: (context, _) => Stack(
-                          clipBehavior: Clip.none,
-                          alignment: AlignmentDirectional.centerStart,
-                          children: [
-                            Positioned.fill(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.s10),
-                                child: RepaintBoundary(
-                                  child: CustomPaint(
-                                    painter: _MiniProgressWavePainter(
-                                      progress: progress,
-                                      phase:
-                                          _waveController.value * 2 * math.pi,
-                                      activeColor: widget.activeAccent,
-                                      inactiveColor: widget.hairlineColor,
-                                      isPlaying: widget.isPlaying,
-                                      isDragging: isDragging,
+                            },
+                      // Generous hit area so the thin wavy bar is easy to grab; the
+                      // wave amplitude stays small so the card never grows.
+                      child: SizedBox(
+                        height: AppSpacing.s24,
+                        width: double.infinity,
+                        child: AnimatedBuilder(
+                          animation: _waveController,
+                          builder: (context, _) => Stack(
+                            clipBehavior: Clip.none,
+                            alignment: AlignmentDirectional.centerStart,
+                            children: [
+                              Positioned.fill(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.s10),
+                                  child: RepaintBoundary(
+                                    child: CustomPaint(
+                                      painter: _MiniProgressWavePainter(
+                                        progress: progress,
+                                        phase:
+                                            _waveController.value * 2 * math.pi,
+                                        activeColor: widget.activeAccent,
+                                        inactiveColor: widget.hairlineColor,
+                                        isPlaying: widget.isPlaying,
+                                        isDragging: isDragging,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                            // Scrub thumb & floating time readout while dragging
-                            if (isDragging) ...[
-                              PositionedDirectional(
-                                top: -24,
-                                start: 12,
-                                end: 12,
-                                child: Align(
-                                  alignment: Alignment(
-                                      thumbAlignX.clamp(-0.85, 0.85), 0),
-                                  child: IgnorePointer(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 7,
-                                        vertical: 2.5,
+                              // Scrub thumb & floating time readout while dragging
+                              if (isDragging) ...[
+                                PositionedDirectional(
+                                  top: -24,
+                                  start: 12,
+                                  end: 12,
+                                  child: Align(
+                                    alignment: Alignment(
+                                        thumbAlignX.clamp(-0.85, 0.85), 0),
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 7,
+                                          vertical: 2.5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: p.surfaceContainerHigh,
+                                          borderRadius: AppRadii.r8All,
+                                          border: Border.all(
+                                            color: widget.activeAccent
+                                                .withValues(alpha: 0.45),
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black
+                                                  .withValues(alpha: 0.25),
+                                              blurRadius: 6,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Text(
+                                          valueLabel,
+                                          style: TextStyle(
+                                            color: p.textPrimary,
+                                            fontSize: AppFontSize.tiny,
+                                            fontWeight: FontWeight.w700,
+                                            fontFeatures: const [
+                                              FontFeature.tabularFigures()
+                                            ],
+                                          ),
+                                        ),
                                       ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.s10),
+                                  child: Align(
+                                    alignment: Alignment(thumbAlignX, 0),
+                                    child: Container(
+                                      width: 11,
+                                      height: 11,
                                       decoration: BoxDecoration(
-                                        color: p.surfaceContainerHigh,
-                                        borderRadius: AppRadii.r8All,
+                                        color: widget.activeAccent,
+                                        shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: widget.activeAccent
-                                              .withValues(alpha: 0.45),
+                                          color: Colors.white
+                                              .withValues(alpha: 0.85),
+                                          width: 1.5,
                                         ),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black
-                                                .withValues(alpha: 0.25),
-                                            blurRadius: 6,
-                                            offset: const Offset(0, 2),
+                                            color: widget.activeAccent
+                                                .withValues(alpha: 0.55),
+                                            blurRadius: 8,
                                           ),
                                         ],
                                       ),
-                                      child: Text(
-                                        valueLabel,
-                                        style: TextStyle(
-                                          color: p.textPrimary,
-                                          fontSize: AppFontSize.tiny,
-                                          fontWeight: FontWeight.w700,
-                                          fontFeatures: const [
-                                            FontFeature.tabularFigures()
-                                          ],
-                                        ),
-                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.s10),
-                                child: Align(
-                                  alignment: Alignment(thumbAlignX, 0),
-                                  child: Container(
-                                    width: 11,
-                                    height: 11,
-                                    decoration: BoxDecoration(
-                                      color: widget.activeAccent,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: Colors.white
-                                            .withValues(alpha: 0.85),
-                                        width: 1.5,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: widget.activeAccent
-                                              .withValues(alpha: 0.55),
-                                          blurRadius: 8,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
-            );
-          },
+                  );
+                },
+              );
+            },
+          ),
         ),
       ),
     );
