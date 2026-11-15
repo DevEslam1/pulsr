@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/widgets/throttled_slider.dart';
 // lib/features/player/presentation/widgets/compressor_limiter_sheet.dart
 import 'package:flutter/material.dart';
@@ -86,55 +88,106 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
   }
 
   Future<void> _applyMbc() async {
-    widget.equalizerManager.isMultibandCompressorEnabled = _mbcEnabled;
-    widget.equalizerManager.multibandCompressorF0 = _mbcF0;
-    widget.equalizerManager.multibandCompressorF1 = _mbcF1;
-    widget.equalizerManager.multibandCompressorF2 = _mbcF2;
-    final cubit = context.read<PlayerCubit?>();
-    if (cubit != null) {
-      await cubit.setMultibandCompressor(
+    // AUDIT-FIX (P3-25): Route MBC writes exclusively through PlayerCubit so
+    // DSP guards, rollback, and telemetry run once with no direct manager write.
+    try {
+      final cubit = context.read<PlayerCubit?>();
+      if (cubit == null) return;
+      final ok = await cubit.setMultibandCompressor(
         _mbcEnabled,
         f0: _mbcF0,
         f1: _mbcF1,
         f2: _mbcF2,
       );
+      if (!ok && mounted) {
+        setState(() => _syncFromManager());
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply multiband compressor settings',
+          error: e, stackTrace: st, category: 'CompressorLimiterSheet');
+      if (mounted) {
+        setState(() => _syncFromManager());
+      }
     }
   }
 
   Future<void> _applyMbcBand(
       int index, MultibandCompressorBandConfig band) async {
     setState(() => _mbcBands[index] = band);
-    widget.equalizerManager.setMultibandCompressorBand(index, band);
-    final cubit = context.read<PlayerCubit?>();
-    if (cubit != null) {
-      await cubit.setMultibandCompressorBand(index, band);
+    try {
+      final cubit = context.read<PlayerCubit?>();
+      if (cubit == null) return;
+      final ok = await cubit.setMultibandCompressorBand(index, band);
+      if (!ok && mounted) {
+        setState(() => _syncFromManager());
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply multiband compressor band $index',
+          error: e, stackTrace: st, category: 'CompressorLimiterSheet');
+      if (mounted) {
+        setState(() => _syncFromManager());
+      }
     }
   }
 
-  void _applyParams() {
-    widget.equalizerManager.limiterThresholdDb = _thresholdDb;
-    widget.equalizerManager.limiterReleaseMs = _releaseMs;
-    widget.equalizerManager.setCompressorParams(
-      thresholdDb: _thresholdDb,
-      ratio: _ratio,
-      attackMs: _attackMs,
-      releaseMs: _releaseMs,
-      makeupGainDb: _makeupGainDb,
-    );
-    final cubit = context.read<PlayerCubit?>();
-    if (cubit != null) {
-      cubit.setLookaheadLimiter(
-        _limiterEnabled,
+  Future<void> _applyParams() async {
+    // AUDIT-FIX (P3-25): Route limiter/compressor parameter updates exclusively
+    // through PlayerCubit so only one guarded write hits the audio handler.
+    try {
+      final cubit = context.read<PlayerCubit?>();
+      if (cubit == null) return;
+      if (_advancedSupported) {
+        final ok = await cubit.setCompressorParams(
+          thresholdDb: _thresholdDb,
+          ratio: _ratio,
+          attackMs: _attackMs,
+          releaseMs: _releaseMs,
+          makeupGainDb: _makeupGainDb,
+        );
+        if (!ok && mounted) {
+          setState(() => _syncFromManager());
+        }
+      } else {
+        await cubit.setLookaheadLimiter(
+          _limiterEnabled,
+          thresholdDb: _thresholdDb,
+          releaseMs: _releaseMs,
+        );
+        if (mounted &&
+            (cubit.state.isLimiterEnabled != _limiterEnabled ||
+                (cubit.state.limiterThresholdDb - _thresholdDb).abs() > 0.01 ||
+                (cubit.state.limiterReleaseMs - _releaseMs).abs() > 0.01)) {
+          setState(() => _syncFromManager());
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply limiter/compressor parameters',
+          error: e, stackTrace: st, category: 'CompressorLimiterSheet');
+      if (mounted) {
+        setState(() => _syncFromManager());
+      }
+    }
+  }
+
+  Future<void> _toggleLimiter(bool val) async {
+    setState(() => _limiterEnabled = val);
+    try {
+      final cubit = context.read<PlayerCubit?>();
+      if (cubit == null) return;
+      await cubit.setLookaheadLimiter(
+        val,
         thresholdDb: _thresholdDb,
         releaseMs: _releaseMs,
       );
-      cubit.setCompressorParams(
-        thresholdDb: _thresholdDb,
-        ratio: _ratio,
-        attackMs: _attackMs,
-        releaseMs: _releaseMs,
-        makeupGainDb: _makeupGainDb,
-      );
+      if (mounted && cubit.state.isLimiterEnabled != _limiterEnabled) {
+        setState(() => _limiterEnabled = cubit.state.isLimiterEnabled);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to toggle lookahead limiter',
+          error: e, stackTrace: st, category: 'CompressorLimiterSheet');
+      if (mounted) {
+        setState(() => _syncFromManager());
+      }
     }
   }
 
@@ -148,6 +201,12 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
           prev.isLimiterEnabled != curr.isLimiterEnabled ||
           prev.limiterThresholdDb != curr.limiterThresholdDb ||
           prev.limiterReleaseMs != curr.limiterReleaseMs ||
+          prev.isMultibandCompressorEnabled !=
+              curr.isMultibandCompressorEnabled ||
+          prev.multibandCompressorF0 != curr.multibandCompressorF0 ||
+          prev.multibandCompressorF1 != curr.multibandCompressorF1 ||
+          prev.multibandCompressorF2 != curr.multibandCompressorF2 ||
+          prev.multibandCompressorBands != curr.multibandCompressorBands ||
           prev.eqPreset != curr.eqPreset,
       listener: (context, state) {
         if (mounted) {
@@ -197,15 +256,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   Switch.adaptive(
                     value: _limiterEnabled,
                     activeThumbColor: p.primary,
-                    onChanged: (val) async {
-                      setState(() => _limiterEnabled = val);
-                      widget.equalizerManager.isLimiterEnabled = val;
-                      final cubit = context.read<PlayerCubit?>();
-                      if (cubit != null) {
-                        await cubit.setLookaheadLimiter(val,
-                            thresholdDb: _thresholdDb, releaseMs: _releaseMs);
-                      }
-                    },
+                    onChanged: (val) => unawaited(_toggleLimiter(val)),
                   ),
                 ],
               ),
@@ -256,7 +307,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 enabled: _limiterEnabled,
                 onChanged: (val) {
                   setState(() => _thresholdDb = val);
-                  _applyParams();
+                  unawaited(_applyParams());
                 },
               ),
 
@@ -271,7 +322,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 enabled: _limiterEnabled && _advancedSupported,
                 onChanged: (val) {
                   setState(() => _ratio = val);
-                  _applyParams();
+                  unawaited(_applyParams());
                 },
               ),
 
@@ -286,7 +337,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 enabled: _limiterEnabled && _advancedSupported,
                 onChanged: (val) {
                   setState(() => _attackMs = val);
-                  _applyParams();
+                  unawaited(_applyParams());
                 },
               ),
 
@@ -301,7 +352,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 enabled: _limiterEnabled,
                 onChanged: (val) {
                   setState(() => _releaseMs = val);
-                  _applyParams();
+                  unawaited(_applyParams());
                 },
               ),
 
@@ -316,7 +367,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                 enabled: _limiterEnabled && _advancedSupported,
                 onChanged: (val) {
                   setState(() => _makeupGainDb = val);
-                  _applyParams();
+                  unawaited(_applyParams());
                 },
               ),
 
@@ -340,7 +391,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                       _releaseMs = 50.0;
                       _makeupGainDb = 0.0;
                     });
-                    _applyParams();
+                    unawaited(_applyParams());
                   },
                   child: Text(context.l10n.resetStudioDefaults),
                 ),
@@ -370,9 +421,9 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                     Switch.adaptive(
                       value: _mbcEnabled,
                       activeThumbColor: p.primary,
-                      onChanged: (val) async {
+                      onChanged: (val) {
                         setState(() => _mbcEnabled = val);
-                        await _applyMbc();
+                        unawaited(_applyMbc());
                       },
                     ),
                   ],
@@ -394,7 +445,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   enabled: _mbcEnabled,
                   onChanged: (val) {
                     setState(() => _mbcF0 = val);
-                    _applyMbc();
+                    unawaited(_applyMbc());
                   },
                 ),
                 _buildParamRow(
@@ -407,7 +458,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   enabled: _mbcEnabled,
                   onChanged: (val) {
                     setState(() => _mbcF1 = val);
-                    _applyMbc();
+                    unawaited(_applyMbc());
                   },
                 ),
                 _buildParamRow(
@@ -420,7 +471,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   enabled: _mbcEnabled,
                   onChanged: (val) {
                     setState(() => _mbcF2 = val);
-                    _applyMbc();
+                    unawaited(_applyMbc());
                   },
                 ),
                 const SizedBox(height: AppSpacing.xs),
@@ -487,8 +538,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                             min: -60.0,
                             max: 0.0,
                             enabled: _mbcEnabled,
-                            onChanged: (val) => _applyMbcBand(
-                                i, band.copyWith(thresholdDb: val)),
+                            onChanged: (val) => unawaited(_applyMbcBand(
+                                i, band.copyWith(thresholdDb: val))),
                           ),
                           _buildParamRow(
                             title: context.l10n.dspRatio,
@@ -497,8 +548,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                             min: 1.0,
                             max: 20.0,
                             enabled: _mbcEnabled,
-                            onChanged: (val) =>
-                                _applyMbcBand(i, band.copyWith(ratio: val)),
+                            onChanged: (val) => unawaited(
+                                _applyMbcBand(i, band.copyWith(ratio: val))),
                           ),
                           _buildParamRow(
                             title: context.l10n.dspMakeupGain,
@@ -508,8 +559,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                             min: 0.0,
                             max: 24.0,
                             enabled: _mbcEnabled,
-                            onChanged: (val) => _applyMbcBand(
-                                i, band.copyWith(makeupGainDb: val)),
+                            onChanged: (val) => unawaited(_applyMbcBand(
+                                i, band.copyWith(makeupGainDb: val))),
                           ),
                           _buildParamRow(
                             title: context.l10n.dspAttackTime,
@@ -519,8 +570,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                             min: 0.1,
                             max: 200.0,
                             enabled: _mbcEnabled,
-                            onChanged: (val) =>
-                                _applyMbcBand(i, band.copyWith(attackMs: val)),
+                            onChanged: (val) => unawaited(
+                                _applyMbcBand(i, band.copyWith(attackMs: val))),
                           ),
                           _buildParamRow(
                             title: context.l10n.releaseTime,
@@ -530,8 +581,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                             min: 5.0,
                             max: 1000.0,
                             enabled: _mbcEnabled,
-                            onChanged: (val) =>
-                                _applyMbcBand(i, band.copyWith(releaseMs: val)),
+                            onChanged: (val) => unawaited(_applyMbcBand(
+                                i, band.copyWith(releaseMs: val))),
                           ),
                           _buildParamRow(
                             title: context.l10n.dspKnee,
@@ -541,8 +592,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                             min: 0.0,
                             max: 12.0,
                             enabled: _mbcEnabled,
-                            onChanged: (val) =>
-                                _applyMbcBand(i, band.copyWith(kneeDb: val)),
+                            onChanged: (val) => unawaited(
+                                _applyMbcBand(i, band.copyWith(kneeDb: val))),
                           ),
                         ],
                       ),

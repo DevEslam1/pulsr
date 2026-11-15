@@ -123,7 +123,33 @@ void main() {
   testWidgets('native mode reset icon restores a single parameter default',
       (tester) async {
     final manager = buildManager();
-    await pumpSheet(tester, manager);
+    var currentState = const PlayerState();
+    final cubit = stubPlayerCubit();
+    when(() => cubit.state).thenAnswer((_) => currentState);
+    when(() => cubit.setLookaheadLimiter(
+          any(),
+          thresholdDb: any(named: 'thresholdDb'),
+          releaseMs: any(named: 'releaseMs'),
+        )).thenAnswer((inv) async {
+      final enabled = inv.positionalArguments[0] as bool;
+      final thresholdDb = inv.namedArguments[#thresholdDb] as double?;
+      final releaseMs = inv.namedArguments[#releaseMs] as double?;
+      currentState = currentState.copyWith(
+        dsp: currentState.dsp.copyWith(
+          isLimiterEnabled: enabled,
+          limiterThresholdDb:
+              thresholdDb ?? currentState.dsp.limiterThresholdDb,
+          limiterReleaseMs: releaseMs ?? currentState.dsp.limiterReleaseMs,
+        ),
+      );
+      await manager.setLookaheadLimiter(
+        enabled,
+        thresholdDb: thresholdDb,
+        releaseMs: releaseMs,
+      );
+      return;
+    });
+    await pumpSheet(tester, manager, cubit: cubit);
 
     await tester.tap(find.byType(Switch).first);
     await tester.pumpAndSettle();
