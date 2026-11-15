@@ -33,11 +33,11 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     int? queueIndex,
   }) async {
     _cancelPendingSeek();
-    final state = _getState();
+    final initialState = _getState();
     if (openPlayerIfPlaying &&
         initialPosition == null &&
-        _isSameTrack(state.currentSong, song) &&
-        (queueIndex == null || queueIndex == state.currentIndex)) {
+        _isSameTrack(initialState.currentSong, song) &&
+        (queueIndex == null || queueIndex == initialState.currentIndex)) {
       // A supplied queue is a request to replace/reorder the current queue (e.g.
       // the Queue screen "Shuffle" action passes the current song with a freshly
       // shuffled queue). Only take the plain resume shortcut when the queue is
@@ -45,12 +45,12 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       final queueUnchanged = queue == null ||
           listEquals(
             queue.map((s) => s.id).toList(growable: false),
-            state.queue.map((s) => s.id).toList(growable: false),
+            initialState.queue.map((s) => s.id).toList(growable: false),
           );
       if (queueUnchanged) {
-        _emit(state.copyWith(
-            playback: state.playback.copyWith(isExpanded: true)));
-        if (!state.isPlaying && !preservePlaybackState) {
+        _emit(initialState.copyWith(
+            playback: initialState.playback.copyWith(isExpanded: true)));
+        if (!initialState.isPlaying && !preservePlaybackState) {
           try {
             await _audioHandler.play();
           } catch (e, st) {
@@ -87,7 +87,14 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       } catch (_) {}
     }
 
-    final videoIdForLatency = effectiveSong.remoteId ?? effectiveSong.id.toString();
+    if (_isClosed()) return;
+    // AUDIT-FIX (P0-2): Re-read live state after the local-match await so
+    // concurrent engine updates (position, isPlaying, isBuffering, history)
+    // are not rolled back by the optimistic emit or captured into prev* snapshots.
+    final state = _getState();
+
+    final videoIdForLatency =
+        effectiveSong.remoteId ?? effectiveSong.id.toString();
     try {
       _latencyTracker?.start(videoId: videoIdForLatency);
       _latencyTracker?.markStage(PlaybackStage.tap);
@@ -119,7 +126,8 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
     final capturedSwapGen = _localMatchSwapGuard.next();
     _mediaItemGuard.next();
 
-    final rawQueue = queue != null ? List<SongsTableData>.from(queue) : [effectiveSong];
+    final rawQueue =
+        queue != null ? List<SongsTableData>.from(queue) : [effectiveSong];
     var targetIndex = -1;
     if (queueIndex != null &&
         queueIndex >= 0 &&
