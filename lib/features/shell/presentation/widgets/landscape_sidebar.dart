@@ -15,6 +15,7 @@ import '../../../../core/widgets/pulsr_logo.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../nav_destinations.dart';
+import 'package:pulsr/features/command_palette/presentation/command_palette_sheet.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
 /// The 4 navigation rail display modes based on screen width/posture.
@@ -268,6 +269,9 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                                 item.index);
                                           }
                                         },
+                                        onLongPress: item.index == 2
+                                            ? () => CommandPaletteSheet.show(context)
+                                            : null,
                                       ),
                                       const SizedBox(height: AppSpacing.xxs),
                                     ],
@@ -306,6 +310,9 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                                 item.index);
                                           }
                                         },
+                                        onLongPress: item.index == 2
+                                            ? () => CommandPaletteSheet.show(context)
+                                            : null,
                                       ),
                                       const SizedBox(height: AppSpacing.xxs),
                                     ],
@@ -495,6 +502,7 @@ class _SidebarNavItem extends StatelessWidget {
   final bool showCompactLabel;
   final PulsrPalette p;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final String? trailingBadge;
   final int? badgeCount;
 
@@ -508,6 +516,7 @@ class _SidebarNavItem extends StatelessWidget {
     required this.showCompactLabel,
     required this.p,
     required this.onTap,
+    this.onLongPress,
     this.trailingBadge,
     this.badgeCount,
   });
@@ -530,6 +539,12 @@ class _SidebarNavItem extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: onTap,
+                onLongPress: onLongPress != null
+                    ? () {
+                        PulsrHaptics.mediumImpact();
+                        onLongPress!();
+                      }
+                    : null,
                 borderRadius: AppRadii.r14All,
                 splashColor: activeColor.withValues(alpha: 0.15),
                 highlightColor: Colors.transparent,
@@ -639,6 +654,12 @@ class _SidebarNavItem extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          onLongPress: onLongPress != null
+              ? () {
+                  PulsrHaptics.mediumImpact();
+                  onLongPress!();
+                }
+              : null,
           borderRadius: AppRadii.r12All,
           splashColor: activeColor.withValues(alpha: 0.12),
           highlightColor: Colors.transparent,

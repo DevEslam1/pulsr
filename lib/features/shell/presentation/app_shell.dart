@@ -27,6 +27,7 @@ import '../../../core/widgets/pulsr_toast.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
+import '../../settings/presentation/widgets/settings_picker_sheets.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import 'widgets/dock_style_controller.dart';
 import 'widgets/landscape_sidebar.dart';
@@ -72,6 +73,11 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
     DockStyleController.load();
     _downloadEffectsSub =
         context.read<YtmDownloadCubit?>()?.effects.listen(_showDownloadEffect);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        maybeShowVersionGatedWhatsNew(context);
+      }
+    });
   }
 
   void _showDownloadEffect(UiEffect effect) {

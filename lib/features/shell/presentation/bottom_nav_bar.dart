@@ -14,6 +14,7 @@ import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import 'package:pulsr/features/command_palette/presentation/command_palette_sheet.dart';
 import 'nav_destinations.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
@@ -26,6 +27,7 @@ class PulsrBottomNavBar extends StatefulWidget {
   final bool iconOnly;
   final bool enableBlur;
   final bool embedded;
+  final void Function(int index)? onLongPress;
 
   const PulsrBottomNavBar({
     super.key,
@@ -37,6 +39,7 @@ class PulsrBottomNavBar extends StatefulWidget {
     this.iconOnly = false,
     this.enableBlur = false,
     this.embedded = false,
+    this.onLongPress,
   });
 
   @override
@@ -84,6 +87,13 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                     iconOnly: widget.iconOnly,
                     embedded: true,
                     onTap: () => widget.onTap(i),
+                    onLongPress: i == 2
+                        ? () => (widget.onLongPress != null
+                            ? widget.onLongPress!(i)
+                            : CommandPaletteSheet.show(context))
+                        : (widget.onLongPress != null
+                            ? () => widget.onLongPress!(i)
+                            : null),
                   ),
                 ),
             ],
@@ -289,6 +299,13 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                             isTablet: isTablet,
                                             iconOnly: widget.iconOnly,
                                             onTap: () => widget.onTap(i),
+                                            onLongPress: i == 2
+                                                ? () => (widget.onLongPress != null
+                                                    ? widget.onLongPress!(i)
+                                                    : CommandPaletteSheet.show(context))
+                                                : (widget.onLongPress != null
+                                                    ? () => widget.onLongPress!(i)
+                                                    : null),
                                           ),
                                         ),
                                     ],
@@ -331,6 +348,7 @@ class _NavTabItem extends StatelessWidget {
   final bool iconOnly;
   final bool embedded;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _NavTabItem({
     required this.item,
@@ -341,6 +359,7 @@ class _NavTabItem extends StatelessWidget {
     required this.iconOnly,
     this.embedded = false,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -365,6 +384,12 @@ class _NavTabItem extends StatelessWidget {
               PulsrHaptics.selectionClick();
               onTap();
             },
+            onLongPress: onLongPress != null
+                ? () {
+                    PulsrHaptics.mediumImpact();
+                    onLongPress!();
+                  }
+                : null,
             borderRadius: itemRadius,
             splashColor: p.accent.withValues(alpha: 0.12),
             highlightColor: Colors.transparent,

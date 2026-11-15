@@ -8,6 +8,7 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/responsive/layout_delegate.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
+import '../../../../core/services/coach_mark_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -318,6 +319,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
     if (widget.mode == nextMode) return;
     PulsrHaptics.lightImpact();
     widget.onModeChanged(nextMode);
+    CoachMarkService.maybeShowDockSwipeHint(context);
   }
 
   void _handleSwipeDown() {

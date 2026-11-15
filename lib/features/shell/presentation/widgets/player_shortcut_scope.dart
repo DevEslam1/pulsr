@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
+import '../../../command_palette/presentation/command_palette_sheet.dart';
 import 'shortcut_help_sheet.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
@@ -36,6 +37,7 @@ class PlayerShortcutScope extends StatelessWidget {
   final VoidCallback onToggleLyrics;
   final VoidCallback onToggleQueue;
   final VoidCallback? onToggleFavorite;
+  final VoidCallback? onOpenCommandPalette;
 
   const PlayerShortcutScope({
     super.key,
@@ -51,6 +53,7 @@ class PlayerShortcutScope extends StatelessWidget {
     required this.onToggleLyrics,
     required this.onToggleQueue,
     this.onToggleFavorite,
+    this.onOpenCommandPalette,
   });
 
   /// True when the primary focus belongs to a text input, in which case
@@ -86,6 +89,17 @@ class PlayerShortcutScope extends StatelessWidget {
       if (isTextInputFocused()) return;
       PulsrHaptics.selectionClick();
       ShortcutHelpSheet.show(context);
+    };
+  }
+
+  VoidCallback _guardPalette(BuildContext context) {
+    return () {
+      PulsrHaptics.selectionClick();
+      if (onOpenCommandPalette != null) {
+        onOpenCommandPalette!();
+      } else {
+        CommandPaletteSheet.show(context);
+      }
     };
   }
 
@@ -156,6 +170,10 @@ class PlayerShortcutScope extends StatelessWidget {
       ),
       const SingleActivator(LogicalKeyboardKey.slash, shift: true):
           _guardHelp(context),
+      const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+          _guardPalette(context),
+      const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+          _guardPalette(context),
     };
 
     if (onToggleFavorite != null) {

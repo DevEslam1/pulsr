@@ -1,0 +1,640 @@
+// lib/features/command_palette/presentation/command_palette_sheet.dart
+import 'dart:math' as math;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../core/config/app_config.dart';
+import '../../../core/constants/app_radii.dart';
+import '../../../core/constants/app_spacing.dart';
+import '../../../core/constants/app_typography.dart';
+import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/pulsr_haptics.dart';
+import '../../../core/widgets/gestures_sheet.dart';
+import '../../../core/widgets/highlighted_text.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_pressable.dart';
+import '../../../core/widgets/pulsr_search_field.dart';
+import '../../player/cubit/player_cubit.dart';
+import '../../player/presentation/widgets/audio_quality_sheet.dart';
+import '../../player/presentation/widgets/equalizer_sheet.dart';
+import '../../settings/cubit/settings_cubit.dart';
+import '../../settings/presentation/widgets/settings_picker_sheets.dart';
+import '../../sheets/sleep_timer_sheet.dart';
+import '../../shell/presentation/widgets/shortcut_help_sheet.dart';
+
+enum CommandPaletteSection {
+  navigation,
+  actions,
+  settings,
+}
+
+class CommandPaletteItem {
+  final String id;
+  final String title;
+  final String? subtitle;
+  final IconData icon;
+  final CommandPaletteSection section;
+  final List<String> keywords;
+  final void Function(BuildContext context) onSelect;
+
+  const CommandPaletteItem({
+    required this.id,
+    required this.title,
+    this.subtitle,
+    required this.icon,
+    required this.section,
+    this.keywords = const [],
+    required this.onSelect,
+  });
+
+  bool matches(String query) {
+    if (query.isEmpty) return true;
+    final q = query.toLowerCase();
+    if (title.toLowerCase().contains(q)) return true;
+    if (subtitle?.toLowerCase().contains(q) == true) return true;
+    return keywords.any((k) => k.toLowerCase().contains(q));
+  }
+}
+
+class CommandPaletteSheet extends StatefulWidget {
+  const CommandPaletteSheet({super.key});
+
+  static Future<void> show(BuildContext context) {
+    PulsrHaptics.selectionClick();
+    return PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      builder: (_) => const CommandPaletteSheet(),
+    );
+  }
+
+  @override
+  State<CommandPaletteSheet> createState() => _CommandPaletteSheetState();
+}
+
+class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  int _selectedIndex = 0;
+  String _query = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    setState(() {
+      _query = _searchController.text.trim();
+      _selectedIndex = 0;
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  List<CommandPaletteItem> _buildAllItems(BuildContext context) {
+    final l10n = context.l10n;
+
+    return [
+      // 1. Navigation
+      CommandPaletteItem(
+        id: 'nav_home',
+        title: l10n.navHome,
+        icon: Icons.home_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['start', 'main', 'feed', 'discover'],
+        onSelect: (ctx) => ctx.go('/'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_library',
+        title: l10n.navLibrary,
+        icon: Icons.library_music_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['songs', 'tracks', 'albums', 'artists', 'folders', 'genres', 'years'],
+        onSelect: (ctx) => ctx.go('/library'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_search',
+        title: l10n.navSearch,
+        icon: Icons.search_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['find', 'query', 'lookup'],
+        onSelect: (ctx) => ctx.go('/search'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_playlists',
+        title: l10n.navPlaylists,
+        icon: Icons.queue_music_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['mix', 'collection'],
+        onSelect: (ctx) => ctx.go('/playlists'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_favorites',
+        title: l10n.favorites,
+        icon: Icons.favorite_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['loved', 'stars', 'liked'],
+        onSelect: (ctx) => ctx.push('/favorites'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_queue',
+        title: l10n.queue,
+        icon: Icons.format_list_numbered_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['up next', 'tracks', 'slots', 'playing'],
+        onSelect: (ctx) => ctx.push('/queue'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_radio',
+        title: l10n.radioTitle,
+        icon: Icons.radio_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['quran', 'recitation', 'broadcast'],
+        onSelect: (ctx) => ctx.push('/radio'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_downloads',
+        title: l10n.downloadsTitle,
+        icon: Icons.download_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['offline', 'cache', 'files'],
+        onSelect: (ctx) => ctx.push('/downloads'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_smart_playlists',
+        title: l10n.smartPlaylists,
+        icon: Icons.auto_awesome_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['rules', 'filters', 'smart'],
+        onSelect: (ctx) => ctx.push('/smart-playlist-builder'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_recents',
+        title: l10n.history,
+        icon: Icons.history_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: ['recent', 'played', 'last'],
+        onSelect: (ctx) => ctx.push('/recents'),
+      ),
+
+      // 2. Actions
+      CommandPaletteItem(
+        id: 'action_play_pause',
+        title: l10n.commandPaletteActionPlay,
+        subtitle: l10n.shortcutPlayPauseDesc,
+        icon: Icons.play_arrow_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['playback', 'resume', 'stop'],
+        onSelect: (ctx) => ctx.read<PlayerCubit>().togglePlayPause(),
+      ),
+      CommandPaletteItem(
+        id: 'action_next',
+        title: l10n.shortcutNext,
+        subtitle: l10n.shortcutNextDesc,
+        icon: Icons.skip_next_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['forward', 'skip'],
+        onSelect: (ctx) => ctx.read<PlayerCubit>().next(),
+      ),
+      CommandPaletteItem(
+        id: 'action_prev',
+        title: l10n.shortcutPrevious,
+        subtitle: l10n.shortcutPreviousDesc,
+        icon: Icons.skip_previous_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['back', 'rewind'],
+        onSelect: (ctx) => ctx.read<PlayerCubit>().previous(),
+      ),
+      CommandPaletteItem(
+        id: 'action_shuffle',
+        title: l10n.commandPaletteActionShuffle,
+        subtitle: l10n.shuffleAll,
+        icon: Icons.shuffle_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['random', 'mix'],
+        onSelect: (ctx) => ctx.read<PlayerCubit>().toggleShuffle(),
+      ),
+      CommandPaletteItem(
+        id: 'action_equalizer',
+        title: l10n.commandPaletteActionEqualizer,
+        subtitle: l10n.equalizerSubtitle,
+        icon: Icons.tune_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['dsp', 'sound', 'bands', 'bass', 'profile'],
+        onSelect: (ctx) => EqualizerSheet.show(ctx),
+      ),
+      CommandPaletteItem(
+        id: 'action_audio_quality',
+        title: l10n.commandPaletteActionAudioQuality,
+        subtitle: l10n.audioQualityDiagnosticsProHint,
+        icon: Icons.high_quality_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['dac', 'bit-perfect', 'khz', 'flac', 'lossless', 'usb'],
+        onSelect: (ctx) {
+          final song = ctx.read<PlayerCubit>().state.currentSong;
+          if (song != null) {
+            AudioQualitySheet.show(ctx, song, ctx.palette.accent);
+          } else {
+            ctx.go('/settings?category=sound');
+          }
+        },
+      ),
+      CommandPaletteItem(
+        id: 'action_sleep_timer',
+        title: l10n.commandPaletteActionSleepTimer,
+        subtitle: l10n.sleepTimerSubtitle,
+        icon: Icons.bedtime_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['stop', 'countdown', 'auto off'],
+        onSelect: (ctx) => SleepTimerSheet.show(ctx),
+      ),
+      CommandPaletteItem(
+        id: 'action_gestures',
+        title: l10n.gesturesGuideTitle,
+        subtitle: l10n.gesturesGuideSubtitle,
+        icon: Icons.gesture_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['touch', 'swipe', 'shortcuts', 'chevrons'],
+        onSelect: (ctx) => GesturesSheet.show(ctx),
+      ),
+      CommandPaletteItem(
+        id: 'action_theme',
+        title: l10n.commandPaletteActionThemeSwitch,
+        subtitle: l10n.appearance,
+        icon: Icons.palette_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['theme', 'accent', 'visual density', 'calm', 'dark'],
+        onSelect: (ctx) {
+          final cubit = ctx.read<SettingsCubit>();
+          showThemePickerSheet(ctx, cubit, cubit.state.playerThemeMode);
+        },
+      ),
+      CommandPaletteItem(
+        id: 'action_whats_new',
+        title: l10n.whatsNewInPulsr,
+        subtitle: l10n.whatsNewSubtitle(AppConfig.appVersion),
+        icon: Icons.new_releases_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['changelog', 'release', 'update', 'features'],
+        onSelect: (ctx) => showWhatsNewSheet(ctx),
+      ),
+      CommandPaletteItem(
+        id: 'action_shortcuts',
+        title: l10n.shortcutHelpTitle,
+        subtitle: l10n.shortcutHelpSubtitle,
+        icon: Icons.keyboard_rounded,
+        section: CommandPaletteSection.actions,
+        keywords: ['hotkeys', 'keys', 'desktop'],
+        onSelect: (ctx) => ShortcutHelpSheet.show(ctx),
+      ),
+
+      // 3. Settings Sections
+      CommandPaletteItem(
+        id: 'settings_sound',
+        title: l10n.settingsSectionSoundPlayback,
+        subtitle: l10n.settingsCategoryAudioSubtitle,
+        icon: Icons.equalizer_rounded,
+        section: CommandPaletteSection.settings,
+        keywords: ['dsp', 'gain', 'limiter', 'crossfeed', 'reverb', 'profile'],
+        onSelect: (ctx) => ctx.go('/settings?category=sound'),
+      ),
+      CommandPaletteItem(
+        id: 'settings_appearance',
+        title: l10n.settingsSectionAppearanceGestures,
+        subtitle: l10n.settingsCategoryAppearanceSubtitle,
+        icon: Icons.palette_rounded,
+        section: CommandPaletteSection.settings,
+        keywords: ['theme', 'accent', 'visual density', 'calm', 'amoled', 'dark'],
+        onSelect: (ctx) => ctx.go('/settings?category=look'),
+      ),
+      CommandPaletteItem(
+        id: 'settings_library',
+        title: l10n.libraryAndScanning,
+        subtitle: l10n.settingsCategoryLibrarySubtitle,
+        icon: Icons.folder_copy_rounded,
+        section: CommandPaletteSection.settings,
+        keywords: ['folders', 'scan', 'rescan', 'auto scan'],
+        onSelect: (ctx) => ctx.go('/settings?category=library'),
+      ),
+      CommandPaletteItem(
+        id: 'settings_online',
+        title: AppConfig.ytmEnabled
+            ? l10n.youtubeMusicAndOnline
+            : l10n.networkAndProxy,
+        subtitle: l10n.settingsCategoryOnlineSubtitle,
+        icon: Icons.cloud_sync_rounded,
+        section: CommandPaletteSection.settings,
+        keywords: ['streaming', 'ytm', 'offline', 'wifi only'],
+        onSelect: (ctx) => ctx.go('/settings?category=network'),
+      ),
+      CommandPaletteItem(
+        id: 'settings_privacy',
+        title: l10n.privacyAndData,
+        subtitle: l10n.settingsCategoryPrivacySubtitle,
+        icon: Icons.security_rounded,
+        section: CommandPaletteSection.settings,
+        keywords: ['backup', 'restore', 'export', 'cache', 'storage'],
+        onSelect: (ctx) => ctx.go('/settings?category=privacy'),
+      ),
+      CommandPaletteItem(
+        id: 'settings_about',
+        title: l10n.about,
+        subtitle: l10n.settingsCategoryAboutSubtitle(AppConfig.appVersion),
+        icon: Icons.info_outline_rounded,
+        section: CommandPaletteSection.settings,
+        keywords: ['about', 'version', 'build', 'license'],
+        onSelect: (ctx) => ctx.go('/settings?category=about'),
+      ),
+    ];
+  }
+
+  void _handleSelect(CommandPaletteItem item) {
+    PulsrHaptics.lightImpact();
+    Navigator.of(context).pop();
+    item.onSelect(context);
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+    final filtered = _buildAllItems(context)
+        .where((item) => item.matches(_query))
+        .toList();
+
+    if (filtered.isEmpty) return KeyEventResult.ignored;
+
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        _selectedIndex = (_selectedIndex + 1) % filtered.length;
+      });
+      return KeyEventResult.handled;
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      setState(() {
+        _selectedIndex = (_selectedIndex - 1 + filtered.length) % filtered.length;
+      });
+      return KeyEventResult.handled;
+    } else if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (_selectedIndex >= 0 && _selectedIndex < filtered.length) {
+        _handleSelect(filtered[_selectedIndex]);
+        return KeyEventResult.handled;
+      }
+    } else if (event.logicalKey == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
+
+    return KeyEventResult.ignored;
+  }
+
+  String _sectionTitle(BuildContext context, CommandPaletteSection section) {
+    final l10n = context.l10n;
+    switch (section) {
+      case CommandPaletteSection.navigation:
+        return l10n.commandPaletteSectionRoutes;
+      case CommandPaletteSection.actions:
+        return l10n.commandPaletteSectionActions;
+      case CommandPaletteSection.settings:
+        return l10n.commandPaletteSectionSettings;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final l10n = context.l10n;
+    final allItems = _buildAllItems(context);
+    final filtered = allItems.where((item) => item.matches(_query)).toList();
+
+    final maxH = math.min(
+      Adaptive.sheetMaxHeight(context),
+      MediaQuery.sizeOf(context).height * 0.75,
+    );
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxH),
+      child: Focus(
+        focusNode: _focusNode,
+        onKeyEvent: _handleKeyEvent,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Search Input Header
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.xs,
+              ),
+              child: PulsrSearchField(
+                controller: _searchController,
+                hintText: l10n.commandPaletteHint,
+                autofocus: true,
+                onSubmitted: (_) {
+                  if (filtered.isNotEmpty &&
+                      _selectedIndex >= 0 &&
+                      _selectedIndex < filtered.length) {
+                    _handleSelect(filtered[_selectedIndex]);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Divider(color: p.hairline, height: 1),
+
+            // Filtered Items List
+            Expanded(
+              child: filtered.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.search_off_rounded,
+                                size: 36, color: p.textTertiary),
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              l10n.commandPaletteNoResults,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.body,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xs,
+                        horizontal: AppSpacing.sm,
+                      ),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, index) {
+                        final item = filtered[index];
+                        final isHighlighted = index == _selectedIndex;
+
+                        // Insert section separator if first item or section changes
+                        final showSectionHeader = index == 0 ||
+                            filtered[index - 1].section != item.section;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (showSectionHeader) ...[
+                              Padding(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
+                                  AppSpacing.sm,
+                                  AppSpacing.s8,
+                                  AppSpacing.sm,
+                                  AppSpacing.s4,
+                                ),
+                                child: Text(
+                                  _sectionTitle(context, item.section),
+                                  style: TextStyle(
+                                    color: p.textTertiary,
+                                    fontSize: AppFontSize.label,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: AppTracking.label,
+                                  ),
+                                ),
+                              ),
+                            ],
+                            Semantics(
+                              button: true,
+                              label: item.title,
+                              hint: item.subtitle,
+                              child: Container(
+                                margin: const EdgeInsets.symmetric(
+                                  vertical: 1.5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isHighlighted
+                                      ? p.accent.withValues(alpha: 0.14)
+                                      : Colors.transparent,
+                                  borderRadius: AppRadii.r12All,
+                                  border: Border.all(
+                                    color: isHighlighted
+                                        ? p.accent.withValues(alpha: 0.35)
+                                        : Colors.transparent,
+                                  ),
+                                ),
+                                child: PulsrPressable(
+                                  pressedScale: 0.985,
+                                  onTap: () => _handleSelect(item),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minHeight: AppSpacing.minTouchTarget,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                        vertical: AppSpacing.xs,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 32,
+                                            height: 32,
+                                            decoration: BoxDecoration(
+                                              color: isHighlighted
+                                                  ? p.accent
+                                                  : p.surfaceContainerHigh,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Icon(
+                                              item.icon,
+                                              size: 17,
+                                              color: isHighlighted
+                                                  ? p.onAccent
+                                                  : p.textSecondary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: AppSpacing.sm),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                PulsrHighlightedText(
+                                                  text: item.title,
+                                                  query: _query,
+                                                  baseStyle: TextStyle(
+                                                    color: isHighlighted
+                                                        ? p.textPrimary
+                                                        : p.textPrimary,
+                                                    fontSize: AppFontSize.body,
+                                                    fontWeight: isHighlighted
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w600,
+                                                  ),
+                                                  matchStyle: TextStyle(
+                                                    color: p.accent,
+                                                    fontSize: AppFontSize.body,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                                if (item.subtitle != null) ...[
+                                                  const SizedBox(height: 2),
+                                                  PulsrHighlightedText(
+                                                    text: item.subtitle!,
+                                                    query: _query,
+                                                    baseStyle: TextStyle(
+                                                      color: p.textSecondary,
+                                                      fontSize:
+                                                          AppFontSize.caption,
+                                                    ),
+                                                    matchStyle: TextStyle(
+                                                      color: p.accent,
+                                                      fontSize:
+                                                          AppFontSize.caption,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ),
+                                          Icon(
+                                            Icons.chevron_right_rounded,
+                                            size: 16,
+                                            color: isHighlighted
+                                                ? p.accent
+                                                : p.textTertiary
+                                                    .withValues(alpha: 0.5),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

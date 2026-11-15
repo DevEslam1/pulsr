@@ -382,4 +382,12 @@ class PrefsKeys {
 
   // Visual density mode: 'comfortable' (full gradients/glows) | 'calm'.
   static const String visualDensityMode = 'setting_visual_density_mode';
+
+  // Contextual coach marks seen state.
+  static const String coachMarkDspSeen = 'coach_mark_dsp_seen';
+  static const String coachMarkUsbDacSeen = 'coach_mark_usb_dac_seen';
+  static const String coachMarkDockSwipeSeen = 'coach_mark_dock_swipe_seen';
+
+  // Last seen application version for the version-gated "What's new" sheet.
+  static const String lastSeenAppVersion = 'last_seen_app_version';
 }

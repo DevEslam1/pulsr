@@ -1,6 +1,8 @@
 // lib/features/settings/presentation/widgets/settings_picker_sheets.dart
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/config/app_config.dart';
+import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/ytm_locale.dart';
@@ -398,6 +400,22 @@ void showAboutSheet(BuildContext context) {
       ),
     ),
   );
+}
+
+Future<bool> maybeShowVersionGatedWhatsNew(
+  BuildContext context, {
+  SharedPreferences? customPrefs,
+}) async {
+  final prefs = customPrefs ?? await SharedPreferences.getInstance();
+  final currentVersion = AppConfig.appVersion;
+  final lastSeen = prefs.getString(PrefsKeys.lastSeenAppVersion);
+  if (lastSeen == currentVersion) return false;
+
+  await prefs.setString(PrefsKeys.lastSeenAppVersion, currentVersion);
+  if (!context.mounted) return true;
+
+  showWhatsNewSheet(context);
+  return true;
 }
 
 void showWhatsNewSheet(BuildContext context) {

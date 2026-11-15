@@ -3,6 +3,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/prefs_keys.dart';
+import '../../../../core/services/coach_mark_service.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -107,6 +108,13 @@ class AudioQualitySheet extends StatelessWidget {
       dspSlice,
       resolvedSong,
       (assessment, usbStatus) {
+        if (outputDevice?.isUsbDac == true || usbStatus.attached) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) {
+              CoachMarkService.maybeShowUsbDacExplainer(context);
+            }
+          });
+        }
         final nowPlayingChildren = <Widget>[
           // Hero Quality Tier Card
           Container(

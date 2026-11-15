@@ -96,6 +96,12 @@ class ShortcutHelpSheet extends StatelessWidget {
         icon: Icons.queue_music_rounded,
       ),
       _ShortcutItemData(
+        keyLabel: 'Ctrl+K',
+        title: l10n.commandPaletteTitle,
+        description: l10n.commandPaletteHint,
+        icon: Icons.search_rounded,
+      ),
+      _ShortcutItemData(
         keyLabel: '?',
         title: l10n.shortcutHelp,
         description: l10n.shortcutHelpDesc,
