@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
 import 'sync_diagnostics_sheet.dart';
@@ -12,10 +13,13 @@ import 'sync_diagnostics_sheet.dart';
 /// Status chip displaying live bit-perfect USB streaming status with real-time underrun counter.
 class ExclusiveUsbChip extends StatefulWidget {
   final bool compact;
+  @visibleForTesting
+  final UsbExclusiveService? service;
 
   const ExclusiveUsbChip({
     super.key,
     this.compact = false,
+    this.service,
   });
 
   @override
@@ -23,12 +27,16 @@ class ExclusiveUsbChip extends StatefulWidget {
 }
 
 class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
-  final UsbExclusiveService _service = UsbExclusiveService();
+  static const Duration _pollTimeout = Duration(milliseconds: 900);
+
+  late final UsbExclusiveService _service =
+      widget.service ?? UsbExclusiveService();
   StreamSubscription<UsbExclusiveStatus>? _statusSub;
   Timer? _pollTimer;
 
   bool _isActive = false;
   int _underruns = 0;
+  bool _pollInFlight = false;
 
   @override
   void initState() {
@@ -71,15 +79,26 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
   }
 
   Future<void> _pollDiagnostics() async {
-    final diag = await _service.getDiagnostics();
-    if (!mounted) return;
-    final isStreaming = diag['isStreamActive'] == true;
-    final underruns = (diag['underrunCount'] as num?)?.toInt() ?? 0;
-    if (_isActive != isStreaming || _underruns != underruns) {
-      setState(() {
-        _isActive = isStreaming;
-        _underruns = underruns;
-      });
+    // AUDIT-FIX (P2-18): Guard against overlapping diagnostics calls and bound
+    // platform waits with a timeout so slow USB queries cannot pile up.
+    if (_pollInFlight || !mounted) return;
+    _pollInFlight = true;
+    try {
+      final diag = await _service.getDiagnostics().timeout(_pollTimeout);
+      if (!mounted) return;
+      final isStreaming = diag['isStreamActive'] == true;
+      final underruns = (diag['underrunCount'] as num?)?.toInt() ?? 0;
+      if (_isActive != isStreaming || _underruns != underruns) {
+        setState(() {
+          _isActive = isStreaming;
+          _underruns = underruns;
+        });
+      }
+    } catch (e, st) {
+      ErrorLogger.log('USB chip diagnostics poll failed',
+          error: e, stackTrace: st, category: 'ExclusiveUsbChip');
+    } finally {
+      _pollInFlight = false;
     }
   }
 

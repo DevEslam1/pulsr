@@ -1,4 +1,6 @@
 // test/features/player/widgets/sync_diagnostics_sheet_test.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -133,6 +135,52 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(find.byType(SyncDiagnosticsSheet), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+    });
+
+    testWidgets(
+        'P2-18 serializes slow diagnostic polls with in-flight guard and timeout',
+        (tester) async {
+      var latencyCallCount = 0;
+      Completer<int>? slowCall;
+      messenger.setMockMethodCallHandler(
+        const MethodChannel(PulsrChannels.audioEffects),
+        (call) async {
+          switch (call.method) {
+            case 'getPipelineLatencyFrames':
+              latencyCallCount++;
+              if (latencyCallCount == 1) {
+                slowCall = Completer<int>();
+                return slowCall!.future;
+              }
+              return 256;
+            case 'getAppliedSampleRate':
+              return 48000.0;
+            default:
+              return null;
+          }
+        },
+      );
+
+      await tester.pumpWidget(
+        host(const SyncDiagnosticsSheet(sampleRate: 48000.0)),
+      );
+      await tester.pump();
+      expect(latencyCallCount, 1);
+
+      // While call 1 is pending, a resume lifecycle trigger must NOT launch an
+      // overlapping channel call (in-flight guard).
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(latencyCallCount, 1);
+
+      // Call 1 never completes (hung platform call); the per-call timeout must
+      // release the in-flight guard so the next 1s tick recovers with call 2.
+      await tester.pump(const Duration(seconds: 2));
+      expect(latencyCallCount, greaterThanOrEqualTo(2));
+      expect(find.textContaining('256 frames'), findsOneWidget);
 
       await tester.pumpWidget(const SizedBox());
       await tester.pump();

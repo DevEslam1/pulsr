@@ -6,6 +6,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
@@ -34,11 +35,14 @@ class SyncDiagnosticsSheet extends StatefulWidget {
 
 class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
     with WidgetsBindingObserver {
+  static const Duration _pollTimeout = Duration(milliseconds: 900);
+
   int _pipelineLatencyFrames = 0;
   double _appliedSampleRate = 48000.0;
   double _usbBufferedMs = 0.0;
   Map<String, dynamic> _usbDiagnostics = const {};
   Timer? _timer;
+  bool _fetchInFlight = false;
 
   @override
   void initState() {
@@ -80,19 +84,38 @@ class _SyncDiagnosticsSheetState extends State<SyncDiagnosticsSheet>
   }
 
   Future<void> _fetchDiagnostics() async {
-    final frames = await AudioEffectsChannel().getPipelineLatencyFrames();
-    final appliedRate = await AudioEffectsChannel().getAppliedSampleRate();
-    final usbService = UsbExclusiveService();
-    final usbMs = await usbService.getBufferedMs();
-    final usbDiag = await usbService.getDiagnostics();
+    // AUDIT-FIX (P2-18): Serialize slow platform polls with an in-flight
+    // guard and per-call timeout so stalled channels cannot stack calls or
+    // freeze the 1s poll loop.
+    if (_fetchInFlight || !mounted) return;
+    _fetchInFlight = true;
+    try {
+      final effects = AudioEffectsChannel();
+      final frames =
+          await effects.getPipelineLatencyFrames().timeout(_pollTimeout);
+      if (!mounted) return;
+      final appliedRate =
+          await effects.getAppliedSampleRate().timeout(_pollTimeout);
+      if (!mounted) return;
+      final usbService = UsbExclusiveService();
+      final usbMs = await usbService.getBufferedMs().timeout(_pollTimeout);
+      if (!mounted) return;
+      final usbDiag = await usbService.getDiagnostics().timeout(_pollTimeout);
 
-    if (mounted) {
-      setState(() {
-        _pipelineLatencyFrames = frames;
-        _appliedSampleRate = appliedRate > 0 ? appliedRate : widget.sampleRate;
-        _usbBufferedMs = usbMs;
-        _usbDiagnostics = usbDiag;
-      });
+      if (mounted) {
+        setState(() {
+          _pipelineLatencyFrames = frames;
+          _appliedSampleRate =
+              appliedRate > 0 ? appliedRate : widget.sampleRate;
+          _usbBufferedMs = usbMs;
+          _usbDiagnostics = usbDiag;
+        });
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Sync diagnostics poll failed',
+          error: e, stackTrace: st, category: 'SyncDiagnosticsSheet');
+    } finally {
+      _fetchInFlight = false;
     }
   }
 
