@@ -336,7 +336,7 @@ class _DspSection extends StatelessWidget {
                     Text(
                       l10n.dspLoudnessReplayGainNote,
                       style: TextStyle(
-                          color: p.textTertiary, fontSize: AppFontSize.tiny),
+                          color: p.textTertiary, fontSize: AppFontSize.caption),
                     ),
                   ],
                 ],

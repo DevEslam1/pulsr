@@ -65,6 +65,9 @@ class AudioDeviceEntry {
   final bool isPreferred;
   final List<int> sampleRates;
   final int maxBitDepth;
+  final List<String> supportedEncodings;
+  final List<int> channelCounts;
+  final List<int> channelMasks;
 
   const AudioDeviceEntry({
     required this.id,
@@ -75,6 +78,9 @@ class AudioDeviceEntry {
     this.isPreferred = false,
     this.sampleRates = const <int>[],
     this.maxBitDepth = 0,
+    this.supportedEncodings = const <String>[],
+    this.channelCounts = const <int>[],
+    this.channelMasks = const <int>[],
   });
 
   factory AudioDeviceEntry.fromMap(Map<dynamic, dynamic> map) {
@@ -83,6 +89,27 @@ class AudioDeviceEntry {
     if (rawRates is List) {
       for (final r in rawRates) {
         if (r is num) rates.add(r.toInt());
+      }
+    }
+    final rawEncs = map['supportedEncodings'];
+    final encs = <String>[];
+    if (rawEncs is List) {
+      for (final e in rawEncs) {
+        if (e is String && e.isNotEmpty) encs.add(e);
+      }
+    }
+    final rawChCounts = map['channelCounts'];
+    final chCounts = <int>[];
+    if (rawChCounts is List) {
+      for (final c in rawChCounts) {
+        if (c is num) chCounts.add(c.toInt());
+      }
+    }
+    final rawChMasks = map['channelMasks'];
+    final chMasks = <int>[];
+    if (rawChMasks is List) {
+      for (final m in rawChMasks) {
+        if (m is num) chMasks.add(m.toInt());
       }
     }
     return AudioDeviceEntry(
@@ -94,6 +121,9 @@ class AudioDeviceEntry {
       isPreferred: (map['isPreferred'] as bool?) ?? false,
       sampleRates: rates.isNotEmpty ? rates : const <int>[],
       maxBitDepth: (map['maxBitDepth'] as num?)?.toInt() ?? 0,
+      supportedEncodings: encs.isNotEmpty ? encs : const <String>[],
+      channelCounts: chCounts.isNotEmpty ? chCounts : const <int>[],
+      channelMasks: chMasks.isNotEmpty ? chMasks : const <int>[],
     );
   }
 
@@ -106,6 +136,9 @@ class AudioDeviceEntry {
         'isPreferred': isPreferred,
         'sampleRates': sampleRates,
         'maxBitDepth': maxBitDepth,
+        'supportedEncodings': supportedEncodings,
+        'channelCounts': channelCounts,
+        'channelMasks': channelMasks,
       };
 
   @override
@@ -120,7 +153,10 @@ class AudioDeviceEntry {
           isCurrent == other.isCurrent &&
           isPreferred == other.isPreferred &&
           _listEquals(sampleRates, other.sampleRates) &&
-          maxBitDepth == other.maxBitDepth;
+          maxBitDepth == other.maxBitDepth &&
+          _listEquals(supportedEncodings, other.supportedEncodings) &&
+          _listEquals(channelCounts, other.channelCounts) &&
+          _listEquals(channelMasks, other.channelMasks);
 
   @override
   int get hashCode => Object.hash(
@@ -132,6 +168,9 @@ class AudioDeviceEntry {
         isPreferred,
         Object.hashAll(sampleRates),
         maxBitDepth,
+        Object.hashAll(supportedEncodings),
+        Object.hashAll(channelCounts),
+        Object.hashAll(channelMasks),
       );
 }
 
@@ -199,6 +238,9 @@ class AudioOutputInfo {
   final List<String> btSupportedCodecs;
   final List<int> btSelectableSampleRates;
   final List<int> btSelectableBitDepths;
+  final List<String> supportedEncodings;
+  final List<int> supportedChannelCounts;
+  final List<int> supportedChannelMasks;
 
   const AudioOutputInfo({
     required this.deviceName,
@@ -242,6 +284,9 @@ class AudioOutputInfo {
     this.btSupportedCodecs = const [],
     this.btSelectableSampleRates = const [],
     this.btSelectableBitDepths = const [],
+    this.supportedEncodings = const <String>[],
+    this.supportedChannelCounts = const <int>[],
+    this.supportedChannelMasks = const <int>[],
   });
 
   factory AudioOutputInfo.fromMap(Map<dynamic, dynamic> map) {
@@ -333,6 +378,24 @@ class AudioOutputInfo {
             ? raw.whereType<num>().map((n) => n.toInt()).toList()
             : const <int>[];
       }(),
+      supportedEncodings: () {
+        final raw = map['supportedEncodings'];
+        return (raw is List)
+            ? raw.whereType<String>().toList()
+            : const <String>[];
+      }(),
+      supportedChannelCounts: () {
+        final raw = map['supportedChannelCounts'];
+        return (raw is List)
+            ? raw.whereType<num>().map((n) => n.toInt()).toList()
+            : const <int>[];
+      }(),
+      supportedChannelMasks: () {
+        final raw = map['supportedChannelMasks'];
+        return (raw is List)
+            ? raw.whereType<num>().map((n) => n.toInt()).toList()
+            : const <int>[];
+      }(),
     );
   }
 
@@ -398,6 +461,9 @@ class AudioOutputInfo {
       'btSupportedCodecs': btSupportedCodecs,
       'btSelectableSampleRates': btSelectableSampleRates,
       'btSelectableBitDepths': btSelectableBitDepths,
+      'supportedEncodings': supportedEncodings,
+      'supportedChannelCounts': supportedChannelCounts,
+      'supportedChannelMasks': supportedChannelMasks,
     };
   }
 
@@ -442,6 +508,9 @@ class AudioOutputInfo {
     List<String>? btSupportedCodecs,
     List<int>? btSelectableSampleRates,
     List<int>? btSelectableBitDepths,
+    List<String>? supportedEncodings,
+    List<int>? supportedChannelCounts,
+    List<int>? supportedChannelMasks,
   }) {
     return AudioOutputInfo(
       deviceName: deviceName ?? this.deviceName,
@@ -492,6 +561,11 @@ class AudioOutputInfo {
           btSelectableSampleRates ?? this.btSelectableSampleRates,
       btSelectableBitDepths:
           btSelectableBitDepths ?? this.btSelectableBitDepths,
+      supportedEncodings: supportedEncodings ?? this.supportedEncodings,
+      supportedChannelCounts:
+          supportedChannelCounts ?? this.supportedChannelCounts,
+      supportedChannelMasks:
+          supportedChannelMasks ?? this.supportedChannelMasks,
     );
   }
 
@@ -539,7 +613,10 @@ class AudioOutputInfo {
           _listEquals(btSelectableCodecs, other.btSelectableCodecs) &&
           _listEquals(btSupportedCodecs, other.btSupportedCodecs) &&
           _listEquals(btSelectableSampleRates, other.btSelectableSampleRates) &&
-          _listEquals(btSelectableBitDepths, other.btSelectableBitDepths);
+          _listEquals(btSelectableBitDepths, other.btSelectableBitDepths) &&
+          _listEquals(supportedEncodings, other.supportedEncodings) &&
+          _listEquals(supportedChannelCounts, other.supportedChannelCounts) &&
+          _listEquals(supportedChannelMasks, other.supportedChannelMasks);
 
   @override
   int get hashCode => Object.hashAll([
@@ -583,6 +660,9 @@ class AudioOutputInfo {
         Object.hashAll(btSupportedCodecs),
         Object.hashAll(btSelectableSampleRates),
         Object.hashAll(btSelectableBitDepths),
+        Object.hashAll(supportedEncodings),
+        Object.hashAll(supportedChannelCounts),
+        Object.hashAll(supportedChannelMasks),
       ]);
 
   @override

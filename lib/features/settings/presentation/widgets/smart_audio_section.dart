@@ -301,7 +301,7 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
                       child: Text(
                         isAuto ? l10n.smartAudioAuto : l10n.smartAudioManual,
                         style: TextStyle(
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
                           color: isAuto ? p.accent : p.textSecondary,
                         ),

@@ -466,7 +466,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                               child: Text(
                                 context.l10n.downloadsLabel,
                                 style: TextStyle(
-                                  fontSize: AppFontSize.micro,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w800,
                                   color: p.accent,
                                   letterSpacing: AppTracking.medium,
@@ -488,7 +488,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                               child: Text(
                                 context.l10n.folderPersistentExcludedBadge,
                                 style: TextStyle(
-                                  fontSize: AppFontSize.micro,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w800,
                                   color: p.error,
                                   letterSpacing: AppTracking.medium,

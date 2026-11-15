@@ -208,7 +208,7 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                                   child: Text(
                                     letter,
                                     style: TextStyle(
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: isSelected
                                           ? FontWeight.w900
                                           : FontWeight.w600,

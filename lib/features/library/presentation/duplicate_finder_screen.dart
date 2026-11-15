@@ -650,7 +650,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                           ),
                           style: FilledButton.styleFrom(
                             backgroundColor: p.error,
-                            foregroundColor: Colors.white,
+                            foregroundColor: p.onError,
                             shape: RoundedRectangleBorder(
                               borderRadius: AppRadii.r12All,
                             ),
@@ -875,7 +875,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       child: Text(
                         isHiResSong(song) ? 'HI-RES' : 'LOSSLESS',
                         style: TextStyle(
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w800,
                           color: p.info,
                         ),
@@ -884,7 +884,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                   Text(
                     specs,
                     style: TextStyle(
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w600,
                       color: p.textTertiary,
                     ),

@@ -300,7 +300,7 @@ spl1 = spl1 + lp1 * amount;''',
                               context.l10n.bytecodeJit,
                               style: TextStyle(
                                 color: p.primary,
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),

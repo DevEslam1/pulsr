@@ -747,7 +747,7 @@ class _SongOptionsSheetState extends State<SongOptionsSheet> {
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w600,
                       color: isActive ? p.favorite : p.textSecondary,
                     ),

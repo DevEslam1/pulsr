@@ -536,7 +536,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               hasHiRes ? 'HI-RES' : 'LOSSLESS',
               style: TextStyle(
                 color: p.info,
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
               ),
@@ -647,7 +647,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               context.l10n.queue.toUpperCase(),
               style: TextStyle(
                 color: p.textTertiary,
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.8,
               ),

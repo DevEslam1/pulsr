@@ -670,7 +670,7 @@ class _ManageSongRow extends StatelessWidget {
                         isNewlyAdded ? '+1' : '-1',
                         style: TextStyle(
                           color: isNewlyAdded ? p.accent : p.error,
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w800,
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
@@ -683,7 +683,7 @@ class _ManageSongRow extends StatelessWidget {
                       Formatters.formatDurationMs(song.durationMs),
                       style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),

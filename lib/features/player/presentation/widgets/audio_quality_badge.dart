@@ -118,7 +118,7 @@ class AudioQualityBadge extends StatelessWidget {
                   style: TextStyle(
                     color:
                         isUsb ? AppColors.dacGold : context.palette.textPrimary,
-                    fontSize: compact ? AppFontSize.tiny : AppFontSize.label,
+                    fontSize: compact ? AppFontSize.caption : AppFontSize.label,
                     fontWeight: FontWeight.w800,
                     letterSpacing: AppTracking.overline,
                   ),
@@ -142,8 +142,7 @@ class AudioQualityBadge extends StatelessWidget {
                             : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b'),
                     style: TextStyle(
                       color: palette.textSecondary,
-                      fontSize:
-                          compact ? AppFontSize.tiny : AppFontSize.caption,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

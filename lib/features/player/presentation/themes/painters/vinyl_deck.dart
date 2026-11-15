@@ -251,13 +251,15 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.s6),
-                              Text(
-                                context.l10n.vinylDirectDrive,
-                                style: const TextStyle(
-                                  fontSize: AppFontSize.micro,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: AppTracking.wide,
-                                  color: Colors.white38,
+                              ExcludeSemantics(
+                                child: Text(
+                                  context.l10n.vinylDirectDrive,
+                                  style: const TextStyle(
+                                    fontSize: AppFontSize.micro,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: AppTracking.wide,
+                                    color: Colors.white38,
+                                  ),
                                 ),
                               ),
                             ],
@@ -482,7 +484,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                         ? context.l10n.vinylSpeedRpm
                                         : context.l10n.dspStandby,
                                     style: TextStyle(
-                                      fontSize: AppFontSize.micro,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: AppTracking.overline,
                                       color: state.isPlaying

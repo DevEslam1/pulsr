@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
 
@@ -25,6 +26,7 @@ class QuickCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
     final isCompact = MediaQuery.sizeOf(context).width < 380;
 
     return Semantics(
@@ -41,17 +43,19 @@ class QuickCard extends StatelessWidget {
             vertical: isCompact ? 10 : 12,
           ),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                color.withValues(alpha: 0.16),
-                color.withValues(alpha: 0.03)
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            gradient: isCalm
+                ? null
+                : LinearGradient(
+                    colors: [
+                      color.withValues(alpha: 0.16),
+                      color.withValues(alpha: 0.03)
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
             color: p.surfaceContainer,
             borderRadius: AppRadii.r18All,
-            border: Border.all(color: p.hairline),
+            border: Border.all(color: isCalm ? p.borderSubtle : p.hairline),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,8 +88,7 @@ class QuickCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: p.textSecondary,
-                  fontSize:
-                      isCompact ? AppFontSize.tiny : AppFontSize.caption,
+                  fontSize: AppFontSize.caption,
                 ),
               ),
             ],

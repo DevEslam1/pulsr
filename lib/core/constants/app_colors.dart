@@ -21,9 +21,17 @@ abstract class AppColors {
   /// Single source for the ubiquitous `Color(0xFF101223)` "on-bright" text.
   static const Color onBright = Color(0xFF101223);
 
+  /// WCAG-contrast-safe foreground ink (`onBright` or white) for filled
+  /// semantic/brand buttons whose background is [fill].
+  static Color textOnAccent(Color fill) =>
+      fill.computeLuminance() > 0.179 ? onBright : Colors.white;
+
   // Brand & feature accents. These are intentionally fixed (not theme-driven)
   // because they identify a source/tier rather than a UI surface.
   static const Color dacGold = Color(0xFFFFD700); // Hi-Res / USB DAC tier
+  static const Color giltGold = Color(0xFFC9A24B); // Quran radio gilt accent
+  static const Color onGiltLight = Color(0xFFFFF7E6); // Warm cream ink on gilt
+  static const Color onGiltDark = Color(0xFF231A06); // Deep umber ink on gilt
   static const Color ytRed = Color(0xFFFF0000); // YouTube family
   static const Color ytRedDeep = Color(0xFF8B0000); // YouTube gradient end
   static const Color netflixRed = Color(0xFFE50914); // curated online red

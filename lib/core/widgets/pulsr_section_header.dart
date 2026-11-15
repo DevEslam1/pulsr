@@ -140,7 +140,7 @@ class PulsrSectionHeader extends StatelessWidget {
                           '$count',
                           style: TextStyle(
                             fontFamily: 'Manrope',
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w800,
                             color: isCapsule
                                 ? PulsrCapsuleStyle.secondaryForegroundColor(p)

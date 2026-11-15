@@ -783,7 +783,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                                 : context.l10n.settingsDisabledBadge,
                             style: TextStyle(
                               color: _enabled ? p.success : p.textTertiary,
-                              fontSize: AppFontSize.micro,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w800,
                               letterSpacing: AppTracking.medium,
                             ),

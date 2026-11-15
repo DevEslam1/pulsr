@@ -6,6 +6,7 @@ import '../../../core/performance/gpu_budget.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 import 'settings_cubit.dart';
+import 'settings_state.dart';
 
 /// Accessibility-related settings mutations, split out of `SettingsCubit` so
 /// that file stays under the fat-file ratchet. Mirrors the existing
@@ -47,6 +48,13 @@ extension SettingsAccessibilityX on SettingsCubit {
       final prefs = await SharedPreferences.getInstance();
       PulsrHaptics.setEnabled(prefs.getBool(PrefsKeys.hapticsEnabled) ?? true);
     } catch (_) {}
+  }
+
+  Future<void> setVisualDensityMode(VisualDensityMode mode) async {
+    markDirty('visualDensityMode');
+    safeEmit(state.copyWith(visualDensityMode: mode));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.visualDensityMode, mode.name);
   }
 
   /// Sets whether UI sound feedback is enabled app-wide.

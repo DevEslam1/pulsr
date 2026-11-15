@@ -393,16 +393,18 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                       child: FilledButton(
                         style: FilledButton.styleFrom(
                           backgroundColor: AppColors.discordBlurple,
-                          foregroundColor: Colors.white,
+                          foregroundColor:
+                              AppColors.textOnAccent(AppColors.discordBlurple),
                         ),
                         onPressed: _isSaving ? null : _saveToken,
                         child: _isSaving
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  color: Colors.white,
+                                  color: AppColors.textOnAccent(
+                                      AppColors.discordBlurple),
                                 ),
                               )
                             : Text(hasToken

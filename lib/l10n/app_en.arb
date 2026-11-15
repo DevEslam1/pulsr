@@ -7700,5 +7700,17 @@
       }
     }
   },
-  "lyricsOffsetChipTooltip": "Tap to fine-tune lyrics sync offset"
+  "lyricsOffsetChipTooltip": "Tap to fine-tune lyrics sync offset",
+  "visualDensityTitle": "Visual density",
+  "visualDensitySubtitle": "Reduce chrome glows, extra gradient layers, and specular hairlines",
+  "visualDensityComfortable": "Comfortable",
+  "visualDensityCalm": "Calm",
+  "signalPathTitle": "Audio Signal Path",
+  "signalPathSubtitle": "Real-time sample rate, bit depth, and route custody",
+  "dspDecoderOutput": "Decoder Output",
+  "signalPathActiveRoute": "Active Output Route",
+  "signalPathCopyTooltip": "Copy signal path trace",
+  "signalPathCopied": "Signal path trace copied",
+  "signalPathEncodingsLabel": "Encodings",
+  "signalPathChannelsLabel": "Channels"
 }

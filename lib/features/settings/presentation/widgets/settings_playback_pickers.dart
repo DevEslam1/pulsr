@@ -609,7 +609,7 @@ void showDspPreferencePickerSheet(
                                           child: Text(
                                             opt.badge,
                                             style: TextStyle(
-                                              fontSize: AppFontSize.tiny,
+                                              fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w800,
                                               color: isSelected
                                                   ? primaryColor

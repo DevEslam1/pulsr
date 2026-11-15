@@ -241,7 +241,9 @@ class PlayerSwitcherItem extends StatelessWidget {
                     curve: context.motionCurve(Curves.easeOutCubic),
                     style: TextStyle(
                       fontFamily: 'Manrope',
-                      fontSize: isTablet ? 13.0 : 11.8,
+                      fontSize: isTablet
+                          ? AppFontSize.bodySmall
+                          : AppFontSize.label,
                       fontWeight:
                           isSelected ? FontWeight.w800 : FontWeight.w600,
                       color: isSelected ? p.textPrimary : p.textSecondary,
@@ -271,7 +273,7 @@ class PlayerSwitcherItem extends StatelessWidget {
                     child: Text(
                       '$badgeCount',
                       style: TextStyle(
-                        fontSize: isTablet ? 10.5 : 9.5,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w800,
                         color: isSelected
                             ? _readableOn(activeColor)
@@ -1276,7 +1278,7 @@ class PlayerTopBar extends StatelessWidget {
                                       .textTheme
                                       .bodySmall
                                       ?.copyWith(
-                                        fontSize: AppFontSize.tiny,
+                                        fontSize: AppFontSize.caption,
                                         letterSpacing: AppTracking.wide,
                                         fontWeight: FontWeight.w800,
                                         color: resolvedSubtitle.withValues(

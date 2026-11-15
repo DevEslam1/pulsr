@@ -259,7 +259,7 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
                 },
                 avatar: Text(
                   effect.emoji,
-                  style: const TextStyle(fontSize: 16),
+                  style: const TextStyle(fontSize: AppFontSize.bodyLarge),
                 ),
                 label: Text(effect.localizedLabel(context.l10n)),
                 labelStyle: TextStyle(
@@ -469,7 +469,7 @@ class AmbientStatusBadge extends StatelessWidget {
             ? context.l10n.ambientStatusPlaying
             : context.l10n.ambientStatusPaused,
         style: TextStyle(
-          fontSize: 10,
+          fontSize: AppFontSize.caption,
           fontWeight: FontWeight.w600,
           color: isPlaying ? p.accent : p.textSecondary,
         ),
@@ -508,7 +508,7 @@ class AmbientActiveBadge extends StatelessWidget {
       child: Text(
         context.l10n.ambientActiveCount(count).toUpperCase(),
         style: TextStyle(
-          fontSize: 10,
+          fontSize: AppFontSize.caption,
           fontWeight: FontWeight.w800,
           color: p.accent,
           letterSpacing: 0.5,
@@ -591,7 +591,7 @@ class _VolumeRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Row(
         children: [
-          Text(effect.emoji, style: const TextStyle(fontSize: 14)),
+          Text(effect.emoji, style: const TextStyle(fontSize: AppFontSize.body)),
           const SizedBox(width: 6),
           SizedBox(
             width: 72,

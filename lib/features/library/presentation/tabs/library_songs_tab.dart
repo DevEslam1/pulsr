@@ -136,7 +136,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w800,
                             color: p.info,
                           ),
@@ -306,7 +306,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                                           child: Text(
                                             badge,
                                             style: TextStyle(
-                                              fontSize: AppFontSize.tiny,
+                                              fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w800,
                                               color: p.info,
                                             ),

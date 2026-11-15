@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
 
@@ -29,6 +30,7 @@ class HeroMixCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
     return Semantics(
       button: true,
       label: '$title, $subtitle',
@@ -43,8 +45,8 @@ class HeroMixCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: AppRadii.r24All,
-            border: Border.all(color: p.hairline),
-            boxShadow: PulsrElevation.level2(context),
+            border: Border.all(color: isCalm ? p.borderSubtle : p.hairline),
+            boxShadow: isCalm ? null : PulsrElevation.level2(context),
           ),
           child: Stack(
             children: [
@@ -54,7 +56,8 @@ class HeroMixCard extends StatelessWidget {
                 top: -14,
                 child: ExcludeSemantics(
                   child: Icon(icon,
-                      size: 132, color: p.accent.withValues(alpha: 0.11)),
+                      size: 132,
+                      color: p.accent.withValues(alpha: isCalm ? 0.06 : 0.11)),
                 ),
               ),
               Padding(
@@ -72,12 +75,15 @@ class HeroMixCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: p.accent.withValues(alpha: 0.16),
+                              color: p.accent
+                                  .withValues(alpha: isCalm ? 0.10 : 0.16),
                               borderRadius: AppRadii.circular(999),
-                              border: Border.all(
-                                color: p.accent.withValues(alpha: 0.26),
-                                width: 0.8,
-                              ),
+                              border: isCalm
+                                  ? null
+                                  : Border.all(
+                                      color: p.accent.withValues(alpha: 0.26),
+                                      width: 0.8,
+                                    ),
                             ),
                             child: Text(
                               overline.toUpperCase(),
@@ -85,7 +91,7 @@ class HeroMixCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: p.accent,
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 1.1,
                               ),
@@ -98,7 +104,7 @@ class HeroMixCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: p.textPrimary,
-                              fontSize: 22,
+                              fontSize: AppFontSize.titleMedium,
                               fontWeight: FontWeight.w800,
                               height: 1.1,
                               letterSpacing: -0.3,
@@ -126,14 +132,16 @@ class HeroMixCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: p.accent,
                           shape: BoxShape.circle,
-                          boxShadow: [
-                            ...PulsrElevation.level2(context),
-                            BoxShadow(
-                              color: p.accent.withValues(alpha: 0.35),
-                              blurRadius: 16,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          boxShadow: isCalm
+                              ? null
+                              : [
+                                  ...PulsrElevation.level2(context),
+                                  BoxShadow(
+                                    color: p.accent.withValues(alpha: 0.35),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
                         ),
                         child: Icon(Icons.play_arrow_rounded,
                             color: p.onAccent, size: 30),

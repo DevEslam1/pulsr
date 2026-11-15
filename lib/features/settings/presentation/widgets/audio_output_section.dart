@@ -271,7 +271,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                               style: TextStyle(
                                 color: p.warning,
                                 fontWeight: FontWeight.w900,
-                                fontSize: AppFontSize.micro,
+                                fontSize: AppFontSize.caption,
                                 letterSpacing: AppTracking.medium,
                               ),
                             ),

@@ -34,6 +34,9 @@ void main() {
       expect(bluetoothCodecTier('AAC'), BluetoothCodecTier.standard);
       expect(bluetoothCodecTier('aptX'), BluetoothCodecTier.standard);
       expect(bluetoothCodecTier('aptX HD'), BluetoothCodecTier.high);
+      expect(bluetoothCodecTier('aptX Adaptive'), BluetoothCodecTier.high);
+      expect(bluetoothCodecTier('aptX Lossless'), BluetoothCodecTier.high);
+      expect(bluetoothCodecTier('LHDC V5'), BluetoothCodecTier.high);
       expect(bluetoothCodecTier('LDAC'), BluetoothCodecTier.high);
       expect(bluetoothCodecTier('LC3'), BluetoothCodecTier.high);
       expect(bluetoothCodecTier('LC3plus'), BluetoothCodecTier.high);
@@ -141,6 +144,55 @@ void main() {
       expect(
         run(trackRate: 44100, codecRate: 48000).reason,
         'bt-hires-align-rate',
+      );
+    });
+  });
+
+  group('bit depth alignment & dynamic buffer recommendation', () {
+    test('aligns 16-bit codec depth to 24-bit for 24-bit tracks when supported', () {
+      final p = run(
+        codec: 'LDAC',
+        codecDepth: 16,
+        trackDepth: 24,
+        selectableDepths: const [16, 24],
+      );
+      expect(p.alignCodecBitDepthTo, 24);
+    });
+
+    test('attempts 24-bit alignment for high-tier codecs with empty selectable list', () {
+      final p = run(
+        codec: 'LHDC V5',
+        codecDepth: 16,
+        trackDepth: 24,
+        selectableDepths: const [],
+      );
+      expect(p.alignCodecBitDepthTo, 24);
+    });
+
+    test('computes dynamic buffer duration by codec & bitrate', () {
+      expect(
+        recommendedBluetoothBufferMs(
+          codecName: 'LDAC',
+          sampleRateHz: 96000,
+          bitrateKbps: 990,
+        ),
+        280,
+      );
+      expect(
+        recommendedBluetoothBufferMs(codecName: 'aptX Lossless'),
+        280,
+      );
+      expect(
+        recommendedBluetoothBufferMs(codecName: 'aptX HD', sampleRateHz: 48000),
+        200,
+      );
+      expect(
+        recommendedBluetoothBufferMs(codecName: 'AAC'),
+        150,
+      );
+      expect(
+        recommendedBluetoothBufferMs(codecName: 'LC3', isLeAudio: true),
+        80,
       );
     });
   });

@@ -457,7 +457,7 @@ class _SidebarBrandHeader extends StatelessWidget {
                             color: p.accent,
                             fontWeight: FontWeight.w700,
                             letterSpacing: AppTracking.wide,
-                            fontSize: AppFontSize.micro,
+                            fontSize: AppFontSize.caption,
                           ),
                         ),
                     ],
@@ -581,7 +581,7 @@ class _SidebarNavItem extends StatelessWidget {
                                   label: Text(
                                     badgeCount! > 99 ? '99+' : '$badgeCount',
                                     style: const TextStyle(
-                                      fontSize: AppFontSize.micro,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -609,7 +609,7 @@ class _SidebarNavItem extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: AppFontSize.micro,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: isSelected
                                     ? FontWeight.w700
                                     : FontWeight.w500,
@@ -731,7 +731,7 @@ class _SidebarNavItem extends StatelessWidget {
                         trailingBadge ??
                             (badgeCount! > 99 ? '99+' : '$badgeCount'),
                         style: TextStyle(
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w800,
                           color: activeColor,
                           letterSpacing: AppTracking.overline,
@@ -910,7 +910,7 @@ class _SidebarBottomSection extends StatelessWidget {
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       color: p.textSecondary,
                                     ),
                                   ),

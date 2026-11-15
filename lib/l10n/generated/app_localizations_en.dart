@@ -10036,4 +10036,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get lyricsOffsetChipTooltip => 'Tap to fine-tune lyrics sync offset';
+
+  @override
+  String get visualDensityTitle => 'Visual density';
+
+  @override
+  String get visualDensitySubtitle =>
+      'Reduce chrome glows, extra gradient layers, and specular hairlines';
+
+  @override
+  String get visualDensityComfortable => 'Comfortable';
+
+  @override
+  String get visualDensityCalm => 'Calm';
+
+  @override
+  String get signalPathTitle => 'Audio Signal Path';
+
+  @override
+  String get signalPathSubtitle =>
+      'Real-time sample rate, bit depth, and route custody';
+
+  @override
+  String get dspDecoderOutput => 'Decoder Output';
+
+  @override
+  String get signalPathActiveRoute => 'Active Output Route';
+
+  @override
+  String get signalPathCopyTooltip => 'Copy signal path trace';
+
+  @override
+  String get signalPathCopied => 'Signal path trace copied';
+
+  @override
+  String get signalPathEncodingsLabel => 'Encodings';
+
+  @override
+  String get signalPathChannelsLabel => 'Channels';
 }

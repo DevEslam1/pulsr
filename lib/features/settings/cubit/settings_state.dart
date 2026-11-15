@@ -12,6 +12,9 @@ part 'settings_state.freezed.dart';
 
 enum AppThemeMode { dark, light, amoled, system }
 
+/// Controls visual chrome complexity (glows, layered gradients, specular edges).
+enum VisualDensityMode { comfortable, calm }
+
 /// Where the app's accent color comes from.
 /// - [system]: OS wallpaper palette (Material You / Monet, Android 12+),
 ///   falling back to album artwork when the OS provides no dynamic colors.
@@ -85,6 +88,8 @@ abstract class SettingsState with _$SettingsState {
     @Default(true) bool resumeAfterInterruption,
     @Default(true) bool waveformSeekBarEnabled,
     @Default(AppThemeMode.dark) AppThemeMode themeMode,
+    @Default(VisualDensityMode.comfortable)
+    VisualDensityMode visualDensityMode,
     @Default(false) bool autoThemeByTime,
     @Default(false) bool highContrast,
     // Eye comfort: when true, peak white text is softened (dim white point)
@@ -237,6 +242,9 @@ abstract class SettingsState with _$SettingsState {
 
   /// True when the full professional control surface should be shown.
   bool get isProfessional => experienceMode == ExperienceMode.professional;
+
+  /// True when Calm visual density is selected (reduced glows & chrome layers).
+  bool get isCalmDensity => visualDensityMode == VisualDensityMode.calm;
 
   /// True when the accent should track album artwork. Kept for call sites that
   /// only care about the per-song artwork behavior (e.g. Now Playing).

@@ -494,7 +494,7 @@ class _FavoritesHeaderCard extends StatelessWidget {
                             child: Text(
                               '$losslessCount Lossless',
                               style: TextStyle(
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 color: p.info,
                               ),
@@ -712,7 +712,7 @@ class _FavoriteGridCard extends StatelessWidget {
                             child: Text(
                               badge,
                               style: TextStyle(
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 color: p.info,
                               ),

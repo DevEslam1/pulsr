@@ -379,4 +379,7 @@ class PrefsKeys {
   // first N app sessions before fading out permanently.
   static const String dockGrabChevronSessions =
       'dock_grab_chevron_sessions_v1';
+
+  // Visual density mode: 'comfortable' (full gradients/glows) | 'calm'.
+  static const String visualDensityMode = 'setting_visual_density_mode';
 }

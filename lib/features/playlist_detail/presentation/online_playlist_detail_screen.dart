@@ -977,7 +977,7 @@ class _OnlinePlaylistDetailScreenState
                                 style: TextStyle(
                                   color: selected ? p.accent : p.textSecondary,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                   fontFeatures: const [
                                     FontFeature.tabularFigures(),
                                   ],
@@ -1389,7 +1389,7 @@ class _OnlinePlaylistDetailScreenState
                           context.l10n.ytmHeader,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w900,
                             letterSpacing: AppTracking.medium,
                           ),
@@ -1664,7 +1664,7 @@ class _OnlinePlaylistDetailScreenState
           Text(
             label,
             style: TextStyle(
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w700,
               color: highlight ? p.accent : p.textSecondary,
               fontFeatures: const [FontFeature.tabularFigures()],

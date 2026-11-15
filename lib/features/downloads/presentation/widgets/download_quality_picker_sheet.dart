@@ -205,7 +205,7 @@ class _DownloadQualityPickerSheetState
                                       child: Text(
                                         opt.badge,
                                         style: TextStyle(
-                                          fontSize: AppFontSize.tiny,
+                                          fontSize: AppFontSize.caption,
                                           fontWeight: FontWeight.w700,
                                           color: isSelected
                                               ? p.accent
@@ -269,7 +269,7 @@ class _DownloadQualityPickerSheetState
             label: Text(context.l10n.confirm),
             style: FilledButton.styleFrom(
               backgroundColor: p.accent,
-              foregroundColor: Colors.white,
+              foregroundColor: p.onAccent,
               minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
               shape: RoundedRectangleBorder(
                 borderRadius: AppRadii.r14All,

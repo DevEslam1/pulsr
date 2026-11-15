@@ -242,7 +242,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                   context.l10n.notAppliedWarn,
                   style: TextStyle(
                     color: p.error,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -793,7 +793,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                       ? context.l10n.dspStatOn
                                       : context.l10n.dspStatOff),
                               style: TextStyle(
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 color: dspBlockedGlobal != null
                                     ? p.error
@@ -947,7 +947,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                       ? context.l10n.dspStatOn
                                       : context.l10n.dspStatOff),
                               style: TextStyle(
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 color: dspBlockedGlobal != null
                                     ? p.error
@@ -1062,7 +1062,7 @@ extension _EqSheetShell on _EqualizerSheetState {
         Text(
           context.l10n.eqSoundProfiles,
           style: TextStyle(
-            fontSize: AppFontSize.tiny,
+            fontSize: AppFontSize.caption,
             fontWeight: FontWeight.w800,
             letterSpacing: AppTracking.wide,
             color: p.textTertiary,
@@ -1157,7 +1157,7 @@ extension _EqSheetShell on _EqualizerSheetState {
         Text(
           context.l10n.eqQuickToneDials,
           style: TextStyle(
-            fontSize: AppFontSize.tiny,
+            fontSize: AppFontSize.caption,
             fontWeight: FontWeight.w800,
             letterSpacing: AppTracking.wide,
             color: p.textTertiary,
@@ -1393,7 +1393,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           Text(
             context.l10n.eqSoundProfiles,
             style: TextStyle(
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w800,
               letterSpacing: AppTracking.wide,
               color: p.textTertiary,
@@ -1518,7 +1518,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     Text(
                       subtitle,
                       style: TextStyle(
-                          fontSize: AppFontSize.tiny, color: p.textTertiary),
+                          fontSize: AppFontSize.caption, color: p.textTertiary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -2034,7 +2034,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           '${state.selectedHeadphoneProfile!.brand} • '
                           '${context.l10n.preampLabel}: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
                           style: TextStyle(
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               color: p.textTertiary),
                         ),
                       ],
@@ -2190,7 +2190,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w700,
                             color: p.accent,
                           ),
@@ -2640,7 +2640,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   ),
                                   style: TextStyle(
                                       color: p.error,
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w600),
                                 ),
                               ),
@@ -2843,7 +2843,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           context.l10n.dspLimitedForHeadroom,
                           style: TextStyle(
                             color: p.textTertiary,
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                           ),
                         ),
                       ],
@@ -3026,7 +3026,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 preampDb.toStringAsFixed(1)),
                             style: TextStyle(
                                 color: p.error,
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -3047,7 +3047,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                             context.l10n.highBoostWarn,
                             style: TextStyle(
                                 color: p.error,
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w600),
                           ),
                         ),
@@ -3067,7 +3067,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           context.l10n.dspLimitedForHeadroom,
                           style: TextStyle(
                             color: p.textTertiary,
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                           ),
                         ),
                       ],
@@ -3136,7 +3136,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   ? 'Spatial API'
                                   : 'Emulated',
                               style: TextStyle(
-                                fontSize: AppFontSize.micro,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
                                 color: state.isSpatializerSupported
                                     ? p.accent
@@ -3308,7 +3308,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                         Text(
                           context.l10n.appliedTuningProfile,
                           style: TextStyle(
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w700,
                               color: p.accent),
                         ),

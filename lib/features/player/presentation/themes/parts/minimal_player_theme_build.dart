@@ -256,7 +256,7 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
       label,
       style: TextStyle(
         fontFamily: 'monospace',
-        fontSize: 9.5,
+        fontSize: AppFontSize.caption,
         fontWeight: FontWeight.w800,
         color: textColor,
         letterSpacing: 0.6,

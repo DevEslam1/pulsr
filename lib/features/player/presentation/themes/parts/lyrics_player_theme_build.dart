@@ -22,7 +22,7 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
           Text(
             context.l10n.lyrics,
             style: TextStyle(
-              fontSize: AppFontSize.micro,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w900,
               letterSpacing: AppTracking.overline,
               color: activeColor,

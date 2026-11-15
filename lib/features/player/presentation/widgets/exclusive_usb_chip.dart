@@ -153,8 +153,7 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
                 context.l10n.exclusiveUsbActive,
                 style: TextStyle(
                   color: AppColors.dacGold,
-                  fontSize:
-                      widget.compact ? AppFontSize.tiny : AppFontSize.caption,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
@@ -175,8 +174,7 @@ class _ExclusiveUsbChipState extends State<ExclusiveUsbChip> {
                   color: _underruns > 0
                       ? AppColors.warning
                       : AppColors.dacGold.withValues(alpha: 0.8),
-                  fontSize:
-                      widget.compact ? AppFontSize.tiny : AppFontSize.caption,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w600,
                 ),
               ),

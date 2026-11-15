@@ -670,7 +670,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                         context.l10n.visualizerCpuFallbackBadge,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -699,7 +699,7 @@ class AudioVisualizerState extends State<AudioVisualizer>
                         context.l10n.visualizerSimulationNotice,
                         style: const TextStyle(
                           color: Colors.white70,
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

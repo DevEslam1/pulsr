@@ -10131,4 +10131,42 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get lyricsOffsetChipTooltip =>
       'Toca para ajustar con precisión la sincronización';
+
+  @override
+  String get visualDensityTitle => 'Densidad visual';
+
+  @override
+  String get visualDensitySubtitle =>
+      'Reduce brillos, capas de degradado y líneas especulares en la interfaz';
+
+  @override
+  String get visualDensityComfortable => 'Cómodo';
+
+  @override
+  String get visualDensityCalm => 'Calmado';
+
+  @override
+  String get signalPathTitle => 'Ruta de señal de audio';
+
+  @override
+  String get signalPathSubtitle =>
+      'Custodia en tiempo real de frecuencia, bits y salida';
+
+  @override
+  String get dspDecoderOutput => 'Salida del decodificador';
+
+  @override
+  String get signalPathActiveRoute => 'Ruta de salida activa';
+
+  @override
+  String get signalPathCopyTooltip => 'Copiar traza de señal';
+
+  @override
+  String get signalPathCopied => 'Traza de señal copiada';
+
+  @override
+  String get signalPathEncodingsLabel => 'Codificaciones';
+
+  @override
+  String get signalPathChannelsLabel => 'Canales';
 }

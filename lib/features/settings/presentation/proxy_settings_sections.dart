@@ -321,7 +321,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                               context.l10n.activeLabel,
                               style: TextStyle(
                                 color: p.onAccent,
-                                fontSize: AppFontSize.micro,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: AppTracking.medium,
                               ),
@@ -422,7 +422,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                             : context.l10n.settingsHttpLabel,
                         style: TextStyle(
                           color: p.textSecondary,
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -445,7 +445,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                               item.username,
                               style: TextStyle(
                                   color: p.accent,
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w600),
                             ),
                           ],
@@ -483,7 +483,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
             Text(context.l10n.testingLabel,
                 style: TextStyle(
                     color: p.accent,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600)),
           ],
         ),
@@ -516,7 +516,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
               '${latency}ms',
               style: TextStyle(
                 color: color,
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
               ),
@@ -544,7 +544,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
               context.l10n.failedLabel,
               style: TextStyle(
                   color: p.error,
-                  fontSize: AppFontSize.tiny,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w700),
             ),
           ],
@@ -563,7 +563,7 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
         context.l10n.unverifiedLabel,
         style: TextStyle(
             color: p.textTertiary,
-            fontSize: AppFontSize.tiny,
+            fontSize: AppFontSize.caption,
             fontWeight: FontWeight.w600),
       ),
     );

@@ -178,7 +178,7 @@ mixin PhoneLayoutSection
                             context.l10n.settingsSetUpSoundDesc,
                             style: TextStyle(
                               color: p.textSecondary,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                             ),
                           ),
                         ],
@@ -221,7 +221,7 @@ mixin PhoneLayoutSection
                     context.l10n.bitPerfectLabel,
                     style: TextStyle(
                       color: p.warning,
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w800,
                     ),
                   ),

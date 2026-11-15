@@ -72,7 +72,7 @@ class QuranModeBadge extends StatelessWidget {
                   context.l10n.quranMode,
                   style: TextStyle(
                     color: context.palette.textPrimary,
-                    fontSize: compact ? AppFontSize.tiny : AppFontSize.label,
+                    fontSize: compact ? AppFontSize.caption : AppFontSize.label,
                     fontWeight: FontWeight.w800,
                     letterSpacing: AppTracking.overline,
                   ),

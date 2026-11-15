@@ -509,7 +509,7 @@ class _AuthSheetState extends State<AuthSheet> {
                                   context.l10n.ytmHeader,
                                   style: TextStyle(
                                     color: p.textTertiary,
-                                    fontSize: AppFontSize.tiny,
+                                    fontSize: AppFontSize.caption,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: AppTracking.overline,
                                   ),

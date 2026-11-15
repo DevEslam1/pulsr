@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/services/ytm_account_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -24,6 +25,7 @@ class SettingsHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
 
     return BlocBuilder<AuthCubit, AuthState>(
       builder: (context, state) {
@@ -54,38 +56,41 @@ class SettingsHeroCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: p.surfaceContainer,
             borderRadius: AppRadii.cardRadius,
-            border: Border.all(color: p.hairline),
-            boxShadow: [
-              BoxShadow(
-                color: (user != null ? p.accent : Colors.black)
-                    .withValues(alpha: p.isDark ? 0.08 : 0.04),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            border: Border.all(color: isCalm ? p.borderSubtle : p.hairline),
+            boxShadow: isCalm
+                ? null
+                : [
+                    BoxShadow(
+                      color: (user != null ? p.accent : Colors.black)
+                          .withValues(alpha: p.isDark ? 0.08 : 0.04),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
           ),
           child: ClipRRect(
             borderRadius: AppRadii.cardRadius,
             child: Stack(
               children: [
                 // Subtle accent gradient glow on top-right corner
-                PositionedDirectional(
-                  top: -24,
-                  end: -24,
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          p.accent.withValues(alpha: 0.12),
-                          Colors.transparent,
-                        ],
+                if (!isCalm)
+                  PositionedDirectional(
+                    top: -24,
+                    end: -24,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            p.accent.withValues(alpha: 0.12),
+                            Colors.transparent,
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 Padding(
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: Column(
@@ -210,7 +215,7 @@ class SettingsHeroCard extends StatelessWidget {
                                               context.l10n.syncedLabel,
                                               style: TextStyle(
                                                 color: p.accent,
-                                                fontSize: AppFontSize.tiny,
+                                                fontSize: AppFontSize.caption,
                                                 fontWeight: FontWeight.w800,
                                                 letterSpacing:
                                                     AppTracking.medium,
@@ -513,7 +518,7 @@ class SettingsHeroCard extends StatelessWidget {
                                       status,
                                       style: TextStyle(
                                         color: p.success,
-                                        fontSize: AppFontSize.tiny,
+                                        fontSize: AppFontSize.caption,
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: AppTracking.medium,
                                       ),
@@ -557,7 +562,8 @@ class SettingsHeroCard extends StatelessWidget {
                       label: Text(context.l10n.signIn),
                       style: FilledButton.styleFrom(
                         backgroundColor: AppColors.ytRed,
-                        foregroundColor: Colors.white,
+                        foregroundColor:
+                            AppColors.textOnAccent(AppColors.ytRed),
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s14,
                             vertical: AppSpacing.xs),

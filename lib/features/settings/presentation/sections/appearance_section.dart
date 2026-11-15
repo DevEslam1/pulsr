@@ -264,6 +264,60 @@ mixin SettingsAppearanceSection
           ),
         ),
         _divider(p),
+        Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.md, AppSpacing.s14, AppSpacing.md, AppSpacing.s14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.visualDensityTitle,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: AppFontSize.body,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                context.l10n.visualDensitySubtitle,
+                style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: AppFontSize.label,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.s10),
+              SizedBox(
+                width: double.infinity,
+                child: PulsrSegmentedControl(
+                  key: const ValueKey('settings_visual_density_segmented'),
+                  fitLabels: true,
+                  segments: [
+                    PulsrSegment(
+                      label: context.l10n.visualDensityComfortable,
+                      icon: Icons.auto_awesome_rounded,
+                    ),
+                    PulsrSegment(
+                      label: context.l10n.visualDensityCalm,
+                      icon: Icons.spa_outlined,
+                    ),
+                  ],
+                  selectedIndex:
+                      state.visualDensityMode == VisualDensityMode.calm ? 1 : 0,
+                  onChanged: (i) {
+                    PulsrHaptics.selection();
+                    cubit.setVisualDensityMode(
+                      i == 1
+                          ? VisualDensityMode.calm
+                          : VisualDensityMode.comfortable,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        _divider(p),
         _navTile(
           context,
           Icons.language_rounded,

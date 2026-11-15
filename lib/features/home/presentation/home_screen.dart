@@ -324,7 +324,9 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
         left: false,
         right: false,
         child: Padding(
-          padding: EdgeInsets.only(left: cutoutLeft, right: cutoutRight),
+          padding: Directionality.of(context) == TextDirection.rtl
+              ? EdgeInsetsDirectional.only(start: cutoutRight, end: cutoutLeft)
+              : EdgeInsetsDirectional.only(start: cutoutLeft, end: cutoutRight),
           child: Center(
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
@@ -380,7 +382,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                                         .toUpperCase(),
                                     style: TextStyle(
                                       color: p.textTertiary,
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 1.1,
                                     ),

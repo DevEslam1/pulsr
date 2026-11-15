@@ -1071,7 +1071,7 @@ class _StartPage extends StatelessWidget {
         Text(
           title.toUpperCase(),
           style: TextStyle(
-            fontSize: AppFontSize.tiny,
+            fontSize: AppFontSize.caption,
             fontWeight: FontWeight.w800,
             color: p.textTertiary,
             letterSpacing: AppTracking.wide,
@@ -1155,7 +1155,7 @@ class _SavedSearchChip extends StatelessWidget {
                     decoded.filter,
                     style: TextStyle(
                       color: palette.accent,
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -2056,7 +2056,7 @@ Widget _buildSectionHeader({
             child: Text(
               '$count',
               style: TextStyle(
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w700,
                 color: p.textSecondary,
                 fontFeatures: const [FontFeature.tabularFigures()],
@@ -2179,7 +2179,7 @@ Widget _buildRecentSectionHeader({
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w800,
                     letterSpacing: AppTracking.wide,
                     color: p.textTertiary,

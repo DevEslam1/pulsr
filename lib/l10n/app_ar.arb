@@ -5802,5 +5802,17 @@
   "lyricsOffsetEarlier": "تقديم الكلمات (-100 مللي ثانية)",
   "lyricsOffsetLater": "تأخير الكلمات (+100 مللي ثانية)",
   "lyricsOffsetAdjusted": "تم ضبط إزاحة الكلمات على {offset}",
-  "lyricsOffsetChipTooltip": "انقر لضبط مزامنة الكلمات بدقة"
+  "lyricsOffsetChipTooltip": "انقر لضبط مزامنة الكلمات بدقة",
+  "visualDensityTitle": "الكثافة البصرية",
+  "visualDensitySubtitle": "تقليل التوهج وطبقات التدرج والخطوط اللامعة في الواجهة",
+  "visualDensityComfortable": "مريح",
+  "visualDensityCalm": "هادئ",
+  "signalPathTitle": "مسار الإشارة الصوتية",
+  "signalPathSubtitle": "تتبع معدل العينة وعمق البت والمسار لحظياً",
+  "dspDecoderOutput": "مخرج وحدة فك الترميز",
+  "signalPathActiveRoute": "مسار الإخراج النشط",
+  "signalPathCopyTooltip": "نسخ مسار الإشارة",
+  "signalPathCopied": "تم نسخ مسار الإشارة",
+  "signalPathEncodingsLabel": "التنسيقات المدعومة",
+  "signalPathChannelsLabel": "القنوات"
 }

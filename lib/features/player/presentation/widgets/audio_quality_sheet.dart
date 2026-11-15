@@ -14,6 +14,8 @@ import '../../../../data/db/app_database.dart';
 import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
+import '../../../../domain/models/audio_signal_path.dart';
+import 'audio_signal_path_card.dart';
 import '../../../../data/services/hires_audio_service.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../../core/constants/audio_feature_info.dart';
@@ -215,7 +217,7 @@ class AudioQualitySheet extends StatelessWidget {
                 Text(
                   context.l10n.downloadsMatchStream,
                   style: TextStyle(
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     color: activeColor,
                     fontWeight: FontWeight.w700,
                   ),
@@ -342,14 +344,14 @@ class AudioQualitySheet extends StatelessWidget {
                     vertical: AppSpacing.s2,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFD700).withValues(alpha: 0.18),
+                    color: AppColors.dacGold.withValues(alpha: 0.18),
                     borderRadius: AppRadii.r6All,
                   ),
                   child: Text(
                     context.l10n.usbDacAttached,
                     style: TextStyle(
                       color: AppColors.dacGold,
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -513,13 +515,36 @@ class AudioQualitySheet extends StatelessWidget {
                   Text(
                     context.l10n.audioQualityCapabilityProbe,
                     style: TextStyle(
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       color: p.textSecondary,
                     ),
                   ),
                 ],
               );
             },
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          // Real-Time 4-Stage Audio Signal Path Readout
+          AudioSignalPathCard(
+            signalPath: AudioSignalPath.fromOutputInfo(
+              sourceCodec: info.format,
+              sourceSampleRate: effectiveSourceSampleRate(
+                tagged: song.sampleRate ?? 0,
+                decoded: outputDevice?.decodedSampleRate ?? 0,
+              ),
+              sourceBitDepth: effectiveSourceBitDepth(
+                tagged: song.bitDepth ?? 0,
+                decoded: outputDevice?.decodedBitDepth ?? 0,
+              ),
+              isDsdSource: info.format.toUpperCase().contains('DSD') ||
+                  info.codecName.toUpperCase().contains('DSD'),
+              output: outputDevice,
+              uac2DirectActive: usbStatus.streamingActive,
+              aaudioEnabled: settingsState?.aaudioOutputEnabled == true,
+              floatOutputEnabled: settingsState?.floatOutputEnabled == true,
+            ),
+            activeColor: activeColor,
           ),
           const SizedBox(height: AppSpacing.md),
 
@@ -1286,7 +1311,7 @@ class AudioQualitySheet extends StatelessWidget {
                               context.l10n.activeLabel,
                               style: TextStyle(
                                 color: goldAccent,
-                                fontSize: AppFontSize.micro,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w900,
                                 letterSpacing: AppTracking.medium,
                               ),
@@ -1306,7 +1331,7 @@ class AudioQualitySheet extends StatelessWidget {
                               context.l10n.armedLabel,
                               style: TextStyle(
                                 color: p.accent,
-                                fontSize: AppFontSize.micro,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: AppTracking.medium,
                               ),
@@ -1560,6 +1585,14 @@ class AudioQualitySheet extends StatelessWidget {
             : (info.sampleRate != 'Unknown' && info.sampleRate.isNotEmpty
                 ? '${info.format} (${info.sampleRate})'
                 : info.format));
+    final decRate = outputDevice?.decodedSampleRate ?? 0;
+    final decDepth = outputDevice?.decodedBitDepth ?? 0;
+    final decEnc = outputDevice?.decodedPcmEncoding ?? 0;
+    final decoderLabel = decRate > 0 && decDepth > 0
+        ? '${AudioSignalPath.pcmEncodingName(decEnc)} • '
+            '${_sampleRateLabel(decRate)} / $decDepth-bit'
+        : AudioSignalPath.pcmEncodingName(decEnc);
+
     // Derived from the live state instead of being hardcoded, so the chain
     // never claims processing that is switched off. Any stage the engine has
     // beyond the four named ones is counted, not silently dropped: the verdict
@@ -1663,7 +1696,7 @@ class AudioQualitySheet extends StatelessWidget {
                       context.l10n.bpGuardrails,
                       style: TextStyle(
                         color: AppColors.dacGold,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1691,7 +1724,7 @@ class AudioQualitySheet extends StatelessWidget {
                       _chainWarningText(context, assessment),
                       style: TextStyle(
                         color: p.warning,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                         height: 1.25,
                       ),
@@ -1711,6 +1744,15 @@ class AudioQualitySheet extends StatelessWidget {
           _SignalChainConnector(p: p),
           _SignalChainNode(
             step: 2,
+            title: context.l10n.dspDecoderOutput,
+            detail: decoderLabel,
+            icon: Icons.memory_rounded,
+            color: activeColor,
+            p: p,
+          ),
+          _SignalChainConnector(p: p),
+          _SignalChainNode(
+            step: 3,
             title: context.l10n.dspDspProcessing,
             detail: dspLabel,
             icon: isBitPerfect
@@ -1722,7 +1764,7 @@ class AudioQualitySheet extends StatelessWidget {
           ),
           _SignalChainConnector(p: p),
           _SignalChainNode(
-            step: 3,
+            step: 4,
             title: context.l10n.dspResamplingEngine,
             detail: resamplerLabel,
             icon: Icons.transform_rounded,
@@ -1732,7 +1774,7 @@ class AudioQualitySheet extends StatelessWidget {
           ),
           _SignalChainConnector(p: p),
           _SignalChainNode(
-            step: 4,
+            step: 5,
             title: context.l10n.dspOutputDriver,
             detail: driverLabel,
             icon: Icons.cable_rounded,
@@ -1741,7 +1783,7 @@ class AudioQualitySheet extends StatelessWidget {
           ),
           _SignalChainConnector(p: p),
           _SignalChainNode(
-            step: 5,
+            step: 6,
             title: context.l10n.dspHardwareEndpoint,
             detail: assessment.isVerified
                 ? '$dacLabel • ${_sampleRateLabel(assessment.outputSampleRate)} / '
@@ -1842,7 +1884,7 @@ class _SignalChainNode extends StatelessWidget {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: AppFontSize.tiny,
+                  fontSize: AppFontSize.caption,
                   letterSpacing: AppTracking.wide,
                   fontWeight: FontWeight.w800,
                   color: isDimmed
@@ -1958,7 +2000,7 @@ class _OptionPill extends StatelessWidget {
                   Text(
                     subtitle,
                     style: TextStyle(
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w500,
                       color: isSelected
@@ -2260,7 +2302,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           Text(
             context.l10n.supportedCodecs,
             style: TextStyle(
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               letterSpacing: AppTracking.wide,
               fontWeight: FontWeight.w700,
               color: p.textTertiary,
@@ -2349,7 +2391,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               child: Text(
                 context.l10n.leAudioRequiresBle,
                 style: TextStyle(
-                  fontSize: AppFontSize.tiny,
+                  fontSize: AppFontSize.caption,
                   color: p.textTertiary,
                   fontStyle: FontStyle.italic,
                 ),
@@ -2370,7 +2412,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     Text(
                       context.l10n.sampleRateLabel,
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         letterSpacing: AppTracking.wide,
                         fontWeight: FontWeight.w700,
                         color: p.textTertiary,
@@ -2442,7 +2484,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     Text(
                       context.l10n.bitDepthLabel,
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         letterSpacing: AppTracking.wide,
                         fontWeight: FontWeight.w700,
                         color: p.textTertiary,
@@ -2525,7 +2567,7 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                 Text(
                   context.l10n.ldacQuality,
                   style: TextStyle(
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     letterSpacing: AppTracking.wide,
                     fontWeight: FontWeight.w700,
                     color: _ldacAccent.withValues(alpha: 0.8),

@@ -271,7 +271,7 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
                 child: Text(
                   context.l10n.simulatedPitchBadge,
                   style: const TextStyle(
-                    fontSize: 8.5,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.8,
                     color: Colors.amber,
@@ -318,7 +318,7 @@ class _KaraokePitchHighwayState extends State<KaraokePitchHighway>
                     Text(
                       '${_lastSmoothed.noteName} • ${_lastSmoothed.frequencyHz.toStringAsFixed(0)} Hz',
                       style: TextStyle(
-                        fontSize: AppFontSize.micro,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                         color: p.textPrimary,
                         fontFeatures: const [FontFeature.tabularFigures()],

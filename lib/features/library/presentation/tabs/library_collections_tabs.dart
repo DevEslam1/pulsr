@@ -120,7 +120,7 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                           child: Text(
                                             '${album.songCount}',
                                             style: const TextStyle(
-                                              fontSize: AppFontSize.tiny,
+                                              fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w800,
                                               color: Colors.white,
                                             ),

@@ -156,7 +156,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                   context.l10n.dspStatusDegraded,
                   style: TextStyle(
                     color: p.error,
-                    fontSize: AppFontSize.micro,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -319,7 +319,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                       bandLabels[i],
                       style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: AppFontSize.micro,
+                        fontSize: AppFontSize.caption,
                       ),
                     ),
                   ],
@@ -373,7 +373,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                       'B${i + 1}',
                       style: TextStyle(
                         color: p.textSecondary,
-                        fontSize: AppFontSize.nano,
+                        fontSize: AppFontSize.caption,
                       ),
                     ),
                   ],

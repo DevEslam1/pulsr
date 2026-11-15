@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/widgets/cached_artwork.dart';
@@ -71,21 +72,23 @@ class MilkdropPlayerTheme extends StatelessWidget {
           width: 0.8,
         ),
       ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.blur_on_rounded, size: 12, color: Colors.white),
-          SizedBox(width: 4),
-          Text(
-            'MILKDROP',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
-              color: Colors.white,
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.blur_on_rounded, size: 12, color: Colors.white),
+            SizedBox(width: 4),
+            Text(
+              'MILKDROP',
+              style: TextStyle(
+                fontSize: AppFontSize.tiny,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+                color: Colors.white,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 

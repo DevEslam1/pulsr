@@ -1007,7 +1007,7 @@ class _SignalStageChip extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w800,
               letterSpacing: 0.5,
               color: isActive ? p.textPrimary : p.textSecondary,

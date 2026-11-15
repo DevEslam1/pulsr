@@ -614,7 +614,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   color: p.accent,
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: AppTracking.wide,
                                 ),
@@ -921,7 +921,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 style: TextStyle(
                                   color: selected ? p.accent : p.textSecondary,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                   fontFeatures: const [
                                     FontFeature.tabularFigures(),
                                   ],

@@ -52,54 +52,56 @@ class _PulsrViewportDebugOverlayState extends State<PulsrViewportDebugOverlay> {
                   borderRadius: AppRadii.r8All,
                   border: Border.all(color: Colors.white24, width: 0.8),
                 ),
-                child: _minimized
-                    ? Text(
-                        '📐 ${vp.width.round()}x${vp.height.round()} [${vp.sizeClass.name}]',
-                        style: const TextStyle(
-                          color: Colors.greenAccent,
-                          fontSize: AppFontSize.tiny,
-                          fontWeight: FontWeight.bold,
-                          fontFamily: 'monospace',
-                        ),
-                      )
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'VIEWPORT: ${vp.width.round()} x ${vp.height.round()}',
-                            style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.bold),
+                child: ExcludeSemantics(
+                  child: _minimized
+                      ? Text(
+                          '📐 ${vp.width.round()}x${vp.height.round()} [${vp.sizeClass.name}]',
+                          style: const TextStyle(
+                            color: Colors.greenAccent,
+                            fontSize: AppFontSize.tiny,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'monospace',
                           ),
-                          Text(
-                              'Class: ${vp.deviceClass.name} | Size: ${vp.sizeClass.name}',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'VIEWPORT: ${vp.width.round()} x ${vp.height.round()}',
                               style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.tiny)),
-                          Text(
-                              'Orientation: ${vp.orientation.name} | Short: ${vp.isShortHeight}',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.tiny)),
-                          Text(
-                              'Content Max: ${vp.contentMaxWidth.round()}dp | Pad: ${vp.pagePadding.round()}dp',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.tiny)),
-                          Text(
-                              'Grid Cols: ${vp.gridColumns} | Nav: ${vp.navMode.name}',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.tiny)),
-                          Text(
-                              'Insets: T${insets.top.round()} B${insets.bottom.round()} L${insets.left.round()} R${insets.right.round()}',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: AppFontSize.tiny)),
-                        ],
-                      ),
+                                  color: Colors.greenAccent,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                                'Class: ${vp.deviceClass.name} | Size: ${vp.sizeClass.name}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: AppFontSize.tiny)),
+                            Text(
+                                'Orientation: ${vp.orientation.name} | Short: ${vp.isShortHeight}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: AppFontSize.tiny)),
+                            Text(
+                                'Content Max: ${vp.contentMaxWidth.round()}dp | Pad: ${vp.pagePadding.round()}dp',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: AppFontSize.tiny)),
+                            Text(
+                                'Grid Cols: ${vp.gridColumns} | Nav: ${vp.navMode.name}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: AppFontSize.tiny)),
+                            Text(
+                                'Insets: T${insets.top.round()} B${insets.bottom.round()} L${insets.left.round()} R${insets.right.round()}',
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: AppFontSize.tiny)),
+                          ],
+                        ),
+                ),
               ),
             ),
           ),

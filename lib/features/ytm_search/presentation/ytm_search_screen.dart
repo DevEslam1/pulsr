@@ -272,7 +272,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                 context.l10n.history.toUpperCase(),
                 style: TextStyle(
                   color: p.textTertiary,
-                  fontSize: AppFontSize.tiny,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w800,
                   letterSpacing: AppTracking.wide,
                 ),

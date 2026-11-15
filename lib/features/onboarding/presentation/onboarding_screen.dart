@@ -409,7 +409,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             child: Text(
                               '${_currentPage + 1} / $_pageCount',
                               style: TextStyle(
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
                                 color: p.textSecondary,
                               ),
@@ -1328,7 +1328,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 Text(
                                   '24-bit / 192kHz • FLAC',
                                   style: TextStyle(
-                                    fontSize: AppFontSize.tiny,
+                                    fontSize: AppFontSize.caption,
                                     fontWeight: FontWeight.w700,
                                     color: p.accent,
                                   ),
@@ -1514,7 +1514,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: p.textSecondary,
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w700,
             ),
           ),

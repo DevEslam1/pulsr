@@ -244,7 +244,7 @@ class _DockStyleOption extends StatelessWidget {
                         Text(
                           bestFor,
                           style: TextStyle(
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w700,
                             color: selected
                                 ? p.accent.withValues(alpha: 0.92)
@@ -351,7 +351,7 @@ class _LiveDockPreviewBanner extends StatelessWidget {
                     Text(
                       context.l10n.dockStylePreviewBadge,
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w800,
                         color: p.accent,
                         letterSpacing: 0.5,
@@ -364,7 +364,7 @@ class _LiveDockPreviewBanner extends StatelessWidget {
               Text(
                 dockStyleName(context, previewMode),
                 style: TextStyle(
-                  fontSize: AppFontSize.tiny,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w700,
                   color: p.textSecondary,
                 ),
@@ -446,15 +446,17 @@ class _HeroDockStage extends StatelessWidget {
                 Icon(Icons.play_arrow_rounded, size: 12, color: p.accent),
                 const SizedBox(width: AppSpacing.xxs),
                 Expanded(
-                  child: Text(
-                    context.l10n.dockStyleNowPlaying,
-                    style: TextStyle(
-                      fontSize: AppFontSize.tiny,
-                      fontWeight: FontWeight.w700,
-                      color: p.textPrimary.withValues(alpha: opacity),
+                  child: ExcludeSemantics(
+                    child: Text(
+                      context.l10n.dockStyleNowPlaying,
+                      style: TextStyle(
+                        fontSize: AppFontSize.tiny,
+                        fontWeight: FontWeight.w700,
+                        color: p.textPrimary.withValues(alpha: opacity),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Icon(Icons.skip_next_rounded, size: 11, color: p.textSecondary),
@@ -588,15 +590,17 @@ class _DockMicroMockup extends StatelessWidget {
               Icon(Icons.play_arrow_rounded, size: 8, color: p.accent),
               const SizedBox(width: 2),
               Flexible(
-                child: Text(
-                  context.l10n.nowPlayingPreview,
-                  style: TextStyle(
-                    fontSize: 6,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary.withValues(alpha: opacity),
+                child: ExcludeSemantics(
+                  child: Text(
+                    context.l10n.nowPlayingPreview,
+                    style: TextStyle(
+                      fontSize: AppFontSize.nano,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary.withValues(alpha: opacity),
+                    ),
+                    overflow: TextOverflow.clip,
+                    maxLines: 1,
                   ),
-                  overflow: TextOverflow.clip,
-                  maxLines: 1,
                 ),
               ),
             ],

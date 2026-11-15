@@ -594,7 +594,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             context.l10n.folderPersistentExcludedBadge,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.4,
             ),
@@ -817,7 +817,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 0.6,
                                 color: p.accent,
@@ -1012,7 +1012,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               '${songs.length}',
               style: TextStyle(
                 color: p.textSecondary,
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w700,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
@@ -1209,7 +1209,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           _formatTrackDuration(song.durationMs),
                           style: TextStyle(
                             color: isActive ? p.accent : p.textTertiary,
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w600,
                             fontFeatures: const [
                               FontFeature.tabularFigures(),
@@ -1271,7 +1271,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  fontSize: isShort ? 17 : 20,
+                  fontSize:
+                      isShort ? AppFontSize.subtitle : AppFontSize.titleLarge,
                   letterSpacing: -0.3,
                   color: p.textPrimary,
                 ),
@@ -1520,8 +1521,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
                                           fontSize: screenWidth < 360
-                                              ? 22.0
-                                              : (isTablet ? 30.0 : 26.0),
+                                              ? AppFontSize.titleMedium
+                                              : (isTablet
+                                                  ? AppFontSize.displayLarge
+                                                  : AppFontSize.titleXL),
                                           fontWeight: FontWeight.w800,
                                           letterSpacing: -0.5,
                                           color: p.textPrimary,

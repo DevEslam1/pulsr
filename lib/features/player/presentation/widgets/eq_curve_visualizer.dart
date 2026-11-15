@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 
@@ -390,7 +391,7 @@ class _CatmullRomEqPainter extends CustomPainter {
     if (size.height >= 48) {
       final labelStyle = TextStyle(
         color: color.withValues(alpha: 0.38),
-        fontSize: 8.5,
+        fontSize: AppFontSize.nano,
         fontWeight: FontWeight.w700,
         letterSpacing: 0.2,
       );
@@ -414,7 +415,7 @@ class _CatmullRomEqPainter extends CustomPainter {
         final fLabels = ['100', '1k', '10k'];
         final markerStyle = TextStyle(
           color: color.withValues(alpha: 0.28),
-          fontSize: 8.0,
+          fontSize: AppFontSize.nano,
           fontWeight: FontWeight.w600,
         );
         for (int m = 0; m < fMarkers.length; m++) {

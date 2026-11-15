@@ -24,7 +24,7 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
           Text(
             context.l10n.waveformLabel,
             style: TextStyle(
-              fontSize: AppFontSize.micro,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w900,
               letterSpacing: AppTracking.overline,
               color: activeColor,

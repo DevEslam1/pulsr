@@ -148,7 +148,7 @@ class LyricsShareCardRenderer {
         text: brandText,
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.95),
-          fontSize: 22,
+          fontSize: AppFontSize.titleMedium,
           fontWeight: FontWeight.w800,
           letterSpacing: 3.5,
         ),
@@ -301,7 +301,7 @@ class LyricsShareCardRenderer {
           text: '♫',
           style: TextStyle(
             color: accentColor,
-            fontSize: 60,
+            fontSize: AppFontSize.heroDisplay,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -335,7 +335,7 @@ class LyricsShareCardRenderer {
         text: title,
         style: const TextStyle(
           color: Colors.white,
-          fontSize: 44,
+          fontSize: AppFontSize.heroXL,
           fontWeight: FontWeight.w800,
         ),
       ),
@@ -351,7 +351,7 @@ class LyricsShareCardRenderer {
         text: artist,
         style: TextStyle(
           color: Colors.white.withValues(alpha: 0.75),
-          fontSize: 34,
+          fontSize: AppFontSize.heroLarge,
           fontWeight: FontWeight.w600,
         ),
       ),

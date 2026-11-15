@@ -364,7 +364,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                       context.l10n.upNext,
                       style: TextStyle(
                         color: widget.activeColor,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w800,
                         letterSpacing: AppTracking.overline,
                       ),
@@ -685,7 +685,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                               '${crossfadeSec.toStringAsFixed(crossfadeSec.truncateToDouble() == crossfadeSec ? 0 : 1)}s ${context.l10n.browseCrossfade}',
                               style: TextStyle(
                                 color: p.accent.withValues(alpha: 0.85),
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
                                 fontFeatures: const [
                                   FontFeature.tabularFigures()

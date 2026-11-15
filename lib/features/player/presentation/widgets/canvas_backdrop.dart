@@ -7,6 +7,7 @@ import 'package:video_player/video_player.dart';
 
 import '../../../../core/constants/app_blur.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -477,7 +478,7 @@ class CanvasToggleChip extends StatelessWidget {
               Text(
                 'CANVAS',
                 style: TextStyle(
-                  fontSize: compact ? 9.5 : 11,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 0.8,
                   color: isCanvasEnabled ? activeColor : Colors.white60,

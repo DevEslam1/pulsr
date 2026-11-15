@@ -2080,6 +2080,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["directFormats"] = getCachedDirectFormats(routeDevice?.id ?: -1)
         result["supportedSampleRates"] = sampleRates
         result["supportedEncodings"] = routeDevice?.encodings
+            ?.toList()
             ?.mapNotNull { encodingTag(it) }
             ?.distinct()
             ?: emptyList<String>()

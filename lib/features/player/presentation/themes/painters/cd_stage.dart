@@ -505,7 +505,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
           Text(
             context.l10n.cdTrackNumber(trackNum),
             style: TextStyle(
-              fontSize: 10,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w900,
               color: isPlaying ? Colors.cyanAccent : Colors.white70,
               letterSpacing: 1.0,
@@ -524,7 +524,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
           Text(
             _formatAudioSpec(state.currentSong),
             style: const TextStyle(
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w700,
               color: Colors.white60,
               letterSpacing: 0.6,

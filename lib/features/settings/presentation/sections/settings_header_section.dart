@@ -140,7 +140,7 @@ mixin SettingsHeaderSection on State<SettingsScreen> {
                   'v${AppConfig.appVersion}',
                   style: TextStyle(
                     color: p.accent,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
                   ),
                 ),

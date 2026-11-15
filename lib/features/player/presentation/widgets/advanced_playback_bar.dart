@@ -283,7 +283,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                       child: Text(
                                         'A ${_fmt(state.abPointA)} · B ${_fmt(state.abPointB)}',
                                         style: TextStyle(
-                                          fontSize: AppFontSize.tiny,
+                                          fontSize: AppFontSize.caption,
                                           fontWeight: FontWeight.w700,
                                           color: resolvedActiveColor,
                                           fontFeatures: const [
@@ -367,7 +367,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
                                             '${state.trackDelayMs > 0 ? '+' : ''}${state.trackDelayMs}ms',
                                             style: const TextStyle(
                                               color: Colors.black,
-                                              fontSize: 7.5,
+                                              fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w900,
                                             ),
                                           ),
@@ -419,7 +419,7 @@ class AdvancedPlaybackBar extends StatelessWidget {
         label,
         style: TextStyle(
           fontWeight: FontWeight.w800,
-          fontSize: 13,
+          fontSize: AppFontSize.bodySmall,
           color: isActive ? activeColor : p.textSecondary,
         ),
       ),

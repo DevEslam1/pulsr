@@ -793,7 +793,7 @@ class _LyricsViewState extends State<LyricsView> {
         widget.activeColor == Colors.white ? p.accent : widget.activeColor;
     final preset = LyricPreset(
       textStyle: TextStyle(
-        fontSize: isSeamless ? 20.0 : 19.0,
+        fontSize: isSeamless ? AppFontSize.titleLarge : AppFontSize.title,
         fontWeight: FontWeight.w600,
         color: isSeamless
             ? Colors.white.withValues(alpha: 0.46)
@@ -801,7 +801,7 @@ class _LyricsViewState extends State<LyricsView> {
         height: isSeamless ? 1.42 : 1.4,
       ),
       activeTextStyle: TextStyle(
-        fontSize: isSeamless ? 27.0 : AppFontSize.headline,
+        fontSize: isSeamless ? AppFontSize.display : AppFontSize.headline,
         fontWeight: FontWeight.w800,
         color: isSeamless ? Colors.white : activeCol,
         height: 1.35,
@@ -1031,7 +1031,7 @@ class _LyricsViewState extends State<LyricsView> {
                                   context.l10n.searchLyrics,
                                   style: TextStyle(
                                     color: PulsrCapsuleStyle.foregroundColor(p),
-                                    fontSize: 12,
+                                    fontSize: AppFontSize.label,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.2,
                                   ),

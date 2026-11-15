@@ -616,13 +616,15 @@ class _GraphicSpectrumHudState extends State<_GraphicSpectrumHud> {
                     ],
                     const SizedBox(height: 2),
                     // Frequency Label
-                    Text(
-                      _bandLabels[index],
-                      style: const TextStyle(
-                        fontSize: 6.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white54,
-                        letterSpacing: 0.2,
+                    ExcludeSemantics(
+                      child: Text(
+                        _bandLabels[index],
+                        style: const TextStyle(
+                          fontSize: AppFontSize.nano,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white54,
+                          letterSpacing: 0.2,
+                        ),
                       ),
                     ),
                   ],

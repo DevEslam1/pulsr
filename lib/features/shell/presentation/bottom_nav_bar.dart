@@ -11,6 +11,7 @@ import 'package:pulsr/core/services/settings_cache.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import 'nav_destinations.dart';
@@ -142,6 +143,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                 valueListenable: _visualDyNotifier,
                 builder: (context, visualDy, child) {
                   final isDraggingDock = visualDy.abs() > 0.5;
+                  final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
                   return AnimatedContainer(
                     duration: context.motionMs(120),
                     curve: context.motionCurve(Curves.easeOutCubic),
@@ -151,22 +153,24 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                       borderRadius: navRadius,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black
-                              .withValues(alpha: p.isDark ? 0.38 : 0.09),
-                          blurRadius: 18,
+                          color: Colors.black.withValues(
+                              alpha: (p.isDark ? 0.38 : 0.09) *
+                                  (isCalm ? 0.5 : 1.0)),
+                          blurRadius: isCalm ? 10 : 18,
                           spreadRadius: -2,
-                          offset: const Offset(0, 6),
+                          offset: const Offset(0, 5),
                         ),
-                        BoxShadow(
-                          color: p.accent.withValues(
-                            alpha: isDraggingDock
-                                ? (p.isDark ? 0.14 : 0.08)
-                                : (p.isDark ? 0.05 : 0.02),
+                        if (!isCalm)
+                          BoxShadow(
+                            color: p.accent.withValues(
+                              alpha: isDraggingDock
+                                  ? (p.isDark ? 0.14 : 0.08)
+                                  : (p.isDark ? 0.05 : 0.02),
+                            ),
+                            blurRadius: 14,
+                            spreadRadius: -4,
+                            offset: const Offset(0, 2),
                           ),
-                          blurRadius: 14,
-                          spreadRadius: -4,
-                          offset: const Offset(0, 2),
-                        ),
                       ],
                     ),
                     child: ClipRRect(
@@ -185,24 +189,28 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                               defaultValue: 0.8,
                             );
                           }
-                          final allowBlur = AppBlur.canBlur(context,
+                          final allowBlur = !isCalm &&
+                              AppBlur.canBlur(context,
                                   enableBlur: widget.enableBlur) &&
                               glassIntensity > 0.0;
                           final navContainer = DecoratedBox(
                             decoration: BoxDecoration(
                               borderRadius: navRadius,
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  p.surfaceContainerHigh.withValues(
-                                    alpha: allowBlur ? 0.88 : 1.0,
-                                  ),
-                                  p.surfaceContainer.withValues(
-                                    alpha: allowBlur ? 0.84 : 1.0,
-                                  ),
-                                ],
-                              ),
+                              color: isCalm ? p.surfaceContainerHigh : null,
+                              gradient: isCalm
+                                  ? null
+                                  : LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        p.surfaceContainerHigh.withValues(
+                                          alpha: allowBlur ? 0.88 : 1.0,
+                                        ),
+                                        p.surfaceContainer.withValues(
+                                          alpha: allowBlur ? 0.84 : 1.0,
+                                        ),
+                                      ],
+                                    ),
                               border: Border.all(
                                 color: isDraggingDock
                                     ? p.accent.withValues(alpha: 0.35)
@@ -214,30 +222,34 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                               alignment: Alignment.center,
                               children: [
                                 // Subtle top inner specular highlight hairline
-                                PositionedDirectional(
-                                  top: 0,
-                                  start: 24,
-                                  end: 24,
-                                  child: IgnorePointer(
-                                    child: Container(
-                                      height: 1,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.white.withValues(alpha: 0.0),
-                                            (p.isDark
-                                                    ? Colors.white
-                                                    : Colors.black)
-                                                .withValues(
-                                                    alpha:
-                                                        p.isDark ? 0.12 : 0.04),
-                                            Colors.white.withValues(alpha: 0.0),
-                                          ],
+                                if (!isCalm)
+                                  PositionedDirectional(
+                                    top: 0,
+                                    start: 24,
+                                    end: 24,
+                                    child: IgnorePointer(
+                                      child: Container(
+                                        height: 1,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              Colors.white
+                                                  .withValues(alpha: 0.0),
+                                              (p.isDark
+                                                      ? Colors.white
+                                                      : Colors.black)
+                                                  .withValues(
+                                                      alpha: p.isDark
+                                                          ? 0.12
+                                                          : 0.04),
+                                              Colors.white
+                                                  .withValues(alpha: 0.0),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
                                 // Top gesture grab handle pill
                                 Align(
                                   alignment: Alignment.topCenter,

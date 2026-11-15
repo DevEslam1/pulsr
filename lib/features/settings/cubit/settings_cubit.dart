@@ -28,6 +28,7 @@ import '../../../core/utils/platform_capabilities.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/bit_perfect_chain.dart';
+import '../../../data/audio/bluetooth_quality_policy.dart';
 import '../../../data/audio/output_format_negotiation.dart';
 import '../../../data/audio/dsd_decoder_helper.dart';
 import '../../../data/audio/tap_src_policy.dart';
@@ -316,6 +317,11 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       (e) => e.name == themeModeStr,
       orElse: () => AppThemeMode.dark,
     );
+    final visualDensityStr = prefs.getString(PrefsKeys.visualDensityMode);
+    final visualDensityMode = VisualDensityMode.values.firstWhere(
+      (e) => e.name == visualDensityStr,
+      orElse: () => VisualDensityMode.comfortable,
+    );
     final customAccentValue = prefs.getInt(_keyCustomAccent) ?? 0xFF9B9EF5;
 
     final playerThemeStr =
@@ -390,6 +396,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
     return current.copyWith(
       themeMode: themeMode,
+      visualDensityMode: visualDensityMode,
       autoThemeByTime:
           prefs.getBool(_keyAutoThemeByTime) ?? current.autoThemeByTime,
       highContrast: prefs.getBool(_keyHighContrast) ?? current.highContrast,
@@ -849,6 +856,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         }
         if (reconciledDirty.contains('themeMode')) {
           loadedState = loadedState.copyWith(themeMode: previous.themeMode);
+        }
+        if (reconciledDirty.contains('visualDensityMode')) {
+          loadedState = loadedState.copyWith(
+              visualDensityMode: previous.visualDensityMode);
         }
         if (reconciledDirty.contains('customAccentColorValue')) {
           loadedState = loadedState.copyWith(

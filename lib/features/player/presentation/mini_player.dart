@@ -12,8 +12,8 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../core/constants/prefs_keys.dart';
-
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/performance/gpu_budget.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
@@ -462,6 +462,7 @@ class MiniPlayerState extends State<MiniPlayer> {
 
         final isTablet = Adaptive.isTablet(context);
         final playerRadius = isTablet ? AppRadii.r28All : AppRadii.r24All;
+        final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
 
         // Screen readers cannot perform drag gestures, so expose the swipe
         // up/down actions as custom semantics actions (I9).
@@ -593,19 +594,21 @@ class MiniPlayerState extends State<MiniPlayer> {
                       borderRadius: playerRadius,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black
-                              .withValues(alpha: p.isDark ? 0.42 : 0.10),
-                          blurRadius: 22,
+                          color: Colors.black.withValues(
+                              alpha: (p.isDark ? 0.42 : 0.10) *
+                                  (isCalm ? 0.5 : 1.0)),
+                          blurRadius: isCalm ? 12 : 22,
                           spreadRadius: -2,
-                          offset: const Offset(0, 8),
+                          offset: const Offset(0, 6),
                         ),
-                        BoxShadow(
-                          color: activeAccent.withValues(
-                              alpha: p.isDark ? 0.08 : 0.04),
-                          blurRadius: 16,
-                          spreadRadius: -4,
-                          offset: const Offset(0, 4),
-                        ),
+                        if (!isCalm)
+                          BoxShadow(
+                            color: activeAccent.withValues(
+                                alpha: p.isDark ? 0.08 : 0.04),
+                            blurRadius: 16,
+                            spreadRadius: -4,
+                            offset: const Offset(0, 4),
+                          ),
                       ],
                     ),
                     child: ClipRRect(
@@ -613,19 +616,22 @@ class MiniPlayerState extends State<MiniPlayer> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: playerRadius,
-                          gradient: LinearGradient(
-                            begin: AlignmentDirectional.centerStart,
-                            end: AlignmentDirectional.centerEnd,
-                            colors: [
-                              Color.alphaBlend(
-                                activeAccent.withValues(
-                                    alpha: p.isDark ? 0.09 : 0.06),
-                                p.surfaceContainerHigh,
-                              ),
-                              p.surfaceContainer,
-                            ],
-                            stops: const [0.0, 0.68],
-                          ),
+                          color: isCalm ? p.surfaceContainerHigh : null,
+                          gradient: isCalm
+                              ? null
+                              : LinearGradient(
+                                  begin: AlignmentDirectional.centerStart,
+                                  end: AlignmentDirectional.centerEnd,
+                                  colors: [
+                                    Color.alphaBlend(
+                                      activeAccent.withValues(
+                                          alpha: p.isDark ? 0.09 : 0.06),
+                                      p.surfaceContainerHigh,
+                                    ),
+                                    p.surfaceContainer,
+                                  ],
+                                  stops: const [0.0, 0.68],
+                                ),
                           border: Border.all(
                             color: p.hairline,
                             width: 1.0,
@@ -635,27 +641,32 @@ class MiniPlayerState extends State<MiniPlayer> {
                           alignment: Alignment.topCenter,
                           children: [
                             // Subtle top inner specular highlight
-                            PositionedDirectional(
-                              top: 0,
-                              start: 20,
-                              end: 20,
-                              child: IgnorePointer(
-                                child: Container(
-                                  height: 1,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.white.withValues(alpha: 0.0),
-                                        (p.isDark ? Colors.white : Colors.black)
-                                            .withValues(
-                                                alpha: p.isDark ? 0.12 : 0.04),
-                                        Colors.white.withValues(alpha: 0.0),
-                                      ],
+                            if (!isCalm)
+                              PositionedDirectional(
+                                top: 0,
+                                start: 20,
+                                end: 20,
+                                child: IgnorePointer(
+                                  child: Container(
+                                    height: 1,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.white.withValues(alpha: 0.0),
+                                          (p.isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
+                                              .withValues(
+                                                  alpha: p.isDark
+                                                      ? 0.12
+                                                      : 0.04),
+                                          Colors.white.withValues(alpha: 0.0),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -1649,7 +1660,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar>
                                           valueLabel,
                                           style: TextStyle(
                                             color: p.textPrimary,
-                                            fontSize: AppFontSize.tiny,
+                                            fontSize: AppFontSize.caption,
                                             fontWeight: FontWeight.w700,
                                             fontFeatures: const [
                                               FontFeature.tabularFigures()
@@ -2013,7 +2024,7 @@ class MiniPlayerHorizontal extends StatelessWidget {
                                     velocity: 24.0,
                                     blankSpace: 32.0,
                                     style: TextStyle(
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w500,
                                       color: p.textSecondary,
                                     ),

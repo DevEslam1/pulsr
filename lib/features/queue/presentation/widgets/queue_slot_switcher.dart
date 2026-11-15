@@ -158,7 +158,7 @@ class QueueSlotBadge extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: AppFontSize.micro,
+            fontSize: AppFontSize.caption,
             fontWeight: FontWeight.w800,
             color: p.accent,
             letterSpacing: AppTracking.medium,

@@ -550,7 +550,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                     '${_zoomScale.toStringAsFixed(1)}x',
                                     style: TextStyle(
                                       color: context.palette.accent,
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),

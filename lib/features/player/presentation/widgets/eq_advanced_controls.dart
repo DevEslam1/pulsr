@@ -92,7 +92,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             ? 'Android Spatializer API with multi-channel soundstage'
                             : 'Stereo field widening active via hardware virtualizer',
                         style: TextStyle(
-                            fontSize: AppFontSize.tiny, color: p.textTertiary),
+                            fontSize: AppFontSize.caption, color: p.textTertiary),
                       ),
                     ],
                   ),
@@ -152,7 +152,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               child: Text(
                                 context.l10n.spatialApi,
                                 style: TextStyle(
-                                  fontSize: AppFontSize.micro,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w700,
                                   color: p.accent,
                                 ),
@@ -197,7 +197,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                   child: Text(context.l10n.blockedByBitPerfectShort,
                       style: TextStyle(
                           color: p.error,
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w600))),
             const SizedBox(height: AppSpacing.md),
           ],
@@ -283,7 +283,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600))),
                 const SizedBox(height: AppSpacing.md),
 
@@ -457,7 +457,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600))),
                 _effectNotAppliedNotice('dynamics', p),
                 const SizedBox(height: AppSpacing.s14),
@@ -528,7 +528,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                       Text(
                                         preset.description,
                                         style: TextStyle(
-                                            fontSize: AppFontSize.tiny,
+                                            fontSize: AppFontSize.caption,
                                             color: p.textTertiary),
                                       ),
                                     ],
@@ -637,7 +637,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600))),
                 if (dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -1018,7 +1018,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600))),
                 if (dspBlocked == null && state.isLimiterEnabled) ...[
                   const SizedBox(height: AppSpacing.s14),
@@ -1260,7 +1260,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600)))
                 else if (!_nativePcmEffectsAvailable)
                   Padding(
@@ -1268,7 +1268,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.nativeDspUnavailable,
                           style: TextStyle(
                               color: p.textTertiary,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600))),
                 const SizedBox(height: AppSpacing.s14),
                 Row(
@@ -1453,7 +1453,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.blockedByBitPerfectShort,
                           style: TextStyle(
                               color: p.error,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600)))
                 else if (!_nativePcmEffectsAvailable)
                   Padding(
@@ -1461,7 +1461,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       child: Text(context.l10n.nativeDspUnavailable,
                           style: TextStyle(
                               color: p.textTertiary,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w600))),
                 if (dspBlocked == null &&
                     _nativePcmEffectsAvailable &&
@@ -1798,7 +1798,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
@@ -1858,7 +1858,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     Text(
                       context.l10n.saturationBandDesc,
                       style: TextStyle(
-                          fontSize: AppFontSize.tiny, color: p.textTertiary),
+                          fontSize: AppFontSize.caption, color: p.textTertiary),
                     ),
                   ],
                 ),
@@ -1958,7 +1958,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
@@ -2118,7 +2118,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
@@ -2127,7 +2127,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
             // Honest copy: this is bass redirection, not multichannel LFE.
             Text(l10n.dspSubCrossoverNote,
                 style: TextStyle(
-                    fontSize: AppFontSize.tiny, color: p.textTertiary)),
+                    fontSize: AppFontSize.caption, color: p.textTertiary)),
             const SizedBox(height: AppSpacing.s10),
             _buildDspSliderRow(
               context: context,
@@ -2279,7 +2279,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600))),
           if (dspBlocked == null &&
               _nativePcmEffectsAvailable &&
@@ -2612,7 +2612,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(context.l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600)))
           else if (!_nativePcmEffectsAvailable)
             Padding(
@@ -2620,7 +2620,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(context.l10n.nativeDspUnavailable,
                     style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600))),
           if (available && state.isLoudnessContourEnabled) ...[
             const SizedBox(height: AppSpacing.s14),
@@ -2712,7 +2712,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(context.l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600)))
           else if (!_nativePcmEffectsAvailable)
             Padding(
@@ -2720,7 +2720,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(context.l10n.nativeDspUnavailable,
                     style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600))),
           if (available && state.isDitherEnabled) ...[
             const SizedBox(height: AppSpacing.s14),
@@ -2836,7 +2836,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(context.l10n.blockedByBitPerfectShort,
                     style: TextStyle(
                         color: p.error,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600)))
           else if (!_nativePcmEffectsAvailable)
             Padding(
@@ -2844,7 +2844,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 child: Text(context.l10n.nativeDspUnavailable,
                     style: TextStyle(
                         color: p.textTertiary,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w600))),
         ],
       ),
@@ -2947,7 +2947,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
                     color: p.error,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             )
@@ -2958,7 +2958,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             ),
@@ -3092,7 +3092,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
                     color: p.error,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             )
@@ -3103,7 +3103,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             ),
@@ -3236,7 +3236,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
                     color: p.error,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             )
@@ -3247,7 +3247,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             ),
@@ -3379,7 +3379,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.blockedByBitPerfectShort,
                 style: TextStyle(
                     color: p.error,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             )
@@ -3390,7 +3390,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                 context.l10n.nativeDspUnavailable,
                 style: TextStyle(
                     color: p.textTertiary,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600),
               ),
             ),

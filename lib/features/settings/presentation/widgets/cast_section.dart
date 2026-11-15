@@ -366,7 +366,7 @@ class _CastSectionState extends State<CastSection> {
                         context.l10n.settingsActiveBadge,
                         style: TextStyle(
                           color: p.accent,
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w800,
                           letterSpacing: AppTracking.medium,
                         ),
@@ -489,7 +489,7 @@ class _CastSectionState extends State<CastSection> {
                                       l10n.castConnected.toUpperCase(),
                                       style: TextStyle(
                                         color: p.accent,
-                                        fontSize: AppFontSize.tiny,
+                                        fontSize: AppFontSize.caption,
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),

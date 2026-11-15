@@ -303,7 +303,7 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                               style: TextStyle(
-                                                fontSize: AppFontSize.tiny,
+                                                fontSize: AppFontSize.caption,
                                                 color: p.textSecondary,
                                               ),
                                             ),

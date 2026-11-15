@@ -9983,4 +9983,41 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get lyricsOffsetChipTooltip => 'انقر لضبط مزامنة الكلمات بدقة';
+
+  @override
+  String get visualDensityTitle => 'الكثافة البصرية';
+
+  @override
+  String get visualDensitySubtitle =>
+      'تقليل التوهج وطبقات التدرج والخطوط اللامعة في الواجهة';
+
+  @override
+  String get visualDensityComfortable => 'مريح';
+
+  @override
+  String get visualDensityCalm => 'هادئ';
+
+  @override
+  String get signalPathTitle => 'مسار الإشارة الصوتية';
+
+  @override
+  String get signalPathSubtitle => 'تتبع معدل العينة وعمق البت والمسار لحظياً';
+
+  @override
+  String get dspDecoderOutput => 'مخرج وحدة فك الترميز';
+
+  @override
+  String get signalPathActiveRoute => 'مسار الإخراج النشط';
+
+  @override
+  String get signalPathCopyTooltip => 'نسخ مسار الإشارة';
+
+  @override
+  String get signalPathCopied => 'تم نسخ مسار الإشارة';
+
+  @override
+  String get signalPathEncodingsLabel => 'التنسيقات المدعومة';
+
+  @override
+  String get signalPathChannelsLabel => 'القنوات';
 }

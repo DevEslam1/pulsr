@@ -739,7 +739,7 @@ class _BrowseTrackCard extends StatelessWidget {
                                 formatDuration(item.duration),
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w700,
                                   fontFeatures: [
                                     FontFeature.tabularFigures(),

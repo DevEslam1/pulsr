@@ -169,7 +169,7 @@ class HighlightedSongTile extends StatelessWidget {
                               Formatters.formatDurationMs(song.durationMs),
                               style: TextStyle(
                                 color: isActive ? p.accent : p.textTertiary,
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
                                 fontFeatures: const [
                                   FontFeature.tabularFigures(),

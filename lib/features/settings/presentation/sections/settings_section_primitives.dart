@@ -82,7 +82,7 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
                       trailingBadge,
                       style: TextStyle(
                         color: p.accent,
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w800,
                         letterSpacing: AppTracking.label,
                       ),
@@ -242,7 +242,7 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: context.palette.error,
-            foregroundColor: Colors.white,
+            foregroundColor: context.palette.onError,
           ),
           onPressed: () => Navigator.of(context, rootNavigator: true).pop(true),
           child: Text(l10n.remove),

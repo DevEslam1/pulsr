@@ -360,10 +360,10 @@ class _LyricLineWidget extends StatelessWidget {
     final isInSplit = PlayerSplitViewScope.of(context);
     final TextStyle baseStyle = TextStyle(
       fontSize: isBackground
-          ? (isInSplit ? 18.0 : 17.0)
+          ? (isInSplit ? AppFontSize.title : AppFontSize.subtitle)
           : (isActive
-              ? (isInSplit ? 27.0 : 22.0)
-              : (isInSplit ? 20.0 : 19.0)),
+              ? (isInSplit ? AppFontSize.display : AppFontSize.titleMedium)
+              : (isInSplit ? AppFontSize.titleLarge : AppFontSize.title)),
       fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
       fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
       height: isInSplit ? 1.40 : 1.35,
@@ -438,7 +438,7 @@ class _KaraokeWordView extends StatelessWidget {
         : palette.textSecondary.withValues(alpha: 0.55);
 
     final style = TextStyle(
-      fontSize: isBackground ? 17.0 : 22.0,
+      fontSize: isBackground ? AppFontSize.subtitle : AppFontSize.titleMedium,
       fontWeight: (isSung || isSinging) ? FontWeight.w900 : FontWeight.w600,
       fontStyle: isBackground ? FontStyle.italic : FontStyle.normal,
       color: isSung ? activeColor : inactiveColor,

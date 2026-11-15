@@ -188,7 +188,7 @@ class SmartPlaylistCard extends StatelessWidget {
                             context.l10n.browseSmart.toUpperCase(),
                             style: TextStyle(
                               color: p.accent,
-                              fontSize: AppFontSize.micro,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w800,
                               letterSpacing: AppTracking.wide,
                             ),

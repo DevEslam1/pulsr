@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -627,7 +628,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   '${_currentPage + 1}/$total',
                   style: TextStyle(
                     color: p.textSecondary,
-                    fontSize: 10.5,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
                     fontFeatures: const [
                       FontFeature.tabularFigures(),
@@ -687,7 +688,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                                 context.l10n.radioTitle,
                                 style: TextStyle(
                                   color: p.accent,
-                                  fontSize: 11.0,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.2,
                                 ),
@@ -836,7 +837,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                               : context.l10n.pinRadioCardToFirstSubtitle,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                           ),
                         ),
                         trailing: (isPinned && !isPinnedFirst)
@@ -1021,7 +1022,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                           context.l10n.radioCardsRestoreHint,
                           style: TextStyle(
                             color: p.textSecondary,
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                           ),
                         ),
                         onTap: () async {
@@ -1058,15 +1059,15 @@ Color _giltOf(BuildContext context) {
   final p = context.palette;
   return Color.lerp(
     p.accent,
-    const Color(0xFFC9A24B),
+    AppColors.giltGold,
     p.isDark ? 0.58 : 0.50,
   )!;
 }
 
 Color _onGilt(Color gilt) {
   return ThemeData.estimateBrightnessForColor(gilt) == Brightness.dark
-      ? const Color(0xFFFFF7E6)
-      : const Color(0xFF231A06);
+      ? AppColors.onGiltLight
+      : AppColors.onGiltDark;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1396,7 +1397,7 @@ class _SortOptionChip extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: selected ? p.accent : p.textPrimary,
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                   ),
                 ),
@@ -1759,7 +1760,7 @@ class _QuranHeroCard extends StatelessWidget {
                                                       TextOverflow.ellipsis,
                                                   style: TextStyle(
                                                     color: p.accent,
-                                                    fontSize: AppFontSize.tiny,
+                                                    fontSize: AppFontSize.caption,
                                                     fontWeight: FontWeight.w800,
                                                     letterSpacing: 0.45,
                                                   ),
@@ -1779,7 +1780,7 @@ class _QuranHeroCard extends StatelessWidget {
                                                       TextOverflow.ellipsis,
                                                   style: TextStyle(
                                                     color: p.accent,
-                                                    fontSize: AppFontSize.tiny,
+                                                    fontSize: AppFontSize.caption,
                                                     fontWeight: FontWeight.w700,
                                                     letterSpacing: 0.3,
                                                   ),
@@ -1823,7 +1824,7 @@ class _QuranHeroCard extends StatelessWidget {
                                 blankSpace: 36.0,
                                 style: TextStyle(
                                   color: p.textPrimary,
-                                  fontSize: 16.5,
+                                  fontSize: AppFontSize.subtitle,
                                   fontWeight: FontWeight.w800,
                                   height: 1.2,
                                   letterSpacing: -0.25,
@@ -1855,7 +1856,7 @@ class _QuranHeroCard extends StatelessWidget {
                                         color: isPlaying
                                             ? p.accent
                                             : p.textSecondary,
-                                        fontSize: 12.0,
+                                        fontSize: AppFontSize.label,
                                         fontWeight: isPlaying
                                             ? FontWeight.w700
                                             : FontWeight.w500,
@@ -1942,7 +1943,7 @@ class _QuranHeroCard extends StatelessWidget {
                                                   context.l10n.radioListenNow,
                                                   style: TextStyle(
                                                     color: onGilt,
-                                                    fontSize: 11.5,
+                                                    fontSize: AppFontSize.label,
                                                     fontWeight: FontWeight.w800,
                                                     letterSpacing: 0.1,
                                                   ),
@@ -1982,7 +1983,7 @@ class _QuranHeroCard extends StatelessWidget {
                                             context.l10n.radioLiveShortBadge,
                                             style: TextStyle(
                                               color: p.accent,
-                                              fontSize: 11,
+                                              fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w800,
                                               letterSpacing: 0.3,
                                             ),

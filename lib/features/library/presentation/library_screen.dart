@@ -803,7 +803,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         context.l10n.navLibrary,
                         style: TextStyle(
                           color: p.textPrimary,
-                          fontSize: 26,
+                          fontSize: AppFontSize.titleXL,
                           fontWeight: FontWeight.w800,
                           letterSpacing: AppTracking.heading,
                         ),
@@ -840,7 +840,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 '$losslessCount FLAC/Hi-Res',
                                 style: TextStyle(
                                   color: p.info,
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),

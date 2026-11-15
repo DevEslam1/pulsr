@@ -48,6 +48,13 @@ class BluetoothQualityPlan {
   /// Item 3: the rate to ask the codec to switch to (null = leave it alone).
   final int? alignCodecSampleRateTo;
 
+  /// Target bit depth to ask the A2DP codec to switch to (null = leave alone).
+  final int? alignCodecBitDepthTo;
+
+  /// Recommended sink target buffer duration (ms) for this Bluetooth link to
+  /// avoid HCI/A2DP buffer underruns at high bitrates (LDAC 990 / aptX Lossless / LHDC).
+  final int recommendedBufferMs;
+
   /// Item 4: quality class of the active codec.
   final BluetoothCodecTier codecTier;
 
@@ -65,6 +72,8 @@ class BluetoothQualityPlan {
     required this.allowBluetoothDither,
     required this.ditherBitDepth,
     required this.alignCodecSampleRateTo,
+    this.alignCodecBitDepthTo,
+    this.recommendedBufferMs = 150,
     required this.codecTier,
     required this.isLeAudio,
     required this.reason,
@@ -74,7 +83,8 @@ class BluetoothQualityPlan {
   String toString() => 'BluetoothQualityPlan(codecTier: ${codecTier.name}, '
       'leAudio: $isLeAudio, keepFloat: $keepFloatPath, '
       'btDither: $allowBluetoothDither@$ditherBitDepth, '
-      'alignRate: $alignCodecSampleRateTo, reason: $reason)';
+      'alignRate: $alignCodecSampleRateTo, alignBits: $alignCodecBitDepthTo, '
+      'bufMs: $recommendedBufferMs, reason: $reason)';
 }
 
 /// Classifies a codec name reported by the platform. Case/space/`-` insensitive.
@@ -82,6 +92,8 @@ BluetoothCodecTier bluetoothCodecTier(String? codecName) {
   final c = (codecName ?? '').toUpperCase().replaceAll('-', ' ').trim();
   if (c.isEmpty) return BluetoothCodecTier.unknown;
   if (c.contains('LDAC') ||
+      c.contains('LHDC') ||
+      c.contains('LLAC') ||
       c.contains('LC3PLUS') ||
       c.contains('LC3 PLUS') ||
       c.contains('APTX HD') ||
@@ -91,11 +103,32 @@ BluetoothCodecTier bluetoothCodecTier(String? codecName) {
   }
   // Bare LC3 is the LE Audio codec; A2DP codec controls do not apply.
   if (c == 'LC3') return BluetoothCodecTier.high;
-  if (c.contains('APTX') || c.contains('AAC')) {
+  if (c.contains('APTX') || c.contains('AAC') || c.contains('OPUS')) {
     return BluetoothCodecTier.standard;
   }
   if (c.contains('SBC')) return BluetoothCodecTier.low;
   return BluetoothCodecTier.standard;
+}
+
+/// Computes dynamic PCM sink buffer duration (ms) for a Bluetooth link.
+int recommendedBluetoothBufferMs({
+  required String? codecName,
+  int? bitrateKbps,
+  int? sampleRateHz,
+  bool isLeAudio = false,
+}) {
+  final c = (codecName ?? '').toUpperCase().replaceAll('-', ' ').trim();
+  if (isLeAudio || c == 'LC3') return 80;
+  if (c.contains('APTX LOSSLESS') ||
+      (bitrateKbps != null && bitrateKbps >= 900) ||
+      ((c.contains('LDAC') || c.contains('LHDC')) &&
+          sampleRateHz != null &&
+          sampleRateHz >= 88200)) {
+    return 280;
+  }
+  if (bluetoothCodecTier(codecName) == BluetoothCodecTier.high) return 200;
+  if (bluetoothCodecTier(codecName) == BluetoothCodecTier.standard) return 150;
+  return 120;
 }
 
 /// Clamps a bit depth to the three values the native dither stage accepts.
@@ -163,6 +196,34 @@ BluetoothQualityPlan resolveBluetoothQualityPlan({
     }
   }
 
+  int? alignBitDepth;
+  if (bluetoothHiResEnabled &&
+      !leAudio &&
+      trackBitDepth > 0 &&
+      codecBitDepth != null) {
+    final int desiredDepth = trackBitDepth >= 32 &&
+            codecSelectableBitDepths.contains(32)
+        ? 32
+        : (trackBitDepth >= 24 ? 24 : 16);
+    if (desiredDepth > codecBitDepth) {
+      final bool depthSelectable =
+          codecSelectableBitDepths.contains(desiredDepth);
+      final bool depthFallback = !depthSelectable &&
+          codecSelectableBitDepths.isEmpty &&
+          tier == BluetoothCodecTier.high;
+      if (depthSelectable || depthFallback) {
+        alignBitDepth = desiredDepth;
+      }
+    }
+  }
+
+  final effectiveRate = alignRate ?? codecSampleRateHz ?? trackSampleRate;
+  final recommendedBuf = recommendedBluetoothBufferMs(
+    codecName: codecName,
+    sampleRateHz: effectiveRate > 0 ? effectiveRate : null,
+    isLeAudio: leAudio,
+  );
+
   final reason = !bluetoothHiResEnabled
       ? 'bt-hires-off'
       : alignRate != null
@@ -182,6 +243,8 @@ BluetoothQualityPlan resolveBluetoothQualityPlan({
     allowBluetoothDither: allowBluetoothDither,
     ditherBitDepth: ditherBitDepth,
     alignCodecSampleRateTo: alignRate,
+    alignCodecBitDepthTo: alignBitDepth,
+    recommendedBufferMs: recommendedBuf,
     codecTier: tier,
     isLeAudio: leAudio,
     reason: reason,

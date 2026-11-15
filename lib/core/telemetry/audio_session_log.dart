@@ -107,6 +107,15 @@ class AudioSessionRecord {
   int? sampleRate;
   int? bitDepth;
   int? bitrateKbps;
+  String? sourceCodec;
+  int? sourceSampleRate;
+  int? sourceBitDepth;
+  int? decoderSampleRate;
+  int? decoderBitDepth;
+  String? decoderEncoding;
+  String? driverPath;
+  bool? isBitPerfect;
+  String? signalPathSummary;
   final List<AudioRouteChangeEvent> routeChanges;
   final List<AudioInterruptionEvent> interruptions;
   int bufferUnderruns;
@@ -123,6 +132,15 @@ class AudioSessionRecord {
     this.sampleRate,
     this.bitDepth,
     this.bitrateKbps,
+    this.sourceCodec,
+    this.sourceSampleRate,
+    this.sourceBitDepth,
+    this.decoderSampleRate,
+    this.decoderBitDepth,
+    this.decoderEncoding,
+    this.driverPath,
+    this.isBitPerfect,
+    this.signalPathSummary,
     List<AudioRouteChangeEvent>? routeChanges,
     List<AudioInterruptionEvent>? interruptions,
     this.bufferUnderruns = 0,
@@ -142,6 +160,15 @@ class AudioSessionRecord {
         'sampleRate': sampleRate,
         'bitDepth': bitDepth,
         'bitrateKbps': bitrateKbps,
+        if (sourceCodec != null) 'sourceCodec': sourceCodec,
+        if (sourceSampleRate != null) 'sourceSampleRate': sourceSampleRate,
+        if (sourceBitDepth != null) 'sourceBitDepth': sourceBitDepth,
+        if (decoderSampleRate != null) 'decoderSampleRate': decoderSampleRate,
+        if (decoderBitDepth != null) 'decoderBitDepth': decoderBitDepth,
+        if (decoderEncoding != null) 'decoderEncoding': decoderEncoding,
+        if (driverPath != null) 'driverPath': driverPath,
+        if (isBitPerfect != null) 'isBitPerfect': isBitPerfect,
+        if (signalPathSummary != null) 'signalPathSummary': signalPathSummary,
         'routeChanges': routeChanges.map((e) => e.toJson()).toList(),
         'interruptions': interruptions.map((e) => e.toJson()).toList(),
         'bufferUnderruns': bufferUnderruns,
@@ -160,6 +187,15 @@ class AudioSessionRecord {
         sampleRate: (json['sampleRate'] as num?)?.toInt(),
         bitDepth: (json['bitDepth'] as num?)?.toInt(),
         bitrateKbps: (json['bitrateKbps'] as num?)?.toInt(),
+        sourceCodec: json['sourceCodec'] as String?,
+        sourceSampleRate: (json['sourceSampleRate'] as num?)?.toInt(),
+        sourceBitDepth: (json['sourceBitDepth'] as num?)?.toInt(),
+        decoderSampleRate: (json['decoderSampleRate'] as num?)?.toInt(),
+        decoderBitDepth: (json['decoderBitDepth'] as num?)?.toInt(),
+        decoderEncoding: json['decoderEncoding'] as String?,
+        driverPath: json['driverPath'] as String?,
+        isBitPerfect: json['isBitPerfect'] as bool?,
+        signalPathSummary: json['signalPathSummary'] as String?,
         routeChanges: (json['routeChanges'] as List<dynamic>?)
                 ?.whereType<Map>()
                 .map((e) => AudioRouteChangeEvent.fromJson(
@@ -257,6 +293,15 @@ class AudioSessionLog {
     int? sampleRate,
     int? bitDepth,
     int? bitrateKbps,
+    String? sourceCodec,
+    int? sourceSampleRate,
+    int? sourceBitDepth,
+    int? decoderSampleRate,
+    int? decoderBitDepth,
+    String? decoderEncoding,
+    String? driverPath,
+    bool? isBitPerfect,
+    String? signalPathSummary,
   }) {
     return _run(() async {
       await _finalizeActive();
@@ -271,7 +316,22 @@ class AudioSessionLog {
         sampleRate: sampleRate,
         bitDepth: bitDepth,
         bitrateKbps: bitrateKbps,
+        sourceCodec: sourceCodec,
+        sourceSampleRate: sourceSampleRate,
+        sourceBitDepth: sourceBitDepth,
+        decoderSampleRate: decoderSampleRate,
+        decoderBitDepth: decoderBitDepth,
+        decoderEncoding: decoderEncoding,
+        driverPath: driverPath,
+        isBitPerfect: isBitPerfect,
+        signalPathSummary: signalPathSummary,
       );
+      if (signalPathSummary != null && signalPathSummary.isNotEmpty) {
+        ErrorLogger.log(
+          'Signal Path [start]: $signalPathSummary',
+          category: 'AudioSignalPath',
+        );
+      }
     });
   }
 
@@ -282,15 +342,42 @@ class AudioSessionLog {
     String? bluetoothCodec,
     int? sampleRate,
     int? bitDepth,
+    String? sourceCodec,
+    int? sourceSampleRate,
+    int? sourceBitDepth,
+    int? decoderSampleRate,
+    int? decoderBitDepth,
+    String? decoderEncoding,
+    String? driverPath,
+    bool? isBitPerfect,
+    String? signalPathSummary,
   }) {
     return _run(() async {
       final active = _active;
       if (active == null) return;
       final previous = active.routeType;
+      final previousPath = active.signalPathSummary;
       active.routeType = routeType;
       if (bluetoothCodec != null) active.bluetoothCodec = bluetoothCodec;
       if (sampleRate != null) active.sampleRate = sampleRate;
       if (bitDepth != null) active.bitDepth = bitDepth;
+      if (sourceCodec != null) active.sourceCodec = sourceCodec;
+      if (sourceSampleRate != null) active.sourceSampleRate = sourceSampleRate;
+      if (sourceBitDepth != null) active.sourceBitDepth = sourceBitDepth;
+      if (decoderSampleRate != null) active.decoderSampleRate = decoderSampleRate;
+      if (decoderBitDepth != null) active.decoderBitDepth = decoderBitDepth;
+      if (decoderEncoding != null) active.decoderEncoding = decoderEncoding;
+      if (driverPath != null) active.driverPath = driverPath;
+      if (isBitPerfect != null) active.isBitPerfect = isBitPerfect;
+      if (signalPathSummary != null) {
+        active.signalPathSummary = signalPathSummary;
+        if (signalPathSummary != previousPath && signalPathSummary.isNotEmpty) {
+          ErrorLogger.log(
+            'Signal Path [route]: $signalPathSummary',
+            category: 'AudioSignalPath',
+          );
+        }
+      }
       if (previous != routeType) {
         active.routeChanges.add(AudioRouteChangeEvent(
           timestamp: _nowIso(),

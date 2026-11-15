@@ -633,7 +633,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
               child: Text(
                 context.l10n.sibilanceDesc,
                 style: TextStyle(
-                    color: p.textTertiary, fontSize: AppFontSize.tiny),
+                    color: p.textTertiary, fontSize: AppFontSize.caption),
               ),
             ),
             if (state.isQuranModeEnabled) ...[
@@ -882,7 +882,7 @@ class _QuranModePanelState extends State<QuranModePanel> {
             Text(
               context.l10n.quranRepeatMode,
               style: TextStyle(
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w800,
                 letterSpacing: AppTracking.wide,
                 color: p.accent,

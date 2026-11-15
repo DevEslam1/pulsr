@@ -108,7 +108,7 @@ class _DownloadConcurrencyTileState extends State<DownloadConcurrencyTile> {
               '$_value',
               style: TextStyle(
                 color: p.accent,
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w800,
               ),
             ),

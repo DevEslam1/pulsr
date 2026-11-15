@@ -64,7 +64,8 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? errorSoft,
     Color? warningSoft,
     Color? goldAccent,
-  })  : _goldAccent = goldAccent,
+    this.isCalmDensity = false,
+  }) : _goldAccent = goldAccent,
         surfaceElevated =
             surfaceElevated ?? (isDark ? surfaceContainerHigh : surface),
         surfaceOverlay = surfaceOverlay ??
@@ -136,6 +137,13 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final Color successSoft;
   final Color errorSoft;
   final Color warningSoft;
+  final bool isCalmDensity;
+
+  /// Glow opacity multiplier (reduced in Calm visual density).
+  double get chromeGlowScale => isCalmDensity ? 0.35 : 1.0;
+
+  /// Specular hairline opacity multiplier (reduced in Calm visual density).
+  double get specularScale => isCalmDensity ? 0.55 : 1.0;
 
   Color get background => bg;
   Color get primary => accent;
@@ -184,6 +192,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     Color? errorSoft,
     Color? warningSoft,
     Color? goldAccent,
+    bool? isCalmDensity,
   }) {
     return PulsrPalette(
       accent: accent ?? this.accent,
@@ -219,6 +228,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       errorSoft: errorSoft ?? this.errorSoft,
       warningSoft: warningSoft ?? this.warningSoft,
       goldAccent: goldAccent ?? _goldAccent,
+      isCalmDensity: isCalmDensity ?? this.isCalmDensity,
     );
   }
 
@@ -272,6 +282,7 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       warningSoft: Color.lerp(warningSoft, other.warningSoft, t) ?? warningSoft,
       goldAccent: Color.lerp(_goldAccent ?? goldAccent, other.goldAccent, t) ??
           goldAccent,
+      isCalmDensity: t < 0.5 ? isCalmDensity : other.isCalmDensity,
     );
   }
 }
@@ -299,12 +310,13 @@ class AuraTheme {
   /// dark-AMOLED cyan everywhere, while genuinely raising text/outline
   /// contrast (the palette and component outlines differ from [customTheme]).
   static ThemeData highContrastThemeFor(Brightness brightness,
-      {Color seed = AppColors.accentCyan}) {
+      {Color seed = AppColors.accentCyan, bool isCalmDensity = false}) {
     final isDark = brightness == Brightness.dark;
     return customTheme(seed,
         brightness: brightness,
         isAmoled: isDark ? true : false,
-        isHighContrast: true);
+        isHighContrast: true,
+        isCalmDensity: isCalmDensity);
   }
 
   /// Gold tier marker that stays legible on a light surface: darken the brand
@@ -377,7 +389,9 @@ class AuraTheme {
 
   static PulsrPalette _palette(
       Color accent, Brightness brightness, bool isAmoled,
-      {bool dimWhitePoint = false, bool isHighContrast = false}) {
+      {bool dimWhitePoint = false,
+      bool isHighContrast = false,
+      bool isCalmDensity = false}) {
     final isDark = brightness == Brightness.dark;
 
     if (!isDark) {
@@ -401,7 +415,7 @@ class AuraTheme {
           accent: readableAccent,
           onAccent: lightOnAccent,
           accentContainer: readableAccent.withValues(alpha: 0.22),
-          glow: readableAccent.withValues(alpha: 0.45),
+          glow: readableAccent.withValues(alpha: isCalmDensity ? 0.16 : 0.45),
           bg: Colors.white,
           surface: Colors.white,
           surfaceContainer: const Color(0xFFF1F1F1),
@@ -430,13 +444,15 @@ class AuraTheme {
           goldAccent: _lightGold(0.62),
           playerCard: Colors.white,
           deepShade: Colors.white,
+          isCalmDensity: isCalmDensity,
         );
       }
       return PulsrPalette(
         accent: readableAccent,
         onAccent: lightOnAccent,
-        accentContainer: readableAccent.withValues(alpha: 0.12),
-        glow: readableAccent.withValues(alpha: 0.22),
+        accentContainer:
+            readableAccent.withValues(alpha: isCalmDensity ? 0.08 : 0.12),
+        glow: readableAccent.withValues(alpha: isCalmDensity ? 0.08 : 0.22),
         bg: const Color(0xFFF6F7FA),
         surface: Colors.white,
         surfaceContainer: const Color(0xFFF1F2F6),
@@ -446,17 +462,22 @@ class AuraTheme {
         scrimLight: AppColors.scrimAt(0.08),
         scrimMedium: AppColors.scrimAt(0.25),
         scrimHeavy: AppColors.scrimAt(0.50),
-        borderSubtle: const Color(0x12000000),
+        borderSubtle: isCalmDensity
+            ? const Color(0x0A000000)
+            : const Color(0x12000000),
         borderStrong: const Color(0x2E000000),
-        accentSoft: readableAccent.withValues(alpha: 0.12),
-        accentMedium: readableAccent.withValues(alpha: 0.25),
+        accentSoft:
+            readableAccent.withValues(alpha: isCalmDensity ? 0.08 : 0.12),
+        accentMedium:
+            readableAccent.withValues(alpha: isCalmDensity ? 0.18 : 0.25),
         successSoft: readableSuccess.withValues(alpha: 0.15),
         errorSoft: readableError.withValues(alpha: 0.15),
         warningSoft: readableWarning.withValues(alpha: 0.15),
-        hairline: const Color(0xFF0F1724).withValues(alpha: 0.08),
+        hairline: const Color(0xFF0F1724)
+            .withValues(alpha: isCalmDensity ? 0.05 : 0.08),
         textPrimary: const Color(0xFF131722),
         textSecondary: const Color(0xFF5A6274),
-        textTertiary: const Color(0xFF5F6779),
+        textTertiary: const Color(0xFF565E70),
         favorite: AppColors.favorite,
         success: readableSuccess,
         error: readableError,
@@ -465,6 +486,7 @@ class AuraTheme {
         goldAccent: _lightGold(0.50),
         playerCard: Colors.white,
         deepShade: const Color(0xFFF6F7FA),
+        isCalmDensity: isCalmDensity,
       );
     }
 
@@ -489,7 +511,7 @@ class AuraTheme {
         accent: effectiveDarkAccent,
         onAccent: onAccent,
         accentContainer: effectiveDarkAccent.withValues(alpha: 0.26),
-        glow: effectiveDarkAccent.withValues(alpha: 0.50),
+        glow: effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.18 : 0.50),
         bg: Colors.black,
         surface: const Color(0xFF050506),
         surfaceContainer: const Color(0xFF111114),
@@ -516,14 +538,16 @@ class AuraTheme {
         isDark: true,
         playerCard: const Color(0xFF050506),
         deepShade: Colors.black,
+        isCalmDensity: isCalmDensity,
       );
     }
     if (isAmoled) {
       return PulsrPalette(
         accent: effectiveDarkAccent,
         onAccent: onAccent,
-        accentContainer: effectiveDarkAccent.withValues(alpha: 0.16),
-        glow: effectiveDarkAccent.withValues(alpha: 0.30),
+        accentContainer:
+            effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.10 : 0.16),
+        glow: effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.11 : 0.30),
         bg: Colors.black,
         surface: const Color(0xFF0A0A0D),
         surfaceContainer: const Color(0xFF111116),
@@ -533,14 +557,16 @@ class AuraTheme {
         scrimLight: AppColors.scrimAt(0.20),
         scrimMedium: AppColors.scrimAt(0.50),
         scrimHeavy: AppColors.scrimAt(0.85),
-        borderSubtle: AppColors.specularAt(0.08),
+        borderSubtle: AppColors.specularAt(isCalmDensity ? 0.04 : 0.08),
         borderStrong: AppColors.specularAt(0.20),
-        accentSoft: effectiveDarkAccent.withValues(alpha: 0.12),
-        accentMedium: effectiveDarkAccent.withValues(alpha: 0.25),
+        accentSoft:
+            effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.08 : 0.12),
+        accentMedium:
+            effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.18 : 0.25),
         successSoft: AppColors.success.withValues(alpha: 0.15),
         errorSoft: AppColors.error.withValues(alpha: 0.15),
         warningSoft: AppColors.warning.withValues(alpha: 0.15),
-        hairline: AppColors.specularAt(0.09),
+        hairline: AppColors.specularAt(isCalmDensity ? 0.05 : 0.09),
         textPrimary:
             dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFF4F5F9),
         textSecondary: const Color(0xFFA0A6B4),
@@ -551,13 +577,15 @@ class AuraTheme {
         isDark: true,
         playerCard: const Color(0xFF0A0A0D),
         deepShade: Colors.black,
+        isCalmDensity: isCalmDensity,
       );
     }
     return PulsrPalette(
       accent: effectiveDarkAccent,
       onAccent: onAccent,
-      accentContainer: effectiveDarkAccent.withValues(alpha: 0.14),
-      glow: effectiveDarkAccent.withValues(alpha: 0.26),
+      accentContainer:
+          effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.09 : 0.14),
+      glow: effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.09 : 0.26),
       bg: const Color(0xFF0B0D12),
       surface: const Color(0xFF12151D),
       surfaceContainer: const Color(0xFF191D28),
@@ -567,24 +595,29 @@ class AuraTheme {
       scrimLight: AppColors.scrimAt(0.16),
       scrimMedium: AppColors.scrimAt(0.42),
       scrimHeavy: AppColors.scrimAt(0.72),
-      borderSubtle: AppColors.specularAt(0.07),
+      borderSubtle: AppColors.specularAt(isCalmDensity ? 0.04 : 0.07),
       borderStrong: AppColors.specularAt(0.16),
-      accentSoft: effectiveDarkAccent.withValues(alpha: 0.12),
-      accentMedium: effectiveDarkAccent.withValues(alpha: 0.24),
+      accentSoft:
+          effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.08 : 0.12),
+      accentMedium:
+          effectiveDarkAccent.withValues(alpha: isCalmDensity ? 0.17 : 0.24),
       successSoft: AppColors.success.withValues(alpha: 0.15),
       errorSoft: AppColors.error.withValues(alpha: 0.15),
       warningSoft: AppColors.warning.withValues(alpha: 0.15),
-      hairline: AppColors.specular,
+      hairline: isCalmDensity
+          ? AppColors.specularAt(0.05)
+          : AppColors.specular,
       textPrimary:
           dimWhitePoint ? const Color(0xFFCDD0DC) : const Color(0xFFF2F4FA),
       textSecondary: const Color(0xFFA6ADC2),
-      textTertiary: const Color(0xFF8B93AB),
+      textTertiary: const Color(0xFF939BB2),
       favorite: AppColors.favorite,
       success: AppColors.success,
       error: AppColors.error,
       isDark: true,
       playerCard: const Color(0xFF141926),
       deepShade: PlayerMaterialColors.immersiveBackdrop,
+      isCalmDensity: isCalmDensity,
     );
   }
 
@@ -595,9 +628,12 @@ class AuraTheme {
     bool isBoldText = false,
     bool dimWhitePoint = false,
     bool isHighContrast = false,
+    bool isCalmDensity = false,
   }) {
     final p = _palette(accent, brightness, isAmoled,
-        dimWhitePoint: dimWhitePoint, isHighContrast: isHighContrast);
+        dimWhitePoint: dimWhitePoint,
+        isHighContrast: isHighContrast,
+        isCalmDensity: isCalmDensity);
     final isDark = p.isDark;
     final outlineWidth = isHighContrast ? 1.6 : 1.0;
     final focusRingWidth = isHighContrast ? 2.6 : 1.5;
@@ -677,7 +713,7 @@ class AuraTheme {
           color: p.textTertiary,
           fontWeight: FontWeight.w800,
           letterSpacing: AppTracking.wide,
-          fontSize: AppFontSize.tiny,
+          fontSize: AppFontSize.caption,
           fontFamily: fontFamily,
           fontFamilyFallback: fontFallbacks),
     );
@@ -1011,6 +1047,20 @@ class AuraTheme {
                 fontFamily: fontFamily,
                 fontFamilyFallback: fontFallbacks,
                 fontWeight: FontWeight.w700)),
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thickness: const WidgetStatePropertyAll<double>(6.0),
+        radius: const Radius.circular(AppRadii.r3),
+        thumbColor: WidgetStateProperty.resolveWith<Color?>((states) {
+          if (states.contains(WidgetState.hovered) ||
+              states.contains(WidgetState.dragged) ||
+              states.contains(WidgetState.pressed)) {
+            return p.accent.withValues(alpha: 0.70);
+          }
+          return p.accent.withValues(alpha: 0.40);
+        }),
+        trackColor: WidgetStatePropertyAll<Color>(p.surfaceContainer),
+        trackBorderColor: WidgetStatePropertyAll<Color>(p.hairline),
       ),
     );
   }

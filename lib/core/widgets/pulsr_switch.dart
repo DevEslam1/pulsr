@@ -398,7 +398,7 @@ class PulsrSwitchListTile extends StatelessWidget {
                       child: Text(
                         disabledReason!,
                         style: TextStyle(
-                          fontSize: AppFontSize.tiny,
+                          fontSize: AppFontSize.caption,
                           fontWeight: FontWeight.w700,
                           color: p.error,
                         ),

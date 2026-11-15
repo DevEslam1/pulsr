@@ -18,6 +18,7 @@ abstract class AppRadii {
   // above for new work.
   static const double r1_5 = 1.5;
   static const double r2 = 2.0;
+  static const double r3 = 3.0;
   static const double r4 = 4.0;
   static const double r6 = 6.0;
   static const double r8 = 8.0;

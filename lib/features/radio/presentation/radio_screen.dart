@@ -624,7 +624,7 @@ class _RadioScreenState extends State<RadioScreen> {
                     station.genre!,
                     style: TextStyle(
                       color: p.accent,
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -1288,7 +1288,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
           errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14),
         ),
       ),
-      label: Text(label, style: const TextStyle(fontSize: 11)),
+      label: Text(label, style: const TextStyle(fontSize: AppFontSize.caption)),
       selected: isSelected,
       onSelected: (val) {
         setState(() => _artworkUrl = val ? assetPath : null);
@@ -1367,7 +1367,7 @@ class _AddStationDialogState extends State<_AddStationDialog> {
               ActionChip(
                 avatar: const Icon(Icons.clear_rounded, size: 14),
                 label: Text(context.l10n.radioCancelImageAction,
-                    style: const TextStyle(fontSize: 11)),
+                    style: const TextStyle(fontSize: AppFontSize.caption)),
                 onPressed: () => setState(() => _artworkUrl = null),
               ),
           ],

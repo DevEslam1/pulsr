@@ -603,7 +603,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       children: [
         Text(
           label,
-          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.tiny),
+          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
         ),
         Text(
           value,
@@ -1035,7 +1035,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             Text(context.l10n.roomPositionCenter,
                                 style: TextStyle(
                                     color: p.textTertiary,
-                                    fontSize: AppFontSize.tiny)),
+                                    fontSize: AppFontSize.caption)),
                             const SizedBox(width: 8),
                             Container(
                                 width: 10,
@@ -1045,7 +1045,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             Text(context.l10n.roomPositionLeft,
                                 style: TextStyle(
                                     color: p.textTertiary,
-                                    fontSize: AppFontSize.tiny)),
+                                    fontSize: AppFontSize.caption)),
                             const SizedBox(width: 8),
                             Container(
                                 width: 10,
@@ -1055,7 +1055,7 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             Text(context.l10n.roomPositionRight,
                                 style: TextStyle(
                                     color: p.textTertiary,
-                                    fontSize: AppFontSize.tiny)),
+                                    fontSize: AppFontSize.caption)),
                           ],
                         ),
                         const SizedBox(height: 2),

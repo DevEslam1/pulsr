@@ -348,7 +348,7 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                             '${l10n.tracksCount(filtered.length).toUpperCase()}'
                                             '${filtered.isNotEmpty ? " • ${Formatters.formatDuration(Duration(milliseconds: totalDurationMs)).toUpperCase()}" : ""}',
                                             style: TextStyle(
-                                              fontSize: AppFontSize.tiny,
+                                              fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w700,
                                               letterSpacing: 0.8,
                                               color: p.textTertiary,

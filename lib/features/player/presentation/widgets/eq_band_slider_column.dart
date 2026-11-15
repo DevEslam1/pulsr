@@ -227,7 +227,7 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: AppFontSize.micro,
+                    fontSize: AppFontSize.caption,
                     height: 1.0,
                     fontWeight: FontWeight.w800,
                     color: active ? activeColor : context.palette.textTertiary,
@@ -351,7 +351,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
             child: Text(
               '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',
               style: TextStyle(
-                fontSize: AppFontSize.tiny,
+                fontSize: AppFontSize.caption,
                 color: _isDragging
                     ? Colors.white
                     : (gain.abs() > 0.1
@@ -469,7 +469,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                             child: Text(
                               '${gain > 0 ? "+" : ""}${gain.toStringAsFixed(1)} dB',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w700,
                                 color: widget.accentColor,
                                 fontFeatures: const [

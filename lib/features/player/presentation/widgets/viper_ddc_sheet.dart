@@ -544,7 +544,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                     'Preamp: ${(-avgGain).toStringAsFixed(1)} dB',
                                     style: TextStyle(
                                       color: p.textTertiary,
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -571,23 +571,23 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   Text(context.l10n.freq20Hz,
                                       style: TextStyle(
                                           color: p.textTertiary,
-                                          fontSize: AppFontSize.tiny)),
+                                          fontSize: AppFontSize.caption)),
                                   Text(context.l10n.freq100Hz,
                                       style: TextStyle(
                                           color: p.textTertiary,
-                                          fontSize: AppFontSize.tiny)),
+                                          fontSize: AppFontSize.caption)),
                                   Text(context.l10n.freq1kHz,
                                       style: TextStyle(
                                           color: p.textTertiary,
-                                          fontSize: AppFontSize.tiny)),
+                                          fontSize: AppFontSize.caption)),
                                   Text(context.l10n.freq10kHz,
                                       style: TextStyle(
                                           color: p.textTertiary,
-                                          fontSize: AppFontSize.tiny)),
+                                          fontSize: AppFontSize.caption)),
                                   Text(context.l10n.freq20kHz,
                                       style: TextStyle(
                                           color: p.textTertiary,
-                                          fontSize: AppFontSize.tiny)),
+                                          fontSize: AppFontSize.caption)),
                                 ],
                               ),
                             ],
@@ -616,7 +616,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                         ? context.l10n.viperStopSweep
                                         : context.l10n.viperTestTone,
                                     style:
-                                        TextStyle(fontSize: AppFontSize.tiny),
+                                        TextStyle(fontSize: AppFontSize.caption),
                                   ),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(
@@ -675,7 +675,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   _abBypassed
                                       ? context.l10n.viperAbBypassedShort
                                       : context.l10n.viperAbCompare,
-                                  style: TextStyle(fontSize: AppFontSize.tiny),
+                                  style: TextStyle(fontSize: AppFontSize.caption),
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(
@@ -710,7 +710,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                     context.l10n.dspViperDdcDemoNote,
                     style: TextStyle(
                       color: p.textTertiary,
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       height: 1.3,
                     ),
                   ),
@@ -778,7 +778,7 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                     context.l10n.activeLabel,
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: AppFontSize.tiny,
+                                      fontSize: AppFontSize.caption,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),

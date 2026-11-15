@@ -260,7 +260,7 @@ mixin SettingsSearchResults
                           r.category.toUpperCase(),
                           style: TextStyle(
                             color: p.accent,
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w800,
                             letterSpacing: AppTracking.medium,
                           ),
@@ -286,7 +286,7 @@ mixin SettingsSearchResults
                             "PRO",
                             style: TextStyle(
                               color: p.onAccent,
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w900,
                               letterSpacing: AppTracking.wide,
                             ),
@@ -619,6 +619,33 @@ mixin SettingsSearchResults
           _searchController.clear();
           setState(() => _selectedCategoryId = 'look');
         },
+      ),
+      _SearchItem(
+        categoryId: 'look',
+        category: lookCat,
+        title: context.l10n.visualDensityTitle,
+        subtitle: context.l10n.visualDensitySubtitle,
+        icon: Icons.spa_outlined,
+        keywords: [
+          'visual',
+          'density',
+          'calm',
+          'comfortable',
+          'glow',
+          'minimal',
+          'gradient'
+        ],
+        trailing: Switch.adaptive(
+          value: state.isCalmDensity,
+          onChanged: (v) => cubit.setVisualDensityMode(
+            v ? VisualDensityMode.calm : VisualDensityMode.comfortable,
+          ),
+        ),
+        onTap: () => cubit.setVisualDensityMode(
+          state.isCalmDensity
+              ? VisualDensityMode.comfortable
+              : VisualDensityMode.calm,
+        ),
       ),
       _SearchItem(
         categoryId: 'look',

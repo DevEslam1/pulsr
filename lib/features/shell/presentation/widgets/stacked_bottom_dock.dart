@@ -5,6 +5,7 @@ import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/responsive/layout_delegate.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -542,19 +543,22 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                 break;
             }
 
+            final bool isCalm = p.isCalmDensity || GpuBudget.isEnabled;
             final List<BoxShadow> stackedElevationShadow = [
               BoxShadow(
-                color: AppColors.scrimAt(p.isDark ? 0.48 : 0.20),
-                blurRadius: 20,
+                color: AppColors.scrimAt(
+                    (p.isDark ? 0.48 : 0.20) * (isCalm ? 0.55 : 1.0)),
+                blurRadius: isCalm ? 12 : 20,
                 spreadRadius: -1,
                 offset: const Offset(0, -4),
               ),
-              BoxShadow(
-                color: p.accent.withValues(alpha: p.isDark ? 0.08 : 0.04),
-                blurRadius: 14,
-                spreadRadius: -2,
-                offset: const Offset(0, 2),
-              ),
+              if (!isCalm)
+                BoxShadow(
+                  color: p.accent.withValues(alpha: p.isDark ? 0.08 : 0.04),
+                  blurRadius: 14,
+                  spreadRadius: -2,
+                  offset: const Offset(0, 2),
+                ),
             ];
 
             // ── Card 1: Mini Player Card ──

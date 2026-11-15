@@ -442,7 +442,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                                           _report?.activeEffectNames.length ??
                                               0),
                                       style: TextStyle(
-                                        fontSize: AppFontSize.tiny,
+                                        fontSize: AppFontSize.caption,
                                         fontWeight: FontWeight.w800,
                                         color: (_report?.activeEffectNames
                                                     .isNotEmpty ==
@@ -623,7 +623,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                                   ? context.l10n.dspStatusHalOff
                                   : context.l10n.dspStatusDetached))),
                   style: TextStyle(
-                    fontSize: AppFontSize.tiny,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w800,
                     color: isBypassed
                         ? AppColors.dacGold
@@ -973,7 +973,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                             Text(
                               context.l10n.dspLatestError,
                               style: TextStyle(
-                                fontSize: AppFontSize.micro,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                                 color: p.error,
                               ),
@@ -1025,7 +1025,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
           Text(
             context.l10n.dspStatChipLabel(label),
             style: TextStyle(
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               color: p.textSecondary,
               fontWeight: FontWeight.w600,
             ),
@@ -1033,7 +1033,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
           Text(
             value,
             style: TextStyle(
-              fontSize: AppFontSize.tiny,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w800,
               fontFeatures: const [FontFeature.tabularFigures()],
               color: isWarning
@@ -1102,7 +1102,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                 child: Text(
                   stage.category,
                   style: TextStyle(
-                    fontSize: AppFontSize.micro,
+                    fontSize: AppFontSize.caption,
                     color: p.textSecondary,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1125,7 +1125,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                               ? context.l10n.dspStageStatusActive
                               : context.l10n.dspStageStatusOff)),
                   style: TextStyle(
-                    fontSize: AppFontSize.micro,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w800,
                     color: statusColor,
                   ),

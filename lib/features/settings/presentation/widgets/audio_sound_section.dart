@@ -202,7 +202,7 @@ class _AudioEffectsDspSectionState extends State<AudioEffectsDspSection> {
                                   context.l10n.proBadge,
                                   style: TextStyle(
                                     color: p.accent,
-                                    fontSize: AppFontSize.tiny,
+                                    fontSize: AppFontSize.caption,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),

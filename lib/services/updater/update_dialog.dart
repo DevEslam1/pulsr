@@ -145,7 +145,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                   'v${info.version}',
                                   style: TextStyle(
                                     color: p.accent,
-                                    fontSize: AppFontSize.tiny,
+                                    fontSize: AppFontSize.caption,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -156,7 +156,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                     'v${AppConfig.appVersion}'),
                                 style: TextStyle(
                                   color: p.textSecondary,
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                 ),
                               ),
                             ],

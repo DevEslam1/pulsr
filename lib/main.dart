@@ -19,6 +19,7 @@ import 'firebase_options.dart';
 import 'core/performance/gpu_budget.dart';
 import 'core/utils/platform_capabilities.dart';
 import 'core/config/app_config.dart';
+import 'core/constants/app_typography.dart';
 import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
 import 'core/services/artwork_cache_manager.dart';
@@ -973,6 +974,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
               ({
                 ThemeColorSource colorSource,
                 AppThemeMode themeMode,
+                VisualDensityMode visualDensityMode,
                 Color customAccent,
                 String languageCode,
                 bool highContrast,
@@ -982,6 +984,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
             selector: (state) => (
               colorSource: state.themeColorSource,
               themeMode: state.themeMode,
+              visualDensityMode: state.visualDensityMode,
               customAccent: state.customAccentColor,
               languageCode: state.languageCode,
               highContrast: state.highContrast,
@@ -1018,19 +1021,25 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                       final isHighContrast = settingsConfig.highContrast ||
                           MediaQuery.highContrastOf(context);
                       final isBoldText = MediaQuery.boldTextOf(context);
+                      final isCalmDensity =
+                          settingsConfig.visualDensityMode ==
+                              VisualDensityMode.calm;
 
                       final lightTheme = isHighContrast
                           ? AuraTheme.highContrastThemeFor(Brightness.light,
-                              seed: resolveAccent(lightDynamic?.primary))
+                              seed: resolveAccent(lightDynamic?.primary),
+                              isCalmDensity: isCalmDensity)
                           : AuraTheme.customTheme(
                               resolveAccent(lightDynamic?.primary),
                               brightness: Brightness.light,
                               isBoldText: isBoldText,
+                              isCalmDensity: isCalmDensity,
                             );
 
                       final darkTheme = isHighContrast
                           ? AuraTheme.highContrastThemeFor(Brightness.dark,
-                              seed: resolveAccent(darkDynamic?.primary))
+                              seed: resolveAccent(darkDynamic?.primary),
+                              isCalmDensity: isCalmDensity)
                           : AuraTheme.customTheme(
                               resolveAccent(darkDynamic?.primary),
                               brightness: Brightness.dark,
@@ -1038,6 +1047,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                                   AppThemeMode.amoled,
                               isBoldText: isBoldText,
                               dimWhitePoint: settingsConfig.dimWhitePoint,
+                              isCalmDensity: isCalmDensity,
                             );
 
                       final ThemeMode flutterThemeMode;
@@ -1232,13 +1242,13 @@ class PulsrConfigurationErrorApp extends StatelessWidget {
                   context.l10n.bootConfigurationError,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w800),
+                      fontSize: AppFontSize.title, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, height: 1.4),
+                  style: const TextStyle(fontSize: AppFontSize.body, height: 1.4),
                 ),
               ],
             ),
@@ -1285,13 +1295,15 @@ class _DependencyBootstrapScreen extends StatelessWidget {
                     context.l10n.bootStartupFailed,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
-                        fontSize: 17, fontWeight: FontWeight.w700),
+                        fontSize: AppFontSize.subtitle,
+                        fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     context.l10n.bootStartupFailedMessage,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 13.5, height: 1.4),
+                    style: const TextStyle(
+                        fontSize: AppFontSize.bodySmall, height: 1.4),
                   ),
                   const SizedBox(height: 20),
                   FilledButton(

@@ -73,7 +73,7 @@ class PulsrTextStyles {
   static TextStyle overline(BuildContext context, {Color? color}) {
     final typo = context.responsiveTypography;
     return TextStyle(
-      fontSize: (typo.caption - 1.0).clamp(9.0, 12.0),
+      fontSize: typo.caption.clamp(AppFontSize.caption, AppFontSize.label),
       fontWeight: FontWeight.w700,
       letterSpacing: 0.5,
       color: color,

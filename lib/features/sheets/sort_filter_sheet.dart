@@ -311,7 +311,7 @@ class SortFilterSheet extends StatelessWidget {
                           ascending ? 'A–Z' : 'Z–A',
                           style: TextStyle(
                             color: p.accent,
-                            fontSize: 10,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.3,
                           ),

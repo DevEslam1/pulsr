@@ -5802,5 +5802,17 @@
   "lyricsOffsetEarlier": "Adelantar letras (-100 ms)",
   "lyricsOffsetLater": "Retrasar letras (+100 ms)",
   "lyricsOffsetAdjusted": "Desfase de letras ajustado a {offset}",
-  "lyricsOffsetChipTooltip": "Toca para ajustar con precisión la sincronización"
+  "lyricsOffsetChipTooltip": "Toca para ajustar con precisión la sincronización",
+  "visualDensityTitle": "Densidad visual",
+  "visualDensitySubtitle": "Reduce brillos, capas de degradado y líneas especulares en la interfaz",
+  "visualDensityComfortable": "Cómodo",
+  "visualDensityCalm": "Calmado",
+  "signalPathTitle": "Ruta de señal de audio",
+  "signalPathSubtitle": "Custodia en tiempo real de frecuencia, bits y salida",
+  "dspDecoderOutput": "Salida del decodificador",
+  "signalPathActiveRoute": "Ruta de salida activa",
+  "signalPathCopyTooltip": "Copiar traza de señal",
+  "signalPathCopied": "Traza de señal copiada",
+  "signalPathEncodingsLabel": "Codificaciones",
+  "signalPathChannelsLabel": "Canales"
 }

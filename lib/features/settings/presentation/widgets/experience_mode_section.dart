@@ -130,7 +130,7 @@ class ExperienceModeSection extends StatelessWidget {
                     child: Text(
                       isPro ? 'PRO' : l10n.experienceModeNormal.toUpperCase(),
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                         color: isPro ? p.accent : p.textSecondary,
                       ),
@@ -274,7 +274,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
                           TextSpan(
                             text: '${item.$1}: ',
                             style: TextStyle(
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w800,
                               color: p.textPrimary,
                             ),
@@ -282,7 +282,7 @@ class _WhatChangesExpanderState extends State<_WhatChangesExpander>
                           TextSpan(
                             text: widget.isPro ? item.$2 : item.$3,
                             style: TextStyle(
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               color: p.textSecondary,
                             ),
                           ),

@@ -24,10 +24,16 @@
 /// | display | 28 | hero headings |
 /// | displayLarge | 32 | numeric hero values |
 abstract class AppFontSize {
-  /// 8 — ultra-dense micro glyphs (badge counters, telemetry tick labels).
+  /// 8 — decorative-only micro glyphs (must be wrapped in [ExcludeSemantics]).
   static const double nano = 8;
+
+  /// 9 — decorative-only micro decals/ticks (must be wrapped in [ExcludeSemantics]).
   static const double micro = 9;
+
+  /// 10 — decorative-only preview labels/ticks (must be wrapped in [ExcludeSemantics]).
   static const double tiny = 10;
+
+  /// 11 — minimum size for all functional UI text.
   static const double caption = 11;
   static const double label = 12;
   static const double bodySmall = 13;
@@ -37,10 +43,14 @@ abstract class AppFontSize {
   static const double subtitle = 17;
   static const double title = 18;
   static const double titleLarge = 20;
+  static const double titleMedium = 22;
   static const double headline = 24;
   static const double titleXL = 26;
   static const double display = 28;
   static const double displayLarge = 32;
+  static const double heroLarge = 34;
+  static const double heroXL = 44;
+  static const double heroDisplay = 60;
 }
 
 /// Canonical letter-spacing (tracking) scale.

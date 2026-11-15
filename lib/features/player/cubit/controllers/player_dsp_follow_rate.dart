@@ -22,6 +22,53 @@ extension PlayerDspFollowRate on PlayerDspController {
       try {
         if (_isClosed()) return;
         final settings = _settingsCubit!.state;
+        // Log real-time 4-stage signal path telemetry per track start (no-op if disabled).
+        final signalPath = AudioSignalPath.fromOutputInfo(
+          sourceCodec: song.codec ?? '',
+          sourceSampleRate: effectiveSourceSampleRate(
+            tagged: song.sampleRate ?? 0,
+            decoded: settings.currentOutputDevice?.decodedSampleRate ?? 0,
+          ),
+          sourceBitDepth: effectiveSourceBitDepth(
+            tagged: song.bitDepth ?? 0,
+            decoded: settings.currentOutputDevice?.decodedBitDepth ?? 0,
+          ),
+          isDsdSource: (song.codec ?? '').toUpperCase().contains('DSD') ||
+              song.path.toLowerCase().endsWith('.dsf') ||
+              song.path.toLowerCase().endsWith('.dff'),
+          output: settings.currentOutputDevice,
+          uac2DirectActive: _usbExclusiveService.lastStatus.streamingActive,
+          aaudioEnabled: settings.aaudioOutputEnabled,
+          floatOutputEnabled: settings.floatOutputEnabled,
+        );
+        unawaited(AudioSessionLog.instance.updateOutputInfo(
+          routeType:
+              AudioSessionLog.routeTypeForInfo(settings.currentOutputDevice),
+          bluetoothCodec: settings.currentOutputDevice?.btCodecName,
+          sampleRate: signalPath.hardwareSampleRate > 0
+              ? signalPath.hardwareSampleRate
+              : null,
+          bitDepth: signalPath.hardwareBitDepth > 0
+              ? signalPath.hardwareBitDepth
+              : null,
+          sourceCodec: signalPath.sourceCodec,
+          sourceSampleRate: signalPath.sourceSampleRate > 0
+              ? signalPath.sourceSampleRate
+              : null,
+          sourceBitDepth: signalPath.sourceBitDepth > 0
+              ? signalPath.sourceBitDepth
+              : null,
+          decoderSampleRate: signalPath.decoderSampleRate > 0
+              ? signalPath.decoderSampleRate
+              : null,
+          decoderBitDepth: signalPath.decoderBitDepth > 0
+              ? signalPath.decoderBitDepth
+              : null,
+          decoderEncoding: signalPath.decoderEncodingName,
+          driverPath: signalPath.driverPath,
+          isBitPerfect: signalPath.isBitPerfect,
+          signalPathSummary: signalPath.toChainString(),
+        ));
         if (settings.bitPerfectOutput &&
             !await _settingsCubit!.validateBitPerfectTrackSource(song)) {
           _lastFollowedSampleRate = null;
@@ -284,32 +331,46 @@ extension PlayerDspFollowRate on PlayerDspController {
       codecSelectableBitDepths: device?.btSelectableBitDepths ?? const [],
     );
     final target = plan.alignCodecSampleRateTo;
-    if (target == null) return;
-    if (target == _lastFollowedBtCodecRate &&
-        device?.btSampleRateHz == target &&
-        (device?.btBitDepth ?? 0) > 0) {
+    final targetDepth = plan.alignCodecBitDepthTo;
+    if (target == null && targetDepth == null) return;
+    final rateAlreadyOk = target == null ||
+        (target == _lastFollowedBtCodecRate &&
+            device?.btSampleRateHz == target &&
+            (device?.btBitDepth ?? 0) > 0);
+    final depthAlreadyOk =
+        targetDepth == null || device?.btBitDepth == targetDepth;
+    if (rateAlreadyOk && depthAlreadyOk) {
       return;
     }
     try {
-      final ok = await service.setBluetoothSampleRate(target);
-      if (ok) {
+      var rateOk = true;
+      var depthOk = true;
+      if (!rateAlreadyOk) {
+        rateOk = await service.setBluetoothSampleRate(target);
+      }
+      if (!depthAlreadyOk) {
+        depthOk = await service.setBluetoothBitDepth(targetDepth);
+      }
+      if (rateOk || depthOk) {
         await settingsCubit.refreshOutputDevice();
         final actual = settingsCubit.state.currentOutputDevice;
         // Dispatch is not negotiation. Cache only a readback on the same route
         // and codec with a known negotiated depth.
-        _lastFollowedBtCodecRate = actual?.isBluetooth == true &&
-                actual?.deviceName == device?.deviceName &&
-                actual?.btCodecName == device?.btCodecName &&
-                actual?.btSampleRateHz == target &&
-                (actual?.btBitDepth ?? 0) > 0
-            ? target
-            : null;
+        if (target != null) {
+          _lastFollowedBtCodecRate = actual?.isBluetooth == true &&
+                  actual?.deviceName == device?.deviceName &&
+                  actual?.btCodecName == device?.btCodecName &&
+                  actual?.btSampleRateHz == target &&
+                  (actual?.btBitDepth ?? 0) > 0
+              ? target
+              : null;
+        }
       } else {
         _lastFollowedBtCodecRate = null;
       }
     } catch (e, st) {
       _lastFollowedBtCodecRate = null;
-      ErrorLogger.log('Bluetooth codec rate alignment failed ($target)',
+      ErrorLogger.log('Bluetooth codec alignment failed ($target/$targetDepth)',
           error: e, stackTrace: st, category: 'PlayerDspController');
     }
   }

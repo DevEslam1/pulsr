@@ -161,7 +161,7 @@ mixin SettingsOnlineSection
                     context.l10n.activeLabel,
                     style: TextStyle(
                       color: p.success,
-                      fontSize: AppFontSize.tiny,
+                      fontSize: AppFontSize.caption,
                       fontWeight: FontWeight.w800,
                     ),
                   ),

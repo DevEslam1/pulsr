@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/services/ambient_sound_service.dart';
@@ -732,7 +733,7 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
                   color: isDragging
                       ? Colors.white
                       : Colors.white.withValues(alpha: 0.6),
-                  fontSize: 12.0,
+                  fontSize: AppFontSize.label,
                   fontWeight: FontWeight.w600,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
@@ -753,7 +754,7 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
                       : Formatters.formatDuration(widget.duration),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 12.0,
+                    fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w600,
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
@@ -824,7 +825,7 @@ class _CleanLosslessBadgePill extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.88),
-                  fontSize: 11.0,
+                  fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.1,
                 ),
@@ -1373,7 +1374,7 @@ class _DownBarItem extends StatelessWidget {
                     child: Text(
                       badgeText!,
                       style: TextStyle(
-                        fontSize: 8.5,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w800,
                         color: resolvedColor.computeLuminance() > 0.4
                             ? Colors.black

@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/performance/gpu_budget.dart';
+import 'package:pulsr/core/theme/aura_theme.dart';
 
 void main() {
   List<File> dartFilesUnderLib() {
@@ -175,6 +177,131 @@ void main() {
       expect(canBlurGpuSaver, isFalse);
       expect(AppBlur.clampSigma(24.0), equals(AppBlur.maxSigma));
       expect(AppBlur.clampSigma(-2.0), equals(0.0));
+    });
+
+    test(
+        'zero foregroundColor: Colors.white in lib/ (use p.onAccent / AppColors.textOnAccent)',
+        () {
+      final violations = <String>[];
+      final pat = RegExp(r'foregroundColor\s*:\s*Colors\.white\b');
+      for (final f in dartFilesUnderLib()) {
+        final lines = f.readAsLinesSync();
+        for (int i = 0; i < lines.length; i++) {
+          if (pat.hasMatch(lines[i])) {
+            violations.add('${f.path}:${i + 1}: ${lines[i].trim()}');
+          }
+        }
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            'Button foregroundColor must never hardcode Colors.white:\n${violations.join('\n')}',
+      );
+    });
+
+    test('zero raw numeric fontSize literals in lib/ (use AppFontSize.*)', () {
+      final violations = <String>[];
+      final pat = RegExp(r'fontSize\s*:\s*([0-9]+(?:\.[0-9]+)?)\b');
+      for (final f in dartFilesUnderLib()) {
+        final p = f.path.replaceAll('\\', '/');
+        if (p.endsWith('app_typography.dart') ||
+            p.endsWith('responsive_typography.dart')) {
+          continue;
+        }
+        final lines = f.readAsLinesSync();
+        for (int i = 0; i < lines.length; i++) {
+          final line = lines[i];
+          if (line.trimLeft().startsWith('//')) continue;
+          if (pat.hasMatch(line)) {
+            violations.add('${f.path}:${i + 1}: ${line.trim()}');
+          }
+        }
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            'All font sizes must use AppFontSize tokens:\n${violations.join('\n')}',
+      );
+    });
+
+    test(
+        'sub-11sp font tokens (nano/micro/tiny) only live inside decorative ExcludeSemantics/painter allowlist',
+        () {
+      const decorativeAllowlist = {
+        'app_typography.dart',
+        'cassette_body.dart',
+        'vinyl_deck.dart',
+        'waveform_stage.dart',
+        'milkdrop_player_theme.dart',
+        'eq_curve_visualizer.dart',
+        'dock_style_picker_sheet.dart',
+        'pulsr_viewport_debug_overlay.dart',
+      };
+      final violations = <String>[];
+      final pat = RegExp(r'AppFontSize\.(nano|micro|tiny)\b');
+      for (final f in dartFilesUnderLib()) {
+        final name = f.uri.pathSegments.last;
+        if (decorativeAllowlist.contains(name)) continue;
+        final lines = f.readAsLinesSync();
+        for (int i = 0; i < lines.length; i++) {
+          if (pat.hasMatch(lines[i])) {
+            violations.add('${f.path}:${i + 1}: ${lines[i].trim()}');
+          }
+        }
+      }
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            'Functional UI text must be >= 11sp (AppFontSize.caption):\n${violations.join('\n')}',
+      );
+    });
+
+    test(
+        'textTertiary clears WCAG AA (>= 4.5:1) against real surfaces in light/dark/AMOLED/calm',
+        () {
+      double contrastRatio(Color fg, Color bg) {
+        final l1 = fg.computeLuminance();
+        final l2 = bg.computeLuminance();
+        return l1 > l2 ? (l1 + 0.05) / (l2 + 0.05) : (l2 + 0.05) / (l1 + 0.05);
+      }
+
+      final configs = [
+        ('light', Brightness.light, false, false, false),
+        ('light_calm', Brightness.light, false, false, true),
+        ('light_hc', Brightness.light, false, true, false),
+        ('dark', Brightness.dark, false, false, false),
+        ('dark_calm', Brightness.dark, false, false, true),
+        ('amoled', Brightness.dark, true, false, false),
+        ('amoled_calm', Brightness.dark, true, false, true),
+        ('dark_hc', Brightness.dark, true, true, false),
+      ];
+      for (final (name, brightness, amoled, hc, calm) in configs) {
+        final p = AuraTheme.customTheme(
+          AppColors.primary,
+          brightness: brightness,
+          isAmoled: amoled,
+          isHighContrast: hc,
+          isCalmDensity: calm,
+        ).extension<PulsrPalette>()!;
+        for (final surface in [
+          p.bg,
+          p.surface,
+          p.surfaceContainer,
+          p.surfaceContainerHigh,
+          p.surfaceOverlay,
+        ]) {
+          final ratio = contrastRatio(p.textTertiary, surface);
+          expect(
+            ratio,
+            greaterThanOrEqualTo(4.5),
+            reason:
+                '$name textTertiary (${p.textTertiary}) vs $surface had contrast $ratio < 4.5',
+          );
+        }
+      }
     });
   });
 }

@@ -145,29 +145,31 @@ class _CassetteBody extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             // Left: Side & Tape Formulation
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  context.l10n.cassetteSideA,
-                  style: const TextStyle(
-                    fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: AppTracking.wide,
+            ExcludeSemantics(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.l10n.cassetteSideA,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: AppTracking.wide,
+                    ),
                   ),
-                ),
-                Text(
-                  context.l10n.cassetteTapeType,
-                  style: const TextStyle(
-                    fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white60,
-                    letterSpacing: 0.8,
+                  Text(
+                    context.l10n.cassetteTapeType,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white60,
+                      letterSpacing: 0.8,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
 
             // Center: Stereo Dancing VU Meters (Isolated in RepaintBoundary for 120fps)
@@ -179,29 +181,31 @@ class _CassetteBody extends StatelessWidget {
             ),
 
             // Right: Pulsr Branding & EQ Specs
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  context.l10n.cassettePulsrTape,
-                  style: TextStyle(
-                    fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w900,
-                    color: activeColor,
-                    letterSpacing: AppTracking.wide,
+            ExcludeSemantics(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.l10n.cassettePulsrTape,
+                    style: TextStyle(
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w900,
+                      color: activeColor,
+                      letterSpacing: AppTracking.wide,
+                    ),
                   ),
-                ),
-                Text(
-                  context.l10n.cassetteEqSpec,
-                  style: const TextStyle(
-                    fontSize: AppFontSize.tiny,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white60,
-                    letterSpacing: 0.8,
+                  Text(
+                    context.l10n.cassetteEqSpec,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white60,
+                      letterSpacing: 0.8,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),
@@ -444,7 +448,7 @@ class _CassetteBody extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
                     color: Colors.white60,
                     letterSpacing: 0.5,
@@ -460,13 +464,15 @@ class _CassetteBody extends StatelessWidget {
               borderRadius: AppRadii.r4All,
               border: Border.all(color: Colors.white12),
             ),
-            child: const Text(
-              'NR • OFF',
-              style: TextStyle(
-                fontSize: AppFontSize.tiny,
-                fontWeight: FontWeight.w800,
-                color: Colors.white54,
-                letterSpacing: 0.6,
+            child: const ExcludeSemantics(
+              child: Text(
+                'NR • OFF',
+                style: TextStyle(
+                  fontSize: AppFontSize.tiny,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white54,
+                  letterSpacing: 0.6,
+                ),
               ),
             ),
           ),
@@ -535,14 +541,16 @@ class _CassetteTapeCounter extends StatelessWidget {
                     child: child,
                   );
                 },
-                child: Text(
-                  digits[i],
-                  key: ValueKey<String>('counter_${i}_${digits[i]}'),
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                child: ExcludeSemantics(
+                  child: Text(
+                    digits[i],
+                    key: ValueKey<String>('counter_${i}_${digits[i]}'),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -692,12 +700,14 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          channel,
-          style: const TextStyle(
-            fontSize: 7.5,
-            fontWeight: FontWeight.w800,
-            color: Colors.white54,
+        ExcludeSemantics(
+          child: Text(
+            channel,
+            style: const TextStyle(
+              fontSize: AppFontSize.nano,
+              fontWeight: FontWeight.w800,
+              color: Colors.white54,
+            ),
           ),
         ),
         const SizedBox(width: 4),

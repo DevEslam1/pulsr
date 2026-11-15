@@ -17736,6 +17736,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap to fine-tune lyrics sync offset'**
   String get lyricsOffsetChipTooltip;
+
+  /// No description provided for @visualDensityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visual density'**
+  String get visualDensityTitle;
+
+  /// No description provided for @visualDensitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reduce chrome glows, extra gradient layers, and specular hairlines'**
+  String get visualDensitySubtitle;
+
+  /// No description provided for @visualDensityComfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get visualDensityComfortable;
+
+  /// No description provided for @visualDensityCalm.
+  ///
+  /// In en, this message translates to:
+  /// **'Calm'**
+  String get visualDensityCalm;
+
+  /// No description provided for @signalPathTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Signal Path'**
+  String get signalPathTitle;
+
+  /// No description provided for @signalPathSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Real-time sample rate, bit depth, and route custody'**
+  String get signalPathSubtitle;
+
+  /// No description provided for @dspDecoderOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'Decoder Output'**
+  String get dspDecoderOutput;
+
+  /// No description provided for @signalPathActiveRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Active Output Route'**
+  String get signalPathActiveRoute;
+
+  /// No description provided for @signalPathCopyTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy signal path trace'**
+  String get signalPathCopyTooltip;
+
+  /// No description provided for @signalPathCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Signal path trace copied'**
+  String get signalPathCopied;
+
+  /// No description provided for @signalPathEncodingsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Encodings'**
+  String get signalPathEncodingsLabel;
+
+  /// No description provided for @signalPathChannelsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Channels'**
+  String get signalPathChannelsLabel;
 }
 
 class _AppLocalizationsDelegate

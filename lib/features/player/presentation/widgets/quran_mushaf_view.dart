@@ -231,7 +231,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                                 ? context.l10n.quranReadingOnly
                                 : 'Ayah $activeAyah / ${surah.totalAyahs}',
                             style: TextStyle(
-                              fontSize: AppFontSize.tiny,
+                              fontSize: AppFontSize.caption,
                               fontWeight: FontWeight.w700,
                               color: p.accent,
                             ),

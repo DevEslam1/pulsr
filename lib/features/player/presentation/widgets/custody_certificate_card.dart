@@ -248,13 +248,13 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
                       '${report.measurement!.windowMs.toStringAsFixed(1)} ms · '
                       'in ${report.measurement!.inputSha256.substring(0, 12)}…',
               style:
-                  TextStyle(fontSize: AppFontSize.tiny, color: p.textSecondary),
+                  TextStyle(fontSize: AppFontSize.caption, color: p.textSecondary),
             ),
             if (report.measurement != null)
               Text(
                 'out ${report.measurement!.outputSha256.substring(0, 12)}…',
                 style: TextStyle(
-                    fontSize: AppFontSize.tiny, color: p.textSecondary),
+                    fontSize: AppFontSize.caption, color: p.textSecondary),
               ),
             if (report.limitations.isNotEmpty)
               Padding(
@@ -262,7 +262,7 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
                 child: Text(
                   report.limitations.join('\n'),
                   style: TextStyle(
-                      fontSize: AppFontSize.tiny, color: p.textSecondary),
+                      fontSize: AppFontSize.caption, color: p.textSecondary),
                 ),
               ),
             const SizedBox(height: AppSpacing.xs),

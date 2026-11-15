@@ -432,7 +432,7 @@ class _PartySheetState extends State<PartySheet> {
                         Text(
                           context.l10n.partyRoomCode,
                           style: TextStyle(
-                            fontSize: AppFontSize.tiny,
+                            fontSize: AppFontSize.caption,
                             fontWeight: FontWeight.w800,
                             color: p.textSecondary,
                             letterSpacing: 1.2,
@@ -500,7 +500,7 @@ class _PartySheetState extends State<PartySheet> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         color: p.textSecondary,
                       ),
                     ),
@@ -584,7 +584,7 @@ class _PartySheetState extends State<PartySheet> {
                             Text(
                               context.l10n.partyYouLabel,
                               style: TextStyle(
-                                  fontSize: AppFontSize.tiny,
+                                  fontSize: AppFontSize.caption,
                                   color: p.textSecondary),
                             ),
                           ],
@@ -604,7 +604,7 @@ class _PartySheetState extends State<PartySheet> {
                     child: Text(
                       context.l10n.partyHostMember,
                       style: TextStyle(
-                        fontSize: AppFontSize.tiny,
+                        fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                         color: p.accent,
                       ),

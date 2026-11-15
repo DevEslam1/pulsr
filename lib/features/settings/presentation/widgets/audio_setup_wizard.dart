@@ -574,7 +574,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                               badge,
                               style: TextStyle(
                                 color: p.accent,
-                                fontSize: AppFontSize.tiny,
+                                fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),

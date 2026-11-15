@@ -18,7 +18,7 @@ abstract class FocusTokens {
         BoxShadow(
           color: accentColor.withValues(alpha: 0.35),
           blurRadius: 8,
-          spreadRadius: 1,
+          spreadRadius: 2,
         ),
       ];
 

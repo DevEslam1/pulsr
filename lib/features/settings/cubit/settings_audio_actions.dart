@@ -1207,6 +1207,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         ),
       );
       await _syncTapSrcRate(info);
+      await _syncDynamicOutputBuffer(info);
     } catch (e, st) {
       ErrorLogger.log('Failed to refresh output device or probe DoP',
           error: e, stackTrace: st, category: 'Settings');
@@ -1239,6 +1240,34 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     } catch (e, st) {
       _lastTapSrcTargetRate = null;
       ErrorLogger.log('Failed to sync tap-side SRC rate ($rate)',
+          error: e, stackTrace: st, category: 'Settings');
+    }
+  }
+
+  /// Dynamically raises the sink target buffer duration when streaming over a
+  /// high-bitrate Bluetooth codec (LDAC 990kbps / aptX Lossless / LHDC) so the
+  /// OS A2DP queue does not underrun, while preserving the user's configured
+  /// floor when higher.
+  Future<void> _syncDynamicOutputBuffer(AudioOutputInfo? info) async {
+    if (info == null || !getIt.isRegistered<PulsrAudioHandler>()) return;
+    if (!info.isBt) return;
+    final rec = recommendedBluetoothBufferMs(
+      codecName: info.btCodecName,
+      bitrateKbps: info.btEstimatedBitrateKbps,
+      sampleRateHz: info.btSampleRateHz ?? info.sampleRate,
+      isLeAudio: info.isLeAudio,
+    );
+    final effectiveBuffer =
+        rec > state.aaudioTargetBufferMs ? rec : state.aaudioTargetBufferMs;
+    if (effectiveBuffer == state.aaudioTargetBufferMs) return;
+    try {
+      await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
+        state.aaudioOutputEnabled,
+        preferExclusive: state.aaudioPreferExclusive,
+        targetBufferMs: effectiveBuffer,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply dynamic BT buffer (${effectiveBuffer}ms)',
           error: e, stackTrace: st, category: 'Settings');
     }
   }

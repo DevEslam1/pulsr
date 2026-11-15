@@ -582,7 +582,7 @@ class QueueScreen extends StatelessWidget {
                                       context.l10n.autoplayBadgeLabel,
                                       style: TextStyle(
                                         color: p.accent,
-                                        fontSize: 9,
+                                        fontSize: AppFontSize.caption,
                                         fontWeight: FontWeight.w700,
                                         letterSpacing: 0.5,
                                       ),
