@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart' hide PlayerState;
 import '../../../../core/utils/l10n_extensions.dart';
@@ -29,7 +30,12 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
   StreamSubscription<dynamic>? _toneSubscription;
   bool _isPlayingTone = false;
   bool _abBypassed = false;
+  bool _ddcDisabledBySheetBypass = false;
   bool _pausedMainPlaybackForSweep = false;
+  bool _isPausingForSweep = false;
+  List<double>? _cachedBiquadSource;
+  List<List<double>> _cachedBiquads = const [];
+  double _cachedAvgGain = 0.0;
   PlayerCubit? _playerCubit;
 
   @override
@@ -53,11 +59,16 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
       // Best-effort tone player cleanup.
     }
     _tonePlayer = null;
-    if (_pausedMainPlaybackForSweep) {
+    // AUDIT-FIX (P2-19): Restore only playback/DDC state that this sheet
+    // itself paused or bypassed and that the user has not since overridden.
+    if (_pausedMainPlaybackForSweep && _playerCubit?.state.isPlaying != true) {
       _pausedMainPlaybackForSweep = false;
       _playerCubit?.play();
+    } else {
+      _pausedMainPlaybackForSweep = false;
     }
-    if (_abBypassed) {
+    if (_ddcDisabledBySheetBypass) {
+      _ddcDisabledBySheetBypass = false;
       try {
         _playerCubit?.setViperDdcEnabled(true);
       } catch (_) {
@@ -223,8 +234,13 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
     if (mounted) setState(() => _isPlayingTone = true);
     try {
       if (_playerCubit?.state.isPlaying == true) {
+        _isPausingForSweep = true;
         _pausedMainPlaybackForSweep = true;
-        await _playerCubit?.pause();
+        try {
+          await _playerCubit?.pause();
+        } finally {
+          _isPausingForSweep = false;
+        }
       }
       _tonePlayer ??= AudioPlayer();
       final bytes = generateTestSweepWav();
@@ -306,287 +322,336 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) =>
-          prev.isViperDdcEnabled != curr.isViperDdcEnabled ||
-          prev.viperDdcProfileName != curr.viperDdcProfileName,
-      builder: (context, state) {
-        final cubit = context.read<PlayerCubit>();
+    return BlocListener<PlayerCubit, PlayerState>(
+      listenWhen: (prev, curr) =>
+          prev.isPlaying != curr.isPlaying ||
+          prev.isViperDdcEnabled != curr.isViperDdcEnabled,
+      listener: (context, state) {
+        // If the user resumed main playback outside our sweep pause helper,
+        // relinquish ownership so dispose() will not clobber subsequent pauses.
+        if (!_isPausingForSweep &&
+            _pausedMainPlaybackForSweep &&
+            state.isPlaying) {
+          _pausedMainPlaybackForSweep = false;
+        }
+        // If DDC became enabled again externally while A/B bypass was active,
+        // relinquish ownership of the pending restore.
+        if (_ddcDisabledBySheetBypass && state.isViperDdcEnabled) {
+          _ddcDisabledBySheetBypass = false;
+          if (_abBypassed && mounted) {
+            setState(() => _abBypassed = false);
+          }
+        }
+      },
+      child: BlocBuilder<PlayerCubit, PlayerState>(
+        buildWhen: (prev, curr) =>
+            prev.isViperDdcEnabled != curr.isViperDdcEnabled ||
+            prev.viperDdcProfileName != curr.viperDdcProfileName,
+        builder: (context, state) {
+          final cubit = context.read<PlayerCubit>();
 
-        return Container(
-          padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
-          decoration: BoxDecoration(
-            color: p.surface,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
-          ),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: p.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: AppRadii.r2All,
+          return Container(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.s20, AppSpacing.sm, AppSpacing.s20, AppSpacing.xl),
+            decoration: BoxDecoration(
+              color: p.surface,
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(AppRadii.r28)),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: p.textSecondary.withValues(alpha: 0.3),
+                        borderRadius: AppRadii.r2All,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
+                  const SizedBox(height: AppSpacing.md),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.headphones_rounded, color: p.primary),
+                          const SizedBox(width: AppSpacing.s10),
+                          Text(
+                            'ViPER-DDC',
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.title,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Switch.adaptive(
+                        value: state.isViperDdcEnabled,
+                        activeThumbColor: p.primary,
+                        onChanged: (val) {
+                          // User took explicit ownership of DDC enabled state;
+                          // cancel any sheet-owned A/B restore on dispose.
+                          _ddcDisabledBySheetBypass = false;
+                          if (_abBypassed) {
+                            setState(() => _abBypassed = false);
+                          }
+                          cubit.setViperDdcEnabled(val);
+                        },
+                      ),
+                    ],
+                  ),
+                  Text(
+                    AudioFeatureRegistry.viperDdc
+                        .localized(context.l10n)
+                        .subtitle,
+                    style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.bodySmall),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Current loaded profile card
+                  Container(
+                    padding: const EdgeInsets.all(AppSpacing.s14),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer,
+                      borderRadius: AppRadii.r16All,
+                      border: Border.all(
+                        color: state.isViperDdcEnabled
+                            ? p.primary.withValues(alpha: 0.3)
+                            : p.hairline,
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Icon(Icons.headphones_rounded, color: p.primary),
-                        const SizedBox(width: AppSpacing.s10),
-                        Text(
-                          'ViPER-DDC',
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.title,
-                            fontWeight: FontWeight.w700,
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.s10),
+                          decoration: BoxDecoration(
+                            color: (state.isViperDdcEnabled
+                                    ? p.primary
+                                    : p.textSecondary)
+                                .withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.album_rounded,
+                            color: state.isViperDdcEnabled
+                                ? p.primary
+                                : p.textSecondary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.s14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                context.l10n.activeProfile,
+                                style: TextStyle(
+                                  color: p.textTertiary,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.s2),
+                              Text(
+                                state.viperDdcProfileName.isNotEmpty
+                                    ? state.viperDdcProfileName
+                                    : context.l10n.dspNoProfileLoaded,
+                                style: TextStyle(
+                                  color: state.viperDdcProfileName.isNotEmpty
+                                      ? p.textPrimary
+                                      : p.textTertiary,
+                                  fontSize: AppFontSize.body,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        FilledButton.icon(
+                          onPressed: () => _pickVdcFile(context),
+                          icon: const Icon(Icons.file_open_rounded, size: 16),
+                          label: Text(context.l10n.openVdc),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: AppRadii.r12All,
+                            ),
+                            visualDensity: VisualDensity.compact,
                           ),
                         ),
                       ],
                     ),
-                    Switch.adaptive(
-                      value: state.isViperDdcEnabled,
-                      activeThumbColor: p.primary,
-                      onChanged: (val) {
-                        cubit.setViperDdcEnabled(val);
-                      },
-                    ),
-                  ],
-                ),
-                Text(
-                  AudioFeatureRegistry.viperDdc
-                      .localized(context.l10n)
-                      .subtitle,
-                  style: TextStyle(
-                      color: p.textSecondary, fontSize: AppFontSize.bodySmall),
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // Current loaded profile card
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.s14),
-                  decoration: BoxDecoration(
-                    color: p.surfaceContainer,
-                    borderRadius: AppRadii.r16All,
-                    border: Border.all(
-                      color: state.isViperDdcEnabled
-                          ? p.primary.withValues(alpha: 0.3)
-                          : p.hairline,
-                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.s10),
-                        decoration: BoxDecoration(
-                          color: (state.isViperDdcEnabled
-                                  ? p.primary
-                                  : p.textSecondary)
-                              .withValues(alpha: 0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.album_rounded,
-                          color: state.isViperDdcEnabled
-                              ? p.primary
-                              : p.textSecondary,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.s14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              context.l10n.activeProfile,
-                              style: TextStyle(
-                                color: p.textTertiary,
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.s2),
-                            Text(
-                              state.viperDdcProfileName.isNotEmpty
-                                  ? state.viperDdcProfileName
-                                  : context.l10n.dspNoProfileLoaded,
-                              style: TextStyle(
-                                color: state.viperDdcProfileName.isNotEmpty
-                                    ? p.textPrimary
-                                    : p.textTertiary,
-                                fontSize: AppFontSize.body,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      FilledButton.icon(
-                        onPressed: () => _pickVdcFile(context),
-                        icon: const Icon(Icons.file_open_rounded, size: 16),
-                        label: Text(context.l10n.openVdc),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: p.accent,
-                          foregroundColor: p.onAccent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: AppRadii.r12All,
+                  const SizedBox(height: AppSpacing.md),
+
+                  // Interactive Frequency Response Curve & Tools
+                  Builder(builder: (context) {
+                    final activeCoeffs =
+                        _builtInProfiles[state.viperDdcProfileName] ??
+                            _builtInProfiles.values.first;
+                    if (!identical(_cachedBiquadSource, activeCoeffs)) {
+                      _cachedBiquadSource = activeCoeffs;
+                      _cachedBiquads = extractBiquadSections(activeCoeffs);
+                      _cachedAvgGain = averageGainDb(_cachedBiquads);
+                    }
+                    final biquads = _cachedBiquads;
+                    final avgGain = _cachedAvgGain;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(AppSpacing.s14),
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainer,
+                            borderRadius: AppRadii.r16All,
+                            border: Border.all(color: p.hairline),
                           ),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // Interactive Frequency Response Curve & Tools
-                Builder(builder: (context) {
-                  final activeCoeffs =
-                      _builtInProfiles[state.viperDdcProfileName] ??
-                          _builtInProfiles.values.first;
-                  final biquads = extractBiquadSections(activeCoeffs);
-                  final avgGain = averageGainDb(biquads);
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(AppSpacing.s14),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: AppRadii.r16All,
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.show_chart_rounded,
-                                        size: 18, color: p.primary),
-                                    const SizedBox(width: AppSpacing.xs),
-                                    Text(
-                                      context.l10n.correctionCurveRange,
-                                      style: TextStyle(
-                                        color: p.textPrimary,
-                                        fontSize: AppFontSize.caption,
-                                        fontWeight: FontWeight.w700,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(Icons.show_chart_rounded,
+                                          size: 18, color: p.primary),
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Text(
+                                        context.l10n.correctionCurveRange,
+                                        style: TextStyle(
+                                          color: p.textPrimary,
+                                          fontSize: AppFontSize.caption,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
+                                    ],
+                                  ),
+                                  Text(
+                                    'Preamp: ${(-avgGain).toStringAsFixed(1)} dB',
+                                    style: TextStyle(
+                                      color: p.textTertiary,
+                                      fontSize: AppFontSize.tiny,
+                                      fontWeight: FontWeight.w600,
                                     ),
-                                  ],
-                                ),
-                                Text(
-                                  'Preamp: ${(-avgGain).toStringAsFixed(1)} dB',
-                                  style: TextStyle(
-                                    color: p.textTertiary,
-                                    fontSize: AppFontSize.tiny,
-                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.s10),
+                              SizedBox(
+                                height: 110,
+                                width: double.infinity,
+                                child: CustomPaint(
+                                  painter: _DdcFrequencyResponsePainter(
+                                    biquads: biquads,
+                                    primaryColor: p.primary,
+                                    gridColor: p.hairline,
+                                    textColor: p.textTertiary,
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: AppSpacing.s10),
-                            SizedBox(
-                              height: 110,
-                              width: double.infinity,
-                              child: CustomPaint(
-                                painter: _DdcFrequencyResponsePainter(
-                                  biquads: biquads,
-                                  primaryColor: p.primary,
-                                  gridColor: p.hairline,
-                                  textColor: p.textTertiary,
-                                ),
                               ),
-                            ),
-                            const SizedBox(height: AppSpacing.xs),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(context.l10n.freq20Hz,
-                                    style: TextStyle(
-                                        color: p.textTertiary,
-                                        fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq100Hz,
-                                    style: TextStyle(
-                                        color: p.textTertiary,
-                                        fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq1kHz,
-                                    style: TextStyle(
-                                        color: p.textTertiary,
-                                        fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq10kHz,
-                                    style: TextStyle(
-                                        color: p.textTertiary,
-                                        fontSize: AppFontSize.tiny)),
-                                Text(context.l10n.freq20kHz,
-                                    style: TextStyle(
-                                        color: p.textTertiary,
-                                        fontSize: AppFontSize.tiny)),
-                              ],
-                            ),
-                          ],
+                              const SizedBox(height: AppSpacing.xs),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(context.l10n.freq20Hz,
+                                      style: TextStyle(
+                                          color: p.textTertiary,
+                                          fontSize: AppFontSize.tiny)),
+                                  Text(context.l10n.freq100Hz,
+                                      style: TextStyle(
+                                          color: p.textTertiary,
+                                          fontSize: AppFontSize.tiny)),
+                                  Text(context.l10n.freq1kHz,
+                                      style: TextStyle(
+                                          color: p.textTertiary,
+                                          fontSize: AppFontSize.tiny)),
+                                  Text(context.l10n.freq10kHz,
+                                      style: TextStyle(
+                                          color: p.textTertiary,
+                                          fontSize: AppFontSize.tiny)),
+                                  Text(context.l10n.freq20kHz,
+                                      style: TextStyle(
+                                          color: p.textTertiary,
+                                          fontSize: AppFontSize.tiny)),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      // Audition & Level-Matched A/B Toolbar
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Tooltip(
-                              message: context.l10n.testToneBypassesDspNotice,
-                              child: OutlinedButton.icon(
-                                onPressed: _toggleTestTone,
-                                icon: Icon(
-                                  _isPlayingTone
-                                      ? Icons.stop_rounded
-                                      : Icons.volume_up_rounded,
-                                  size: 16,
-                                  color: _isPlayingTone
-                                      ? Colors.redAccent
-                                      : p.primary,
-                                ),
-                                label: Text(
-                                  _isPlayingTone
-                                      ? context.l10n.viperStopSweep
-                                      : context.l10n.viperTestTone,
-                                  style: TextStyle(fontSize: AppFontSize.tiny),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
+                        const SizedBox(height: AppSpacing.sm),
+                        // Audition & Level-Matched A/B Toolbar
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Tooltip(
+                                message: context.l10n.testToneBypassesDspNotice,
+                                child: OutlinedButton.icon(
+                                  onPressed: _toggleTestTone,
+                                  icon: Icon(
+                                    _isPlayingTone
+                                        ? Icons.stop_rounded
+                                        : Icons.volume_up_rounded,
+                                    size: 16,
                                     color: _isPlayingTone
                                         ? Colors.redAccent
-                                        : p.hairline,
+                                        : p.primary,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: AppRadii.r12All,
+                                  label: Text(
+                                    _isPlayingTone
+                                        ? context.l10n.viperStopSweep
+                                        : context.l10n.viperTestTone,
+                                    style:
+                                        TextStyle(fontSize: AppFontSize.tiny),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(
+                                      color: _isPlayingTone
+                                          ? Colors.redAccent
+                                          : p.hairline,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: AppRadii.r12All,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                final nowBypassed = !_abBypassed;
-                                setState(() => _abBypassed = nowBypassed);
-                                cubit.setViperDdcEnabled(!nowBypassed);
-                                ScaffoldMessenger.of(context).showSnackBar(
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  final nowBypassed = !_abBypassed;
+                                  setState(() => _abBypassed = nowBypassed);
+                                  if (nowBypassed) {
+                                    _ddcDisabledBySheetBypass =
+                                        state.isViperDdcEnabled;
+                                    if (state.isViperDdcEnabled) {
+                                      cubit.setViperDdcEnabled(false);
+                                    }
+                                  } else {
+                                    final shouldReenable =
+                                        _ddcDisabledBySheetBypass;
+                                    _ddcDisabledBySheetBypass = false;
+                                    if (shouldReenable) {
+                                      cubit.setViperDdcEnabled(true);
+                                    }
+                                  }
+                                  ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       duration: const Duration(seconds: 1),
                                       content: Text(
@@ -612,123 +677,124 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                       : context.l10n.viperAbCompare,
                                   style: TextStyle(fontSize: AppFontSize.tiny),
                                 ),
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: _abBypassed ? p.accent : p.hairline,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: AppRadii.r12All,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                }),
-                const SizedBox(height: AppSpacing.s20),
-
-                Text(
-                  context.l10n.dspViperDdcDemoTitle,
-                  style: TextStyle(
-                    color: p.textPrimary,
-                    fontSize: AppFontSize.body,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxs),
-                // These profiles are generated placeholders, not measured
-                // correction curves. Say so plainly rather than implying they
-                // were derived from real headphone measurements.
-                Text(
-                  context.l10n.dspViperDdcDemoNote,
-                  style: TextStyle(
-                    color: p.textTertiary,
-                    fontSize: AppFontSize.tiny,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.s10),
-                ..._builtInProfiles.entries.map((entry) {
-                  final isSelected = state.viperDdcProfileName == entry.key;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: InkWell(
-                      onTap: () {
-                        cubit.setViperDdcEnabled(
-                          true,
-                          profileName: entry.key,
-                          coeffs: entry.value,
-                        );
-                      },
-                      borderRadius: AppRadii.r14All,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s14,
-                            vertical: AppSpacing.sm),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? p.primary.withValues(alpha: 0.12)
-                              : p.surfaceContainer,
-                          borderRadius: AppRadii.r14All,
-                          border: Border.all(
-                            color: isSelected ? p.primary : p.hairline,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              isSelected
-                                  ? Icons.radio_button_checked_rounded
-                                  : Icons.radio_button_unchecked_rounded,
-                              color: isSelected ? p.primary : p.textSecondary,
-                              size: 18,
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Text(
-                                entry.key,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? p.textPrimary
-                                      : p.textSecondary,
-                                  fontSize: AppFontSize.bodySmall,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                            if (isSelected)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.xs,
-                                    vertical: AppSpacing.s2),
-                                decoration: BoxDecoration(
-                                  color: p.primary,
-                                  borderRadius: AppRadii.r8All,
-                                ),
-                                child: Text(
-                                  context.l10n.activeLabel,
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: AppFontSize.tiny,
-                                    fontWeight: FontWeight.w700,
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: _abBypassed ? p.accent : p.hairline,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: AppRadii.r12All,
                                   ),
                                 ),
                               ),
+                            ),
                           ],
                         ),
-                      ),
+                      ],
+                    );
+                  }),
+                  const SizedBox(height: AppSpacing.s20),
+
+                  Text(
+                    context.l10n.dspViperDdcDemoTitle,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontSize: AppFontSize.body,
+                      fontWeight: FontWeight.w700,
                     ),
-                  );
-                }),
-              ],
+                  ),
+                  const SizedBox(height: AppSpacing.xxs),
+                  // These profiles are generated placeholders, not measured
+                  // correction curves. Say so plainly rather than implying they
+                  // were derived from real headphone measurements.
+                  Text(
+                    context.l10n.dspViperDdcDemoNote,
+                    style: TextStyle(
+                      color: p.textTertiary,
+                      fontSize: AppFontSize.tiny,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s10),
+                  ..._builtInProfiles.entries.map((entry) {
+                    final isSelected = state.viperDdcProfileName == entry.key;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                      child: InkWell(
+                        onTap: () {
+                          cubit.setViperDdcEnabled(
+                            true,
+                            profileName: entry.key,
+                            coeffs: entry.value,
+                          );
+                        },
+                        borderRadius: AppRadii.r14All,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s14,
+                              vertical: AppSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? p.primary.withValues(alpha: 0.12)
+                                : p.surfaceContainer,
+                            borderRadius: AppRadii.r14All,
+                            border: Border.all(
+                              color: isSelected ? p.primary : p.hairline,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isSelected
+                                    ? Icons.radio_button_checked_rounded
+                                    : Icons.radio_button_unchecked_rounded,
+                                color: isSelected ? p.primary : p.textSecondary,
+                                size: 18,
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  entry.key,
+                                  style: TextStyle(
+                                    color: isSelected
+                                        ? p.textPrimary
+                                        : p.textSecondary,
+                                    fontSize: AppFontSize.bodySmall,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                              if (isSelected)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.xs,
+                                      vertical: AppSpacing.s2),
+                                  decoration: BoxDecoration(
+                                    color: p.primary,
+                                    borderRadius: AppRadii.r8All,
+                                  ),
+                                  child: Text(
+                                    context.l10n.activeLabel,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: AppFontSize.tiny,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
@@ -814,12 +880,10 @@ class ViperDdcParser {
         throw 'Invalid VDC coefficient structure (expected biquad stages)';
       }
 
-      final startIdx = (coeffs.length % 5 == 0)
-          ? 0
-          : ((coeffs.length - 1) % 5 == 0 ? 1 : 0);
-      final stride = (coeffs.length % 5 == 0 || (coeffs.length - 1) % 5 == 0)
-          ? 5
-          : 6;
+      final startIdx =
+          (coeffs.length % 5 == 0) ? 0 : ((coeffs.length - 1) % 5 == 0 ? 1 : 0);
+      final stride =
+          (coeffs.length % 5 == 0 || (coeffs.length - 1) % 5 == 0) ? 5 : 6;
       for (int i = startIdx; i <= coeffs.length - stride; i += stride) {
         final a1 = coeffs[i + stride - 2];
         final a2 = coeffs[i + stride - 1];
@@ -927,9 +991,20 @@ class _DdcFrequencyResponsePainter extends CustomPainter {
     canvas.drawPath(path, curvePaint);
   }
 
+  static bool _biquadsEqual(List<List<double>> a, List<List<double>> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!listEquals(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
   @override
   bool shouldRepaint(covariant _DdcFrequencyResponsePainter oldDelegate) {
-    return oldDelegate.biquads != biquads ||
-        oldDelegate.primaryColor != primaryColor;
+    return !_biquadsEqual(oldDelegate.biquads, biquads) ||
+        oldDelegate.primaryColor != primaryColor ||
+        oldDelegate.gridColor != gridColor ||
+        oldDelegate.textColor != textColor;
   }
 }

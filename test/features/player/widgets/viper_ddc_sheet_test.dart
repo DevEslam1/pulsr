@@ -1,4 +1,5 @@
 // test/features/player/widgets/viper_ddc_sheet_test.dart
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -226,6 +227,114 @@ void main() {
 
       // DDC must be re-enabled via the captured PlayerCubit reference
       verify(() => cubit.setViperDdcEnabled(true)).called(1);
+    });
+
+    testWidgets(
+        'P2-19 does not re-enable DDC on dispose if user explicitly disabled it or if it started disabled',
+        (tester) async {
+      // Case 1: DDC started enabled -> bypassed via A/B -> user explicitly turns
+      // master Switch OFF -> dispose must NOT re-enable DDC.
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      var current = const PlayerState(
+        dsp: DspSlice(isViperDdcEnabled: true),
+      );
+      final cubit = stubPlayerCubit(state: current);
+      when(() => cubit.state).thenAnswer((_) => current);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+      when(() => cubit.setViperDdcEnabled(any())).thenAnswer((inv) async {
+        final v = inv.positionalArguments.single as bool;
+        current = current.copyWith(
+          dsp: current.dsp.copyWith(isViperDdcEnabled: v),
+        );
+        controller.add(current);
+      });
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const ViperDdcSheet(),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('A/B Compare'));
+      await tester.pump();
+      verify(() => cubit.setViperDdcEnabled(false)).called(1);
+
+      // User explicitly flips Switch ON then OFF, taking manual ownership.
+      await tester.tap(find.byType(Switch));
+      await tester.pump();
+      await tester.tap(find.byType(Switch));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 5));
+      clearInteractions(cubit);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+
+      verifyNever(() => cubit.setViperDdcEnabled(any()));
+
+      // Case 2: DDC started disabled -> A/B tapped -> dispose must NOT turn it on.
+      final cubitOff = buildCubit(enabled: false);
+      when(() => cubitOff.setViperDdcEnabled(any())).thenAnswer((_) async {});
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubitOff,
+        child: const ViperDdcSheet(),
+      ));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('A/B Compare'));
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 5));
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+
+      verifyNever(() => cubitOff.setViperDdcEnabled(true));
+    });
+
+    testWidgets(
+        'P2-19 _DdcFrequencyResponsePainter.shouldRepaint returns false when biquad content is unchanged across rebuilds',
+        (tester) async {
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      var current = const PlayerState(
+        dsp: DspSlice(
+          isViperDdcEnabled: true,
+          viperDdcProfileName: 'Sennheiser HD650 Flat Neutral',
+        ),
+      );
+      final cubit = stubPlayerCubit(state: current);
+      when(() => cubit.state).thenAnswer((_) => current);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const ViperDdcSheet(),
+      ));
+      await tester.pumpAndSettle();
+
+      final curvePaintFinder = find.byWidgetPredicate(
+        (w) =>
+            w is CustomPaint &&
+            '${w.painter?.runtimeType}' == '_DdcFrequencyResponsePainter',
+      );
+      final firstPainter =
+          tester.widget<CustomPaint>(curvePaintFinder).painter!;
+
+      // Rebuild the widget with the same profile (simulating external unrelated state / theme rebuild).
+      current = current.copyWith(
+        dsp: current.dsp.copyWith(isViperDdcEnabled: false),
+      );
+      controller.add(current);
+      await tester.pump();
+      await tester.pump();
+
+      final secondPainter =
+          tester.widget<CustomPaint>(curvePaintFinder).painter!;
+
+      expect(identical(firstPainter, secondPainter), isFalse);
+      expect((secondPainter as dynamic).shouldRepaint(firstPainter), isFalse);
     });
   });
 }
