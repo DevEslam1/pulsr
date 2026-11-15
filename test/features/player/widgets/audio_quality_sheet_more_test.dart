@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
@@ -199,7 +200,11 @@ void main() {
   });
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      PrefsKeys.coachMarkUsbDacSeen: true,
+      PrefsKeys.coachMarkDspSeen: true,
+      PrefsKeys.coachMarkDockSwipeSeen: true,
+    });
   });
 
   testWidgets('USB diagnostics render UAC class and direct playback',

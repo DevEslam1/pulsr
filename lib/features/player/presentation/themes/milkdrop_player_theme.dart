@@ -113,10 +113,8 @@ class MilkdropPlayerTheme extends StatelessWidget {
               builder: (context) {
                 final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
                     (c) => c.state.visualizerStyle);
-                if (visualizerStyle == VisualizerStyle.off) {
-                  return const SizedBox.shrink();
-                }
-                final effectiveStyle = visualizerStyle == VisualizerStyle.bar
+                final effectiveStyle = (visualizerStyle == VisualizerStyle.off ||
+                        visualizerStyle == VisualizerStyle.bar)
                     ? VisualizerStyle.milkdrop
                     : visualizerStyle;
                 return AudioVisualizer(
