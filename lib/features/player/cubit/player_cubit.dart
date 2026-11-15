@@ -436,6 +436,11 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     return assigned;
   }
 
+  /// Exposes [_resolveMediaItemId] for unit tests pinning the negative-ID
+  /// hash range and LRU eviction invariants (P2-22).
+  @visibleForTesting
+  int resolveMediaItemIdForTest(String id) => _resolveMediaItemId(id);
+
   Duration _resolveTrackDuration({
     Duration? engineDuration,
     int? songDurationMs,

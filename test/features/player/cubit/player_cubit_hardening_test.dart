@@ -274,7 +274,11 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
   @override
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry, double? predelayMs, double? damping}) async {}
+  Future<void> setReverb(bool enabled,
+      {int? preset,
+      double? wetDry,
+      double? predelayMs,
+      double? damping}) async {}
   @override
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override
@@ -1128,6 +1132,73 @@ void main() {
       // Audio is still running, so the optimistic `paused` must be reconciled.
       expect(state.isPlaying, isTrue);
       expect(state.errorMessage, equals('Failed to pause playback'));
+    });
+
+    test(
+        'P2-22: negative media IDs keep hash/fallback ranges disjoint across LRU eviction',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        dependencies:
+            PlayerDependencies(scrobblerService: mockScrobblerService),
+      );
+      addTearDown(cubit.close);
+
+      // Numeric IDs pass straight through without touching the negative table.
+      expect(cubit.resolveMediaItemIdForTest('42'), equals(42));
+
+      // Locate two distinct non-numeric keys whose hash bucket modulo 1e9
+      // collides so the fallback allocator (-1000000002 and below) is hit.
+      final seenBuckets = <int, String>{};
+      late String keyA;
+      late String keyB;
+      var foundCollision = false;
+      for (var i = 0; i < 250000; i++) {
+        final candidate = 'remote_collision_probe_$i';
+        final bucket = candidate.hashCode.abs() % 1000000000;
+        final prior = seenBuckets[bucket];
+        if (prior != null) {
+          keyA = prior;
+          keyB = candidate;
+          foundCollision = true;
+          break;
+        }
+        seenBuckets[bucket] = candidate;
+      }
+      expect(foundCollision, isTrue,
+          reason: 'Should find two strings colliding modulo 1e9');
+
+      final idA = cubit.resolveMediaItemIdForTest(keyA);
+      // Insert one filler between keyA and keyB so later eviction pops
+      // filler_0 rather than keyB when keyA is re-resolved.
+      cubit.resolveMediaItemIdForTest('eviction_buffer_filler');
+      final idB = cubit.resolveMediaItemIdForTest(keyB);
+
+      expect(idA, inInclusiveRange(-1000000001, -2));
+      expect(idB, lessThan(-1000000001));
+      expect(idA, isNot(equals(idB)));
+
+      // Fill past capacity (1000) with 998 distinct non-colliding keys: keyA is
+      // evicted while buffer_filler becomes keys.first and keyB remains cached.
+      final targetBucket = keyA.hashCode.abs() % 1000000000;
+      var inserted = 0;
+      var seq = 0;
+      while (inserted < 998) {
+        final filler = 'eviction_filler_${seq++}';
+        if (filler.hashCode.abs() % 1000000000 == targetBucket) continue;
+        final assigned = cubit.resolveMediaItemIdForTest(filler);
+        expect(assigned, isNegative);
+        inserted++;
+      }
+
+      // Now keyA has been evicted while keyB's fallback id (< -1000000001)
+      // remains in the cache; re-resolving keyA must return its exact original
+      // hash id without colliding with keyB.
+      expect(cubit.resolveMediaItemIdForTest(keyA), equals(idA));
+      expect(cubit.resolveMediaItemIdForTest(keyB), equals(idB));
     });
   });
 }
