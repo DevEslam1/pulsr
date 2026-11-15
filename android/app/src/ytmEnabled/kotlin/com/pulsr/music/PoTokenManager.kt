@@ -172,6 +172,14 @@ object PoTokenManager {
         val visitorDataBound: String,
         val timestamp: Long
     )
+    private data class PendingToken(
+        val token: CachedToken,
+        val egressId: String,
+    )
+
+    private val pendingLock = Any()
+    @Volatile
+    private var pendingStoredToken: PendingToken? = null
     private val tokenLru = LruCache<String, CachedToken>(LRU_CAPACITY)
 
     fun init(context: Context) {
@@ -197,29 +205,64 @@ object PoTokenManager {
             if (stored.streamingPoToken.isNotEmpty() && stored.visitorData.isNotEmpty()) {
                 visitorData = stored.visitorData
                 integrityToken = stored.integrityToken
-                streamingPoToken = stored.streamingPoToken
                 dataSyncId = stored.dataSyncId
                 expiryInstant = stored.expiryInstant
-                synchronized(tokenLru) {
-                    tokenLru.put(visitorData, CachedToken(streamingPoToken, visitorData, stored.generatedAt))
+                synchronized(pendingLock) {
+                    pendingStoredToken = PendingToken(
+                        CachedToken(stored.streamingPoToken, stored.visitorData, stored.generatedAt),
+                        stored.egressId,
+                    )
                 }
-                Log.d(TAG, "Loaded valid poToken from persistent store (valid until epoch $expiryInstant)")
+                Log.d(TAG, "Loaded persisted poToken; validating it against the first resolved egress")
             }
 
-            // 2026-09 gap 2: a stored token minted on a different egress is dead.
             activeEgressId = currentEgressId()
-            if (stored.egressId.isNotEmpty() && stored.egressId != activeEgressId) {
-                Log.i(TAG, "Stored poToken egress '" + stored.egressId + "' != current '" + activeEgressId + "' -> treat as expired")
-                visitorData = ""
-                streamingPoToken = ""
-                expiryInstant = 0L
-                synchronized(tokenLru) { tokenLru.evictAll() }
+        }
+    }
+
+    private fun hasUnsettledProxyToken(): Boolean = synchronized(pendingLock) {
+        val pending = pendingStoredToken ?: return@synchronized false
+        pending.egressId.startsWith("proxy:") && !ProxyManager.settingsApplied
+    }
+
+    /**
+     * Persisted tokens are validated lazily, at the first token use, so the
+     * Dart settings layer has a chance to restore the proxy configuration.
+     * Comparing them eagerly at init read a still-unconfigured DIRECT label and
+     * discarded a perfectly valid proxy token on every cold start.
+     */
+    private fun promotePendingStoredToken() {
+        val pending = synchronized(pendingLock) {
+            val current = pendingStoredToken ?: return
+            if (current.egressId.startsWith("proxy:") && !ProxyManager.settingsApplied) return
+            pendingStoredToken = null
+            current
+        }
+        val now = Instant.now().epochSecond
+        if (pending.token.timestamp + TOKEN_TTL_SECONDS <= now || expiryInstant <= now) {
+            streamingPoToken = ""
+            return
+        }
+        val current = currentEgressId()
+        if (pending.egressId.isEmpty() || pending.egressId == current) {
+            streamingPoToken = pending.token.token
+            activeEgressId = current
+            synchronized(tokenLru) {
+                tokenLru.put(pending.token.visitorDataBound, pending.token)
             }
+            Log.i(TAG, "Promoted persisted poToken for egress $current")
+        } else {
+            Log.i(TAG, "Discarding persisted poToken minted on ${pending.egressId} (current $current)")
+            streamingPoToken = ""
+            activeEgressId = current
         }
     }
 
     val isReady: Boolean
-        get() = visitorData.isNotEmpty() && streamingPoToken.isNotEmpty() && !isExpired()
+        get() {
+            promotePendingStoredToken()
+            return visitorData.isNotEmpty() && streamingPoToken.isNotEmpty() && !isExpired()
+        }
 
     fun isExpired(): Boolean {
         val now = Instant.now().epochSecond
@@ -296,6 +339,10 @@ object PoTokenManager {
      */
     suspend fun ensureReady(): Boolean = withContext(Dispatchers.IO) {
         checkEgress()
+        promotePendingStoredToken()
+        if (hasUnsettledProxyToken()) {
+            return@withContext visitorData.isNotEmpty()
+        }
         if (webViewBroken) {
             return@withContext visitorData.isNotEmpty()
         }
@@ -358,13 +405,15 @@ object PoTokenManager {
     @Volatile
     private var activeEgressId: String = ""
 
-    fun currentEgressId(): String = EgressTracker.egressId(
-        proxyLabel = runCatching { ProxyPool.currentPathLabel }.getOrDefault("DIRECT"),
-        vpnActive = runCatching { appContext?.let { CellularFailoverHelper.isVpnActive(it) } ?: false }.getOrDefault(false),
-        isCellular = runCatching {
-            appContext?.let { CellularFailoverHelper.isCellularActive(it) } ?: false
-        }.getOrDefault(false),
-    )
+    fun currentEgressId(): String {
+        val snapshot = appContext?.let { NetworkPathMonitor.current(it) }
+        return EgressTracker.egressId(
+            proxyLabel = if (ProxyManager.enabled) ProxyPool.currentPathLabel else "DIRECT",
+            vpnActive = snapshot?.vpnActive ?: false,
+            isCellular = snapshot?.cellular ?: false,
+            networkIdentity = snapshot?.identity,
+        )
+    }
 
     /**
      * Called on egress change (ProxyPool listener / lazy check). Drops cached
@@ -372,6 +421,13 @@ object PoTokenManager {
      */
     fun onEgressChanged(newEgressId: String) {
         if (appContext == null) return
+        promotePendingStoredToken()
+        if (hasUnsettledProxyToken()) {
+            // Proxy settings have not been restored yet; keep the stored token
+            // pending instead of discarding it against a half-configured path.
+            activeEgressId = newEgressId
+            return
+        }
         val old = activeEgressId
         if (old.isNotEmpty() && old != newEgressId) {
             Log.i(TAG, "Egress changed '" + old + "' -> '" + newEgressId + "': invalidating cached poTokens")
@@ -402,6 +458,11 @@ object PoTokenManager {
 
         // Synchronous egress mismatch guard: never attach token to mismatched egress
         if (activeEgressId.isNotEmpty() && activeEgressId != curEgress) {
+            return fallbackTokenFor(identifier)
+        }
+
+        promotePendingStoredToken()
+        if (hasUnsettledProxyToken()) {
             return fallbackTokenFor(identifier)
         }
 
@@ -546,6 +607,7 @@ object PoTokenManager {
         integrityToken = ""
         webViewBrokenUntilElapsed = 0L
         lastBackgroundRefreshMs.set(0L)
+        synchronized(pendingLock) { pendingStoredToken = null }
         oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
         oldStandby?.let { Handler(Looper.getMainLooper()).post { it.close() } }
         appContext?.let { PoTokenStore.clearAttestation(it) }
@@ -653,6 +715,8 @@ object PoTokenManager {
         visitorData = newVisitorData
         streamingPoToken = newStreamingToken
         expiryInstant = newExpiry
+        activeEgressId = currentEgressId()
+        synchronized(pendingLock) { pendingStoredToken = null }
         val oldGen = generator
         generator = newGenerator
         if (oldGen != null && oldGen !== newGenerator) {

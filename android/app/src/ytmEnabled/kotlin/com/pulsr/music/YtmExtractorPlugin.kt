@@ -1,8 +1,6 @@
 package com.pulsr.music
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -61,6 +59,9 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
     })
     private val pendingResults = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<MethodChannel.Result, Boolean>())
+
+    private val proxyPathListener: (String) -> Unit = { onNetworkPathChanged() }
+    private val networkPathListener: (NetworkPathMonitor.Snapshot) -> Unit = { onNetworkPathChanged() }
 
     companion object {
         private const val TAG = "YtmExtractorPlugin"
@@ -139,19 +140,25 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
             }
 
-            // Proxy rotation changes egress -> re-mint tokens with normalized egress ID (B-03)
-            ProxyPool.setOnPathChangeListener { label ->
-                val vpnActive = runCatching {
-                    plugin.context?.let { CellularFailoverHelper.isVpnActive(it) } ?: false
-                }.getOrDefault(false)
-                val isCellular = runCatching {
-                    plugin.context?.let { CellularFailoverHelper.isCellularActive(it) } ?: false
-                }.getOrDefault(false)
-                val normalizedId = EgressTracker.egressId(label, vpnActive, isCellular)
-                EgressSignals.notify(normalizedId)
+            // Proxy rotation and active-network changes both move the egress.
+            // Keep them on a shared listener so neither replaces the other.
+            ProxyPool.addOnPathChangeListener(plugin.proxyPathListener)
+            appContext?.let { ctx ->
+                NetworkPathMonitor.start(ctx)
+                NetworkPathMonitor.addListener(plugin.networkPathListener)
             }
             EgressSignals.onEgressChanged = { id -> PoTokenManager.onEgressChanged(id) }
             return plugin
+        }
+    }
+
+    private fun onNetworkPathChanged() {
+        if (executor.isShutdown || executor.isTerminated) return
+        executor.execute {
+            RateLimiter.shared.resetAfterNetworkChange()
+            runCatching { YtmHttpClient.TtlDnsCache.instance.clear() }
+            runCatching { PlayerJavaScript.clearCaches() }
+            EgressSignals.notify(PoTokenManager.currentEgressId())
         }
     }
 
@@ -173,7 +180,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             )
 
             PoTokenManager.init(appContext)
-            RateLimiter.shared.initPrefs(appContext)
+            RateLimiter.shared.initPrefs(appContext) { PoTokenManager.currentEgressId() }
             // The capability matrix owns client ordering, token requirements, versions and
             // priorities. It used to be loaded only from the `preWarm` channel branch, which
             // Dart fires and forgets at startup, so any resolve that beat that call ran on
@@ -549,31 +556,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
     private fun isWifiConnected(): Boolean {
         val ctx = context?.applicationContext ?: return false
-        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val activeNetwork = cm.activeNetwork
-            val activeCaps = if (activeNetwork != null) cm.getNetworkCapabilities(activeNetwork) else null
-            if (activeCaps != null && (activeCaps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                    activeCaps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))) {
-                return true
-            }
-            // If activeNetwork has TRANSPORT_VPN, query all physical networks
-            @Suppress("DEPRECATION")
-            for (network in cm.allNetworks) {
-                val caps = cm.getNetworkCapabilities(network) ?: continue
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                    caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) {
-                    return true
-                }
-            }
-            false
-        } else {
-            @Suppress("DEPRECATION")
-            val netInfo = cm.activeNetworkInfo ?: return false
-            @Suppress("DEPRECATION")
-            netInfo.type == ConnectivityManager.TYPE_WIFI ||
-                netInfo.type == ConnectivityManager.TYPE_ETHERNET
-        }
+        return NetworkPathMonitor.current(ctx).wifi
     }
 
     private fun runOffMainThread(
@@ -2035,7 +2018,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         channel?.setMethodCallHandler(null)
         channel = null
         EgressSignals.onEgressChanged = null
-        ProxyPool.setOnPathChangeListener { }
+        ProxyPool.removeOnPathChangeListener(proxyPathListener)
+        NetworkPathMonitor.removeListener(networkPathListener)
         synchronized(initLock) {
             extractorReady = false
             pendingCountry = null

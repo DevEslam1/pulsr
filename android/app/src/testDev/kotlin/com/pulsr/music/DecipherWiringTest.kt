@@ -2,6 +2,7 @@ package com.pulsr.music
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -30,6 +31,22 @@ class DecipherWiringTest {
 
         val proxyNode = EgressTracker.egressId("HTTP:1.2.3.4:8080", vpnActive = false, isCellular = false)
         assertEquals("proxy:HTTP:1.2.3.4:8080", proxyNode)
+
+        // Same transport, different network: direct egress must change.
+        val wifiA = EgressTracker.egressId(
+            "DIRECT", vpnActive = false, isCellular = false, networkIdentity = "a")
+        val wifiB = EgressTracker.egressId(
+            "DIRECT", vpnActive = false, isCellular = false, networkIdentity = "b")
+        assertEquals("wifi:direct:a", wifiA)
+        assertEquals("wifi:direct:b", wifiB)
+        assertNotEquals(wifiA, wifiB)
+
+        // A proxy egress is independent of the local network identity.
+        assertEquals(
+            proxyNode,
+            EgressTracker.egressId(
+                "HTTP:1.2.3.4:8080", vpnActive = false, isCellular = false, networkIdentity = "a"),
+        )
 
         // Verify that listeners receiving normalized egress do not trigger spurious invalidations
         val invalidationCount = AtomicInteger(0)

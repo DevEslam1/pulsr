@@ -2,6 +2,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <!-- Android 17 (API 37+): Gating local network device discovery (Cast, mDNS, LAN group sync) -->
     <uses-permission android:name="android.permission.ACCESS_LOCAL_NETWORK"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>

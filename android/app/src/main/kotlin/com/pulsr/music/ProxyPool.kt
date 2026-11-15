@@ -110,10 +110,33 @@ object ProxyPool {
         private set
 
     @Volatile
-    private var onPathChangeListener: ((String) -> Unit)? = null
+    private var legacyPathListener: ((String) -> Unit)? = null
+    private val pathListeners = CopyOnWriteArrayList<(String) -> Unit>()
 
+    /** Legacy single-slot setter; new code should use [addOnPathChangeListener]. */
     fun setOnPathChangeListener(listener: ((String) -> Unit)?) {
-        onPathChangeListener = listener
+        legacyPathListener = listener
+    }
+
+    fun addOnPathChangeListener(listener: (String) -> Unit) {
+        if (!pathListeners.contains(listener)) pathListeners.add(listener)
+    }
+
+    fun removeOnPathChangeListener(listener: (String) -> Unit) {
+        pathListeners.remove(listener)
+    }
+
+    private fun notifyPathChanged(label: String) {
+        try {
+            legacyPathListener?.invoke(label)
+        } catch (_: Throwable) {
+        }
+        for (listener in pathListeners) {
+            try {
+                listener(label)
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     fun setAutoRotate(enabled: Boolean) {
@@ -123,25 +146,35 @@ object ProxyPool {
     }
 
     fun setProxies(list: List<ProxyNode>, isExplicit: Boolean = true) {
+        var labelToNotify: String? = null
         synchronized(lock) {
             proxies.clear()
             proxies.addAll(list)
-            activeProxyId = null
             hasExplicitPool = isExplicit
-            if (list.isEmpty()) {
-                currentPathLabel = "DIRECT"
+            val first = if (list.isEmpty()) null else stableOrderedAlive().firstOrNull()
+            activeProxyId = first?.id
+            val newLabel = first?.let { "${it.type.name}:${it.host}:${it.port}" } ?: "DIRECT"
+            if (newLabel != currentPathLabel) {
+                currentPathLabel = newLabel
+                labelToNotify = newLabel
             }
         }
+        labelToNotify?.let { notifyPathChanged(it) }
         logI(TAG, "Proxy pool updated with ${list.size} proxies (explicit=$isExplicit)")
     }
 
     fun clearPool() {
+        var labelToNotify: String? = null
         synchronized(lock) {
             proxies.clear()
             activeProxyId = null
             hasExplicitPool = false
-            currentPathLabel = "DIRECT"
+            if (currentPathLabel != "DIRECT") {
+                currentPathLabel = "DIRECT"
+                labelToNotify = "DIRECT"
+            }
         }
+        labelToNotify?.let { notifyPathChanged(it) }
     }
 
     fun clear() = clearPool()
@@ -183,7 +216,7 @@ object ProxyPool {
                 }
             }
         }
-        labelToNotify?.let { label -> onPathChangeListener?.invoke(label) }
+        labelToNotify?.let { label -> notifyPathChanged(label) }
         return selected?.toJavaProxy()
     }
 
@@ -308,7 +341,7 @@ object ProxyPool {
             }
         }
         newLabelToNotify?.let { label ->
-            onPathChangeListener?.invoke(label)
+            notifyPathChanged(label)
         }
     }
 
@@ -407,7 +440,7 @@ object ProxyPool {
                 }
             }
             winnerLabelToNotify?.let { label ->
-                onPathChangeListener?.invoke(label)
+                notifyPathChanged(label)
             }
             callback(winner)
         }

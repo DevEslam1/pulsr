@@ -16,17 +16,26 @@ internal object EgressTracker {
 
     /**
      * @param proxyLabel active proxy label from ProxyPool, or null/"DIRECT"
-     * @param vpnActive  CellularFailoverHelper.isVpnActive(context)
-     * @param isCellular true when the active network is metered/cellular
+     * @param vpnActive  NetworkPathMonitor.current().vpnActive
+     * @param isCellular NetworkPathMonitor.current().cellular
+     * @param networkIdentity stable hash of the active network's interface and
+     *        addresses. Distinguishes Wi-Fi-to-Wi-Fi and cellular egress changes
+     *        that keep the same transport class. Null keeps the legacy mapping.
      */
-    fun egressId(proxyLabel: String?, vpnActive: Boolean, isCellular: Boolean): String {
+    fun egressId(
+        proxyLabel: String?,
+        vpnActive: Boolean,
+        isCellular: Boolean,
+        networkIdentity: String? = null,
+    ): String {
         if (!proxyLabel.isNullOrBlank() && !proxyLabel.equals("DIRECT", ignoreCase = true)) {
             return "proxy:$proxyLabel"
         }
+        val suffix = if (networkIdentity.isNullOrBlank()) "" else ":$networkIdentity"
         return when {
-            vpnActive -> "vpn:direct"
-            isCellular -> "cell:direct"
-            else -> "wifi:direct"
+            vpnActive -> "vpn:direct$suffix"
+            isCellular -> "cell:direct$suffix"
+            else -> "wifi:direct$suffix"
         }
     }
 }

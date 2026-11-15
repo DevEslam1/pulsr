@@ -226,4 +226,28 @@ class ProxyRegressionTest {
         assertEquals("proxy.invalid", (unresolved.address() as java.net.InetSocketAddress).hostString)
         assertTrue((unresolved.address() as java.net.InetSocketAddress).isUnresolved)
     }
+
+    @Test
+    fun setProxiesPublishesPathToAllListeners() {
+        val seenA = mutableListOf<String>()
+        val seenB = mutableListOf<String>()
+        val listenerA: (String) -> Unit = { seenA.add(it) }
+        val listenerB: (String) -> Unit = { seenB.add(it) }
+        ProxyPool.addOnPathChangeListener(listenerA)
+        ProxyPool.addOnPathChangeListener(listenerB)
+        try {
+            ProxyPool.setProxies(listOf(node("a", "10.0.0.1")))
+            assertEquals("HTTP:10.0.0.1:8080", ProxyPool.currentPathLabel)
+            assertEquals(listOf("HTTP:10.0.0.1:8080"), seenA)
+            assertEquals(listOf("HTTP:10.0.0.1:8080"), seenB)
+
+            ProxyPool.clear()
+            assertEquals("DIRECT", ProxyPool.currentPathLabel)
+            assertEquals(listOf("HTTP:10.0.0.1:8080", "DIRECT"), seenA)
+            assertEquals(listOf("HTTP:10.0.0.1:8080", "DIRECT"), seenB)
+        } finally {
+            ProxyPool.removeOnPathChangeListener(listenerA)
+            ProxyPool.removeOnPathChangeListener(listenerB)
+        }
+    }
 }

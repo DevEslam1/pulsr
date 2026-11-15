@@ -29,6 +29,8 @@ class RateLimiter(
     private var prefs: SharedPreferences? = null,
     val respectfulMode: Boolean = true
 ) {
+    private var egressIdProvider: (() -> String)? = null
+
     interface Clock {
         fun elapsedRealtime(): Long
         fun currentTimeMillis(): Long
@@ -83,14 +85,24 @@ class RateLimiter(
         }
     }
 
-    fun initPrefs(context: Context) {
+    fun initPrefs(context: Context, egressIdProvider: (() -> String)? = null) {
+        this.egressIdProvider = egressIdProvider
         prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val savedBackoff = prefs?.getLong(KEY_BACKOFF_UNTIL, 0L) ?: 0L
         val nowWall = clock.currentTimeMillis()
-        if (savedBackoff > nowWall) {
-            val remainingMs = savedBackoff - nowWall
-            backoffUntilTimestamp.set(clock.elapsedRealtime() + remainingMs)
+        if (savedBackoff <= nowWall) return
+
+        // A persisted cooldown belongs to the egress that received the 429. A
+        // restart on a different path must not inherit it.
+        val savedEgress = prefs?.getString(KEY_BACKOFF_EGRESS, "").orEmpty()
+        val currentEgress = runCatching { egressIdProvider?.invoke() }.getOrNull().orEmpty()
+        if (savedEgress.isNotEmpty() && currentEgress.isNotEmpty() && savedEgress != currentEgress) {
+            prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.remove(KEY_BACKOFF_EGRESS)?.apply()
+            return
         }
+
+        val remainingMs = savedBackoff - nowWall
+        backoffUntilTimestamp.set(clock.elapsedRealtime() + remainingMs)
     }
 
     enum class PermitResult {
@@ -247,7 +259,14 @@ class RateLimiter(
 
         // Persist to prefs
         val wallBackoffUntil = clock.currentTimeMillis() + effectiveDelayMs
-        prefs?.edit()?.putLong(KEY_BACKOFF_UNTIL, wallBackoffUntil)?.apply()
+        val egressId = runCatching { egressIdProvider?.invoke() }.getOrNull().orEmpty()
+        prefs?.edit()?.putLong(KEY_BACKOFF_UNTIL, wallBackoffUntil)?.also { editor ->
+            if (egressId.isNotEmpty()) {
+                editor.putString(KEY_BACKOFF_EGRESS, egressId)
+            } else {
+                editor.remove(KEY_BACKOFF_EGRESS)
+            }
+        }?.apply()
 
         // Drain tokens. `lastRefill` must move with them, otherwise refill is
         // purely time-based and the next acquire immediately credits the whole
@@ -275,7 +294,7 @@ class RateLimiter(
         val now = clock.elapsedRealtime()
         lastSuccessTimestamp.set(now)
         cleanSinceTimestamp.compareAndSet(0L, now)
-        prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
+        prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.remove(KEY_BACKOFF_EGRESS)?.apply()
         lock.lock()
         try {
             bucketStates.values.forEach {
@@ -318,12 +337,13 @@ class RateLimiter(
             lock.unlock()
         }
         cleanSinceTimestamp.set(now)
-        prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
+        prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.remove(KEY_BACKOFF_EGRESS)?.apply()
     }
 
     companion object {
         private const val PREFS_NAME = "ytm_ratelimiter_prefs"
         private const val KEY_BACKOFF_UNTIL = "key_backoff_until"
+        private const val KEY_BACKOFF_EGRESS = "key_backoff_egress"
         private const val CLEAN_DECAY_MS = 600_000L
 
         val shared: RateLimiter by lazy { RateLimiter() }

@@ -27,6 +27,22 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     @Volatile
     private var engineAttached = false
 
+    private val proxyPathListener: (String) -> Unit = { label ->
+        mainHandler.post {
+            safeCall("ProxyPlugin", "onPathChanged") {
+                channel?.invokeMethod("onPathChanged", mapOf("path" to label))
+            }
+        }
+    }
+
+    private val networkPathListener: (NetworkPathMonitor.Snapshot) -> Unit = { snapshot ->
+        mainHandler.post {
+            safeCall("ProxyPlugin", "onNetworkChanged") {
+                channel?.invokeMethod("onNetworkChanged", snapshot.toMap())
+            }
+        }
+    }
+
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/proxy"
         private val activeEngines = AtomicInteger(0)
@@ -46,13 +62,9 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel = channel
             channel.setMethodCallHandler(plugin)
-            ProxyPool.setOnPathChangeListener { label ->
-                plugin.mainHandler.post {
-                    safeCall("ProxyPlugin", "onPathChanged") {
-                        plugin.channel?.invokeMethod("onPathChanged", mapOf("path" to label))
-                    }
-                }
-            }
+            NetworkPathMonitor.start(context.applicationContext)
+            NetworkPathMonitor.addListener(plugin.networkPathListener)
+            ProxyPool.addOnPathChangeListener(plugin.proxyPathListener)
             return plugin
         }
     }
@@ -78,11 +90,9 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         DnsOverHttpsResolver.initialize(binding.applicationContext)
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel?.setMethodCallHandler(this)
-        ProxyPool.setOnPathChangeListener { label ->
-            mainHandler.post {
-                channel?.invokeMethod("onPathChanged", mapOf("path" to label))
-            }
-        }
+        NetworkPathMonitor.start(binding.applicationContext)
+        NetworkPathMonitor.addListener(networkPathListener)
+        ProxyPool.addOnPathChangeListener(proxyPathListener)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -93,6 +103,8 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel?.setMethodCallHandler(null)
         channel = null
         context = null
+        ProxyPool.removeOnPathChangeListener(proxyPathListener)
+        NetworkPathMonitor.removeListener(networkPathListener)
         val currentExecutor = executor
         try {
             currentExecutor.shutdownNow()
@@ -102,7 +114,6 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             engineAttached = false
             val remaining = activeEngines.updateAndGet { count -> if (count > 0) count - 1 else 0 }
             if (remaining == 0) {
-                ProxyPool.setOnPathChangeListener(null)
                 ProxyManager.dispose()
             }
         }
@@ -161,10 +172,19 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 // explicit (user-supplied) pool; otherwise ProxyManager stops
                 // honoring the single-proxy configuration.
                 ProxyPool.setProxies(nodes, isExplicit = nodes.isNotEmpty())
+                ProxyManager.markSettingsApplied()
                 // The JVM Authenticator resolves HTTPS CONNECT credentials from
                 // the pool; a pool-only configuration must install it too.
                 ProxyManager.refreshAuthenticator()
                 result.success(true)
+            }
+            "getNetworkState" -> {
+                val ctx = context
+                if (ctx == null) {
+                    result.success(null)
+                } else {
+                    result.success(NetworkPathMonitor.current(ctx).toMap())
+                }
             }
             "testProxy" -> {
                 val testUrl = call.argument<String>("testUrl") ?: "https://www.google.com/generate_204"

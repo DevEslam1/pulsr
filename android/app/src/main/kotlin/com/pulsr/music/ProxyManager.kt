@@ -53,6 +53,20 @@ object ProxyManager {
     var blocked: Boolean = false
         private set
 
+    /**
+     * True once the Dart settings layer has pushed its persisted proxy
+     * configuration (including "disabled"). Startup token validation waits for
+     * this so a stored proxy token is not compared against a still-unconfigured
+     * DIRECT path.
+     */
+    @Volatile
+    var settingsApplied: Boolean = false
+        private set
+
+    fun markSettingsApplied() {
+        settingsApplied = true
+    }
+
     fun isBlocked(): Boolean = blocked
 
     private val defaultBypassList = listOf(
@@ -138,6 +152,7 @@ object ProxyManager {
         // pool-only configuration (setProxyPool without setProxy) can still
         // authenticate HTTPS CONNECT tunnels.
         refreshAuthenticator()
+        settingsApplied = true
 
         logI(TAG, "Proxy configured: enabled=$enabled, type=$proxyType, host=${this.host}:${this.port}, hasAuth=${this.username.isNotEmpty()}")
     }
@@ -205,6 +220,7 @@ object ProxyManager {
         password = ""
         failClosed = false
         blocked = false
+        settingsApplied = false
         directFallbackLogged = false
         bypassList = emptyList()
         ProxyPool.clearPool()
@@ -307,8 +323,11 @@ object ProxyManager {
         }.getOrNull()
     }
 
-    fun onPathFailed(url: String? = null) {
-        ProxyPool.onPathFailed(url)
+    fun onPathFailed(
+        url: String? = null,
+        failureType: ProxyPool.FailureType = ProxyPool.FailureType.UNKNOWN,
+    ) {
+        ProxyPool.onPathFailed(url, failureType = failureType)
     }
 
     fun onPathSuccess() {

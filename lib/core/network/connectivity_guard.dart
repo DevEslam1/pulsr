@@ -1,12 +1,18 @@
 // lib/core/network/connectivity_guard.dart
+import 'dart:io';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
+import '../constants/channels.dart';
 import '../utils/error_logger.dart';
 
 /// Provides a lightweight connectivity pre-check for online fetch operations (I10).
 class ConnectivityGuard {
   static Connectivity _connectivity = Connectivity();
+  static const MethodChannel _nativeChannel =
+      MethodChannel(PulsrChannels.proxy);
 
   @visibleForTesting
   static void setMockConnectivity(Connectivity connectivity) {
@@ -31,7 +37,26 @@ class ConnectivityGuard {
   }
 
   /// Returns true if the device is exclusively on a metered cellular connection.
+  ///
+  /// connectivity_plus reports an active VPN as `vpn` and hides its underlying
+  /// transport, so VPN-over-cellular used to look unmetered and allowed
+  /// aggressive preloading. Prefer the platform's active-network metered flag.
   static Future<bool> isMeteredConnection() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        final state = await _nativeChannel
+            .invokeMapMethod<String, dynamic>('getNetworkState');
+        final metered = state?['metered'];
+        if (metered is bool) return metered;
+      } on MissingPluginException {
+        // Fall through to the plugin transport heuristic.
+      } on PlatformException {
+        // Fall through to the plugin transport heuristic.
+      } catch (e, st) {
+        ErrorLogger.log('Native metered-connection query failed',
+            error: e, stackTrace: st, category: 'Network');
+      }
+    }
     try {
       final results = await _connectivity.checkConnectivity();
       return results.contains(ConnectivityResult.mobile) &&

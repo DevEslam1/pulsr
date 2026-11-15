@@ -62,22 +62,12 @@ internal class ClientWinnerStore(context: Context) {
             return cached
         }
         val result = try {
-            val cm = appContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
-                ?: return "unknown"
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                val net = cm.activeNetwork ?: return "none"
-                val caps = cm.getNetworkCapabilities(net) ?: return "unknown"
-                when {
-                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
-                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> "wifi"
-                    caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> "cellular"
-                    else -> "other"
-                }
-            } else {
-                @Suppress("DEPRECATION")
-                val info = cm.activeNetworkInfo ?: return "none"
-                @Suppress("DEPRECATION")
-                if (info.type == android.net.ConnectivityManager.TYPE_WIFI) "wifi" else "cellular"
+            val snapshot = NetworkPathMonitor.current(appContext)
+            when {
+                snapshot.wifi -> "wifi"
+                snapshot.cellular -> "cellular"
+                snapshot.online -> "other"
+                else -> "none"
             }
         } catch (_: Throwable) {
             "unknown"
