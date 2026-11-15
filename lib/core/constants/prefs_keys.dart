@@ -367,4 +367,11 @@ class PrefsKeys {
   // Settings → Audio → Smart Audio.
   static const String autoDacSelectBitPerfect =
       'setting_auto_dac_select_bitperfect';
+
+  // Per-surface Local/Online scope persistence prefix (`source_scope_<surface>`).
+  static const String sourceScopePrefix = 'source_scope_';
+
+  // Temporary or Normal-mode override to show the Diagnostics tab in AudioQualitySheet.
+  static const String audioQualityShowDiagnostics =
+      'audio_quality_show_diagnostics';
 }

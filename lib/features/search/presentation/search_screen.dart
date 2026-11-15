@@ -22,7 +22,7 @@ import '../../../core/widgets/pulsr_chip.dart';
 import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_progress.dart';
 import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
-import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/source_scope_switcher.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../library/cubit/library_cubit.dart';
@@ -86,8 +86,10 @@ class _SearchViewState extends State<_SearchView> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focus = FocusNode();
 
-  /// 0 = All (Local + Online), 1 = Local, 2 = Online.
-  int _tab = 0;
+  /// Current scope: All / Local / Online.
+  SourceScope _scope = SourceScope.all;
+  int get _tab => _scope.index;
+  set _tab(int value) => _scope = SourceScope.values[value.clamp(0, 2)];
 
   /// Mirrors the text field so Online-tab typing triggers immediate UI updates.
   String _text = '';
@@ -398,24 +400,12 @@ class _SearchViewState extends State<_SearchView> {
                 _buildProgressBar(p, tab),
                 if (showOnline) ...[
                   const SizedBox(height: AppSpacing.xs),
-                  PulsrSegmentedControl(
+                  SourceScopeSwitcher(
+                    persistKey: 'search',
+                    includeAll: true,
                     margin: EdgeInsets.symmetric(horizontal: pad),
-                    selectedIndex: _tab,
-                    onChanged: _onTabChanged,
-                    segments: [
-                      PulsrSegment(
-                        label: context.l10n.all,
-                        icon: Icons.dashboard_rounded,
-                      ),
-                      PulsrSegment(
-                        label: context.l10n.localMusic,
-                        icon: Icons.library_music_rounded,
-                      ),
-                      PulsrSegment(
-                        label: context.l10n.onlineStream,
-                        icon: Icons.public_rounded,
-                      ),
-                    ],
+                    selectedScope: _scope,
+                    onChanged: (next) => _onTabChanged(next.index),
                   ),
                 ],
                 if (tab != 2) _buildFilterBar(p, pad),

@@ -34,7 +34,7 @@ import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_progress.dart';
 import '../../../core/widgets/pulsr_refresh_indicator.dart';
 import '../../../core/widgets/pulsr_section_header.dart';
-import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/source_scope_switcher.dart';
 import '../../../core/widgets/pulsr_static_grid.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
@@ -59,8 +59,6 @@ import 'widgets/spotify_import_dialog.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 part 'playlists_screen_components.dart';
 
-enum _PlaylistTabMode { local, online }
-
 class PlaylistsScreen extends StatefulWidget {
   const PlaylistsScreen({super.key});
 
@@ -69,7 +67,7 @@ class PlaylistsScreen extends StatefulWidget {
 }
 
 class _PlaylistsScreenState extends State<PlaylistsScreen> {
-  _PlaylistTabMode _selectedTab = _PlaylistTabMode.local;
+  SourceScope _scope = SourceScope.local;
   PlaylistsTableData? _selectedPlaylist;
   List<PlaylistSuggestion> _suggestions = const [];
   bool _isCreatingPlaylist = false;
@@ -569,7 +567,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               ),
             ),
             actions: [
-              if (_selectedTab == _PlaylistTabMode.online) ...[
+              if (_scope == SourceScope.online) ...[
                 IconButton(
                   constraints: const BoxConstraints(
                     minWidth: AppSpacing.minTouchTarget,
@@ -702,7 +700,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }) {
     return PulsrRefreshIndicator(
       onRefresh: () async {
-        if (_selectedTab == _PlaylistTabMode.online) {
+        if (_scope == SourceScope.online) {
           await cubit.autoFetchOnlineLibrary(force: true);
         } else {
           final count = await context.read<SettingsCubit>().rescanLibrary();
@@ -835,35 +833,22 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               12,
             ),
           ),
-          Padding(
-            padding: EdgeInsets.symmetric(
+          SourceScopeSwitcher(
+            persistKey: 'playlists',
+            margin: EdgeInsets.symmetric(
               horizontal: Adaptive.pagePadding(context),
             ),
-            child: PulsrSegmentedControl(
-              selectedIndex: _selectedTab == _PlaylistTabMode.local ? 0 : 1,
-              onChanged: (i) {
-                PulsrHaptics.selectionClick();
-                final mode =
-                    i == 0 ? _PlaylistTabMode.local : _PlaylistTabMode.online;
-                setState(() => _selectedTab = mode);
-                if (mode == _PlaylistTabMode.online) {
-                  cubit.autoFetchOnlineLibrary();
-                }
-              },
-              segments: [
-                PulsrSegment(
-                  label: context.l10n.local,
-                  icon: Icons.folder_rounded,
-                ),
-                PulsrSegment(
-                  label: context.l10n.online,
-                  icon: Icons.cloud_rounded,
-                ),
-              ],
-            ),
+            selectedScope: _scope,
+            onChanged: (mode) {
+              PulsrHaptics.selectionClick();
+              setState(() => _scope = mode);
+              if (mode == SourceScope.online) {
+                cubit.autoFetchOnlineLibrary();
+              }
+            },
           ),
           const SizedBox(height: AppSpacing.md),
-          if (_selectedTab == _PlaylistTabMode.local) ...[
+          if (_scope == SourceScope.local) ...[
             if (state.playlists.isEmpty && state.isLoading)
               Padding(
                 padding: EdgeInsets.symmetric(

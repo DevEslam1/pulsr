@@ -105,7 +105,7 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    expect(find.byType(GridView), findsWidgets);
+    expect(find.byType(SliverGrid), findsWidgets);
     expect(find.text('Loved Local'), findsOneWidget);
   });
 

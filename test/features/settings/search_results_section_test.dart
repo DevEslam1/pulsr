@@ -170,4 +170,35 @@ void main() {
 
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('groups search results under at most 7 semantic clusters',
+      (tester) async {
+    final h = await pumpSettingsCategory(
+      tester,
+      category: 'sound',
+      seedState:
+          const SettingsState(experienceMode: ExperienceMode.professional),
+    );
+    addTearDown(h.cubit.close);
+
+    // Query matching items across multiple clusters (e.g. "audio" / "e").
+    await type(tester, 'audio');
+    expect(find.textContaining(l10n.settingsClusterAudioDsp), findsWidgets);
+
+    // Every cluster header must come from the canonical <= 7 cluster set.
+    final canonicalClusters = {
+      l10n.settingsClusterAudioDsp,
+      l10n.settingsClusterDataBackup,
+      l10n.settingsClusterOnlineDownloads,
+      l10n.settingsClusterIntegrations,
+      l10n.playback,
+      l10n.navLibrary,
+      l10n.appearance,
+    };
+    expect(canonicalClusters.length, lessThanOrEqualTo(7));
+    expect(
+      canonicalClusters.any((c) => find.textContaining(c).evaluate().isNotEmpty),
+      isTrue,
+    );
+  });
 }

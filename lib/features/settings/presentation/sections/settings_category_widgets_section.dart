@@ -46,130 +46,176 @@ mixin SettingsCategoryWidgetsSection
     SettingsState state,
     SettingsCubit cubit,
   ) {
+    final stateObj = this as SettingsScreenState;
     switch (catId) {
       case 'sound':
         return [
           // A. Smart Audio (prominent, first)
-          SettingsSection(
-            isProminent: true,
-            icon: Icons.auto_awesome_rounded,
-            title: context.l10n.smartAudioTitle,
-            subtitle: context.l10n.settingsSmartAudioSectionSubtitle,
-            trailing: TextButton.icon(
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('smart_audio'),
+            child: SettingsSection(
+              isProminent: true,
+              icon: Icons.auto_awesome_rounded,
+              title: context.l10n.smartAudioTitle,
+              subtitle: context.l10n.settingsSmartAudioSectionSubtitle,
+              trailing: TextButton.icon(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
+                ),
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: Text(
+                  context.l10n.settingsSetUpSound,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                onPressed: () =>
+                    AudioSetupWizardSheet.show(context, cubit: cubit),
               ),
-              icon: const Icon(Icons.tune_rounded, size: 16),
-              label: Text(
-                context.l10n.settingsSetUpSound,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              onPressed: () =>
-                  AudioSetupWizardSheet.show(context, cubit: cubit),
+              children: const [
+                Padding(
+                  padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
+                      AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                  child: SmartAudioSection(),
+                ),
+              ],
             ),
-            children: const [
-              Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(
-                    AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
-                child: SmartAudioSection(),
-              ),
-            ],
           ),
 
           // B. Output Device Card (device-adaptive surface)
-          _catSection(
-            context,
-            'sound',
-            SettingsSection(
-              icon: Icons.speaker_group_rounded,
-              title: context.l10n.settingsHardwareAudioOutput,
-              children: [
-                DeviceAdaptiveOutputSection(
-                  state: state,
-                  onShowDspPreference: (sheetContext, cubit, pref) {
-                    showDspPreferencePickerSheet(sheetContext, cubit, pref);
-                  },
-                ),
-              ],
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('output'),
+            child: _catSection(
+              context,
+              'sound',
+              SettingsSection(
+                icon: Icons.speaker_group_rounded,
+                title: context.l10n.settingsHardwareAudioOutput,
+                children: [
+                  DeviceAdaptiveOutputSection(
+                    state: state,
+                    onShowDspPreference: (sheetContext, cubit, pref) {
+                      showDspPreferencePickerSheet(sheetContext, cubit, pref);
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
 
           // C. Playback Behavior
-          PlaybackSection(state: state),
-          _section(
-            context,
-            context.l10n.quranMode,
-            context.l10n.reciterDesc,
-            [
-              _navTile(
-                context,
-                Icons.menu_book_rounded,
-                context.l10n.quranMode,
-                context.l10n.settingsQuranModeSubtitle,
-                onTap: () => context.push('/quran-mode'),
-              ),
-            ],
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('playback'),
+            child: PlaybackSection(state: state),
           ),
-
-          // D. Loudness & Gain
-          AudioGainSection(state: state),
-
-          // Experience Mode Placement (above Studio/DSP disclosure)
-          _experienceModeCard(context),
-
-          // E. Effects & DSP
-          AudioEffectsDspSection(state: state),
-
-          // F. Device Profiles & Automation (Professional only)
-          if (state.isProfessional) ...[
-            _section(
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('quran'),
+            child: _section(
               context,
-              context.l10n.deviceProfilesTitle,
-              context.l10n.settingsDeviceProfilesSectionSubtitle,
-              [
-                const Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
-                      AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
-                  child: DeviceProfilesSection(),
-                ),
-              ],
-            ),
-            _section(
-              context,
-              context.l10n.automationRules,
-              context.l10n.settingsAutomationSectionSubtitle,
+              context.l10n.quranMode,
+              context.l10n.reciterDesc,
               [
                 _navTile(
                   context,
-                  Icons.auto_awesome_rounded,
-                  context.l10n.automationRules,
-                  context.l10n.settingsAutomationTileSubtitle,
-                  onTap: () => showAutomationRulesSheet(context),
+                  Icons.menu_book_rounded,
+                  context.l10n.quranMode,
+                  context.l10n.settingsQuranModeSubtitle,
+                  onTap: () => context.push('/quran-mode'),
                 ),
               ],
             ),
+          ),
+
+          // D. Loudness & Gain
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('gain'),
+            child: AudioGainSection(state: state),
+          ),
+
+          // Experience Mode Placement (above Studio/DSP disclosure)
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('experience'),
+            child: _experienceModeCard(context),
+          ),
+
+          // E. Effects & DSP
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('dsp'),
+            child: AudioEffectsDspSection(state: state),
+          ),
+
+          // F. Device Profiles & Automation (Professional only)
+          if (state.isProfessional) ...[
+            KeyedSubtree(
+              key: stateObj._sectionKeyFor('profiles'),
+              child: _section(
+                context,
+                context.l10n.deviceProfilesTitle,
+                context.l10n.settingsDeviceProfilesSectionSubtitle,
+                [
+                  const Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(AppSpacing.md,
+                        AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+                    child: DeviceProfilesSection(),
+                  ),
+                ],
+              ),
+            ),
+            KeyedSubtree(
+              key: stateObj._sectionKeyFor('automation'),
+              child: _section(
+                context,
+                context.l10n.automationRules,
+                context.l10n.settingsAutomationSectionSubtitle,
+                [
+                  _navTile(
+                    context,
+                    Icons.auto_awesome_rounded,
+                    context.l10n.automationRules,
+                    context.l10n.settingsAutomationTileSubtitle,
+                    onTap: () => showAutomationRulesSheet(context),
+                  ),
+                ],
+              ),
+            ),
           ],
 
-          const CastSection(),
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('cast'),
+            child: const CastSection(),
+          ),
         ];
 
       case 'look':
         return [
-          _buildAppearanceSection(context, state, cubit),
-          _buildAccessibilitySection(context, state, cubit),
-          _buildGesturesSection(context, state, cubit),
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('appearance'),
+            child: _buildAppearanceSection(context, state, cubit),
+          ),
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('accessibility'),
+            child: _buildAccessibilitySection(context, state, cubit),
+          ),
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('gestures'),
+            child: _buildGesturesSection(context, state, cubit),
+          ),
         ];
 
       case 'library':
         return [
-          _buildLibrarySection(context, state, cubit),
-          _section(
-            context,
-            context.l10n.storageAndCache,
-            context.l10n.settingsStorageSectionSubtitle,
-            [const StorageCacheSection()],
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('library'),
+            child: _buildLibrarySection(context, state, cubit),
+          ),
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('storage'),
+            child: _section(
+              context,
+              context.l10n.storageAndCache,
+              context.l10n.settingsStorageSectionSubtitle,
+              [const StorageCacheSection()],
+            ),
           ),
         ];
 

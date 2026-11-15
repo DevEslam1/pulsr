@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,6 +19,7 @@ import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -65,549 +68,494 @@ class AudioQualitySheet extends StatelessWidget {
     // here: the toggle inside the sheet reads it off the cubit, and without it
     // the sheet never rebuilds when the toggle changes, so the switch appeared
     // stuck off.
-    final (streamingQuality, outputDevice, _) = context
-        .select<SettingsCubit, (YtmAudioQuality?, AudioOutputInfo?, bool)>(
-            (c) => (
-                  c.state.streamingQuality,
-                  c.state.currentOutputDevice,
-                  c.state.bitPerfectOutput,
-                ));
+    final (streamingQuality, outputDevice, _, experienceMode) = context.select<
+        SettingsCubit,
+        (YtmAudioQuality?, AudioOutputInfo?, bool, ExperienceMode)>(
+      (c) => (
+        c.state.streamingQuality,
+        c.state.currentOutputDevice,
+        c.state.bitPerfectOutput,
+        c.state.experienceMode,
+      ),
+    );
+    final isProfessional = experienceMode == ExperienceMode.professional;
     SongsTableData? currentSong;
     DspSlice dspSlice = const DspSlice();
     try {
       currentSong = context
-        .select<PlayerCubit, SongsTableData?>((c) => c.state.currentSong);
-    // The live DSP picture has to be *selected*, not read inside the chain
-    // builder: reading it once left the signal chain showing the stages that
-    // were on when the sheet opened, so toggling the EQ with the sheet open
-    // never changed the verdict.
+          .select<PlayerCubit, SongsTableData?>((c) => c.state.currentSong);
+      // The live DSP picture has to be *selected*, not read inside the chain
+      // builder: reading it once left the signal chain showing the stages that
+      // were on when the sheet opened, so toggling the EQ with the sheet open
+      // never changed the verdict.
       dspSlice = context.select<PlayerCubit, DspSlice>((c) => c.state.dsp);
     } catch (_) {
       // Safe fallback when PlayerCubit is absent from the widget tree
       dspSlice = const DspSlice();
     }
+    final resolvedSong = currentSong ?? song;
     final info = AudioQualityInfo.fromSong(
-      currentSong ?? song,
+      resolvedSong,
       streamingQuality: streamingQuality,
     );
 
     return _buildLiveChainContent(
-      outputDevice, settingsState, dspSlice, currentSong ?? song,
-      (assessment, usbStatus) => Align(
-      alignment: Alignment.bottomCenter,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: Adaptive.sheetConstraints(context).maxWidth,
-          maxHeight: MediaQuery.of(context).size.height * 0.90,
-        ),
-        child: Material(
-          color: p.surface,
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
-          clipBehavior: Clip.antiAlias,
-          child: SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              padding: const EdgeInsetsDirectional.fromSTEB(AppSpacing.s20,
-                  AppSpacing.s14, AppSpacing.s20, AppSpacing.lg),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle Bar
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
+      outputDevice,
+      settingsState,
+      dspSlice,
+      resolvedSong,
+      (assessment, usbStatus) {
+        final nowPlayingChildren = <Widget>[
+          // Hero Quality Tier Card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSpacing.s18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  info.badgeColor.withValues(alpha: 0.22),
+                  info.badgeColor.withValues(alpha: 0.05),
+                  p.surfaceContainer.withValues(alpha: 0.4),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: AppRadii.r20All,
+              border: Border.all(
+                color: info.badgeColor.withValues(alpha: 0.4),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: info.badgeColor.withValues(alpha: 0.15),
+                  blurRadius: 16,
+                  spreadRadius: -2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
-                        color: p.hairline,
-                        borderRadius: AppRadii.r2All,
+                        color: info.badgeColor.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        info.icon,
+                        color: info.badgeColor,
+                        size: 24,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-
-                  // Hero Quality Tier Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.s18),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          info.badgeColor.withValues(alpha: 0.22),
-                          info.badgeColor.withValues(alpha: 0.05),
-                          p.surfaceContainer.withValues(alpha: 0.4),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: AppRadii.r20All,
-                      border: Border.all(
-                        color: info.badgeColor.withValues(alpha: 0.4),
-                        width: 1.2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: info.badgeColor.withValues(alpha: 0.15),
-                          blurRadius: 16,
-                          spreadRadius: -2,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(AppSpacing.xs),
-                              decoration: BoxDecoration(
-                                color: info.badgeColor.withValues(alpha: 0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                info.icon,
-                                color: info.badgeColor,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    info.tierLabel,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w900,
-                                          color: p.textPrimary,
-                                          letterSpacing: AppTracking.label,
-                                        ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s2),
-                                  Text(
-                                    info.shortBadgeLabel,
-                                    style: TextStyle(
-                                      color: info.badgeColor,
-                                      fontSize: AppFontSize.label,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: AppTracking.overline,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.s10),
-                        Text(
-                          info.description,
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.label,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Streaming & Download Quality Selector for YouTube online streams
-                  if ((song.source == SongSource.youtube ||
-                          song.path.toLowerCase().startsWith('ytmusic://')) &&
-                      song.isDownloaded != true) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          context.l10n.streamingQuality,
-                          style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            letterSpacing: AppTracking.wide,
-                            fontWeight: FontWeight.w800,
-                            color: p.textSecondary,
-                          ),
-                        ),
-                        Text(
-                          context.l10n.downloadsMatchStream,
-                          style: TextStyle(
-                            fontSize: AppFontSize.tiny,
-                            color: activeColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    _buildStreamingQualitySelector(
-                      context,
-                      settingsCubit,
-                      streamingQuality ?? YtmAudioQuality.high,
-                      p,
-                      activeColor,
-                    ),
-                  ],
-
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // --- SECTION 1: HARDWARE OUTPUT ROUTING ---
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        context.l10n.hwOutputRouting,
-                        style: TextStyle(
-                          fontSize: AppFontSize.caption,
-                          letterSpacing: AppTracking.wide,
-                          fontWeight: FontWeight.w800,
-                          color: p.textSecondary,
-                        ),
-                      ),
-                      if (outputDevice?.isUsbDac == true)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.s6,
-                            vertical: AppSpacing.s2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(
-                              0xFFFFD700,
-                            ).withValues(alpha: 0.18),
-                            borderRadius: AppRadii.r6All,
-                          ),
-                          child: Text(
-                            context.l10n.usbDacAttached,
-                            style: TextStyle(
-                              color: AppColors.dacGold,
-                              fontSize: AppFontSize.tiny,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.s10),
-
-                  _buildOutputDevicesSelector(
-                    context,
-                    outputDevice,
-                    settingsCubit,
-                    p,
-                    activeColor,
-                  ),
-                  const SizedBox(height: AppSpacing.s10),
-                  _buildCastOutputTile(context, p, activeColor),
-
-                  // --- BLUETOOTH AUDIO CODEC CONTROL ---
-                  if ((outputDevice?.isBluetooth == true) ||
-                      (outputDevice?.btA2dpPresent == true)) ...[
-                    const SizedBox(height: AppSpacing.s20),
-                    _buildBluetoothCodecSection(
-                      context,
-                      outputDevice,
-                      settingsCubit,
-                      p,
-                      activeColor,
-                    ),
-                  ],
-
-                  // --- PHASE 4: OUTPUT PATH DIAGNOSTICS ---
-                  const SizedBox(height: AppSpacing.s10),
-                  Builder(
-                    builder: (context) {
-                      final uac = outputDevice?.usbAudioClass ?? 0;
-                      final uacLabel = uac == 0 ? 'unknown' : 'UAC$uac';
-                      final direct = outputDevice?.directFormats ?? const [];
-                      final advertised = UsbExclusiveService().lastStatus.advertisedFormats;
-                      final supported =
-                          direct.where((f) => f.supported).toList();
-                      // UAC2 DACs report sample rates on the Clock Source entity, not
-                      // in FORMAT_TYPE_I descriptors, so altSettingFormats.supportedRates
-                      // is always empty even when altSettingFormats is non-empty. Compute
-                      // the max from advertised first; if that yields null, fall back to
-                      // UsbExclusiveService().lastStatus.supportedRates (the rates the
-                      // driver read back from the hardware), and finally to directFormats.
-                      final int? maxRateAdvertised = advertised.isNotEmpty
-                          ? advertised
-                              .map((f) => (f['supportedRates'] as List<dynamic>?)?.cast<int>() ?? <int>[])
-                              .expand((r) => r)
-                              .fold<int?>(null, (max, r) => max == null || r > max ? r : max)
-                          : null;
-                      final int? maxRateStatus = UsbExclusiveService()
-                          .lastStatus
-                          .supportedRates
-                          .fold<int?>(null, (max, r) => max == null || r > max ? r : max);
-                      final int? maxRateSupported = supported.isEmpty
-                          ? null
-                          : supported.map((f) => f.sampleRate).reduce((a, b) => a > b ? a : b);
-                      final int? maxRate =
-                          maxRateAdvertised ?? maxRateStatus ?? maxRateSupported;
-                      final bits = advertised.isNotEmpty
-                          ? advertised
-                              .map((f) => f['bitResolution']?.toString() ?? '')
-                              .where((s) => s.isNotEmpty)
-                              .toSet()
-                          : supported.map((f) => f.encoding).toSet();
-                      final bitsLabel = bits.isEmpty
-                          ? '-'
-                          : bits.contains('24')
-                              ? (bits.contains('float') || bits.contains('32')
-                                  ? '32/24'
-                                  : '24')
-                              : (bits.contains('float') || bits.contains('32')
-                                  ? '32'
-                                  : '-');
-                      return Column(
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            context.l10n.outputPathDiag,
+                            info.tierLabel,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: p.textPrimary,
+                                  letterSpacing: AppTracking.label,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.s2),
+                          Text(
+                            info.shortBadgeLabel,
                             style: TextStyle(
-                              fontSize: AppFontSize.caption,
-                              letterSpacing: AppTracking.wide,
+                              color: info.badgeColor,
+                              fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w800,
-                              color: p.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s6),
-                          Text(
-                            outputDevice?.isUsbDac == true
-                                ? context.l10n.usbDacConnectedSummary(
-                                    outputDevice?.usbDacLabel ?? '-', uacLabel)
-                                : context.l10n.usbDacNoneAttached,
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s2),
-                          Text(
-                            maxRate == null
-                                ? context.l10n.directPlaybackNotReported
-                                : context.l10n.directPlaybackUpTo(
-                                    maxRate.toString(), bitsLabel),
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              color: p.textPrimary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.s2),
-                          Text(
-                            context.l10n.audioQualityCapabilityProbe,
-                            style: TextStyle(
-                              fontSize: AppFontSize.tiny,
-                              color: p.textSecondary,
+                              letterSpacing: AppTracking.overline,
                             ),
                           ),
                         ],
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // --- SECTION 2: OUTPUT SAMPLE RATE CONTROL ---
-                  Text(
-                    context.l10n.targetSampleRate,
-                    style: TextStyle(
-                      fontSize: AppFontSize.caption,
-                      letterSpacing: AppTracking.wide,
-                      fontWeight: FontWeight.w800,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-
-                  _buildSampleRateSelector(
-                    context,
-                    outputDevice,
-                    settingsCubit,
-                    p,
-                    activeColor,
-                    info,
-                    assessment,
-                  ),
-
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // --- SECTION 3: BIT DEPTH & BIT-PERFECT ---
-                  Text(
-                    context.l10n.targetBitPerfect,
-                    style: TextStyle(
-                      fontSize: AppFontSize.caption,
-                      letterSpacing: AppTracking.wide,
-                      fontWeight: FontWeight.w800,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-
-                  _buildBitDepthSelector(
-                    context,
-                    outputDevice,
-                    settingsCubit,
-                    p,
-                    activeColor,
-                    info,
-                    assessment,
-                  ),
-
-                  const SizedBox(height: AppSpacing.s20),
-
-                  // --- SECTION 4: AUDIO SPECIFICATIONS ---
-                  Text(
-                    context.l10n.trackSourceSpecs,
-                    style: TextStyle(
-                      fontSize: AppFontSize.caption,
-                      letterSpacing: AppTracking.wide,
-                      fontWeight: FontWeight.w800,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s10),
-
-                  // Specs Grid / List
-                  Container(
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: AppRadii.r16All,
-                      border: Border.all(color: p.hairline),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildSpecItem(
-                          context,
-                          icon: Icons.audio_file_rounded,
-                          label: context.l10n.dspAudioFormatCodec,
-                          value: info.format,
-                          subValue: info.codecName,
-                          p: p,
-                          isFirst: true,
-                        ),
-                        _buildSpecItem(
-                          context,
-                          icon: Icons.speed_rounded,
-                          label: info.bitrateEstimated
-                              ? context.l10n.containerAverageEstimated
-                              : context.l10n.dspSourceBitrate,
-                          value: info.bitrateKbps != null
-                              ? '${info.bitrateKbps} kbps'
-                              : context.l10n.dspUnknown,
-                          subValue:
-                              info.tier == AudioQualityTier.hiResLossless ||
-                                      info.tier == AudioQualityTier.lossless
-                                  ? context.l10n.losslessOutputFidelityNote
-                                  : context.l10n.dspCompressedStream,
-                          p: p,
-                        ),
-                        _buildSpecItem(
-                          context,
-                          icon: Icons.tune_rounded,
-                          label: context.l10n.dspSourceSampleRateDepth,
-                          value: (info.sampleRate != 'Unknown' &&
-                                  info.sampleRate.isNotEmpty)
-                              ? ((info.bitDepth.isNotEmpty &&
-                                      info.bitDepth != 'Unknown')
-                                  ? '${info.sampleRate} / ${info.bitDepth}'
-                                  : info.sampleRate)
-                              : ((info.bitDepth.isNotEmpty &&
-                                      info.bitDepth != 'Unknown')
-                                  ? info.bitDepth
-                                  : context.l10n.dspUnknown),
-                          subValue: info.channels,
-                          p: p,
-                        ),
-                        _buildSpecItem(
-                          context,
-                          icon: Icons.folder_zip_rounded,
-                          label: context.l10n.dspFileSizeDuration,
-                          value: song.fileSize != null
-                              ? '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB'
-                              : context.l10n.dspUnknown,
-                          subValue:
-                              '${context.l10n.duration}: ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
-                          p: p,
-                        ),
-                        _buildSpecItem(
-                          context,
-                          icon: Icons.graphic_eq_rounded,
-                          label: context.l10n.dspDynamicRangeLra,
-                          value: song.loudnessRange != null
-                              ? '${song.loudnessRange!.toStringAsFixed(1)} LU (${song.loudnessRange! >= 12 ? context.l10n.dspDr12Audiophile : (song.loudnessRange! >= 7 ? context.l10n.dspDrHighDynamic : context.l10n.dspDrStandard)})'
-                              : context.l10n.dspStandardDynamicRange,
-                          subValue: context.l10n.dspEbuR128,
-                          p: p,
-                          isLast: true,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.md),
-
-                  // --- SECTION 5: LIVE SIGNAL CHAIN INDICATOR ---
-                  Text(
-                    context.l10n.liveSignalChain,
-                    style: TextStyle(
-                      fontSize: AppFontSize.caption,
-                      letterSpacing: AppTracking.wide,
-                      fontWeight: FontWeight.w800,
-                      color: p.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.s10),
-
-                  _buildVisualSignalChain(
-                    context,
-                    info,
-                    outputDevice,
-                    settingsState,
-                    p,
-                    activeColor,
-                    dspSlice,
-                    assessment,
-                    usbStatus: usbStatus,
-                  ),
-
-                  const SizedBox(height: AppSpacing.s20),
-
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: activeColor,
-                        foregroundColor: activeColor.computeLuminance() > 0.5
-                            ? Colors.black
-                            : Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: AppSpacing.s14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: AppRadii.r14All,
-                        ),
                       ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: Text(
-                        context.l10n.applyDone,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: AppFontSize.body,
-                        ),
-                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.s10),
+                Text(
+                  info.description,
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.label,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Streaming & Download Quality Selector for YouTube online streams
+          if ((resolvedSong.source == SongSource.youtube ||
+                  resolvedSong.path.toLowerCase().startsWith('ytmusic://')) &&
+              resolvedSong.isDownloaded != true) ...[
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  context.l10n.streamingQuality,
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    letterSpacing: AppTracking.wide,
+                    fontWeight: FontWeight.w800,
+                    color: p.textSecondary,
+                  ),
+                ),
+                Text(
+                  context.l10n.downloadsMatchStream,
+                  style: TextStyle(
+                    fontSize: AppFontSize.tiny,
+                    color: activeColor,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            _buildStreamingQualitySelector(
+              context,
+              settingsCubit,
+              streamingQuality ?? YtmAudioQuality.high,
+              p,
+              activeColor,
+            ),
+          ],
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // Audio Specifications
+          Text(
+            context.l10n.trackSourceSpecs,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              letterSpacing: AppTracking.wide,
+              fontWeight: FontWeight.w800,
+              color: p.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          Container(
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.r16All,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              children: [
+                _buildSpecItem(
+                  context,
+                  icon: Icons.audio_file_rounded,
+                  label: context.l10n.dspAudioFormatCodec,
+                  value: info.format,
+                  subValue: info.codecName,
+                  p: p,
+                  isFirst: true,
+                ),
+                _buildSpecItem(
+                  context,
+                  icon: Icons.speed_rounded,
+                  label: info.bitrateEstimated
+                      ? context.l10n.containerAverageEstimated
+                      : context.l10n.dspSourceBitrate,
+                  value: info.bitrateKbps != null
+                      ? '${info.bitrateKbps} kbps'
+                      : context.l10n.dspUnknown,
+                  subValue: info.tier == AudioQualityTier.hiResLossless ||
+                          info.tier == AudioQualityTier.lossless
+                      ? context.l10n.losslessOutputFidelityNote
+                      : context.l10n.dspCompressedStream,
+                  p: p,
+                ),
+                _buildSpecItem(
+                  context,
+                  icon: Icons.tune_rounded,
+                  label: context.l10n.dspSourceSampleRateDepth,
+                  value: (info.sampleRate != 'Unknown' &&
+                          info.sampleRate.isNotEmpty)
+                      ? ((info.bitDepth.isNotEmpty &&
+                              info.bitDepth != 'Unknown')
+                          ? '${info.sampleRate} / ${info.bitDepth}'
+                          : info.sampleRate)
+                      : ((info.bitDepth.isNotEmpty &&
+                              info.bitDepth != 'Unknown')
+                          ? info.bitDepth
+                          : context.l10n.dspUnknown),
+                  subValue: info.channels,
+                  p: p,
+                ),
+                _buildSpecItem(
+                  context,
+                  icon: Icons.folder_zip_rounded,
+                  label: context.l10n.dspFileSizeDuration,
+                  value: resolvedSong.fileSize != null
+                      ? '${(resolvedSong.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB'
+                      : context.l10n.dspUnknown,
+                  subValue:
+                      '${context.l10n.duration}: ${Formatters.formatDuration(Duration(milliseconds: resolvedSong.durationMs))}',
+                  p: p,
+                ),
+                _buildSpecItem(
+                  context,
+                  icon: Icons.graphic_eq_rounded,
+                  label: context.l10n.dspDynamicRangeLra,
+                  value: resolvedSong.loudnessRange != null
+                      ? '${resolvedSong.loudnessRange!.toStringAsFixed(1)} LU (${resolvedSong.loudnessRange! >= 12 ? context.l10n.dspDr12Audiophile : (resolvedSong.loudnessRange! >= 7 ? context.l10n.dspDrHighDynamic : context.l10n.dspDrStandard)})'
+                      : context.l10n.dspStandardDynamicRange,
+                  subValue: context.l10n.dspEbuR128,
+                  p: p,
+                  isLast: true,
+                ),
+              ],
+            ),
+          ),
+        ];
+
+        final outputChildren = <Widget>[
+          // Hardware Output Routing
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                context.l10n.hwOutputRouting,
+                style: TextStyle(
+                  fontSize: AppFontSize.caption,
+                  letterSpacing: AppTracking.wide,
+                  fontWeight: FontWeight.w800,
+                  color: p.textSecondary,
+                ),
+              ),
+              if (outputDevice?.isUsbDac == true)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s6,
+                    vertical: AppSpacing.s2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD700).withValues(alpha: 0.18),
+                    borderRadius: AppRadii.r6All,
+                  ),
+                  child: Text(
+                    context.l10n.usbDacAttached,
+                    style: TextStyle(
+                      color: AppColors.dacGold,
+                      fontSize: AppFontSize.tiny,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          _buildOutputDevicesSelector(
+            context,
+            outputDevice,
+            settingsCubit,
+            p,
+            activeColor,
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          _buildCastOutputTile(context, p, activeColor),
+
+          // Bluetooth Audio Codec Control
+          if ((outputDevice?.isBluetooth == true) ||
+              (outputDevice?.btA2dpPresent == true)) ...[
+            const SizedBox(height: AppSpacing.s20),
+            _buildBluetoothCodecSection(
+              context,
+              outputDevice,
+              settingsCubit,
+              p,
+              activeColor,
+            ),
+          ],
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // Output Sample Rate Control
+          Text(
+            context.l10n.targetSampleRate,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              letterSpacing: AppTracking.wide,
+              fontWeight: FontWeight.w800,
+              color: p.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          _buildSampleRateSelector(
+            context,
+            outputDevice,
+            settingsCubit,
+            p,
+            activeColor,
+            info,
+            assessment,
+          ),
+
+          const SizedBox(height: AppSpacing.s20),
+
+          // Bit Depth & Bit-Perfect
+          Text(
+            context.l10n.targetBitPerfect,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              letterSpacing: AppTracking.wide,
+              fontWeight: FontWeight.w800,
+              color: p.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          _buildBitDepthSelector(
+            context,
+            outputDevice,
+            settingsCubit,
+            p,
+            activeColor,
+            info,
+            assessment,
+          ),
+        ];
+
+        final diagnosticsChildren = <Widget>[
+          // Output Path Diagnostics / USB Probe
+          Builder(
+            builder: (context) {
+              final uac = outputDevice?.usbAudioClass ?? 0;
+              final uacLabel = uac == 0 ? 'unknown' : 'UAC$uac';
+              final direct = outputDevice?.directFormats ?? const [];
+              final advertised =
+                  UsbExclusiveService().lastStatus.advertisedFormats;
+              final supported = direct.where((f) => f.supported).toList();
+              final int? maxRateAdvertised = advertised.isNotEmpty
+                  ? advertised
+                      .map((f) =>
+                          (f['supportedRates'] as List<dynamic>?)?.cast<int>() ??
+                          <int>[])
+                      .expand((r) => r)
+                      .fold<int?>(
+                          null, (max, r) => max == null || r > max ? r : max)
+                  : null;
+              final int? maxRateStatus = UsbExclusiveService()
+                  .lastStatus
+                  .supportedRates
+                  .fold<int?>(
+                      null, (max, r) => max == null || r > max ? r : max);
+              final int? maxRateSupported = supported.isEmpty
+                  ? null
+                  : supported
+                      .map((f) => f.sampleRate)
+                      .reduce((a, b) => a > b ? a : b);
+              final int? maxRate =
+                  maxRateAdvertised ?? maxRateStatus ?? maxRateSupported;
+              final bits = advertised.isNotEmpty
+                  ? advertised
+                      .map((f) => f['bitResolution']?.toString() ?? '')
+                      .where((s) => s.isNotEmpty)
+                      .toSet()
+                  : supported.map((f) => f.encoding).toSet();
+              final bitsLabel = bits.isEmpty
+                  ? '-'
+                  : bits.contains('24')
+                      ? (bits.contains('float') || bits.contains('32')
+                          ? '32/24'
+                          : '24')
+                      : (bits.contains('float') || bits.contains('32')
+                          ? '32'
+                          : '-');
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.outputPathDiag,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      letterSpacing: AppTracking.wide,
+                      fontWeight: FontWeight.w800,
+                      color: p.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s6),
+                  Text(
+                    outputDevice?.isUsbDac == true
+                        ? context.l10n.usbDacConnectedSummary(
+                            outputDevice?.usbDacLabel ?? '-', uacLabel)
+                        : context.l10n.usbDacNoneAttached,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s2),
+                  Text(
+                    maxRate == null
+                        ? context.l10n.directPlaybackNotReported
+                        : context.l10n.directPlaybackUpTo(
+                            maxRate.toString(), bitsLabel),
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s2),
+                  Text(
+                    context.l10n.audioQualityCapabilityProbe,
+                    style: TextStyle(
+                      fontSize: AppFontSize.tiny,
+                      color: p.textSecondary,
                     ),
                   ),
                 ],
-              ),
+              );
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
+
+          // Live Signal Chain Indicator & Custody
+          Text(
+            context.l10n.liveSignalChain,
+            style: TextStyle(
+              fontSize: AppFontSize.caption,
+              letterSpacing: AppTracking.wide,
+              fontWeight: FontWeight.w800,
+              color: p.textSecondary,
             ),
           ),
-        ),
-      ),
-    ));
+          const SizedBox(height: AppSpacing.s10),
+          _buildVisualSignalChain(
+            context,
+            info,
+            outputDevice,
+            settingsState,
+            p,
+            activeColor,
+            dspSlice,
+            assessment,
+            usbStatus: usbStatus,
+          ),
+        ];
+
+        return _AudioQualityTabbedScaffold(
+          isProfessional: isProfessional,
+          activeColor: activeColor,
+          nowPlayingChildren: nowPlayingChildren,
+          outputChildren: outputChildren,
+          diagnosticsChildren: diagnosticsChildren,
+        );
+      },
+    );
   }
 
   Widget _buildLiveChainContent(
@@ -3042,5 +2990,243 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     }
     await Future<void>.delayed(const Duration(seconds: 2));
     await cubit?.refreshOutputDevice();
+  }
+}
+
+class _AudioQualityTabbedScaffold extends StatefulWidget {
+  final bool isProfessional;
+  final Color activeColor;
+  final List<Widget> nowPlayingChildren;
+  final List<Widget> outputChildren;
+  final List<Widget> diagnosticsChildren;
+
+  const _AudioQualityTabbedScaffold({
+    required this.isProfessional,
+    required this.activeColor,
+    required this.nowPlayingChildren,
+    required this.outputChildren,
+    required this.diagnosticsChildren,
+  });
+
+  @override
+  State<_AudioQualityTabbedScaffold> createState() =>
+      _AudioQualityTabbedScaffoldState();
+}
+
+class _AudioQualityTabbedScaffoldState
+    extends State<_AudioQualityTabbedScaffold> {
+  int _selectedTab = 0;
+  bool _showDiagnostics = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadShowDiagnostics());
+  }
+
+  Future<void> _loadShowDiagnostics() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getBool(PrefsKeys.audioQualityShowDiagnostics);
+      if (!mounted || saved == null) return;
+      if (saved != _showDiagnostics) {
+        setState(() => _showDiagnostics = saved);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _setShowDiagnostics(bool value) async {
+    PulsrHaptics.selectionClick();
+    setState(() {
+      _showDiagnostics = value;
+      if (value) {
+        _selectedTab = 2;
+      } else if (_selectedTab >= 2) {
+        _selectedTab = 1;
+      }
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(PrefsKeys.audioQualityShowDiagnostics, value);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final diagnosticsVisible = widget.isProfessional || _showDiagnostics;
+    final maxTab = diagnosticsVisible ? 2 : 1;
+    final activeTab = _selectedTab.clamp(0, maxTab);
+
+    final segments = <PulsrSegment>[
+      PulsrSegment(
+        label: context.l10n.nowPlaying,
+        icon: Icons.graphic_eq_rounded,
+      ),
+      PulsrSegment(
+        label: context.l10n.audioQualityTabOutput,
+        icon: Icons.speaker_group_rounded,
+      ),
+      if (diagnosticsVisible)
+        PulsrSegment(
+          label: context.l10n.audioQualityTabDiagnostics,
+          icon: Icons.analytics_outlined,
+        ),
+    ];
+
+    final activeChildren = switch (activeTab) {
+      0 => widget.nowPlayingChildren,
+      1 => widget.outputChildren,
+      _ => widget.diagnosticsChildren,
+    };
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: Adaptive.sheetConstraints(context).maxWidth,
+          maxHeight: MediaQuery.of(context).size.height * 0.90,
+        ),
+        child: Material(
+          color: p.surface,
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(AppRadii.r28)),
+          clipBehavior: Clip.antiAlias,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s20,
+                    AppSpacing.s14,
+                    AppSpacing.s20,
+                    AppSpacing.sm,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Handle Bar
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: p.hairline,
+                            borderRadius: AppRadii.r2All,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      PulsrSegmentedControl(
+                        selectedIndex: activeTab,
+                        onChanged: (idx) {
+                          PulsrHaptics.selectionClick();
+                          setState(() => _selectedTab = idx);
+                        },
+                        segments: segments,
+                      ),
+                      if (!widget.isProfessional) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Material(
+                          color: p.surfaceContainer,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: AppRadii.r12All,
+                            side: BorderSide(color: p.hairline),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: SwitchListTile.adaptive(
+                            minTileHeight: AppSpacing.minTouchTarget,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.sm,
+                            ),
+                            secondary: Icon(
+                              Icons.science_outlined,
+                              size: 18,
+                              color: _showDiagnostics
+                                  ? widget.activeColor
+                                  : p.textSecondary,
+                            ),
+                            title: Text(
+                              context.l10n.audioQualityShowDiagnostics,
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              context.l10n.audioQualityDiagnosticsProHint,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.caption,
+                              ),
+                            ),
+                            value: _showDiagnostics,
+                            onChanged: _setShowDiagnostics,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsetsDirectional.fromSTEB(
+                      AppSpacing.s20,
+                      AppSpacing.xs,
+                      AppSpacing.s20,
+                      AppSpacing.md,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: activeChildren,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(
+                    AppSpacing.s20,
+                    AppSpacing.xs,
+                    AppSpacing.s20,
+                    AppSpacing.lg,
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: widget.activeColor,
+                        foregroundColor:
+                            widget.activeColor.computeLuminance() > 0.5
+                                ? Colors.black
+                                : Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.s14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.r14All,
+                        ),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(
+                        context.l10n.applyDone,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: AppFontSize.body,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

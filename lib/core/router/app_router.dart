@@ -478,7 +478,11 @@ GoRouter createRouter(MediaScannerService scannerService,
                 name: 'settings',
                 pageBuilder: (context, state) => _buildTabPage(
                   key: state.pageKey,
-                  child: const SettingsScreen(),
+                  child: SettingsScreen(
+                    initialCategoryId: state.uri.queryParameters['category'],
+                    initialSectionId: state.uri.queryParameters['section'],
+                    initialSearchQuery: state.uri.queryParameters['q'],
+                  ),
                 ),
               ),
             ],

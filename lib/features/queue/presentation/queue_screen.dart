@@ -23,10 +23,12 @@ import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/list_content_diff.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'widgets/queue_slot_switcher.dart';
 
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
@@ -260,8 +262,9 @@ class QueueScreen extends StatelessWidget {
         ),
         body: BlocBuilder<PlayerCubit, PlayerState>(
           buildWhen: (prev, curr) =>
-              prev.queue != curr.queue ||
+              listContentDiffers(prev.queue, curr.queue) ||
               prev.currentIndex != curr.currentIndex ||
+              prev.activeQueueSlot != curr.activeQueueSlot ||
               prev.currentSong?.id != curr.currentSong?.id ||
               prev.isPlaying != curr.isPlaying ||
               prev.queueHistory != curr.queueHistory ||
@@ -269,16 +272,57 @@ class QueueScreen extends StatelessWidget {
           builder: (context, state) {
             final queue = state.queue;
 
+            final headerBar = Center(
+              child: ConstrainedBox(
+                constraints: Adaptive.contentConstraints(context),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context),
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          context.l10n.tracksCount(queue.length),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      QueueSlotSwitcher(
+                        activeSlot: state.activeQueueSlot,
+                        onSlotSelected: (slot) =>
+                            context.read<PlayerCubit>().switchQueueSlot(slot),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+
             if (queue.isEmpty) {
-              return PulsrEmptyState(
-                icon: Icons.queue_music_rounded,
-                title: context.l10n.queue,
-                subtitle: context.l10n.noSongsSubtitle,
-                primaryActionLabel: context.l10n.navLibrary,
-                primaryActionIcon: Icons.library_music_rounded,
-                onPrimaryAction: () {
-                  context.go('/library');
-                },
+              return Column(
+                children: [
+                  headerBar,
+                  Divider(height: 1, color: p.hairline.withValues(alpha: 0.6)),
+                  Expanded(
+                    child: PulsrEmptyState(
+                      icon: Icons.queue_music_rounded,
+                      title: context.l10n.queue,
+                      subtitle: context.l10n.noSongsSubtitle,
+                      primaryActionLabel: context.l10n.navLibrary,
+                      primaryActionIcon: Icons.library_music_rounded,
+                      onPrimaryAction: () {
+                        context.go('/library');
+                      },
+                    ),
+                  ),
+                ],
               );
             }
 
@@ -291,7 +335,12 @@ class QueueScreen extends StatelessWidget {
               slotKeys.add(ValueKey('${id}_#$count'));
             }
 
-            return Align(
+            return Column(
+              children: [
+                headerBar,
+                Divider(height: 1, color: p.hairline.withValues(alpha: 0.6)),
+                Expanded(
+                  child: Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: Adaptive.contentConstraints(context),
@@ -616,7 +665,7 @@ class QueueScreen extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            onTap: () {
+                    onTap: () {
                               context
                                   .read<PlayerCubit>()
                                   .skipToQueueItem(index);
@@ -628,6 +677,9 @@ class QueueScreen extends StatelessWidget {
                   },
                 ),
               ),
+            ),
+            ),
+              ],
             );
           },
         ),

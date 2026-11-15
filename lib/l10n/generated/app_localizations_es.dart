@@ -9969,4 +9969,34 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get setLoopPointBHint => 'Fijar punto de bucle B';
+
+  @override
+  String get settingsClusterAudioDsp => 'Audio y DSP';
+
+  @override
+  String get settingsClusterOnlineDownloads => 'En línea y descargas';
+
+  @override
+  String get settingsClusterIntegrations => 'Integraciones';
+
+  @override
+  String get settingsClusterDataBackup => 'Datos y copias';
+
+  @override
+  String get audioQualityTabOutput => 'Salida';
+
+  @override
+  String get audioQualityTabDiagnostics => 'Diagnósticos';
+
+  @override
+  String get audioQualityShowDiagnostics => 'Mostrar diagnósticos';
+
+  @override
+  String get audioQualityDiagnosticsProHint =>
+      'Cadena de señal, certificado de custodia y sonda USB';
+
+  @override
+  String queueSlotTooltip(int slot) {
+    return 'Cambiar a ranura de cola $slot';
+  }
 }

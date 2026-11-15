@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -88,6 +89,10 @@ void main() {
     registerFallbackValue(YtmAudioQuality.high);
   });
 
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   group('AudioQualitySheet', () {
     testWidgets('renders a local track with the unverified route fallback',
         (tester) async {
@@ -143,6 +148,9 @@ void main() {
       ));
       await tester.pump();
 
+      await tester.tap(find.text('Output'));
+      await tester.pumpAndSettle();
+
       expect(find.text('USB DAC'), findsWidgets);
       await tester.tap(find.text('USB DAC').last);
       await tester.pump();
@@ -166,10 +174,76 @@ void main() {
       ));
       await tester.pump();
 
+      await tester.tap(find.text('Output'));
+      await tester.pumpAndSettle();
+
       expect(find.text('LDAC'), findsWidgets);
-      await tester.tap(find.text('SBC'));
+      final sbcFinder = find.text('SBC');
+      await tester.ensureVisible(sbcFinder);
+      await tester.pump();
+      await tester.tap(sbcFinder);
       await tester.pump();
       verify(() => settings.setBluetoothCodec('SBC')).called(1);
+    });
+
+    testWidgets(
+        'Normal mode hides Diagnostics until Show diagnostics is enabled',
+        (tester) async {
+      final player = stubPlayerCubit();
+      final settings = stubSettingsCubit(
+        state: const SettingsState().copyWith(
+          experienceMode: ExperienceMode.normal,
+          currentOutputDevice: _usbOutput.copyWith(usbAudioClass: 2),
+        ),
+      );
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: player,
+        settingsCubit: settings,
+        child:
+            const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+      ));
+      await tester.pump();
+
+      expect(find.text('Now Playing'), findsOneWidget);
+      expect(find.text('Output'), findsOneWidget);
+      expect(find.text('Diagnostics'), findsNothing);
+      expect(find.text('Show diagnostics'), findsOneWidget);
+
+      await tester.tap(find.text('Show diagnostics'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Diagnostics'), findsOneWidget);
+      expect(find.textContaining('UAC2'), findsWidgets);
+    });
+
+    testWidgets(
+        'Professional mode exposes Diagnostics tab without Normal toggle',
+        (tester) async {
+      final player = stubPlayerCubit();
+      final settings = stubSettingsCubit(
+        state: const SettingsState().copyWith(
+          experienceMode: ExperienceMode.professional,
+          currentOutputDevice: _usbOutput.copyWith(usbAudioClass: 2),
+        ),
+      );
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: player,
+        settingsCubit: settings,
+        child:
+            const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+      ));
+      await tester.pump();
+
+      expect(find.text('Now Playing'), findsOneWidget);
+      expect(find.text('Output'), findsOneWidget);
+      expect(find.text('Diagnostics'), findsOneWidget);
+      expect(find.text('Show diagnostics'), findsNothing);
+
+      await tester.tap(find.text('Diagnostics'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('UAC2'), findsWidgets);
     });
 
     testWidgets('apply button pops the sheet', (tester) async {

@@ -131,6 +131,37 @@ mixin SettingsSearchResults
       );
     }
 
+    // Group results into the <=7 canonical settings clusters so every match
+    // sits under a predictable topical banner and supports AppRouter deep-links.
+    const clusterOrder = <String>[
+      'playback',
+      'audio_dsp',
+      'library',
+      'online_downloads',
+      'appearance',
+      'integrations',
+      'data_backup',
+    ];
+    final grouped = <String, List<_SearchItem>>{
+      for (final id in clusterOrder) id: <_SearchItem>[],
+    };
+    for (final item in results) {
+      final cid = item.clusterId.isNotEmpty
+          ? item.clusterId
+          : _defaultClusterFor(item);
+      (grouped[cid] ??= <_SearchItem>[]).add(item);
+    }
+
+    final rows = <({bool isHeader, String clusterId, int count, _SearchItem? item})>[];
+    for (final cid in clusterOrder) {
+      final bucket = grouped[cid];
+      if (bucket == null || bucket.isEmpty) continue;
+      rows.add((isHeader: true, clusterId: cid, count: bucket.length, item: null));
+      for (final item in bucket) {
+        rows.add((isHeader: false, clusterId: cid, count: 0, item: item));
+      }
+    }
+
     return ListView.builder(
       addAutomaticKeepAlives: false,
       addRepaintBoundaries: true,
@@ -140,7 +171,7 @@ mixin SettingsSearchResults
         start: Adaptive.pagePadding(context),
         end: Adaptive.pagePadding(context),
       ),
-      itemCount: results.length + 1,
+      itemCount: rows.length + 1,
       itemBuilder: (context, i) {
         if (i == 0) {
           return Padding(
@@ -157,7 +188,44 @@ mixin SettingsSearchResults
             ),
           );
         }
-        final r = results[i - 1];
+        final row = rows[i - 1];
+        if (row.isHeader) {
+          return Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.xs, AppSpacing.sm, AppSpacing.xs, AppSpacing.s6),
+            child: Row(
+              children: [
+                Text(
+                  _clusterTitle(context, row.clusterId),
+                  style: TextStyle(
+                    color: p.textSecondary,
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: AppTracking.label,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainerHigh,
+                    borderRadius: AppRadii.r6All,
+                  ),
+                  child: Text(
+                    '${row.count}',
+                    style: TextStyle(
+                      color: p.textTertiary,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        final r = row.item!;
         return Padding(
           padding: const EdgeInsets.only(bottom: AppSpacing.xs),
           child: Material(
@@ -262,6 +330,26 @@ mixin SettingsSearchResults
                     ? r.categoryId
                     : _mapCategoryNameToId(r.category, context);
                 r.onTap?.call();
+                final targetUri = r.deepLinkUri;
+                if (targetUri != null) {
+                  final router = GoRouter.maybeOf(context);
+                  if (router != null) {
+                    if (targetUri.startsWith('/settings')) {
+                      router.go(targetUri);
+                    } else if (r.onTap == null) {
+                      router.push(targetUri);
+                    }
+                  } else {
+                    final parsed = Uri.tryParse(targetUri);
+                    final sec = parsed?.queryParameters['section'];
+                    if (sec != null && sec.isNotEmpty) {
+                      (this as SettingsScreenState)._applyDeepLink(
+                        categoryId: parsed?.queryParameters['category'] ?? catId,
+                        sectionId: sec,
+                      );
+                    }
+                  }
+                }
                 if (mounted) {
                   setState(() {
                     if (catId.isNotEmpty && catId != 'all') {
@@ -277,6 +365,37 @@ mixin SettingsSearchResults
         );
       },
     );
+  }
+
+  static String _defaultClusterFor(_SearchItem item) {
+    switch (item.categoryId) {
+      case 'sound':
+        return 'audio_dsp';
+      case 'library':
+        return 'library';
+      case 'network':
+        return 'online_downloads';
+      case 'look':
+        return 'appearance';
+      case 'privacy':
+      case 'about':
+        return 'data_backup';
+      default:
+        return 'playback';
+    }
+  }
+
+  static String _clusterTitle(BuildContext context, String clusterId) {
+    return switch (clusterId) {
+      'playback' => context.l10n.playback,
+      'audio_dsp' => context.l10n.settingsClusterAudioDsp,
+      'library' => context.l10n.navLibrary,
+      'online_downloads' => context.l10n.settingsClusterOnlineDownloads,
+      'appearance' => context.l10n.settingsCategoryAppearance,
+      'integrations' => context.l10n.settingsClusterIntegrations,
+      'data_backup' => context.l10n.settingsClusterDataBackup,
+      _ => context.l10n.playback,
+    };
   }
 
   String _mapCategoryNameToId(String catName, BuildContext context) {
@@ -721,6 +840,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'sound',
+        clusterId: 'playback',
+        deepLinkUri: '/settings?category=sound&section=playback',
         category: soundCat,
         title: context.l10n.settingsSearchCrossfadeTitle,
         subtitle: context.l10n.settingsSearchCrossfadeSubtitle,
@@ -733,6 +854,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'sound',
+        clusterId: 'playback',
         category: soundCat,
         title: context.l10n.sleepTimer,
         subtitle: context.l10n.settingsSearchSleepTimerSubtitle,
@@ -742,6 +864,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'look',
+        clusterId: 'appearance',
+        deepLinkUri: '/settings?category=look&section=gestures',
         category: lookCat,
         title: context.l10n.settingsSearchSwipeTitle,
         subtitle: context.l10n.settingsSearchSwipeSubtitle,
@@ -754,6 +878,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
+        clusterId: 'library',
+        deepLinkUri: '/settings?category=library&section=library',
         category: libraryCat,
         title: context.l10n.settingsSearchRescanTitle,
         subtitle: context.l10n.settingsSearchRescanSubtitle,
@@ -763,6 +889,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
+        clusterId: 'library',
         category: libraryCat,
         title: context.l10n.settingsRebuildSearchIndexTitle,
         subtitle: context.l10n.settingsRebuildSearchIndexSubtitle,
@@ -772,6 +899,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
+        clusterId: 'playback',
+        deepLinkUri: '/quran-mode',
         category: libraryCat,
         title: context.l10n.quranMode,
         subtitle: context.l10n.settingsQuranModeSubtitle,
@@ -781,6 +910,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
+        clusterId: 'library',
+        deepLinkUri: '/hidden-folders',
         category: libraryCat,
         title: context.l10n.hiddenAndExcludedFolders,
         subtitle: context.l10n.settingsSearchHiddenFoldersSubtitle,
@@ -790,6 +921,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
+        clusterId: 'library',
         category: libraryCat,
         title: context.l10n.shortAudioFilter,
         subtitle: context.l10n.ignoreFilesUnder(state.minDurationSec),
@@ -800,6 +932,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'network',
+        clusterId: 'online_downloads',
+        deepLinkUri: '/proxy-settings',
         category: networkCat,
         title: context.l10n.proxySettings,
         subtitle: context.l10n.settingsSearchProxySubtitle,
@@ -810,6 +944,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'network',
+        clusterId: 'online_downloads',
         category: networkCat,
         title: context.l10n.settingsSearchQualityTitle,
         subtitle: context.l10n.settingsSearchQualitySubtitle,
@@ -824,6 +959,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'library',
+        clusterId: 'data_backup',
+        deepLinkUri: '/settings?category=library&section=storage',
         category: libraryCat,
         title: context.l10n.settingsSearchCacheTitle,
         subtitle: context.l10n.settingsSearchCacheSubtitle,
@@ -836,6 +973,8 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'privacy',
+        clusterId: 'integrations',
+        deepLinkUri: '/scrobble-stats',
         category: privacyCat,
         title: context.l10n.settingsScrobblingTitle,
         subtitle: context.l10n.settingsSearchScrobblingSubtitle,
@@ -845,6 +984,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'privacy',
+        clusterId: 'data_backup',
         category: privacyCat,
         title: context.l10n.settingsSearchPrivacyTitle,
         subtitle: context.l10n.settingsSearchPrivacySubtitle,
@@ -854,6 +994,7 @@ mixin SettingsSearchResults
       ),
       _SearchItem(
         categoryId: 'about',
+        clusterId: 'data_backup',
         category: aboutCat,
         title: context.l10n.about,
         subtitle:
@@ -861,6 +1002,175 @@ mixin SettingsSearchResults
         icon: Icons.info_outline_rounded,
         keywords: ['about', 'version', 'license', 'developer'],
         onTap: () => showAboutSheet(context),
+      ),
+      // ════════ FULL SECTION COVERAGE & DEEP LINKS ════════
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'audio_dsp',
+        deepLinkUri: '/settings?category=sound&section=smart_audio',
+        category: soundCat,
+        title: context.l10n.smartAudioTitle,
+        subtitle: context.l10n.settingsSmartAudioSectionSubtitle,
+        icon: Icons.auto_awesome_rounded,
+        keywords: ['smart audio', 'autoeq', 'dac', 'adaptive'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'audio_dsp',
+        deepLinkUri: '/settings?category=sound&section=output',
+        category: soundCat,
+        title: context.l10n.settingsHardwareAudioOutput,
+        subtitle: context.l10n.settingsAudioOutputDevice,
+        icon: Icons.speaker_group_rounded,
+        keywords: ['output', 'usb', 'dac', 'bluetooth', 'wired', 'routing'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'audio_dsp',
+        deepLinkUri: '/settings?category=sound&section=gain',
+        category: soundCat,
+        title: context.l10n.expGainTitle,
+        subtitle: context.l10n.settingsCategoryAudioSubtitle,
+        icon: Icons.volume_up_rounded,
+        keywords: ['replaygain', 'gain', 'loudness', 'normalization', 'preamp'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'audio_dsp',
+        deepLinkUri: '/settings?category=sound&section=experience',
+        category: soundCat,
+        title: context.l10n.experienceModeTitle,
+        subtitle: context.l10n.experienceModeSubtitle,
+        icon: Icons.tune_rounded,
+        keywords: ['experience', 'normal', 'studio', 'professional', 'advanced'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'audio_dsp',
+        deepLinkUri: '/settings?category=sound&section=dsp',
+        category: soundCat,
+        title: context.l10n.settingsClusterAudioDsp,
+        subtitle: context.l10n.settingsSearchEqualizerSubtitle,
+        icon: Icons.graphic_eq_rounded,
+        keywords: ['dsp', 'viper', 'room correction', 'crossfeed', 'spatial'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'audio_dsp',
+        deepLinkUri: '/settings?category=sound&section=profiles',
+        category: soundCat,
+        title: context.l10n.deviceProfilesTitle,
+        subtitle: context.l10n.settingsDeviceProfilesSectionSubtitle,
+        icon: Icons.headphones_rounded,
+        keywords: ['profile', 'profiles', 'preset', 'device'],
+        pro: true,
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'integrations',
+        deepLinkUri: '/settings?category=sound&section=automation',
+        category: soundCat,
+        title: context.l10n.automationRules,
+        subtitle: context.l10n.settingsAutomationSectionSubtitle,
+        icon: Icons.auto_fix_high_rounded,
+        keywords: ['automation', 'rules', 'trigger', 'schedule'],
+        pro: true,
+        onTap: () => showAutomationRulesSheet(context),
+      ),
+      _SearchItem(
+        categoryId: 'sound',
+        clusterId: 'integrations',
+        deepLinkUri: '/settings?category=sound&section=cast',
+        category: soundCat,
+        title: context.l10n.googleCast,
+        subtitle: context.l10n.settingsAudioOutputDevice,
+        icon: Icons.cast_rounded,
+        keywords: ['cast', 'chromecast', 'dlna', 'upnp', 'wireless'],
+        onTap: () {
+          _searchController.clear();
+          setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      if (AppConfig.ytmEnabled)
+        _SearchItem(
+          categoryId: 'network',
+          clusterId: 'online_downloads',
+          deepLinkUri: '/downloads',
+          category: networkCat,
+          title: context.l10n.downloadsTitle,
+          subtitle: context.l10n.settingsCategoryOnlineSubtitle,
+          icon: Icons.download_rounded,
+          keywords: ['downloads', 'offline', 'saved', 'queue'],
+          onTap: () => context.push('/downloads'),
+        ),
+      if (AppConfig.isCloudSyncAllowed)
+        _SearchItem(
+          categoryId: 'privacy',
+          clusterId: 'data_backup',
+          deepLinkUri: '/cloud-backup',
+          category: privacyCat,
+          title: context.l10n.backupToCloud,
+          subtitle: context.l10n.settingsCategoryPrivacySubtitle,
+          icon: Icons.cloud_upload_rounded,
+          keywords: ['backup', 'restore', 'cloud', 'export', 'import', 'sync'],
+          onTap: () => context.push('/cloud-backup'),
+        ),
+      _SearchItem(
+        categoryId: 'library',
+        clusterId: 'library',
+        deepLinkUri: '/duplicate-finder',
+        category: libraryCat,
+        title: context.l10n.duplicateCleaner,
+        subtitle: context.l10n.settingsCategoryLibrarySubtitle,
+        icon: Icons.find_replace_rounded,
+        keywords: ['duplicates', 'dedup', 'cleanup', 'library'],
+        onTap: () => context.push('/duplicate-finder'),
+      ),
+      _SearchItem(
+        categoryId: 'library',
+        clusterId: 'library',
+        deepLinkUri: '/library-stats',
+        category: libraryCat,
+        title: context.l10n.browseLibraryStats,
+        subtitle: context.l10n.settingsCategoryLibrarySubtitle,
+        icon: Icons.analytics_outlined,
+        keywords: ['stats', 'statistics', 'library', 'summary'],
+        onTap: () => context.push('/library-stats'),
+      ),
+      _SearchItem(
+        categoryId: 'about',
+        clusterId: 'data_backup',
+        deepLinkUri: '/settings?category=about',
+        category: aboutCat,
+        title: context.l10n.whatsNew,
+        subtitle: context.l10n.whatsNewSubtitle(AppConfig.appVersion),
+        icon: Icons.new_releases_outlined,
+        keywords: ['changelog', 'release', 'whats new', 'updates'],
+        onTap: () => showWhatsNewSheet(context),
       ),
     ];
   }

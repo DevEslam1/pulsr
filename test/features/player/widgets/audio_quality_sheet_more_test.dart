@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
@@ -175,11 +176,30 @@ Future<void> _tap(WidgetTester tester, Finder finder) async {
   await tester.tap(finder);
 }
 
+Future<void> _openOutputTab(WidgetTester tester) async {
+  await _tap(tester, find.text(_l10n(tester).audioQualityTabOutput));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openDiagnosticsTab(WidgetTester tester) async {
+  final diagTab = find.text(_l10n(tester).audioQualityTabDiagnostics);
+  if (diagTab.evaluate().isEmpty) {
+    await _tap(tester, find.text(_l10n(tester).audioQualityShowDiagnostics));
+    await tester.pumpAndSettle();
+  }
+  await _tap(tester, find.text(_l10n(tester).audioQualityTabDiagnostics));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() {
     registerFallbackValue(YtmAudioQuality.high);
+  });
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
   });
 
   testWidgets('USB diagnostics render UAC class and direct playback',
@@ -195,6 +215,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(find.textContaining('USB DAC'), findsWidgets);
     expect(find.textContaining('UAC2'), findsWidgets);
@@ -228,6 +249,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(find.textContaining('Up to'), findsWidgets);
   });
@@ -248,6 +270,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     await _tap(tester, find.text('Wired Buds'));
     await tester.pumpAndSettle();
@@ -299,6 +322,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     // Phone Speaker matches deviceName and should be selected (checked radio)
     expect(find.byKey(const ValueKey('checked')), findsOneWidget);
@@ -378,6 +402,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     await _tap(tester, find.byIcon(Icons.settings_bluetooth_rounded));
     await tester.pump();
@@ -412,6 +437,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     await _tap(tester, find.text(_l10n(tester).retry));
     await tester.pump();
@@ -443,6 +469,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     await _tap(tester, find.byIcon(Icons.refresh_rounded).first);
     await tester.pump();
@@ -478,6 +505,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     expect(find.text('SBC'), findsWidgets);
     await _tap(tester, find.byIcon(Icons.developer_mode_rounded));
@@ -509,6 +537,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     expect(find.byIcon(Icons.bluetooth_connected_rounded), findsOneWidget);
   });
@@ -532,6 +561,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     await _tap(tester, find.text('SBC'));
     await tester.pump();
@@ -567,9 +597,11 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(find.textContaining('Exclusive mixer'), findsNothing);
     expect(find.textContaining(_l10n(tester).bpChainVerified), findsNothing);
+    await _openOutputTab(tester);
     expect(find.text(_l10n(tester).armedLabel), findsWidgets);
   });
 
@@ -589,6 +621,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     expect(find.text(_l10n(tester).armedLabel), findsWidgets);
   });
@@ -621,6 +654,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(find.textContaining(_l10n(tester).bpChainResampled), findsWidgets);
     expect(find.textContaining('96 kHz'), findsWidgets);
@@ -666,6 +700,7 @@ void main() {
       sheet: const AudioQualitySheet(song: dsdSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(find.textContaining('DSD Stream'), findsWidgets);
     expect(find.textContaining(_l10n(tester).stageEq), findsWidgets);
@@ -686,6 +721,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openOutputTab(tester);
 
     expect(find.textContaining('Bluetooth'), findsWidgets);
   });
@@ -739,6 +775,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     // Saturation has no dedicated chain label, so it counts as an extra stage.
     expect(find.textContaining('+1'), findsWidgets);
@@ -773,6 +810,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(find.textContaining('Bypassed'), findsWidgets);
     expect(find.textContaining(_l10n(tester).stageEq), findsNothing);
@@ -821,6 +859,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(find.textContaining(_l10n(tester).bpChainVerified), findsNothing);
     expect(
@@ -860,6 +899,7 @@ void main() {
       sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
     ));
     await tester.pump();
+    await _openDiagnosticsTab(tester);
 
     expect(
         find.textContaining('(no_supported_mixer_attributes)'), findsNothing);

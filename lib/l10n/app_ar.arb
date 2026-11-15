@@ -5757,5 +5757,14 @@
   "preampOutputGainHint": "كسب الخرج المطبق قبل المعادل",
   "tabletSplitViewHint": "انقر على زر الفاحص في شريط المشغل لفتح العرض المقسم لقائمة الانتظار والكلمات",
   "setLoopPointAHint": "تعيين نقطة التكرار A",
-  "setLoopPointBHint": "تعيين نقطة التكرار B"
+  "setLoopPointBHint": "تعيين نقطة التكرار B",
+  "settingsClusterAudioDsp": "الصوت ومعالجة الإشارة",
+  "settingsClusterOnlineDownloads": "الإنترنت والتنزيلات",
+  "settingsClusterIntegrations": "التكاملات",
+  "settingsClusterDataBackup": "البيانات والنسخ الاحتياطي",
+  "audioQualityTabOutput": "الإخراج",
+  "audioQualityTabDiagnostics": "التشخيص",
+  "audioQualityShowDiagnostics": "إظهار التشخيص",
+  "audioQualityDiagnosticsProHint": "مسار الإشارة وشهادة الحفظ وفحص USB",
+  "queueSlotTooltip": "التبديل إلى قائمة الانتظار {slot}"
 }

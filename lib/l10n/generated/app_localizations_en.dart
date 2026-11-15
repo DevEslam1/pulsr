@@ -9881,4 +9881,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setLoopPointBHint => 'Set loop point B';
+
+  @override
+  String get settingsClusterAudioDsp => 'Audio & DSP';
+
+  @override
+  String get settingsClusterOnlineDownloads => 'Online & Downloads';
+
+  @override
+  String get settingsClusterIntegrations => 'Integrations';
+
+  @override
+  String get settingsClusterDataBackup => 'Data & Backup';
+
+  @override
+  String get audioQualityTabOutput => 'Output';
+
+  @override
+  String get audioQualityTabDiagnostics => 'Diagnostics';
+
+  @override
+  String get audioQualityShowDiagnostics => 'Show diagnostics';
+
+  @override
+  String get audioQualityDiagnosticsProHint =>
+      'Signal chain, custody certificate, and USB probe';
+
+  @override
+  String queueSlotTooltip(int slot) {
+    return 'Switch to queue slot $slot';
+  }
 }

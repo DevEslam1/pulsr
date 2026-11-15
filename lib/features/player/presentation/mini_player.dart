@@ -24,6 +24,7 @@ import '../../../core/widgets/marquee_text.dart';
 import '../../../core/widgets/spinning_vinyl_disc.dart';
 import '../../../core/widgets/waveform_logo.dart';
 import '../../../data/db/app_database.dart';
+import '../../queue/presentation/widgets/queue_slot_switcher.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
@@ -395,6 +396,7 @@ class MiniPlayerState extends State<MiniPlayer> {
     final content = BlocConsumer<PlayerCubit, PlayerState>(
       listenWhen: (a, b) =>
           a.currentIndex != b.currentIndex ||
+          a.activeQueueSlot != b.activeQueueSlot ||
           a.currentSong?.id != b.currentSong?.id ||
           listContentDiffers(a.queue, b.queue),
       listener: (context, state) {
@@ -418,6 +420,7 @@ class MiniPlayerState extends State<MiniPlayer> {
           a.errorMessage != b.errorMessage ||
           a.duration != b.duration ||
           a.currentIndex != b.currentIndex ||
+          a.activeQueueSlot != b.activeQueueSlot ||
           listContentDiffers(a.queue, b.queue),
       builder: (context, state) {
         final song = state.currentSong;
@@ -874,21 +877,30 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                       const SizedBox(
                                                                           height:
                                                                               AppSpacing.s2),
-                                                                      Text(
-                                                                        item.artist,
-                                                                        maxLines:
-                                                                            1,
-                                                                        overflow:
-                                                                            TextOverflow.ellipsis,
-                                                                        style:
-                                                                            TextStyle(
-                                                                          color:
-                                                                              p.textSecondary,
-                                                                          fontSize:
-                                                                              AppFontSize.label,
-                                                                          fontWeight:
-                                                                              FontWeight.w500,
-                                                                        ),
+                                                                      Row(
+                                                                        children: [
+                                                                          QueueSlotBadge(
+                                                                            activeSlot:
+                                                                                state.activeQueueSlot,
+                                                                          ),
+                                                                          const SizedBox(
+                                                                            width:
+                                                                                AppSpacing.xxs,
+                                                                          ),
+                                                                          Expanded(
+                                                                            child:
+                                                                                Text(
+                                                                              item.artist,
+                                                                              maxLines: 1,
+                                                                              overflow: TextOverflow.ellipsis,
+                                                                              style: TextStyle(
+                                                                                color: p.textSecondary,
+                                                                                fontSize: AppFontSize.label,
+                                                                                fontWeight: FontWeight.w500,
+                                                                              ),
+                                                                            ),
+                                                                          ),
+                                                                        ],
                                                                       ),
                                                                     ],
                                                                   ),

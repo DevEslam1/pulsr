@@ -7,8 +7,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';
+import 'package:pulsr/core/widgets/source_scope_switcher.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
 import 'package:pulsr/features/library/presentation/favorites_screen.dart';
+import 'package:pulsr/features/library/presentation/library_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'library_test_harness.dart';
@@ -177,5 +179,34 @@ void main() {
 
     expect(find.text('No songs match'), findsOneWidget);
     expect(find.text('Beta'), findsNothing);
+  });
+
+  testWidgets(
+      'FavoritesScreen and LibraryFavoritesTab share SourceScope persistence and header',
+      (tester) async {
+    final state = LibraryState(favorites: [
+      testSong(id: 1, title: 'Local Love', isFavorite: true),
+      testOnlineSong(id: 2, title: 'Cloud Love'),
+    ]);
+    await pumpFavorites(tester, state);
+
+    expect(find.byType(SourceScopeSwitcher), findsOneWidget);
+    expect(find.text('Favorites Collection'), findsOneWidget);
+
+    await tester.tap(find.textContaining('Online'));
+    await tester.pumpAndSettle();
+    expect(find.text('Cloud Love'), findsOneWidget);
+
+    // Mounting the Library Favorites tab restores the shared persisted scope.
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: stubLibraryCubit(state),
+      child: const LibraryScreen(initialTabName: 'favorites'),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SourceScopeSwitcher), findsOneWidget);
+    expect(find.text('Favorites Collection'), findsOneWidget);
+    expect(find.text('Cloud Love'), findsOneWidget);
+    expect(find.text('Local Love'), findsNothing);
   });
 }

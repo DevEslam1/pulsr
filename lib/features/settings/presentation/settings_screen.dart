@@ -78,7 +78,16 @@ part 'sections/phone_layout_section.dart';
 part 'sections/settings_screen_controller.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final String? initialCategoryId;
+  final String? initialSectionId;
+  final String? initialSearchQuery;
+
+  const SettingsScreen({
+    super.key,
+    this.initialCategoryId,
+    this.initialSectionId,
+    this.initialSearchQuery,
+  });
 
   @override
   State<SettingsScreen> createState() => SettingsScreenState();
@@ -104,6 +113,43 @@ class SettingsScreenState extends State<SettingsScreen>
   final ScrollController _scrollController = ScrollController();
   @override
   final TextEditingController _searchController = TextEditingController();
+  final Map<String, GlobalKey> _sectionKeys = <String, GlobalKey>{};
+
+  GlobalKey _sectionKeyFor(String sectionId) =>
+      _sectionKeys.putIfAbsent(sectionId, GlobalKey.new);
+
+  void _applyDeepLink({
+    String? categoryId,
+    String? sectionId,
+    String? searchQuery,
+  }) {
+    if (categoryId != null && categoryId.isNotEmpty) {
+      final normalized = SettingsScreenController.normalizeCategoryId(categoryId);
+      if (normalized != _selectedCategoryId) {
+        _selectedCategoryId = normalized;
+        SettingsScreenController._sessionCategoryId = normalized;
+      }
+    }
+    if (searchQuery != null) {
+      final trimmed = searchQuery.trim();
+      _searchController.text = trimmed;
+      _searchQuery = trimmed.toLowerCase();
+    }
+    if (sectionId != null && sectionId.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final ctx = _sectionKeys[sectionId]?.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: context.motionMs(260),
+            curve: context.motionCurve(Curves.easeOutCubic),
+            alignment: 0.1,
+          );
+        }
+      });
+    }
+  }
 
   @override
   String _selectedCategoryId = 'all';
@@ -116,8 +162,29 @@ class SettingsScreenState extends State<SettingsScreen>
     _categories =
         _categoryIds.map((id) => _Category(id, _iconFor(id))).toList();
     _restoreLastCategory();
+    _applyDeepLink(
+      categoryId: widget.initialCategoryId,
+      sectionId: widget.initialSectionId,
+      searchQuery: widget.initialSearchQuery,
+    );
     // FIX-H05: Debounce search results via Timer with immediate clear on empty
     _bindSearchListener();
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialCategoryId != oldWidget.initialCategoryId ||
+        widget.initialSectionId != oldWidget.initialSectionId ||
+        widget.initialSearchQuery != oldWidget.initialSearchQuery) {
+      setState(() {
+        _applyDeepLink(
+          categoryId: widget.initialCategoryId,
+          sectionId: widget.initialSectionId,
+          searchQuery: widget.initialSearchQuery,
+        );
+      });
+    }
   }
 
   @override

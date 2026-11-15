@@ -17466,6 +17466,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Set loop point B'**
   String get setLoopPointBHint;
+
+  /// Settings search cluster label for Audio and DSP items
+  ///
+  /// In en, this message translates to:
+  /// **'Audio & DSP'**
+  String get settingsClusterAudioDsp;
+
+  /// Settings search cluster label for Online and Downloads items
+  ///
+  /// In en, this message translates to:
+  /// **'Online & Downloads'**
+  String get settingsClusterOnlineDownloads;
+
+  /// Settings search cluster label for Integrations items
+  ///
+  /// In en, this message translates to:
+  /// **'Integrations'**
+  String get settingsClusterIntegrations;
+
+  /// Settings search cluster label for Data and Backup items
+  ///
+  /// In en, this message translates to:
+  /// **'Data & Backup'**
+  String get settingsClusterDataBackup;
+
+  /// Tab title for hardware output settings in Audio Quality sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get audioQualityTabOutput;
+
+  /// Tab title for technical diagnostics in Audio Quality sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get audioQualityTabDiagnostics;
+
+  /// Toggle label in Normal mode to reveal the Diagnostics tab in Audio Quality sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Show diagnostics'**
+  String get audioQualityShowDiagnostics;
+
+  /// Subtitle explaining the Diagnostics toggle in Audio Quality sheet
+  ///
+  /// In en, this message translates to:
+  /// **'Signal chain, custody certificate, and USB probe'**
+  String get audioQualityDiagnosticsProHint;
+
+  /// Tooltip and semantic label for queue slot selector Q1/Q2/Q3
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to queue slot {slot}'**
+  String queueSlotTooltip(int slot);
 }
 
 class _AppLocalizationsDelegate

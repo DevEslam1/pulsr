@@ -27,6 +27,8 @@ class _Category {
 
 class _SearchItem {
   final String categoryId;
+  final String clusterId;
+  final String? deepLinkUri;
   final String category;
   final String title;
   final String subtitle;
@@ -40,6 +42,8 @@ class _SearchItem {
 
   _SearchItem({
     this.categoryId = '',
+    this.clusterId = '',
+    this.deepLinkUri,
     required this.category,
     required this.title,
     required this.subtitle,

@@ -5757,5 +5757,14 @@
   "preampOutputGainHint": "Ganancia de salida aplicada antes del ecualizador",
   "tabletSplitViewHint": "Toca el botón del inspector en la barra del reproductor para abrir la vista dividida",
   "setLoopPointAHint": "Fijar punto de bucle A",
-  "setLoopPointBHint": "Fijar punto de bucle B"
+  "setLoopPointBHint": "Fijar punto de bucle B",
+  "settingsClusterAudioDsp": "Audio y DSP",
+  "settingsClusterOnlineDownloads": "En línea y descargas",
+  "settingsClusterIntegrations": "Integraciones",
+  "settingsClusterDataBackup": "Datos y copias",
+  "audioQualityTabOutput": "Salida",
+  "audioQualityTabDiagnostics": "Diagnósticos",
+  "audioQualityShowDiagnostics": "Mostrar diagnósticos",
+  "audioQualityDiagnosticsProHint": "Cadena de señal, certificado de custodia y sonda USB",
+  "queueSlotTooltip": "Cambiar a ranura de cola {slot}"
 }

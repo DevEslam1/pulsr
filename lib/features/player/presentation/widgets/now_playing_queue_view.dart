@@ -7,7 +7,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
-import '../../../../core/theme/pulsr_button_style.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/pulsr_adaptive_sheet.dart';
 import '../../../../core/widgets/song_tile.dart';
@@ -19,6 +18,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../../../../data/db/app_database.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../party/presentation/party_sheet.dart';
+import '../../../queue/presentation/widgets/queue_slot_switcher.dart';
 import '../themes/player_theme.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
@@ -214,66 +214,10 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                       ),
                     ),
                     const SizedBox(width: AppSpacing.xs),
-                    ...List.generate(3, (slotIndex) {
-                      final isSelected = state.activeQueueSlot == slotIndex;
-                      final isCapsule = context.isCapsuleButtons;
-                      final queueRadius = isCapsule
-                          ? context.buttonRadius(rectRadius: 6.0)
-                          : AppRadii.r10All;
-                      return Padding(
-                        padding: const EdgeInsetsDirectional.only(
-                            start: AppSpacing.s6),
-                        child: InkWell(
-                          onTap: () => cubit.switchQueueSlot(slotIndex),
-                          borderRadius: queueRadius,
-                          child: AnimatedContainer(
-                            duration: context.motionMs(180),
-                            padding: EdgeInsets.symmetric(
-                                horizontal: isCapsule ? 10.0 : AppSpacing.sm,
-                                vertical: isCapsule ? 4.0 : AppSpacing.s6),
-                            decoration: isCapsule
-                                ? (isSelected
-                                    ? BoxDecoration(
-                                        color: p.accent,
-                                        borderRadius: queueRadius,
-                                        border: Border.all(
-                                          color: Colors.white.withValues(alpha: 0.35),
-                                          width: 0.8,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: p.accent.withValues(alpha: 0.3),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      )
-                                    : PulsrCapsuleStyle.decoration(p, borderRadius: queueRadius))
-                                : BoxDecoration(
-                                    color: isSelected
-                                        ? p.accent
-                                        : p.surfaceContainerHigh,
-                                    borderRadius: AppRadii.r10All,
-                                    border: Border.all(
-                                      color: isSelected ? p.accent : p.hairline,
-                                    ),
-                                  ),
-                            child: Text(
-                              'Q${slotIndex + 1}',
-                              style: TextStyle(
-                                fontSize: isCapsule ? 11.5 : AppFontSize.label,
-                                fontWeight: FontWeight.w800,
-                                color: isSelected
-                                    ? p.onAccent
-                                    : (isCapsule
-                                        ? PulsrCapsuleStyle.foregroundColor(p)
-                                        : p.textSecondary),
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }),
+                    QueueSlotSwitcher(
+                      activeSlot: state.activeQueueSlot,
+                      onSlotSelected: cubit.switchQueueSlot,
+                    ),
                     const SizedBox(width: AppSpacing.s6),
                     IconButton(
                       constraints: const BoxConstraints(

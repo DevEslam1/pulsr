@@ -16,7 +16,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
-import '../../../core/widgets/pulsr_segmented_control.dart';
+import '../../../core/widgets/source_scope_switcher.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dock_tracker.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
@@ -88,7 +88,8 @@ class _HomeScreenContent extends StatefulWidget {
 }
 
 class _HomeScreenContentState extends State<_HomeScreenContent> {
-  int _selectedTab = 0; // 0: Local, 1: Online
+  SourceScope _scope = SourceScope.local;
+  int get _selectedTab => _scope == SourceScope.online ? 1 : 0;
   String _selectedOnlineCategory = 'Recommended For You';
 
   YtmAccountService get _ytmAccountService =>
@@ -531,21 +532,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                       // ---------- Segmented Tab Selector (Local vs Online) ----------
                       if (showOnlineTab) ...[
                         const SizedBox(height: AppSpacing.md),
-                        PulsrSegmentedControl(
+                        SourceScopeSwitcher(
+                          persistKey: 'home',
                           margin: EdgeInsets.symmetric(
                               horizontal: Adaptive.pagePadding(context)),
-                          selectedIndex: currentTab,
-                          onChanged: (i) => setState(() => _selectedTab = i),
-                          segments: [
-                            PulsrSegment(
-                              label: context.l10n.localMusic,
-                              icon: Icons.library_music_rounded,
-                            ),
-                            PulsrSegment(
-                              label: context.l10n.onlineStream,
-                              icon: Icons.public_rounded,
-                            ),
-                          ],
+                          selectedScope: _scope,
+                          onChanged: (next) => setState(() => _scope = next),
                         ),
                       ] else if (offlineOnly) ...[
                         const SizedBox(height: AppSpacing.md),

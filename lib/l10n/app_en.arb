@@ -7615,5 +7615,46 @@
   },
   "@setLoopPointBHint": {
     "description": "Tooltip to set A-B loop end point"
+  },
+  "settingsClusterAudioDsp": "Audio & DSP",
+  "@settingsClusterAudioDsp": {
+    "description": "Settings search cluster label for Audio and DSP items"
+  },
+  "settingsClusterOnlineDownloads": "Online & Downloads",
+  "@settingsClusterOnlineDownloads": {
+    "description": "Settings search cluster label for Online and Downloads items"
+  },
+  "settingsClusterIntegrations": "Integrations",
+  "@settingsClusterIntegrations": {
+    "description": "Settings search cluster label for Integrations items"
+  },
+  "settingsClusterDataBackup": "Data & Backup",
+  "@settingsClusterDataBackup": {
+    "description": "Settings search cluster label for Data and Backup items"
+  },
+  "audioQualityTabOutput": "Output",
+  "@audioQualityTabOutput": {
+    "description": "Tab title for hardware output settings in Audio Quality sheet"
+  },
+  "audioQualityTabDiagnostics": "Diagnostics",
+  "@audioQualityTabDiagnostics": {
+    "description": "Tab title for technical diagnostics in Audio Quality sheet"
+  },
+  "audioQualityShowDiagnostics": "Show diagnostics",
+  "@audioQualityShowDiagnostics": {
+    "description": "Toggle label in Normal mode to reveal the Diagnostics tab in Audio Quality sheet"
+  },
+  "audioQualityDiagnosticsProHint": "Signal chain, custody certificate, and USB probe",
+  "@audioQualityDiagnosticsProHint": {
+    "description": "Subtitle explaining the Diagnostics toggle in Audio Quality sheet"
+  },
+  "queueSlotTooltip": "Switch to queue slot {slot}",
+  "@queueSlotTooltip": {
+    "description": "Tooltip and semantic label for queue slot selector Q1/Q2/Q3",
+    "placeholders": {
+      "slot": {
+        "type": "int"
+      }
+    }
   }
 }

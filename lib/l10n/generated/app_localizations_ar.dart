@@ -9826,4 +9826,34 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get setLoopPointBHint => 'تعيين نقطة التكرار B';
+
+  @override
+  String get settingsClusterAudioDsp => 'الصوت ومعالجة الإشارة';
+
+  @override
+  String get settingsClusterOnlineDownloads => 'الإنترنت والتنزيلات';
+
+  @override
+  String get settingsClusterIntegrations => 'التكاملات';
+
+  @override
+  String get settingsClusterDataBackup => 'البيانات والنسخ الاحتياطي';
+
+  @override
+  String get audioQualityTabOutput => 'الإخراج';
+
+  @override
+  String get audioQualityTabDiagnostics => 'التشخيص';
+
+  @override
+  String get audioQualityShowDiagnostics => 'إظهار التشخيص';
+
+  @override
+  String get audioQualityDiagnosticsProHint =>
+      'مسار الإشارة وشهادة الحفظ وفحص USB';
+
+  @override
+  String queueSlotTooltip(int slot) {
+    return 'التبديل إلى قائمة الانتظار $slot';
+  }
 }
