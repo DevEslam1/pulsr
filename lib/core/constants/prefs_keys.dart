@@ -374,4 +374,9 @@ class PrefsKeys {
   // Temporary or Normal-mode override to show the Diagnostics tab in AudioQualitySheet.
   static const String audioQualityShowDiagnostics =
       'audio_quality_show_diagnostics';
+
+  // Session counter used to show the grab-handle chevron affordance for the
+  // first N app sessions before fading out permanently.
+  static const String dockGrabChevronSessions =
+      'dock_grab_chevron_sessions_v1';
 }

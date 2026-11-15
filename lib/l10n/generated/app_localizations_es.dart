@@ -9999,4 +9999,136 @@ class AppLocalizationsEs extends AppLocalizations {
   String queueSlotTooltip(int slot) {
     return 'Cambiar a ranura de cola $slot';
   }
+
+  @override
+  String get gesturesGuideTitle => 'Guía de gestos';
+
+  @override
+  String get gesturesGuideSubtitle =>
+      'Cada deslizamiento, toque, pellizco y atajo analógico en Pulsr';
+
+  @override
+  String get gestureSurfaceMiniPlayer => 'Minirreproductor';
+
+  @override
+  String get gestureSurfaceDock => 'Barra inferior';
+
+  @override
+  String get gestureSurfaceNowPlaying => 'Reproduciendo ahora';
+
+  @override
+  String get gestureSurfacePlatter => 'Tocadiscos y CD';
+
+  @override
+  String get gestureSurfaceWaveform => 'Barra de forma de onda';
+
+  @override
+  String get gestureSurfaceLyrics => 'Letras';
+
+  @override
+  String get gestureMiniSwipeHorizTitle =>
+      'Desliza el minirreproductor a izquierda o derecha';
+
+  @override
+  String get gestureMiniSwipeHorizDesc =>
+      'Avanza o retrocede en tu cola o activa acciones personalizadas';
+
+  @override
+  String get gestureMiniSwipeUpTitle =>
+      'Desliza hacia arriba en el minirreproductor';
+
+  @override
+  String get gestureMiniSwipeUpDesc =>
+      'Expande la pantalla completa de Reproducción';
+
+  @override
+  String get gestureDockSwipeDownTitle =>
+      'Desliza hacia abajo o mantén pulsada la barra';
+
+  @override
+  String get gestureDockSwipeDownDesc =>
+      'Elige el estilo de apilamiento entre minirreproductor y navegación';
+
+  @override
+  String get gestureArtworkTapTitle => 'Toca la carátula';
+
+  @override
+  String get gestureArtworkTapDesc =>
+      'Muestra u oculta las letras sincronizadas (o reproducir/pausar en tocadiscos)';
+
+  @override
+  String get gestureArtworkDoubleTapTitle => 'Toca dos veces la carátula';
+
+  @override
+  String get gestureArtworkDoubleTapDesc =>
+      'Marca o desmarca como favorita la pista actual (configurable en Ajustes)';
+
+  @override
+  String get gestureArtworkSwipeTitle =>
+      'Desliza la carátula a izquierda o derecha';
+
+  @override
+  String get gestureArtworkSwipeDesc =>
+      'Salta a la pista siguiente o anterior de la cola';
+
+  @override
+  String get gestureNowPlayingDismissTitle =>
+      'Desliza hacia abajo en Reproduciendo';
+
+  @override
+  String get gestureNowPlayingDismissDesc =>
+      'Cierra el reproductor y vuelve a tu biblioteca';
+
+  @override
+  String get gesturePlatterScrubTitle =>
+      'Arrastra en círculo el plato de Vinilo o CD';
+
+  @override
+  String get gesturePlatterScrubDesc =>
+      'Avance o retroceso analógico sobre el disco con respuesta háptica';
+
+  @override
+  String get gestureRpmBadgeTitle => 'Toca la insignia 33⅓ RPM / Espera';
+
+  @override
+  String get gestureRpmBadgeDesc =>
+      'Abre directamente el selector de velocidad de reproducción';
+
+  @override
+  String get gestureWaveformPinchTitle =>
+      'Pellizca la barra de forma de onda (o toca dos veces)';
+
+  @override
+  String get gestureWaveformPinchDesc =>
+      'Haz zoom para buscar con precisión; toca dos veces para restablecer';
+
+  @override
+  String get gestureLyricsOffsetTitle =>
+      'Controles − / + de sincronización y etiqueta de desfase';
+
+  @override
+  String get gestureLyricsOffsetDesc =>
+      'Adelanta (−100 ms) o retrasa (+100 ms) las letras con deshacer, o toca el chip';
+
+  @override
+  String get viewAllGestures => 'Ver todos los gestos';
+
+  @override
+  String get gesturesGuideSubtitleShort =>
+      'Deslizamientos, plato, RPM y letras';
+
+  @override
+  String get lyricsOffsetEarlier => 'Adelantar letras (-100 ms)';
+
+  @override
+  String get lyricsOffsetLater => 'Retrasar letras (+100 ms)';
+
+  @override
+  String lyricsOffsetAdjusted(String offset) {
+    return 'Desfase de letras ajustado a $offset';
+  }
+
+  @override
+  String get lyricsOffsetChipTooltip =>
+      'Toca para ajustar con precisión la sincronización';
 }

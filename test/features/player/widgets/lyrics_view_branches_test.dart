@@ -360,7 +360,7 @@ void main() {
     });
   });
 
-  group('long-press offset nudge', () {
+  group('explicit offset controls, persistent chip, and undo snackbar', () {
     const synced = [
       LyricsLine(timestamp: Duration(seconds: 2), text: 'First'),
       LyricsLine(timestamp: Duration(seconds: 4), text: 'Second'),
@@ -376,40 +376,72 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
-    testWidgets('long-press on the right half nudges the offset +0.1s',
+    testWidgets('long-press halves do not accidentally change offset',
         (tester) async {
       await pumpSynced(tester);
 
       final rect = tester.getRect(find.byType(LyricView));
       await tester.longPressAt(Offset(rect.right - 24, rect.center.dy));
       await tester.pumpAndSettle();
-
-      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 100);
-    });
-
-    testWidgets('long-press on the left half nudges the offset -0.1s',
-        (tester) async {
-      await pumpSynced(tester);
-
-      final rect = tester.getRect(find.byType(LyricView));
       await tester.longPressAt(Offset(rect.left + 24, rect.center.dy));
       await tester.pumpAndSettle();
 
-      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), -100);
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 0);
+      expect(find.byKey(const ValueKey('lyrics_offset_chip')), findsNothing);
     });
 
-    testWidgets('consecutive long-presses accumulate the nudge',
+    testWidgets('explicit header + / - buttons adjust, accumulate, and show chip',
+        (tester) async {
+      await pumpSynced(tester);
+      expect(find.byKey(const ValueKey('lyrics_offset_chip')), findsNothing);
+
+      final plusBtn = find.byKey(const ValueKey('lyrics_offset_plus_btn'));
+      final minusBtn = find.byKey(const ValueKey('lyrics_offset_minus_btn'));
+      expect(plusBtn, findsOneWidget);
+      expect(minusBtn, findsOneWidget);
+
+      await tester.tap(plusBtn);
+      await tester.pumpAndSettle();
+      await tester.tap(plusBtn);
+      await tester.pumpAndSettle();
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 200);
+      expect(find.byKey(const ValueKey('lyrics_offset_chip')), findsOneWidget);
+      expect(find.text('+200 ms'), findsOneWidget);
+
+      await tester.tap(minusBtn);
+      await tester.pumpAndSettle();
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 100);
+      expect(find.text('+100 ms'), findsOneWidget);
+    });
+
+    testWidgets('tapping persistent offset chip opens the sync offset sheet',
         (tester) async {
       await pumpSynced(tester);
 
-      final rect = tester.getRect(find.byType(LyricView));
-      final target = Offset(rect.right - 24, rect.center.dy);
-      await tester.longPressAt(target);
-      await tester.pumpAndSettle();
-      await tester.longPressAt(target);
+      await tester.tap(find.byKey(const ValueKey('lyrics_offset_plus_btn')));
       await tester.pumpAndSettle();
 
-      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 200);
+      await tester.tap(find.byKey(const ValueKey('lyrics_offset_chip')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('-50 ms'), findsOneWidget);
+      expect(find.text('+50 ms'), findsOneWidget);
+    });
+
+    testWidgets('every offset change shows Undo snackbar that restores offset',
+        (tester) async {
+      await pumpSynced(tester);
+
+      await tester.tap(find.byKey(const ValueKey('lyrics_offset_minus_btn')));
+      await tester.pumpAndSettle();
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), -100);
+      expect(find.byType(SnackBar), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(SnackBarAction, 'Undo'));
+      await tester.pumpAndSettle();
+
+      expect(await LyricsOffsetStore().getOffsetMs('/music/1.mp3'), 0);
+      expect(find.byKey(const ValueKey('lyrics_offset_chip')), findsNothing);
     });
   });
 

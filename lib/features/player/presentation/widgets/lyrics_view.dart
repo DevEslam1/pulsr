@@ -242,27 +242,58 @@ class _LyricsViewState extends State<LyricsView> {
     }
   }
 
-  Future<void> _adjustManualOffset(int deltaMs) async {
-    final path = _offsetSongPath;
-    if (path == null || path.isEmpty) return;
-    final next = (_manualOffsetMs + deltaMs).clamp(-5000, 5000);
-    if (next == _manualOffsetMs) return;
+  String _formatOffsetMs(int ms) => '${ms >= 0 ? '+' : ''}$ms ms';
+
+  Future<void> _applyManualOffsetWithUndo(
+    int targetMs, {
+    bool showUndoSnack = true,
+  }) async {
+    final previousMs = _manualOffsetMs;
+    final next = targetMs.clamp(-5000, 5000);
+    if (next == previousMs) return;
+
     // Commit synchronously (this runs from a button handler, not build) so
     // rapid consecutive taps accumulate instead of all reading the same stale
     // value while _applyManualOffset's post-frame commit is still pending.
     _commitManualOffset(next);
-    await _offsetStore.setOffsetMs(path, next);
+
+    final path = _offsetSongPath;
+    if (path != null && path.isNotEmpty) {
+      if (next == 0) {
+        await _offsetStore.clearOffset(path);
+      } else {
+        await _offsetStore.setOffsetMs(path, next);
+      }
+    }
+
+    if (showUndoSnack && mounted) {
+      final messenger = ScaffoldMessenger.maybeOf(context);
+      if (messenger != null) {
+        final l10n = context.l10n;
+        messenger.clearSnackBars();
+        messenger.showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text(l10n.lyricsOffsetAdjusted(_formatOffsetMs(next))),
+            action: SnackBarAction(
+              label: l10n.undo,
+              onPressed: () {
+                unawaited(_applyManualOffsetWithUndo(
+                  previousMs,
+                  showUndoSnack: false,
+                ));
+              },
+            ),
+          ),
+        );
+      }
+    }
   }
 
-  Future<void> _resetManualOffset() async {
-    final path = _offsetSongPath;
-    if (_manualOffsetMs != 0) {
-      _commitManualOffset(0);
-    }
-    if (path != null && path.isNotEmpty) {
-      await _offsetStore.clearOffset(path);
-    }
-  }
+  Future<void> _adjustManualOffset(int deltaMs) =>
+      _applyManualOffsetWithUndo(_manualOffsetMs + deltaMs);
+
+  Future<void> _resetManualOffset() => _applyManualOffsetWithUndo(0);
 
   Future<void> _showOffsetSheet() async {
     final l10n = context.l10n;
@@ -473,8 +504,13 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   Widget _headerIconButton(
-      IconData icon, String tooltip, VoidCallback onPressed) {
+    IconData icon,
+    String tooltip,
+    VoidCallback onPressed, {
+    Key? key,
+  }) {
     return IconButton(
+      key: key,
       icon: Icon(icon, color: widget.activeColor, size: 20),
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
@@ -572,6 +608,67 @@ class _LyricsViewState extends State<LyricsView> {
     ));
   }
 
+  Widget _buildPersistentOffsetChip(PulsrPalette p) {
+    final activeCol =
+        widget.activeColor == Colors.white ? p.accent : widget.activeColor;
+    final label = _formatOffsetMs(_manualOffsetMs);
+    return Semantics(
+      button: true,
+      label: '${context.l10n.lyricsOffsetChipTooltip}: $label',
+      child: Tooltip(
+        message: context.l10n.lyricsOffsetChipTooltip,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          child: Center(
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const ValueKey('lyrics_offset_chip'),
+                borderRadius: AppRadii.full,
+                onTap: () {
+                  PulsrHaptics.selectionClick();
+                  unawaited(_showOffsetSheet());
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s10,
+                    vertical: AppSpacing.xxs,
+                  ),
+                  decoration: BoxDecoration(
+                    color: activeCol.withValues(alpha: p.isDark ? 0.22 : 0.16),
+                    borderRadius: AppRadii.full,
+                    border: Border.all(
+                      color: activeCol.withValues(alpha: 0.45),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.sync_rounded, size: 13, color: activeCol),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          color: activeCol,
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildHeaderActions() {
     PlayerCubit? cubit;
     try {
@@ -579,11 +676,32 @@ class _LyricsViewState extends State<LyricsView> {
     } catch (_) {}
     final hasSong = cubit?.state.currentSong != null;
     final hasLyrics = widget.lyrics.isNotEmpty;
+    final isSynced = _isSynced;
     final p = context.palette;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (hasSong && isSynced) ...[
+          _headerIconButton(
+            Icons.remove_circle_outline_rounded,
+            context.l10n.lyricsOffsetEarlier,
+            () {
+              PulsrHaptics.selectionClick();
+              unawaited(_adjustManualOffset(-100));
+            },
+            key: const ValueKey('lyrics_offset_minus_btn'),
+          ),
+          _headerIconButton(
+            Icons.add_circle_outline_rounded,
+            context.l10n.lyricsOffsetLater,
+            () {
+              PulsrHaptics.selectionClick();
+              unawaited(_adjustManualOffset(100));
+            },
+            key: const ValueKey('lyrics_offset_plus_btn'),
+          ),
+        ],
         if (hasSong)
           _headerIconButton(Icons.sync_rounded, context.l10n.settingsSyncOffset,
               () => unawaited(_showOffsetSheet())),
@@ -668,17 +786,6 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 
-  /// Long-press on the left half nudges the sync offset -0.1s (lyrics appear
-  /// earlier); the right half nudges +0.1s. The header sync-offset sheet
-  /// remains the precise path.
-  void _handleLyricLongPressStart(LongPressStartDetails details) {
-    final width = context.size?.width ?? 0;
-    if (width <= 0) return;
-    PulsrHaptics.selectionClick();
-    unawaited(
-        _adjustManualOffset(details.localPosition.dx < width / 2 ? -100 : 100));
-  }
-
   Widget _buildSyncedLyricView(PulsrPalette p) {
     final isInSplit = PlayerSplitViewScope.of(context);
     final isSeamless = isInSplit || widget.transparentBackground;
@@ -727,22 +834,19 @@ class _LyricsViewState extends State<LyricsView> {
     return Stack(
       children: [
         if (!_useAdvancedView)
-          GestureDetector(
-            onLongPressStart: _handleLyricLongPressStart,
-            child: RepaintBoundary(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return SizedBox(
-                    width: constraints.maxWidth,
-                    height: constraints.maxHeight,
-                    child: LyricView(
-                      controller: _lyricController,
-                      preset: preset,
-                      onLineTap: (details) => _onTapLine(details.seekPosition),
-                    ),
-                  );
-                },
-              ),
+          RepaintBoundary(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SizedBox(
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  child: LyricView(
+                    controller: _lyricController,
+                    preset: preset,
+                    onLineTap: (details) => _onTapLine(details.seekPosition),
+                  ),
+                );
+              },
             ),
           ),
         if (_useAdvancedView)
@@ -803,16 +907,28 @@ class _LyricsViewState extends State<LyricsView> {
           PositionedDirectional(
             top: topSafe + 4,
             start: 4,
-            child: _buildHeaderActions(),
-          ),
-          if (source != LyricsSource.none)
-            PositionedDirectional(
-              top: topSafe + 12,
-              end: 12,
-              child: IgnorePointer(
-                child: _buildSourceBadge(source, isSynced),
-              ),
+            end: 8,
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: _buildHeaderActions(),
+                  ),
+                ),
+                if (_manualOffsetMs != 0) ...[
+                  const SizedBox(width: AppSpacing.xxs),
+                  _buildPersistentOffsetChip(p),
+                ],
+                if (source != LyricsSource.none) ...[
+                  const SizedBox(width: AppSpacing.xxs),
+                  IgnorePointer(
+                    child: _buildSourceBadge(source, isSynced),
+                  ),
+                ],
+              ],
             ),
+          ),
         ],
       ),
     );

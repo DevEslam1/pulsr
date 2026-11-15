@@ -93,9 +93,11 @@ object UsbDacDiagnostics {
      * framework-free; the plugin maps them to android.media.AudioFormat. */
     val PROBE_TAGS: List<Pair<String, Int>> = listOf(
         "float" to 44100, "float" to 48000, "float" to 88200, "float" to 96000,
-        "float" to 176400, "float" to 192000,
+        "float" to 176400, "float" to 192000, "float" to 352800, "float" to 384000,
         "24" to 44100, "24" to 48000, "24" to 96000, "24" to 192000,
+        "24" to 352800, "24" to 384000,
         "32" to 44100, "32" to 48000, "32" to 96000, "32" to 192000,
+        "32" to 352800, "32" to 384000,
     )
 
     /**

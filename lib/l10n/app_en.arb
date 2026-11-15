@@ -7656,5 +7656,49 @@
         "type": "int"
       }
     }
-  }
+  },
+  "gesturesGuideTitle": "Gestures Guide",
+  "gesturesGuideSubtitle": "Every swipe, tap, pinch, and analog shortcut in Pulsr",
+  "gestureSurfaceMiniPlayer": "Mini Player",
+  "gestureSurfaceDock": "Bottom Dock",
+  "gestureSurfaceNowPlaying": "Now Playing",
+  "gestureSurfacePlatter": "Turntable & CD Deck",
+  "gestureSurfaceWaveform": "Waveform Seek Bar",
+  "gestureSurfaceLyrics": "Lyrics",
+  "gestureMiniSwipeHorizTitle": "Swipe mini player left or right",
+  "gestureMiniSwipeHorizDesc": "Skip through your queue carousel or trigger custom swipe actions",
+  "gestureMiniSwipeUpTitle": "Swipe up on mini player",
+  "gestureMiniSwipeUpDesc": "Expand the full-screen Now Playing player",
+  "gestureDockSwipeDownTitle": "Swipe down or long-press dock",
+  "gestureDockSwipeDownDesc": "Choose dock stacking style between mini player and navigation bar",
+  "gestureArtworkTapTitle": "Tap artwork",
+  "gestureArtworkTapDesc": "Show or hide synchronized lyrics (or Play/Pause on turntable decks)",
+  "gestureArtworkDoubleTapTitle": "Double-tap artwork",
+  "gestureArtworkDoubleTapDesc": "Toggle Favorite on the current track (configurable in Settings)",
+  "gestureArtworkSwipeTitle": "Swipe artwork left or right",
+  "gestureArtworkSwipeDesc": "Jump to next or previous track in queue",
+  "gestureNowPlayingDismissTitle": "Swipe down on Now Playing",
+  "gestureNowPlayingDismissDesc": "Dismiss the full-screen player back to your library",
+  "gesturePlatterScrubTitle": "Circularly drag Vinyl or CD platter",
+  "gesturePlatterScrubDesc": "Analog turntable scrub forward or backward with haptic detents",
+  "gestureRpmBadgeTitle": "Tap the 33⅓ RPM / Standby badge",
+  "gestureRpmBadgeDesc": "Quick-open the playback speed picker directly from the turntable plinth",
+  "gestureWaveformPinchTitle": "Pinch waveform seek bar (or double-tap)",
+  "gestureWaveformPinchDesc": "Zoom waveform in for precision scrubbing; double-tap to reset",
+  "gestureLyricsOffsetTitle": "Lyrics − / + sync controls & offset chip",
+  "gestureLyricsOffsetDesc": "Shift lyrics earlier (−100 ms) or later (+100 ms), undo anytime, or tap the offset chip",
+  "viewAllGestures": "View all gestures",
+  "gesturesGuideSubtitleShort": "Swipes, platter scrub, RPM & lyrics sync",
+  "lyricsOffsetEarlier": "Shift lyrics earlier (-100 ms)",
+  "lyricsOffsetLater": "Shift lyrics later (+100 ms)",
+  "lyricsOffsetAdjusted": "Lyrics offset set to {offset}",
+  "@lyricsOffsetAdjusted": {
+    "description": "Snackbar message when lyrics sync offset changes",
+    "placeholders": {
+      "offset": {
+        "type": "String"
+      }
+    }
+  },
+  "lyricsOffsetChipTooltip": "Tap to fine-tune lyrics sync offset"
 }

@@ -217,16 +217,25 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
         if (error != nullptr) *error = lastError_;
         return false;
     }
-    if (bitPerfect_ &&
-        TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
-        if (error != nullptr) error->clear();
-        return true;
-    }
     if (bitPerfect_) {
+        // Prefer LOW_LATENCY for wired/short bursts unless a deep buffer is
+        // requested (>= 180 ms); fall back to PERFORMANCE_MODE_NONE in
+        // EXCLUSIVE so DACs/HALs that only grant exclusive mode on NONE still
+        // receive a bit-perfect stream.
+        const bool preferDeepExclusive = config_.targetBufferMs >= 180;
+        if ((!preferDeepExclusive &&
+             TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) ||
+            TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_NONE) ||
+            (preferDeepExclusive &&
+             TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY))) {
+            if (error != nullptr) error->clear();
+            return true;
+        }
         if (error != nullptr) *error = lastError_;
         return false;
     }
     if (config_.lowLatency &&
+        config_.targetBufferMs < 180 &&
         TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
         if (error != nullptr) error->clear();
         return true;

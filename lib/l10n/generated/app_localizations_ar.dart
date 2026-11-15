@@ -9856,4 +9856,131 @@ class AppLocalizationsAr extends AppLocalizations {
   String queueSlotTooltip(int slot) {
     return 'التبديل إلى قائمة الانتظار $slot';
   }
+
+  @override
+  String get gesturesGuideTitle => 'دليل الإيماءات';
+
+  @override
+  String get gesturesGuideSubtitle =>
+      'كل سحبة ونقرة وتقريب واختصار تناظري في Pulsr';
+
+  @override
+  String get gestureSurfaceMiniPlayer => 'المشغل المصغر';
+
+  @override
+  String get gestureSurfaceDock => 'الشريط السفلي';
+
+  @override
+  String get gestureSurfaceNowPlaying => 'قيد التشغيل الآن';
+
+  @override
+  String get gestureSurfacePlatter => 'قرص الفينيل والـ CD';
+
+  @override
+  String get gestureSurfaceWaveform => 'شريط الموجة الصوتية';
+
+  @override
+  String get gestureSurfaceLyrics => 'كلمات الأغاني';
+
+  @override
+  String get gestureMiniSwipeHorizTitle =>
+      'اسحب المشغل المصغر يسارًا أو يمينًا';
+
+  @override
+  String get gestureMiniSwipeHorizDesc =>
+      'تخطَّ المسارات في قائمة الانتظار أو فعّل إجراءات السحب المخصصة';
+
+  @override
+  String get gestureMiniSwipeUpTitle => 'اسحب لأعلى على المشغل المصغر';
+
+  @override
+  String get gestureMiniSwipeUpDesc => 'توسيع شاشة التشغيل الكاملة';
+
+  @override
+  String get gestureDockSwipeDownTitle =>
+      'اسحب لأسفل أو اضغط مطولًا على الشريط السفلي';
+
+  @override
+  String get gestureDockSwipeDownDesc =>
+      'اختر نمط تكديس الشريط السفلي بين المشغل المصغر والتنقل';
+
+  @override
+  String get gestureArtworkTapTitle => 'انقر على الغلاف';
+
+  @override
+  String get gestureArtworkTapDesc =>
+      'إظهار أو إخفاء الكلمات المتزامنة (أو تشغيل/إيقاف مؤقت على قرص الفينيل)';
+
+  @override
+  String get gestureArtworkDoubleTapTitle => 'انقر مرتين على الغلاف';
+
+  @override
+  String get gestureArtworkDoubleTapDesc =>
+      'تبديل المفضلة للمسار الحالي (قابل للتخصيص من الإعدادات)';
+
+  @override
+  String get gestureArtworkSwipeTitle => 'اسحب الغلاف يسارًا أو يمينًا';
+
+  @override
+  String get gestureArtworkSwipeDesc =>
+      'الانتقال إلى المسار التالي أو السابق في القائمة';
+
+  @override
+  String get gestureNowPlayingDismissTitle => 'اسحب لأسفل في شاشة التشغيل';
+
+  @override
+  String get gestureNowPlayingDismissDesc =>
+      'إغلاق شاشة التشغيل والعودة إلى مكتبتك';
+
+  @override
+  String get gesturePlatterScrubTitle =>
+      'اسحب قرص الفينيل أو الـ CD بشكل دائري';
+
+  @override
+  String get gesturePlatterScrubDesc =>
+      'تحريك تناظري للأمام أو للخلف مع اهتزازات استجابة لمسية';
+
+  @override
+  String get gestureRpmBadgeTitle => 'انقر على شارة 33⅓ RPM / الاستعداد';
+
+  @override
+  String get gestureRpmBadgeDesc =>
+      'فتح منتقي سرعة التشغيل مباشرة من قاعدة القرص';
+
+  @override
+  String get gestureWaveformPinchTitle =>
+      'قرّب/باعد بإصبعين على شريط الموجة (أو انقر مرتين)';
+
+  @override
+  String get gestureWaveformPinchDesc =>
+      'تكبير الموجة للتنقل الدقيق؛ انقر مرتين لإعادة الضبط';
+
+  @override
+  String get gestureLyricsOffsetTitle =>
+      'أزرار − / + لمزامنة الكلمات وشريحة الإزاحة';
+
+  @override
+  String get gestureLyricsOffsetDesc =>
+      'تقديم الكلمات (−100 مللي ثانية) أو تأخيرها (+100 مللي ثانية) مع التراجع أو فتح لوحة المزامنة';
+
+  @override
+  String get viewAllGestures => 'عرض كل الإيماءات';
+
+  @override
+  String get gesturesGuideSubtitleShort =>
+      'السحب، الفينيل، السرعة ومزامنة الكلمات';
+
+  @override
+  String get lyricsOffsetEarlier => 'تقديم الكلمات (-100 مللي ثانية)';
+
+  @override
+  String get lyricsOffsetLater => 'تأخير الكلمات (+100 مللي ثانية)';
+
+  @override
+  String lyricsOffsetAdjusted(String offset) {
+    return 'تم ضبط إزاحة الكلمات على $offset';
+  }
+
+  @override
+  String get lyricsOffsetChipTooltip => 'انقر لضبط مزامنة الكلمات بدقة';
 }

@@ -19,6 +19,14 @@ mixin SettingsGesturesSection
       [
         _navTile(
           context,
+          Icons.help_outline_rounded,
+          context.l10n.gesturesGuideTitle,
+          context.l10n.gesturesGuideSubtitleShort,
+          onTap: () => GesturesSheet.show(context),
+        ),
+        _divider(p),
+        _navTile(
+          context,
           Icons.swipe_left_rounded,
           context.l10n.miniPlayerSwipeLeft,
           getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft, context.l10n),

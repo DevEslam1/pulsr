@@ -19,6 +19,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/responsive/breakpoints.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
+import '../../../core/widgets/gestures_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_search_field.dart';

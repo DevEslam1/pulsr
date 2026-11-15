@@ -624,49 +624,116 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
     }
 
+    private fun lookupOptionalCodecField(fieldName: String): Int {
+        return try {
+            BluetoothCodecConfig::class.java.getField(fieldName).getInt(null)
+        } catch (_: Throwable) {
+            -1
+        }
+    }
+
     private val lc3CodecType: Int by lazy {
         if (Build.VERSION.SDK_INT >= 33) {
-            try {
-                BluetoothCodecConfig::class.java.getField("SOURCE_CODEC_TYPE_LC3").getInt(null)
-            } catch (_: Throwable) {
-                5
-            }
+            lookupOptionalCodecField("SOURCE_CODEC_TYPE_LC3").let { if (it != -1) it else 5 }
         } else {
             -1
         }
     }
 
-    /** Maps codec type int to a human-readable name. */
-    private fun codecTypeName(codecType: Int): String = when {
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC    -> "SBC"
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC    -> "AAC"
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX   -> "aptX"
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> "aptX HD"
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC   -> "LDAC"
-        lc3CodecType != -1 && codecType == lc3CodecType -> "LC3"
-        // SOURCE_CODEC_TYPE_OPUS (hidden constant) is 6 on Android 13+.
-        Build.VERSION.SDK_INT >= 33 && codecType == 6 -> "Opus"
-        // Vendor codecs (LHDC, etc.) use OEM-assigned ids with no stable
-        // public constant, so report them honestly instead of guessing.
-        else -> "Vendor codec ($codecType)"
+    private val opusCodecType: Int by lazy {
+        if (Build.VERSION.SDK_INT >= 33) {
+            lookupOptionalCodecField("SOURCE_CODEC_TYPE_OPUS").let { if (it != -1) it else 6 }
+        } else {
+            -1
+        }
     }
+
+    private var cachedGetCodecNameMethod: java.lang.reflect.Method? = null
+
+    private fun normalizeVendorCodecName(raw: String): String {
+        val u = raw.trim().uppercase().replace('-', ' ').replace('_', ' ')
+        return when {
+            u.contains("APTX LOSSLESS") -> "aptX Lossless"
+            u.contains("APTX ADAPTIVE") -> "aptX Adaptive"
+            u.contains("APTX HD") -> "aptX HD"
+            u == "APTX" || u.contains("APTX CLASSIC") -> "aptX"
+            u.contains("LHDC V5") || u.contains("LHDCV5") -> "LHDC V5"
+            u.contains("LHDC V3") || u.contains("LHDCV3") -> "LHDC V3"
+            u.contains("LHDC") -> "LHDC"
+            u.contains("LLAC") -> "LLAC"
+            u.contains("LC3PLUS") -> "LC3plus"
+            u == "LC3" -> "LC3"
+            u == "LDAC" -> "LDAC"
+            u == "OPUS" -> "Opus"
+            u == "AAC" -> "AAC"
+            u == "SBC" -> "SBC"
+            else -> raw.trim()
+        }
+    }
+
+    /** Maps codec config to a human-readable name, using API 33+ getCodecName when available. */
+    private fun codecConfigName(config: BluetoothCodecConfig): String {
+        val standard = codecTypeNameOrNull(config.codecType)
+        if (standard != null) return standard
+        if (Build.VERSION.SDK_INT >= 29) {
+            try {
+                val m = cachedGetCodecNameMethod ?: BluetoothCodecConfig::class.java
+                    .getMethod("getCodecName")
+                    .also { cachedGetCodecNameMethod = it }
+                val raw = m.invoke(config) as? String
+                if (!raw.isNullOrBlank() &&
+                    !raw.equals("UNKNOWN", ignoreCase = true) &&
+                    !raw.equals("INVALID", ignoreCase = true)
+                ) {
+                    return normalizeVendorCodecName(raw)
+                }
+            } catch (_: Throwable) {}
+        }
+        return "Vendor codec (${config.codecType})"
+    }
+
+    private fun codecTypeNameOrNull(codecType: Int): String? = when {
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC -> "SBC"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC -> "AAC"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX -> "aptX"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> "aptX HD"
+        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC -> "LDAC"
+        lc3CodecType != -1 && codecType == lc3CodecType -> "LC3"
+        opusCodecType != -1 && codecType == opusCodecType -> "Opus"
+        else -> null
+    }
+
+    /** Maps codec type int to a human-readable name. */
+    private fun codecTypeName(codecType: Int): String =
+        codecTypeNameOrNull(codecType) ?: "Vendor codec ($codecType)"
 
     /**
      * Typical negotiated bitrate (kbps) for a codec, or null when it cannot be
      * derived honestly (variable/vendor). Values are nominal, not measured.
      */
-    private fun estimatedBitrateKbps(codecType: Int, ldacMode: Int?): Int? = when {
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC -> when (ldacMode) {
-            3 -> 990
-            2 -> 660
-            1 -> 330
+    private fun estimatedBitrateKbps(
+        codecType: Int,
+        ldacMode: Int?,
+        codecName: String? = null
+    ): Int? {
+        val norm = codecName?.uppercase()?.replace('-', ' ') ?: ""
+        return when {
+            codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC -> when (ldacMode) {
+                3 -> 990
+                2 -> 660
+                1 -> 330
+                else -> null
+            }
+            codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> 576
+            codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX -> 352
+            codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC -> 256
+            codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC -> 328
+            norm.contains("APTX LOSSLESS") -> 1100
+            norm.contains("APTX ADAPTIVE") -> 420
+            norm.contains("LHDC") -> 900
+            norm.contains("OPUS") -> 510
             else -> null
         }
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> 576
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX -> 352
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC -> 256
-        codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC -> 328
-        else -> null
     }
 
     /** Cheap change-detection key for the active codec (empty when no A2DP). */
@@ -684,16 +751,27 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     /** Maps codec name string to BluetoothCodecConfig codec type int, or -1 when unknown. */
-    private fun codecNameToType(name: String): Int = when (name.uppercase()) {
-        "SBC"      -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC
-        "AAC"      -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC
-        "APTX"     -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX
-        "APTX HD"  -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD
-        "LDAC"     -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC
-        "LC3"      -> if (lc3CodecType != -1) lc3CodecType else -1
-        // Unknown names must NOT silently fall back to SBC (that would switch
-        // the user's codec without consent); callers reject -1 explicitly.
-        else       -> -1
+    private fun codecNameToType(
+        name: String,
+        capabilities: List<BluetoothCodecConfig> = emptyList()
+    ): Int {
+        val norm = normalizeVendorCodecName(name).uppercase()
+        val direct = when (norm) {
+            "SBC" -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC
+            "AAC" -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC
+            "APTX" -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX
+            "APTX HD" -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD
+            "LDAC" -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC
+            "LC3" -> if (lc3CodecType != -1) lc3CodecType else -1
+            "OPUS" -> if (opusCodecType != -1) opusCodecType else -1
+            else -> -1
+        }
+        if (direct != -1) return direct
+        // Resolve vendor codecs (aptX Adaptive, aptX Lossless, LHDC, etc.) from
+        // the sink's reported selectable/local capabilities rather than guessing.
+        return capabilities.firstOrNull { cfg ->
+            normalizeVendorCodecName(codecConfigName(cfg)).uppercase() == norm
+        }?.codecType ?: -1
     }
 
     /** Maps BluetoothCodecConfig sample rate flag to Hz, or 0 when unknown. */
@@ -911,19 +989,20 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 BluetoothCodecConfig.BITS_PER_SAMPLE_32
             )
 
+            val resolvedCodecName = codecConfigName(current)
             mapOf(
                 "supported" to true,
                 "connected" to true,
-                "codecName" to codecTypeName(current.codecType),
+                "codecName" to resolvedCodecName,
                 "codecType" to current.codecType,
                 "sampleRateHz" to codecSampleRateToHz(current.sampleRate),
                 "bitDepth" to codecBitsToDepth(current.bitsPerSample),
                 "ldacQualityMode" to ldacMode,
                 // Raw mode byte so the UI can explain values we can't map.
                 "ldacQualityRaw" to ldacRaw,
-                "estimatedBitrateKbps" to estimatedBitrateKbps(current.codecType, ldacMode),
-                "supportedCodecs" to localCaps.map { cap -> codecTypeName(cap.codecType) }.distinct(),
-                "selectableCodecs" to selectableCaps.map { cap -> codecTypeName(cap.codecType) }.distinct(),
+                "estimatedBitrateKbps" to estimatedBitrateKbps(current.codecType, ldacMode, resolvedCodecName),
+                "supportedCodecs" to localCaps.map { cap -> codecConfigName(cap) }.distinct(),
+                "selectableCodecs" to selectableCaps.map { cap -> codecConfigName(cap) }.distinct(),
                 "selectableSampleRates" to selectableCaps
                     .filter { cap -> cap.codecType == current.codecType }
                     .flatMap { cfg ->
@@ -999,8 +1078,26 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 val current = getCodecConfigMethod.invoke(status)
                     as? BluetoothCodecConfig ?: run { finish(false); return@post }
 
+                @Suppress("UNCHECKED_CAST")
+                val selectableCaps: List<BluetoothCodecConfig> =
+                    ((cachedGetCodecsSelectableCapabilitiesMethod ?: run {
+                        status.javaClass.getMethod("getCodecsSelectableCapabilities").apply {
+                            cachedGetCodecsSelectableCapabilitiesMethod = this
+                        }
+                    }).invoke(status) as? List<*>)
+                        ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
+
+                @Suppress("UNCHECKED_CAST")
+                val localCapsForMatch: List<BluetoothCodecConfig> =
+                    ((cachedGetCodecsLocalCapabilitiesMethod ?: run {
+                        status.javaClass.getMethod("getCodecsLocalCapabilities").apply {
+                            cachedGetCodecsLocalCapabilitiesMethod = this
+                        }
+                    }).invoke(status) as? List<*>)
+                        ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
+
                 val targetCodecType = if (codec != null) {
-                    val mapped = codecNameToType(codec)
+                    val mapped = codecNameToType(codec, selectableCaps + localCapsForMatch)
                     if (mapped == -1) {
                         Log.w(TAG, "Unknown codec name '$codec' — refusing to change codec (no silent SBC fallback)")
                         finish(false)
@@ -1014,15 +1111,6 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 val targetBits = if (bitDepth != null && bitDepth > 0)
                     depthToCodecBits(bitDepth)
                     else current.bitsPerSample
-
-                @Suppress("UNCHECKED_CAST")
-                val selectableCaps: List<BluetoothCodecConfig> =
-                    ((cachedGetCodecsSelectableCapabilitiesMethod ?: run {
-                        status.javaClass.getMethod("getCodecsSelectableCapabilities").apply {
-                            cachedGetCodecsSelectableCapabilitiesMethod = this
-                        }
-                    }).invoke(status) as? List<*>)
-                        ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
 
                 // Validate against device selectable capabilities
                 if (selectableCaps.isNotEmpty()) {
@@ -1374,6 +1462,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
     }
 
+    private fun encodingTag(encoding: Int): String? = when (encoding) {
+        AudioFormat.ENCODING_PCM_16BIT -> "16"
+        AudioFormat.ENCODING_PCM_24BIT_PACKED -> "24"
+        AudioFormat.ENCODING_PCM_32BIT -> "32"
+        AudioFormat.ENCODING_PCM_FLOAT -> "float"
+        else -> null
+    }
+
     private fun isDirectSupportedForDevice(device: AudioDeviceInfo?): Boolean {
         if (device == null) return false
         // Bluetooth is never bit-perfect (transcoded), LE Audio included
@@ -1383,13 +1479,48 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             device.encodings.contains(AudioFormat.ENCODING_PCM_24BIT_PACKED) ||
             device.encodings.contains(AudioFormat.ENCODING_PCM_32BIT)
         val hasHiResRate = device.sampleRates.any { it >= 88200 }
-        // API 29+ can query directly
+        // API 33+ exposes per-attribute direct AudioProfile list from AudioPolicy.
+        if (Build.VERSION.SDK_INT >= 33 && audioManager != null) {
+            try {
+                val profiles = audioManager.getDirectProfilesForAttributes(mediaAttributes)
+                if (profiles.any { p ->
+                        p.format == AudioFormat.ENCODING_PCM_FLOAT ||
+                            p.format == AudioFormat.ENCODING_PCM_24BIT_PACKED ||
+                            p.format == AudioFormat.ENCODING_PCM_32BIT ||
+                            p.sampleRates.any { it >= 88200 }
+                    }
+                ) {
+                    return true
+                }
+            } catch (_: Throwable) {}
+        }
+        // API 29+ can query direct playback across the device's advertised encodings, rates, and channel masks.
         if (Build.VERSION.SDK_INT >= 29) {
             try {
-                val fmt = AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_FLOAT).setSampleRate(96000).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build()
-                val attr = android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC).build()
-                val supported = AudioTrack.isDirectPlaybackSupported(fmt, attr)
-                if (supported) return true
+                val attr = android.media.AudioAttributes.Builder()
+                    .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                    .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                    .build()
+                val directEncodings = listOf(
+                    AudioFormat.ENCODING_PCM_FLOAT,
+                    AudioFormat.ENCODING_PCM_32BIT,
+                    AudioFormat.ENCODING_PCM_24BIT_PACKED,
+                )
+                val deviceEncs = device.encodings.filter { it in directEncodings }
+                val encodingsToProbe = if (deviceEncs.isNotEmpty()) deviceEncs else directEncodings
+                val deviceRates = device.sampleRates.filter { it >= 44100 }.sortedDescending()
+                val ratesToProbe = if (deviceRates.isNotEmpty()) deviceRates else listOf(192000, 96000, 48000)
+                val channelMask = device.channelMasks.firstOrNull { it != 0 } ?: AudioFormat.CHANNEL_OUT_STEREO
+                for (enc in encodingsToProbe) {
+                    for (rate in ratesToProbe) {
+                        val fmt = AudioFormat.Builder()
+                            .setEncoding(enc)
+                            .setSampleRate(rate)
+                            .setChannelMask(channelMask)
+                            .build()
+                        if (AudioTrack.isDirectPlaybackSupported(fmt, attr)) return true
+                    }
+                }
             } catch (_: Exception) {}
         }
         return hasDirectEncoding || hasHiResRate
@@ -1779,7 +1910,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 when (encoding) {
                     AudioFormat.ENCODING_PCM_FLOAT -> isDirectSupported = true
                     AudioFormat.ENCODING_PCM_24BIT_PACKED -> isDirectSupported = true
-                    AudioFormat.ENCODING_PCM_32BIT -> Unit
+                    AudioFormat.ENCODING_PCM_32BIT -> isDirectSupported = true
                 }
             }
             // Offload supported on Q+ if not Bluetooth (classic or LE)
@@ -1824,7 +1955,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         for (device in devices) {
             val dRates = device.sampleRates.toList().filter { it > 0 }
             var dBitDepth = 0
+            val dEncodings = mutableListOf<String>()
             for (encoding in device.encodings) {
+                encodingTag(encoding)?.let { tag ->
+                    if (!dEncodings.contains(tag)) dEncodings.add(tag)
+                }
                 when (encoding) {
                     AudioFormat.ENCODING_PCM_16BIT -> dBitDepth = maxOf(dBitDepth, 16)
                     AudioFormat.ENCODING_PCM_FLOAT -> dBitDepth = maxOf(dBitDepth, 32)
@@ -1832,6 +1967,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     AudioFormat.ENCODING_PCM_32BIT -> dBitDepth = maxOf(dBitDepth, 32)
                 }
             }
+            val dChannelCounts = device.channelCounts.toList().filter { it > 0 }
+            val dChannelMasks = device.channelMasks.toList().filter { it != 0 }
             availableList.add(mapOf(
                 "id" to device.id,
                 "name" to getCleanDeviceName(device),
@@ -1840,7 +1977,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 "isCurrent" to (currentDevice != null && device.id == currentDevice.id),
                 "isPreferred" to (preferredRouteApplied && device.id == selectedDeviceId),
                 "sampleRates" to dRates,
-                "maxBitDepth" to dBitDepth
+                "maxBitDepth" to dBitDepth,
+                "supportedEncodings" to dEncodings,
+                "channelCounts" to dChannelCounts,
+                "channelMasks" to dChannelMasks,
             ))
         }
 
@@ -1939,6 +2079,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["usbDacLabel"] = usbDacLabel
         result["directFormats"] = getCachedDirectFormats(routeDevice?.id ?: -1)
         result["supportedSampleRates"] = sampleRates
+        result["supportedEncodings"] = routeDevice?.encodings
+            ?.mapNotNull { encodingTag(it) }
+            ?.distinct()
+            ?: emptyList<String>()
+        result["supportedChannelCounts"] = routeDevice?.channelCounts
+            ?.toList()?.filter { it > 0 } ?: emptyList<Int>()
+        result["supportedChannelMasks"] = routeDevice?.channelMasks
+            ?.toList()?.filter { it != 0 } ?: emptyList<Int>()
         result["availableDevices"] = availableList
         result["targetSampleRate"] = targetSampleRate
         result["targetBitDepth"] = targetBitDepth
@@ -1947,11 +2095,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // Bluetooth codec info — included whenever any A2DP device is detected
         // (not just when BT is the active output path, so the section shows even
         //  while audio routes via phone speaker with earbuds paired/connected).
-        // LE Audio is deliberately excluded: LC3 negotiation has no app-facing
-        // control surface, so there is nothing to read or set.
+        // LE Audio uses system-managed LC3, so A2DP setter controls do not apply,
+        // though we still report active LE sample rate/bit depth when routed.
         val a2dpAnyPresent = devices.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
         val bleAnyPresent = devices.any { isBleOutputType(it.type) }
-        result["isLeAudio"] = routeDevice != null && isBleOutputType(routeDevice.type)
+        val routeIsLeAudio = routeDevice != null && isBleOutputType(routeDevice.type)
+        result["isLeAudio"] = routeIsLeAudio
         result["bleAudioPresent"] = bleAnyPresent
         if (a2dpAnyPresent && isBluetooth) {
             val btCodec = try { getBluetoothCodecInfo() } catch (_: Exception) { emptyMap<String, Any?>() }
@@ -1968,12 +2117,18 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             result["btSelectableSampleRates"] = btCodec["selectableSampleRates"] ?: emptyList<Int>()
             result["btSelectableBitDepths"] = btCodec["selectableBitDepths"] ?: emptyList<Int>()
         } else {
+            val leSampleRate = if (routeIsLeAudio) {
+                stream[1].takeIf { it > 0 } ?: routeDevice?.sampleRates?.firstOrNull { it > 0 }
+            } else null
+            val leBitDepth = if (routeIsLeAudio) {
+                reportedDepth.takeIf { it > 0 }
+            } else null
             result["btCodecName"] = if (bleAnyPresent) "LC3" else null
-            result["btSampleRateHz"] = null
-            result["btBitDepth"] = null
+            result["btSampleRateHz"] = leSampleRate
+            result["btBitDepth"] = leBitDepth
             result["btLdacQualityMode"] = null
             result["btEstimatedBitrateKbps"] = null
-            result["btCodecConnected"] = false
+            result["btCodecConnected"] = routeIsLeAudio
             result["btA2dpPresent"] = false
             result["btReason"] = if (bleAnyPresent) "le_audio_not_configurable" else "no_device_connected"
             result["btSelectableCodecs"] = emptyList<String>()

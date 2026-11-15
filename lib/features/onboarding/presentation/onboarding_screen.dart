@@ -17,6 +17,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/pulsr_haptics.dart';
+import '../../../core/widgets/gestures_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -1220,6 +1221,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                 ],
               ).animate().fadeIn(delay: context.motionMs(400)),
+              const SizedBox(height: AppSpacing.xs),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, AppSpacing.minTouchTarget),
+                ),
+                onPressed: () {
+                  PulsrHaptics.selectionClick();
+                  GesturesSheet.show(context);
+                },
+                icon: const Icon(Icons.gesture_rounded, size: 18),
+                label: Text(context.l10n.viewAllGestures),
+              ),
               SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.sm),
             ],
           ),

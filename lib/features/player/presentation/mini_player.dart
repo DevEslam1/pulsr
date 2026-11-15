@@ -5,10 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+
+import '../../../core/constants/prefs_keys.dart';
 
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -61,6 +64,14 @@ class MiniPlayerState extends State<MiniPlayer> {
   final ValueNotifier<bool> _isInteracting = ValueNotifier<bool>(false);
   @visibleForTesting
   ValueNotifier<bool> get isInteractingNotifier => _isInteracting;
+  final ValueNotifier<double> _carouselDragDelta = ValueNotifier<double>(0.0);
+  bool _showGrabChevron = false;
+  static const int _maxGrabChevronSessions = 5;
+  static bool _chevronSessionCounted = false;
+  @visibleForTesting
+  static void resetSessionTrackingForTest() {
+    _chevronSessionCounted = false;
+  }
   bool _swipeInFlight = false;
 
   /// Bounded post-frame retries while the PageView catches up with a queue
@@ -157,6 +168,7 @@ class MiniPlayerState extends State<MiniPlayer> {
     final safeInitial = initialIndex >= 0 ? initialIndex : 0;
     _pageController = PageController(initialPage: safeInitial);
     _isInteracting.addListener(_onInteractionChanged);
+    unawaited(_loadGrabChevronState());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _controllerDisposed) return;
       final playerCubit = context.read<PlayerCubit>();
@@ -170,6 +182,22 @@ class MiniPlayerState extends State<MiniPlayer> {
           state.currentIndex.clamp(0, math.max(0, queue.length - 1)).toInt();
       _syncPageController(currentIndex, queue.length);
     });
+  }
+
+  Future<void> _loadGrabChevronState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final count = prefs.getInt(PrefsKeys.dockGrabChevronSessions) ?? 0;
+      if (!mounted) return;
+      final show = count < _maxGrabChevronSessions;
+      if (show != _showGrabChevron) {
+        setState(() => _showGrabChevron = show);
+      }
+      if (!_chevronSessionCounted) {
+        _chevronSessionCounted = true;
+        await prefs.setInt(PrefsKeys.dockGrabChevronSessions, count + 1);
+      }
+    } catch (_) {}
   }
 
   void _onInteractionChanged() {
@@ -204,6 +232,7 @@ class MiniPlayerState extends State<MiniPlayer> {
     _pageSyncRetries = 0;
     _isInteracting.removeListener(_onInteractionChanged);
     _isInteracting.dispose();
+    _carouselDragDelta.dispose();
     _verticalSwipeTimer?.cancel();
     _pageController?.dispose();
     _pageController = null;
@@ -646,8 +675,11 @@ class MiniPlayerState extends State<MiniPlayer> {
                                               MediaQuery.textScalerOf(context)
                                                   .scale(1.0)
                                                   .clamp(1.0, 1.5),
-                                          child: NotificationListener<
-                                              ScrollNotification>(
+                                          child: Stack(
+                                            alignment: Alignment.center,
+                                            children: [
+                                              NotificationListener<
+                                                  ScrollNotification>(
                                             onNotification: (notification) {
                                               if (notification
                                                       is ScrollStartNotification &&
@@ -655,16 +687,39 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                       null) {
                                                 _isInteracting.value = true;
                                               } else if (notification
+                                                      is ScrollUpdateNotification &&
+                                                  carouselEnabled &&
+                                                  _pageController != null &&
+                                                  _pageController!.hasClients) {
+                                                final page =
+                                                    _pageController!.page;
+                                                if (page != null) {
+                                                  _carouselDragDelta.value =
+                                                      (page - currentIndex)
+                                                          .clamp(-1.0, 1.0);
+                                                }
+                                              } else if (notification
                                                   is UserScrollNotification) {
                                                 if (notification.direction !=
                                                     ScrollDirection.idle) {
                                                   _isInteracting.value = true;
                                                 } else if (!_swipeInFlight) {
                                                   _isInteracting.value = false;
+                                                  if (_carouselDragDelta
+                                                          .value !=
+                                                      0.0) {
+                                                    _carouselDragDelta.value =
+                                                        0.0;
+                                                  }
                                                 }
                                               } else if (notification
                                                   is ScrollEndNotification) {
                                                 _isInteracting.value = false;
+                                                if (_carouselDragDelta.value !=
+                                                    0.0) {
+                                                  _carouselDragDelta.value =
+                                                      0.0;
+                                                }
                                                 if (!_swipeInFlight) {
                                                   _drainPendingSync();
                                                 }
@@ -906,7 +961,8 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                                   ),
                                                                 ),
                                                               ),
-                                                              if (_horizontalDragDx <
+                                                              if (!carouselEnabled &&
+                                                                  _horizontalDragDx <
                                                                       -8 &&
                                                                   swipeLeftIcon !=
                                                                       null)
@@ -958,9 +1014,74 @@ class MiniPlayerState extends State<MiniPlayer> {
                                               },
                                             ),
                                           ),
+                                          if (carouselEnabled)
+                                            Positioned.fill(
+                                              child: IgnorePointer(
+                                                child: ValueListenableBuilder<
+                                                    double>(
+                                                  valueListenable:
+                                                      _carouselDragDelta,
+                                                  builder:
+                                                      (context, delta, _) {
+                                                    if (delta.abs() <= 0.05) {
+                                                      return const SizedBox
+                                                          .shrink();
+                                                    }
+                                                    final isNext = delta > 0;
+                                                    final progress =
+                                                        (delta.abs() / 0.35)
+                                                            .clamp(0.0, 1.0);
+                                                    final crossed =
+                                                        delta.abs() >= 0.35;
+                                                    return Stack(
+                                                      alignment:
+                                                          Alignment.center,
+                                                      children: [
+                                                        if (isNext)
+                                                          PositionedDirectional(
+                                                            end: 2,
+                                                            child:
+                                                                _SwipeActionBadge(
+                                                              key: const ValueKey(
+                                                                  'mini_player_carousel_badge_next'),
+                                                              icon: Icons
+                                                                  .skip_next_rounded,
+                                                              progress:
+                                                                  progress,
+                                                              thresholdCrossed:
+                                                                  crossed,
+                                                              accentColor:
+                                                                  activeAccent,
+                                                            ),
+                                                          )
+                                                        else
+                                                          PositionedDirectional(
+                                                            start: 2,
+                                                            child:
+                                                                _SwipeActionBadge(
+                                                              key: const ValueKey(
+                                                                  'mini_player_carousel_badge_prev'),
+                                                              icon: Icons
+                                                                  .skip_previous_rounded,
+                                                              progress:
+                                                                  progress,
+                                                              thresholdCrossed:
+                                                                  crossed,
+                                                              accentColor:
+                                                                  activeAccent,
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(width: AppSpacing.xs),
+                                    ),
+                                    const SizedBox(width: AppSpacing.xs),
                                       // Primary Play/Pause Button with tonal capsule
                                       Container(
                                         width: 40,
@@ -1059,19 +1180,41 @@ class MiniPlayerState extends State<MiniPlayer> {
                                 ),
                               ],
                             ),
-                            // Top grab handle pill
+                            // Top grab handle pill (+ directional chevron for first N sessions)
                             Positioned(
-                              top: 4.5,
+                              top: _showGrabChevron ? 1.5 : 4.5,
                               child: IgnorePointer(
-                                child: AnimatedContainer(
-                                  duration: context.motion(PulsrMotion.state),
-                                  width: _swipeInFlight ? 34 : 28,
-                                  height: 3.0,
-                                  decoration: BoxDecoration(
-                                    color:
-                                        (p.isDark ? Colors.white : Colors.black)
-                                            .withValues(alpha: 0.20),
-                                    borderRadius: AppRadii.r1_5All,
+                                child: ExcludeSemantics(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      AnimatedContainer(
+                                        duration:
+                                            context.motion(PulsrMotion.state),
+                                        width: _swipeInFlight ? 34 : 28,
+                                        height: 3.0,
+                                        decoration: BoxDecoration(
+                                          color: (p.isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
+                                              .withValues(alpha: 0.20),
+                                          borderRadius: AppRadii.r1_5All,
+                                        ),
+                                      ),
+                                      if (_showGrabChevron) ...[
+                                        const SizedBox(width: AppSpacing.s2),
+                                        Icon(
+                                          Icons.keyboard_arrow_up_rounded,
+                                          key: const ValueKey(
+                                              'dock_grab_chevron'),
+                                          size: 12,
+                                          color: (p.isDark
+                                                  ? Colors.white
+                                                  : Colors.black)
+                                              .withValues(alpha: 0.38),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               ),
@@ -1152,6 +1295,7 @@ class _SwipeActionBadge extends StatelessWidget {
   final Color accentColor;
 
   const _SwipeActionBadge({
+    super.key,
     required this.icon,
     required this.progress,
     required this.thresholdCrossed,

@@ -8,6 +8,7 @@ import '../../../../core/constants/app_icons.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
+import '../../../../core/widgets/gestures_sheet.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_list_tile.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
@@ -191,6 +192,17 @@ class PlayerMoreSheet extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+            _MoreActionTile(
+              icon: Icons.gesture_rounded,
+              iconColor: activeColor,
+              title: l10n.gesturesGuideTitle,
+              subtitle: l10n.gesturesGuideSubtitleShort,
+              onTap: () {
+                PulsrHaptics.selection();
+                Navigator.of(context).pop();
+                GesturesSheet.show(context);
+              },
             ),
           ],
         ),

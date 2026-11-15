@@ -8,6 +8,7 @@
 #import "./include/just_audio/LoopingAudioSource.h"
 #import "./include/just_audio/ClippingAudioSource.h"
 #import <AVFoundation/AVFoundation.h>
+#import <CoreMedia/CoreMedia.h>
 #import <stdlib.h>
 #include <TargetConditionals.h>
 
@@ -779,6 +780,31 @@
     }
 }
 
+- (void)configureHiResAudioSessionForItem:(AVPlayerItem *)item {
+#if TARGET_OS_IPHONE
+    if (!item || !item.asset) return;
+    NSArray<AVAssetTrack *> *audioTracks = [item.asset tracksWithMediaType:AVMediaTypeAudio];
+    double maxSampleRate = 0.0;
+    for (AVAssetTrack *track in audioTracks) {
+        for (id desc in track.formatDescriptions) {
+            CMAudioFormatDescriptionRef fmt = (__bridge CMAudioFormatDescriptionRef)desc;
+            if (!fmt) continue;
+            const AudioStreamBasicDescription *asbd = CMAudioFormatDescriptionGetStreamBasicDescription(fmt);
+            if (asbd && asbd->mSampleRate > maxSampleRate) {
+                maxSampleRate = asbd->mSampleRate;
+            }
+        }
+    }
+    if (maxSampleRate >= 44100.0) {
+        AVAudioSession *session = [AVAudioSession sharedInstance];
+        if (fabs(session.sampleRate - maxSampleRate) > 1.0) {
+            NSError *err = nil;
+            [session setPreferredSampleRate:maxSampleRate error:&err];
+        }
+    }
+#endif
+}
+
 - (void)observeValueForKeyPath:(NSString *)keyPath
                       ofObject:(id)object
                         change:(NSDictionary<NSString *,id> *)change
@@ -795,6 +821,7 @@
         switch (status) {
             case AVPlayerItemStatusReadyToPlay: {
                 if (playerItem != _player.currentItem) return;
+                [self configureHiResAudioSessionForItem:playerItem];
                 // Detect buffering in different ways depending on whether we're playing
                 if (_playing) {
                     if (@available(macOS 10.12, iOS 10.0, *)) {

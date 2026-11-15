@@ -9911,4 +9911,129 @@ class AppLocalizationsEn extends AppLocalizations {
   String queueSlotTooltip(int slot) {
     return 'Switch to queue slot $slot';
   }
+
+  @override
+  String get gesturesGuideTitle => 'Gestures Guide';
+
+  @override
+  String get gesturesGuideSubtitle =>
+      'Every swipe, tap, pinch, and analog shortcut in Pulsr';
+
+  @override
+  String get gestureSurfaceMiniPlayer => 'Mini Player';
+
+  @override
+  String get gestureSurfaceDock => 'Bottom Dock';
+
+  @override
+  String get gestureSurfaceNowPlaying => 'Now Playing';
+
+  @override
+  String get gestureSurfacePlatter => 'Turntable & CD Deck';
+
+  @override
+  String get gestureSurfaceWaveform => 'Waveform Seek Bar';
+
+  @override
+  String get gestureSurfaceLyrics => 'Lyrics';
+
+  @override
+  String get gestureMiniSwipeHorizTitle => 'Swipe mini player left or right';
+
+  @override
+  String get gestureMiniSwipeHorizDesc =>
+      'Skip through your queue carousel or trigger custom swipe actions';
+
+  @override
+  String get gestureMiniSwipeUpTitle => 'Swipe up on mini player';
+
+  @override
+  String get gestureMiniSwipeUpDesc =>
+      'Expand the full-screen Now Playing player';
+
+  @override
+  String get gestureDockSwipeDownTitle => 'Swipe down or long-press dock';
+
+  @override
+  String get gestureDockSwipeDownDesc =>
+      'Choose dock stacking style between mini player and navigation bar';
+
+  @override
+  String get gestureArtworkTapTitle => 'Tap artwork';
+
+  @override
+  String get gestureArtworkTapDesc =>
+      'Show or hide synchronized lyrics (or Play/Pause on turntable decks)';
+
+  @override
+  String get gestureArtworkDoubleTapTitle => 'Double-tap artwork';
+
+  @override
+  String get gestureArtworkDoubleTapDesc =>
+      'Toggle Favorite on the current track (configurable in Settings)';
+
+  @override
+  String get gestureArtworkSwipeTitle => 'Swipe artwork left or right';
+
+  @override
+  String get gestureArtworkSwipeDesc =>
+      'Jump to next or previous track in queue';
+
+  @override
+  String get gestureNowPlayingDismissTitle => 'Swipe down on Now Playing';
+
+  @override
+  String get gestureNowPlayingDismissDesc =>
+      'Dismiss the full-screen player back to your library';
+
+  @override
+  String get gesturePlatterScrubTitle => 'Circularly drag Vinyl or CD platter';
+
+  @override
+  String get gesturePlatterScrubDesc =>
+      'Analog turntable scrub forward or backward with haptic detents';
+
+  @override
+  String get gestureRpmBadgeTitle => 'Tap the 33⅓ RPM / Standby badge';
+
+  @override
+  String get gestureRpmBadgeDesc =>
+      'Quick-open the playback speed picker directly from the turntable plinth';
+
+  @override
+  String get gestureWaveformPinchTitle =>
+      'Pinch waveform seek bar (or double-tap)';
+
+  @override
+  String get gestureWaveformPinchDesc =>
+      'Zoom waveform in for precision scrubbing; double-tap to reset';
+
+  @override
+  String get gestureLyricsOffsetTitle =>
+      'Lyrics − / + sync controls & offset chip';
+
+  @override
+  String get gestureLyricsOffsetDesc =>
+      'Shift lyrics earlier (−100 ms) or later (+100 ms), undo anytime, or tap the offset chip';
+
+  @override
+  String get viewAllGestures => 'View all gestures';
+
+  @override
+  String get gesturesGuideSubtitleShort =>
+      'Swipes, platter scrub, RPM & lyrics sync';
+
+  @override
+  String get lyricsOffsetEarlier => 'Shift lyrics earlier (-100 ms)';
+
+  @override
+  String get lyricsOffsetLater => 'Shift lyrics later (+100 ms)';
+
+  @override
+  String lyricsOffsetAdjusted(String offset) {
+    return 'Lyrics offset set to $offset';
+  }
+
+  @override
+  String get lyricsOffsetChipTooltip => 'Tap to fine-tune lyrics sync offset';
 }

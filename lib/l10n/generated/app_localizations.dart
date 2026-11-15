@@ -17520,6 +17520,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Switch to queue slot {slot}'**
   String queueSlotTooltip(int slot);
+
+  /// No description provided for @gesturesGuideTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gestures Guide'**
+  String get gesturesGuideTitle;
+
+  /// No description provided for @gesturesGuideSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Every swipe, tap, pinch, and analog shortcut in Pulsr'**
+  String get gesturesGuideSubtitle;
+
+  /// No description provided for @gestureSurfaceMiniPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini Player'**
+  String get gestureSurfaceMiniPlayer;
+
+  /// No description provided for @gestureSurfaceDock.
+  ///
+  /// In en, this message translates to:
+  /// **'Bottom Dock'**
+  String get gestureSurfaceDock;
+
+  /// No description provided for @gestureSurfaceNowPlaying.
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing'**
+  String get gestureSurfaceNowPlaying;
+
+  /// No description provided for @gestureSurfacePlatter.
+  ///
+  /// In en, this message translates to:
+  /// **'Turntable & CD Deck'**
+  String get gestureSurfacePlatter;
+
+  /// No description provided for @gestureSurfaceWaveform.
+  ///
+  /// In en, this message translates to:
+  /// **'Waveform Seek Bar'**
+  String get gestureSurfaceWaveform;
+
+  /// No description provided for @gestureSurfaceLyrics.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics'**
+  String get gestureSurfaceLyrics;
+
+  /// No description provided for @gestureMiniSwipeHorizTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe mini player left or right'**
+  String get gestureMiniSwipeHorizTitle;
+
+  /// No description provided for @gestureMiniSwipeHorizDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip through your queue carousel or trigger custom swipe actions'**
+  String get gestureMiniSwipeHorizDesc;
+
+  /// No description provided for @gestureMiniSwipeUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe up on mini player'**
+  String get gestureMiniSwipeUpTitle;
+
+  /// No description provided for @gestureMiniSwipeUpDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand the full-screen Now Playing player'**
+  String get gestureMiniSwipeUpDesc;
+
+  /// No description provided for @gestureDockSwipeDownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe down or long-press dock'**
+  String get gestureDockSwipeDownTitle;
+
+  /// No description provided for @gestureDockSwipeDownDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose dock stacking style between mini player and navigation bar'**
+  String get gestureDockSwipeDownDesc;
+
+  /// No description provided for @gestureArtworkTapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap artwork'**
+  String get gestureArtworkTapTitle;
+
+  /// No description provided for @gestureArtworkTapDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Show or hide synchronized lyrics (or Play/Pause on turntable decks)'**
+  String get gestureArtworkTapDesc;
+
+  /// No description provided for @gestureArtworkDoubleTapTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-tap artwork'**
+  String get gestureArtworkDoubleTapTitle;
+
+  /// No description provided for @gestureArtworkDoubleTapDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle Favorite on the current track (configurable in Settings)'**
+  String get gestureArtworkDoubleTapDesc;
+
+  /// No description provided for @gestureArtworkSwipeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe artwork left or right'**
+  String get gestureArtworkSwipeTitle;
+
+  /// No description provided for @gestureArtworkSwipeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to next or previous track in queue'**
+  String get gestureArtworkSwipeDesc;
+
+  /// No description provided for @gestureNowPlayingDismissTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipe down on Now Playing'**
+  String get gestureNowPlayingDismissTitle;
+
+  /// No description provided for @gestureNowPlayingDismissDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss the full-screen player back to your library'**
+  String get gestureNowPlayingDismissDesc;
+
+  /// No description provided for @gesturePlatterScrubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Circularly drag Vinyl or CD platter'**
+  String get gesturePlatterScrubTitle;
+
+  /// No description provided for @gesturePlatterScrubDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Analog turntable scrub forward or backward with haptic detents'**
+  String get gesturePlatterScrubDesc;
+
+  /// No description provided for @gestureRpmBadgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the 33⅓ RPM / Standby badge'**
+  String get gestureRpmBadgeTitle;
+
+  /// No description provided for @gestureRpmBadgeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick-open the playback speed picker directly from the turntable plinth'**
+  String get gestureRpmBadgeDesc;
+
+  /// No description provided for @gestureWaveformPinchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinch waveform seek bar (or double-tap)'**
+  String get gestureWaveformPinchTitle;
+
+  /// No description provided for @gestureWaveformPinchDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Zoom waveform in for precision scrubbing; double-tap to reset'**
+  String get gestureWaveformPinchDesc;
+
+  /// No description provided for @gestureLyricsOffsetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics − / + sync controls & offset chip'**
+  String get gestureLyricsOffsetTitle;
+
+  /// No description provided for @gestureLyricsOffsetDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift lyrics earlier (−100 ms) or later (+100 ms), undo anytime, or tap the offset chip'**
+  String get gestureLyricsOffsetDesc;
+
+  /// No description provided for @viewAllGestures.
+  ///
+  /// In en, this message translates to:
+  /// **'View all gestures'**
+  String get viewAllGestures;
+
+  /// No description provided for @gesturesGuideSubtitleShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Swipes, platter scrub, RPM & lyrics sync'**
+  String get gesturesGuideSubtitleShort;
+
+  /// No description provided for @lyricsOffsetEarlier.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift lyrics earlier (-100 ms)'**
+  String get lyricsOffsetEarlier;
+
+  /// No description provided for @lyricsOffsetLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Shift lyrics later (+100 ms)'**
+  String get lyricsOffsetLater;
+
+  /// Snackbar message when lyrics sync offset changes
+  ///
+  /// In en, this message translates to:
+  /// **'Lyrics offset set to {offset}'**
+  String lyricsOffsetAdjusted(String offset);
+
+  /// No description provided for @lyricsOffsetChipTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to fine-tune lyrics sync offset'**
+  String get lyricsOffsetChipTooltip;
 }
 
 class _AppLocalizationsDelegate
