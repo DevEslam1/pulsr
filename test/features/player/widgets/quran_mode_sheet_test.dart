@@ -13,6 +13,7 @@ import 'package:pulsr/domain/models/quran_surah.dart';
 import 'package:pulsr/domain/repositories/quran_repository.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/quran_mode_sheet.dart';
+import 'package:pulsr/features/player/presentation/widgets/quran_mushaf_view.dart';
 
 import 'player_sheet_test_support.dart';
 
@@ -526,6 +527,57 @@ void main() {
 
       expect(find.byType(SnackBar), findsOneWidget);
       expect(find.textContaining('Al-Fatihah • Ayah 1'), findsOneWidget);
+    });
+
+    testWidgets(
+        'P3-23: position ticks update QuranMushafView without rebuilding outer QuranModePanel',
+        (tester) async {
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      var current = quranState(enabled: true).copyWith(
+        playback: const PlaybackSlice(
+          currentSong: testSong,
+          position: Duration(seconds: 1),
+        ),
+      );
+      final cubit = quranCubit(current);
+      when(() => cubit.state).thenAnswer((_) => current);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        child: const SingleChildScrollView(child: QuranModePanel()),
+      ));
+      await tester.pumpAndSettle();
+
+      final headerBefore = tester.widget<Text>(find.text('Quran Mode'));
+      expect(
+        tester
+            .widget<QuranMushafView>(find.byType(QuranMushafView))
+            .currentPosition,
+        const Duration(seconds: 1),
+      );
+
+      for (var s = 2; s <= 5; s++) {
+        current = current.copyWith(
+          playback: current.playback.copyWith(position: Duration(seconds: s)),
+        );
+        controller.add(current);
+        await tester.pump();
+      }
+
+      final headerAfter = tester.widget<Text>(find.text('Quran Mode'));
+      expect(
+        identical(headerBefore, headerAfter),
+        isTrue,
+        reason: 'Outer QuranModePanel must not rebuild on position ticks',
+      );
+      expect(
+        tester
+            .widget<QuranMushafView>(find.byType(QuranMushafView))
+            .currentPosition,
+        const Duration(seconds: 5),
+      );
     });
   });
 }

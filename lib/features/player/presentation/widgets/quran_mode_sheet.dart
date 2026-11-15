@@ -167,6 +167,9 @@ class _QuranModePanelState extends State<QuranModePanel> {
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
+      // AUDIT-FIX (P3-23): Omit `position` from outer `buildWhen` so 4Hz+
+      // playback ticks do not rebuild the entire sheet; only `QuranMushafView`
+      // needs live position via its own `BlocSelector`.
       buildWhen: (a, b) =>
           a.isQuranModeEnabled != b.isQuranModeEnabled ||
           a.quranReciterStyle != b.quranReciterStyle ||
@@ -176,7 +179,6 @@ class _QuranModePanelState extends State<QuranModePanel> {
           a.saturationMix != b.saturationMix ||
           a.playbackSpeed != b.playbackSpeed ||
           a.errorMessage != b.errorMessage ||
-          a.position != b.position ||
           a.abLoopEnabled != b.abLoopEnabled ||
           a.abPointA != b.abPointA ||
           a.abPointB != b.abPointB ||
@@ -188,9 +190,11 @@ class _QuranModePanelState extends State<QuranModePanel> {
         final currentTrackUri =
             state.currentSong?.uri ?? state.currentSong?.path;
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _checkMetadata(currentTrackUri);
-        });
+        if (currentTrackUri != _lastLoadedTrackUri) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _checkMetadata(currentTrackUri);
+          });
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,12 +638,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
             ),
             if (state.isQuranModeEnabled) ...[
               const SizedBox(height: AppSpacing.md),
-              QuranMushafView(
-                key: ValueKey(currentTrackUri),
-                metadata:
-                    currentTrackUri == _lastLoadedTrackUri ? _metadata : null,
-                currentPosition: state.position,
-                onSeek: (pos) => cubit.seek(pos),
+              BlocSelector<PlayerCubit, PlayerState, Duration>(
+                selector: (s) => s.position,
+                builder: (context, position) => QuranMushafView(
+                  key: ValueKey(currentTrackUri),
+                  metadata:
+                      currentTrackUri == _lastLoadedTrackUri ? _metadata : null,
+                  currentPosition: position,
+                  onSeek: (pos) => cubit.seek(pos),
+                ),
               ),
             ],
           ],
@@ -782,12 +789,13 @@ class _QuranModePanelState extends State<QuranModePanel> {
                     : () async {
                         final uri = _lastLoadedTrackUri;
                         if (uri == null) return;
-                        final currentAyah = meta.ayahAt(state.position);
+                        final currentPosition = cubit.state.position;
+                        final currentAyah = meta.ayahAt(currentPosition);
                         final newBookmark = QuranBookmark(
                           trackUri: uri,
                           metadata: meta,
                           currentAyah: currentAyah,
-                          position: state.position,
+                          position: currentPosition,
                           timestamp: DateTime.now(),
                         );
                         final repo = getIt.isRegistered<QuranRepository>()
