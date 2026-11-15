@@ -9,10 +9,13 @@ import 'package:pulsr/features/player/presentation/widgets/canvas_backdrop.dart'
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/services/canvas/canvas_repository.dart';
+import 'package:video_player/video_player.dart';
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class MockCanvasRepository extends Mock implements CanvasRepository {}
+
+class MockVideoPlayerController extends Mock implements VideoPlayerController {}
 
 void main() {
   late MockSettingsCubit mockSettingsCubit;
@@ -144,13 +147,16 @@ void main() {
       verifyNever(() => repository.canvasFor(any()));
     });
 
-    testWidgets('0.9 toggling canvasEnabled to false stops and disposes controller and shows fallback', (tester) async {
+    testWidgets(
+        '0.9 toggling canvasEnabled to false stops and disposes controller and shows fallback',
+        (tester) async {
       final streamController = StreamController<SettingsState>.broadcast();
       addTearDown(streamController.close);
 
       var currentState = const SettingsState(canvasEnabled: true);
       when(() => mockSettingsCubit.state).thenAnswer((_) => currentState);
-      when(() => mockSettingsCubit.stream).thenAnswer((_) => streamController.stream);
+      when(() => mockSettingsCubit.stream)
+          .thenAnswer((_) => streamController.stream);
 
       const fallbackKey = ValueKey('fallback_art');
       const dummySong = SongsTableData(
@@ -196,6 +202,100 @@ void main() {
       final stateFinder = find.byType(CanvasBackdrop);
       final backdropState = tester.state(stateFinder) as dynamic;
       expect(backdropState.canvas, isNull);
+    });
+
+    testWidgets(
+        'P2-13 disposes local VideoPlayerController when initialize() throws',
+        (tester) async {
+      const dummySong = SongsTableData(
+        id: 4,
+        title: 'Fail Init Track',
+        artist: 'Artist',
+        album: 'Album',
+        path: '/storage/music/song4.mp3',
+        source: 'local',
+        isDownloaded: false,
+        durationMs: 180000,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      const artwork = CanvasArtwork(
+        videoUrl: 'https://example.com/canvas.mp4',
+        source: 'test',
+      );
+      final repository = MockCanvasRepository();
+      when(() => repository.cached(dummySong)).thenReturn(artwork);
+
+      final mockController = MockVideoPlayerController();
+      when(() => mockController.value)
+          .thenReturn(const VideoPlayerValue.uninitialized());
+      when(() => mockController.initialize())
+          .thenThrow(Exception('decoder failed'));
+      when(() => mockController.dispose()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        buildTestableWidget(
+          CanvasBackdrop(
+            song: dummySong,
+            isPlaying: true,
+            repository: repository,
+            controllerFactory: (_) => mockController,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => mockController.dispose()).called(1);
+    });
+
+    testWidgets(
+        'P2-13 disposes local VideoPlayerController when setVolume() throws after initialize()',
+        (tester) async {
+      const dummySong = SongsTableData(
+        id: 5,
+        title: 'Fail Volume Track',
+        artist: 'Artist',
+        album: 'Album',
+        path: '/storage/music/song5.mp3',
+        source: 'local',
+        isDownloaded: false,
+        durationMs: 180000,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      const artwork = CanvasArtwork(
+        videoUrl: 'https://example.com/canvas2.mp4',
+        source: 'test',
+      );
+      final repository = MockCanvasRepository();
+      when(() => repository.cached(dummySong)).thenReturn(artwork);
+
+      final mockController = MockVideoPlayerController();
+      when(() => mockController.value)
+          .thenReturn(const VideoPlayerValue.uninitialized());
+      when(() => mockController.initialize()).thenAnswer((_) async {});
+      when(() => mockController.setLooping(true)).thenAnswer((_) async {});
+      when(() => mockController.setVolume(0.0))
+          .thenThrow(Exception('audio sink failed'));
+      when(() => mockController.dispose()).thenAnswer((_) async {});
+
+      await tester.pumpWidget(
+        buildTestableWidget(
+          CanvasBackdrop(
+            song: dummySong,
+            isPlaying: false,
+            repository: repository,
+            controllerFactory: (_) => mockController,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      verify(() => mockController.dispose()).called(1);
     });
   });
 }

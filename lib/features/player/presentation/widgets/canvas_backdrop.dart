@@ -17,6 +17,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Looped video backdrop for Spotify Canvas, Apple Music motion artwork,
 /// and Tidal video covers.
 ///
@@ -33,6 +34,8 @@ class CanvasBackdrop extends StatefulWidget {
   final BorderRadius? borderRadius;
   final double blurSigma;
   final CanvasRepository? repository;
+  @visibleForTesting
+  final VideoPlayerController Function(CanvasArtwork)? controllerFactory;
 
   const CanvasBackdrop({
     super.key,
@@ -43,6 +46,7 @@ class CanvasBackdrop extends StatefulWidget {
     this.borderRadius,
     this.blurSigma = 28.0,
     this.repository,
+    this.controllerFactory,
   });
 
   @override
@@ -169,14 +173,18 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
     int? songId,
     int generation,
   ) async {
+    VideoPlayerController? controller;
     try {
-      VideoPlayerController controller;
-      final local = canvas.localFilePath;
-      if (local != null && File(local).existsSync()) {
-        controller = VideoPlayerController.file(File(local));
+      if (widget.controllerFactory != null) {
+        controller = widget.controllerFactory!(canvas);
       } else {
-        controller =
-            VideoPlayerController.networkUrl(Uri.parse(canvas.videoUrl));
+        final local = canvas.localFilePath;
+        if (local != null && File(local).existsSync()) {
+          controller = VideoPlayerController.file(File(local));
+        } else {
+          controller =
+              VideoPlayerController.networkUrl(Uri.parse(canvas.videoUrl));
+        }
       }
 
       await controller.initialize();
@@ -197,13 +205,25 @@ class _CanvasBackdropState extends State<CanvasBackdrop> {
         await controller.play();
       }
 
-      if (mounted && generation == _loadGeneration) {
-        setState(() => _isRendered = true);
+      if (!mounted || generation != _loadGeneration) {
+        return;
       }
+
+      setState(() => _isRendered = true);
     } catch (e, st) {
+      // AUDIT-FIX (P2-13): Dispose locally created controller if initialize() or
+      // any subsequent await throws so native player handles do not leak.
+      if (identical(_controller, controller)) {
+        _controller = null;
+      }
+      if (controller != null) {
+        try {
+          await controller.dispose();
+        } catch (_) {}
+      }
       ErrorLogger.log('Canvas VideoPlayerController initialization failed',
           error: e, stackTrace: st, category: 'CanvasBackdrop');
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() => _isRendered = false);
       }
     }
@@ -409,9 +429,7 @@ class CanvasToggleChip extends StatelessWidget {
           PulsrToast.show(
             context,
             message:
-                next
-                    ? context.l10n.canvasEnabled
-                    : context.l10n.canvasDisabled,
+                next ? context.l10n.canvasEnabled : context.l10n.canvasDisabled,
             icon: next
                 ? Icons.motion_photos_on_rounded
                 : Icons.motion_photos_off_rounded,
