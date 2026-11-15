@@ -10169,4 +10169,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get signalPathChannelsLabel => 'Canales';
+
+  @override
+  String get seekBarSliderStyleTitle => 'Estilo de barra de progreso';
 }

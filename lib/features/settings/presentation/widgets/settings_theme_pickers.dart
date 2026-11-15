@@ -1487,7 +1487,7 @@ void showSliderStylePickerSheet(
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
                 child: Text(
-                  'Seek Bar Slider Style',
+                  ctx.l10n.seekBarSliderStyleTitle,
                   style: TextStyle(
                     fontSize: AppFontSize.title,
                     fontWeight: FontWeight.w900,

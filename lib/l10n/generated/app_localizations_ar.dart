@@ -10020,4 +10020,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get signalPathChannelsLabel => 'القنوات';
+
+  @override
+  String get seekBarSliderStyleTitle => 'نمط شريط التمرير';
 }

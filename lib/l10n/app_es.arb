@@ -5814,5 +5814,6 @@
   "signalPathCopyTooltip": "Copiar traza de señal",
   "signalPathCopied": "Traza de señal copiada",
   "signalPathEncodingsLabel": "Codificaciones",
-  "signalPathChannelsLabel": "Canales"
+  "signalPathChannelsLabel": "Canales",
+  "seekBarSliderStyleTitle": "Estilo de barra de progreso"
 }

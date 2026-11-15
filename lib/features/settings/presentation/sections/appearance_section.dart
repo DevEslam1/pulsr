@@ -202,7 +202,7 @@ mixin SettingsAppearanceSection
         _navTile(
           context,
           Icons.linear_scale_rounded,
-          'Seek Bar Slider Style',
+          context.l10n.seekBarSliderStyleTitle,
           switch (state.playerSliderStyle) {
             PlayerSliderStyle.capsule => 'Capsule (Apple Music)',
             PlayerSliderStyle.normal => 'Classic (Knob)',

@@ -17808,6 +17808,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Channels'**
   String get signalPathChannelsLabel;
+
+  /// No description provided for @seekBarSliderStyleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Seek Bar Slider Style'**
+  String get seekBarSliderStyleTitle;
 }
 
 class _AppLocalizationsDelegate

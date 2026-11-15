@@ -10074,4 +10074,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get signalPathChannelsLabel => 'Channels';
+
+  @override
+  String get seekBarSliderStyleTitle => 'Seek Bar Slider Style';
 }

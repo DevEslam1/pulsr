@@ -5814,5 +5814,6 @@
   "signalPathCopyTooltip": "نسخ مسار الإشارة",
   "signalPathCopied": "تم نسخ مسار الإشارة",
   "signalPathEncodingsLabel": "التنسيقات المدعومة",
-  "signalPathChannelsLabel": "القنوات"
+  "signalPathChannelsLabel": "القنوات",
+  "seekBarSliderStyleTitle": "نمط شريط التمرير"
 }

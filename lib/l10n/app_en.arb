@@ -7712,5 +7712,6 @@
   "signalPathCopyTooltip": "Copy signal path trace",
   "signalPathCopied": "Signal path trace copied",
   "signalPathEncodingsLabel": "Encodings",
-  "signalPathChannelsLabel": "Channels"
+  "signalPathChannelsLabel": "Channels",
+  "seekBarSliderStyleTitle": "Seek Bar Slider Style"
 }

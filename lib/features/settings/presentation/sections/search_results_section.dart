@@ -759,7 +759,7 @@ mixin SettingsSearchResults
       _SearchItem(
         categoryId: 'look',
         category: lookCat,
-        title: 'Seek Bar Slider Style',
+        title: context.l10n.seekBarSliderStyleTitle,
         subtitle: switch (state.playerSliderStyle) {
           PlayerSliderStyle.capsule => 'Capsule (Apple Music)',
           PlayerSliderStyle.normal => 'Classic (Knob)',
