@@ -153,9 +153,12 @@ spl1 = spl1 + lp1 * amount;''',
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
+      // AUDIT-FIX: P3-29 — rebuild when liveProgStatus changes so compile/engine
+      // status updates and syntax errors render live in the sheet.
       buildWhen: (prev, curr) =>
           prev.isLiveProgEnabled != curr.isLiveProgEnabled ||
-          prev.liveProgCode != curr.liveProgCode,
+          prev.liveProgCode != curr.liveProgCode ||
+          prev.liveProgStatus != curr.liveProgStatus,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
 
@@ -216,6 +219,51 @@ spl1 = spl1 + lp1 * amount;''',
                   style: TextStyle(
                       color: p.textSecondary, fontSize: AppFontSize.bodySmall),
                 ),
+                if (state.liveProgStatus.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  Builder(builder: (context) {
+                    final lower = state.liveProgStatus.toLowerCase();
+                    final isError = lower.contains('error') ||
+                        lower.contains('fail') ||
+                        lower.contains('invalid');
+                    final tone = isError ? p.error : p.accent;
+                    return Container(
+                      key: const ValueKey('live_prog_status_banner'),
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sm,
+                        vertical: AppSpacing.xs,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tone.withValues(alpha: 0.12),
+                        borderRadius: AppRadii.r10All,
+                        border: Border.all(color: tone.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isError
+                                ? Icons.error_outline_rounded
+                                : Icons.check_circle_outline_rounded,
+                            size: 16,
+                            color: tone,
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              state.liveProgStatus,
+                              style: TextStyle(
+                                color: tone,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
                 const SizedBox(height: AppSpacing.md),
 
                 // Script Code Editor

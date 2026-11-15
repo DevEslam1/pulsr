@@ -1,9 +1,12 @@
 // test/features/player/widgets/live_prog_sheet_test.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/data/audio/live_prog_slider_persistence.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/live_prog_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -79,5 +82,43 @@ void main() {
 
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.controller!.text, contains('@init'));
+  });
+
+  testWidgets('surfaces liveProgStatus changes and compile errors reactively',
+      (tester) async {
+    tester.view.physicalSize = const Size(900, 2600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = StreamController<PlayerState>.broadcast();
+    addTearDown(controller.close);
+    var currentState = const PlayerState();
+    final cubit = stubPlayerCubit(state: currentState);
+    when(() => cubit.state).thenAnswer((_) => currentState);
+    when(() => cubit.stream).thenAnswer((_) => controller.stream);
+    when(() => cubit.setLiveProgEnabled(any(), code: any(named: 'code')))
+        .thenAnswer((_) async {});
+
+    await tester.pumpWidget(sheetHost(
+      playerCubit: cubit,
+      child: const LiveProgSheet(),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('live_prog_status_banner')), findsNothing);
+
+    currentState = const PlayerState(
+      dsp:
+          DspSlice(liveProgStatus: 'Compile error: unexpected token at line 2'),
+    );
+    controller.add(currentState);
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+        find.byKey(const ValueKey('live_prog_status_banner')), findsOneWidget);
+    expect(
+        find.text('Compile error: unexpected token at line 2'), findsOneWidget);
   });
 }
