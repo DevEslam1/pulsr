@@ -19,6 +19,7 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   int _retryCount = 0;
   bool _didLogFailure = false;
   bool _fetchInFlight = false;
+  Duration? _lastRetryDelay;
 
   /// B3: after this many consecutive failed polls the timer is parked so a
   /// broken channel (non-Android, engine not ready, test fakes) cannot fire an
@@ -44,6 +45,12 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
 
   @visibleForTesting
   int get listenerCount => _listenerCount;
+
+  @visibleForTesting
+  Duration? get lastRetryDelay => _lastRetryDelay;
+
+  @visibleForTesting
+  int get retryCount => _retryCount;
 
   /// Increments consumer reference count and starts polling if first subscriber.
   void subscribe() {
@@ -71,9 +78,23 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
     _retryCount = 0;
     _didLogFailure = false;
     _pollingTimer = Timer.periodic(pollingInterval, (_) {
-      unawaited(_fetchTelemetry());
+      unawaited(_fetchTelemetry().catchError((Object e, StackTrace st) {
+        ErrorLogger.log(
+          'Telemetry poll failed',
+          error: e,
+          stackTrace: st,
+          category: 'DspTelemetry',
+        );
+      }));
     });
-    unawaited(_fetchTelemetry());
+    unawaited(_fetchTelemetry().catchError((Object e, StackTrace st) {
+      ErrorLogger.log(
+        'Initial telemetry poll failed',
+        error: e,
+        stackTrace: st,
+        category: 'DspTelemetry',
+      );
+    }));
   }
 
   /// Cancels the timer only; keeps the current emitted value and listener count.
@@ -93,18 +114,41 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   void _scheduleRetry() {
     _retryTimer?.cancel();
     if (isClosed || _listenerCount == 0) return;
-    // AUDIT-FIX: Exponential backoff (retryInterval * 2^_retryCount, max 30s)
-    final factor = math.pow(2, _retryCount).toDouble();
-    final computedMs = (retryInterval.inMilliseconds * factor).round();
-    final delay = Duration(
-      milliseconds:
-          math.min(computedMs, const Duration(seconds: 30).inMilliseconds),
-    );
-    _retryCount++;
-    _retryTimer = Timer(delay, () {
-      if (isClosed || _listenerCount == 0) return;
-      unawaited(_fetchTelemetry());
-    });
+    // AUDIT-FIX (P0-4): Clamp backoff exponent and guard non-finite/overflowing
+    // values so _scheduleRetry can never throw Infinity.round() or wrap 64-bit
+    // int to 0/negative inside _fetchTelemetry's catch block.
+    try {
+      const maxDelayMs = 30000;
+      final clampedExponent = _retryCount.clamp(0, 10);
+      final factor = math.pow(2.0, clampedExponent).toDouble();
+      final rawMs = retryInterval.inMilliseconds * factor;
+      final delayMs = !rawMs.isFinite || rawMs >= maxDelayMs
+          ? maxDelayMs
+          : math.max(0, rawMs.round());
+      final delay = Duration(milliseconds: delayMs);
+      _lastRetryDelay = delay;
+      if (_retryCount < 10) {
+        _retryCount++;
+      }
+      _retryTimer = Timer(delay, () {
+        if (isClosed || _listenerCount == 0) return;
+        unawaited(_fetchTelemetry().catchError((Object e, StackTrace st) {
+          ErrorLogger.log(
+            'Telemetry retry failed',
+            error: e,
+            stackTrace: st,
+            category: 'DspTelemetry',
+          );
+        }));
+      });
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to schedule telemetry retry',
+        error: e,
+        stackTrace: st,
+        category: 'DspTelemetry',
+      );
+    }
   }
 
   Future<void> refreshOnce() async {

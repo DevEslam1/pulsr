@@ -153,4 +153,32 @@ void main() {
 
     await cubit.close();
   });
+
+  test(
+      'P0-4: high retry counts cap backoff at 30s without Infinity.round() crash',
+      () async {
+    final channel = MockAudioEffectsChannel();
+    when(() => channel.getTelemetry())
+        .thenAnswer((_) async => throw Exception('engine down'));
+
+    final cubit = DspTelemetryCubit(
+      channel: channel,
+      pollingInterval: const Duration(hours: 1),
+      retryInterval: const Duration(seconds: 3),
+    );
+    cubit.subscribe();
+
+    // Drive past 64+ and 1024+ consecutive failures (where 2^n overflows
+    // 64-bit int on VM or double on web).
+    for (var i = 0; i < 1035; i++) {
+      await cubit.refreshOnce();
+    }
+
+    expect(cubit.isRetryTimerActive, isTrue);
+    expect(cubit.retryCount, lessThanOrEqualTo(10));
+    expect(cubit.lastRetryDelay, const Duration(seconds: 30));
+
+    cubit.unsubscribe();
+    await cubit.close();
+  });
 }
