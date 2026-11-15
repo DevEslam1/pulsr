@@ -275,10 +275,8 @@ internal object PlayerJavaScript {
 
     private fun fetchPlayerUrlFromIframeApi(): String? {
         return try {
-            val conn = java.net.URL("https://www.youtube.com/iframe_api").openConnection()
-            conn.connectTimeout = 8000
-            conn.readTimeout = 8000
-            val iframeHtml = conn.getInputStream().bufferedReader().use { it.readText() }
+            val iframeHtml = fetchPlayerText("https://www.youtube.com/iframe_api")
+                ?: return fetchPlayerUrlFromWatchPage()
             val srcPatterns = listOf(
                 Regex("""(/s/player/[a-zA-Z0-9_-]+/player_ias\.vflset/[^"'\s/]+/base\.js)"""),
                 Regex("""src=[\"'](/s/player/[^\"']+/base\.js)[\"']"""),
@@ -313,15 +311,10 @@ internal object PlayerJavaScript {
 
     private fun fetchPlayerUrlFromWatchPage(): String? {
         return try {
-            val conn = java.net.URL("https://www.youtube.com/watch?v=dQw4w9WgXcQ").openConnection()
-            conn.connectTimeout = 8000
-            conn.readTimeout = 8000
-            conn.setRequestProperty(
-                "User-Agent",
-                DESKTOP_UA
-            )
-            conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-            val html = conn.getInputStream().bufferedReader().use { it.readText() }
+            val html = fetchPlayerText(
+                "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                mapOf("Accept-Language" to "en-US,en;q=0.9"),
+            ) ?: return PINNED_PLAYER_URL
             val patterns = listOf(
                 Regex("""(/s/player/[a-zA-Z0-9_-]+/player_ias\.vflset/[^"'\s/]+/base\.js)"""),
                 Regex("""(/s/player/[a-f0-9]+/player_ias\.vflset/[^/]+/base\.js)"""),
@@ -401,16 +394,48 @@ internal object PlayerJavaScript {
         if (!current.isNullOrEmpty()) return current
         if (System.currentTimeMillis() < nextFetchAttemptAt) return null
         val targetUrl = playerUrl.ifEmpty { PINNED_PLAYER_URL }
-        return try {
-            val conn = java.net.URL(targetUrl).openConnection()
-            conn.connectTimeout = 8000
-            conn.readTimeout = 8000
-            conn.setRequestProperty("User-Agent", DESKTOP_UA)
-            conn.getInputStream().bufferedReader().use { it.readText() }.also { cachedJs = it }
-        } catch (e: Throwable) {
+        val fetched = fetchPlayerText(targetUrl)
+        if (fetched.isNullOrEmpty()) {
             nextFetchAttemptAt = System.currentTimeMillis() + FETCH_RETRY_COOLDOWN_MS
-            logW(TAG, "Could not fetch base.js: ${e.message}")
+            return null
+        }
+        cachedJs = fetched
+        return fetched
+    }
+
+    /**
+     * Player-JS resources travel through [YtmHttpClient] so they respect the
+     * configured proxy, system proxy/VPN, DNS cache, and timeouts. Direct
+     * [java.net.URL] reads bypassed all of those and left the custom decipher
+     * path unusable on proxy-only networks.
+     */
+    private fun fetchPlayerText(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+    ): String? {
+        val permit = RateLimiter.shared.tryAcquirePermit(RateLimiter.Bucket.STREAM, 10_000L)
+        if (permit != RateLimiter.PermitResult.GRANTED) {
+            logW(TAG, "Rate limiter unavailable for player JS fetch: $url")
+            return null
+        }
+        return try {
+            val builder = okhttp3.Request.Builder()
+                .url(url)
+                .header("User-Agent", DESKTOP_UA)
+            headers.forEach { (name, value) -> builder.header(name, value) }
+            YtmHttpClient.okHttpClient.newCall(builder.build()).execute().use { response ->
+                if (!response.isSuccessful) {
+                    logW(TAG, "Player JS fetch HTTP ${response.code} for $url")
+                    null
+                } else {
+                    response.body?.string()
+                }
+            }
+        } catch (t: Throwable) {
+            logW(TAG, "Player JS fetch failed for $url: ${t.message}")
             null
+        } finally {
+            RateLimiter.shared.releasePermit()
         }
     }
 
@@ -895,7 +920,7 @@ internal object PlayerJavaScript {
         }
         val js = cachedJs ?: try {
             val targetUrl = playerUrl.ifEmpty { PINNED_PLAYER_URL }
-            java.net.URL(targetUrl).readText().also { cachedJs = it }
+            fetchPlayerText(targetUrl)?.also { cachedJs = it }
         } catch (_: Throwable) { null }
 
         if (js != null) {
