@@ -87,6 +87,13 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           final songs = QueueSlotCodec.mergeInPersistedOrder(
               decoded.songIds, songsMap, decoded.onlineSongsById);
           if (songs.isEmpty) continue;
+          // AUDIT-FIX (P2-17): Rehydrate per-instance Expando flag from the
+          // persisted slot trackTiers without a global id set.
+          for (final s in songs) {
+            if (decoded.trackTiers[s.id] == QueueTier.autoplay) {
+              s.isAutoplay = true;
+            }
+          }
           // Cold-start race guard: if playback already began during this async
           // restore window, do not overwrite the live active slot (the other,
           // inactive slots are still restored).
@@ -136,6 +143,12 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
                 ? targetSongs[slotData.currentIndex]
                 : null;
             final validSongs = targetSongs.where((s) => !s.isMissing).toList();
+            for (final s in validSongs) {
+              final isAuto = slotData.trackTiers[s.id] == QueueTier.autoplay;
+              if (s.isAutoplay != isAuto) {
+                s.isAutoplay = isAuto;
+              }
+            }
             if (validSongs.isNotEmpty) {
               int safeIdx = -1;
               if (targetOriginalSong != null) {
@@ -562,6 +575,12 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           ? targetSongs[targetSlot.currentIndex]
           : null;
       final validSongs = targetSongs.where((s) => !s.isMissing).toList();
+      for (final s in validSongs) {
+        final isAuto = targetSlot.trackTiers[s.id] == QueueTier.autoplay;
+        if (s.isAutoplay != isAuto) {
+          s.isAutoplay = isAuto;
+        }
+      }
 
       debouncedPersistQueueSlots();
 

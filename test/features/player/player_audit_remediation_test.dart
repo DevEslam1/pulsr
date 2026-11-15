@@ -227,17 +227,24 @@ DSP Chain Status:
     });
 
     test(
-        'SongAutoplayExtension preserves isAutoplay across copyWith and QueueSlice.differs detects trackTiers',
+        'SongAutoplayExtension isolates instances via Expando and QueueSlice.differs detects trackTiers',
         () {
       final song = _makeSong(-9001, 'Autoplay Song', 'Artist')
         ..isAutoplay = true;
       expect(song.isAutoplay, isTrue);
+      expect(song.hasExplicitAutoplayFlag, isTrue);
 
-      final copied = song.copyWith(isFavorite: true);
-      expect(copied.isAutoplay, isTrue);
+      // P2-17: Fresh/copied instances sharing the same id must not inherit
+      // sticky global autoplay state unless explicitly propagated.
+      final freshCopy = song.copyWith(isFavorite: true);
+      expect(freshCopy.isAutoplay, isFalse);
 
-      copied.isAutoplay = false;
-      expect(copied.copyWith(isFavorite: false).isAutoplay, isFalse);
+      final propagated = song.copyWith(isFavorite: true)
+        ..isAutoplay = song.isAutoplay;
+      expect(propagated.isAutoplay, isTrue);
+
+      propagated.isAutoplay = false;
+      expect(propagated.isAutoplay, isFalse);
 
       const sliceA = QueueSlice(trackTiers: {-9001: QueueTier.autoplay});
       const sliceB = QueueSlice(trackTiers: {-9001: QueueTier.userQueue});

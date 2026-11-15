@@ -21,27 +21,18 @@ enum PlayerRepeatMode { off, all, one }
 /// - autoplay: auto-fetched endless recommendation tracks
 enum QueueTier { context, userQueue, autoplay }
 
+// AUDIT-FIX (P2-17): Keep the per-instance Expando as the sole source of
+// truth for `isAutoplay` rather than a process-global `_autoplaySongIds` set,
+// so fresh SongsTableData rows sharing an id never inherit stale autoplay state.
 final Expando<bool> _songAutoplayExpando = Expando<bool>('songAutoplayExpando');
-final Set<int> _autoplaySongIds = <int>{};
-const int _maxAutoplaySongIds = 4096;
 
 extension SongAutoplayExtension on SongsTableData {
-  bool get isAutoplay =>
-      _songAutoplayExpando[this] ?? _autoplaySongIds.contains(id);
+  bool get isAutoplay => _songAutoplayExpando[this] ?? false;
 
   bool get hasExplicitAutoplayFlag => _songAutoplayExpando[this] == true;
 
   set isAutoplay(bool value) {
     _songAutoplayExpando[this] = value;
-    if (value) {
-      _autoplaySongIds.remove(id);
-      _autoplaySongIds.add(id);
-      if (_autoplaySongIds.length > _maxAutoplaySongIds) {
-        _autoplaySongIds.remove(_autoplaySongIds.first);
-      }
-    } else {
-      _autoplaySongIds.remove(id);
-    }
   }
 }
 
