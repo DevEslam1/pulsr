@@ -1390,9 +1390,19 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
   Future<void> setWaveformSeekBar(bool value) async {
     markDirty('waveformSeekBarEnabled');
-    safeEmit(state.copyWith(waveformSeekBarEnabled: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyWaveformSeekBar, value);
+    if (value && state.playerSliderStyle != PlayerSliderStyle.normal) {
+      markDirty('playerSliderStyle');
+      await prefs.setString(
+          _keyPlayerSliderStyle, PlayerSliderStyle.normal.name);
+      safeEmit(state.copyWith(
+        waveformSeekBarEnabled: true,
+        playerSliderStyle: PlayerSliderStyle.normal,
+      ));
+    } else {
+      safeEmit(state.copyWith(waveformSeekBarEnabled: value));
+    }
   }
 
   Future<void> toggleCanvasEnabled([bool? enabled]) async {
@@ -1525,9 +1535,18 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
   Future<void> setPlayerSliderStyle(PlayerSliderStyle style) async {
     markDirty('playerSliderStyle');
-    safeEmit(state.copyWith(playerSliderStyle: style));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyPlayerSliderStyle, style.name);
+    if (style != PlayerSliderStyle.normal && state.waveformSeekBarEnabled) {
+      markDirty('waveformSeekBarEnabled');
+      await prefs.setBool(_keyWaveformSeekBar, false);
+      safeEmit(state.copyWith(
+        playerSliderStyle: style,
+        waveformSeekBarEnabled: false,
+      ));
+    } else {
+      safeEmit(state.copyWith(playerSliderStyle: style));
+    }
   }
 
   Future<void> setAppButtonStyle(AppButtonStyle style) async {

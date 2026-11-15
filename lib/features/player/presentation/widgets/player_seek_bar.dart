@@ -168,9 +168,6 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
     final waveformEnabled = context
         .select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
-    final sliderStyle = context.select<SettingsCubit, PlayerSliderStyle>(
-      (c) => c.state.playerSliderStyle,
-    );
     final isBuffering =
         context.select<PlayerCubit, bool>((c) => c.state.isBuffering);
 
@@ -203,11 +200,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
 
     final Widget seekWidget;
     // Check if Waveform Seek Bar is enabled in settings and song ID is available.
-    // When a specific slider style (e.g. Capsule/Apple Music, Wavy, Minimal) is active,
-    // it takes precedence so the user's chosen slider theme applies across all player themes.
-    final showWaveform = waveformEnabled &&
-        effectiveSongId != null &&
-        sliderStyle == PlayerSliderStyle.normal;
+    final showWaveform = waveformEnabled && effectiveSongId != null;
     if (showWaveform) {
       final instantSamples = WaveformService.instance.getInstantWaveform(
         songId: effectiveSongId,

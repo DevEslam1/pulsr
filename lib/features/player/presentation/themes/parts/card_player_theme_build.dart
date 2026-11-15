@@ -27,10 +27,7 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
     final textTitleColor = isDark ? Colors.white : p.textPrimary;
     final textSubtitleColor = isDark ? Colors.white70 : p.textSecondary;
 
-    final isWaveformActive = waveformSeekBarEnabled &&
-        playerSliderStyle == PlayerSliderStyle.normal;
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-        !isWaveformActive &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&
         !PlayerSplitViewScope.of(context);
@@ -118,9 +115,14 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
         onTap: () => cubit.toggleLyricsVisibility(),
         child: LayoutBuilder(
           builder: (context, artConstraints) {
+            final double visualizerH =
+                visualizerStyle == VisualizerStyle.circular ? 64.0 : 40.0;
+            final double visualizerSpace =
+                showVisualizer ? visualizerH + 4.0 : 0.0;
             final double cardArtSize = PlayerThemeMetrics.safeArtworkSize(
               availableWidth: artConstraints.maxWidth,
-              availableHeight: artConstraints.maxHeight,
+              availableHeight:
+                  math.max(0.0, artConstraints.maxHeight - visualizerSpace),
               isTablet: metrics.isTablet,
               maxAllowedOverride: metrics.isLandscape ? 280.0 : null,
             );

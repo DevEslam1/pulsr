@@ -31,13 +31,14 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
 
     final artRadius = resolveCustomRadius(context, AppRadii.r28);
 
-    final isWaveformActive = waveformSeekBarEnabled &&
-        playerSliderStyle == PlayerSliderStyle.normal;
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-        !isWaveformActive &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&
         !PlayerSplitViewScope.of(context);
+
+    final double vizHeight =
+        visualizerStyle == VisualizerStyle.circular ? 60.0 : 34.0;
+    final double visualizerSpace = showVisualizer ? vizHeight + 8.0 : 0.0;
 
     final visualizer = showVisualizer
         ? Center(
@@ -49,9 +50,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                 child: AudioVisualizer(
                   style: visualizerStyle,
                   color: activeColor,
-                  height: visualizerStyle == VisualizerStyle.circular
-                      ? 65
-                      : 36,
+                  height: vizHeight,
                   isPlaying: state.isPlaying,
                   audioSessionId: state.audioSessionId,
                   trackSeed: song?.id,
@@ -71,7 +70,8 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
           builder: (context, artConstraints) {
             final double dynamicArtSize = PlayerThemeMetrics.safeArtworkSize(
               availableWidth: artConstraints.maxWidth,
-              availableHeight: artConstraints.maxHeight,
+              availableHeight:
+                  math.max(0.0, artConstraints.maxHeight - visualizerSpace),
               isTablet: metrics.isTablet,
               maxAllowedOverride: metrics.isLandscape ? 280.0 : null,
             );

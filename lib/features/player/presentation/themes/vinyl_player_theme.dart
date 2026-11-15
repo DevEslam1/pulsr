@@ -10,6 +10,8 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import '../../../settings/cubit/settings_cubit.dart';
+import '../widgets/audio_visualizer.dart';
 import '../widgets/player_gesture_scope.dart';
 import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';

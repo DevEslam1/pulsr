@@ -61,16 +61,25 @@ class _WaveformHeroStage extends StatelessWidget {
             // 0. Live FFT Visualizer Waveform Layer (Isolated in RepaintBoundary)
             Positioned.fill(
               child: RepaintBoundary(
-                child: Opacity(
-                  opacity: isPlaying ? 0.65 : 0.25,
-                  child: AudioVisualizer(
-                    style: VisualizerStyle.wave,
-                    color: activeColor,
-                    isPlaying: isPlaying,
-                    audioSessionId: audioSessionId,
-                    trackId: song?.id,
-                    trackPath: song?.path,
-                  ),
+                child: Builder(
+                  builder: (context) {
+                    final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
+                        (c) => c.state.visualizerStyle);
+                    if (visualizerStyle == VisualizerStyle.off) {
+                      return const SizedBox.shrink();
+                    }
+                    return Opacity(
+                      opacity: isPlaying ? 0.65 : 0.25,
+                      child: AudioVisualizer(
+                        style: visualizerStyle,
+                        color: activeColor,
+                        isPlaying: isPlaying,
+                        audioSessionId: audioSessionId,
+                        trackId: song?.id,
+                        trackPath: song?.path,
+                      ),
+                    );
+                  },
                 ),
               ),
             ),

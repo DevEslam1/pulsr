@@ -33,6 +33,7 @@ import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import '../widgets/ambient_sound_sheet.dart';
 import '../widgets/audio_quality_sheet.dart';
+import '../widgets/audio_visualizer.dart';
 import '../widgets/canvas_backdrop.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/player_gesture_scope.dart';
@@ -41,6 +42,8 @@ import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_volume_bar.dart';
 import '../widgets/quran_mode_sheet.dart';
 import '../widgets/speed_picker_sheet.dart';
+import '../widgets/waveform_seek_bar.dart';
+import '../../../../core/services/waveform_service.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
@@ -390,6 +393,30 @@ class CleanPlayerTheme extends StatelessWidget {
           ),
         );
 
+        final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
+            (c) => c.state.visualizerStyle);
+        final showVisualizer = visualizerStyle != VisualizerStyle.off &&
+            !state.isLyricsVisible &&
+            !state.isQueueVisible &&
+            !isInSplitView;
+
+        final visualizer = showVisualizer
+            ? Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: horizontalPadding,
+                  vertical: AppSpacing.xxs,
+                ),
+                child: AudioVisualizer(
+                  style: visualizerStyle,
+                  color: activeColor,
+                  height: visualizerStyle == VisualizerStyle.circular ? 60 : 34,
+                  isPlaying: state.isPlaying,
+                  audioSessionId: state.audioSessionId,
+                  trackSeed: song?.id,
+                ),
+              )
+            : null;
+
         // 3. Apple-style Seek Bar with Lossless badge & timestamps
         final cleanSeekBar = _CleanSeekBar(
           props: props,
@@ -464,6 +491,7 @@ class CleanPlayerTheme extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             trackHeader,
+                            if (visualizer != null) visualizer,
                             SizedBox(height: spacingTrackToSeek),
                             cleanSeekBar,
                             if (bookmarkBanner != null) ...[
@@ -509,6 +537,7 @@ class CleanPlayerTheme extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         trackHeader,
+                        if (visualizer != null) visualizer,
                         SizedBox(height: spacingTrackToSeek),
                         cleanSeekBar,
                         if (bookmarkBanner != null) ...[
@@ -652,13 +681,55 @@ class _CleanSeekBar extends StatefulWidget {
 class _CleanSeekBarState extends State<_CleanSeekBar> {
   double? _dragValue;
   bool _showRemainingTime = true;
+  Future<List<double>>? _cachedWaveformFuture;
+  int? _lastSongId;
+  String? _lastFilePath;
 
   @override
   void didUpdateWidget(covariant _CleanSeekBar oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.song?.id != oldWidget.song?.id) {
       _dragValue = null;
+      _cachedWaveformFuture = null;
     }
+  }
+
+  Widget _buildPulsrSlider(
+    double effectiveValue,
+    double maxDuration,
+    PlayerSliderStyle effectiveStyle,
+    bool isPlaying,
+    bool isBuffering,
+  ) {
+    return SizedBox(
+      height: widget.isCompact ? 22.0 : 28.0,
+      child: PulsrSlider(
+        value: effectiveValue,
+        min: 0.0,
+        max: maxDuration > 0 ? maxDuration : 1.0,
+        height: widget.isCompact ? 22.0 : 28.0,
+        activeColor: Colors.white,
+        inactiveColor: Colors.white.withValues(alpha: 0.22),
+        thumbColor: Colors.white,
+        sliderStyle: effectiveStyle,
+        isWavy: effectiveStyle == PlayerSliderStyle.wavy,
+        animateWave: isPlaying && !isBuffering,
+        onChangeStart: (val) {
+          PulsrHaptics.selectionClick();
+          setState(() => _dragValue = val);
+        },
+        onChanged: (val) {
+          setState(() => _dragValue = val);
+        },
+        onChangeEnd: (val) {
+          widget.props.cubit.seek(Duration(milliseconds: val.round()));
+          setState(() => _dragValue = null);
+        },
+        onChangeCancel: () {
+          setState(() => _dragValue = null);
+        },
+      ),
+    );
   }
 
   @override
@@ -669,6 +740,8 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
         context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
     final isBuffering =
         context.select<PlayerCubit, bool>((c) => c.state.isBuffering);
+    final waveformEnabled = context
+        .select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
 
     final double maxDuration = widget.duration.inMilliseconds.toDouble();
     final double currentPos = position.inMilliseconds.toDouble();
@@ -682,45 +755,69 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
         ? widget.duration - currentDuration
         : Duration.zero;
 
-    final effectiveStyle = widget.sliderStyle == PlayerSliderStyle.normal
-        ? PlayerSliderStyle.capsule
-        : widget.sliderStyle;
+    final effectiveStyle = widget.sliderStyle;
+    final showWaveform = waveformEnabled && widget.song != null;
+
+    final Widget sliderWidget;
+    if (showWaveform) {
+      final songId = widget.song!.id;
+      final songPath = widget.song!.path;
+      if (_lastSongId != songId || _lastFilePath != songPath) {
+        _lastSongId = songId;
+        _lastFilePath = songPath;
+        _cachedWaveformFuture = null;
+      }
+      final instantSamples = WaveformService.instance.getInstantWaveform(
+        songId: songId,
+        filePath: songPath,
+      );
+      _cachedWaveformFuture ??= WaveformService.instance
+          .getWaveform(songId: songId, filePath: songPath);
+
+      sliderWidget = FutureBuilder<List<double>>(
+        key: ValueKey(songId),
+        initialData: instantSamples,
+        future: _cachedWaveformFuture,
+        builder: (context, snapshot) {
+          final samples = (snapshot.hasData && snapshot.data!.isNotEmpty)
+              ? snapshot.data!
+              : instantSamples;
+          if (samples.isNotEmpty) {
+            return WaveformSeekBar(
+              position: position,
+              duration: widget.duration,
+              onSeek: (pos) => widget.props.cubit.seek(pos),
+              samples: samples,
+              enabled: !isBuffering,
+              activeColor: Colors.white,
+              height: widget.isCompact ? 28.0 : 36.0,
+            );
+          }
+          return _buildPulsrSlider(
+            effectiveValue,
+            maxDuration,
+            effectiveStyle,
+            isPlaying,
+            isBuffering,
+          );
+        },
+      );
+    } else {
+      sliderWidget = _buildPulsrSlider(
+        effectiveValue,
+        maxDuration,
+        effectiveStyle,
+        isPlaying,
+        isBuffering,
+      );
+    }
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: widget.horizontalPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Sleek slider line
-          SizedBox(
-            height: widget.isCompact ? 22.0 : 28.0,
-            child: PulsrSlider(
-              value: effectiveValue,
-              min: 0.0,
-              max: maxDuration > 0 ? maxDuration : 1.0,
-              height: widget.isCompact ? 22.0 : 28.0,
-              activeColor: Colors.white,
-              inactiveColor: Colors.white.withValues(alpha: 0.22),
-              thumbColor: Colors.white,
-              sliderStyle: effectiveStyle,
-              isWavy: effectiveStyle == PlayerSliderStyle.wavy,
-              animateWave: isPlaying && !isBuffering,
-              onChangeStart: (val) {
-                PulsrHaptics.selectionClick();
-                setState(() => _dragValue = val);
-              },
-              onChanged: (val) {
-                setState(() => _dragValue = val);
-              },
-              onChangeEnd: (val) {
-                widget.props.cubit.seek(Duration(milliseconds: val.round()));
-                setState(() => _dragValue = null);
-              },
-              onChangeCancel: () {
-                setState(() => _dragValue = null);
-              },
-            ),
-          ),
+          sliderWidget,
           const SizedBox(height: 3),
           // Row with: 0:46 (left), Lossless badge pill (center), -1:30 (right)
           Row(

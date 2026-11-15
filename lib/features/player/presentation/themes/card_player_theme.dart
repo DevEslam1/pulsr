@@ -1,4 +1,5 @@
 // lib/features/player/presentation/themes/card_player_theme.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';

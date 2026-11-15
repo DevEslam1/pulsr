@@ -1,7 +1,9 @@
 // lib/features/player/presentation/themes/waveform_player_theme.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../settings/cubit/settings_cubit.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';

@@ -2,22 +2,66 @@ part of '../cd_player_theme.dart';
 
 extension _CdPlayerThemeBuild on _CdPlayerThemeState {
   Widget _buildBody(BuildContext context) {
+    final state = widget.props.state;
+    final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
+        (c) => c.state.visualizerStyle);
+    final showVisualizer = visualizerStyle != VisualizerStyle.off &&
+        !state.isLyricsVisible &&
+        !state.isQueueVisible &&
+        !PlayerSplitViewScope.of(context);
+
     return PlayerThemeScaffold(
       props: widget.props,
       trackIcon: Icons.album_outlined,
       dockIconStyle: PlayerDockIconStyle.cd,
-      stage: (context, metrics) => Center(
-        key: const ValueKey('cd_stage_view'),
-        child: Hero(
-          tag: widget.props.heroTag,
-          child: _CdTurntableStage(
-            props: widget.props,
-            isTablet: metrics.isTablet,
-            isLandscape: metrics.isLandscape,
-            rotationController: _rotationController,
-            tonearmAnimation: _tonearmAnimation,
-          ),
-        ),
+      stage: (context, metrics) => LayoutBuilder(
+        builder: (context, stageConstraints) {
+          final double visualizerH = showVisualizer
+              ? (visualizerStyle == VisualizerStyle.circular ? 60.0 : 34.0)
+              : 0.0;
+          final double visualizerSpace =
+              showVisualizer ? visualizerH + 8.0 : 0.0;
+          final double availableH =
+              math.max(0.0, stageConstraints.maxHeight - visualizerSpace);
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                key: const ValueKey('cd_stage_view'),
+                child: SizedBox(
+                  height: availableH,
+                  child: Hero(
+                    tag: widget.props.heroTag,
+                    child: _CdTurntableStage(
+                      props: widget.props,
+                      isTablet: metrics.isTablet,
+                      isLandscape: metrics.isLandscape,
+                      rotationController: _rotationController,
+                      tonearmAnimation: _tonearmAnimation,
+                    ),
+                  ),
+                ),
+              ),
+              if (showVisualizer)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
+                    child: AudioVisualizer(
+                      style: visualizerStyle,
+                      color: widget.props.activeColor,
+                      height: visualizerH,
+                      isPlaying: state.isPlaying,
+                      audioSessionId: state.audioSessionId,
+                      trackSeed: state.currentSong?.id,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
       chrome: (context, metrics) => PlayerControlsColumn(
         props: widget.props,

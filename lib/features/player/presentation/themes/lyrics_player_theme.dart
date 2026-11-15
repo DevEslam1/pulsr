@@ -1,7 +1,10 @@
 // lib/features/player/presentation/themes/lyrics_player_theme.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../../../settings/cubit/settings_cubit.dart';
+import '../widgets/audio_visualizer.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../widgets/player_gesture_scope.dart';

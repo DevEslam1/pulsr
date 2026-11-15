@@ -1,7 +1,11 @@
 // lib/features/player/presentation/themes/circle_player_theme.dart
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import '../../../settings/cubit/settings_cubit.dart';
+import '../widgets/audio_visualizer.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/theme/aura_theme.dart';

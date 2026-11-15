@@ -22,10 +22,7 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
           playerSliderStyle: c.state.playerSliderStyle,
         ));
 
-    final isWaveformActive = waveformSeekBarEnabled &&
-        playerSliderStyle == PlayerSliderStyle.normal;
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
-        !isWaveformActive &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&
         !PlayerSplitViewScope.of(context);

@@ -109,14 +109,26 @@ class MilkdropPlayerTheme extends StatelessWidget {
                 ),
               ),
             ),
-            AudioVisualizer(
-              style: VisualizerStyle.milkdrop,
-              color: Colors.white,
-              transparentBackground: true,
-              isPlaying: state.isPlaying,
-              audioSessionId: state.audioSessionId,
-              trackId: song?.id,
-              trackPath: song?.path,
+            Builder(
+              builder: (context) {
+                final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
+                    (c) => c.state.visualizerStyle);
+                if (visualizerStyle == VisualizerStyle.off) {
+                  return const SizedBox.shrink();
+                }
+                final effectiveStyle = visualizerStyle == VisualizerStyle.bar
+                    ? VisualizerStyle.milkdrop
+                    : visualizerStyle;
+                return AudioVisualizer(
+                  style: effectiveStyle,
+                  color: Colors.white,
+                  transparentBackground: true,
+                  isPlaying: state.isPlaying,
+                  audioSessionId: state.audioSessionId,
+                  trackId: song?.id,
+                  trackPath: song?.path,
+                );
+              },
             ),
             PositionedDirectional(
               top: 0,

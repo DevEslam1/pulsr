@@ -1186,7 +1186,7 @@ extension _EqSheetShell on _EqualizerSheetState {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: Container(
-        height: PulsrLayoutMetrics.fieldHeight(context) + 6,
+        height: PulsrLayoutMetrics.fieldHeight(context),
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
           color: p.surfaceContainer,
