@@ -61,6 +61,12 @@ class SharedPlaylistBundle {
 
 @lazySingleton
 class PlaylistShareService {
+  /// Maximum raw JSON payload character length accepted on playlist import (2 MiB).
+  static const int maxJsonLength = 2 * 1024 * 1024;
+
+  /// Maximum container nesting (`{` / `[`) allowed during raw pre-scan.
+  static const int maxRawNestingDepth = 5;
+
   /// Exports a playlist and its songs to a portable JSON bundle.
   String exportPlaylist(String playlistName, List<SongsTableData> songs) {
     final bundle = SharedPlaylistBundle(
@@ -103,10 +109,60 @@ class PlaylistShareService {
     return currentDepth;
   }
 
+  /// String-aware O(N) bracket/brace depth pre-scan executed BEFORE `json.decode`
+  /// so deeply nested payloads cannot trigger recursive parser allocation or stack pressure.
+  static bool _exceedsRawNestingLimit(String raw) {
+    var depth = 0;
+    var inString = false;
+    var escaped = false;
+    for (var i = 0; i < raw.length; i++) {
+      final code = raw.codeUnitAt(i);
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (code == 0x5C /* \ */) {
+          escaped = true;
+        } else if (code == 0x22 /* " */) {
+          inString = false;
+        }
+        continue;
+      }
+      if (code == 0x22 /* " */) {
+        inString = true;
+      } else if (code == 0x7B /* { */ || code == 0x5B /* [ */) {
+        depth++;
+        if (depth > maxRawNestingDepth) return true;
+      } else if (code == 0x7D /* } */ || code == 0x5D /* ] */) {
+        if (depth > 0) depth--;
+      }
+    }
+    return false;
+  }
+
   /// Parses a shared playlist bundle from JSON.
-  SharedPlaylistBundle? importPlaylist(String jsonString) {
+  SharedPlaylistBundle? importPlaylist(
+    String jsonString, {
+    @visibleForTesting Object? Function(String)? decoder,
+  }) {
     try {
-      final decoded = json.decode(jsonString);
+      // AUDIT-FIX (P2-16): Bound raw input size and container nesting before
+      // handing untrusted text to json.decode; keep post-decode computeDepth
+      // check for leaf-level depth enforcement.
+      if (jsonString.length > maxJsonLength) {
+        ErrorLogger.log(
+          'Shared playlist JSON exceeds max length (${jsonString.length} > $maxJsonLength)',
+          category: 'PlaylistShareService',
+        );
+        return null;
+      }
+      if (_exceedsRawNestingLimit(jsonString)) {
+        ErrorLogger.log(
+          'Shared playlist JSON exceeds raw nesting depth limit ($maxRawNestingDepth)',
+          category: 'PlaylistShareService',
+        );
+        return null;
+      }
+      final decoded = (decoder ?? json.decode)(jsonString);
       if (decoded is! Map<String, dynamic>) {
         ErrorLogger.log('Invalid JSON root format in shared playlist',
             category: 'PlaylistShareService');

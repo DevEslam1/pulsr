@@ -170,6 +170,58 @@ void main() {
     });
 
     test(
+        '4b. P2-16 PlaylistShareService rejects oversized and deeply nested raw JSON before json.decode runs',
+        () {
+      final service = PlaylistShareService();
+      var decoderCalled = false;
+      Object? trackingDecode(String source) {
+        decoderCalled = true;
+        return jsonDecode(source);
+      }
+
+      // Hostile deep bracket bomb (depth = 200, well below VM stack limit but > 5).
+      final deepBomb = '${'[' * 200}0${']' * 200}';
+      expect(
+        service.importPlaylist(deepBomb, decoder: trackingDecode),
+        isNull,
+      );
+      expect(decoderCalled, isFalse,
+          reason: 'Deep bracket bomb must be rejected before json.decode');
+
+      // Oversized payload exceeding byte/char cap.
+      decoderCalled = false;
+      final oversized =
+          '{"name":"${'a' * (2 * 1024 * 1024 + 64)}","tracks":[]}';
+      expect(
+        service.importPlaylist(oversized, decoder: trackingDecode),
+        isNull,
+      );
+      expect(decoderCalled, isFalse,
+          reason: 'Oversized payload must be rejected before json.decode');
+
+      // Benign brackets inside quoted string literals must still decode normally.
+      decoderCalled = false;
+      final trickyTitleJson = jsonEncode({
+        'name': 'Live {{{[[[[Mix]]]]}}}',
+        'exportTimestamp': 1710000000000,
+        'tracks': [
+          {
+            'title': '[[[Track]]]',
+            'artist': 'Artist',
+            'album': 'Album',
+            'durationMs': 120000,
+            'source': 'local',
+          }
+        ],
+      });
+      final ok =
+          service.importPlaylist(trickyTitleJson, decoder: trackingDecode);
+      expect(decoderCalled, isTrue);
+      expect(ok, isNotNull);
+      expect(ok!.name, 'Live {{{[[[[Mix]]]]}}}');
+    });
+
+    test(
         '5. YtmWebLoginSheet builds hardened sandbox settings and navigation policy',
         () {
       final settings = YtmWebLoginSheet.buildDefaultSettings();
