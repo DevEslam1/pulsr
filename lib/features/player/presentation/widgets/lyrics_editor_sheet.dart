@@ -48,6 +48,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   Timer? _fallbackTimer;
   late String _initialSnapshot;
   bool _allowPop = false;
+  bool _dirty = false;
 
   String _snapshot() => _lines
       .map((l) => '${l.timestamp.inMilliseconds}|${l.text}')
@@ -170,7 +171,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     final p = context.palette;
 
     return PopScope(
-      canPop: _allowPop || _snapshot() == _initialSnapshot,
+      canPop: _allowPop || (!_dirty && _snapshot() == _initialSnapshot),
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final discard = await PulsrDialogHelper.showConfirmDialog(
@@ -368,6 +369,12 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                             ),
                             onChanged: (val) {
                               _lines[index] = _lines[index].copyWith(text: val);
+                              // AUDIT-FIX (P0-1): Trigger one rebuild on the
+                              // false->true transition so PopScope blocks back
+                              // without rebuilding the list on every keystroke.
+                              if (!_dirty) {
+                                setState(() => _dirty = true);
+                              }
                             },
                           ),
                         ),

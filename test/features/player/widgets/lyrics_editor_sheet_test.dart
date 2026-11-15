@@ -257,5 +257,39 @@ void main() {
       expect(line.isBackground, isFalse);
       expect(line.alignment, LyricAlignment.start);
     });
+
+    testWidgets(
+        'typing in a TextFormField triggers discard confirmation on back pop',
+        (tester) async {
+      final cubit = stubPlayerCubit();
+
+      await tester.pumpWidget(lyricsHost(
+        cubit: cubit,
+        sheetBuilder: (_) => LyricsEditorSheet(
+          song: testSong,
+          currentPosition: Duration.zero,
+          initialLyrics: initial,
+          onSave: (_) {},
+        ),
+      ));
+      await tester.pump();
+
+      final l10n = AppLocalizations.of(
+        tester.element(find.byType(LyricsEditorSheet)),
+      )!;
+
+      // Type into the first lyric line without performing any structural edit.
+      await tester.enterText(find.byType(TextFormField).first, 'Typed edit');
+      await tester.pump();
+
+      // Trigger a back pop on the sheet's route.
+      Navigator.of(tester.element(find.byType(LyricsEditorSheet))).maybePop();
+      await tester.pumpAndSettle();
+
+      // The discard confirmation dialog should appear and keep the sheet open.
+      expect(find.text(l10n.discardChangesTitle), findsOneWidget);
+      expect(find.text(l10n.discard), findsOneWidget);
+      expect(find.byType(LyricsEditorSheet), findsOneWidget);
+    });
   });
 }
