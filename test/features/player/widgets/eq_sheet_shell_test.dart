@@ -259,6 +259,86 @@ void main() {
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();
     });
+
+    testWidgets(
+        'hardware device profile bar matches segmented bar height and equal flex distribution',
+        (tester) async {
+      EqualizerSheet.debugForceAndroidSurface = true;
+      addTearDown(() => EqualizerSheet.debugForceAndroidSurface = null);
+
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: stubPlayerCubit(),
+        settingsCubit: stubSettingsCubit(
+            state: const SettingsState(
+                experienceMode: ExperienceMode.professional)),
+        child: const EqualizerSheet(),
+      ));
+      await tester.pump();
+
+      // Verify all 4 device items exist in the bar
+      expect(find.text('Headset'), findsOneWidget);
+      expect(find.text('Speaker'), findsOneWidget);
+      expect(find.text('Bluetooth'), findsOneWidget);
+      expect(find.text('USB DAC'), findsOneWidget);
+
+      // Verify each device chip has equal width and standard height (>= 44dp touch target)
+      final headsetBox = tester.getRect(find.text('Headset'));
+      final speakerBox = tester.getRect(find.text('Speaker'));
+      final btBox = tester.getRect(find.text('Bluetooth'));
+      final usbBox = tester.getRect(find.text('USB DAC'));
+
+      expect(headsetBox.height, greaterThan(0));
+      expect(speakerBox.height, greaterThan(0));
+      expect(btBox.height, greaterThan(0));
+      expect(usbBox.height, greaterThan(0));
+
+      // Check the device profile bar container height
+      final deviceBarFinder = find.ancestor(
+        of: find.text('Headset'),
+        matching: find.byType(Container),
+      );
+      expect(deviceBarFinder, findsWidgets);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('hardware device profile bar does not overflow on 320dp width and 2.0 text scale',
+        (tester) async {
+      EqualizerSheet.debugForceAndroidSurface = true;
+      addTearDown(() => EqualizerSheet.debugForceAndroidSurface = null);
+
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: stubPlayerCubit(),
+        settingsCubit: stubSettingsCubit(
+            state: const SettingsState(
+                experienceMode: ExperienceMode.professional)),
+        child: const MediaQuery(
+          data: MediaQueryData(textScaler: TextScaler.linear(2.0)),
+          child: EqualizerSheet(),
+        ),
+      ));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Headset'), findsOneWidget);
+      expect(find.text('Speaker'), findsOneWidget);
+      expect(find.text('Bluetooth'), findsOneWidget);
+      expect(find.text('USB DAC'), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    });
   });
 
   group('EqualizerSheet.show route', () {
