@@ -317,17 +317,17 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             settingsState.crossfadeSeconds != prevCrossfadeSeconds;
         final gaplessChanged = settingsState.gaplessPlayback != prevGapless;
         final automixChanged = settingsState.automixEnabled != prevAutomix;
-        final volumeRelatedChanged =
-            settingsState.replayGainMode != prevReplayGainMode ||
-                settingsState.replayGainPreampWithRg != prevPreampWithRg ||
-                settingsState.replayGainPreampWithoutRg != prevPreampWithoutRg ||
-                // Each of these moves the composed gain between software and
-                // hardware/DVC ownership; leaving the old player gain in place
-                // would keep attenuating (or boosting) a stream the user just
-                // asked to be bit-perfect.
-                settingsState.bitPerfectOutput != prevBitPerfect ||
-                settingsState.bypassDspOnBitPerfect != prevBypassDsp ||
-                settingsState.usbHardwareVolumeEnabled != prevUsbHardwareVolume;
+        final volumeRelatedChanged = settingsState.replayGainMode !=
+                prevReplayGainMode ||
+            settingsState.replayGainPreampWithRg != prevPreampWithRg ||
+            settingsState.replayGainPreampWithoutRg != prevPreampWithoutRg ||
+            // Each of these moves the composed gain between software and
+            // hardware/DVC ownership; leaving the old player gain in place
+            // would keep attenuating (or boosting) a stream the user just
+            // asked to be bit-perfect.
+            settingsState.bitPerfectOutput != prevBitPerfect ||
+            settingsState.bypassDspOnBitPerfect != prevBypassDsp ||
+            settingsState.usbHardwareVolumeEnabled != prevUsbHardwareVolume;
         final sampleRateRelatedChanged =
             settingsState.followTrackSampleRate != prevFollowSampleRate ||
                 settingsState.bitPerfectOutput != prevBitPerfect;
@@ -369,7 +369,16 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             settingsState.bitPerfectOutput) {
           final song = state.currentSong;
           if (song != null) {
-            unawaited(dspController.maybeFollowTrackSampleRate(song));
+            // AUDIT-FIX (P0-6): guard fire-and-forget follow-rate call.
+            unawaited(dspController
+                .maybeFollowTrackSampleRate(song)
+                .catchError((Object e, StackTrace st) {
+              ErrorLogger.log(
+                  'Follow-track sample rate on settings change failed',
+                  error: e,
+                  stackTrace: st,
+                  category: 'PlayerCubit');
+            }));
           }
         }
       });
@@ -459,7 +468,13 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     _lastFailedSongId = null;
     _consecutiveErrorCount = 0;
     unawaited(metadataController.enrichTrackParallel(song));
-    unawaited(dspController.maybeFollowTrackSampleRate(song));
+    // AUDIT-FIX (P0-6): guard fire-and-forget follow-rate call on track change.
+    unawaited(dspController
+        .maybeFollowTrackSampleRate(song)
+        .catchError((Object e, StackTrace st) {
+      ErrorLogger.log('Follow-track sample rate on track change failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }));
     unawaited(playbackOptionsController.onCurrentSongChanged(song));
     unawaited(checkAndTriggerAutoplay());
     widgetBridge.updateWidgetThrottled(state,
@@ -523,9 +538,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         lyricsSlice: state.lyricsSlice.copyWith(
           lyrics: isSameSong ? state.lyrics : const [],
           lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
-          isLoadingLyrics: (!isSameSong || needsSideEffects)
-              ? true
-              : state.isLoadingLyrics,
+          isLoadingLyrics:
+              (!isSameSong || needsSideEffects) ? true : state.isLoadingLyrics,
         ),
       ));
       if (!isSameSong || needsSideEffects) {
@@ -888,7 +902,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       widgetBridge.updateWidgetProgressThrottled(state);
       final current = state.currentSong;
       if (current != null) {
-        widgetBridge.debouncedScrobble(current, state.position, resolvedPlaying);
+        widgetBridge.debouncedScrobble(
+            current, state.position, resolvedPlaying);
       }
     });
 
@@ -963,8 +978,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         _consecutiveErrorCount = 0;
         widgetBridge.onPlaybackError(msg);
         safeEmit(state.copyWith(
-            playback:
-                state.playback.copyWith(errorMessage: msg, isBuffering: false)));
+            playback: state.playback
+                .copyWith(errorMessage: msg, isBuffering: false)));
         return;
       }
       widgetBridge.onPlaybackError(err);

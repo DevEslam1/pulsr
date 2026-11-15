@@ -5,7 +5,14 @@ extension PlayerDspProfilesExtension on PlayerDspController {
   Future<void> onOutputDeviceChanged(AudioOutputInfo device) async {
     if (_isClosed()) return;
     final song = _getState().currentSong;
-    if (song != null) unawaited(maybeFollowTrackSampleRate(song));
+    if (song != null) {
+      // AUDIT-FIX (P0-6): guard fire-and-forget follow-rate call on device switch.
+      unawaited(maybeFollowTrackSampleRate(song)
+          .catchError((Object e, StackTrace st) {
+        ErrorLogger.log('Follow-track sample rate on device change failed',
+            error: e, stackTrace: st, category: 'PlayerDspController');
+      }));
+    }
     // Route-aware DSP that must track EVERY device/codec change, independent of
     // the device-profile auto-switch services below (fix #1 crossfeed gating +
     // fix #2 codec-aware music compensation). Runs before the dedup/early
@@ -380,24 +387,31 @@ extension PlayerDspProfilesExtension on PlayerDspController {
   /// the merge/subtract math is unit-tested here.
   Future<void> applyCodecAwareMusicCompensation() async {
     if (_isClosed()) return;
-    final state = _getState();
-    // Quran Mode owns its own codec adaptation (player_playback_options_quran).
-    if (state.isQuranModeEnabled) return;
-    // While a bit-perfect bypass owns the chain the engine ignores DSP writes;
-    // drop tracking so a later unblocked pass recomputes from the true base.
-    if (dspBlockedReason() != null) {
-      _appliedMusicEqComp = null;
-      _appliedMusicReverbScale = 1.0;
-      _musicForcedEqEnabled = false;
-      return;
+    // AUDIT-FIX (P0-6): guard capability probe & downstream applies so
+    // fire-and-forget callers never leak unhandled async zone errors.
+    try {
+      final state = _getState();
+      // Quran Mode owns its own codec adaptation (player_playback_options_quran).
+      if (state.isQuranModeEnabled) return;
+      // While a bit-perfect bypass owns the chain the engine ignores DSP writes;
+      // drop tracking so a later unblocked pass recomputes from the true base.
+      if (dspBlockedReason() != null) {
+        _appliedMusicEqComp = null;
+        _appliedMusicReverbScale = 1.0;
+        _musicForcedEqEnabled = false;
+        return;
+      }
+
+      final caps = _earbudService.detect(currentOutputInfo());
+      final wantComp = caps.isLossyBluetooth && !caps.codec.isUltraHighQuality;
+
+      await _applyMusicEqCompensation(caps, wantComp);
+      if (_isClosed()) return;
+      await _applyMusicReverbTrim(caps, wantComp);
+    } catch (e, st) {
+      ErrorLogger.log('Codec-aware music compensation failed',
+          error: e, stackTrace: st, category: 'PlayerDspController');
     }
-
-    final caps = _earbudService.detect(currentOutputInfo());
-    final wantComp = caps.isLossyBluetooth && !caps.codec.isUltraHighQuality;
-
-    await _applyMusicEqCompensation(caps, wantComp);
-    if (_isClosed()) return;
-    await _applyMusicReverbTrim(caps, wantComp);
   }
 
   Future<void> _applyMusicEqCompensation(

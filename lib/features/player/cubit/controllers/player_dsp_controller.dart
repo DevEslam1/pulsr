@@ -75,10 +75,10 @@ class PlayerDspController {
 
   /// Pure, route-based DSP compensation (crossfeed gating + codec-aware music
   /// EQ/reverb) runs through [EarbudOptimizationService.detect], whose methods
-  /// are side-effect-free. Constructed directly (same pattern as the
-  /// UsbExclusiveService use in the follow-rate path) because the cubit does
-  /// not inject it into this controller.
-  final EarbudOptimizationService _earbudService = EarbudOptimizationService();
+  /// are side-effect-free. Defaults to a fresh instance when the cubit does
+  /// not inject one.
+  final EarbudOptimizationService _earbudService;
+  final UsbExclusiveService _usbExclusiveService;
 
   /// Codec-aware music compensation tracking (fix #2). The compensation is a
   /// small, reversible overlay merged on top of the user's active EQ/reverb;
@@ -129,6 +129,8 @@ class PlayerDspController {
     HiResAudioService? hiResAudioService,
     SmartAudioService? smartAudioService,
     HeadphoneProfilesRepository? headphoneProfilesRepo,
+    EarbudOptimizationService? earbudService,
+    UsbExclusiveService? usbExclusiveService,
     required PlayerState Function() getState,
     required void Function(PlayerState state) emit,
     required void Function() syncAudioEffects,
@@ -139,8 +141,12 @@ class PlayerDspController {
         _deviceProfileService = deviceProfileService,
         _hiResAudioService = hiResAudioService,
         _smartAudioService = smartAudioService,
-        _headphoneProfilesRepo =
-            headphoneProfilesRepo ?? (getIt.isRegistered<HeadphoneProfilesRepository>() ? getIt<HeadphoneProfilesRepository>() : HeadphoneProfilesRepository()),
+        _headphoneProfilesRepo = headphoneProfilesRepo ??
+            (getIt.isRegistered<HeadphoneProfilesRepository>()
+                ? getIt<HeadphoneProfilesRepository>()
+                : HeadphoneProfilesRepository()),
+        _earbudService = earbudService ?? EarbudOptimizationService(),
+        _usbExclusiveService = usbExclusiveService ?? UsbExclusiveService(),
         _getState = getState,
         _emit = emit,
         _syncAudioEffects = syncAudioEffects,
@@ -152,7 +158,12 @@ class PlayerDspController {
     final hiRes = _hiResAudioService;
     if (hiRes == null) return;
     _deviceSub = hiRes.outputDeviceStream.listen((device) {
-      onOutputDeviceChanged(device);
+      // AUDIT-FIX (P0-6): guard fire-and-forget listener callback.
+      unawaited(
+          onOutputDeviceChanged(device).catchError((Object e, StackTrace st) {
+        ErrorLogger.log('Output device change handling failed',
+            error: e, stackTrace: st, category: 'PlayerDspController');
+      }));
     });
   }
 

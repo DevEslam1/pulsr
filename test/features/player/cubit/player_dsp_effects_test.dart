@@ -1,8 +1,12 @@
 // Coverage for the uncovered branches of player_dsp_effects.dart.
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/channels.dart';
+import 'package:pulsr/core/services/earbud_optimization_service.dart';
+import 'package:pulsr/core/utils/error_logger.dart';
 import 'package:pulsr/data/services/hires_audio_service.dart';
+import 'package:pulsr/data/services/usb_exclusive_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/comparison_slot.dart';
@@ -15,6 +19,10 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import '../player_test_support.dart';
 
 class _FollowHiRes extends Mock implements HiResAudioService {}
+
+class _MockEarbudService extends Mock implements EarbudOptimizationService {}
+
+class _MockUsbExclusiveService extends Mock implements UsbExclusiveService {}
 
 class _BassTrackingAudioHandler extends RecordingAudioHandler {
   final List<double> bassBoostHistory = <double>[];
@@ -30,6 +38,10 @@ class _BassTrackingAudioHandler extends RecordingAudioHandler {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    registerFallbackValue(buildSong(0));
+  });
 
   late RecordingAudioHandler handler;
   late MockSettingsCubit settings;
@@ -135,6 +147,126 @@ void main() {
       await controller.maybeFollowTrackSampleRate(song);
       await controller.maybeFollowTrackSampleRate(song);
       verify(() => hires.setBluetoothSampleRate(96000)).called(2);
+    });
+
+    test(
+        'P0-6: validateBitPerfectTrackSource and setBitPerfectOutput failures '
+        'are caught and logged instead of escaping', () async {
+      final recordedErrors = <Object>[];
+      ErrorLogger.onCrashReported = (error, _, __) => recordedErrors.add(error);
+      addTearDown(() => ErrorLogger.onCrashReported = null);
+
+      const output = AudioOutputInfo(
+        deviceName: 'DAC',
+        isUsbDac: true,
+        sampleRate: 48000,
+        bitDepth: 24,
+        supportedSampleRates: [48000],
+        isBitPerfectActive: true,
+      );
+      when(() => settings.state).thenReturn(const SettingsState(
+        bitPerfectOutput: true,
+        strictBitPerfect: true,
+        followTrackSampleRate: true,
+        outputFormatNegotiationEnabled: true,
+        currentOutputDevice: output,
+      ));
+      when(() => settings.bitPerfectViaDirectStream).thenReturn(false);
+      when(() => settings.validateBitPerfectTrackSource(any()))
+          .thenThrow(StateError('validation boom'));
+
+      final song =
+          buildSong(1, path: '/music/a.flac', sampleRate: 96000, bitDepth: 24);
+      await controller.maybeFollowTrackSampleRate(song);
+
+      expect(recordedErrors, isNotEmpty);
+      expect(recordedErrors.last, isA<StateError>());
+
+      // Now pass validation, but throw from setBitPerfectOutput in strict mode.
+      recordedErrors.clear();
+      when(() => settings.validateBitPerfectTrackSource(any()))
+          .thenAnswer((_) async => true);
+      when(() => settings.setBitPerfectOutput(false))
+          .thenThrow(StateError('disable boom'));
+      const usb = MethodChannel(PulsrChannels.usbExclusive);
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(usb, (_) async => {'channels': 2});
+      addTearDown(() => messenger.setMockMethodCallHandler(usb, null));
+
+      await controller.maybeFollowTrackSampleRate(song);
+      expect(recordedErrors, isNotEmpty);
+      expect(recordedErrors.last, isA<StateError>());
+    });
+
+    test(
+        'P0-6: usb.getProducerChannels, suspendDirectBitPerfectForTrack, and '
+        'earbudService.detect failures are caught and logged cleanly',
+        () async {
+      final recordedErrors = <Object>[];
+      ErrorLogger.onCrashReported = (error, _, __) => recordedErrors.add(error);
+      addTearDown(() => ErrorLogger.onCrashReported = null);
+
+      final earbud = _MockEarbudService();
+      final usbService = _MockUsbExclusiveService();
+      when(() => earbud.detect(any())).thenThrow(StateError('detect boom'));
+      when(() => usbService.lastStatus).thenReturn(const UsbExclusiveStatus(
+        attached: true,
+        permitted: true,
+        streamingActive: false,
+        streamingSampleRate: 0,
+      ));
+      when(() => usbService.getProducerChannels())
+          .thenThrow(StateError('channels boom'));
+
+      final throwingController = PlayerDspController(
+        audioHandler: handler,
+        settingsCubit: settings,
+        hiResAudioService: hires,
+        earbudService: earbud,
+        usbExclusiveService: usbService,
+        getState: () => state,
+        emit: (s) => state = s,
+        syncAudioEffects: ({bool force = false}) {},
+        isClosed: () => false,
+      );
+      addTearDown(throwingController.dispose);
+
+      const output = AudioOutputInfo(
+        deviceName: 'DAC',
+        isUsbDac: true,
+        sampleRate: 48000,
+        bitDepth: 24,
+        supportedSampleRates: [48000, 96000],
+        isBitPerfectActive: true,
+      );
+      when(() => settings.state).thenReturn(const SettingsState(
+        bitPerfectOutput: true,
+        bypassDspOnBitPerfect: false,
+        followTrackSampleRate: true,
+        outputFormatNegotiationEnabled: true,
+        currentOutputDevice: output,
+      ));
+      when(() => settings.bitPerfectViaDirectStream).thenReturn(true);
+      when(() => settings.validateBitPerfectTrackSource(any()))
+          .thenAnswer((_) async => true);
+
+      final zoneErrors = <Object>[];
+      await runZonedGuarded(() async {
+        final song = buildSong(2, path: '/music/b.flac', sampleRate: 96000);
+        await throwingController.maybeFollowTrackSampleRate(song);
+        await Future<void>.delayed(Duration.zero);
+      }, (e, _) => zoneErrors.add(e));
+
+      expect(zoneErrors, isEmpty);
+      expect(recordedErrors.length, greaterThanOrEqualTo(2));
+      expect(
+        recordedErrors.map((e) => e.toString()),
+        containsAll(<Matcher>[
+          contains('detect boom'),
+          contains('channels boom'),
+        ]),
+      );
     });
   });
 
