@@ -343,7 +343,11 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                             ),
                           ),
                           IconButton(
-                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
+                            tooltip: context.l10n.search,
                             icon: Icon(
                               Icons.north_west_rounded,
                               size: 16,
@@ -355,7 +359,10 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                             ),
                           ),
                           IconButton(
-                            visualDensity: VisualDensity.compact,
+                            constraints: const BoxConstraints(
+                              minWidth: AppSpacing.minTouchTarget,
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
                             tooltip: context.l10n.remove,
                             icon: Icon(
                               Icons.close_rounded,

@@ -293,6 +293,7 @@ class _YtmBrowseView extends StatelessWidget {
                                   icon: Icons.play_arrow_rounded,
                                   iconColor: p.accent,
                                   palette: p,
+                                  tooltip: context.l10n.playAll,
                                   onPressed: () {
                                     PulsrHaptics.selectionClick();
                                     context.read<PlayerCubit>().playSong(
@@ -567,10 +568,10 @@ class _SectionIconButton extends StatelessWidget {
       child: IconButton(
         tooltip: tooltip,
         constraints: const BoxConstraints(
-          minWidth: 38,
-          minHeight: 38,
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget,
         ),
-        visualDensity: VisualDensity.compact,
+        padding: EdgeInsets.zero,
         icon: Icon(icon, size: 18, color: iconColor),
         onPressed: onPressed,
       ),

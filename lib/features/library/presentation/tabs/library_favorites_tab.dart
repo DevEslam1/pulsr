@@ -16,8 +16,12 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
     final onlineFavorites =
         allFavorites.where((s) => _isOnlineFavorite(s)).toList();
 
-    final currentFavorites =
+    final filteredFavorites =
         _favTabFilter == 0 ? localFavorites : onlineFavorites;
+    final currentFavorites = LibraryTabSort.sortSongs(
+      filteredFavorites,
+      _tabSortFor('favorites'),
+    );
     final losslessCount = currentFavorites.where(isLosslessSong).length;
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
@@ -236,7 +240,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                                 size: 18,
                               ),
                               style: IconButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
+                                minimumSize: const Size(
+                                  AppSpacing.minTouchTarget,
+                                  AppSpacing.minTouchTarget,
+                                ),
                                 backgroundColor: p.surfaceContainerHigh,
                                 foregroundColor: p.textPrimary,
                               ),
@@ -254,7 +261,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                                   size: 18,
                                 ),
                                 style: IconButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
+                                  minimumSize: const Size(
+                                    AppSpacing.minTouchTarget,
+                                    AppSpacing.minTouchTarget,
+                                  ),
                                   backgroundColor:
                                       p.accent.withValues(alpha: 0.15),
                                   foregroundColor: p.accent,
@@ -270,7 +280,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                               onPressed: () => _syncYtmLikes(context),
                               icon: const Icon(Icons.sync_rounded, size: 18),
                               style: IconButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
+                                minimumSize: const Size(
+                                  AppSpacing.minTouchTarget,
+                                  AppSpacing.minTouchTarget,
+                                ),
                                 backgroundColor:
                                     p.accent.withValues(alpha: 0.15),
                                 foregroundColor: p.accent,
@@ -283,7 +296,10 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                                   _showImportYtmFavoritesDialog(context),
                               icon: const Icon(Icons.link_rounded, size: 18),
                               style: IconButton.styleFrom(
-                                visualDensity: VisualDensity.compact,
+                                minimumSize: const Size(
+                                  AppSpacing.minTouchTarget,
+                                  AppSpacing.minTouchTarget,
+                                ),
                                 backgroundColor: p.surfaceContainerHigh,
                                 foregroundColor: p.textPrimary,
                               ),
@@ -1073,4 +1089,7 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
 
   // Requires: provided by the composing class (same library).
   TextEditingController get _importYtmController;
+
+  // Requires: provided by the composing class (same library).
+  LibraryTabSortSpec _tabSortFor(String tabName);
 }

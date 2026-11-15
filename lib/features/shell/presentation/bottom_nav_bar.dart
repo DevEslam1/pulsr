@@ -467,30 +467,32 @@ class _NavTabItem extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 1.5),
-                          AnimatedDefaultTextStyle(
-                            duration: context.motionMs(200),
-                            style: TextStyle(
-                              fontSize: isTablet
-                                  ? AppFontSize.label
-                                  : AppFontSize.caption,
-                              height: 1.1,
-                              fontWeight: isSelected
-                                  ? FontWeight.w800
-                                  : FontWeight.w500,
-                              color: isSelected
-                                  ? p.accent
-                                  : p.textTertiary.withValues(alpha: 0.85),
-                              letterSpacing: isRtl ? 0 : AppTracking.label,
-                              fontFamily: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.fontFamily,
-                            ),
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                item.label,
-                                maxLines: 1,
+                          Flexible(
+                            child: AnimatedDefaultTextStyle(
+                              duration: context.motionMs(200),
+                              style: TextStyle(
+                                fontSize: isTablet
+                                    ? AppFontSize.label
+                                    : AppFontSize.caption,
+                                height: 1.1,
+                                fontWeight: isSelected
+                                    ? FontWeight.w800
+                                    : FontWeight.w500,
+                                color: isSelected
+                                    ? p.accent
+                                    : p.textTertiary.withValues(alpha: 0.85),
+                                letterSpacing: isRtl ? 0 : AppTracking.label,
+                                fontFamily: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.fontFamily,
+                              ),
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  item.label,
+                                  maxLines: 1,
+                                ),
                               ),
                             ),
                           ),

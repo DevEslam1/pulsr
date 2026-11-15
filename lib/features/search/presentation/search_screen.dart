@@ -23,7 +23,6 @@ import '../../../core/widgets/pulsr_empty_state.dart';
 import '../../../core/widgets/pulsr_progress.dart';
 import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/pulsr_segmented_control.dart';
-import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../data/db/app_database.dart';
 import '../../library/cubit/library_cubit.dart';
@@ -486,25 +485,7 @@ class _SearchViewState extends State<_SearchView> {
             valueListenable: _controller,
             builder: (context, val, _) {
               if (val.text.isEmpty) {
-                if (!AppConfig.voiceSearchEnabled) {
-                  return const SizedBox.shrink();
-                }
-                return IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget,
-                  ),
-                  icon: Icon(Icons.mic_rounded, color: p.textTertiary),
-                  tooltip: context.l10n.voiceSearch,
-                  onPressed: () {
-                    PulsrHaptics.lightImpact();
-                    PulsrToast.show(
-                      context,
-                      message: context.l10n.voiceSearchUnavailable,
-                      icon: Icons.mic_rounded,
-                    );
-                  },
-                );
+                return const SizedBox.shrink();
               }
               return IconButton(
                 constraints: const BoxConstraints(
@@ -770,7 +751,11 @@ class _SuggestionsCard extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        tooltip: context.l10n.search,
                         icon: Icon(
                           Icons.north_west_rounded,
                           size: 17,
@@ -1285,12 +1270,15 @@ class _SearchPlayedSongTile extends StatelessWidget {
                   ),
                 ),
               IconButton(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
                 icon: Icon(
                   Icons.close_rounded,
                   size: 18,
                   color: p.textTertiary,
                 ),
-                visualDensity: VisualDensity.compact,
                 tooltip: context.l10n.remove,
                 onPressed: onRemove,
               ),
@@ -1348,7 +1336,11 @@ class _RecentRow extends StatelessWidget {
                 ),
               ),
               IconButton(
-                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                tooltip: context.l10n.search,
                 icon: Icon(
                   Icons.north_west_rounded,
                   size: 16,
@@ -1357,7 +1349,10 @@ class _RecentRow extends StatelessWidget {
                 onPressed: onFill,
               ),
               IconButton(
-                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
                 tooltip: context.l10n.remove,
                 icon: Icon(
                   Icons.close_rounded,

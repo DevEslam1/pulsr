@@ -118,11 +118,11 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    visualDensity: VisualDensity.compact,
                     constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
                     ),
+                    padding: EdgeInsets.zero,
                     icon: const Icon(Icons.zoom_out_rounded, size: 18),
                     color: activeCols < maxCols ? p.textPrimary : p.textTertiary,
                     tooltip: context.l10n.zoomOut,
@@ -148,11 +148,11 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                     ),
                   ),
                   IconButton(
-                    visualDensity: VisualDensity.compact,
                     constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
                     ),
+                    padding: EdgeInsets.zero,
                     icon: const Icon(Icons.zoom_in_rounded, size: 18),
                     color: activeCols > minCols ? p.textPrimary : p.textTertiary,
                     tooltip: context.l10n.zoomIn,

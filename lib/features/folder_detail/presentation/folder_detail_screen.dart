@@ -1428,6 +1428,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                             children: [
                               if (songs.isNotEmpty)
                                 IconButton(
+                                  constraints: const BoxConstraints(
+                                    minWidth: AppSpacing.minTouchTarget,
+                                    minHeight: AppSpacing.minTouchTarget,
+                                  ),
+                                  tooltip: context.l10n.playAll,
                                   icon: Icon(
                                     Icons.play_circle_fill_rounded,
                                     color: p.accent,

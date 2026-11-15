@@ -464,9 +464,12 @@ class _SidebarBrandHeader extends StatelessWidget {
                   ),
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   tooltip: context.l10n.sidebarCollapse,
                   iconSize: 18,
-                  visualDensity: VisualDensity.compact,
                   icon: Icon(
                     Icons.keyboard_double_arrow_left_rounded,
                     color: p.textTertiary,

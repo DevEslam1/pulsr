@@ -28,7 +28,16 @@ import '../../../../core/utils/pulsr_haptics.dart';
 enum _FolderSort { name, count }
 
 class FolderBrowserTab extends StatefulWidget {
-  const FolderBrowserTab({super.key});
+  final String? sortBy;
+  final bool? ascending;
+  final void Function(String sortBy, bool ascending)? onSortChanged;
+
+  const FolderBrowserTab({
+    super.key,
+    this.sortBy,
+    this.ascending,
+    this.onSortChanged,
+  });
 
   @override
   State<FolderBrowserTab> createState() => _FolderBrowserTabState();
@@ -37,6 +46,23 @@ class FolderBrowserTab extends StatefulWidget {
 class _FolderBrowserTabState extends State<FolderBrowserTab> {
   _FolderSort _sort = _FolderSort.name;
   bool _ascending = true;
+
+  _FolderSort get _effectiveSort => widget.sortBy != null
+      ? (widget.sortBy == 'songCount' ? _FolderSort.count : _FolderSort.name)
+      : _sort;
+
+  bool get _effectiveAscending => widget.ascending ?? _ascending;
+
+  void _applySort(_FolderSort sort, bool asc) {
+    setState(() {
+      _sort = sort;
+      _ascending = asc;
+    });
+    widget.onSortChanged?.call(
+      sort == _FolderSort.count ? 'songCount' : 'name',
+      asc,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,12 +117,14 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
         }
 
         final sortedFolders = List<FolderItem>.from(folders);
-        if (_sort == _FolderSort.name) {
-          sortedFolders.sort((a, b) => _ascending
+        final activeSort = _effectiveSort;
+        final activeAscending = _effectiveAscending;
+        if (activeSort == _FolderSort.name) {
+          sortedFolders.sort((a, b) => activeAscending
               ? a.name.toLowerCase().compareTo(b.name.toLowerCase())
               : b.name.toLowerCase().compareTo(a.name.toLowerCase()));
         } else {
-          sortedFolders.sort((a, b) => _ascending
+          sortedFolders.sort((a, b) => activeAscending
               ? a.songCount.compareTo(b.songCount)
               : b.songCount.compareTo(a.songCount));
         }
@@ -318,7 +346,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _sort == _FolderSort.name
+                      _effectiveSort == _FolderSort.name
                           ? Icons.sort_by_alpha_rounded
                           : Icons.numbers_rounded,
                       size: 14,
@@ -326,7 +354,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                     ),
                     const SizedBox(width: AppSpacing.s6),
                     Text(
-                      _sort == _FolderSort.name
+                      _effectiveSort == _FolderSort.name
                           ? context.l10n.title
                           : context.l10n.songs,
                       style: TextStyle(
@@ -337,7 +365,7 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                     ),
                     const SizedBox(width: AppSpacing.s4),
                     Icon(
-                      _ascending
+                      _effectiveAscending
                           ? Icons.arrow_upward_rounded
                           : Icons.arrow_downward_rounded,
                       size: 13,
@@ -532,8 +560,8 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                 // 3-dots more options menu
                 IconButton(
                   constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
                   ),
                   padding: EdgeInsets.zero,
                   icon: const Icon(Icons.more_vert_rounded),
@@ -1141,49 +1169,33 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
                 sheetContext: sheetContext,
                 title: '${context.l10n.title} (A → Z)',
                 icon: Icons.sort_by_alpha_rounded,
-                selected: _sort == _FolderSort.name && _ascending,
-                onTap: () {
-                  setState(() {
-                    _sort = _FolderSort.name;
-                    _ascending = true;
-                  });
-                },
+                selected:
+                    _effectiveSort == _FolderSort.name && _effectiveAscending,
+                onTap: () => _applySort(_FolderSort.name, true),
               ),
               _buildSortOptionTile(
                 sheetContext: sheetContext,
                 title: '${context.l10n.title} (Z → A)',
                 icon: Icons.sort_by_alpha_rounded,
-                selected: _sort == _FolderSort.name && !_ascending,
-                onTap: () {
-                  setState(() {
-                    _sort = _FolderSort.name;
-                    _ascending = false;
-                  });
-                },
+                selected:
+                    _effectiveSort == _FolderSort.name && !_effectiveAscending,
+                onTap: () => _applySort(_FolderSort.name, false),
               ),
               _buildSortOptionTile(
                 sheetContext: sheetContext,
                 title: '${context.l10n.songs} (High → Low)',
                 icon: Icons.numbers_rounded,
-                selected: _sort == _FolderSort.count && !_ascending,
-                onTap: () {
-                  setState(() {
-                    _sort = _FolderSort.count;
-                    _ascending = false;
-                  });
-                },
+                selected:
+                    _effectiveSort == _FolderSort.count && !_effectiveAscending,
+                onTap: () => _applySort(_FolderSort.count, false),
               ),
               _buildSortOptionTile(
                 sheetContext: sheetContext,
                 title: '${context.l10n.songs} (Low → High)',
                 icon: Icons.numbers_rounded,
-                selected: _sort == _FolderSort.count && _ascending,
-                onTap: () {
-                  setState(() {
-                    _sort = _FolderSort.count;
-                    _ascending = true;
-                  });
-                },
+                selected:
+                    _effectiveSort == _FolderSort.count && _effectiveAscending,
+                onTap: () => _applySort(_FolderSort.count, true),
               ),
               const SizedBox(height: AppSpacing.sm),
             ],

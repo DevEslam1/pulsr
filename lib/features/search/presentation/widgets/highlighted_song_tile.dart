@@ -185,6 +185,10 @@ class HighlightedSongTile extends StatelessWidget {
                         if (onMorePressed != null)
                           RepaintBoundary(
                             child: IconButton(
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
+                              ),
                               icon: Icon(
                                 Icons.more_vert_rounded,
                                 size: 20,
@@ -193,7 +197,6 @@ class HighlightedSongTile extends StatelessWidget {
                               tooltip: MaterialLocalizations.of(context)
                                   .moreButtonTooltip,
                               onPressed: onMorePressed,
-                              visualDensity: VisualDensity.compact,
                             ),
                           ),
                       ],

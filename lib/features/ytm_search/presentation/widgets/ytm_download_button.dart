@@ -199,8 +199,12 @@ class YtmDownloadButton extends StatelessWidget {
                 key: const ValueKey('ytm_dl_failed'),
                 onLongPress: () => _openQualityPicker(context, cubit),
                 child: IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   tooltip: item.error == null
-                      ? null
+                      ? context.l10n.retry
                       : resolveUiErrorMessage(context, item.error!),
                   icon: Icon(
                     Icons.error_outline_rounded,
@@ -211,7 +215,6 @@ class YtmDownloadButton extends StatelessWidget {
                     PulsrHaptics.selectionClick();
                     cubit.retryDownload(song);
                   },
-                  visualDensity: VisualDensity.compact,
                 ),
               );
               break;
@@ -222,6 +225,10 @@ class YtmDownloadButton extends StatelessWidget {
                 key: const ValueKey('ytm_dl_idle'),
                 onLongPress: () => _openQualityPicker(context, cubit),
                 child: IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   tooltip: context.l10n.browseDownloadOffline,
                   icon: Icon(
                     Icons.download_rounded,
@@ -232,7 +239,6 @@ class YtmDownloadButton extends StatelessWidget {
                     PulsrHaptics.selectionClick();
                     cubit.download(song);
                   },
-                  visualDensity: VisualDensity.compact,
                 ),
               );
               break;

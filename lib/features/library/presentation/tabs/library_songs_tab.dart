@@ -169,7 +169,10 @@ mixin LibrarySongsTab on State<LibraryScreen> {
               },
               icon: const Icon(Icons.shuffle_rounded, size: 18),
               style: IconButton.styleFrom(
-                visualDensity: VisualDensity.compact,
+                minimumSize: const Size(
+                  AppSpacing.minTouchTarget,
+                  AppSpacing.minTouchTarget,
+                ),
                 backgroundColor: p.surfaceContainerHigh,
                 foregroundColor: p.textPrimary,
               ),
@@ -540,7 +543,10 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     final p = context.palette;
     // Full downloaded list from the repository stream (not the paginated
     // songs window), so downloads outside page 1 stay visible and counted.
-    final downloaded = state.downloadedSongs;
+    final downloaded = LibraryTabSort.sortSongs(
+      state.downloadedSongs,
+      _tabSortFor('downloaded'),
+    );
     final trackCols = PulsrAdaptiveGrid.songColumns(context);
 
     if (downloaded.isEmpty) {
@@ -814,4 +820,7 @@ mixin LibrarySongsTab on State<LibraryScreen> {
 
   // Requires: provided by the composing class (same library).
   ScrollController get _songsScrollController;
+
+  // Requires: provided by the composing class (same library).
+  LibraryTabSortSpec _tabSortFor(String tabName);
 }

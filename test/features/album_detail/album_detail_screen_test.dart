@@ -67,9 +67,13 @@ void main() {
     useCase = _Albums();
   });
 
-  Widget build(Stream<Result<List<SongsTableData>>> stream) {
+  Widget build(
+    Stream<Result<List<SongsTableData>>> stream, {
+    Size size = const Size(1024, 2000),
+  }) {
     when(() => useCase.watchAlbumSongs(any())).thenAnswer((_) => stream);
     return detailHarness(
+      size: size,
       child: AlbumDetailScreen(album: _album, getAlbumsUseCase: useCase),
     );
   }
@@ -254,5 +258,31 @@ void main() {
     final emptyButton = tester
         .widget<FilledButton>(find.widgetWithText(FilledButton, 'Play All'));
     expect(emptyButton.onPressed, isNull);
+  });
+
+  testWidgets('reveals animated collapsed title and quick-play after scroll',
+      (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final songs = List.generate(
+      20,
+      (i) => _song(i + 1, 'Track ${i + 1}', track: i + 1),
+    );
+    await tester.pumpWidget(
+      build(Stream.value(Right(songs)), size: const Size(390, 844)),
+    );
+    await tester.pumpAndSettle();
+
+    final titleFinder = find.byKey(const Key('album_detail_collapsed_title'));
+    expect(titleFinder, findsOneWidget);
+    expect(tester.widget<AnimatedOpacity>(titleFinder).opacity, 0.0);
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<AnimatedOpacity>(titleFinder).opacity, 1.0);
   });
 }

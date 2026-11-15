@@ -20,7 +20,14 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 
 class FolderTreeBrowserTab extends StatefulWidget {
-  const FolderTreeBrowserTab({super.key});
+  final String sortBy;
+  final bool ascending;
+
+  const FolderTreeBrowserTab({
+    super.key,
+    this.sortBy = 'name',
+    this.ascending = true,
+  });
 
   @override
   State<FolderTreeBrowserTab> createState() => _FolderTreeBrowserTabState();
@@ -227,7 +234,30 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           final normF = p_path.posix.normalize(f.replaceAll('\\', '/'));
           return normF != currentDir && normF.startsWith(dirPrefix);
         }).toList()
-          ..sort();
+          ..sort((a, b) {
+            int cmp;
+            if (widget.sortBy == 'songCount') {
+              final ca = representatives[p_path.posix
+                          .normalize(a.replaceAll('\\', '/'))]
+                      ?.songCount ??
+                  0;
+              final cb = representatives[p_path.posix
+                          .normalize(b.replaceAll('\\', '/'))]
+                      ?.songCount ??
+                  0;
+              cmp = ca.compareTo(cb);
+            } else {
+              cmp = p_path.posix
+                  .basename(a)
+                  .toLowerCase()
+                  .compareTo(p_path.posix.basename(b).toLowerCase());
+            }
+            if (cmp != 0) return widget.ascending ? cmp : -cmp;
+            return p_path.posix
+                .basename(a)
+                .toLowerCase()
+                .compareTo(p_path.posix.basename(b).toLowerCase());
+          });
 
         // Breadcrumb parts (posix: MediaStore paths are always /-separated).
         final breadcrumbs = p_path.posix.split(currentDir);
@@ -236,10 +266,16 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
           stream: _folderSongsStream(cubit, currentDir),
           builder: (context, snapshot) {
             final result = snapshot.data;
-            final childSongs = result == null
+            final rawSongs = result == null
                 ? const <SongsTableData>[]
                 : result.fold(
                     (_) => const <SongsTableData>[], (songs) => songs);
+            final childSongs = List<SongsTableData>.of(rawSongs)
+              ..sort((a, b) {
+                final cmp =
+                    a.title.toLowerCase().compareTo(b.title.toLowerCase());
+                return widget.ascending ? cmp : -cmp;
+              });
 
             return Column(
               children: [

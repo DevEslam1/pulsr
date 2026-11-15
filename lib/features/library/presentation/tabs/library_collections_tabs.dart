@@ -6,7 +6,8 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
   // ================= ALBUMS (adaptive grid / list) =================
   Widget _buildAlbumsTab(BuildContext context, LibraryState state) {
     final p = context.palette;
-    final albums = state.albums;
+    final albumSort = _tabSortFor('albums');
+    final albums = LibraryTabSort.sortAlbums(state.albums, albumSort);
 
     if (albums.isEmpty) {
       if (state.isLoading) {
@@ -250,7 +251,10 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
   // ================= ARTISTS =================
   Widget _buildArtistsTab(BuildContext context, LibraryState state) {
     final p = context.palette;
-    final artists = state.artists;
+    final artists = LibraryTabSort.sortArtists(
+      state.artists,
+      _tabSortFor('artists'),
+    );
 
     if (artists.isEmpty) {
       if (state.isLoading) {
@@ -504,9 +508,22 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
           },
         ),
         Expanded(
-          child: _folderTree
-              ? const FolderTreeBrowserTab()
-              : const FolderBrowserTab(),
+          child: Builder(
+            builder: (context) {
+              final folderSort = _tabSortFor('folders');
+              return _folderTree
+                  ? FolderTreeBrowserTab(
+                      sortBy: folderSort.sortBy,
+                      ascending: folderSort.ascending,
+                    )
+                  : FolderBrowserTab(
+                      sortBy: folderSort.sortBy,
+                      ascending: folderSort.ascending,
+                      onSortChanged: (sortBy, asc) =>
+                          _setTabSort('folders', sortBy, asc),
+                    );
+            },
+          ),
         ),
       ],
     );
@@ -514,7 +531,10 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
 
   Widget _buildGenresTab(BuildContext context, LibraryState state) {
     final p = context.palette;
-    final genres = state.genres;
+    final genres = LibraryTabSort.sortGenres(
+      state.genres,
+      _tabSortFor('genres'),
+    );
 
     if (genres.isEmpty) {
       if (state.isLoading) {
@@ -662,7 +682,10 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
   }
 
   Widget _buildYearsTab(BuildContext context, LibraryState state) {
-    final years = state.years;
+    final years = LibraryTabSort.sortYears(
+      state.years,
+      _tabSortFor('years'),
+    );
     if (years.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
@@ -749,6 +772,12 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
 
   // Requires: provided by the composing class (same library).
   void _setGenreHierarchy(bool value);
+
+  // Requires: provided by the composing class (same library).
+  LibraryTabSortSpec _tabSortFor(String tabName);
+
+  // Requires: provided by the composing class (same library).
+  void _setTabSort(String tabName, String sortBy, bool ascending);
 
   // Requires: provided by the composing class (same library).
   Widget _buildEmpty(

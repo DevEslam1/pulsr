@@ -180,4 +180,12 @@ void main() {
 
     expect(find.byType(PulsrEmptyState), findsOneWidget);
   });
+
+  testWidgets('does not show a dead voice-search mic control when query is empty',
+      (tester) async {
+    await pumpScreen(tester);
+
+    expect(find.byIcon(Icons.mic_rounded), findsNothing);
+    expect(find.byIcon(Icons.cancel_rounded), findsNothing);
+  });
 }

@@ -7,6 +7,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/responsive/breakpoints.dart';
 import '../../../core/responsive/detail_scaffold.dart';
 import '../../../core/responsive/pulsr_layout_metrics.dart';
@@ -15,6 +16,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 import '../../../core/widgets/async_state_builder.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
@@ -245,6 +247,65 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                           elevation: 0,
                           scrolledUnderElevation: 0,
                           backgroundColor: p.bg,
+                          surfaceTintColor: Colors.transparent,
+                          centerTitle: true,
+                          title: ExcludeSemantics(
+                            excluding: !_showCollapsedTitle,
+                            child: AnimatedOpacity(
+                              key: const Key('album_detail_collapsed_title'),
+                              duration: context.motion(PulsrMotion.state),
+                              opacity: _showCollapsedTitle ? 1.0 : 0.0,
+                              child: Text(
+                                widget.album.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: AppFontSize.subtitle,
+                                  color: p.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          actions: [
+                            IgnorePointer(
+                              ignoring: !_showCollapsedTitle,
+                              child: ExcludeSemantics(
+                                excluding: !_showCollapsedTitle,
+                                child: AnimatedOpacity(
+                                  duration: context.motion(PulsrMotion.state),
+                                  opacity: _showCollapsedTitle ? 1.0 : 0.0,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (songs.isNotEmpty)
+                                        IconButton(
+                                          constraints: const BoxConstraints(
+                                            minWidth: AppSpacing.minTouchTarget,
+                                            minHeight:
+                                                AppSpacing.minTouchTarget,
+                                          ),
+                                          icon: Icon(
+                                            Icons.play_circle_fill_rounded,
+                                            color: p.accent,
+                                            size: 28,
+                                          ),
+                                          tooltip: context.l10n.playAll,
+                                          onPressed: () {
+                                            PulsrHaptics.mediumImpact();
+                                            context.read<PlayerCubit>().playSong(
+                                                  songs.first,
+                                                  queue: songs,
+                                                );
+                                          },
+                                        ),
+                                      const SizedBox(width: AppSpacing.xxs),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                           flexibleSpace: FlexibleSpaceBar(
                             background: Container(
                               decoration: BoxDecoration(

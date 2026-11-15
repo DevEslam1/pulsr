@@ -276,9 +276,12 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                     }),
                     const SizedBox(width: AppSpacing.s6),
                     IconButton(
+                      constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget,
+                      ),
                       icon: const Icon(Icons.group_rounded, size: 20),
                       tooltip: context.l10n.partyListenTogether,
-                      visualDensity: VisualDensity.compact,
                       onPressed: () {
                         PulsrHaptics.lightImpact();
                         PartySheet.show(context);

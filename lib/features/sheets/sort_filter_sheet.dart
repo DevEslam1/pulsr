@@ -9,12 +9,12 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../core/utils/pulsr_haptics.dart';
-class _SortOptionSpec {
+class SortOptionSpec {
   final String key;
   final String label;
   final IconData icon;
 
-  const _SortOptionSpec({
+  const SortOptionSpec({
     required this.key,
     required this.label,
     required this.icon,
@@ -26,12 +26,14 @@ class SortFilterSheet extends StatelessWidget {
   final String currentSort;
   final bool ascending;
   final Function(String sortBy, bool ascending) onApply;
+  final List<SortOptionSpec>? options;
 
   const SortFilterSheet({
     super.key,
     required this.currentSort,
     required this.ascending,
     required this.onApply,
+    this.options,
   });
 
   static Future<void> show(
@@ -39,6 +41,7 @@ class SortFilterSheet extends StatelessWidget {
     required String currentSort,
     required bool ascending,
     required Function(String sortBy, bool ascending) onApply,
+    List<SortOptionSpec>? options,
   }) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
@@ -47,6 +50,7 @@ class SortFilterSheet extends StatelessWidget {
         currentSort: currentSort,
         ascending: ascending,
         onApply: onApply,
+        options: options,
       ),
     );
   }
@@ -57,6 +61,9 @@ class SortFilterSheet extends StatelessWidget {
       'rating',
       'dateAdded',
       'lastPlayed',
+      'songCount',
+      'albumCount',
+      'year',
     };
     final isSelected = currentSort == key;
     final newAsc = isSelected ? !ascending : !descendingFirst.contains(key);
@@ -70,50 +77,53 @@ class SortFilterSheet extends StatelessWidget {
     final p = context.palette;
     final size = MediaQuery.sizeOf(context);
     final screenHeight = size.height;
-    final sortOptions = <_SortOptionSpec>[
-      _SortOptionSpec(
-          key: 'title',
-          label: context.l10n.title,
-          icon: Icons.sort_by_alpha_rounded),
-      _SortOptionSpec(
-          key: 'artist',
-          label: context.l10n.artist,
-          icon: Icons.person_outline_rounded),
-      _SortOptionSpec(
-          key: 'album', label: context.l10n.albums, icon: Icons.album_outlined),
-      _SortOptionSpec(
-          key: 'dateAdded',
-          label: context.l10n.recentlyAdded,
-          icon: Icons.auto_awesome_mosaic_outlined),
-      _SortOptionSpec(
-          key: 'duration',
-          label: context.l10n.duration,
-          icon: Icons.schedule_rounded),
-      _SortOptionSpec(
-          key: 'playCount',
-          label: context.l10n.mostPlayed,
-          icon: Icons.trending_up_rounded),
-      _SortOptionSpec(
-          key: 'rating',
-          label: context.l10n.browseTopRated,
-          icon: Icons.star_outline_rounded),
-      _SortOptionSpec(
-          key: 'lastPlayed',
-          label: context.l10n.recentlyPlayed,
-          icon: Icons.history_rounded),
-      _SortOptionSpec(
-          key: 'fileSize',
-          label: context.l10n.fileSize,
-          icon: Icons.sd_storage_outlined),
-      _SortOptionSpec(
-          key: 'sampleRate',
-          label: context.l10n.sampleRate,
-          icon: Icons.graphic_eq_rounded),
-      _SortOptionSpec(
-          key: 'year',
-          label: context.l10n.browseReleaseYear,
-          icon: Icons.calendar_today_rounded),
-    ];
+    final sortOptions = options ??
+        <SortOptionSpec>[
+          SortOptionSpec(
+              key: 'title',
+              label: context.l10n.title,
+              icon: Icons.sort_by_alpha_rounded),
+          SortOptionSpec(
+              key: 'artist',
+              label: context.l10n.artist,
+              icon: Icons.person_outline_rounded),
+          SortOptionSpec(
+              key: 'album',
+              label: context.l10n.albums,
+              icon: Icons.album_outlined),
+          SortOptionSpec(
+              key: 'dateAdded',
+              label: context.l10n.recentlyAdded,
+              icon: Icons.auto_awesome_mosaic_outlined),
+          SortOptionSpec(
+              key: 'duration',
+              label: context.l10n.duration,
+              icon: Icons.schedule_rounded),
+          SortOptionSpec(
+              key: 'playCount',
+              label: context.l10n.mostPlayed,
+              icon: Icons.trending_up_rounded),
+          SortOptionSpec(
+              key: 'rating',
+              label: context.l10n.browseTopRated,
+              icon: Icons.star_outline_rounded),
+          SortOptionSpec(
+              key: 'lastPlayed',
+              label: context.l10n.recentlyPlayed,
+              icon: Icons.history_rounded),
+          SortOptionSpec(
+              key: 'fileSize',
+              label: context.l10n.fileSize,
+              icon: Icons.sd_storage_outlined),
+          SortOptionSpec(
+              key: 'sampleRate',
+              label: context.l10n.sampleRate,
+              icon: Icons.graphic_eq_rounded),
+          SortOptionSpec(
+              key: 'year',
+              label: context.l10n.browseReleaseYear,
+              icon: Icons.calendar_today_rounded),
+        ];
 
     return PulsrBottomSheetContainer(
       title: Text(context.l10n.sortAndFilter),
@@ -220,7 +230,7 @@ class SortFilterSheet extends StatelessWidget {
   Widget _buildSortOptionTile(
     BuildContext context,
     PulsrPalette p,
-    _SortOptionSpec option, {
+    SortOptionSpec option, {
     required bool isGrid,
   }) {
     final isSelected = currentSort == option.key;

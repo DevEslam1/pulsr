@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+import 'package:pulsr/core/widgets/pulsr_dock_tracker.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -37,7 +39,10 @@ const _song = SongsTableData(
   isDownloaded: true,
 );
 
-Widget _harness({required DockStackMode mode}) {
+Widget _harness({
+  required DockStackMode mode,
+  double textScale = 1.0,
+}) {
   final playerCubit = MockPlayerCubit();
   final settingsCubit = MockSettingsCubit();
 
@@ -70,8 +75,9 @@ Widget _harness({required DockStackMode mode}) {
       theme: theme,
       home: Scaffold(
         body: MediaQuery(
-          data: const MediaQueryData(
-            size: Size(390, 844),
+          data: MediaQueryData(
+            size: const Size(390, 844),
+            textScaler: TextScaler.linear(textScale),
             disableAnimations: true,
           ),
           child: Stack(
@@ -102,16 +108,49 @@ void main() {
   bool goldenExists(String name) =>
       File('test/golden/goldens/$name').existsSync();
 
-  for (final mode in DockStackMode.values) {
-    testWidgets('MiniPlayer dock golden: ${mode.name}',
-        skip: !goldenExists('mini_player_${mode.name}.png'), (tester) async {
-      await tester.pumpWidget(_harness(mode: mode));
-      await tester.pumpAndSettle();
+  const textScales = [1.0, 1.5, 2.0];
 
-      await expectLater(
-        find.byType(StackedBottomDock),
-        matchesGoldenFile('goldens/mini_player_${mode.name}.png'),
-      );
-    });
+  for (final mode in DockStackMode.values) {
+    for (final scale in textScales) {
+      testWidgets('MiniPlayer dock height sync: ${mode.name} @ ${scale}x',
+          (tester) async {
+        await tester.pumpWidget(_harness(mode: mode, textScale: scale));
+        await tester.pumpAndSettle();
+
+        final dockCtx = tester.element(find.byType(StackedBottomDock));
+        final expectedDockHeight = StackedBottomDock.computeDockHeight(
+          hasSong: true,
+          mode: mode,
+          navBarTotalHeight: PulsrLayoutMetrics.navBarTotalHeight(dockCtx),
+          miniPlayerHeight:
+              StackedBottomDock.scaledMiniPlayerHeight(dockCtx),
+        );
+        expect(
+          tester.getSize(find.byType(StackedBottomDock)).height,
+          closeTo(expectedDockHeight, 0.01),
+        );
+        expect(
+          PulsrDockTracker.dockHeight.value,
+          closeTo(expectedDockHeight, 0.01),
+        );
+      });
+
+      final scaleTag = scale.toStringAsFixed(1).replaceAll('.', '_');
+      final fileName = scale == 1.0
+          ? 'mini_player_${mode.name}.png'
+          : 'mini_player_${mode.name}_ts_$scaleTag.png';
+
+      testWidgets('MiniPlayer dock golden: ${mode.name} @ ${scale}x',
+          skip: !autoUpdateGoldenFiles && !goldenExists(fileName),
+          (tester) async {
+        await tester.pumpWidget(_harness(mode: mode, textScale: scale));
+        await tester.pumpAndSettle();
+
+        await expectLater(
+          find.byType(StackedBottomDock),
+          matchesGoldenFile('goldens/$fileName'),
+        );
+      });
+    }
   }
 }

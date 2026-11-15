@@ -356,6 +356,10 @@ class _SongTileState extends State<SongTile> {
                             if (widget.onMorePressed != null)
                               RepaintBoundary(
                                 child: IconButton(
+                                  constraints: const BoxConstraints(
+                                    minWidth: AppSpacing.minTouchTarget,
+                                    minHeight: AppSpacing.minTouchTarget,
+                                  ),
                                   icon: Icon(
                                     Icons.more_vert_rounded,
                                     size: 20,
@@ -364,7 +368,6 @@ class _SongTileState extends State<SongTile> {
                                   tooltip: MaterialLocalizations.of(context)
                                       .moreButtonTooltip,
                                   onPressed: widget.onMorePressed,
-                                  visualDensity: VisualDensity.compact,
                                 ),
                               ),
                           ],

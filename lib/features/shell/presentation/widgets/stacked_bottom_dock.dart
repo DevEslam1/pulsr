@@ -9,6 +9,7 @@ import '../../../../core/responsive/layout_delegate.dart';
 import '../../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dock_tracker.dart';
 import '../../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../player/cubit/player_cubit.dart';
@@ -78,12 +79,16 @@ class StackedBottomDock extends StatefulWidget {
     this.layoutMode,
   });
 
+  static double scaledMiniPlayerHeight(BuildContext context) =>
+      StackedBottomDockState.scaledMiniPlayerHeight(context);
+
   static double computeDockHeight({
     required bool hasSong,
     required DockStackMode mode,
     required double navBarTotalHeight,
     double keyboardInset = 0.0,
     bool isKeyboardVisible = false,
+    double? miniPlayerHeight,
   }) =>
       StackedBottomDockState.computeDockHeight(
         hasSong: hasSong,
@@ -91,6 +96,8 @@ class StackedBottomDock extends StatefulWidget {
         navBarTotalHeight: navBarTotalHeight,
         keyboardInset: keyboardInset,
         isKeyboardVisible: isKeyboardVisible,
+        miniPlayerHeight:
+            miniPlayerHeight ?? PulsrLayoutMetrics.miniPlayerHeight,
       );
 
   @override
@@ -139,6 +146,16 @@ class StackedBottomDockState extends State<StackedBottomDock> {
     });
   }
 
+  static double scaledMiniPlayerHeight(BuildContext context) {
+    final scale = MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.5);
+    // Matches MiniPlayer's internal vertical geometry: 32 dp fixed chrome
+    // (6 dp top padding + 24 dp progress bar + 2 dp hairline border) plus
+    // a 52 dp content row scaled by textScaler (clamped to 1.0..1.5).
+    const double fixedChrome = 32.0;
+    final double baseRowHeight = _miniPlayerHeight - fixedChrome;
+    return fixedChrome + baseRowHeight * scale;
+  }
+
   static double computeDockHeight({
     required bool hasSong,
     required DockStackMode mode,
@@ -158,6 +175,32 @@ class StackedBottomDockState extends State<StackedBottomDock> {
         : (_peekOffset + miniPlayerHeight);
   }
 
+  ({
+    double miniPlayerHeight,
+    double navBarTotalHeight,
+    double dockHeight,
+  }) _resolveDockHeights(
+    BuildContext context, {
+    required bool hasSong,
+    required DockStackMode mode,
+    double keyboardInset = 0.0,
+  }) {
+    final miniPlayerHeight = scaledMiniPlayerHeight(context);
+    final navBarTotalHeight = PulsrLayoutMetrics.navBarTotalHeight(context);
+    final dockHeight = computeDockHeight(
+      hasSong: hasSong,
+      mode: mode,
+      navBarTotalHeight: navBarTotalHeight,
+      keyboardInset: keyboardInset,
+      miniPlayerHeight: miniPlayerHeight,
+    );
+    return (
+      miniPlayerHeight: miniPlayerHeight,
+      navBarTotalHeight: navBarTotalHeight,
+      dockHeight: dockHeight,
+    );
+  }
+
   void _syncDock({required bool hasSong}) {
     if (!mounted) return;
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -171,21 +214,14 @@ class StackedBottomDockState extends State<StackedBottomDock> {
       return;
     }
 
-    final double navBarTotalHeight =
-        PulsrLayoutMetrics.navBarTotalHeight(context);
-
-    final double dockHeight = computeDockHeight(
+    final resolved = _resolveDockHeights(
+      context,
       hasSong: hasSong,
       mode: widget.mode,
-      navBarTotalHeight: navBarTotalHeight,
       keyboardInset: keyboardInset,
-      // The mini player grows with the user's text scale (clamped to 1.5x) so
-      // 200 % type does not overflow its fixed 52 dp content box.
-      miniPlayerHeight: _miniPlayerHeight *
-          MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.5),
     );
     _maybeUpdateDock(
-      height: dockHeight,
+      height: resolved.dockHeight,
       miniPlayer: keyboardInset > 0 ? false : hasSong,
     );
   }
@@ -195,6 +231,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
   double? _lastKnownKeyboardInset;
   Orientation? _lastKnownOrientation;
   Size? _lastKnownSize;
+  double? _lastKnownTextScale;
   Timer? _dockSyncDebounceTimer;
 
   @visibleForTesting
@@ -211,17 +248,21 @@ class StackedBottomDockState extends State<StackedBottomDock> {
       final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
       final orientation = MediaQuery.orientationOf(context);
       final size = MediaQuery.sizeOf(context);
+      final textScale =
+          MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.5);
       if (_lastKnownSongId != songId ||
           _lastKnownHasSong != hasSong ||
           _lastKnownKeyboardInset != keyboardInset ||
           _lastKnownOrientation != orientation ||
-          _lastKnownSize != size) {
+          _lastKnownSize != size ||
+          _lastKnownTextScale != textScale) {
         final isFirstSync = _lastKnownHasSong == null;
         _lastKnownSongId = songId;
         _lastKnownHasSong = hasSong;
         _lastKnownKeyboardInset = keyboardInset;
         _lastKnownOrientation = orientation;
         _lastKnownSize = size;
+        _lastKnownTextScale = textScale;
         _dockSyncDebounceTimer?.cancel();
         _dockSyncDebounceTimer = null;
         if (isFirstSync) {
@@ -333,13 +374,21 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                   safePadding.left > 0 ? safePadding.left + 4.0 : 14.0;
               final rightPad =
                   safePadding.right > 0 ? safePadding.right + 4.0 : 14.0;
+              final isRtl = Directionality.of(context) == TextDirection.rtl;
+              final startPad = isRtl ? rightPad : leftPad;
+              final endPad = isRtl ? leftPad : rightPad;
               return SafeArea(
                 top: false,
                 left: false,
                 right: false,
                 bottom: true,
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(leftPad, 4, rightPad, 4),
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                    startPad,
+                    4,
+                    endPad,
+                    4,
+                  ),
                   child: Center(
                     child: ConstrainedBox(
                       constraints:
@@ -440,11 +489,13 @@ class StackedBottomDockState extends State<StackedBottomDock> {
             final isStacked = mode != DockStackMode.defaultLayout;
             final isNavBarOnTop = mode == DockStackMode.navBarOnTop;
 
-            final double dockHeight = computeDockHeight(
+            final resolved = _resolveDockHeights(
+              context,
               hasSong: true,
               mode: mode,
-              navBarTotalHeight: navBarTotalHeight,
             );
+            final double miniPlayerHeight = resolved.miniPlayerHeight;
+            final double dockHeight = resolved.dockHeight;
 
             // Calculate card bottom offsets, scales, and opacities
             final double miniPlayerBottom;
@@ -477,7 +528,7 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                 miniPlayerScale = 1.0;
                 miniPlayerOpacity = 1.0;
                 navBarBottom =
-                    _miniPlayerHeight - navBarTotalHeight + _peekOffset;
+                    miniPlayerHeight - navBarTotalHeight + _peekOffset;
                 navBarScale = 0.95;
                 navBarOpacity = 0.72;
                 break;
@@ -529,9 +580,14 @@ class StackedBottomDockState extends State<StackedBottomDock> {
               DockStackMode targetMode, {
               required bool isMini,
             }) {
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _setMode(targetMode),
+              return Semantics(
+                button: true,
+                label: isMini
+                    ? context.l10n.expandPlayer
+                    : context.l10n.dockStyleTitle,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _setMode(targetMode),
                 onVerticalDragStart: (_) {
                   if (isMini) {
                     _behindMiniDragDy = 0;
@@ -560,14 +616,15 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                     _behindNavDragDy = 0;
                   }
                 },
-                onVerticalDragCancel: () {
-                  if (isMini) {
-                    _behindMiniDragDy = 0;
-                  } else {
-                    _behindNavDragDy = 0;
-                  }
-                },
-                child: AbsorbPointer(child: child),
+                  onVerticalDragCancel: () {
+                    if (isMini) {
+                      _behindMiniDragDy = 0;
+                    } else {
+                      _behindNavDragDy = 0;
+                    }
+                  },
+                  child: AbsorbPointer(child: child),
+                ),
               );
             }
 

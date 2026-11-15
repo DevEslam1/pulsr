@@ -48,6 +48,7 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
 import 'library_quality_utils.dart';
+import 'library_tab_sort.dart';
 import 'widgets/alphabet_quick_scroll.dart';
 import 'widgets/category_card.dart';
 import 'widgets/folder_browser_tab.dart';
@@ -196,6 +197,47 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   bool _folderTree = false;
 
+  final Map<String, LibraryTabSortSpec> _tabSorts = Map.of(
+    LibraryTabSort.defaults,
+  );
+
+  @override
+  LibraryTabSortSpec _tabSortFor(String tabName) =>
+      _tabSorts[tabName] ?? LibraryTabSort.defaultFor(tabName);
+
+  @override
+  void _setTabSort(String tabName, String sortBy, bool ascending) {
+    final spec = LibraryTabSortSpec(sortBy: sortBy, ascending: ascending);
+    setState(() {
+      _tabSorts[tabName] = spec;
+    });
+    unawaited(_persistTabSort(tabName, spec));
+  }
+
+  Future<void> _persistTabSort(
+    String tabName,
+    LibraryTabSortSpec spec,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        LibraryTabSort.sortByPrefKey(tabName),
+        spec.sortBy,
+      );
+      await prefs.setBool(
+        LibraryTabSort.ascendingPrefKey(tabName),
+        spec.ascending,
+      );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to persist tab sort preference',
+        error: e,
+        stackTrace: st,
+        category: 'Library',
+      );
+    }
+  }
+
   @override
   final TextEditingController _importYtmController = TextEditingController();
 
@@ -247,6 +289,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     if (!mounted) return;
     if (_tabController.indexIsChanging) return;
     final index = _tabController.index;
+    setState(() {});
     if (index == _lastPersistedTab) return;
     // Selection is scoped to the list it started in. Carrying it into another
     // tab would let a batch action hit rows the user can no longer see.
@@ -357,6 +400,18 @@ class _LibraryScreenState extends State<LibraryScreen>
         }
         _genreHierarchy = prefs.getBool(_genreHierarchyPrefKey) ?? false;
         _folderTree = prefs.getBool(_folderTreePrefKey) ?? false;
+        for (final entry in LibraryTabSort.defaults.entries) {
+          final savedBy =
+              prefs.getString(LibraryTabSort.sortByPrefKey(entry.key));
+          final savedAsc =
+              prefs.getBool(LibraryTabSort.ascendingPrefKey(entry.key));
+          if (savedBy != null || savedAsc != null) {
+            _tabSorts[entry.key] = LibraryTabSortSpec(
+              sortBy: savedBy ?? entry.value.sortBy,
+              ascending: savedAsc ?? entry.value.ascending,
+            );
+          }
+        }
       });
     } catch (e, st) {
       ErrorLogger.log(
@@ -646,12 +701,21 @@ class _LibraryScreenState extends State<LibraryScreen>
         final cubit = context.read<LibraryCubit>();
         final playerCubit = context.read<PlayerCubit>();
         final isMultiSelect = state.isMultiSelectMode;
-        // Collection tabs (Albums/Artists/Folders/Genres/Years) use the fixed
-        // repository order, so the global sort control would silently do
-        // nothing there. Keep it active only on Songs (and Favorites/Downloads,
-        // which share the song ordering).
-        final canSort = _activeTab == LibraryTabItem.songs;
-        final isSortedCustom = state.sortBy != 'title' || !state.ascending;
+        final activeTab = _activeTab;
+        final isSongsTab =
+            activeTab == null || activeTab == LibraryTabItem.songs;
+        final activeSort = isSongsTab
+            ? LibraryTabSortSpec(
+                sortBy: state.sortBy,
+                ascending: state.ascending,
+              )
+            : _tabSortFor(activeTab.name);
+        final defaultSort = isSongsTab
+            ? const LibraryTabSortSpec(sortBy: 'title', ascending: true)
+            : LibraryTabSort.defaultFor(activeTab.name);
+        final isSortedCustom = activeSort != defaultSort;
+        final sortLabel =
+            LibraryTabSort.labelForKey(context, activeSort.sortBy);
         final isGridView = state.viewMode == LibraryViewMode.grid;
         final losslessCount = state.songs.where(isLosslessSong).length;
         final p = context.palette;
@@ -825,28 +889,40 @@ class _LibraryScreenState extends State<LibraryScreen>
                         minWidth: AppSpacing.minTouchTarget,
                         minHeight: AppSpacing.minTouchTarget,
                       ),
-                      style: canSort && isSortedCustom
+                      style: isSortedCustom
                           ? IconButton.styleFrom(
                               backgroundColor:
                                   p.accent.withValues(alpha: 0.14),
                             )
                           : null,
                       icon: const Icon(Icons.sort_rounded),
-                      color: !canSort
-                          ? p.textTertiary
-                          : isSortedCustom
-                              ? p.accent
-                              : p.textSecondary,
-                      tooltip: context.l10n.sortBy,
-                      onPressed: canSort
-                          ? () => SortFilterSheet.show(
-                                context,
-                                currentSort: state.sortBy,
-                                ascending: state.ascending,
-                                onApply: (sort, asc) =>
-                                    cubit.updateSort(sort, asc),
-                              )
-                          : null,
+                      color: isSortedCustom ? p.accent : p.textSecondary,
+                      tooltip: '${context.l10n.sortBy}: $sortLabel',
+                      onPressed: () {
+                        if (isSongsTab) {
+                          SortFilterSheet.show(
+                            context,
+                            currentSort: state.sortBy,
+                            ascending: state.ascending,
+                            onApply: (sort, asc) => cubit.updateSort(sort, asc),
+                          );
+                          return;
+                        }
+                        SortFilterSheet.show(
+                          context,
+                          currentSort: activeSort.sortBy,
+                          ascending: activeSort.ascending,
+                          options: LibraryTabSort.optionsForTab(
+                            context,
+                            activeTab.name,
+                          ),
+                          onApply: (sort, asc) => _setTabSort(
+                            activeTab.name,
+                            sort,
+                            asc,
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(width: AppSpacing.xs),
                   ],

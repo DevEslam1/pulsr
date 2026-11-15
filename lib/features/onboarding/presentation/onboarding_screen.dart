@@ -530,9 +530,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               children: [
                                 if (_currentPage > 0) ...[
                                   SizedBox(
-                                    width: isLandscape ? 44 : 52,
-                                    height: isLandscape ? 44 : 52,
+                                    width: isLandscape
+                                        ? AppSpacing.minTouchTarget
+                                        : 52,
+                                    height: isLandscape
+                                        ? AppSpacing.minTouchTarget
+                                        : 52,
                                     child: IconButton.outlined(
+                                      tooltip: context.l10n.previous,
                                       style: IconButton.styleFrom(
                                         foregroundColor: p.textPrimary,
                                         side: BorderSide(color: p.hairline),
