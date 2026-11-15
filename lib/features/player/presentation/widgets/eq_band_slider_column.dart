@@ -63,12 +63,22 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
   }) {
     final isMuted = _mutedBands.contains(index);
     final isSoloed = _soloedBands.contains(index);
+    // AUDIT-FIX (P2-21): Collapse slider semantics to a single outer node
+    // (`excludeSemantics: true` + clamped increase/decrease values) so
+    // TalkBack does not announce two nested sliders per EQ band.
     void adjustGain(double delta) {
       if (!state.isEqEnabled) {
         cubit.setEqualizerEnabled(true);
       }
-      cubit.setBandGain(index, gain + delta);
+      final clamped =
+          (gain + delta).clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
+      cubit.setBandGain(index, double.parse(clamped.toStringAsFixed(1)));
     }
+
+    final nextGain =
+        (gain + 1.0).clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
+    final prevGain =
+        (gain - 1.0).clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
 
     return RepaintBoundary(
       child: Column(
@@ -76,13 +86,14 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
         children: [
           Semantics(
             slider: true,
+            excludeSemantics: true,
             enabled: isEnabled,
-            label: context.l10n.eqBandLabel(index + 1),
+            label: '${context.l10n.eqBandLabel(index + 1)} ($label)',
             value: '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)} dB',
             increasedValue:
-                '${gain + 1 > 0 ? '+' : ''}${(gain + 1).toStringAsFixed(1)} dB',
+                '${nextGain > 0 ? '+' : ''}${nextGain.toStringAsFixed(1)} dB',
             decreasedValue:
-                '${gain - 1 > 0 ? '+' : ''}${(gain - 1).toStringAsFixed(1)} dB',
+                '${prevGain > 0 ? '+' : ''}${prevGain.toStringAsFixed(1)} dB',
             onIncrease: isEnabled ? () => adjustGain(1.0) : null,
             onDecrease: isEnabled ? () => adjustGain(-1.0) : null,
             child: _VerticalEqSlider(
@@ -343,7 +354,9 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                 fontSize: AppFontSize.tiny,
                 color: _isDragging
                     ? Colors.white
-                    : (gain.abs() > 0.1 ? widget.accentColor : widget.textColor),
+                    : (gain.abs() > 0.1
+                        ? widget.accentColor
+                        : widget.textColor),
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -366,90 +379,72 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
               final thumbY = topMargin + (1.0 - fraction) * trackHeight;
               final centerY = topMargin + trackHeight / 2;
 
-              final formattedGain =
-                  '${gain > 0 ? "+" : ""}${gain.toStringAsFixed(1)} dB';
-              final nextGain = (gain + 1.0)
-                  .clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
-              final prevGain = (gain - 1.0)
-                  .clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
-
-              return Semantics(
-                label: '${widget.label} EQ',
-                slider: true,
-                value: formattedGain,
-                increasedValue:
-                    '${nextGain > 0 ? "+" : ""}${nextGain.toStringAsFixed(1)} dB',
-                decreasedValue:
-                    '${prevGain > 0 ? "+" : ""}${prevGain.toStringAsFixed(1)} dB',
-                onIncrease: () {
-                  widget.onChanged(double.parse(nextGain.toStringAsFixed(1)));
+              // AUDIT-FIX (P2-21): Outer slider column Semantics owns the single
+              // slider node (`excludeSemantics: true`); avoid a duplicate inner
+              // slider node here.
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                // Tap-to-set on release so starting a drag never jumps the band.
+                onTapUp: (details) {
+                  _handlePointer(details.localPosition.dy, height,
+                      notifyParent: true);
                 },
-                onDecrease: () {
-                  widget.onChanged(double.parse(prevGain.toStringAsFixed(1)));
+                // Double-tap-to-zero (0.0 dB) reset with confirmation haptics.
+                onDoubleTap: () {
+                  PulsrHaptics.confirm();
+                  widget.onChanged(0.0);
+                  setState(() => _dragGain = 0.0);
                 },
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  // Tap-to-set on release so starting a drag never jumps the band.
-                  onTapUp: (details) {
-                    _handlePointer(details.localPosition.dy, height,
-                        notifyParent: true);
-                  },
-                  // Double-tap-to-zero (0.0 dB) reset with confirmation haptics.
-                  onDoubleTap: () {
-                    PulsrHaptics.confirm();
-                    widget.onChanged(0.0);
-                    setState(() => _dragGain = 0.0);
-                  },
-                  onVerticalDragStart: (details) {
-                    setState(() => _isDragging = true);
-                    widget.onDragStart?.call();
-                    _handlePointer(details.localPosition.dy, height,
-                        notifyParent: true);
-                  },
-                  onVerticalDragUpdate: (details) {
-                    _handlePointer(details.localPosition.dy, height,
-                        notifyParent: true);
-                  },
-                  onVerticalDragEnd: (_) {
-                    final finalGain = _dragGain ?? widget.value;
-                    widget.onChanged(finalGain);
-                    widget.onDragEnd?.call();
-                    setState(() {
-                      _isDragging = false;
-                      _dragGain = null;
-                    });
-                  },
-                  onVerticalDragCancel: () {
-                    widget.onDragEnd?.call();
-                    setState(() {
-                      _isDragging = false;
-                      _dragGain = null;
-                    });
-                  },
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      CustomPaint(
-                        size: Size(constraints.maxWidth, height),
-                        painter: _VerticalSliderPainter(
-                          fraction: fraction,
-                          thumbY: thumbY,
-                          centerY: centerY,
-                          topMargin: topMargin,
-                          bottomMargin: bottomMargin,
-                          isDragging: _isDragging,
-                          isEnabled: widget.isEnabled,
-                          accentColor: widget.accentColor,
-                          trackColor: widget.trackColor,
-                          surfaceColor: widget.surfaceColor,
-                        ),
+                onVerticalDragStart: (details) {
+                  setState(() => _isDragging = true);
+                  widget.onDragStart?.call();
+                  _handlePointer(details.localPosition.dy, height,
+                      notifyParent: true);
+                },
+                onVerticalDragUpdate: (details) {
+                  _handlePointer(details.localPosition.dy, height,
+                      notifyParent: true);
+                },
+                onVerticalDragEnd: (_) {
+                  final finalGain = _dragGain ?? widget.value;
+                  widget.onChanged(finalGain);
+                  widget.onDragEnd?.call();
+                  setState(() {
+                    _isDragging = false;
+                    _dragGain = null;
+                  });
+                },
+                onVerticalDragCancel: () {
+                  widget.onDragEnd?.call();
+                  setState(() {
+                    _isDragging = false;
+                    _dragGain = null;
+                  });
+                },
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    CustomPaint(
+                      size: Size(constraints.maxWidth, height),
+                      painter: _VerticalSliderPainter(
+                        fraction: fraction,
+                        thumbY: thumbY,
+                        centerY: centerY,
+                        topMargin: topMargin,
+                        bottomMargin: bottomMargin,
+                        isDragging: _isDragging,
+                        isEnabled: widget.isEnabled,
+                        accentColor: widget.accentColor,
+                        trackColor: widget.trackColor,
+                        surfaceColor: widget.surfaceColor,
                       ),
-                      // Floating dB readout badge while dragging
-                      if (_isDragging)
-                        PositionedDirectional(
-                          top: (thumbY - 26).clamp(0.0, height - 22.0),
-                          start: 0,
-                          end: 0,
+                    ),
+                    // Floating dB readout badge while dragging
+                    if (_isDragging)
+                      PositionedDirectional(
+                        top: (thumbY - 26).clamp(0.0, height - 22.0),
+                        start: 0,
+                        end: 0,
                         child: Center(
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -486,7 +481,6 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                         ),
                       ),
                   ],
-                ),
                 ),
               );
             },
