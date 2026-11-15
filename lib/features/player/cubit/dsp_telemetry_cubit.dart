@@ -18,7 +18,7 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   // AUDIT-FIX: Exponential backoff retry counter
   int _retryCount = 0;
   bool _didLogFailure = false;
-  bool _fetchInFlight = false;
+  Future<void>? _activeFetch;
   Duration? _lastRetryDelay;
 
   /// B3: after this many consecutive failed polls the timer is parked so a
@@ -152,25 +152,35 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
   }
 
   Future<void> refreshOnce() async {
-    // A timer tick may already be in flight. Wait for it to finish instead of
-    // silently dropping the user's explicit refresh (the old implementation
-    // returned immediately, so a refresh during a slow/failing poll did
-    // nothing).
-    while (_fetchInFlight) {
-      await Future<void>.delayed(const Duration(milliseconds: 1));
+    // AUDIT-FIX (P3-26): Await the active fetch Future directly rather than
+    // spinning on a 1ms Timer loop, then issue a fresh fetch so an explicit
+    // refresh during a slow/failing poll is never dropped.
+    while (_activeFetch != null) {
+      await _activeFetch;
+      if (isClosed) return;
     }
     await _fetchTelemetry();
   }
 
-  Future<void> _fetchTelemetry() async {
-    // Skip this tick while a previous fetch is still in flight: the 200ms timer
-    // can fire before the channel timeout, and overlapping polls could emit
-    // telemetry out of order.
-    if (_fetchInFlight) return;
-    _fetchInFlight = true;
+  Future<void> _fetchTelemetry() {
+    // Skip timer ticks while a previous fetch is still in flight: the 200ms
+    // timer can fire before the channel timeout, and overlapping polls could
+    // emit telemetry out of order.
+    if (_activeFetch != null) return Future<void>.value();
+    late final Future<void> run;
+    run = _performFetchTelemetry().whenComplete(() {
+      if (identical(_activeFetch, run)) {
+        _activeFetch = null;
+      }
+    });
+    _activeFetch = run;
+    return run;
+  }
+
+  Future<void> _performFetchTelemetry() async {
     try {
       // Bound the cubit's own wait as well: a channel/fake that never completes
-      // would otherwise leave _fetchInFlight stuck true forever.
+      // would otherwise leave _activeFetch non-null until timeout.
       final telemetry = await _channel.getTelemetry().timeout(
             const Duration(seconds: 1),
           );
@@ -208,8 +218,6 @@ class DspTelemetryCubit extends Cubit<DspTelemetry> {
         _stopTimer();
         _scheduleRetry();
       }
-    } finally {
-      _fetchInFlight = false;
     }
   }
 

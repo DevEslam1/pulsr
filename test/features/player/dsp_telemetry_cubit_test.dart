@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/audio_effects_channel.dart';
@@ -177,6 +178,66 @@ void main() {
     expect(cubit.isRetryTimerActive, isTrue);
     expect(cubit.retryCount, lessThanOrEqualTo(10));
     expect(cubit.lastRetryDelay, const Duration(seconds: 30));
+
+    cubit.unsubscribe();
+    await cubit.close();
+  });
+
+  test(
+      'P3-26: refreshOnce awaits active fetch directly without spin-wait and still fetches fresh sample',
+      () async {
+    final firstPoll = Completer<DspTelemetry>();
+    final secondPoll = Completer<DspTelemetry>();
+    var calls = 0;
+    final channel = MockAudioEffectsChannel();
+    when(() => channel.getTelemetry()).thenAnswer((_) {
+      calls++;
+      return calls == 1 ? firstPoll.future : secondPoll.future;
+    });
+
+    final cubit = DspTelemetryCubit(
+      channel: channel,
+      pollingInterval: const Duration(hours: 1),
+    );
+    cubit.subscribe();
+    expect(calls, 1);
+
+    var refreshDone = false;
+    final refreshFuture = cubit.refreshOnce().whenComplete(() {
+      refreshDone = true;
+    });
+    // Yield microtasks: refreshOnce must suspend cleanly on _activeFetch
+    // rather than spinning or issuing a concurrent second call prematurely.
+    await Future<void>.delayed(Duration.zero);
+    expect(refreshDone, isFalse);
+    expect(calls, 1);
+
+    firstPoll.complete(
+      const DspTelemetry(
+        limiterGrDb: -1.0,
+        dynEqGrDb: [0, 0, 0, 0, 0, 0, 0, 0],
+        multibandGrDb: [0, 0, 0, 0],
+        rollingRtf: 0.2,
+        autoDegradedStages: 0,
+      ),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(cubit.state.limiterGrDb, equals(-1.0));
+    expect(calls, 2);
+    expect(refreshDone, isFalse);
+
+    secondPoll.complete(
+      const DspTelemetry(
+        limiterGrDb: -6.0,
+        dynEqGrDb: [0, 0, 0, 0, 0, 0, 0, 0],
+        multibandGrDb: [0, 0, 0, 0],
+        rollingRtf: 0.2,
+        autoDegradedStages: 0,
+      ),
+    );
+    await refreshFuture;
+    expect(refreshDone, isTrue);
+    expect(cubit.state.limiterGrDb, equals(-6.0));
 
     cubit.unsubscribe();
     await cubit.close();
