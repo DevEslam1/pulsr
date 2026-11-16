@@ -34,6 +34,33 @@ class SacdIsoIndex {
   /// Area the indexer recommends for playback, or null when none parsed.
   SacdToc? get preferred => areas.isEmpty ? null : areas.first;
 
+  /// The stereo area, or null when the image only carries a multichannel /
+  /// master area.
+  ///
+  /// The in-memory DSF decoder supports mono/stereo only, so extraction and
+  /// playlist building must go through this getter instead of [preferred]:
+  /// an image with a 6-channel area would otherwise be handed to a decoder
+  /// that rejects it after a long extraction.
+  SacdToc? get stereoToc {
+    for (final area in areas) {
+      if (area.channels <= 2 && area.area != SacdAreaKind.multiChannel) {
+        return area;
+      }
+    }
+    for (final area in areas) {
+      if (area.channels <= 2) return area;
+    }
+    return null;
+  }
+
+  /// Stereo tracks of the image, or an empty list when it has none.
+  List<SacdTrack> get stereoTracks =>
+      stereoToc?.tracks ?? const <SacdTrack>[];
+
+  /// True when the image parsed but has no area the decoder can play.
+  bool get hasOnlyMultichannel =>
+      areas.isNotEmpty && stereoToc == null;
+
   /// Tracks of [preferred], or an empty list when no area parsed.
   List<SacdTrack> get tracks => preferred?.tracks ?? const <SacdTrack>[];
 }

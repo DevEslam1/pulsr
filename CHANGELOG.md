@@ -1,5 +1,12 @@
 # Pulsr Hardening & Delivery Changelog
 
+## Documentation Refresh — 2026-11-17
+- **README.md** rewritten against the current source: 11 themes, 652 AutoEQ profiles, the 20-stage native DSP chain, DSD512/DoP, USB-DAC exclusive output, party protocol v1, Quran Mode, remote sources, DLNA, diagnostics and the honest bit-perfect policy.
+- **docs/FEATURE_MATRIX.md** added as the source-verified capability inventory, including explicit limits.
+- **docs/README.md** added as the documentation index separating living references from dated audit snapshots.
+- **DESIGN_SYSTEM.md**, **CLAUDE.md**, **docs/player_architecture.md** and **docs/qa/dsp-device-validation.md** corrected for the 11-theme registry, five Quran reciter styles and removal of stale sinc/binaural/sub-millisecond claims.
+- Website download panel now points to per-release SHA-256 checksums instead of an inline placeholder.
+
 ## Phase 0 — Baseline & P0 Corrections
 - **`lib/core/constants/audio_feature_info.dart`**
   - **Change**: Restored truncated prefix check to `!lowerPath.startsWith('content://')) {`.

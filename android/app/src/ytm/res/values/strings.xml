@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Must match the ytm applicationId (com.pulsr.music.ytm) + .suggestions. -->
+    <string name="search_suggestions_authority" translatable="false">com.pulsr.music.ytm.suggestions</string>
+</resources>

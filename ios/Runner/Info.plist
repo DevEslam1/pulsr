@@ -80,9 +80,15 @@
 	<string>Pulsr discovers and streams to DLNA/UPnP renderers and network shares on your local network.</string>
 	<key>NSBonjourServices</key>
 	<array>
-		<string>_pulsr._tcp</string>
 		<string>_googlecast._tcp</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- LAN shares, DLNA renderers and the local stream server use plain
+		     HTTP on private addresses; public traffic stays ATS-protected. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

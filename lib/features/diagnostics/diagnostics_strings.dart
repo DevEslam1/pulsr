@@ -30,6 +30,12 @@ abstract final class DiagnosticsStrings {
   static const String safeModeOn = 'Safe mode is active';
   static const String safeModeOff = 'Safe mode is off';
   static const String safeModeReset = 'Reset safe mode';
+  static const String safeModeEnter = 'Enter safe mode';
+  static const String safeModeExit = 'Exit safe mode';
+  static const String safeModeEntered =
+      'Safe mode is on. AAudio, USB volume and strict bit-perfect are off.';
+  static const String safeModeExited =
+      'Safe mode is off. Your previous output settings were restored.';
   static const String safeModeResetDone = 'Safe mode was reset.';
   static const String safeModeResetFailed = 'Resetting safe mode failed.';
   static const String safeModePersistFailed =

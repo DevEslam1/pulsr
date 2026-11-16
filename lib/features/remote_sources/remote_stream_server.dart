@@ -3,15 +3,24 @@
 // P0-1 "remote sources": the loopback HTTP bridge that turns any remote
 // provider into a seekable URL for the existing player.
 //
-// GET /stream/<sourceId>/<base64url path> answers 200 with the whole file or
-// 206 with a byte window, reusing the disk cache when the file was already
-// downloaded and warming it while a full download streams through. Range
-// arithmetic lives in remote_byte_range.dart on purpose: this module does not
-// import the DLNA code, so the two cannot drift apart silently.
+// GET /stream/<sourceId>/<token>/<base64url path> answers 200 with the whole
+// file or 206 with a byte window, reusing the disk cache when the file was
+// already downloaded and warming it while a full download streams through.
+// Range arithmetic lives in remote_byte_range.dart on purpose: this module does
+// not import the DLNA code, so the two cannot drift apart silently.
+//
+// Every URL carries a 128-bit token generated with [Random.secure] and checked
+// on each request. The token is per source, survives a provider replacement
+// (seeks keep working) and is revoked by [RemoteStreamServer.unregisterSource]
+// or by deleting the source through [RemoteSourceStore], which calls
+// [RemoteStreamServer.revokeSource]. A stale URL from a deleted library
+// therefore answers 403/404 instead of streaming someone else's file.
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
+import '../../core/errors/app_error_base.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/interfaces/remote_fs_provider.dart';
 import '../../domain/models/remote_source.dart';
@@ -37,6 +46,13 @@ class RemoteStreamServer {
   final RemoteCacheStore? _cache;
   final RemoteStreamPump _pump;
   final Map<String, RemoteFsProvider> _providers = <String, RemoteFsProvider>{};
+  final Map<String, String> _tokens = <String, String>{};
+
+  /// Servers whose socket is accepting connections; used by [revokeSource] so
+  /// a deleted library stops streaming even when its owner forgot to call
+  /// [unregisterSource].
+  static final Set<RemoteStreamServer> _live = <RemoteStreamServer>{};
+
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _subscription;
   Future<void>? _starting;
@@ -48,14 +64,42 @@ class RemoteStreamServer {
   bool get isRunning => _server != null;
 
   /// Makes [provider] reachable under its source id.
-  void registerProvider(RemoteFsProvider provider) {
-    _providers[provider.source.id] = provider;
+  ///
+  /// A previous provider for the same id is replaced and closed: keeping it
+  /// alive would leak a socket (FTP) or a native SMB session per song. The
+  /// token is deliberately *not* rotated here, so a stream URL the player is
+  /// already using keeps working across a provider swap.
+  Future<void> registerProvider(RemoteFsProvider provider) async {
+    final sourceId = provider.source.id;
+    final previous = _providers[sourceId];
+    _providers[sourceId] = provider;
+    _tokens.putIfAbsent(sourceId, _newToken);
+    if (previous != null && !identical(previous, provider)) {
+      await _closeQuietly(previous);
+    }
   }
 
-  /// Removes the provider registered for [sourceId] (the provider is not
-  /// closed here; the owner decides its lifetime).
-  void unregisterProvider(String sourceId) {
-    _providers.remove(sourceId);
+  /// Revokes [sourceId]'s token, drops its provider and closes it.
+  ///
+  /// Call this when a library is deleted or disabled; every URL handed out for
+  /// it stops working immediately.
+  Future<void> unregisterSource(
+    String sourceId, {
+    bool closeProvider = true,
+  }) async {
+    _tokens.remove(sourceId);
+    final provider = _providers.remove(sourceId);
+    if (closeProvider && provider != null) await _closeQuietly(provider);
+  }
+
+  /// Revokes [sourceId] on every live server in this isolate.
+  ///
+  /// [RemoteSourceStore] calls this after a delete so a deleted library cannot
+  /// keep serving a token that was already handed to the player.
+  static Future<void> revokeSource(String sourceId) async {
+    for (final server in _live.toList(growable: false)) {
+      await server.unregisterSource(sourceId);
+    }
   }
 
   /// Builds the URL a player should open for [path] on [source].
@@ -66,13 +110,21 @@ class RemoteStreamServer {
     if (!isRunning) {
       throw StateError('Await RemoteStreamServer.start() before uriFor().');
     }
+    final token = _tokens[source.id] ??= _newToken();
     final encoded = base64UrlEncode(utf8.encode(path)).replaceAll('=', '');
     return Uri(
       scheme: 'http',
       host: InternetAddress.loopbackIPv4.address,
       port: port,
-      pathSegments: <String>['stream', source.id, encoded],
+      pathSegments: <String>['stream', source.id, token, encoded],
     );
+  }
+
+  /// A fresh 128-bit URL segment from the platform CSPRNG.
+  static String _newToken() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    return base64Url.encode(bytes).replaceAll('=', '');
   }
 
   /// Starts listening on an ephemeral loopback port; safe to call twice.
@@ -101,6 +153,7 @@ class RemoteStreamServer {
       );
       server.autoCompress = false;
       _server = server;
+      _live.add(this);
       _subscription = server.listen(
         _handleRequest,
         onError: (Object error, StackTrace stackTrace) {
@@ -123,30 +176,36 @@ class RemoteStreamServer {
     }
   }
 
-  /// Stops listening and closes the registered providers.
+  /// Stops listening, revokes every token and closes registered providers.
   Future<void> stop({bool closeProviders = true}) async {
     final server = _server;
     final subscription = _subscription;
     _server = null;
     _subscription = null;
+    _live.remove(this);
     await subscription?.cancel();
     if (server != null) await server.close(force: true);
+    _tokens.clear();
     if (closeProviders) {
       final providers = _providers.values.toList(growable: false);
       _providers.clear();
       for (final provider in providers) {
-        try {
-          await provider.close();
-        } catch (e, st) {
-          ErrorLogger.log(
-            'Remote provider did not close cleanly',
-            error: e,
-            stackTrace: st,
-            category: 'RemoteSources',
-            meta: {'authority': provider.source.authority},
-          );
-        }
+        await _closeQuietly(provider);
       }
+    }
+  }
+
+  Future<void> _closeQuietly(RemoteFsProvider provider) async {
+    try {
+      await provider.close();
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Remote provider did not close cleanly',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+        meta: {'authority': provider.source.authority},
+      );
     }
   }
 
@@ -171,7 +230,7 @@ class RemoteStreamServer {
     response.headers.contentType = ContentType.binary;
     try {
       final segments = request.uri.pathSegments;
-      if (segments.length < 3 || segments.first != 'stream') {
+      if (segments.length < 4 || segments.first != 'stream') {
         await _pump.sendText(response, HttpStatus.notFound, 'Not a stream URL.');
         return;
       }
@@ -180,12 +239,16 @@ class RemoteStreamServer {
         await _pump.sendText(response, HttpStatus.methodNotAllowed, 'GET only.');
         return;
       }
-      final sourceId = segments[1];
-      final path = _decodePath(segments.sublist(2).join('/'));
-      if (path == null) {
-        await _pump.sendText(response, HttpStatus.badRequest, 'Bad stream path.');
+      if (segments.any(_isTraversalSegment)) {
+        await _pump.sendText(
+          response,
+          HttpStatus.badRequest,
+          'Bad stream path.',
+        );
         return;
       }
+      final sourceId = segments[1];
+      final token = segments[2];
       final provider = _providers[sourceId];
       if (provider == null) {
         await _pump.sendText(
@@ -193,6 +256,20 @@ class RemoteStreamServer {
           HttpStatus.notFound,
           'No remote source is registered for this id.',
         );
+        return;
+      }
+      final expected = _tokens[sourceId];
+      if (expected == null || !_tokensMatch(token, expected)) {
+        await _pump.sendText(
+          response,
+          HttpStatus.forbidden,
+          'Invalid stream token.',
+        );
+        return;
+      }
+      final path = _decodePath(segments.sublist(3).join('/'));
+      if (path == null || _hasTraversal(path)) {
+        await _pump.sendText(response, HttpStatus.badRequest, 'Bad stream path.');
         return;
       }
       await _serve(request, response, provider, path);
@@ -239,10 +316,34 @@ class RemoteStreamServer {
     String path,
   ) async {
     final sourceId = provider.source.id;
-    final cached = await _cache?.lookup(sourceId, path);
-    final totalLength = cached != null
-        ? await cached.length()
-        : (await provider.stat(path))?.sizeBytes;
+    // One stat per request is the price of never serving stale audio: the
+    // cache entry carries the validators from the download, and a server-side
+    // change (re-encoded file, replaced track) invalidates it here. A cached
+    // file is still playable when the library is temporarily unreachable.
+    final cachedFile = await _cache?.lookup(sourceId, path);
+    RemoteEntry? stat;
+    try {
+      stat = await provider.stat(path);
+    } on AppError catch (e, st) {
+      if (cachedFile == null) rethrow;
+      ErrorLogger.log(
+        'Remote stat failed; serving the cached copy of this file',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+        meta: {'authority': provider.source.authority},
+      );
+    }
+    final cached = cachedFile == null
+        ? null
+        : await _cache!.lookup(
+            sourceId,
+            path,
+            etag: stat?.etag,
+            modifiedAt: stat?.modifiedAt,
+          );
+    final cachedLength = cached != null ? await cached.length() : null;
+    final totalLength = cachedLength ?? stat?.sizeBytes;
     final headOnly = request.method == 'HEAD';
     if (totalLength == null || totalLength <= 0) {
       // The size is unknown (or the file is empty): serve the body directly and
@@ -271,14 +372,21 @@ class RemoteStreamServer {
     final range = parsed.range;
     if (range == null) {
       response.statusCode = HttpStatus.ok;
-      response.contentLength = totalLength;
     } else {
       response.statusCode = HttpStatus.partialContent;
-      response.contentLength = range.length;
       response.headers.set(
         HttpHeaders.contentRangeHeader,
         'bytes ${range.start}-${range.end}/$totalLength',
       );
+    }
+    // Content-Length is only promised when a local file proves the byte count
+    // (or for HEAD, where a metadata answer cannot truncate a body). A live
+    // provider stream is framed as chunked: a server that reports a size but
+    // sends fewer bytes would otherwise leave the player waiting forever.
+    if (cached != null) {
+      response.contentLength = range?.length ?? cachedLength!;
+    } else if (headOnly) {
+      response.contentLength = range?.length ?? totalLength;
     }
     if (headOnly) {
       await response.close();
@@ -289,7 +397,12 @@ class RemoteStreamServer {
       return;
     }
     final sink = range == null
-        ? await _pump.startCacheWrite(provider.source.id, path)
+        ? await _pump.startCacheWrite(
+            provider.source.id,
+            path,
+            etag: stat?.etag,
+            modifiedAt: stat?.modifiedAt,
+          )
         : null;
     await _pump.sendFromProvider(
       response,
@@ -301,6 +414,35 @@ class RemoteStreamServer {
     );
   }
 
+  /// True for a `.`/`..` segment or a percent-encoded spelling of `..`.
+  static bool _isTraversalSegment(String segment) {
+    if (segment.isEmpty) return false;
+    if (segment == '.') return false;
+    if (segment == '..') return true;
+    try {
+      return Uri.decodeComponent(segment) == '..';
+    } on ArgumentError {
+      return true;
+    } on FormatException {
+      return true;
+    }
+  }
+
+  /// True when [path] contains a `..` segment after base64 decoding.
+  static bool _hasTraversal(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    return normalized.split('/').any(_isTraversalSegment);
+  }
+
+  /// Constant-time-ish comparison so a token cannot be discovered byte by byte.
+  static bool _tokensMatch(String candidate, String expected) {
+    if (candidate.length != expected.length) return false;
+    var diff = 0;
+    for (var i = 0; i < candidate.length; i++) {
+      diff |= candidate.codeUnitAt(i) ^ expected.codeUnitAt(i);
+    }
+    return diff == 0;
+  }
 
   String? _decodePath(String encoded) {
     if (encoded.isEmpty) return '';

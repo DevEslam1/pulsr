@@ -15,6 +15,7 @@ import '../../core/utils/error_logger.dart';
 import '../../core/utils/l10n_holder.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';
+import '../remote_sources/remote_host_allowlist.dart';
 
 @lazySingleton
 class WidgetService {
@@ -543,8 +544,16 @@ class WidgetService {
         HttpClient? client;
         try {
           final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
+          // A configured remote library may serve cover art over plain HTTP on
+          // the LAN; everything else keeps the HTTPS-only rule.
+          final allowlist = RemoteHostAllowlist.instance;
+          final allowlistedHost = uri != null && allowlist.allows(uri.host);
           if (uri != null &&
-              RemoteTargetPolicy.isAllowed(uri.toString(), requireHttps: true)) {
+              RemoteTargetPolicy.isAllowed(
+                uri.toString(),
+                requireHttps: !allowlistedHost,
+                allowedHostSuffixes: allowlist.hosts,
+              )) {
             client = HttpClient()
               ..connectionTimeout = _networkTimeout
               ..idleTimeout = const Duration(seconds: 5);

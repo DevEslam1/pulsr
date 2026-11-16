@@ -378,6 +378,12 @@ class WebDavFsProvider implements RemoteFsProvider {
     void addSegments(String value) {
       for (final segment in value.split('/')) {
         if (segment.isEmpty || segment == '.') continue;
+        if (_isTraversalSegment(segment)) {
+          throw const RemoteProtocolError(
+            code: 'WEBDAV_PATH_TRAVERSAL',
+            userMessage: 'That path is not allowed.',
+          );
+        }
         segments.add(segment);
       }
     }
@@ -390,6 +396,18 @@ class WebDavFsProvider implements RemoteFsProvider {
       port: source.port,
       pathSegments: segments.isEmpty ? const [''] : segments,
     );
+  }
+
+  /// Rejects `..` in either literal or percent-encoded form.
+  static bool _isTraversalSegment(String segment) {
+    if (segment == '..') return true;
+    try {
+      return Uri.decodeComponent(segment) == '..';
+    } on ArgumentError {
+      return true;
+    } on FormatException {
+      return true;
+    }
   }
 
   static String _stripSlashes(String value) {

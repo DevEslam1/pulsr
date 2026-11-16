@@ -152,6 +152,15 @@ void main() {
       expect(safe, isFalse);
     });
 
+    test('fails closed when the resolver returns no addresses', () async {
+      final safe = await RemoteTargetPolicy.isSafeHost(
+        'empty.example.net',
+        lookup: (_) async => const <String>[],
+      );
+      expect(safe, isFalse,
+          reason: 'an empty DNS answer cannot prove the host is public');
+    });
+
     test('does not resolve when the host is already private', () async {
       var lookups = 0;
       final safe = await RemoteTargetPolicy.isSafeHost(

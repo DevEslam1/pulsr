@@ -97,8 +97,21 @@ class TrackAnnouncer {
   bool _started = false;
   bool _disposed = false;
 
+  /// True from the moment speech is queued until it is stopped or replaced.
+  ///
+  /// The platform does not report completion through [TtsEngine], so this flag
+  /// is conservative: it stays set after [TtsEngine.speak] returns and is
+  /// cleared by stop, pause, a track change or dispose.
+  bool _speechLive = false;
+
   /// Whether [start] has been called and [dispose] has not.
   bool get isStarted => _started && !_disposed;
+
+  /// Whether a track announcement is waiting for the delay to elapse.
+  bool get hasPendingAnnouncement => _pendingTimer != null;
+
+  /// Whether the engine may still be speaking the last announcement.
+  bool get isSpeechLive => _speechLive;
 
   /// When the last announcement was actually spoken, or `null`.
   DateTime? get lastAnnouncementAt => _lastAnnouncementAt;
@@ -139,17 +152,33 @@ class TrackAnnouncer {
     if (_disposed) return;
     _disposed = true;
     _started = false;
+    _speechLive = false;
     _cancelPending();
-    await _mediaSubscription?.cancel();
-    await _stateSubscription?.cancel();
-    _mediaSubscription = null;
-    _stateSubscription = null;
+    try {
+      await _mediaSubscription?.cancel();
+    } finally {
+      _mediaSubscription = null;
+      try {
+        await _stateSubscription?.cancel();
+      } finally {
+        _stateSubscription = null;
+      }
+    }
+    _currentItem = null;
     await _stopSpeech();
   }
 
   void _onMediaItem(MediaItem? item) {
     if (_disposed) return;
+    final previousId = _currentItem?.id;
     _currentItem = item;
+    final nextId = item?.id;
+    if (nextId != previousId && _speechLive) {
+      // The previous track's sentence is still in flight. Stop it before the
+      // delay for the new track elapses, otherwise the user hears two titles.
+      _speechLive = false;
+      unawaited(_stopSpeech());
+    }
     _evaluate();
   }
 
@@ -201,14 +230,26 @@ class TrackAnnouncer {
       announcementTrackForMediaItem(item),
       maxLength: settings.maxLength,
     );
-    if (text.isEmpty) return;
+    if (text.isEmpty) {
+      // Nothing to say for this track (no elements selected, or every chosen
+      // field is unknown). Mark it handled so every later playback-state emit
+      // does not schedule another timer for the same silent track.
+      _announcedId = item.id;
+      return;
+    }
     // Marked before awaiting so a burst of duplicate playback-state emits
     // cannot start a second utterance for the same track.
     _announcedId = item.id;
     _lastAnnouncementAt = _now();
+    _speechLive = true;
     try {
-      await engine.speak(text, volume: settings.volume);
+      await engine.speak(
+        text,
+        volume: settings.volume,
+        duckAudio: settings.duckAudio,
+      );
     } on Exception catch (error, stackTrace) {
+      _speechLive = false;
       ErrorLogger.log(
         'Announcement speech failed',
         error: error,
@@ -235,6 +276,7 @@ class TrackAnnouncer {
   }
 
   Future<void> _stopSpeech() async {
+    _speechLive = false;
     try {
       await engine.stop();
     } on Exception catch (error, stackTrace) {

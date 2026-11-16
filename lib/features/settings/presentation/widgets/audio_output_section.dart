@@ -1,7 +1,6 @@
 part of 'audio_sound_section.dart';
 
 /// Native DSD is a transport name, not localizable copy (like LC3/M3U).
-const String _kDsdNativeLabel = 'Native';
 
 /// Collapsible disclosure for rarely-used audiophile controls.
 /// Reuses the animation pattern from [_WhatChangesExpander].
@@ -462,18 +461,16 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                           ),
                         ),
                       ),
-                      ButtonSegment(
-                        value: DsdOutputMode.native,
-                        label: Text(
-                          _kDsdNativeLabel,
-                          style: const TextStyle(
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
+                      // Native raw-DSD has no measured capability flag on
+                      // Android yet; offering it would silently fall back to
+                      // DoP/PCM, so only the transports that can be honoured
+                      // are exposed.
                     ],
-                    selected: {state.dsdOutputMode},
+                    selected: {
+                      state.dsdOutputMode == DsdOutputMode.native
+                          ? DsdOutputMode.dop
+                          : state.dsdOutputMode,
+                    },
                     onSelectionChanged: (!isAndroid ||
                             !(state.dsdDopSupported ||
                                 (state.currentOutputDevice?.isUsb ?? false)))

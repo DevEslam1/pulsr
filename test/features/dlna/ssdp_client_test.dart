@@ -137,6 +137,72 @@ void main() {
         isNull,
       );
     });
+
+    test('ignores datagrams without an HTTP/1.1 200 status line', () {
+      const headers = 'LOCATION: http://192.168.1.20:49152/description.xml\r\n'
+          'ST: ssdp:all\r\n'
+          'USN: uuid:abc::urn:schemas-upnp-org:device:MediaRenderer:1\r\n'
+          '\r\n';
+
+      for (final firstLine in <String>[
+        'HTTP/1.1 404 Not Found',
+        'HTTP/1.0 200 OK',
+        'NOTIFY * HTTP/1.1',
+        'M-SEARCH * HTTP/1.1',
+        'SEARCH * HTTP/1.1',
+      ]) {
+        expect(
+          SsdpClient.parseResponse(
+            '$firstLine\r\n$headers',
+            sourceAddress: '192.168.1.20',
+          ),
+          isNull,
+          reason: 'status line "$firstLine" must be ignored',
+        );
+      }
+    });
+
+    test('requires an http(s) LOCATION on the responder or private LAN', () {
+      String responseFor(String location) => 'HTTP/1.1 200 OK\r\n'
+          'LOCATION: $location\r\n'
+          'ST: urn:schemas-upnp-org:device:MediaRenderer:1\r\n'
+          'USN: uuid:abc::urn:schemas-upnp-org:device:MediaRenderer:1\r\n'
+          '\r\n';
+
+      expect(
+        SsdpClient.parseResponse(
+          responseFor('http://192.168.1.20:49152/description.xml'),
+          sourceAddress: '192.168.1.20',
+        ),
+        isNotNull,
+        reason: 'same host as the responder is allowed',
+      );
+      expect(
+        SsdpClient.parseResponse(
+          responseFor('http://192.168.1.77:49152/description.xml'),
+          sourceAddress: '192.168.1.20',
+        ),
+        isNotNull,
+        reason: 'another private LAN host is allowed',
+      );
+      for (final location in <String>[
+        'http://example.com/description.xml',
+        'http://203.0.113.9/description.xml',
+        'ftp://192.168.1.20/description.xml',
+        'file:///etc/passwd',
+        'http://renderer.local/description.xml',
+        'not a url',
+      ]) {
+        expect(
+          SsdpClient.parseResponse(
+            responseFor(location),
+            sourceAddress: '192.168.1.20',
+          ),
+          isNull,
+          reason: 'LOCATION $location must be rejected',
+        );
+      }
+    });
   });
 
   group('SsdpClient.search', () {
@@ -184,6 +250,37 @@ void main() {
       expect(socket.sent[0], contains('HOST: 239.255.255.250:1900'));
       expect(socket.sent[0], contains('MAN: "ssdp:discover"'));
       expect(socket.closed, isTrue);
+
+      await socket.dispose();
+    });
+
+    test('ignores NOTIFY datagrams and non-200 replies during search',
+        () async {
+      final socket = _FakeRawDatagramSocket();
+      socket
+        ..queue(
+          'NOTIFY * HTTP/1.1\r\n'
+          'HOST: 239.255.255.250:1900\r\n'
+          'LOCATION: http://192.168.1.20/description.xml\r\n'
+          '\r\n',
+        )
+        ..queue(
+          'HTTP/1.1 404 Not Found\r\n'
+          'LOCATION: http://192.168.1.20/description.xml\r\n'
+          'USN: uuid:bad\r\n'
+          '\r\n',
+        )
+        ..queue(
+          _response(location: 'http://192.168.1.20:49152/description.xml'),
+        );
+
+      final client = SsdpClient(socketFactory: () async => socket);
+      final results = await client.search(
+        timeout: const Duration(milliseconds: 40),
+      );
+
+      expect(results, hasLength(1));
+      expect(results.single.location, 'http://192.168.1.20:49152/description.xml');
 
       await socket.dispose();
     });

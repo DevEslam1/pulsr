@@ -160,7 +160,6 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
         // Keeping the id stable keeps the secure-storage slot valid after an
         // edit that changes the host.
         id: existing?.id,
-        credentialKey: existing?.credentialKey,
         createdAt: existing?.createdAt,
       );
     } on ArgumentError catch (e, st) {
@@ -185,7 +184,7 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
       _notify(RemoteSourcesStrings.saveFailed);
       return;
     }
-    await _writeCredentials(source, draft, existing);
+    await _writeCredentials(source, draft);
     if (!mounted) return;
     setState(() {
       _sources = _store.list;
@@ -196,22 +195,16 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
   Future<void> _writeCredentials(
     RemoteSource source,
     RemoteSourceDraft draft,
-    RemoteSource? existing,
   ) async {
     final username = draft.username.trim();
-    RemoteCredentials? stored;
-    if (existing != null) stored = await _credentials.read(existing.id);
-    final password =
-        draft.password.isNotEmpty ? draft.password : (stored?.password ?? '');
     try {
-      if (username.isEmpty && password.isEmpty) {
-        await _credentials.delete(source.id);
-      } else {
-        await _credentials.save(
-          source.id,
-          RemoteCredentials(username: username, password: password),
-        );
-      }
+      // mergeAndSave keeps a stored password when the field was left blank and
+      // never deletes an existing secret. A source that replaces another one
+      // by id (same endpoint) therefore keeps working credentials.
+      await _credentials.mergeAndSave(
+        source.id,
+        RemoteCredentials(username: username, password: draft.password),
+      );
     } on StateError catch (e, st) {
       ErrorLogger.log(
         'Remote credentials could not be written',

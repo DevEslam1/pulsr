@@ -4,11 +4,13 @@ import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.app.SearchManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -26,9 +28,38 @@ class MainActivity : AudioServiceActivity() {
     private val FILE_OPENER_CHANNEL = "com.pulsr.music/file_opener"
     private val ASSISTANT_CHANNEL = "com.pulsr.music/assistant"
     private val pendingAudioUris = ArrayDeque<String>()
+    private val pendingAssistantExtras = ArrayDeque<Map<String, String>>()
     companion object {
         private const val MAX_PENDING_AUDIO_URIS = 32
+        private const val MAX_PENDING_ASSISTANT_EXTRAS = 8
+
+        /**
+         * Set once the Dart assistant service answers `assistantReady`.
+         *
+         * Process-wide so re-creating the Activity does not downgrade warm
+         * starts to the query-only legacy path while the Dart handler is still
+         * installed.
+         */
+        @Volatile private var assistantReady = false
     }
+
+    /**
+     * Search-intent extras forwarded to the Dart assistant service.
+     *
+     * The canonical uppercase keys match `parseSearchExtras` on the Dart side;
+     * the aliases cover both the platform constants (SearchManager.QUERY,
+     * MediaStore.EXTRA_MEDIA_*) and lower-case senders.
+     */
+    private val assistantExtraAliases = listOf(
+        "QUERY" to listOf(SearchManager.QUERY, SearchManager.USER_QUERY, "QUERY"),
+        "PLAYLIST" to listOf("PLAYLIST", "playlist"),
+        "ALBUM" to listOf(MediaStore.EXTRA_MEDIA_ALBUM, "ALBUM", "album"),
+        "ARTIST" to listOf(MediaStore.EXTRA_MEDIA_ARTIST, "ARTIST", "artist"),
+        "GENRE" to listOf("GENRE", "genre"),
+        "SONG" to listOf(MediaStore.EXTRA_MEDIA_TITLE, "SONG", "song"),
+        "TITLE" to listOf("TITLE", "title"),
+        "MIME_TYPE" to listOf("MIME_TYPE", "mime_type")
+    )
 
     private fun addPendingAudioUri(uri: String) {
         synchronized(pendingAudioUris) {
@@ -38,7 +69,66 @@ class MainActivity : AudioServiceActivity() {
             pendingAudioUris.addLast(uri)
         }
     }
+
+    /**
+     * Queues assistant extras until the Dart handler is bound (cold start).
+     */
+    private fun queueAssistantExtras(extras: Map<String, String>) {
+        if (extras.isEmpty()) return
+        synchronized(pendingAssistantExtras) {
+            while (pendingAssistantExtras.size >= MAX_PENDING_ASSISTANT_EXTRAS) {
+                pendingAssistantExtras.removeFirstOrNull()
+            }
+            pendingAssistantExtras.addLast(extras)
+        }
+    }
+
+    /** Reads the media-search extras the Dart resolver understands. */
+    private fun readAssistantExtras(intent: Intent): Map<String, String> {
+        val extras = LinkedHashMap<String, String>()
+        for ((canonical, aliases) in assistantExtraAliases) {
+            for (key in aliases) {
+                val value = intent.getStringExtra(key)
+                if (!value.isNullOrBlank()) {
+                    extras[canonical] = value
+                    break
+                }
+            }
+        }
+        intent.type?.takeIf { it.isNotBlank() }?.let { extras["MIME_TYPE"] = it }
+        return extras
+    }
+
+    /**
+     * Forwards one ACTION_SEARCH intent to Dart.
+     *
+     * ACTION_SEARCH had no legacy handler, so its extras are queued on cold
+     * start and flushed when the assistant channel binds.
+     */
+    private fun forwardSearchIntent(intent: Intent, fromColdStart: Boolean): Boolean {
+        val extras = readAssistantExtras(intent)
+        if (extras.isEmpty()) return false
+        val channel = assistantChannel
+        if (!fromColdStart && channel != null) {
+            channel.invokeMethod("onSearchQuery", extras)
+        } else {
+            queueAssistantExtras(extras)
+        }
+        return true
+    }
+
+    private fun flushPendingAssistantExtras(channel: MethodChannel) {
+        val pending = synchronized(pendingAssistantExtras) {
+            val copy = pendingAssistantExtras.toList()
+            pendingAssistantExtras.clear()
+            copy
+        }
+        for (extras in pending) {
+            channel.invokeMethod("onSearchQuery", extras)
+        }
+    }
     private var fileOpenerChannel: MethodChannel? = null
+    private var assistantChannel: MethodChannel? = null
     private var lyricsChannel: MethodChannel? = null
     private var purityChannel: MethodChannel? = null
     private var batteryChannel: MethodChannel? = null
@@ -170,12 +260,33 @@ class MainActivity : AudioServiceActivity() {
         // Assistant / voice-search entry point: bring the app forward so the
         // Dart layer can resume or start playback. Previously dropped.
         if (intent?.action == "android.media.action.MEDIA_PLAY_FROM_SEARCH") {
-            val q = intent.getStringExtra("query")
+            val q = intent.getStringExtra(SearchManager.QUERY)
+            val channel = assistantChannel
+            // Warm start (or an Activity recreated while Dart is alive): the
+            // full extras map (ALBUM / ARTIST / SONG ...) goes to the assistant
+            // service instead of only the free-text query. Deduplication lives
+            // in AssistantIntentService.
+            if (assistantReady) {
+                if (!fromColdStart && channel != null) {
+                    channel.invokeMethod("onSearchQuery", readAssistantExtras(intent))
+                } else {
+                    // Channel not bound yet; the bind-time probe or handshake
+                    // flushes the queue.
+                    queueAssistantExtras(readAssistantExtras(intent))
+                }
+                return
+            }
+            // True process cold start: keep the existing query path so voice
+            // search always works even if the Dart service is absent.
             if (fromColdStart || fileOpenerChannel == null) {
                 addPendingAudioUri("pulsr://voice-search?query=${Uri.encode(q ?: "")}")
             } else {
                 fileOpenerChannel?.invokeMethod("onVoiceSearch", q ?: "")
             }
+            return
+        }
+        if (intent?.action == Intent.ACTION_SEARCH) {
+            forwardSearchIntent(intent, fromColdStart)
             return
         }
         if (intent?.action != Intent.ACTION_VIEW &&
@@ -298,8 +409,16 @@ class MainActivity : AudioServiceActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             ASSISTANT_CHANNEL
         )
+        assistantChannel = assistantChan
         assistantChan.setMethodCallHandler { call, result ->
             when (call.method) {
+                // Dart handshake: the intent service now owns the channel.
+                // Flush search intents received before the handler existed.
+                "assistantReady" -> {
+                    assistantReady = true
+                    flushPendingAssistantExtras(assistantChan)
+                    result.success(true)
+                }
                 "updateSuggestions" -> {
                     val rows = (call.arguments as? List<*>)?.mapNotNull { raw ->
                         val map = raw as? Map<*, *> ?: return@mapNotNull null
@@ -329,6 +448,19 @@ class MainActivity : AudioServiceActivity() {
                 else -> result.notImplemented()
             }
         }
+        // Probe the Dart handler: it may already be installed (audio_service
+        // keeps the engine alive while the Activity is recreated), in which
+        // case pending search intents can be flushed without waiting for a new
+        // handshake.
+        assistantChan.invokeMethod("isReady", null, object : MethodChannel.Result {
+            override fun success(result: Any?) {
+                assistantReady = true
+                flushPendingAssistantExtras(assistantChan)
+            }
+
+            override fun error(errorCode: String, errorMessage: String?, errorDetails: Any?) = Unit
+            override fun notImplemented() = Unit
+        })
 
         val lyricsChan = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LYRICS_CHANNEL)
         lyricsChannel = lyricsChan
@@ -657,6 +789,8 @@ class MainActivity : AudioServiceActivity() {
         batteryChannel = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
+        assistantChannel?.setMethodCallHandler(null)
+        assistantChannel = null
         lyricsChannel?.setMethodCallHandler(null)
         lyricsChannel = null
         activityChannelsBound = false

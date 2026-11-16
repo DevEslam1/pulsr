@@ -216,7 +216,7 @@ void main() {
             (d) => d.copyWith(dynamicsPreset: DynamicsPreset.studioPunch),
           ),
       'quranReciterStyle': () => _diff(
-            (d) => d.copyWith(quranReciterStyle: QuranReciterStyle.mujawwad),
+            (d) => d.copyWith(quranReciterStyle: QuranReciterStyle.murattal),
           ),
       'selectedHeadphoneProfile': () => _diff(
             (d) => d.copyWith(

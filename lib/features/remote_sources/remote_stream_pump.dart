@@ -31,11 +31,25 @@ class RemoteStreamPump {
 
   /// Starts a cache write for a full download, or returns `null` when caching
   /// is disabled or unavailable.
-  Future<RemoteCacheSink?> startCacheWrite(String sourceId, String path) async {
+  ///
+  /// [etag]/[modifiedAt] are the validators the provider reported for the
+  /// file; they are stored with the entry so a later [RemoteCacheStore.lookup]
+  /// can tell whether the bytes on disk still describe the server's file.
+  Future<RemoteCacheSink?> startCacheWrite(
+    String sourceId,
+    String path, {
+    String? etag,
+    DateTime? modifiedAt,
+  }) async {
     final store = cache;
     if (store == null) return null;
     try {
-      return await store.beginWrite(sourceId, path);
+      return await store.beginWrite(
+        sourceId,
+        path,
+        etag: etag,
+        modifiedAt: modifiedAt,
+      );
     } catch (e, st) {
       ErrorLogger.log(
         'Remote cache write could not start',

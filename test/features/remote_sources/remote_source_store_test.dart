@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/remote_source.dart';
+import 'package:pulsr/features/remote_sources/remote_host_allowlist.dart';
 import 'package:pulsr/features/remote_sources/remote_source_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -128,5 +129,31 @@ void main() {
     await expectLater(store.add(invalid), throwsStateError);
     expect(store.list, isEmpty);
     expect(await _rawPrefs(), isNull);
+  });
+
+  test('adding and removing a source keeps the host allowlist in step',
+      () async {
+    final store = RemoteSourceStore();
+    final source = await store.add(_source(host: '192.168.1.20'));
+
+    expect(RemoteHostAllowlist.instance.allows('192.168.1.20'), isTrue);
+
+    await store.remove(source.id);
+
+    expect(RemoteHostAllowlist.instance.allows('192.168.1.20'), isFalse);
+  });
+
+  test('a load rebuilds the allowlist instead of merging stale hosts',
+      () async {
+    RemoteHostAllowlist.instance.allowHost('stale.example');
+    SharedPreferences.setMockInitialValues({
+      RemoteSourceStore.prefsKey: jsonEncode([_source().toJson()]),
+    });
+
+    final store = RemoteSourceStore();
+    await store.ready;
+
+    expect(RemoteHostAllowlist.instance.allows('nas.local'), isTrue);
+    expect(RemoteHostAllowlist.instance.allows('stale.example'), isFalse);
   });
 }

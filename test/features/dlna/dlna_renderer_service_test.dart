@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:pulsr/features/dlna/av_transport.dart';
 import 'package:pulsr/features/dlna/dlna_renderer_service.dart';
 import 'package:pulsr/features/dlna/ssdp_client.dart';
+import 'package:pulsr/features/dlna/upnp_device.dart';
 
 const String _descriptionXml = '<?xml version="1.0"?><root><device>'
     '<deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>'
@@ -127,6 +128,7 @@ void main() {
       httpClient: client,
       pollInterval: pollInterval,
       discoveryTimeout: const Duration(milliseconds: 10),
+      localAddressResolver: (host, port) async => InternetAddress.loopbackIPv4,
     );
   }
 
@@ -240,6 +242,186 @@ void main() {
     expect(service.state, DlnaState.playing);
   });
 
+  test('keeps polling and reports connecting while the renderer is '
+      'TRANSITIONING or unknown', () async {
+    service = buildService(pollInterval: const Duration(milliseconds: 30));
+    addTearDown(service.dispose);
+    await service.discover();
+    await service.select(service.devices.single);
+    await service.playFile(mediaFile.path, title: 'Song');
+
+    transportState = 'TRANSITIONING';
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(service.state, DlnaState.connecting);
+
+    int transportPolls() => requests
+        .where((request) => _actionOf(request) == 'GetTransportInfo')
+        .length;
+    final before = transportPolls();
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(transportPolls(), greaterThan(before));
+    expect(service.state, DlnaState.connecting);
+
+    transportState = 'SOME_UNKNOWN_STATE';
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    expect(service.state, DlnaState.connecting);
+  });
+
+  test('switching renderers stops the previous one before connecting',
+      () async {
+    service = buildService();
+    addTearDown(service.dispose);
+
+    UpnpDeviceDescription device(String suffix) => UpnpDeviceDescription(
+          friendlyName: 'Renderer $suffix',
+          udn: 'uuid:renderer-$suffix',
+          deviceType: 'urn:schemas-upnp-org:device:MediaRenderer:1',
+          location: Uri.parse('http://192.168.1.5:5555/description.xml'),
+          avTransportControlUrl:
+              Uri.parse('http://192.168.1.5:5555/control/avt-$suffix'),
+        );
+
+    await service.select(device('a'));
+    await service.playFile(mediaFile.path, title: 'Song');
+    requests.clear();
+
+    await service.select(device('b'));
+
+    final stopIndex =
+        requests.indexWhere((request) => _actionOf(request) == 'Stop');
+    expect(stopIndex, isNonNegative);
+    expect(requests[stopIndex].url.path, endsWith('/control/avt-a'));
+    final probeIndex = requests.indexWhere(
+      (request) => _actionOf(request) == 'GetTransportInfo',
+    );
+    expect(probeIndex, isNonNegative);
+    expect(stopIndex, lessThan(probeIndex));
+    expect(service.selectedDevice?.identity, 'uuid:renderer-b');
+  });
+
+  test('retry re-casts the current file instead of reconnecting', () async {
+    service = buildService();
+    addTearDown(service.dispose);
+    await service.discover();
+    await service.select(service.devices.single);
+    await service.playFile(mediaFile.path, title: 'Song');
+    requests.clear();
+
+    await service.retry();
+
+    final actions = requests.map(_actionOf).toList(growable: false);
+    expect(
+      actions,
+      containsAllInOrder(<String>['SetAVTransportURI', 'Play']),
+    );
+    expect(actions, isNot(contains('GetTransportInfo')));
+    expect(service.state, DlnaState.playing);
+  });
+
+  test('cast tokens are revoked on stop and replaced by a new cast', () async {
+    service = buildService();
+    addTearDown(service.dispose);
+    await service.discover();
+    await service.select(service.devices.single);
+    await service.playFile(mediaFile.path, title: 'Song');
+
+    String currentToken() {
+      final setUri = requests.lastWhere(
+        (request) => _actionOf(request) == 'SetAVTransportURI',
+      );
+      final uri = AvTransportClient.elementText(setUri.body, 'CurrentURI')!;
+      return Uri.parse(uri).pathSegments.last;
+    }
+
+    Future<int> statusOf(String token) async {
+      final client = HttpClient();
+      try {
+        final request = await client.getUrl(
+          Uri.parse('http://127.0.0.1:${service.mediaServer.port}/media/$token'),
+        );
+        final response = await request.close();
+        await response.drain<void>();
+        return response.statusCode;
+      } finally {
+        client.close(force: true);
+      }
+    }
+
+    final first = currentToken();
+    expect(first, matches(RegExp(r'^[0-9a-f]{32}$')));
+    expect(await statusOf(first), 200);
+
+    await service.stop();
+    expect(await statusOf(first), 403);
+
+    await service.playFile(mediaFile.path, title: 'Song');
+    final second = currentToken();
+    expect(second, isNot(first));
+    expect(await statusOf(second), 200);
+    expect(await statusOf(first), 403);
+  });
+
+  test('description fetches disable redirects and reject non-200 responses',
+      () async {
+    final redirectFlags = <bool>[];
+    final client = MockClient((request) async {
+      redirectFlags.add(request.followRedirects);
+      return http.Response(
+        '',
+        302,
+        headers: <String, String>{
+          'location': 'http://192.168.1.5:5555/evil-description.xml',
+        },
+      );
+    });
+    final service = DlnaRendererService(
+      ssdpClient: _FakeSsdpClient(<SsdpResponse>[
+        const SsdpResponse(
+          location: 'http://192.168.1.5:5555/description.xml',
+          searchTarget: 'urn:schemas-upnp-org:device:MediaRenderer:1',
+          usn: 'uuid:redirected',
+          server: 'Test/1.0 UPnP/1.1',
+          sourceAddress: '192.168.1.5',
+        ),
+      ]),
+      httpClient: client,
+      discoveryTimeout: const Duration(milliseconds: 10),
+      localAddressResolver: (host, port) async => InternetAddress.loopbackIPv4,
+    );
+    addTearDown(service.dispose);
+
+    await service.discover();
+
+    expect(service.devices, isEmpty);
+    expect(redirectFlags, isNotEmpty);
+    expect(redirectFlags, everyElement(isFalse));
+  });
+
+  test('rejects description bodies larger than 256 KB', () async {
+    final oversized = StringBuffer('<root><device><friendlyName>')
+      ..write('x' * (DlnaRendererService.maxDescriptionBytes + 1))
+      ..write('</friendlyName></device></root>');
+    final service = DlnaRendererService(
+      ssdpClient: _FakeSsdpClient(<SsdpResponse>[
+        const SsdpResponse(
+          location: 'http://192.168.1.5:5555/description.xml',
+          searchTarget: 'urn:schemas-upnp-org:device:MediaRenderer:1',
+          usn: 'uuid:oversized',
+          server: 'Test/1.0 UPnP/1.1',
+          sourceAddress: '192.168.1.5',
+        ),
+      ]),
+      httpClient: MockClient((_) async => http.Response(oversized.toString(), 200)),
+      discoveryTimeout: const Duration(milliseconds: 10),
+      localAddressResolver: (host, port) async => InternetAddress.loopbackIPv4,
+    );
+    addTearDown(service.dispose);
+
+    await service.discover();
+
+    expect(service.devices, isEmpty);
+  });
+
   test('playFile without a selected device reports a typed error', () async {
     service = buildService();
     addTearDown(service.dispose);
@@ -261,5 +443,18 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
     expect(service.mediaServer.isRunning, isFalse);
+  });
+
+  test('dispose sends Stop to the renderer', () async {
+    service = buildService();
+    await service.discover();
+    await service.select(service.devices.single);
+    await service.playFile(mediaFile.path, title: 'Song');
+    requests.clear();
+
+    service.dispose();
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+
+    expect(requests.map(_actionOf), contains('Stop'));
   });
 }

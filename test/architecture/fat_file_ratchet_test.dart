@@ -74,7 +74,14 @@ void main() {
     };
     final offenders = <String>[];
     caps.forEach((path, cap) {
-      final size = File(path).statSync().size;
+      // Count logical source size, not checkout line endings: a CRLF working
+      // tree is one extra byte per line and must not trip a size ratchet that
+      // was calibrated on LF.
+      final bytes = File(path).readAsBytesSync();
+      var size = bytes.length;
+      for (var index = 0; index + 1 < bytes.length; index++) {
+        if (bytes[index] == 0x0D && bytes[index + 1] == 0x0A) size--;
+      }
       if (size > cap) offenders.add('$path: $size > $cap');
     });
     expect(offenders, isEmpty,

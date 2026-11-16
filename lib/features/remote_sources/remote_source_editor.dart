@@ -220,13 +220,24 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
                 keyboardType: TextInputType.number,
                 textInputAction: TextInputAction.next,
               ),
-              if (_kind == RemoteSourceKind.webdav)
+              if (_kind == RemoteSourceKind.webdav) ...[
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: const Text(RemoteSourcesStrings.tlsLabel),
                   value: _useTls,
                   onChanged: (value) => setState(() => _useTls = value),
                 ),
+                if (!_useTls)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      RemoteSourcesStrings.cleartextWarning,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                    ),
+                  ),
+              ],
               _Field(
                 controller: _root,
                 label: RemoteSourcesStrings.rootLabel,

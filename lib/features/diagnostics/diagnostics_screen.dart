@@ -4,6 +4,8 @@
 // output paths are live, whether safe mode tripped, and a one-tap export of the
 // redacted bundle. The screen only reads services, it never touches the engine.
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -110,6 +112,14 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    // Never leave a redacted bundle behind if the user leaves the screen
+    // without sharing, or if the share future completed just before teardown.
+    unawaited(widget.bundleService.cleanupExport());
+    super.dispose();
+  }
+
   Future<void> _exportBundle() async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final errorColor = context.palette.error;
@@ -136,11 +146,43 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         ),
       );
     } finally {
+      // The bundle contains paths and preferences; do not let it accumulate in
+      // the cache directory after the share sheet has it.
+      await widget.bundleService.cleanupExport();
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _resetSafeMode() async {
+  Future<void> _enterSafeMode() async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final errorColor = context.palette.error;
+    setState(() => _busy = true);
+    try {
+      await widget.safeMode.applyFallback(_currentDeviceKey());
+      if (!mounted) return;
+      setState(_syncSafeMode);
+      messenger?.showSnackBar(
+        const SnackBar(content: Text(DiagnosticsStrings.safeModeEntered)),
+      );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Entering safe mode failed',
+        error: e,
+        stackTrace: st,
+        category: 'DiagnosticsScreen',
+      );
+      messenger?.showSnackBar(
+        SnackBar(
+          content: const Text(DiagnosticsStrings.safeModeResetFailed),
+          backgroundColor: errorColor,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _exitSafeMode() async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final errorColor = context.palette.error;
     setState(() => _busy = true);
@@ -149,11 +191,11 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
       if (!mounted) return;
       setState(_syncSafeMode);
       messenger?.showSnackBar(
-        const SnackBar(content: Text(DiagnosticsStrings.safeModeResetDone)),
+        const SnackBar(content: Text(DiagnosticsStrings.safeModeExited)),
       );
     } catch (e, st) {
       ErrorLogger.log(
-        'Resetting safe mode failed',
+        'Exiting safe mode failed',
         error: e,
         stackTrace: st,
         category: 'DiagnosticsScreen',
@@ -262,7 +304,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
           failures: _safeModeFailures,
           reason: _safeModeReason,
           busy: _busy,
-          onReset: _resetSafeMode,
+          onEnter: _enterSafeMode,
+          onExit: _exitSafeMode,
         ),
         const SizedBox(height: AppSpacing.sm),
         _LogCard(lines: bundle.logLines),
@@ -432,14 +475,16 @@ class _SafeModeCard extends StatelessWidget {
     required this.failures,
     required this.reason,
     required this.busy,
-    required this.onReset,
+    required this.onEnter,
+    required this.onExit,
   });
 
   final bool active;
   final int failures;
   final String? reason;
   final bool busy;
-  final VoidCallback onReset;
+  final VoidCallback onEnter;
+  final VoidCallback onExit;
 
   @override
   Widget build(BuildContext context) {
@@ -472,11 +517,19 @@ class _SafeModeCard extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.xs),
         _A11yButton(
-          label: DiagnosticsStrings.safeModeReset,
+          label: active
+              ? DiagnosticsStrings.safeModeExit
+              : DiagnosticsStrings.safeModeEnter,
           child: OutlinedButton.icon(
-            onPressed: busy ? null : onReset,
-            icon: const Icon(Icons.restart_alt_rounded),
-            label: const Text(DiagnosticsStrings.safeModeReset),
+            onPressed: busy ? null : (active ? onExit : onEnter),
+            icon: Icon(
+              active ? Icons.restart_alt_rounded : Icons.shield_rounded,
+            ),
+            label: Text(
+              active
+                  ? DiagnosticsStrings.safeModeExit
+                  : DiagnosticsStrings.safeModeEnter,
+            ),
           ),
         ),
       ],

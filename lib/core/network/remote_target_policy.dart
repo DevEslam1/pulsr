@@ -142,9 +142,11 @@ abstract final class RemoteTargetPolicy {
 
   /// Resolves [host] and rejects any answer in private space.
   ///
-  /// A resolution failure returns false (fail closed) unless the caller passes
-  /// its own [lookup], which tests use to simulate rebinding. Hosts under the
-  /// RFC 2606 test domains (`.test`, `.example`, `.invalid`) skip DNS.
+  /// Every failure mode is closed: a resolver error *and* an empty answer are
+  /// both refused, because neither can prove the target is public. [lookup] is
+  /// injectable so tests can simulate rebinding without touching real DNS.
+  /// Hosts under the RFC 2606 test domains (`.test`, `.example`, `.invalid`)
+  /// skip DNS.
   static Future<bool> isSafeHost(
     String host, {
     Future<List<String>> Function(String host)? lookup,
@@ -162,7 +164,8 @@ abstract final class RemoteTargetPolicy {
     try {
       final resolver = lookup ?? defaultDnsLookup;
       final resolved = await resolver(trimmed);
-      if (resolved.isEmpty) return lookup == null;
+      // No answer is not a public answer: refuse rather than fail open.
+      if (resolved.isEmpty) return false;
       for (final ip in resolved) {
         if (isUnsafeHost(ip)) return false;
       }

@@ -158,11 +158,14 @@ void main() {
     String? authorization;
     String? depthHeader;
     String? rangeHeader;
+    var requestCount = 0;
     final payload = List<int>.generate(32, (index) => index);
 
     setUp(() async {
+      requestCount = 0;
       server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       server.listen((request) async {
+        requestCount++;
         if (request.method == 'PROPFIND') {
           authorization =
               request.headers.value(HttpHeaders.authorizationHeader);
@@ -233,6 +236,22 @@ void main() {
       expect(depthHeader, '0');
       expect(entry?.path, 'Music/01 Intro.mp3');
       expect(entry?.sizeBytes, 1024);
+    });
+
+    test('a .. segment is rejected before any request is sent', () async {
+      await expectLater(
+        provider.list('../etc'),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+      expect(requestCount, 0);
+    });
+
+    test('a percent-encoded .. segment is rejected too', () async {
+      await expectLater(
+        provider.list('%2e%2e/etc'),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+      expect(requestCount, 0);
     });
   });
 

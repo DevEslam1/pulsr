@@ -354,7 +354,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       return;
     }
     try {
-      await widget.engine.speak(text, volume: settings.volume);
+      await widget.engine.speak(
+        text,
+        volume: settings.volume,
+        duckAudio: settings.duckAudio,
+      );
     } on Exception catch (error, stackTrace) {
       ErrorLogger.log(
         'Test announcement could not be spoken',

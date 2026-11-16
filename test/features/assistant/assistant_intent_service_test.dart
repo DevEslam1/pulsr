@@ -184,6 +184,15 @@ void main() {
       expect(played, isEmpty);
     });
 
+    test('the readiness probe does not play anything', () async {
+      final service = build();
+      await expectLater(
+        service.handleMethodCall(const MethodCall('isReady')),
+        completes,
+      );
+      expect(played, isEmpty);
+    });
+
     test('dispose stops handling further requests', () async {
       final service = build();
       service.dispose();

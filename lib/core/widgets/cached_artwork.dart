@@ -10,6 +10,7 @@ import '../network/remote_target_policy.dart';
 import '../services/artwork_cache_manager.dart';
 import '../utils/error_logger.dart';
 import '../utils/l10n_extensions.dart';
+import '../../features/remote_sources/remote_host_allowlist.dart';
 import 'artwork_placeholder.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 
@@ -372,8 +373,14 @@ class _CachedArtworkState extends State<CachedArtwork> {
             : url);
 
     final uri = Uri.tryParse(targetUrl);
+    // The SSRF policy still rejects every arbitrary private host; the only
+    // exception is a host the user configured as a remote library, whose cover
+    // art legitimately lives on the LAN.
     if (uri == null ||
-        !RemoteTargetPolicy.isAllowed(targetUrl, requireHttps: false)) {
+        !RemoteTargetPolicy.isAllowed(
+          targetUrl,
+          allowedHostSuffixes: RemoteHostAllowlist.instance.hosts,
+        )) {
       return null;
     }
     HttpClientRequest? request;

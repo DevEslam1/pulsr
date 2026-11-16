@@ -13,6 +13,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/remote_source.dart';
+import 'remote_host_allowlist.dart';
+import 'remote_stream_server.dart';
 
 /// Reads and writes the user's remote library list.
 ///
@@ -67,6 +69,9 @@ class RemoteSourceStore {
         _sources[index] = source;
       }
       await _persist();
+      // Artwork/widget fetchers may reach this host from now on (LAN cover
+      // art); see RemoteHostAllowlist for the exact scope.
+      RemoteHostAllowlist.instance.allowSource(source);
       return source;
     });
   }
@@ -80,6 +85,9 @@ class RemoteSourceStore {
   }
 
   /// Deletes the source with [id]; a no-op when it is already gone.
+  ///
+  /// Also revokes the loopback stream token of that source, so a URL already
+  /// handed to the player cannot keep streaming a library the user removed.
   Future<void> remove(String id) async {
     await ready;
     await _mutex.protect(() async {
@@ -87,6 +95,8 @@ class RemoteSourceStore {
       _sources.removeWhere((s) => s.id == id);
       if (_sources.length != before) await _persist();
     });
+    RemoteHostAllowlist.instance.removeSource(id);
+    await RemoteStreamServer.revokeSource(id);
   }
 
   /// Re-reads the list from disk, discarding unsaved in-memory state.
@@ -97,6 +107,9 @@ class RemoteSourceStore {
   }
 
   Future<void> _load() async {
+    // The list is the source of truth for the allowlist: rebuild it rather
+    // than merging with entries left over from a previous load.
+    RemoteHostAllowlist.instance.clear();
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(prefsKey);
@@ -123,6 +136,7 @@ class RemoteSourceStore {
             continue;
           }
           _sources.add(source);
+          RemoteHostAllowlist.instance.allowSource(source);
         } on FormatException catch (e) {
           skipped++;
           ErrorLogger.log(

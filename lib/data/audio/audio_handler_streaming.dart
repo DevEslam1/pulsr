@@ -242,6 +242,11 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
             ? await DsdDecoderHelper.probeDopCapabilities()
             : DsdDacCapabilities.none;
         final rateMultiple = await DsdHeaderProbe.probeMultiple(song.path);
+        // Native capability is the *measured* raw-DSD flag only. A USB sink
+        // that merely advertises a 768 kHz PCM carrier (dsd512) used to turn
+        // nativeCapable on, and the handler then handed Android a 768 kHz PCM
+        // stream as if the DAC decoded raw DSD. `canUseNativeDsd` now requires
+        // nativeDsd, and the resolver is the only place that can select native.
         final plan = resolveDsdTransport(
           mode: dsdMode,
           bitPerfectActive: bitPerfectActive,

@@ -15,6 +15,20 @@ abstract final class DlnaStrings {
   /// Label of the scan button.
   static const String scan = 'Scan for devices';
 
+  /// Label of the button that picks a local file and casts it.
+  static const String castFile = 'Cast file';
+
+  /// Label of the button that casts the track playing on this device.
+  static const String castCurrentTrack = 'Cast current track';
+
+  /// Semantics label for the cast-file action.
+  static const String castFileSemantics =
+      'Choose a local audio file to cast to the renderer';
+
+  /// Semantics label for the cast-current-track action.
+  static const String castCurrentSemantics =
+      'Cast the track currently playing on this device to the renderer';
+
   /// Label shown while discovery runs.
   static const String scanning = 'Searching for renderers';
 

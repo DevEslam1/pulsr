@@ -15,27 +15,24 @@
 //   DSD chunk (28 bytes) | fmt chunk (52 bytes) | data chunk header (12 bytes)
 //   followed by data interleaved in channel-major blocks of
 //   [blockSizePerChannel] bytes, the last block zero padded.
+//
+// Bit order contract: a DSF header says `bitsPerSample = 1` for LSB-first data
+// and `8` for MSB-first data (the decoder sets `msbFirst = bitsPerSample == 8`).
+// The extractor copies image bytes verbatim when [reverseBits] is false, so the
+// header must then declare 8. Declaring 1 while writing MSB-first bytes made
+// the decoder invert the bitstream.
 
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:path_provider/path_provider.dart';
-
 import '../../../core/utils/error_logger.dart';
 import 'iso9660_reader.dart';
+import 'sacd_dsf_cache.dart';
+import 'sacd_exceptions.dart';
+import 'sacd_limits.dart';
 import 'sacd_toc.dart';
 
-/// Thrown when a track cannot be extracted into a DSF file.
-class SacdDsfException implements Exception {
-  /// Creates the exception with a loggable [message].
-  const SacdDsfException(this.message);
-
-  /// Human-readable reason, safe to log.
-  final String message;
-
-  @override
-  String toString() => 'SacdDsfException: $message';
-}
+export 'sacd_exceptions.dart';
 
 /// Serialises the 92-byte DSF preamble (DSD + fmt chunks, data chunk header).
 ///
@@ -181,12 +178,45 @@ class SacdDsfExtractor {
   /// [sectorHeaderBytes] is the non-audio prefix of each image sector,
   /// [blockSizePerChannel] the DSF interleaving block, [reverseBits] flips the
   /// DSD bit order per byte, and [maxOutputBytes] caps the written file size.
+  ///
+  /// Throws [ArgumentError] for a non-positive or absurd block size, a sector
+  /// header outside `0..2047`, or a non-positive output cap. Validating here
+  /// keeps a zero block size from reaching the `~/ blockSizePerChannel`
+  /// divisions in [extractTrack].
   SacdDsfExtractor({
     this.sectorHeaderBytes = SacdLayout.sectorHeaderBytes,
     this.blockSizePerChannel = DsfHeaderWriter.defaultBlockSize,
     this.reverseBits = false,
-    this.maxOutputBytes = 512 * 1024 * 1024,
-  });
+    this.maxOutputBytes = kMaxDsdFileBytes,
+    SacdDsfCache? cache,
+  }) : cache = cache ?? SacdDsfCache.shared {
+    if (sectorHeaderBytes < 0 || sectorHeaderBytes >= SacdLayout.sectorSize) {
+      throw ArgumentError.value(
+        sectorHeaderBytes,
+        'sectorHeaderBytes',
+        'must be inside 0..${SacdLayout.sectorSize - 1}',
+      );
+    }
+    if (blockSizePerChannel <= 0 || blockSizePerChannel > maxBlockSize) {
+      throw ArgumentError.value(
+        blockSizePerChannel,
+        'blockSizePerChannel',
+        'must be inside 1..$maxBlockSize',
+      );
+    }
+    if (maxOutputBytes <= 0) {
+      throw ArgumentError.value(maxOutputBytes, 'maxOutputBytes', 'must be > 0');
+    }
+  }
+
+  /// Largest interleaving block the extractor will accept.
+  static const int maxBlockSize = 64 * 1024;
+
+  /// Test seam: throw once this many payload bytes have been written.
+  ///
+  /// Used to prove that a failed extraction deletes its partial file even when
+  /// the handle close itself fails.
+  static int? debugFailAfterPayloadBytes;
 
   /// Non-audio bytes at the start of every image sector.
   final int sectorHeaderBytes;
@@ -200,32 +230,25 @@ class SacdDsfExtractor {
   /// Upper bound for the written DSF payload, in bytes.
   final int maxOutputBytes;
 
-  /// Writes track [track] of image [iso] as a DSF file and returns it.
+  /// Cache used for naming, budget and partial-file cleanup.
+  final SacdDsfCache cache;
+
+  /// DSF bit depth matching [reverseBits]: 8 (MSB first) for verbatim image
+  /// bytes, 1 (LSB first) only when the writer reverses every byte.
+  int get bitsPerSample => reverseBits ? 1 : 8;
+
+  /// Total DSF file size (header + padded payload) for [track].
   ///
-  /// The file lands in [outDir] when given, otherwise in a `sacd` folder under
-  /// the app cache directory. Throws [SacdDsfException] when the track extent,
-  /// channel count or output size cannot be honoured, and [IsoFormatException]
-  /// when the image is not readable ISO9660.
-  Future<File> extractTrack(
-    File iso,
-    SacdTrack track, {
-    Directory? outDir,
-  }) async {
-    if (track.lengthSectors <= 0) {
-      throw SacdDsfException('Track ${track.index} has no sectors to extract');
-    }
-    if (sectorHeaderBytes < 0 || sectorHeaderBytes >= SacdLayout.sectorSize) {
-      throw SacdDsfException(
-        'Sector header size $sectorHeaderBytes is not inside 0..'
-        '${SacdLayout.sectorSize - 1}',
-      );
-    }
-    if (DsfHeaderWriter.channelTypeFor(track.channels) == 0) {
-      throw SacdDsfException(
-        'Track ${track.index} declares ${track.channels} channels, which a DSF '
-        'file cannot describe',
-      );
-    }
+  /// Throws [SacdDsfException] for a zero/negative extent, a channel count the
+  /// decoder cannot play, or a track shorter than one interleaved frame.
+  int estimateOutputBytes(SacdTrack track) {
+    _validateTrack(track);
+    return _geometry(track).totalBytes;
+  }
+
+  ({int bytesPerChannel, int dataBytes, int totalBytes}) _geometry(
+    SacdTrack track,
+  ) {
     final payloadPerSector = SacdLayout.sectorSize - sectorHeaderBytes;
     final totalPayloadBytes = track.lengthSectors * payloadPerSector;
     final bytesPerChannel = totalPayloadBytes ~/ track.channels;
@@ -236,11 +259,41 @@ class SacdDsfExtractor {
     }
     final blocks =
         (bytesPerChannel + blockSizePerChannel - 1) ~/ blockSizePerChannel;
-    final paddedPerChannel = blocks * blockSizePerChannel;
-    final dataBytes = paddedPerChannel * track.channels;
-    if (dataBytes > maxOutputBytes) {
+    final dataBytes = blocks * blockSizePerChannel * track.channels;
+    return (
+      bytesPerChannel: bytesPerChannel,
+      dataBytes: dataBytes,
+      totalBytes: DsfHeaderWriter.headerSize + dataBytes,
+    );
+  }
+
+  /// Writes track [track] of image [iso] as a DSF file and returns it.
+  ///
+  /// The file lands in [outDir] when given, otherwise in the cache directory
+  /// (see [SacdDsfCache]). Its name is content addressed: image path + image
+  /// modification time + track identity + extraction parameters. Two discs can
+  /// never collide on "track 01", and a changed image gets fresh files.
+  ///
+  /// Throws [SacdDsfException] when the track extent, channel count or output
+  /// size cannot be honoured, [ArgumentError] when the extractor itself was
+  /// configured badly, and [IsoFormatException] when the image is not readable
+  /// ISO9660.
+  Future<File> extractTrack(
+    File iso,
+    SacdTrack track, {
+    Directory? outDir,
+  }) async {
+    _validateTrack(track);
+    final stat = await iso.stat();
+    if (stat.type == FileSystemEntityType.notFound) {
+      throw SacdDsfException('SACD image not found: ${iso.path}');
+    }
+    final geometry = _geometry(track);
+    final totalBytes = geometry.totalBytes;
+    final dataBytes = geometry.dataBytes;
+    if (totalBytes > maxOutputBytes) {
       throw SacdDsfException(
-        'Track ${track.index} needs $dataBytes bytes, above the '
+        'Track ${track.index} needs $totalBytes bytes, above the '
         '$maxOutputBytes-byte extraction limit',
       );
     }
@@ -253,22 +306,31 @@ class SacdDsfExtractor {
         '${reader.fileLength}-byte image',
       );
     }
-    final directory = outDir ?? await _defaultOutputDirectory();
-    final output = File(
-      '${directory.path}${Platform.pathSeparator}'
-      'sacd_track_${track.index.toString().padLeft(2, '0')}_'
-      '${track.channels}ch.dsf',
+    final directory = outDir ?? await cache.directory();
+    if (outDir == null) {
+      // Fail before writing when the shared cache has no room for this track.
+      await cache.ensureRoom(totalBytes, keepSourcePath: iso.path);
+    }
+    final output = await cache.trackFile(
+      iso,
+      track,
+      sectorHeaderBytes: sectorHeaderBytes,
+      blockSizePerChannel: blockSizePerChannel,
+      reverseBits: reverseBits,
+      directory: directory,
     );
     RandomAccessFile? handle;
     var completed = false;
+    var written = 0;
     try {
       await directory.create(recursive: true);
       handle = await output.open(mode: FileMode.write);
       final header = DsfHeaderWriter(
         channels: track.channels,
         sampleRateHz: track.sampleRateHz,
-        sampleCount: bytesPerChannel * 8,
+        sampleCount: geometry.bytesPerChannel * 8,
         blockSizePerChannel: blockSizePerChannel,
+        bitsPerSample: bitsPerSample,
       ).write(dataBytes);
       await handle.writeFrom(header);
       final channelBlocks = List<Uint8List>.generate(
@@ -277,6 +339,7 @@ class SacdDsfExtractor {
       );
       var filled = 0;
       var channelCursor = 0;
+      final payloadPerSector = SacdLayout.sectorSize - sectorHeaderBytes;
       for (var sector = 0; sector < track.lengthSectors; sector++) {
         final payload = await reader.readAt(
           track.startOffsetBytes +
@@ -300,6 +363,8 @@ class SacdDsfExtractor {
             filled++;
             if (filled == blockSizePerChannel) {
               await _writeBlocks(handle, channelBlocks);
+              written += blockSizePerChannel * track.channels;
+              _failWhenRequested(written);
               filled = 0;
             }
           }
@@ -310,16 +375,81 @@ class SacdDsfExtractor {
           block.fillRange(filled, blockSizePerChannel, 0);
         }
         await _writeBlocks(handle, channelBlocks);
+        written += blockSizePerChannel * track.channels;
+        _failWhenRequested(written);
       }
       await handle.flush();
+      if (written != dataBytes) {
+        throw SacdDsfException(
+          'Track ${track.index} wrote $written bytes, expected $dataBytes',
+        );
+      }
       completed = true;
       return output;
+    } on FileSystemException catch (error, stack) {
+      ErrorLogger.log(
+        'Could not write the extracted SACD track ${track.index}',
+        error: error,
+        stackTrace: stack,
+        category: 'SacdExtract',
+      );
+      throw SacdDsfException(
+        'Could not write track ${track.index} to ${output.path}: '
+        '${error.osError?.message ?? error.message}',
+      );
     } finally {
-      await handle?.close();
-      await reader.close();
+      // A close that throws must not skip the partial-file cleanup: the old
+      // single-statement finally leaked a half-written DSF that the decoder
+      // could later pick up.
+      try {
+        await handle?.close();
+      } catch (error, stack) {
+        completed = false;
+        ErrorLogger.log(
+          'Could not close the extracted SACD track ${track.index}',
+          error: error,
+          stackTrace: stack,
+          category: 'SacdExtract',
+        );
+      }
+      try {
+        await reader.close();
+      } catch (error, stack) {
+        ErrorLogger.log(
+          'Could not close the SACD image after extraction',
+          error: error,
+          stackTrace: stack,
+          category: 'SacdExtract',
+        );
+      }
       if (!completed) {
         await _discardPartial(output);
       }
+    }
+  }
+
+  void _validateTrack(SacdTrack track) {
+    if (track.lengthSectors <= 0) {
+      throw SacdDsfException('Track ${track.index} has no sectors to extract');
+    }
+    if (track.channels < 1 || track.channels > kMaxDsdDecodeChannels) {
+      throw SacdDsfException(
+        'Track ${track.index} declares ${track.channels} channels; the DSD '
+        'decoder supports 1..$kMaxDsdDecodeChannels, so multichannel '
+        'extraction stays disabled',
+      );
+    }
+    if (track.startSector < 0) {
+      throw SacdDsfException(
+        'Track ${track.index} starts at negative sector ${track.startSector}',
+      );
+    }
+  }
+
+  static void _failWhenRequested(int written) {
+    final limit = debugFailAfterPayloadBytes;
+    if (limit != null && written >= limit) {
+      throw StateError('Injected SACD extraction failure after $written bytes');
     }
   }
 
@@ -330,11 +460,6 @@ class SacdDsfExtractor {
     for (final block in blocks) {
       await handle.writeFrom(block);
     }
-  }
-
-  static Future<Directory> _defaultOutputDirectory() async {
-    final cache = await getTemporaryDirectory();
-    return Directory('${cache.path}${Platform.pathSeparator}sacd');
   }
 
   static Future<void> _discardPartial(File output) async {

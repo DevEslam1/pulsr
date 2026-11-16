@@ -1,16 +1,18 @@
 // lib/features/audio_profiles/audio_profile.dart
 //
 // Value type and versioned JSON codec for a portable Pulsr audio profile.
-// Decoding is deliberately strict: unknown top-level keys are ignored so an
-// older build can read a newer field set, but every setting value must be one
-// of the five SharedPreferences scalar types and a payload may never exceed
-// 512 KB or carry more than 200 settings.
+// Decoding is strict about the document shape (format version, id, name and
+// timestamps) so a malformed import is rejected, while a single corrupt
+// setting is dropped and reported instead of discarding the whole profile.
+// Unknown top-level keys are ignored so an older build can read a newer field
+// set, and a payload may never exceed 512 KB or carry more than 200 settings.
 
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import '../../core/errors/app_error.dart';
+import 'audio_profile_keys.dart';
 import 'audio_profile_strings.dart';
 
 /// A profile file that is unreadable, newer than this build supports, or
@@ -27,17 +29,46 @@ class ProfileFormatError extends AppError {
 /// One shareable audio setup: the whitelisted audio preferences captured on a
 /// device, stamped with the app version and the output device they came from.
 class AudioProfile {
-  AudioProfile({
+  factory AudioProfile({
+    required String id,
+    required String name,
+    required DateTime createdAt,
+    required String appVersion,
+    int formatVersion = currentFormatVersion,
+    int? deviceVid,
+    int? devicePid,
+    String? deviceName,
+    Map<String, Object?> values = const <String, Object?>{},
+    List<String> ignoredKeys = const <String>[],
+  }) {
+    final (normalized, dropped) = _normalizeValues(values, ignoredKeys);
+    return AudioProfile._(
+      formatVersion: formatVersion,
+      id: id,
+      name: name,
+      createdAt: createdAt,
+      appVersion: appVersion,
+      deviceVid: deviceVid,
+      devicePid: devicePid,
+      deviceName: deviceName,
+      values: normalized,
+      ignoredKeys: dropped,
+    );
+  }
+
+  AudioProfile._({
+    required this.formatVersion,
     required this.id,
     required this.name,
     required this.createdAt,
     required this.appVersion,
-    this.formatVersion = currentFormatVersion,
-    this.deviceVid,
-    this.devicePid,
-    this.deviceName,
-    Map<String, Object?> values = const <String, Object?>{},
-  }) : _values = _normalizeValues(values);
+    required this.deviceVid,
+    required this.devicePid,
+    required this.deviceName,
+    required Map<String, Object?> values,
+    required List<String> ignoredKeys,
+  })  : _values = values,
+        ignoredKeys = List<String>.unmodifiable(ignoredKeys);
 
   /// Format this build writes and the newest format it accepts.
   static const int currentFormatVersion = 1;
@@ -47,6 +78,11 @@ class AudioProfile {
 
   /// Hard ceiling on the number of settings one profile may carry.
   static const int maxValueCount = 200;
+
+  static final RegExp _idPattern = RegExp(r'^[A-Za-z0-9_-]{1,80}$');
+
+  /// Whether [id] is a safe on-disk profile identifier.
+  static bool isValidId(String id) => _idPattern.hasMatch(id);
 
   /// Format version declared by this profile.
   final int formatVersion;
@@ -74,6 +110,11 @@ class AudioProfile {
 
   final Map<String, Object?> _values;
 
+  /// Keys dropped while building the profile because they are not on
+  /// [AudioProfileKeys.whitelist] or carried a corrupt value. An import still
+  /// succeeds; the affected settings simply keep their current/default value.
+  final List<String> ignoredKeys;
+
   /// Whitelisted preference values, normalized and unmodifiable.
   Map<String, Object?> get values =>
       UnmodifiableMapView<String, Object?>(_values);
@@ -92,6 +133,7 @@ class AudioProfile {
         devicePid: devicePid,
         deviceName: deviceName,
         values: _values,
+        ignoredKeys: ignoredKeys,
       );
 
   /// Serializable form written to disk and to the share sheet.
@@ -115,9 +157,12 @@ class AudioProfile {
 
   /// Reads a profile from an already-decoded JSON [json] object.
   ///
-  /// Unknown keys are ignored, `formatVersion` above [currentFormatVersion] is
-  /// rejected with [ProfileFormatError], and every value in `values` is checked
-  /// against the supported scalar types.
+  /// Unknown top-level keys are ignored and only settings on
+  /// [AudioProfileKeys.whitelist] are kept; `formatVersion` above
+  /// [currentFormatVersion] is rejected with [ProfileFormatError]. A corrupt
+  /// individual setting is dropped (and reported through [ignoredKeys]) so the
+  /// rest of the profile still imports and the affected preference keeps its
+  /// current/default value.
   factory AudioProfile.fromJson(Map<String, Object?> json) {
     final version = json['formatVersion'];
     if (version is! int) {
@@ -146,18 +191,41 @@ class AudioProfile {
         userMessage: AudioProfileStrings.formatCorrupt,
       );
     }
+    if (rawValues is Map && rawValues.length > maxValueCount) {
+      throw const ProfileFormatError(
+        code: 'audio-profile-too-many-values',
+        userMessage: AudioProfileStrings.formatTooManyValues,
+      );
+    }
     final values = <String, Object?>{};
+    final ignored = <String>[];
     if (rawValues is Map) {
       for (final entry in rawValues.entries) {
         final key = entry.key;
         if (key is! String) {
+          ignored.add('$key');
+          continue;
+        }
+        if (key.isEmpty) {
           throw const ProfileFormatError(
-            code: 'audio-profile-key-invalid',
-            userMessage: AudioProfileStrings.formatCorrupt,
+            code: 'audio-profile-empty-key',
+            userMessage: AudioProfileStrings.formatEmptyKey,
           );
+        }
+        if (!AudioProfileKeys.isWhitelisted(key)) {
+          ignored.add(key);
+          continue;
         }
         values[key] = entry.value;
       }
+    }
+
+    final id = _readRequiredString(json, 'id');
+    if (!isValidId(id)) {
+      throw const ProfileFormatError(
+        code: 'audio-profile-id-invalid',
+        userMessage: AudioProfileStrings.formatInvalidId,
+      );
     }
 
     final createdAt = DateTime.tryParse(_readString(json, 'createdAt') ?? '');
@@ -170,14 +238,15 @@ class AudioProfile {
 
     return AudioProfile(
       formatVersion: version,
-      id: _readRequiredString(json, 'id'),
+      id: id,
       name: _readRequiredString(json, 'name'),
       createdAt: createdAt,
-      appVersion: _readString(json, 'appVersion') ?? 'unknown',
+      appVersion: _readLenientString(json, 'appVersion') ?? 'unknown',
       deviceVid: _readOptionalInt(json, 'deviceVid'),
       devicePid: _readOptionalInt(json, 'devicePid'),
-      deviceName: _readString(json, 'deviceName'),
+      deviceName: _readLenientString(json, 'deviceName'),
       values: values,
+      ignoredKeys: ignored,
     );
   }
 
@@ -236,7 +305,10 @@ class AudioProfile {
     return AudioProfile.fromJson(json);
   }
 
-  static Map<String, Object?> _normalizeValues(Map<String, Object?> source) {
+  static (Map<String, Object?>, List<String>) _normalizeValues(
+    Map<String, Object?> source,
+    List<String> alreadyIgnored,
+  ) {
     if (source.length > maxValueCount) {
       throw const ProfileFormatError(
         code: 'audio-profile-too-many-values',
@@ -244,16 +316,24 @@ class AudioProfile {
       );
     }
     final normalized = <String, Object?>{};
+    final ignored = <String>[
+      for (final key in alreadyIgnored)
+        if (key.isNotEmpty) key,
+    ];
     for (final entry in source.entries) {
       if (entry.key.isEmpty) {
-        throw const ProfileFormatError(
-          code: 'audio-profile-empty-key',
-          userMessage: AudioProfileStrings.formatEmptyKey,
-        );
+        ignored.add(entry.key);
+        continue;
       }
-      normalized[entry.key] = _normalizeValue(entry.key, entry.value);
+      try {
+        normalized[entry.key] = _normalizeValue(entry.key, entry.value);
+      } on ProfileFormatError {
+        // A single corrupt setting must not make the whole profile unusable;
+        // the preference simply keeps its current/default value.
+        ignored.add(entry.key);
+      }
     }
-    return normalized;
+    return (normalized, ignored);
   }
 
   static Object? _normalizeValue(String key, Object? value) {
@@ -307,14 +387,21 @@ class AudioProfile {
     );
   }
 
+  /// Like [_readString], but degrades a corrupt optional field to `null`.
+  static String? _readLenientString(Map<String, Object?> json, String key) {
+    final value = json[key];
+    return value is String ? value : null;
+  }
+
   static int? _readOptionalInt(Map<String, Object?> json, String key) {
     final value = json[key];
     if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    throw ProfileFormatError(
-      code: 'audio-profile-field-type',
-      userMessage: AudioProfileStrings.formatInvalidValue(key),
-    );
+    if (value is int) return value >= 0 ? value : null;
+    if (value is num) {
+      final rounded = value.toInt();
+      return rounded >= 0 ? rounded : null;
+    }
+    // A corrupt device field must not block the rest of the metadata.
+    return null;
   }
 }

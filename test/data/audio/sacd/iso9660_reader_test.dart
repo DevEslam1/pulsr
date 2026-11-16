@@ -1,5 +1,6 @@
 // test/data/audio/sacd/iso9660_reader_test.dart
 
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -150,5 +151,154 @@ void main() {
       expect(reader.readAt(-1, 4), throwsA(isA<IsoFormatException>()));
       expect(reader.readAt(0, -4), throwsA(isA<IsoFormatException>()));
     });
+
+    test('a 4-byte Rock Ridge NM at the extent end is not read past',
+        () async {
+      // The NM record is the last thing in the directory extent: signature NM,
+      // entry length 4, version 1 — and therefore no flags byte. Reading the
+      // flags at position + 4 used to index one byte past the buffer.
+      final image = _isoWithTrailingShortNm();
+      final reader = await Iso9660Reader.fromBytes(image);
+      addTearDown(reader.close);
+
+      final entries = await reader.list(reader.root);
+      final bin = entries.singleWhere((entry) => entry.isoName == 'BIN1');
+      expect(bin.name, 'BIN1', reason: 'a malformed NM is ignored, not thrown');
+    });
+
+    test('survives mutated images without RangeError or TypeError', () async {
+      final random = Random(20261117);
+      for (var round = 0; round < 200; round++) {
+        final mutated = Uint8List.fromList(fixture.bytes);
+        final mutations = 1 + random.nextInt(10);
+        for (var i = 0; i < mutations; i++) {
+          mutated[random.nextInt(mutated.length)] = random.nextInt(256);
+        }
+        try {
+          final reader = await Iso9660Reader.fromBytes(mutated);
+          try {
+            await reader.lookupPath('SACD');
+            await reader.lookupPath('SACD/SACD_2CH.TOC');
+            await reader.list(reader.root);
+          } finally {
+            await reader.close();
+          }
+        } catch (error) {
+          expect(error, isNot(isA<RangeError>()),
+              reason: 'round $round: $error');
+          expect(error, isNot(isA<TypeError>()),
+              reason: 'round $round: $error');
+        }
+      }
+    });
+
+    test('survives every truncation prefix of the fixture', () async {
+      final fixtureBytes = fixture.bytes;
+      for (var cut = 0; cut <= fixtureBytes.length; cut += 1024) {
+        final truncated = Uint8List.sublistView(fixtureBytes, 0, cut);
+        try {
+          final reader = await Iso9660Reader.fromBytes(truncated);
+          try {
+            await reader.lookupPath('SACD');
+            await reader.list(reader.root);
+          } finally {
+            await reader.close();
+          }
+        } catch (error) {
+          expect(error, isNot(isA<RangeError>()), reason: 'cut $cut');
+          expect(error, isNot(isA<TypeError>()), reason: 'cut $cut');
+        }
+      }
+    });
   });
+}
+
+/// Minimal ISO with a Rock Ridge `NM` entry that ends exactly at the directory
+/// extent boundary and carries no flags byte.
+Uint8List _isoWithTrailingShortNm() {
+  const sectors = 21;
+  final image = Uint8List(sectors * fixtureSectorSize);
+
+  // Primary volume descriptor at sector 16.
+  final pvd = 16 * fixtureSectorSize;
+  image[pvd] = 0x01;
+  _writeAscii(image, pvd + 1, 'CD001');
+  image[pvd + 6] = 0x01;
+  const directoryBytes = 34 + 34 + 42;
+  _writeRecord(
+    image,
+    pvd + 156,
+    identifier: const <int>[0x00],
+    extentSector: 20,
+    sizeBytes: directoryBytes,
+    isDirectory: true,
+  );
+
+  // Root directory: self, parent, then the malformed NM entry.
+  var offset = 20 * fixtureSectorSize;
+  offset += _writeRecord(
+    image,
+    offset,
+    identifier: const <int>[0x00],
+    extentSector: 20,
+    sizeBytes: directoryBytes,
+    isDirectory: true,
+  );
+  offset += _writeRecord(
+    image,
+    offset,
+    identifier: const <int>[0x01],
+    extentSector: 20,
+    sizeBytes: directoryBytes,
+    isDirectory: true,
+  );
+  _writeRecord(
+    image,
+    offset,
+    identifier: <int>[0x42, 0x49, 0x4E, 0x31], // 'BIN1', even -> pad byte
+    extentSector: 20,
+    sizeBytes: 1,
+    isDirectory: false,
+    systemUse: const <int>[0x4E, 0x4D, 0x04, 0x01], // 'NM', len 4, version 1
+  );
+  return image;
+}
+
+int _writeRecord(
+  Uint8List image,
+  int offset, {
+  required List<int> identifier,
+  required int extentSector,
+  required int sizeBytes,
+  required bool isDirectory,
+  List<int> systemUse = const <int>[],
+}) {
+  final padAfterIdentifier = identifier.length.isEven ? 1 : 0;
+  final length =
+      33 + identifier.length + padAfterIdentifier + systemUse.length;
+  final view = ByteData.sublistView(image, offset, offset + length);
+  image[offset] = length;
+  image[offset + 1] = 0;
+  view.setUint32(2, extentSector, Endian.little);
+  view.setUint32(6, extentSector, Endian.big);
+  view.setUint32(10, sizeBytes, Endian.little);
+  view.setUint32(14, sizeBytes, Endian.big);
+  image[offset + 25] = isDirectory ? 0x02 : 0x00;
+  view.setUint16(28, 1, Endian.little);
+  view.setUint16(30, 1, Endian.big);
+  image[offset + 32] = identifier.length;
+  for (var i = 0; i < identifier.length; i++) {
+    image[offset + 33 + i] = identifier[i];
+  }
+  var cursor = offset + 33 + identifier.length + padAfterIdentifier;
+  for (final byte in systemUse) {
+    image[cursor++] = byte;
+  }
+  return length;
+}
+
+void _writeAscii(Uint8List target, int offset, String text) {
+  for (var i = 0; i < text.length; i++) {
+    target[offset + i] = text.codeUnitAt(i);
+  }
 }

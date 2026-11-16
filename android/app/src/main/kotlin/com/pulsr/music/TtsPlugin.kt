@@ -2,8 +2,13 @@ package com.pulsr.music
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,25 +27,73 @@ import java.util.UUID
  * Channel: `com.pulsr.music/tts`.
  *
  * * `init` -> Boolean: whether the engine is ready. Safe to call repeatedly.
- * * `speak` {text, volume, voiceId?, localeId?} -> Boolean: QUEUE_FLUSH speech.
- * * `stop` -> Boolean: stops immediately and drops queued utterances.
+ * * `speak` {text, volume, duckAudio, voiceId?, localeId?} -> Boolean:
+ *   QUEUE_FLUSH speech. With `duckAudio` the engine asks the platform for
+ *   transient audio focus with ducking, so music keeps playing quietly.
+ * * `stop` -> Boolean: stops immediately, abandons focus and drops the queue.
  * * `voices` -> List<Map{id, name, localeCode, quality}>: installed voices.
  * * `isSpeaking` -> Boolean: live speech state.
  *
  * The engine is created lazily on the first `init`, because constructing it
  * binds a system speech service and the plugin is attached during app startup.
+ * Resolved voices are cached per (voiceId, localeId) pair so selecting a voice
+ * does not enumerate the engine's voice list for every utterance.
  */
 class TtsPlugin : FlutterPlugin, MethodCallHandler {
     private var channel: MethodChannel? = null
     private var context: Context? = null
     private var tts: TextToSpeech? = null
+    private var audioManager: AudioManager? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var state: InitState = InitState.IDLE
     private val pendingInitResults = mutableListOf<Result>()
+
+    /**
+     * Incremented on every init attempt and on dispose. Callbacks carrying an
+     * older token are ignored, so a late onInit after shutdown cannot resurrect
+     * a released engine or double-complete a Result.
+     */
+    private var generation = 0
+    private var disposed = false
+
+    private var focusRequest: AudioFocusRequest? = null
+    private var focusHeld = false
+    private var activeUtteranceId: String? = null
+
+    private var voiceCacheKey: String? = null
+    private var cachedVoice: Voice? = null
+    private var cachedDefaultLocale: Locale? = null
+
+    private val speechAttributes: AudioAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+
+    private val utteranceListener = object : UtteranceProgressListener() {
+        override fun onStart(utteranceId: String?) = Unit
+
+        override fun onDone(utteranceId: String?) {
+            // Ducking focus must be released when the sentence ends, or the
+            // music stays attenuated until the next announcement.
+            releaseFocusFor(utteranceId)
+        }
+
+        override fun onError(utteranceId: String?) {
+            releaseFocusFor(utteranceId)
+        }
+
+        override fun onError(utteranceId: String?, errorCode: Int) {
+            releaseFocusFor(utteranceId)
+        }
+    }
 
     private enum class InitState { IDLE, INITIALIZING, READY, UNAVAILABLE }
 
     override fun onAttachedToEngine(binding: FlutterPluginBinding) {
         context = binding.applicationContext
+        audioManager =
+            binding.applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+        disposed = false
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME).also { created ->
             created.setMethodCallHandler(this)
         }
@@ -49,6 +102,7 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
     override fun onDetachedFromEngine(binding: FlutterPluginBinding) {
         dispose()
         context = null
+        audioManager = null
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -64,20 +118,30 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
 
     /** Stops speech and releases the native engine. Safe to call more than once. */
     fun dispose() {
+        disposed = true
+        generation++
         channel?.setMethodCallHandler(null)
         channel = null
-        val pending = pendingInitResults.toList()
-        pendingInitResults.clear()
-        for (result in pending) {
-            result.success(false)
-        }
-        tts?.stop()
-        tts?.shutdown()
+        completePending(false)
+        val engine = tts
         tts = null
         state = InitState.IDLE
+        // stop/shutdown can throw on a half-initialised engine; teardown must
+        // never surface that as a crash.
+        runCatching { engine?.stop() }
+        runCatching { engine?.shutdown() }
+        activeUtteranceId = null
+        abandonFocusNow()
+        voiceCacheKey = null
+        cachedVoice = null
+        cachedDefaultLocale = null
     }
 
     private fun initialize(result: Result) {
+        if (disposed) {
+            result.success(false)
+            return
+        }
         when (state) {
             InitState.READY -> {
                 result.success(true)
@@ -101,48 +165,66 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
         }
         state = InitState.INITIALIZING
         pendingInitResults.add(result)
-        // onInit is posted to the main looper, so the assignment below always
-        // lands before handleInit runs.
-        val engine = TextToSpeech(appContext) { code -> handleInit(code) }
+        val token = ++generation
+        val engine = try {
+            TextToSpeech(appContext) { code -> handleInit(token, code) }
+        } catch (e: Exception) {
+            Log.w(TAG, "TextToSpeech constructor failed: ${e.message}")
+            // Invalidate the token and complete everyone waiting, including
+            // the result just queued.
+            generation++
+            state = InitState.UNAVAILABLE
+            completePending(false)
+            return
+        }
         tts = engine
         if (state == InitState.UNAVAILABLE) {
             // Defensive: an engine that reported failure before the field was
             // assigned must not stay bound to the speech service.
-            engine.shutdown()
+            runCatching { engine.shutdown() }
             tts = null
         }
     }
 
-    private fun handleInit(code: Int) {
-        val ready = code == TextToSpeech.SUCCESS
-        if (ready) {
+    private fun handleInit(token: Int, code: Int) {
+        if (disposed || token != generation) {
+            // Late callback from a disposed or superseded engine.
+            return
+        }
+        val engine = tts
+        if (code == TextToSpeech.SUCCESS && engine != null) {
             state = InitState.READY
-            applySpeechAttributes()
+            configureEngine(engine)
+            completePending(true)
         } else {
             state = InitState.UNAVAILABLE
-            tts?.shutdown()
+            runCatching { engine?.shutdown() }
             tts = null
             Log.w(TAG, "TextToSpeech init failed with code $code")
+            completePending(false)
         }
+    }
+
+    private fun completePending(success: Boolean) {
         val results = pendingInitResults.toList()
         pendingInitResults.clear()
         for (pending in results) {
-            pending.success(ready)
+            runCatching { pending.success(success) }
         }
     }
 
-    private fun applySpeechAttributes() {
-        val engine = tts ?: return
+    private fun configureEngine(engine: TextToSpeech) {
         runCatching {
-            engine.setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_ASSISTANCE_ACCESSIBILITY)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                    .build()
-            )
+            engine.setAudioAttributes(speechAttributes)
+            engine.setOnUtteranceProgressListener(utteranceListener)
+            voiceCacheKey = null
+            cachedVoice = null
+            cachedDefaultLocale = null
+            // Resolve the device locale once at init, never per utterance.
             val deviceLocale = Locale.getDefault()
             if (engine.isLanguageAvailable(deviceLocale) >= TextToSpeech.LANG_AVAILABLE) {
                 engine.language = deviceLocale
+                cachedDefaultLocale = deviceLocale
             }
         }.onFailure { error ->
             Log.w(TAG, "Speech attribute setup failed: ${error.message}")
@@ -151,7 +233,7 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun speak(call: MethodCall, result: Result) {
         val engine = tts
-        if (state != InitState.READY || engine == null) {
+        if (disposed || state != InitState.READY || engine == null) {
             result.success(false)
             return
         }
@@ -161,47 +243,143 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         val volume = (call.argument<Double>("volume") ?: 1.0).toFloat().coerceIn(0f, 1f)
-        applyVoice(engine, call.argument<String>("voiceId"), call.argument<String>("localeId"))
-        val params = Bundle().apply {
-            putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
+        val duckAudio = call.argument<Boolean>("duckAudio") ?: false
+        try {
+            applyVoice(engine, call.argument<String>("voiceId"), call.argument<String>("localeId"))
+            if (duckAudio) {
+                requestDuckFocus()
+            } else {
+                // A previous announcement may still hold ducking focus even
+                // though this one must not duck.
+                abandonFocusNow()
+            }
+            val params = Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
+            }
+            val utteranceId = "announce-${UUID.randomUUID()}"
+            activeUtteranceId = utteranceId
+            val queued = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
+            if (queued != TextToSpeech.SUCCESS) {
+                activeUtteranceId = null
+                abandonFocusNow()
+            }
+            result.success(queued == TextToSpeech.SUCCESS)
+        } catch (e: Exception) {
+            // Never leave the Dart future pending because the platform threw.
+            Log.w(TAG, "Speak failed: ${e.message}")
+            activeUtteranceId = null
+            abandonFocusNow()
+            runCatching { result.success(false) }
         }
-        val utteranceId = "announce-${UUID.randomUUID()}"
-        val queued = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-        result.success(queued == TextToSpeech.SUCCESS)
     }
 
     private fun stopSpeech(): Boolean {
-        val engine = tts
-        if (engine == null) return false
-        return engine.stop() == TextToSpeech.SUCCESS
+        activeUtteranceId = null
+        abandonFocusNow()
+        val engine = tts ?: return false
+        return runCatching { engine.stop() == TextToSpeech.SUCCESS }.getOrDefault(false)
     }
 
-    private fun isSpeaking(): Boolean = tts?.isSpeaking ?: false
+    private fun isSpeaking(): Boolean = runCatching { tts?.isSpeaking ?: false }.getOrDefault(false)
 
+    /**
+     * Applies the requested voice, resolving the engine voice list at most once
+     * per (voiceId, localeId) pair.
+     *
+     * A failed resolution is cached too, so an uninstalled voice id cannot make
+     * every utterance re-enumerate `engine.voices`.
+     */
     private fun applyVoice(engine: TextToSpeech, voiceId: String?, localeId: String?) {
+        val key = "${voiceId.orEmpty()}|${localeId.orEmpty()}"
+        if (key == voiceCacheKey) {
+            val cached = cachedVoice
+            if (cached != null) {
+                runCatching { engine.voice = cached }
+            }
+            return
+        }
         runCatching {
+            val requestedVoice = if (!voiceId.isNullOrEmpty()) {
+                engine.voices?.firstOrNull { voice -> voice.name == voiceId }
+            } else {
+                null
+            }
+            if (requestedVoice != null) {
+                engine.voice = requestedVoice
+                cachedVoice = requestedVoice
+                voiceCacheKey = key
+                return
+            }
             if (!voiceId.isNullOrEmpty()) {
-                val match = engine.voices?.firstOrNull { voice -> voice.name == voiceId }
-                if (match != null) {
-                    engine.voice = match
-                    return
-                }
                 Log.w(TAG, "Voice $voiceId is not installed; keeping the current voice")
             }
-            if (!localeId.isNullOrEmpty()) {
-                val locale = Locale.forLanguageTag(localeId)
-                if (engine.isLanguageAvailable(locale) >= TextToSpeech.LANG_AVAILABLE) {
-                    engine.voice = null
-                    engine.language = locale
-                }
+            val requestedLocale = if (!localeId.isNullOrEmpty()) {
+                Locale.forLanguageTag(localeId)
+            } else {
+                null
+            }
+            if (requestedLocale != null &&
+                engine.isLanguageAvailable(requestedLocale) >= TextToSpeech.LANG_AVAILABLE
+            ) {
+                engine.voice = null
+                engine.language = requestedLocale
+                cachedVoice = null
+                voiceCacheKey = key
+                return
+            }
+            // No explicit choice (or an unavailable one): return to the cached
+            // device locale without another availability probe.
+            cachedVoice = null
+            voiceCacheKey = key
+            val defaultLocale = cachedDefaultLocale
+            if (defaultLocale != null) {
+                engine.voice = null
+                engine.language = defaultLocale
             }
         }.onFailure { error ->
             Log.w(TAG, "Voice selection failed: ${error.message}")
         }
     }
 
+    private fun requestDuckFocus() {
+        val manager = audioManager ?: return
+        if (focusHeld) return
+        val request = focusRequest ?: AudioFocusRequest.Builder(
+            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
+        )
+            .setAudioAttributes(speechAttributes)
+            .setWillPauseWhenDucked(false)
+            .setOnAudioFocusChangeListener { }
+            .build()
+            .also { focusRequest = it }
+        val granted = runCatching { manager.requestAudioFocus(request) }
+            .getOrDefault(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        focusHeld = granted == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    private fun abandonFocusNow() {
+        val manager = audioManager
+        val request = focusRequest
+        if (focusHeld && manager != null && request != null) {
+            runCatching { manager.abandonAudioFocusRequest(request) }
+        }
+        focusHeld = false
+    }
+
+    private fun releaseFocusFor(utteranceId: String?) {
+        mainHandler.post {
+            // A done/error callback from the previous sentence must not release
+            // the ducking focus a newer utterance already acquired.
+            if (activeUtteranceId != null && activeUtteranceId != utteranceId) {
+                return@post
+            }
+            activeUtteranceId = null
+            abandonFocusNow()
+        }
+    }
+
     private fun voices(): List<Map<String, Any>> {
-        if (state != InitState.READY) return emptyList()
+        if (disposed || state != InitState.READY) return emptyList()
         val engine = tts ?: return emptyList()
         val installed = runCatching { engine.voices }.getOrNull() ?: return emptyList()
         return installed.mapNotNull { voice -> voice.toMap() }

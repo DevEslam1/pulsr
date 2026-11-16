@@ -54,7 +54,15 @@ abstract class TtsEngine {
   Future<bool> init();
 
   /// Speaks [text], replacing any utterance already queued, at [volume].
-  Future<void> speak(String text, {double volume = 1.0});
+  ///
+  /// When [duckAudio] is true the platform asks for transient audio focus with
+  /// ducking, so music continues quietly under the announcement instead of
+  /// being stopped.
+  Future<void> speak(
+    String text, {
+    double volume = 1.0,
+    bool duckAudio = false,
+  });
 
   /// Stops speech immediately.
   Future<void> stop();
@@ -109,11 +117,16 @@ class MethodChannelTtsEngine implements TtsEngine {
   }
 
   @override
-  Future<void> speak(String text, {double volume = 1.0}) async {
+  Future<void> speak(
+    String text, {
+    double volume = 1.0,
+    bool duckAudio = false,
+  }) async {
     if (!_available || text.isEmpty) return;
     final arguments = <String, Object?>{
       'text': text,
       'volume': volume.clamp(0.0, 1.0),
+      'duckAudio': duckAudio,
     };
     if (voiceId.isNotEmpty) arguments['voiceId'] = voiceId;
     if (localeId.isNotEmpty) arguments['localeId'] = localeId;

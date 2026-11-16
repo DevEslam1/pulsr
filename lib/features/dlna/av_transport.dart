@@ -188,10 +188,19 @@ class AvTransportClient {
       ..bodyBytes = utf8.encode(envelope);
 
     final streamed = await _client.send(request).timeout(_timeout);
-    final response = await http.Response.fromStream(streamed);
+    final response = await http.Response.fromStream(streamed).timeout(_timeout);
     final body = utf8.decode(response.bodyBytes, allowMalformed: true);
 
     final fault = _faultFrom(body, action);
+    if (response.statusCode >= 400) {
+      if (fault != null) throw fault;
+      throw UpnpActionError(
+        code: 'DLNA_HTTP_${response.statusCode}',
+        userMessage:
+            'The renderer rejected $action (HTTP ${response.statusCode}).',
+        action: action,
+      );
+    }
     if (fault != null) throw fault;
     if (response.statusCode != 200) {
       throw UpnpActionError(
@@ -302,12 +311,17 @@ class AvTransportClient {
   }
 
   /// Builds DIDL-Lite metadata for one audio item served at [url].
+  ///
+  /// [size] and [duration] become `<res>` attributes when known. Every text
+  /// value and attribute is escaped.
   static String buildDidlLiteMetadata({
     required String url,
     String? title,
     String? artist,
     String? album,
     String? mimeType,
+    int? size,
+    Duration? duration,
     String itemId = '0',
   }) {
     final type = (mimeType == null || mimeType.isEmpty)
@@ -331,7 +345,15 @@ class AvTransportClient {
     }
     buffer
       ..write('<upnp:class>object.item.audioItem.musicTrack</upnp:class>')
-      ..write('<res protocolInfo="http-get:*:${escapeXml(type)}:*">')
+      ..write('<res protocolInfo="http-get:*:${escapeXml(type)}:*"');
+    if (size != null && size >= 0) {
+      buffer.write(' size="$size"');
+    }
+    if (duration != null) {
+      buffer.write(' duration="${formatUpnpDuration(duration)}"');
+    }
+    buffer
+      ..write('>')
       ..write(escapeXml(url))
       ..write('</res>')
       ..write('</item>')
@@ -422,8 +444,13 @@ class AvTransportClient {
   }
 
   static UpnpActionError? _faultFrom(String body, String action) {
-    if (!body.contains('Fault')) return null;
+    // Only a real `<Fault>` element (optionally namespace-prefixed) or a
+    // numeric errorCode counts as a UPnP fault; the word "Fault" elsewhere in
+    // a normal response must not be treated as one.
+    final hasFaultTag =
+        RegExp(r'<\s*(?:[A-Za-z_][\w.-]*:)?Fault(?:\s|>)').hasMatch(body);
     final code = int.tryParse(elementText(body, 'errorCode') ?? '');
+    if (!hasFaultTag && code == null) return null;
     final description = elementText(body, 'errorDescription');
     return UpnpActionError(
       code: code == null ? 'DLNA_UPNP_ERROR' : 'DLNA_UPNP_ERROR_$code',

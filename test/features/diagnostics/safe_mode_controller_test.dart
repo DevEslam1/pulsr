@@ -132,4 +132,77 @@ void main() {
 
     expect(controller.lastFailureReason('Pixel 8')!.length, 200);
   });
+
+  test('reset restores the pre-fallback output settings', () async {
+    final description = await controller.applyFallback('Pixel 8');
+    expect(description, contains('AAudio'));
+
+    expect(prefs.getBool(PrefsKeys.aaudioOutputEnabled), isFalse);
+    expect(prefs.getString(PrefsKeys.dsdOutputMode), 'pcm');
+
+    await controller.reset('Pixel 8');
+
+    expect(prefs.getBool(PrefsKeys.aaudioOutputEnabled), isTrue);
+    expect(prefs.getBool(PrefsKeys.usbHardwareVolumeEnabled), isTrue);
+    expect(prefs.getString(PrefsKeys.dsdOutputMode), 'dop');
+    expect(prefs.getBool(PrefsKeys.strictBitPerfect), isTrue);
+    expect(
+      prefs.containsKey(SafeModeController.snapshotKey('Pixel 8')),
+      isFalse,
+    );
+  });
+
+  test('a repeated fallback never replaces the original snapshot', () async {
+    await controller.applyFallback('Pixel 8');
+    // Simulate the user turning AAudio back on before the fallback is applied
+    // a second time for the same device.
+    await prefs.setBool(PrefsKeys.aaudioOutputEnabled, true);
+
+    await controller.applyFallback('Pixel 8');
+    await controller.reset('Pixel 8');
+
+    expect(prefs.getBool(PrefsKeys.aaudioOutputEnabled), isTrue);
+  });
+
+  test('reset restores an originally absent setting to absent', () async {
+    SharedPreferences.resetStatic();
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      PrefsKeys.aaudioOutputEnabled: true,
+      PrefsKeys.dsdOutputMode: 'dop',
+    });
+    final fresh = await SharedPreferences.getInstance();
+    final local = SafeModeController(prefs: fresh);
+    addTearDown(local.dispose);
+
+    await local.applyFallback('Pixel 8');
+    expect(
+      fresh.containsKey(PrefsKeys.usbHardwareVolumeEnabled),
+      isTrue,
+    );
+
+    await local.reset('Pixel 8');
+    expect(
+      fresh.containsKey(PrefsKeys.usbHardwareVolumeEnabled),
+      isFalse,
+    );
+    expect(
+      fresh.containsKey(PrefsKeys.strictBitPerfect),
+      isFalse,
+    );
+  });
+
+  test('apply and reset notify the settings reloader', () async {
+    var reloads = 0;
+    final local = SafeModeController(
+      prefs: prefs,
+      reloadSettings: () async => reloads++,
+    );
+    addTearDown(local.dispose);
+
+    await local.applyFallback('Pixel 8');
+    expect(reloads, 1);
+
+    await local.reset('Pixel 8');
+    expect(reloads, 2);
+  });
 }

@@ -8,6 +8,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 
 /// How the exclusive USB path reacts when audio focus is lost.
@@ -51,13 +52,15 @@ enum SoftwareVolumeCurve {
 /// They deliberately live here instead of `PrefsKeys`: the module owns its
 /// storage contract and the `sysbeh_` prefix keeps it out of the global
 /// preference namespace.
+///
+/// The notification policy is the one exception: it is not stored here.
+/// [SystemBehaviorPrefsKeys.duckingModeOwner] is the single source of truth
+/// shared with the audio settings screen, so the two cannot disagree.
 abstract final class SystemBehaviorPrefsKeys {
   static const String usbReleaseOnFocusLoss =
       'sysbeh_usb_release_on_focus_loss';
   static const String closeUsbWhenBackgrounded =
       'sysbeh_close_usb_when_backgrounded';
-  static const String pauseOnNotificationSound =
-      'sysbeh_pause_on_notification_sound';
   static const String stopWhenTaskRemoved = 'sysbeh_stop_when_task_removed';
   static const String volumeRockerTrackSwitch =
       'sysbeh_volume_rocker_track_switch';
@@ -65,6 +68,10 @@ abstract final class SystemBehaviorPrefsKeys {
   static const String softwareVolumeCurve = 'sysbeh_software_volume_curve';
   static const String volumeStepPercent = 'sysbeh_volume_step_percent';
   static const String resumeAfterCall = 'sysbeh_resume_after_call';
+
+  /// Preference key that owns the pause/duck decision. Named after its global
+  /// owner so it is obvious that this module must not add a second key.
+  static const String duckingModeOwner = PrefsKeys.duckingMode;
 }
 
 /// Immutable settings values handed to the system-event decisions.
@@ -79,7 +86,7 @@ class SystemBehaviorSettingsSnapshot {
   const SystemBehaviorSettingsSnapshot({
     this.usbReleaseOnFocusLoss = UsbReleaseOnFocusLoss.never,
     this.closeUsbWhenBackgrounded = false,
-    this.pauseOnNotificationSound = true,
+    this.pauseOnNotificationSound = false,
     this.stopWhenTaskRemoved = false,
     this.volumeRockerTrackSwitch = false,
     this.fadeOutOnPauseMs = 0,
@@ -92,7 +99,7 @@ class SystemBehaviorSettingsSnapshot {
   factory SystemBehaviorSettingsSnapshot.normalized({
     UsbReleaseOnFocusLoss usbReleaseOnFocusLoss = UsbReleaseOnFocusLoss.never,
     bool closeUsbWhenBackgrounded = false,
-    bool pauseOnNotificationSound = true,
+    bool pauseOnNotificationSound = false,
     bool stopWhenTaskRemoved = false,
     bool volumeRockerTrackSwitch = false,
     int fadeOutOnPauseMs = 0,
@@ -138,6 +145,10 @@ class SystemBehaviorSettingsSnapshot {
   final bool closeUsbWhenBackgrounded;
 
   /// Whether a system notification sound pauses instead of ducking.
+  ///
+  /// Backed by the app-wide [PrefsKeys.duckingMode]: `true` means the mode is
+  /// `pause`, `false` means `duck`. The default is `duck`, matching the audio
+  /// settings screen, so an untouched install behaves exactly as before.
   final bool pauseOnNotificationSound;
 
   /// Whether removing the app from the recents list stops playback.
@@ -241,11 +252,30 @@ class SystemBehaviorSettings extends ChangeNotifier {
 
   SystemBehaviorSettingsSnapshot _snapshot =
       SystemBehaviorSettingsSnapshot.defaults;
+  SharedPreferences? _prefs;
   bool _loaded = false;
   bool _disposed = false;
 
   /// Current values; the service reads this once per event.
-  SystemBehaviorSettingsSnapshot get snapshot => _snapshot;
+  ///
+  /// The notification policy is overlaid from [PrefsKeys.duckingMode] on every
+  /// read, so a change made on the audio settings screen is honored without a
+  /// reload and without a second preference key.
+  SystemBehaviorSettingsSnapshot get snapshot {
+    final SharedPreferences? prefs = _prefs;
+    if (prefs == null) return _snapshot;
+    final bool pause = _pauseFromPrefs(prefs);
+    final bool resume = prefs.getBool(PrefsKeys.resumeAfterInterruption) ??
+        _snapshot.resumeAfterCall;
+    if (pause == _snapshot.pauseOnNotificationSound &&
+        resume == _snapshot.resumeAfterCall) {
+      return _snapshot;
+    }
+    return _snapshot.copyWith(
+      pauseOnNotificationSound: pause,
+      resumeAfterCall: resume,
+    );
+  }
 
   /// Whether [load] has completed at least once.
   bool get isLoaded => _loaded;
@@ -258,7 +288,10 @@ class SystemBehaviorSettings extends ChangeNotifier {
   bool get closeUsbWhenBackgrounded => _snapshot.closeUsbWhenBackgrounded;
 
   /// Whether a system notification sound pauses instead of ducking.
-  bool get pauseOnNotificationSound => _snapshot.pauseOnNotificationSound;
+  ///
+  /// Reads [PrefsKeys.duckingMode] live, so the toggle on this screen and the
+  /// one in the audio settings stay one value.
+  bool get pauseOnNotificationSound => snapshot.pauseOnNotificationSound;
 
   /// Whether removing the app from recents stops playback.
   bool get stopWhenTaskRemoved => _snapshot.stopWhenTaskRemoved;
@@ -283,6 +316,7 @@ class SystemBehaviorSettings extends ChangeNotifier {
   Future<void> load() async {
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
+      _prefs = prefs;
       _snapshot = SystemBehaviorSettingsSnapshot.normalized(
         usbReleaseOnFocusLoss: UsbReleaseOnFocusLoss.parse(
           prefs.getString(SystemBehaviorPrefsKeys.usbReleaseOnFocusLoss),
@@ -291,10 +325,7 @@ class SystemBehaviorSettings extends ChangeNotifier {
             prefs.getBool(SystemBehaviorPrefsKeys.closeUsbWhenBackgrounded) ??
                 SystemBehaviorSettingsSnapshot
                     .defaults.closeUsbWhenBackgrounded,
-        pauseOnNotificationSound:
-            prefs.getBool(SystemBehaviorPrefsKeys.pauseOnNotificationSound) ??
-                SystemBehaviorSettingsSnapshot
-                    .defaults.pauseOnNotificationSound,
+        pauseOnNotificationSound: _pauseFromPrefs(prefs),
         stopWhenTaskRemoved:
             prefs.getBool(SystemBehaviorPrefsKeys.stopWhenTaskRemoved) ??
                 SystemBehaviorSettingsSnapshot.defaults.stopWhenTaskRemoved,
@@ -311,9 +342,10 @@ class SystemBehaviorSettings extends ChangeNotifier {
         volumeStepPercent:
             prefs.getInt(SystemBehaviorPrefsKeys.volumeStepPercent) ??
                 SystemBehaviorSettingsSnapshot.defaults.volumeStepPercent,
-        resumeAfterCall:
-            prefs.getBool(SystemBehaviorPrefsKeys.resumeAfterCall) ??
-                SystemBehaviorSettingsSnapshot.defaults.resumeAfterCall,
+        // Delegates to the audio handler's existing resume setting instead of
+        // a second copy that could disagree with it.
+        resumeAfterCall: prefs.getBool(PrefsKeys.resumeAfterInterruption) ??
+            SystemBehaviorSettingsSnapshot.defaults.resumeAfterCall,
       );
       _loaded = true;
     } catch (e, st) {
@@ -346,12 +378,34 @@ class SystemBehaviorSettings extends ChangeNotifier {
   }
 
   /// Sets whether a notification sound pauses instead of ducking.
-  Future<void> setPauseOnNotificationSound(bool value) {
-    return _apply(
-      _snapshot.copyWith(pauseOnNotificationSound: value),
-      (SharedPreferences prefs) => prefs.setBool(
-          SystemBehaviorPrefsKeys.pauseOnNotificationSound, value),
-    );
+  ///
+  /// This is a view over [PrefsKeys.duckingMode], not a second pref: it writes
+  /// `pause`/`duck` so the audio settings screen and the audio handler see the
+  /// same value. Left callers (settings screen, startup glue) stay compatible.
+  Future<void> setPauseOnNotificationSound(bool value) async {
+    if (_disposed) return;
+    if (pauseOnNotificationSound == value) return;
+    // Write first: SharedPreferences updates its in-memory cache synchronously,
+    // so listeners notified below already observe the new value through
+    // [pauseOnNotificationSound] instead of the stale pref.
+    try {
+      final SharedPreferences prefs =
+          _prefs ?? await SharedPreferences.getInstance();
+      _prefs = prefs;
+      await prefs.setString(
+        SystemBehaviorPrefsKeys.duckingModeOwner,
+        value ? _duckingPause : _duckingDuck,
+      );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Persisting the notification policy failed',
+        error: e,
+        stackTrace: st,
+        category: 'SystemBehaviorSettings',
+      );
+    }
+    _snapshot = _snapshot.copyWith(pauseOnNotificationSound: value);
+    if (!_disposed) notifyListeners();
   }
 
   /// Sets whether removing the task stops playback.
@@ -404,13 +458,35 @@ class SystemBehaviorSettings extends ChangeNotifier {
   }
 
   /// Sets whether playback resumes after a call.
-  Future<void> setResumeAfterCall(bool value) {
-    return _apply(
-      _snapshot.copyWith(resumeAfterCall: value),
-      (SharedPreferences prefs) =>
-          prefs.setBool(SystemBehaviorPrefsKeys.resumeAfterCall, value),
-    );
+  Future<void> setResumeAfterCall(bool value) async {
+    if (_disposed || resumeAfterCall == value) return;
+    _snapshot = _snapshot.copyWith(resumeAfterCall: value);
+    notifyListeners();
+    try {
+      final SharedPreferences prefs =
+          _prefs ?? await SharedPreferences.getInstance();
+      await prefs.setBool(PrefsKeys.resumeAfterInterruption, value);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Persisting resume-after-interruption failed',
+        error: e,
+        stackTrace: st,
+        category: 'SystemBehaviorSettings',
+      );
+    }
   }
+
+  /// Persisted `duckingMode` value that means "pause the music".
+  static const String _duckingPause = 'pause';
+
+  /// Persisted `duckingMode` value that means "lower the music".
+  static const String _duckingDuck = 'duck';
+
+  /// App default for the notification policy: duck, never pause.
+  static bool _pauseFromPrefs(SharedPreferences prefs) =>
+      (prefs.getString(SystemBehaviorPrefsKeys.duckingModeOwner) ??
+          _duckingDuck) ==
+      _duckingPause;
 
   Future<void> _apply(
     SystemBehaviorSettingsSnapshot next,

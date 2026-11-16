@@ -135,7 +135,8 @@ object AudioIntentClassifier {
                 (s == "content" && mimeType == null)
         }
         if (mimeType?.startsWith("audio/") == true ||
-            mimeType?.startsWith("text/") == true
+            mimeType?.startsWith("text/") == true ||
+            mimeType == "application/x-iso9660-image"
         ) {
             return true
         }

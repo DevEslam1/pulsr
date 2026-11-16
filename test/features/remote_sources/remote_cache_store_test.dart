@@ -185,4 +185,76 @@ void main() {
     expect(await stale.exists(), isFalse);
     expect(await store.currentBytes(), 0);
   });
+
+  test('a matching etag is served and a changed one invalidates the entry',
+      () async {
+    final store = buildStore();
+    await store.store(
+      'src',
+      'a.mp3',
+      Stream.value(utf8.encode('one')),
+      etag: '"v1"',
+    );
+
+    expect(await store.lookup('src', 'a.mp3', etag: '"v1"'), isNotNull);
+    expect(await store.lookup('src', 'a.mp3', etag: '"v2"'), isNull);
+    expect(await store.contains('src', 'a.mp3'), isFalse,
+        reason: 'the stale entry must be deleted, not just hidden');
+    expect(await store.currentBytes(), 0);
+  });
+
+  test('a changed modification time invalidates, same second still hits',
+      () async {
+    final store = buildStore();
+    final modified = DateTime.utc(2024, 1, 1, 12, 0, 0);
+    await store.store(
+      'src',
+      'a.mp3',
+      Stream.value(utf8.encode('one')),
+      modifiedAt: modified,
+    );
+
+    expect(
+      await store.lookup(
+        'src',
+        'a.mp3',
+        modifiedAt: modified.add(const Duration(milliseconds: 400)),
+      ),
+      isNotNull,
+      reason: 'HTTP/FTP timestamps only carry second precision',
+    );
+    expect(
+      await store.lookup(
+        'src',
+        'a.mp3',
+        modifiedAt: modified.add(const Duration(seconds: 2)),
+      ),
+      isNull,
+    );
+  });
+
+  test('validators survive an index reload', () async {
+    final first = buildStore();
+    await first.store(
+      'src',
+      'a.mp3',
+      Stream.value(utf8.encode('one')),
+      etag: 'v1',
+      modifiedAt: DateTime.utc(2024, 1, 1),
+    );
+
+    final matching = buildStore();
+    expect(
+      await matching.lookup(
+        'src',
+        'a.mp3',
+        etag: 'v1',
+        modifiedAt: DateTime.utc(2024, 1, 1),
+      ),
+      isNotNull,
+    );
+
+    final changed = buildStore();
+    expect(await changed.lookup('src', 'a.mp3', etag: 'v2'), isNull);
+  });
 }

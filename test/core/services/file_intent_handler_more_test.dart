@@ -69,6 +69,12 @@ void main() {
     repository = MockMusicRepository();
     playerCubit = MockPlayerCubit();
     when(() => playerCubit.playSong(any())).thenAnswer((_) async {});
+    // The assistant path builds a queue, so match the named arguments too.
+    when(() => playerCubit.playSong(
+          any(),
+          queue: any(named: 'queue'),
+          queueIndex: any(named: 'queueIndex'),
+        )).thenAnswer((_) async {});
     when(() => repository.getSongByPath(any()))
         .thenAnswer((_) async => const Right(null));
     when(() => repository.getSongByUri(any()))
@@ -76,6 +82,17 @@ void main() {
     when(() => repository.watchAllSongs(
             searchQuery: any(named: 'searchQuery'), limit: any(named: 'limit')))
         .thenAnswer((_) => Stream.value(const Right(<SongsTableData>[])));
+    // The assistant resolver resolves ids returned by the search before playing.
+    when(() => repository.getSongsByIds(any())).thenAnswer(
+      (invocation) async {
+        final ids = invocation.positionalArguments.first as List<int>;
+        return Right(
+          ids.contains(existingSong.id)
+              ? const <SongsTableData>[existingSong]
+              : const <SongsTableData>[],
+        );
+      },
+    );
     handler = FileIntentHandler(repository, playerCubit);
   });
 
@@ -121,7 +138,7 @@ void main() {
   group('handleAudioUri', () {
     test('routes a pulsr voice-search URI through handleVoiceSearch', () async {
       await handler.handleAudioUri('pulsr://voice-search?query=hello');
-      verify(() => repository.watchAllSongs(searchQuery: 'hello', limit: 1))
+      verify(() => repository.watchAllSongs(searchQuery: 'hello', limit: 50))
           .called(1);
     });
 
@@ -214,7 +231,11 @@ void main() {
 
       await handler.handleVoiceSearch('library');
 
-      verify(() => playerCubit.playSong(existingSong)).called(1);
+      verify(() => playerCubit.playSong(
+            existingSong,
+            queue: any(named: 'queue'),
+            queueIndex: any(named: 'queueIndex'),
+          )).called(1);
     });
 
     test('falls through when nothing matches', () async {
@@ -343,7 +364,7 @@ void main() {
             .encodeMethodCall(const MethodCall('onVoiceSearch', 'hi')),
         (_) {},
       );
-      verify(() => repository.watchAllSongs(searchQuery: 'hi', limit: 1))
+      verify(() => repository.watchAllSongs(searchQuery: 'hi', limit: 50))
           .called(1);
     });
 

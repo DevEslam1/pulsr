@@ -51,11 +51,13 @@ UsbExclusiveStatus _status({
   bool attached = true,
   int? vid = 0x1d6b,
   int? pid = 0x0104,
+  int? deviceId = 42,
   String? name = 'Melo DAC',
 }) {
   return UsbExclusiveStatus(
     attached: attached,
     permitted: true,
+    deviceId: deviceId,
     vendorId: vid,
     productId: pid,
     deviceName: name,
@@ -69,11 +71,6 @@ void main() {
     vid: 0x1d6b,
     pid: 0x0104,
     label: 'Melo DAC',
-    silenceMs: 250,
-    bufferMs: 40,
-    transferSizeBytes: 8192,
-    altResetOnStop: true,
-    force16Bit: true,
     hidEnabled: true,
   );
 
@@ -111,12 +108,13 @@ void main() {
       final args = applied.single.arguments as Map<Object?, Object?>;
       expect(args['vid'], 0x1d6b);
       expect(args['pid'], 0x0104);
-      expect(args['silenceMs'], 250);
-      expect(args['bufferMs'], 40);
-      expect(args['transferSizeBytes'], 8192);
-      expect(args['altResetOnStop'], isTrue);
-      expect(args['force16Bit'], isTrue);
       expect(args['hidEnabled'], isTrue);
+      // The removed write-only knobs must never be sent again.
+      expect(args.containsKey('silenceMs'), isFalse);
+      expect(args.containsKey('bufferMs'), isFalse);
+      expect(args.containsKey('transferSizeBytes'), isFalse);
+      expect(args.containsKey('force16Bit'), isFalse);
+      expect(args.containsKey('altResetOnStop'), isFalse);
 
       expect(service.state.attached, isTrue);
       expect(service.state.deviceLabel, 'Melo DAC');
@@ -135,8 +133,6 @@ void main() {
           .named(UsbErgonomicsService.applyMethod)
           .single
           .arguments as Map<Object?, Object?>;
-      expect(args['silenceMs'], 0);
-      expect(args['force16Bit'], isFalse);
       expect(args['hidEnabled'], isFalse);
       expect(service.state.quirk, isNull);
       service.dispose();
@@ -186,16 +182,16 @@ void main() {
       controller.add(_status());
       await pumpEventQueue();
 
-      final edited = profile.copyWith(silenceMs: 800);
+      final edited = profile.copyWith(hidEnabled: false);
       expect(await service.saveQuirk(edited), isTrue);
       await pumpEventQueue();
 
-      expect(store.get(profile.vid, profile.pid)?.silenceMs, 800);
+      expect(store.get(profile.vid, profile.pid)?.hidEnabled, isFalse);
       final applied = fake.named(UsbErgonomicsService.applyMethod);
       expect(applied, hasLength(2));
       expect(
-        (applied.last.arguments as Map<Object?, Object?>)['silenceMs'],
-        800,
+        (applied.last.arguments as Map<Object?, Object?>)['hidEnabled'],
+        isFalse,
       );
       expect(service.state.quirk, edited);
       service.dispose();
@@ -216,8 +212,8 @@ void main() {
       expect(service.state.quirk, fallback);
       expect(
         (fake.named(UsbErgonomicsService.applyMethod).last.arguments
-            as Map<Object?, Object?>)['silenceMs'],
-        0,
+            as Map<Object?, Object?>)['hidEnabled'],
+        isFalse,
       );
       service.dispose();
     });
@@ -246,7 +242,13 @@ void main() {
 
       expect(mbps, 480.0);
       expect(service.state.busSpeedMbps, 480.0);
-      expect(fake.named(UsbErgonomicsService.probeMethod), hasLength(1));
+      expect(service.state.deviceId, 42);
+      final probe = fake.named(UsbErgonomicsService.probeMethod).single;
+      expect(
+        (probe.arguments as Map<Object?, Object?>)['deviceId'],
+        42,
+        reason: 'the probe must target the selected physical device',
+      );
       service.dispose();
     });
 

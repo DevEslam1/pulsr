@@ -35,6 +35,19 @@ abstract final class AudioProfileStrings {
   static const String shareTooltip = 'Share profile';
   static const String deleteTooltip = 'Delete profile';
 
+  static const String defaultTooltip = 'Default profile';
+  static const String defaultDialogTitle = 'Default profile';
+  static const String defaultDialogMessage =
+      'Pick the profile marked as this device\'s default. Clearing it keeps '
+      'your current settings untouched.';
+  static const String defaultNone = 'No default';
+  static const String defaultSaved = 'Default profile saved.';
+  static const String defaultCleared = 'Default profile cleared.';
+  static const String defaultMissing =
+      'That profile is no longer available on this device.';
+  static const String defaultBadge = 'Default profile';
+  static const String cancelAction = 'Cancel';
+
   static const String deleteConfirm = 'Delete';
   static const String deleteDialogTitle = 'Delete profile?';
   static const String deleted = 'Profile deleted.';
@@ -72,6 +85,29 @@ abstract final class AudioProfileStrings {
   /// Success message after applying [count] settings.
   static String applyDone(int count) =>
       count == 1 ? 'Applied 1 setting.' : 'Applied $count settings.';
+
+  /// Success message when [skipped] settings were outside the whitelist.
+  static String applyDoneWithSkipped(int applied, int skipped) =>
+      '${applyDone(applied)} Skipped $skipped unsupported '
+      '${skipped == 1 ? 'setting' : 'settings'}.';
+
+  /// Failure message when [failed] settings were rejected and the previous
+  /// values were restored.
+  static String applyFailedRolledBack(int failed) =>
+      '${failed == 1 ? 'One setting' : '$failed settings'} could not be '
+      'written; your previous settings were restored.';
+
+  /// Failure message when [failed] settings were rejected and the rollback was
+  /// only partially successful.
+  static String applyFailedRollbackIncomplete(int failed) =>
+      '${failed == 1 ? 'One setting' : '$failed settings'} could not be '
+      'written and the previous settings could not be fully restored.';
+
+  /// Import message when [skipped] unsupported or corrupt settings were
+  /// dropped from the imported file.
+  static String importSavedSkipped(int skipped) =>
+      'Profile imported. Skipped $skipped unsupported '
+      '${skipped == 1 ? 'setting' : 'settings'}.';
 
   /// Confirmation body for deleting a profile called [name].
   static String deleteDialogBody(String name) =>

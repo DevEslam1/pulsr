@@ -14,6 +14,7 @@ import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_quality_info.dart';
 import 'audio_effects_channel.dart';
 import 'dop_encoder.dart';
+import 'sacd/sacd_limits.dart';
 
 /// Thrown when a DSD (DSF/DFF) file is played on a platform/build with no
 /// native DSD decoder — most notably iOS, where the `decodeDsd` channel method
@@ -77,8 +78,14 @@ class DsdDacCapabilities {
   /// of the carrier rates cannot carry DoP, so the UI must not enable it.
   bool get canUseDop => dop && (dsd64 || dsd128 || dsd256);
 
-  /// True when Direct Native DSD (raw bitstream without DoP encapsulation) is supported.
-  bool get canUseNativeDsd => nativeDac && (nativeDsd || dsd512);
+  /// True when Direct Native DSD (raw bitstream without DoP encapsulation) is
+  /// supported.
+  ///
+  /// Only the measured [nativeDsd] flag counts. [dsd512] describes a PCM
+  /// carrier rate the USB sink can switch to (768 kHz); it says nothing about
+  /// raw-DSD alt settings, and treating it as native proof sent a 768 kHz PCM
+  /// stream at a DAC that cannot accept it.
+  bool get canUseNativeDsd => nativeDac && nativeDsd;
 
   /// Whether this device advertises the DoP carrier rate for [dsdRate]
   /// (the DSD multiple of 44.1 kHz: 64, 128 or 256). Rates above DSD256 have no
@@ -171,8 +178,12 @@ class DsdDecoderHelper {
   /// [dopContainerBits] selects the PCM container width: 24 (standard DoP
   /// packing, default) or 32 (zero-padded 32-bit frames for DACs that require
   /// 32-bit USB frames). Any other value falls back to 24.
-  /// Maximum allowed file size for in-memory DSD decoding (300 MB) (Bug 6 & 18).
-  static const int kMaxInMemoryDecodeBytes = 300 * 1024 * 1024;
+  /// Maximum allowed file size for in-memory DSD decoding.
+  ///
+  /// Shares [kMaxDsdFileBytes] with the SACD extractor so a file can never be
+  /// written by one component and rejected by the other, and so the ~3x
+  /// decode/DoP expansion stays inside a phone-sized memory envelope.
+  static const int kMaxInMemoryDecodeBytes = kMaxDsdFileBytes;
 
   static Future<AudioSource> decodeDsdFile(
     SongsTableData song,
@@ -191,7 +202,9 @@ class DsdDecoderHelper {
     final fileSize = await file.length();
     if (fileSize > kMaxInMemoryDecodeBytes) {
       throw DsdUnsupportedException(
-        'DSD file exceeds max in-memory decode size of 300 MB (${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB)',
+        'DSD file exceeds the '
+        '${kMaxInMemoryDecodeBytes ~/ (1024 * 1024)} MB in-memory decode '
+        'limit (${(fileSize / (1024 * 1024)).toStringAsFixed(1)} MB)',
       );
     }
     final bytes = await file.readAsBytes();

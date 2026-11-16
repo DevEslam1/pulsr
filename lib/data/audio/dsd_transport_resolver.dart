@@ -115,6 +115,7 @@ DsdTransportPlan resolveDsdTransport({
       reason: DsdTransportReason.requiresBitPerfect,
       dopCapable: dopCapable,
       dsdRateMultiple: dsdRateMultiple,
+      bitPerfectActive: false,
     );
   }
 
@@ -139,6 +140,7 @@ DsdTransportPlan resolveDsdTransport({
       reason: DsdTransportReason.deviceLacksNativeDsd,
       dopCapable: dopCapable,
       dsdRateMultiple: dsdRateMultiple,
+      bitPerfectActive: true,
     );
   }
 
@@ -166,17 +168,24 @@ DsdTransportPlan resolveDsdTransport({
 
 /// Builds the fallback plan for a request that cannot be honoured as asked.
 ///
-/// The chain is fixed: Native DSD degrades to DoP (when the rate has a carrier
-/// and the DAC advertises one), and DoP degrades to PCM. A DoP request never
-/// upgrades to Native: the user did not ask for it, and native framing is the
-/// riskier path on unknown hardware.
+/// The chain is fixed: Native DSD degrades to DoP (when the pipeline is
+/// bit-perfect, the rate has a carrier and the DAC advertises one), and any
+/// other request degrades to PCM. A DoP request never upgrades to Native: the
+/// user did not ask for it, and native framing is the riskier path on unknown
+/// hardware.
+///
+/// [bitPerfectActive] is enforced here, not just by the caller: DoP framing
+/// embeds 0x05/0xFA markers that DSP volume/gain math corrupts, so a fallback
+/// produced for a non-bit-perfect pipeline must always land on PCM.
 DsdTransportPlan planFallback({
   required DsdTransport requested,
   required DsdTransportReason reason,
   required bool dopCapable,
   required int dsdRateMultiple,
+  required bool bitPerfectActive,
 }) {
-  final dopUsable = dopCapable &&
+  final dopUsable = bitPerfectActive &&
+      dopCapable &&
       dsdRateMultiple > 0 &&
       dsdRateMultiple <= kMaxDopRateMultiple;
   if (requested == DsdTransport.native && dopUsable) {

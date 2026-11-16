@@ -1,6 +1,7 @@
 // lib/data/audio/dsd_header_probe.dart
 //
-// Reads only the DSD rate multiple (64/128/256/512) from a DSF/DFF header.
+// Reads only the rate multiple (64/128/256/512) and, for DSF, the declared bit
+// order from a DSF/DFF header.
 //
 // The playback router must know the rate *before* decoding (the transport
 // decision depends on whether a DoP carrier exists at that rate), while the
@@ -20,17 +21,34 @@ abstract final class DsdHeaderProbe {
 
   /// Returns 64, 128, 256 or 512, or 0 when the rate cannot be determined.
   static Future<int> probeMultiple(String path) async {
+    final head = await _readHead(path);
+    if (head == null) return 0;
+    return _extensionOf(path) == 'dsf'
+        ? parseDsfMultiple(head)
+        : parseDffMultiple(head);
+  }
+
+  /// Returns 1 (LSB first) or 8 (MSB first) for a DSF file, 0 when unknown.
+  ///
+  /// DFF is always MSB first and is not described by a header field.
+  static Future<int> probeBitsPerSample(String path) async {
+    if (_extensionOf(path) != 'dsf') return 0;
+    final head = await _readHead(path);
+    if (head == null) return 0;
+    return parseDsfBitsPerSample(head);
+  }
+
+  static Future<Uint8List?> _readHead(String path) async {
     final ext = _extensionOf(path);
-    if (ext != 'dsf' && ext != 'dff') return 0;
+    if (ext != 'dsf' && ext != 'dff') return null;
     RandomAccessFile? handle;
     try {
       handle = await File(path).open();
       final length = await handle.length();
       final readLength = length < probeBytes ? length : probeBytes;
-      final head = await handle.read(readLength);
-      return ext == 'dsf' ? parseDsfMultiple(head) : parseDffMultiple(head);
+      return await handle.read(readLength);
     } on FileSystemException {
-      return 0;
+      return null;
     } finally {
       try {
         await handle?.close();
@@ -43,14 +61,32 @@ abstract final class DsdHeaderProbe {
   /// Parses the sample frequency field of a Sony DSF header.
   ///
   /// DSF layout: `DSD ` (0x00), chunk size (0x04, 8 bytes LE), file size
-  /// (0x0C), metadata pointer (0x14), `fmt ` (0x1C), fmt chunk size (0x20),
-  /// format version (0x24), format id (0x28), channel type (0x2C), channel
-  /// count (0x30), **sampling frequency (0x34, 4 bytes LE)**.
+  /// (0x0C), metadata pointer (0x14), `fmt ` (0x1C), fmt chunk size (0x20).
+  /// Inside the fmt chunk: format version +12 (0x28), format id +16 (0x2C),
+  /// channel type +20 (0x30), channel count +24 (0x34), **sampling frequency
+  /// +28 (0x38, 4 bytes LE)**, bits per sample +32 (0x3C).
+  ///
+  /// The sampling frequency used to be read at 0x34 — the channel count — so
+  /// every stereo DSF probed as "unknown rate" and never reached DoP.
   static int parseDsfMultiple(Uint8List head) {
-    if (head.length < 0x38) return 0;
+    if (head.length < 0x3C) return 0;
     if (!_matchesAscii(head, 0, 'DSD ')) return 0;
-    final rate = _readUint32Le(head, 0x34);
+    if (!_matchesAscii(head, 0x1C, 'fmt ')) return 0;
+    final rate = _readUint32Le(head, 0x38);
     return multipleFromSampleRate(rate);
+  }
+
+  /// Parses the `bitsPerSample` field of a DSF fmt chunk (0x3C).
+  ///
+  /// Returns 1 for LSB-first data, 8 for MSB-first data, 0 for anything else
+  /// (including a truncated header), matching `DsdDecoderHelper.parseDsfBytes`,
+  /// which derives `msbFirst = bitsPerSample == 8`.
+  static int parseDsfBitsPerSample(Uint8List head) {
+    if (head.length < 0x40) return 0;
+    if (!_matchesAscii(head, 0, 'DSD ')) return 0;
+    if (!_matchesAscii(head, 0x1C, 'fmt ')) return 0;
+    final bits = _readUint32Le(head, 0x3C);
+    return bits == 1 || bits == 8 ? bits : 0;
   }
 
   /// Parses the sample rate inside a Philips DFF header.

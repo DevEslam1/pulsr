@@ -205,7 +205,7 @@ void main() {
       expect(DopEncoder.dopPcmSampleRate(512), 0);
     });
 
-    test('canUseNativeDsd is true when USB DAC supports native DSD or DSD512', () {
+    test('canUseNativeDsd requires the measured nativeDsd flag only', () {
       const nativeCapable = DsdDacCapabilities(
         dsd64: true,
         dsd128: true,
@@ -226,6 +226,20 @@ void main() {
         nativeDsd: false,
       );
       expect(dacWithoutNative.canUseNativeDsd, isFalse);
+
+      // A 768 kHz PCM carrier (dsd512) proves nothing about raw-DSD alt
+      // settings: it used to flip nativeCapable on and send native DSD to a
+      // DAC that only accepts PCM.
+      const pcmCarrierOnly = DsdDacCapabilities(
+        dsd64: true,
+        dsd128: true,
+        dsd256: true,
+        dsd512: true,
+        dop: true,
+        nativeDac: true,
+        nativeDsd: false,
+      );
+      expect(pcmCarrierOnly.canUseNativeDsd, isFalse);
     });
   });
 

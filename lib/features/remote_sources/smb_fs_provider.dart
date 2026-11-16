@@ -7,6 +7,15 @@
 // `com.hierynomus:smbj` dependency) the provider raises an actionable
 // [RemoteUnavailableError]. It never reports a successful listing or an empty
 // file for a channel that is not there.
+//
+// Path contract (do not "helpfully" change one side only):
+//   * `basePath` is the share-relative root of the source (`''` or `Music`).
+//   * `path` is always share-relative as well (`''` or `Albums/a.mp3`), never
+//     prefixed with `basePath`.
+//   * SmbPlugin.kt owns the single `basePath + path` join and answers with
+//     native paths that include `basePath`; this provider strips it back off.
+// Sending `basePath` inside `path` makes the native side join twice, which
+// resolves to `Music/Music/...` on every request.
 import 'dart:async';
 
 import 'package:flutter/services.dart';
@@ -57,7 +66,7 @@ class SmbFsProvider implements RemoteFsProvider {
       'list',
       <String, dynamic>{
         ..._baseArguments(),
-        'path': _nativePath(path),
+        'path': _shareRelativePath(path),
       },
     );
     final entries = <RemoteEntry>[];
@@ -88,7 +97,7 @@ class SmbFsProvider implements RemoteFsProvider {
       'stat',
       <String, dynamic>{
         ..._baseArguments(),
-        'path': _nativePath(path),
+        'path': _shareRelativePath(path),
       },
     );
     if (payload == null) return null;
@@ -114,7 +123,7 @@ class SmbFsProvider implements RemoteFsProvider {
     if (end != null && end < start) {
       throw ArgumentError.value(end, 'end', 'must be >= start');
     }
-    final nativePath = _nativePath(path);
+    final sharePath = _shareRelativePath(path);
     var offset = start;
     var remaining = end == null ? -1 : end - start + 1;
     while (true) {
@@ -122,7 +131,7 @@ class SmbFsProvider implements RemoteFsProvider {
       final want = remaining < 0
           ? _chunkSize
           : (remaining < _chunkSize ? remaining : _chunkSize);
-      final chunk = await _readChunk(nativePath, offset, want);
+      final chunk = await _readChunk(sharePath, offset, want);
       if (chunk.isEmpty) return;
       yield chunk;
       offset += chunk.length;
@@ -198,12 +207,12 @@ class SmbFsProvider implements RemoteFsProvider {
     }
   }
 
-  Future<Uint8List> _readChunk(String nativePath, int offset, int length) async {
+  Future<Uint8List> _readChunk(String sharePath, int offset, int length) async {
     final payload = await _invoke<dynamic>(
       'openReadChunk',
       <String, dynamic>{
         ..._baseArguments(),
-        'path': nativePath,
+        'path': sharePath,
         'offset': offset,
         'length': length,
       },
@@ -328,9 +337,11 @@ class SmbFsProvider implements RemoteFsProvider {
     };
   }
 
-  /// `/<share>/<sub path>` as the native side expects it.
-  String _nativePath(String path) {
-    final base = _shareRelativeRoot();
+  /// Normalizes a provider-relative [path] for the native side.
+  ///
+  /// The result is *share-relative*: `basePath` is sent separately and the
+  /// native `joinPath` prepends it exactly once. Never prepend base here.
+  String _shareRelativePath(String path) {
     var value = path.trim().replaceAll('\\', '/');
     while (value.startsWith('/')) {
       value = value.substring(1);
@@ -338,9 +349,7 @@ class SmbFsProvider implements RemoteFsProvider {
     while (value.endsWith('/')) {
       value = value.substring(0, value.length - 1);
     }
-    if (value.isEmpty) return base;
-    if (base.isEmpty) return value;
-    return '$base/$value';
+    return value;
   }
 
   String _relativeFromNative(String nativePath) {

@@ -132,6 +132,11 @@ class DiagnosticsBundleService {
   static final RegExp _androidDataPath =
       RegExp(r'/Android/(?:data|obb)/[^\s"<>|]*');
   static final RegExp _homePath = RegExp(r'(?:/Users/|/home/)[^\s"<>|]*');
+  static final RegExp _androidInternalPath = RegExp(
+    r'/data/(?:user/\d+|data|app|misc)(?:/[^\s"<>|]*)?',
+  );
+  static final RegExp _optPath = RegExp(r'/opt/[^\s"<>|]*');
+  static final RegExp _uncPath = RegExp(r'\\\\[^\s"<>|\\/]+\\[^\s"<>|]*');
   static final RegExp _fileUri = RegExp(r'\bfile://[^\s"<>|]*');
   static final RegExp _contentUri = RegExp(r'\bcontent://[^\s"<>|]*');
   static final RegExp _urlUserInfo =
@@ -157,6 +162,7 @@ class DiagnosticsBundleService {
   final String Function() _appVersion;
   final DateTime Function() _clock;
   final Future<Directory> Function() _tempDirectory;
+  Directory? _lastExportDirectory;
 
   /// Replaces every value that could identify the user or grant access.
   ///
@@ -184,11 +190,17 @@ class DiagnosticsBundleService {
       (_) => 'content://[REDACTED_URI]',
     );
     output = output.replaceAllMapped(_windowsPath, (_) => '[REDACTED_PATH]');
+    output = output.replaceAllMapped(_uncPath, (_) => '[REDACTED_PATH]');
     output = output.replaceAllMapped(_homePath, (_) => '[REDACTED_PATH]');
     output = output.replaceAllMapped(
       _androidDataPath,
       (_) => '[REDACTED_PATH]',
     );
+    output = output.replaceAllMapped(
+      _androidInternalPath,
+      (_) => '[REDACTED_PATH]',
+    );
+    output = output.replaceAllMapped(_optPath, (_) => '[REDACTED_PATH]');
     output = output.replaceAllMapped(_devicePath, (_) => '[REDACTED_PATH]');
     return output;
   }
@@ -219,10 +231,18 @@ class DiagnosticsBundleService {
 
   /// Writes `bundle.json` and `bundle.log` into a fresh temporary directory and
   /// returns both as shareable files.
+  ///
+  /// The directory is retained until [cleanupExport] runs, because the share
+  /// target reads the files after this future completes. A new export first
+  /// removes the previous directory, so a caller that forgets the cleanup can
+  /// accumulate at most one bundle.
   Future<List<XFile>> export({DiagnosticsBundle? bundle}) async {
     final target = bundle ?? await build();
+    Directory? directory;
     try {
-      final directory = await _tempDirectory();
+      await _cleanupPreviousExport();
+      directory = await _tempDirectory();
+      _lastExportDirectory = directory;
       final jsonFile = File(p.join(directory.path, bundleFileName));
       await jsonFile.writeAsString(
         const JsonEncoder.withIndent('  ').convert(target.toJson()),
@@ -238,6 +258,7 @@ class DiagnosticsBundleService {
         XFile(logFile.path, mimeType: 'text/plain'),
       ];
     } catch (e, st) {
+      await _cleanupDirectory(directory ?? _lastExportDirectory);
       ErrorLogger.log(
         'Exporting the diagnostics bundle failed',
         error: e,
@@ -249,6 +270,39 @@ class DiagnosticsBundleService {
         userMessage: DiagnosticsStrings.exportFailed,
         cause: e,
         stackTrace: st,
+      );
+    }
+  }
+
+  /// Deletes the temporary directory created by the most recent [export].
+  ///
+  /// Call this after the share sheet has consumed the files (or on dispose);
+  /// it is idempotent and never throws. Keeping the cleanup explicit avoids
+  /// pulling files out from under an in-flight share target.
+  Future<void> cleanupExport() async {
+    final directory = _lastExportDirectory;
+    _lastExportDirectory = null;
+    await _cleanupDirectory(directory);
+  }
+
+  Future<void> _cleanupPreviousExport() async {
+    final previous = _lastExportDirectory;
+    _lastExportDirectory = null;
+    await _cleanupDirectory(previous);
+  }
+
+  Future<void> _cleanupDirectory(Directory? directory) async {
+    if (directory == null) return;
+    try {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Removing the diagnostics bundle directory failed',
+        error: e,
+        stackTrace: st,
+        category: 'DiagnosticsBundle',
       );
     }
   }
@@ -284,8 +338,9 @@ class DiagnosticsBundleService {
 
   List<Map<String, Object?>> _dspStages() {
     bool enabled(String key) => _prefs.getBool(key) ?? false;
-    String detail(String key, String fallback) =>
-        _prefs.getString(key) ?? fallback;
+    String detail(String key, String fallback) => _stringValue(key) ?? fallback;
+    String intDetail(String key, String fallback) =>
+        _intValue(key)?.toString() ?? fallback;
     return <Map<String, Object?>>[
       <String, Object?>{
         'stage': 'equalizer',
@@ -295,12 +350,12 @@ class DiagnosticsBundleService {
       <String, Object?>{
         'stage': 'crossfeed',
         'enabled': enabled(PrefsKeys.crossfeedEnabled),
-        'detail': detail(PrefsKeys.crossfeedMode, 'off'),
+        'detail': intDetail(PrefsKeys.crossfeedMode, 'off'),
       },
       <String, Object?>{
         'stage': 'saturation',
         'enabled': enabled(PrefsKeys.saturationEnabled),
-        'detail': detail(PrefsKeys.saturationMode, 'off'),
+        'detail': intDetail(PrefsKeys.saturationMode, 'off'),
       },
       <String, Object?>{
         'stage': 'stereo_width',
@@ -312,36 +367,74 @@ class DiagnosticsBundleService {
       <String, Object?>{
         'stage': 'dynamic_bass',
         'enabled': enabled(PrefsKeys.dynamicBassEnabled),
-        'detail': detail(PrefsKeys.dynamicBassPreset, 'flat'),
+        'detail': intDetail(PrefsKeys.dynamicBassPreset, 'flat'),
       },
       <String, Object?>{
         'stage': 'multiband_compressor',
         'enabled': enabled(PrefsKeys.multibandCompressorEnabled),
-        'detail':
-            '${_prefs.getInt(PrefsKeys.multibandCompressorBands) ?? 3} bands',
+        'detail': '${_multibandBandCount()} bands',
       },
       <String, Object?>{
         'stage': 'convolution_reverb',
         'enabled': enabled(PrefsKeys.convolutionReverbEnabled),
-        'detail': detail(PrefsKeys.convolutionReverbPreset, 'none'),
+        'detail': intDetail(PrefsKeys.convolutionReverbPreset, 'none'),
       },
       <String, Object?>{
         'stage': 'limiter',
         'enabled': enabled(PrefsKeys.lookaheadLimiterEnabled),
         'detail':
-            '${_prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ?? 0} dB',
+            '${_doubleValue(PrefsKeys.lookaheadLimiterThresholdDb) ?? 0} dB',
       },
       <String, Object?>{
         'stage': 'dither',
         'enabled': enabled(PrefsKeys.ditherEnabled),
-        'detail': '${_prefs.getInt(PrefsKeys.ditherTargetBitDepth) ?? 24}-bit',
+        'detail': '${_intValue(PrefsKeys.ditherTargetBitDepth) ?? 24}-bit',
       },
       <String, Object?>{
         'stage': 'dac_voicing',
         'enabled': enabled(PrefsKeys.dacVoicingEnabled),
-        'detail': detail(PrefsKeys.dacVoicingCharacter, 'neutral'),
+        'detail': intDetail(PrefsKeys.dacVoicingCharacter, 'neutral'),
       },
     ];
+  }
+
+  /// Reads a preference only when it is stored as a string.
+  ///
+  /// SharedPreferences' typed getters cast blindly; a value written by an older
+  /// build with a different type would otherwise throw and fail the bundle.
+  String? _stringValue(String key) {
+    final value = _prefs.get(key);
+    return value is String ? _prefs.getString(key) : null;
+  }
+
+  /// Reads a preference only when it is stored as an int.
+  int? _intValue(String key) {
+    final value = _prefs.get(key);
+    return value is int ? _prefs.getInt(key) : null;
+  }
+
+  /// Reads a preference only when it is stored as a double.
+  double? _doubleValue(String key) {
+    final value = _prefs.get(key);
+    return value is double ? _prefs.getDouble(key) : null;
+  }
+
+  /// Number of persisted multiband-compressor bands.
+  ///
+  /// The equalizer stores the band list as a JSON array string, so reading it
+  /// as an int would silently fall back forever. A malformed payload falls back
+  /// to the three-band default.
+  int _multibandBandCount() {
+    final raw = _stringValue(PrefsKeys.multibandCompressorBands);
+    if (raw != null) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List && decoded.isNotEmpty) return decoded.length;
+      } catch (_) {
+        // Corrupt payload: report the default without failing the bundle.
+      }
+    }
+    return 3;
   }
 
   Map<String, Object?> _buildCounters() {
@@ -390,7 +483,9 @@ class DiagnosticsBundleService {
     if (value is List) {
       if (_sensitiveKey.hasMatch(key)) return '[REDACTED]';
       return <Object?>[
-        for (final item in value) item is String ? redactText(item) : item,
+        // Recurse instead of redacting only top-level strings: nested maps in
+        // a list (USB descriptors, path counters) carry paths too.
+        for (final item in value) _redactValue(key, item),
       ];
     }
     if (value is Map) {
@@ -429,13 +524,17 @@ class DiagnosticsBundleService {
   }
 
   Object? _sanitizeValue(String key, Object? value) {
-    if (value is String) return redactText(value);
+    if (value is String) {
+      return _sensitiveKey.hasMatch(key) ? '[REDACTED]' : redactText(value);
+    }
     if (value is List) {
+      if (_sensitiveKey.hasMatch(key)) return '[REDACTED]';
       return <Object?>[
         for (final item in value) _sanitizeValue(key, item),
       ];
     }
     if (value is Map) {
+      if (_sensitiveKey.hasMatch(key)) return '[REDACTED]';
       return <String, Object?>{
         for (final entry in value.entries)
           '${entry.key}': _sanitizeValue('${entry.key}', entry.value),

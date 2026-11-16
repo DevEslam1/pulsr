@@ -54,7 +54,15 @@ Run the common checks for SBC/AAC and, where hardware supports it, LDAC.
   - Tap "Save Quran Bookmark": verify notification surfaces Surah and Ayah; confirm bookmark persists and appears as a resume action.
   - Tap resume action: confirm playback seeks to the bookmarked Ayah position.
   - When accurate Ayah timings are present, test Ayah Repeat modes (Repeat Off, Repeat Ayah, Repeat Range) and verify boundary enforcement.
-  - Verify Quran reciter style tuning (Murattal, Mujawwad, etc.) and learning speed remain isolated from ordinary player settings.
+  - Verify all five Quran reciter styles (Murattal, Mujawwad, Tarawih, Memorization, Sleep) and the 0.5x/0.75x/1.0x tempo steps remain isolated from ordinary player settings.
+
+## DSD, DoP and USB Exclusive Checks
+
+- With a compatible USB DAC, select each DSD output mode (PCM / DoP / Native) and confirm the app either opens the requested path or reports the explicit fallback reason.
+- Verify DoP carrier rates are limited to the DAC-advertised 176.4 / 352.8 / 705.6 kHz and that DSD512 does not claim a DoP carrier.
+- Enable USB-DAC exclusive output, confirm unity gain in bit-perfect mode, then switch the track rate and verify the stream reopens at the new rate.
+- Run the chain-of-custody capture on a lossless source and confirm the certificate only reports `bitExactMeasured` when input and output digests match.
+- Repeat with a lossy source, an ambiguous `.m4a`/`.ogg` container and a 32-bit float source; confirm the verdict is blocked or `unverified` with the expected reason code.
 
 ## Automated Android Integration Tests
 

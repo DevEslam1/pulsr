@@ -4,6 +4,8 @@
 // screen owns dialogs, list state and accessibility labels; the service owns
 // the files and every write to the live audio settings.
 
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:share_plus/share_plus.dart';
@@ -42,11 +44,15 @@ class AudioProfilesScreen extends StatefulWidget {
   State<AudioProfilesScreen> createState() => _AudioProfilesScreenState();
 }
 
+/// Result of the default-profile selector. A null [profileId] means "clear".
+typedef _DefaultPick = ({String? profileId});
+
 class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
   List<AudioProfile> _profiles = const <AudioProfile>[];
   bool _loading = true;
   bool _busy = false;
   String? _error;
+  String? _defaultId;
 
   @override
   void initState() {
@@ -63,9 +69,11 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     }
     try {
       final profiles = await widget.service.list();
+      final defaultId = widget.service.defaultProfileId;
       if (!mounted) return;
       setState(() {
         _profiles = profiles;
+        _defaultId = defaultId;
         _loading = false;
         _error = null;
       });
@@ -156,9 +164,79 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     await _runAction(
       () async {
         final report = await widget.service.apply(profile);
-        return AudioProfileStrings.applyDone(report.appliedCount);
+        return report.skippedKeys.isEmpty
+            ? AudioProfileStrings.applyDone(report.appliedCount)
+            : AudioProfileStrings.applyDoneWithSkipped(
+                report.appliedCount,
+                report.skippedKeys.length,
+              );
       },
       failureMessage: AudioProfileStrings.applyFailed,
+    );
+  }
+
+  Future<void> _chooseDefaultProfile() async {
+    final pick = await PulsrDialogHelper.showPulsrDialog<_DefaultPick>(
+      context,
+      icon: const Icon(Icons.star_rounded, size: 26),
+      title: const Text(AudioProfileStrings.defaultDialogTitle),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            AudioProfileStrings.defaultDialogMessage,
+            style: TextStyle(
+              color: context.palette.textSecondary,
+              fontSize: AppFontSize.bodySmall,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          for (final profile in _profiles)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                profile.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: profile.id == _defaultId
+                  ? Icon(Icons.check_rounded, color: context.palette.accent)
+                  : null,
+              onTap: () => Navigator.of(context, rootNavigator: true)
+                  .pop<_DefaultPick>((profileId: profile.id)),
+            ),
+        ],
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: _defaultId == null
+              ? null
+              : () => Navigator.of(context, rootNavigator: true)
+                  .pop<_DefaultPick>((profileId: null)),
+          child: const Text(AudioProfileStrings.defaultNone),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+          child: const Text(AudioProfileStrings.cancelAction),
+        ),
+      ],
+    );
+    if (!mounted || pick == null) return;
+    await _runAction(
+      () async {
+        final saved = await widget.service.setGlobalDefaults(pick.profileId);
+        if (!saved) {
+          throw const AudioProfileStoreError(
+            code: 'audio-profile-default-missing',
+            userMessage: AudioProfileStrings.defaultMissing,
+          );
+        }
+        return pick.profileId == null
+            ? AudioProfileStrings.defaultCleared
+            : AudioProfileStrings.defaultSaved;
+      },
+      failureMessage: AudioProfileStrings.defaultMissing,
     );
   }
 
@@ -183,12 +261,13 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
   Future<void> _share(AudioProfile profile) async {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final errorColor = context.palette.error;
+    File? exported;
     try {
-      final file = await widget.service.export(profile);
+      exported = await widget.service.export(profile);
       await SharePlus.instance.share(
         ShareParams(
           files: <XFile>[
-            XFile(file.path, mimeType: 'application/json'),
+            XFile(exported.path, mimeType: 'application/json'),
           ],
           text: AudioProfileStrings.shareText(profile.name),
         ),
@@ -206,6 +285,13 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
           backgroundColor: errorColor,
         ),
       );
+    } finally {
+      // The temp folder only exists to feed the share sheet; remove it as soon
+      // as sharing finishes. cleanupExport ignores anything it did not create,
+      // so user-chosen backup/import files are never deleted.
+      if (exported != null) {
+        await widget.service.cleanupExport(exported);
+      }
     }
   }
 
@@ -215,8 +301,12 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
     if (path == null) return;
     await _runAction(
       () async {
-        await widget.service.importFromFile(path);
-        return AudioProfileStrings.importSaved;
+        final imported = await widget.service.importFromFile(path);
+        return imported.ignoredKeys.isEmpty
+            ? AudioProfileStrings.importSaved
+            : AudioProfileStrings.importSavedSkipped(
+                imported.ignoredKeys.length,
+              );
       },
       failureMessage: AudioProfileStrings.importFailed,
     );
@@ -249,6 +339,16 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
       appBar: AppBar(
         title: const Text(AudioProfileStrings.screenTitle),
         actions: <Widget>[
+          IconButton(
+            tooltip: AudioProfileStrings.defaultTooltip,
+            onPressed: _loading || _busy ? null : _chooseDefaultProfile,
+            icon: Icon(
+              _defaultId == null
+                  ? Icons.star_border_rounded
+                  : Icons.star_rounded,
+              color: _defaultId == null ? null : context.palette.accent,
+            ),
+          ),
           IconButton(
             tooltip: AudioProfileStrings.refreshTooltip,
             onPressed: _loading ? null : () => _load(),
@@ -311,6 +411,7 @@ class _AudioProfilesScreenState extends State<AudioProfilesScreen> {
         return _ProfileCard(
           profile: profile,
           busy: _busy,
+          isDefault: profile.id == _defaultId,
           onApply: () => _apply(profile),
           onShare: () => _share(profile),
           onDelete: () => _delete(profile),
@@ -423,6 +524,7 @@ class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
     required this.profile,
     required this.busy,
+    required this.isDefault,
     required this.onApply,
     required this.onShare,
     required this.onDelete,
@@ -430,6 +532,7 @@ class _ProfileCard extends StatelessWidget {
 
   final AudioProfile profile;
   final bool busy;
+  final bool isDefault;
   final VoidCallback onApply;
   final VoidCallback onShare;
   final VoidCallback onDelete;
@@ -453,15 +556,28 @@ class _ProfileCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text(
-            profile.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: AppFontSize.bodyLarge,
-              fontWeight: FontWeight.w600,
-              color: p.textPrimary,
-            ),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  profile.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: AppFontSize.bodyLarge,
+                    fontWeight: FontWeight.w600,
+                    color: p.textPrimary,
+                  ),
+                ),
+              ),
+              if (isDefault) ...<Widget>[
+                const SizedBox(width: AppSpacing.xs),
+                Semantics(
+                  label: AudioProfileStrings.defaultBadge,
+                  child: Icon(Icons.star_rounded, size: 18, color: p.accent),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: AppSpacing.s2),
           Text(

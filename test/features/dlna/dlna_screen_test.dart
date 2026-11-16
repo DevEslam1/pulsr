@@ -1,6 +1,9 @@
 // Screen smoke tests: discovery wiring, 48 dp targets, semantics labels, the
-// error banner retry, and the now-playing transport controls. A stub service
-// keeps the widget layer free of sockets and timers.
+// error banner retry, casting actions, and the now-playing transport controls.
+// A stub service keeps the widget layer free of sockets and timers.
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/errors/app_error.dart';
@@ -8,6 +11,8 @@ import 'package:pulsr/features/dlna/dlna_renderer_service.dart';
 import 'package:pulsr/features/dlna/dlna_screen.dart';
 import 'package:pulsr/features/dlna/dlna_strings.dart';
 import 'package:pulsr/features/dlna/upnp_device.dart';
+
+import '../../data/visualizer/fake_file_picker.dart';
 
 final UpnpDeviceDescription _device = UpnpDeviceDescription(
   friendlyName: 'Mock Renderer',
@@ -22,6 +27,8 @@ class _StubRendererService extends DlnaRendererService {
   _StubRendererService({this.error}) : super();
 
   AppError? error;
+  final List<String> castPaths = <String>[];
+  bool disposed = false;
 
   DlnaState _current = DlnaState.idle;
   List<UpnpDeviceDescription> _deviceList = const <UpnpDeviceDescription>[];
@@ -71,7 +78,9 @@ class _StubRendererService extends DlnaRendererService {
     String? title,
     String? artist,
     String? album,
+    Duration? duration,
   }) async {
+    castPaths.add(path);
     _title = title ?? 'Stub Song';
     _current = DlnaState.playing;
     notifyListeners();
@@ -100,6 +109,22 @@ class _StubRendererService extends DlnaRendererService {
   Future<void> seek(Duration target) async {
     _position = target;
     notifyListeners();
+  }
+
+  @override
+  Future<void> retry() async {
+    final path = castPaths.isEmpty ? null : castPaths.last;
+    if (path != null) {
+      await playFile(path);
+      return;
+    }
+    await discover();
+  }
+
+  @override
+  void dispose() {
+    disposed = true;
+    super.dispose();
   }
 }
 
@@ -185,5 +210,61 @@ void main() {
     await tester.tap(find.byTooltip(DlnaStrings.resume));
     await tester.pump();
     expect(find.byTooltip(DlnaStrings.pause), findsOneWidget);
+  });
+
+  testWidgets('casts a picked local file and hides the current-track action '
+      'without a local handler path', (tester) async {
+    // Real file IO must run outside the widget test's fake-async zone.
+    final pickedPath = (await tester.runAsync(() async {
+      final tempDir =
+          await Directory.systemTemp.createTemp('pulsr_dlna_screen_');
+      final file = File(
+        '${tempDir.path}${Platform.pathSeparator}picked.mp3',
+      )..writeAsBytesSync(<int>[1, 2, 3]);
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      return file.path;
+    }))!;
+    FilePickerPlatform.instance =
+        FakeFilePickerPlatform(result: () => FakePlatformFile(pickedPath));
+
+    final service = _StubRendererService();
+    addTearDown(service.dispose);
+    await service.discover();
+    await service.select(_device);
+
+    await tester.pumpWidget(MaterialApp(home: DlnaScreen(service: service)));
+    expect(find.text(DlnaStrings.castFile), findsOneWidget);
+    expect(find.text(DlnaStrings.castCurrentTrack), findsNothing);
+    expect(
+      tester
+          .getSize(
+            find.widgetWithText(OutlinedButton, DlnaStrings.castFile),
+          )
+          .height,
+      greaterThanOrEqualTo(48.0),
+    );
+
+    await tester.tap(find.text(DlnaStrings.castFile));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(service.castPaths, <String>[pickedPath]);
+    expect(find.text('picked'), findsOneWidget);
+  });
+
+  testWidgets('does not dispose an injected app-scoped service',
+      (tester) async {
+    final service = _StubRendererService();
+
+    await tester.pumpWidget(MaterialApp(home: DlnaScreen(service: service)));
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    await tester.pump();
+
+    expect(service.disposed, isFalse);
+
+    // The app still owns the service; it can keep notifying after the screen
+    // is gone.
+    service.addListener(() {});
+    service.dispose();
   });
 }

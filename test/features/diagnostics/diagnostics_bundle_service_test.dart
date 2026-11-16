@@ -186,4 +186,165 @@ void main() {
     expect(log.contains('/storage/'), isFalse);
     expect(log, contains('[Audio]'));
   });
+
+  test('reads every DSP detail with the type the equalizer persists', () async {
+    SharedPreferences.resetStatic();
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      PrefsKeys.eqEnabled: true,
+      PrefsKeys.eqPresetName: 'Studio',
+      PrefsKeys.crossfeedEnabled: true,
+      PrefsKeys.crossfeedMode: 2,
+      PrefsKeys.saturationEnabled: true,
+      PrefsKeys.saturationMode: 1,
+      PrefsKeys.stereoWidthEnabled: true,
+      PrefsKeys.stereoWidthMultiband: true,
+      PrefsKeys.dynamicBassEnabled: true,
+      PrefsKeys.dynamicBassPreset: 4,
+      PrefsKeys.multibandCompressorEnabled: true,
+      PrefsKeys.multibandCompressorBands: jsonEncode(<Object>[
+        <String, Object>{'frequency': 120},
+        <String, Object>{'frequency': 800},
+        <String, Object>{'frequency': 3000},
+        <String, Object>{'frequency': 9000},
+      ]),
+      PrefsKeys.convolutionReverbEnabled: true,
+      PrefsKeys.convolutionReverbPreset: 3,
+      PrefsKeys.lookaheadLimiterEnabled: true,
+      PrefsKeys.lookaheadLimiterThresholdDb: -1.5,
+      PrefsKeys.ditherEnabled: true,
+      PrefsKeys.ditherTargetBitDepth: 24,
+      PrefsKeys.dacVoicingEnabled: true,
+      PrefsKeys.dacVoicingCharacter: 2,
+    });
+    prefs = await SharedPreferences.getInstance();
+
+    final bundle = await buildService().build();
+    final details = <String, Object?>{
+      for (final stage in bundle.dspStages)
+        '${stage['stage']}': stage['detail'],
+    };
+
+    expect(details['equalizer'], 'Studio');
+    expect(details['crossfeed'], '2');
+    expect(details['saturation'], '1');
+    expect(details['stereo_width'], 'multiband');
+    expect(details['dynamic_bass'], '4');
+    expect(details['multiband_compressor'], '4 bands');
+    expect(details['convolution_reverb'], '3');
+    expect(details['limiter'], '-1.5 dB');
+    expect(details['dither'], '24-bit');
+    expect(details['dac_voicing'], '2');
+    expect(bundle.enabledDspStageCount, 10);
+  });
+
+  test('a wrong-typed DSP preference falls back instead of throwing', () async {
+    SharedPreferences.resetStatic();
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      PrefsKeys.crossfeedMode: '2',
+      PrefsKeys.saturationMode: '1',
+      PrefsKeys.dynamicBassPreset: '4',
+      PrefsKeys.convolutionReverbPreset: '3',
+      PrefsKeys.dacVoicingCharacter: '2',
+      PrefsKeys.ditherTargetBitDepth: '32',
+      PrefsKeys.lookaheadLimiterThresholdDb: 'loud',
+      PrefsKeys.multibandCompressorBands: 4,
+    });
+    prefs = await SharedPreferences.getInstance();
+
+    final bundle = await buildService().build();
+    final details = <String, Object?>{
+      for (final stage in bundle.dspStages)
+        '${stage['stage']}': stage['detail'],
+    };
+
+    expect(details['crossfeed'], 'off');
+    expect(details['saturation'], 'off');
+    expect(details['dynamic_bass'], 'flat');
+    expect(details['convolution_reverb'], 'none');
+    expect(details['dac_voicing'], 'neutral');
+    expect(details['dither'], '24-bit');
+    expect(details['limiter'], '0.0 dB');
+    expect(details['multiband_compressor'], '3 bands');
+  });
+
+  test('redacts internal data, opt and UNC paths', () {
+    final redacted = DiagnosticsBundleService.redactText(
+      'a /data/user/0/com.pulsr.music/files/x.flac '
+      'b /data/data/com.pulsr.music/cache/y '
+      'c /opt/pulsr/bin/pulsr '
+      r'd \\nas\share\music\track.flac',
+    );
+
+    expect(redacted.contains('/data/user/0'), isFalse);
+    expect(redacted.contains('/data/data'), isFalse);
+    expect(redacted.contains('/opt/'), isFalse);
+    expect(redacted.contains(r'\\nas\share'), isFalse);
+    expect(redacted, contains('[REDACTED_PATH]'));
+  });
+
+  test('redacts paths nested in list and map preference values', () async {
+    prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      'nested_list',
+      <String>['/data/user/0/com.pulsr.music/files/a', '/opt/tool/b'],
+    );
+    await prefs.setString(
+      'nested_map',
+      jsonEncode(<String, Object?>{
+        'outer': <String, Object?>{
+          'inner': <String>['/data/data/com.pulsr.music/c', r'\\host\share\d'],
+        },
+      }),
+    );
+
+    final bundle = await buildService().build();
+    final json = jsonEncode(bundle.toJson());
+
+    expect(json.contains('/data/user/0'), isFalse);
+    expect(json.contains('/data/data'), isFalse);
+    expect(json.contains('/opt/'), isFalse);
+    expect(json.contains(r'\\host\share'), isFalse);
+  });
+
+  test('redacts sensitive keys and paths inside nested probe maps', () async {
+    final bundle = await buildService(
+      usb: () async => <String, Object?>{
+        'status': 'ok',
+        'auth': <String, Object?>{
+          'token': 'supersecret',
+          'header': 'Authorization: Bearer abc.def',
+        },
+        'files': <Object?>[
+          <String, Object?>{
+            'path': '/data/user/0/com.pulsr.music/files/a.flac',
+            'name': 'a.flac',
+          },
+        ],
+      },
+    ).build();
+
+    final auth = bundle.usb['auth'] as Map<String, Object?>;
+    expect(auth['token'], '[REDACTED]');
+    expect(auth['header'], contains('REDACTED'));
+    expect(auth['header'], isNot(contains('abc.def')));
+    final files = bundle.usb['files'] as List<Object?>;
+    final file = files.single as Map<String, Object?>;
+    expect('${file['path']}', contains('REDACTED'));
+    expect('${file['path']}', isNot(contains('/data/user/0')));
+    expect(file['name'], 'a.flac');
+  });
+
+  test('cleanupExport removes the temporary bundle directory', () async {
+    final service = buildService();
+    final files = await service.export();
+
+    expect(await temp.exists(), isTrue);
+    for (final file in files) {
+      expect(await File(file.path).exists(), isTrue);
+    }
+
+    await service.cleanupExport();
+
+    expect(await temp.exists(), isFalse);
+  });
 }

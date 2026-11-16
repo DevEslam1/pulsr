@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:mutex/mutex.dart';
 
 import '../../core/errors/app_error_base.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/interfaces/remote_fs_provider.dart';
 import '../../domain/models/remote_source.dart';
@@ -54,21 +55,89 @@ class FtpSession {
   String _homeDir = '/';
   bool _closed = false;
 
-  /// Whether a control connection is open.
-  bool get isConnected => _control != null;
+  /// Whether a *usable* control connection is open.
+  ///
+  /// A socket that failed and was marked unhealthy reports `false`, so callers
+  /// can tell "reconnect will work" apart from "the same dead socket".
+  bool get isConnected => _control?.isHealthy ?? false;
 
   /// Working directory reported by `PWD` after login (`/` before that).
   String get homeDir => _homeDir;
 
   /// Connects and logs in when needed; safe to call before every command.
+  ///
+  /// A cached control connection that failed (closed socket, malformed reply,
+  /// timeout) is discarded instead of reused, and a connect/login attempt that
+  /// dies with [FtpClosedError] or [SocketException] is retried exactly once
+  /// on a fresh connection. Two failures in a row are reported, so a dead host
+  /// still fails fast instead of looping.
   Future<void> ensureConnected() async {
     if (_closed) {
       throw StateError('This FTP session has been closed.');
     }
-    if (_control != null) return;
+    final current = _control;
+    if (current != null) {
+      if (current.isHealthy) return;
+      _control = null;
+      await current.destroy();
+    }
     await _sessionLock.protect(() async {
       if (_control != null) return;
-      await _connectAndLogin();
+      var attempts = 0;
+      while (true) {
+        try {
+          await _connectAndLogin();
+          return;
+        } on FtpClosedError catch (e, st) {
+          attempts++;
+          if (attempts > 1) {
+            ErrorLogger.log(
+              'FTP reconnect failed: the server closed the connection again',
+              error: e,
+              stackTrace: st,
+              category: 'RemoteSources',
+              meta: {'authority': source.authority},
+            );
+            throw RemoteUnavailableError(
+              code: 'FTP_CLOSED',
+              userMessage: 'The server closed the connection during login.',
+              cause: e,
+              stackTrace: st,
+            );
+          }
+          ErrorLogger.log(
+            'FTP control connection closed; reconnecting once',
+            error: e,
+            stackTrace: st,
+            category: 'RemoteSources',
+            meta: {'authority': source.authority},
+          );
+        } on SocketException catch (e, st) {
+          attempts++;
+          if (attempts > 1) {
+            ErrorLogger.log(
+              'FTP reconnect failed on the socket',
+              error: e,
+              stackTrace: st,
+              category: 'RemoteSources',
+              meta: {'authority': source.authority},
+            );
+            throw RemoteUnavailableError(
+              code: 'FTP_CONNECT',
+              userMessage: 'Could not connect to ${source.authority}.',
+              cause: e,
+              stackTrace: st,
+            );
+          }
+          ErrorLogger.log(
+            'FTP control socket failed; reconnecting once',
+            error: e,
+            stackTrace: st,
+            category: 'RemoteSources',
+            meta: {'authority': source.authority},
+          );
+        }
+      }
     });
   }
 
@@ -85,15 +154,22 @@ class FtpSession {
   }
 
   /// Opens a passive data connection (`EPSV` first, then `PASV`).
+  ///
+  /// The data connection always goes to the address the control connection is
+  /// already talking to. A `PASV` reply carries an advisory IP that a hostile
+  /// or NAT-ed server can set to anything; connecting to it is the classic FTP
+  /// bounce primitive. The advertised host is still checked against
+  /// [RemoteTargetPolicy] so a private/loopback spoof is visible in the log.
   Future<Socket> openDataSocket() async {
     final control = requireControl();
+    final peerAddress = control.peerAddress;
     final epsv = await control.command('EPSV');
     if (epsv.code == 229) {
       final port = FtpListingParser.parseExtendedPassiveReply(epsv.message);
       if (port != null) {
         try {
           return await Socket.connect(
-            control.peerAddress,
+            peerAddress,
             port,
             timeout: _timeout,
           );
@@ -117,21 +193,29 @@ class FtpSession {
         userMessage: 'The server sent an unreadable passive-mode address.',
       );
     }
-    var host = parsed.host;
-    if (_isPrivateAddress(host) && !_isPrivateAddress(control.peerAddress)) {
-      // A server behind NAT advertises its LAN address; the control peer is the
-      // address that actually reaches it.
-      host = control.peerAddress;
+    final advertised = parsed.host;
+    if (advertised != peerAddress) {
+      final unsafe = RemoteTargetPolicy.isUnsafeHost(advertised);
       ErrorLogger.log(
-        'FTP PASV advertised a private address; using the control peer instead',
+        unsafe
+            ? 'FTP PASV advertised a private/non-routable address; using the '
+                'control peer instead'
+            : 'FTP PASV advertised an address that differs from the control '
+                'peer; using the control peer instead',
         category: 'RemoteSources',
         meta: {'authority': source.authority},
       );
     }
-    return Socket.connect(host, parsed.port, timeout: _timeout);
+    return Socket.connect(peerAddress, parsed.port, timeout: _timeout);
   }
 
   /// Runs a listing command (`LIST`/`NLST`) and returns its text payload.
+  ///
+  /// The listing is decoded with `allowMalformed` on purpose: servers commonly
+  /// send Latin-1 filenames, and one bad byte must not throw away a whole
+  /// folder. A decode failure on the *control* channel is different — that one
+  /// throws [FtpFormatError] and invalidates the session (see
+  /// [FtpControlConnection]).
   Future<String> readListing(String command) async {
     final control = requireControl();
     final data = await openDataSocket();
@@ -141,8 +225,9 @@ class FtpSession {
       if (!ack.isIntermediate && !ack.isSuccess) {
         throw errors.mapReply(ack, command.split(' ').first);
       }
-      await for (final chunk
-          in data.cast<List<int>>().transform(utf8.decoder).timeout(_timeout)) {
+      await for (final chunk in data.cast<List<int>>().transform(
+        const Utf8Decoder(allowMalformed: true),
+      ).timeout(_timeout)) {
         buffer.write(chunk);
         if (buffer.length > maxListingBytes) {
           throw const RemoteProtocolError(
@@ -151,6 +236,23 @@ class FtpSession {
           );
         }
       }
+    } on FormatException catch (e, st) {
+      // The control reply could not be decoded: the session is out of step and
+      // cannot be reused for the next command.
+      ErrorLogger.log(
+        'FTP listing reply could not be decoded; dropping the session',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+        meta: {'authority': source.authority},
+      );
+      await abort();
+      throw RemoteProtocolError(
+        code: 'FTP_DECODE',
+        userMessage: 'The server sent text this client cannot decode.',
+        cause: e,
+        stackTrace: st,
+      );
     } finally {
       try {
         await data.close();
@@ -175,12 +277,27 @@ class FtpSession {
   }
 
   /// Reads the transfer completion reply; returns whether the session is sane.
+  ///
+  /// The caller must close (or drain) the data socket *before* awaiting this:
+  /// plenty of servers only emit `226` once the data connection is gone, and
+  /// reading the reply first deadlocks them against a client that still holds
+  /// the socket open. `426` is accepted as well — it is the expected answer
+  /// when the client closed the data connection after a ranged read, and the
+  /// control channel itself is still in step.
   Future<bool> completeTransfer() async {
     final control = requireControl();
     try {
       final done =
           await control.readReply().timeout(const Duration(seconds: 10));
       if (done.code == 226 || done.code == 250) return true;
+      if (done.code == 426) {
+        ErrorLogger.log(
+          'FTP transfer was closed early (426); the control channel is intact',
+          category: 'RemoteSources',
+          meta: {'authority': source.authority},
+        );
+        return true;
+      }
       ErrorLogger.log(
         'FTP transfer completed with code ${done.code}',
         category: 'RemoteSources',
@@ -236,6 +353,12 @@ class FtpSession {
     final control = _control;
     _control = null;
     if (control == null) return;
+    if (!control.isHealthy) {
+      // A reply is already pending (or the socket is dead): sending QUIT would
+      // race the outstanding read, so just drop the socket.
+      await control.destroy();
+      return;
+    }
     try {
       await control.send('QUIT');
       // Waiting for 221 lets the server finish before the socket disappears;
@@ -338,12 +461,9 @@ class FtpSession {
         category: 'RemoteSources',
         meta: {'authority': source.authority},
       );
-      throw RemoteUnavailableError(
-        code: 'FTP_CONNECT',
-        userMessage: 'Could not connect to ${source.authority}.',
-        cause: e,
-        stackTrace: st,
-      );
+      // Rethrown raw: [ensureConnected] retries once on a fresh connection
+      // before mapping the final failure for the UI.
+      rethrow;
     } on FtpClosedError catch (e, st) {
       await control?.destroy();
       ErrorLogger.log(
@@ -353,12 +473,7 @@ class FtpSession {
         category: 'RemoteSources',
         meta: {'authority': source.authority},
       );
-      throw RemoteUnavailableError(
-        code: 'FTP_CLOSED',
-        userMessage: 'The server closed the connection during login.',
-        cause: e,
-        stackTrace: st,
-      );
+      rethrow;
     } on FtpFormatError catch (e, st) {
       await control?.destroy();
       ErrorLogger.log(
@@ -384,19 +499,5 @@ class FtpSession {
     if (end == -1) return null;
     final value = message.substring(start + 1, end);
     return value.isEmpty ? null : value;
-  }
-
-  static bool _isPrivateAddress(String address) {
-    if (address == '0.0.0.0' || address == '127.0.0.1') return true;
-    final parts = address.split('.');
-    if (parts.length != 4) return false;
-    final first = int.tryParse(parts[0]);
-    final second = int.tryParse(parts[1]);
-    if (first == null || second == null) return false;
-    if (first == 10) return true;
-    if (first == 127) return true;
-    if (first == 192 && second == 168) return true;
-    if (first == 172 && second >= 16 && second <= 31) return true;
-    return false;
   }
 }

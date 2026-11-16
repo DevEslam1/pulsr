@@ -1,15 +1,19 @@
 // lib/features/usb_tools/usb_quirk_profile.dart
 //
 // Value type for one USB DAC quirk profile. A profile answers the ergonomics
-// questions a problem DAC forces on the user: how long to stay silent while the
-// device settles, whether to drop to 16-bit, whether to reset the alternate
-// setting on stop, whether to claim the HID consumer-control interfaces, and
-// how the isochronous transfers should be sized.
+// questions a problem DAC forces on the user: whether the app should claim the
+// device's HID consumer-control interfaces and map its media buttons.
+//
+// Only knobs with a real consumer live here. Silence/buffer/transfer-size/
+// 16-bit/alt-reset knobs were persisted but never read by any audio path, so
+// they were removed instead of staying as sliders that did nothing. The
+// alt-setting reset survives as an explicit diagnostics action on the screen.
 //
 // The type is immutable and validates in the factory, so an out-of-range value
 // can never reach the native side. `fromJson` is strict about the transport
 // shape (a stored profile that no longer parses is reported, never guessed) and
-// tolerant of unknown keys so a newer build can write a superset.
+// tolerant of unknown keys so a newer build can write a superset — which also
+// makes stored profiles from the removed knobs load cleanly.
 
 import '../../core/errors/app_error.dart';
 
@@ -17,7 +21,7 @@ import '../../core/errors/app_error.dart';
 ///
 /// Extends [AppError] so the UI can surface [userMessage] verbatim and crash
 /// reports carry a stable [code]. [field] names the offending profile field
-/// (`silenceMs`, `vid`, ...) for diagnostics.
+/// (`vid`, `pid`, ...) for diagnostics.
 class QuirkValidationError extends AppError {
   const QuirkValidationError({
     required super.code,
@@ -40,45 +44,24 @@ class QuirkValidationError extends AppError {
 /// Every field is validated on construction:
 /// * [vid] / [pid] must be USB 16-bit ids.
 /// * [label] must be non-empty and at most [maxLabelLength] characters.
-/// * [silenceMs] must be 0..[maxSilenceMs].
-/// * [bufferMs] must be 0..[maxBufferMs].
-/// * [transferSizeBytes] must be 0 (auto) or [minTransferSizeBytes]..
-///   [maxTransferSizeBytes].
 class UsbQuirkProfile {
   /// Builds a validated profile.
   ///
-  /// Throws [QuirkValidationError] when any field is out of range, so callers
+  /// Throws [QuirkValidationError] when a field is out of range, so callers
   /// never have to re-check a profile they already hold.
   factory UsbQuirkProfile({
     required int vid,
     required int pid,
     required String label,
-    int silenceMs = 0,
-    bool altResetOnStop = false,
-    bool force16Bit = false,
     bool hidEnabled = false,
-    int transferSizeBytes = 0,
-    int bufferMs = 0,
   }) {
-    final error = _fieldError(
-      vid: vid,
-      pid: pid,
-      label: label,
-      silenceMs: silenceMs,
-      transferSizeBytes: transferSizeBytes,
-      bufferMs: bufferMs,
-    );
+    final error = _fieldError(vid: vid, pid: pid, label: label);
     if (error != null) throw error;
     return UsbQuirkProfile._(
       vid: vid,
       pid: pid,
       label: label.trim(),
-      silenceMs: silenceMs,
-      altResetOnStop: altResetOnStop,
-      force16Bit: force16Bit,
       hidEnabled: hidEnabled,
-      transferSizeBytes: transferSizeBytes,
-      bufferMs: bufferMs,
     );
   }
 
@@ -86,12 +69,7 @@ class UsbQuirkProfile {
     required this.vid,
     required this.pid,
     required this.label,
-    required this.silenceMs,
-    required this.altResetOnStop,
-    required this.force16Bit,
     required this.hidEnabled,
-    required this.transferSizeBytes,
-    required this.bufferMs,
   });
 
   /// Highest USB vendor/product id (16-bit field).
@@ -99,18 +77,6 @@ class UsbQuirkProfile {
 
   /// Longest accepted [label].
   static const int maxLabelLength = 64;
-
-  /// Longest accepted [silenceMs]; longer than this and the user hears a gap.
-  static const int maxSilenceMs = 2500;
-
-  /// Longest accepted [bufferMs].
-  static const int maxBufferMs = 500;
-
-  /// Smallest non-auto [transferSizeBytes].
-  static const int minTransferSizeBytes = 512;
-
-  /// Largest accepted [transferSizeBytes].
-  static const int maxTransferSizeBytes = 65536;
 
   /// USB vendor id.
   final int vid;
@@ -121,23 +87,8 @@ class UsbQuirkProfile {
   /// Human label shown in the editor and in diagnostics.
   final String label;
 
-  /// Silence written before the first real frame, in milliseconds.
-  final int silenceMs;
-
-  /// Return the streaming interface to alternate setting 0 on stop.
-  final bool altResetOnStop;
-
-  /// Force a 16-bit wire format even when the source is deeper.
-  final bool force16Bit;
-
   /// Claim the device's HID consumer-control interfaces and map media keys.
   final bool hidEnabled;
-
-  /// Requested isochronous transfer size in bytes; 0 means "let the sink pick".
-  final int transferSizeBytes;
-
-  /// Requested sink buffer depth in milliseconds; 0 means "sink default".
-  final int bufferMs;
 
   /// A profile with every knob at its neutral value.
   ///
@@ -148,12 +99,7 @@ class UsbQuirkProfile {
     vid: 0,
     pid: 0,
     label: 'Default',
-    silenceMs: 0,
-    altResetOnStop: false,
-    force16Bit: false,
     hidEnabled: false,
-    transferSizeBytes: 0,
-    bufferMs: 0,
   );
 
   /// Storage key of this device: `vid:pid`, lowercase, zero-padded to 4 hex
@@ -164,13 +110,7 @@ class UsbQuirkProfile {
   bool get isDeviceSpecific => vid > 0 && pid > 0;
 
   /// Whether every knob is at its neutral value.
-  bool get isNeutral =>
-      silenceMs == 0 &&
-      bufferMs == 0 &&
-      transferSizeBytes == 0 &&
-      !altResetOnStop &&
-      !force16Bit &&
-      !hidEnabled;
+  bool get isNeutral => !hidEnabled;
 
   /// Lowercase `vid:pid` storage key, zero-padded to four hex digits each.
   static String deviceKey(int vid, int pid) => '${_hex4(vid)}:${_hex4(pid)}';
@@ -180,23 +120,13 @@ class UsbQuirkProfile {
     int? vid,
     int? pid,
     String? label,
-    int? silenceMs,
-    bool? altResetOnStop,
-    bool? force16Bit,
     bool? hidEnabled,
-    int? transferSizeBytes,
-    int? bufferMs,
   }) {
     return UsbQuirkProfile(
       vid: vid ?? this.vid,
       pid: pid ?? this.pid,
       label: label ?? this.label,
-      silenceMs: silenceMs ?? this.silenceMs,
-      altResetOnStop: altResetOnStop ?? this.altResetOnStop,
-      force16Bit: force16Bit ?? this.force16Bit,
       hidEnabled: hidEnabled ?? this.hidEnabled,
-      transferSizeBytes: transferSizeBytes ?? this.transferSizeBytes,
-      bufferMs: bufferMs ?? this.bufferMs,
     );
   }
 
@@ -205,19 +135,13 @@ class UsbQuirkProfile {
         'vid': vid,
         'pid': pid,
         'label': label,
-        'silenceMs': silenceMs,
-        'altResetOnStop': altResetOnStop,
-        'force16Bit': force16Bit,
         'hidEnabled': hidEnabled,
-        'transferSizeBytes': transferSizeBytes,
-        'bufferMs': bufferMs,
       };
 
   /// Reads a profile from an already-decoded JSON object.
   ///
-  /// Unknown keys are ignored. Missing optional knobs fall back to their
-  /// neutral value; a missing or wrong-typed `vid`/`pid`/`label` (or any knob
-  /// outside its range) throws [QuirkValidationError].
+  /// Unknown keys are ignored. A missing or wrong-typed `vid`/`pid` throws
+  /// [QuirkValidationError]; a missing `label` falls back to the default.
   factory UsbQuirkProfile.fromJson(Map<String, Object?> json) {
     final vid = _readInt(json, 'vid');
     if (vid == null) {
@@ -240,12 +164,7 @@ class UsbQuirkProfile {
       vid: vid,
       pid: pid,
       label: label,
-      silenceMs: _readInt(json, 'silenceMs') ?? 0,
-      altResetOnStop: _readBool(json, 'altResetOnStop') ?? false,
-      force16Bit: _readBool(json, 'force16Bit') ?? false,
       hidEnabled: _readBool(json, 'hidEnabled') ?? false,
-      transferSizeBytes: _readInt(json, 'transferSizeBytes') ?? 0,
-      bufferMs: _readInt(json, 'bufferMs') ?? 0,
     );
   }
 
@@ -273,18 +192,7 @@ class UsbQuirkProfile {
   /// `1d6b:0104 "Melo DAC": defaults`.
   String describe() {
     if (isNeutral) return '$key "$label": defaults';
-    final knobs = <String>[
-      if (silenceMs > 0) 'silence ${silenceMs}ms',
-      if (bufferMs > 0) 'buffer ${bufferMs}ms',
-      if (transferSizeBytes > 0)
-        'transfer ${transferSizeBytes}B'
-      else
-        'transfer auto',
-      if (force16Bit) 'force 16-bit',
-      if (altResetOnStop) 'alt-reset on stop',
-      if (hidEnabled) 'HID consumer keys',
-    ];
-    return '$key "$label": ${knobs.join(', ')}';
+    return '$key "$label": HID consumer keys';
   }
 
   @override
@@ -294,25 +202,10 @@ class UsbQuirkProfile {
           other.vid == vid &&
           other.pid == pid &&
           other.label == label &&
-          other.silenceMs == silenceMs &&
-          other.altResetOnStop == altResetOnStop &&
-          other.force16Bit == force16Bit &&
-          other.hidEnabled == hidEnabled &&
-          other.transferSizeBytes == transferSizeBytes &&
-          other.bufferMs == bufferMs;
+          other.hidEnabled == hidEnabled;
 
   @override
-  int get hashCode => Object.hash(
-        vid,
-        pid,
-        label,
-        silenceMs,
-        altResetOnStop,
-        force16Bit,
-        hidEnabled,
-        transferSizeBytes,
-        bufferMs,
-      );
+  int get hashCode => Object.hash(vid, pid, label, hidEnabled);
 
   @override
   String toString() => 'UsbQuirkProfile(${describe()})';
@@ -324,9 +217,6 @@ class UsbQuirkProfile {
     required int vid,
     required int pid,
     required String label,
-    required int silenceMs,
-    required int transferSizeBytes,
-    required int bufferMs,
   }) {
     if (vid < 0 || vid > maxUsbId) {
       return const QuirkValidationError(
@@ -355,29 +245,6 @@ class UsbQuirkProfile {
         code: 'usb-quirk-label-too-long',
         userMessage: 'Name must be at most 64 characters.',
         field: 'label',
-      );
-    }
-    if (silenceMs < 0 || silenceMs > maxSilenceMs) {
-      return const QuirkValidationError(
-        code: 'usb-quirk-silence-range',
-        userMessage: 'Silence must be between 0 and 2500 ms.',
-        field: 'silenceMs',
-      );
-    }
-    if (bufferMs < 0 || bufferMs > maxBufferMs) {
-      return const QuirkValidationError(
-        code: 'usb-quirk-buffer-range',
-        userMessage: 'Buffer must be between 0 and 500 ms.',
-        field: 'bufferMs',
-      );
-    }
-    if (transferSizeBytes != 0 &&
-        (transferSizeBytes < minTransferSizeBytes ||
-            transferSizeBytes > maxTransferSizeBytes)) {
-      return const QuirkValidationError(
-        code: 'usb-quirk-transfer-size-range',
-        userMessage: 'Transfer size must be auto, or 512-65536 bytes.',
-        field: 'transferSizeBytes',
       );
     }
     return null;

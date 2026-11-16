@@ -18,8 +18,8 @@ const Map<String, SystemBehaviorSettingsSnapshot> _variants =
     usbReleaseOnFocusLoss: UsbReleaseOnFocusLoss.transient,
   ),
   'fade800': SystemBehaviorSettingsSnapshot(fadeOutOnPauseMs: 800),
-  'noNotificationPause': SystemBehaviorSettingsSnapshot(
-    pauseOnNotificationSound: false,
+  'notificationPause': SystemBehaviorSettingsSnapshot(
+    pauseOnNotificationSound: true,
   ),
   'stopOnTaskRemoval': SystemBehaviorSettingsSnapshot(
     stopWhenTaskRemoved: true,
@@ -52,7 +52,7 @@ void main() {
         'releasePermanent': SystemAction.pauseAndReleaseUsb,
         'releaseTransient': SystemAction.pauseKeepUsb,
         'fade800': SystemAction.fadeOutPause,
-        'noNotificationPause': SystemAction.pauseKeepUsb,
+        'notificationPause': SystemAction.pauseKeepUsb,
         'stopOnTaskRemoval': SystemAction.pauseKeepUsb,
         'rockerSwitch': SystemAction.pauseKeepUsb,
       });
@@ -64,7 +64,7 @@ void main() {
         'releasePermanent': SystemAction.pauseKeepUsb,
         'releaseTransient': SystemAction.pauseAndReleaseUsb,
         'fade800': SystemAction.fadeOutPause,
-        'noNotificationPause': SystemAction.pauseKeepUsb,
+        'notificationPause': SystemAction.pauseKeepUsb,
         'stopOnTaskRemoval': SystemAction.pauseKeepUsb,
         'rockerSwitch': SystemAction.pauseKeepUsb,
       });
@@ -76,7 +76,7 @@ void main() {
         'releasePermanent': SystemAction.ignore,
         'releaseTransient': SystemAction.ignore,
         'fade800': SystemAction.ignore,
-        'noNotificationPause': SystemAction.ignore,
+        'notificationPause': SystemAction.ignore,
         'stopOnTaskRemoval': SystemAction.ignore,
         'rockerSwitch': SystemAction.ignore,
       });
@@ -84,13 +84,13 @@ void main() {
 
     test('notification sound', () {
       _expectRow(SystemEvent.notificationSound, <String, SystemAction>{
-        'defaults': SystemAction.pauseKeepUsb,
-        'releasePermanent': SystemAction.pauseKeepUsb,
-        'releaseTransient': SystemAction.pauseKeepUsb,
-        'fade800': SystemAction.fadeOutPause,
-        'noNotificationPause': SystemAction.ignore,
-        'stopOnTaskRemoval': SystemAction.pauseKeepUsb,
-        'rockerSwitch': SystemAction.pauseKeepUsb,
+        'defaults': SystemAction.ignore,
+        'releasePermanent': SystemAction.ignore,
+        'releaseTransient': SystemAction.ignore,
+        'fade800': SystemAction.ignore,
+        'notificationPause': SystemAction.pauseKeepUsb,
+        'stopOnTaskRemoval': SystemAction.ignore,
+        'rockerSwitch': SystemAction.ignore,
       });
     });
 
@@ -100,7 +100,7 @@ void main() {
         'releasePermanent': SystemAction.pauseKeepUsb,
         'releaseTransient': SystemAction.pauseKeepUsb,
         'fade800': SystemAction.pauseKeepUsb,
-        'noNotificationPause': SystemAction.pauseKeepUsb,
+        'notificationPause': SystemAction.pauseKeepUsb,
         'stopOnTaskRemoval': SystemAction.pauseKeepUsb,
         'rockerSwitch': SystemAction.pauseKeepUsb,
       });
@@ -112,7 +112,7 @@ void main() {
         'releasePermanent': SystemAction.pauseKeepUsb,
         'releaseTransient': SystemAction.pauseKeepUsb,
         'fade800': SystemAction.pauseKeepUsb,
-        'noNotificationPause': SystemAction.pauseKeepUsb,
+        'notificationPause': SystemAction.pauseKeepUsb,
         'stopOnTaskRemoval': SystemAction.stop,
         'rockerSwitch': SystemAction.pauseKeepUsb,
       });
@@ -124,7 +124,7 @@ void main() {
         'releasePermanent': SystemAction.ignore,
         'releaseTransient': SystemAction.ignore,
         'fade800': SystemAction.ignore,
-        'noNotificationPause': SystemAction.ignore,
+        'notificationPause': SystemAction.ignore,
         'stopOnTaskRemoval': SystemAction.ignore,
         'rockerSwitch': SystemAction.nextTrack,
       });

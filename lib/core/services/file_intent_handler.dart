@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
@@ -13,6 +14,7 @@ import '../di/injection.dart';
 import '../errors/failures.dart';
 import '../router/app_router.dart';
 import '../utils/error_logger.dart';
+import '../../data/audio/sacd/sacd_iso_library.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/models/ytm_track.dart';
@@ -27,6 +29,14 @@ import 'ytm_service.dart';
 @singleton
 class FileIntentHandler {
   static const int _maxProxyTextBytes = 10 * 1024 * 1024;
+
+  /// Upper bound for one voice-search resolution round trip.
+  ///
+  /// The assistant resolver runs through the platform method channel; without
+  /// this bound a repository stream that never emits (or a wedged channel)
+  /// kept the caller — and Android's voice interaction — waiting forever.
+  static const Duration voiceSearchTimeout = Duration(seconds: 5);
+
   static const MethodChannel _channel = MethodChannel(PulsrChannels.fileOpener);
   static int _tempIdCounter = 0;
   static int _getNextTempId() {
@@ -36,12 +46,22 @@ class FileIntentHandler {
         rand;
   }
 
+  /// Test seam: replaces the SACD open path without touching path_provider.
+  static SacdIsoLibrary? sacdIsoLibraryOverride;
+
   final IMusicRepository _repository;
   final PlayerCubit _playerCubit;
 
   FileIntentHandler(this._repository, this._playerCubit) {
     _initChannel();
+    // Startup janitor for extracted DSF tracks: enforces the cache age/budget
+    // and never throws. This handler is constructed during app warm-up, so it
+    // is the earliest in-scope hook (main.dart is out of this change's scope).
+    unawaited(_sacdLibrary.warmUp());
   }
+
+  SacdIsoLibrary get _sacdLibrary =>
+      sacdIsoLibraryOverride ?? SacdIsoLibrary.shared;
 
   void _initChannel() {
     _channel.setMethodCallHandler((call) async {
@@ -116,9 +136,11 @@ class FileIntentHandler {
   Future<void> _enqueueAdditionalUris(Iterable<String> uris) async {
     final songs = <SongsTableData>[];
     for (final raw in uris) {
-      final song = await _resolveSongForUri(raw);
-      if (song != null) {
-        songs.add(song);
+      try {
+        songs.addAll(await _songsForUri(raw));
+      } catch (e, st) {
+        ErrorLogger.log('Could not queue an external audio URI: $raw',
+            error: e, stackTrace: st, category: 'FileIntentHandler');
       }
     }
     if (songs.isNotEmpty) {
@@ -223,13 +245,24 @@ class FileIntentHandler {
     try {
       final played = await _playAssistantQuery(q);
       if (played) return;
-      final navCtx = rootNavigatorKey.currentContext;
-      if (navCtx != null && navCtx.mounted) {
-        navCtx.go('/search?q=${Uri.encodeComponent(q)}');
-      }
+      _openSearchFor(q);
+    } on TimeoutException catch (e, st) {
+      // A wedged resolver/repository must release the platform channel; the
+      // Search screen (prefilled) is the honest fallback.
+      ErrorLogger.log('Voice search timed out after '
+          '${voiceSearchTimeout.inSeconds}s: $q',
+          error: e, stackTrace: st, category: 'FileIntentHandler');
+      _openSearchFor(q);
     } catch (e, st) {
       ErrorLogger.log('Failed to handle voice search: $query',
           error: e, stackTrace: st, category: 'FileIntentHandler');
+    }
+  }
+
+  void _openSearchFor(String query) {
+    final navCtx = rootNavigatorKey.currentContext;
+    if (navCtx != null && navCtx.mounted) {
+      navCtx.go('/search?q=${Uri.encodeComponent(query)}');
     }
   }
 
@@ -288,11 +321,14 @@ class FileIntentHandler {
           category: 'FileIntentHandler');
       return false;
     }
-    final resolution = await resolver.resolveText(textIntent);
+    final resolution =
+        await resolver.resolveText(textIntent).timeout(voiceSearchTimeout);
     if (resolution is! AssistantPlayPlan || resolution.songIds.isEmpty) {
       return false;
     }
-    final songs = (await _repository.getSongsByIds(resolution.songIds))
+    final songs = (await _repository
+            .getSongsByIds(resolution.songIds)
+            .timeout(voiceSearchTimeout))
         .fold<List<SongsTableData>>((_) => const [], (r) => r);
     if (songs.isEmpty) return false;
     final queue = resolution.shuffle
@@ -368,14 +404,16 @@ class FileIntentHandler {
         return;
       }
 
-      final song = await _resolveSongForUri(uriOrPath, showUnsupportedToast: true);
-      if (song == null) return;
-
-      await _playerCubit.playSong(song);
-      final navCtx = rootNavigatorKey.currentContext;
-      if (navCtx != null && navCtx.mounted) {
-        navCtx.push('/now-playing');
+      final songs = await _songsForUri(uriOrPath, showUnsupportedToast: true);
+      if (songs.isEmpty) return;
+      if (songs.length == 1) {
+        await _playerCubit.playSong(songs.first);
+      } else {
+        // A SACD image expands into one stereo song per TOC track; start the
+        // first and keep the rest queued.
+        await _playerCubit.playSong(songs.first, queue: songs, queueIndex: 0);
       }
+      _pushNowPlaying();
     } catch (e, st) {
       final context = rootNavigatorKey.currentContext;
       if (context != null && context.mounted) {
@@ -391,10 +429,101 @@ class FileIntentHandler {
     }
   }
 
-  Future<SongsTableData?> _resolveSongForUri(
+  void _pushNowPlaying() {
+    final navCtx = rootNavigatorKey.currentContext;
+    if (navCtx != null && navCtx.mounted) {
+      navCtx.push('/now-playing');
+    }
+  }
+
+  /// Resolves one external URI/path into the songs it contributes to playback.
+  ///
+  /// Ordinary audio files contribute at most one synthetic song (or a library
+  /// match); a SACD `.iso` contributes every stereo track it expands.
+  Future<List<SongsTableData>> _songsForUri(
     String uriOrPath, {
     bool showUnsupportedToast = false,
   }) async {
+    final cleanPath = _decodeLocalPath(uriOrPath);
+    if (AudioFormats.kindFor(cleanPath) == AudioFormatKind.sacdContainer) {
+      final sacdSongs = await _sacdSongsForIso(cleanPath);
+      if (sacdSongs != null) return sacdSongs;
+      // Not a SACD image: fall through so the unsupported-format handling runs
+      // (an ordinary data ISO is still rejected, as before).
+    }
+    final song = await _resolveSongForUri(
+      uriOrPath,
+      showUnsupportedToast: showUnsupportedToast,
+    );
+    return song == null ? const <SongsTableData>[] : <SongsTableData>[song];
+  }
+
+  /// Probes, indexes and expands [path] into playable DSF-backed songs.
+  ///
+  /// Returns null when [path] is not a SACD image (the caller falls back to the
+  /// existing unsupported-format path). Extraction failures are reported once
+  /// and yield an empty list: a broken image must never crash the intent.
+  Future<List<SongsTableData>?> _sacdSongsForIso(String path) async {
+    final library = _sacdLibrary;
+    if (!await library.isSacdImage(path)) return null;
+    try {
+      final opened = await library.openStereo(File(path));
+      if (opened.isEmpty) return const <SongsTableData>[];
+      final baseName = p.basenameWithoutExtension(path);
+      final artist =
+          L10nHolder.current?.fileIntentExternalAudio ?? 'External Audio';
+      final album = L10nHolder.current?.fileIntentFilesAlbum ?? 'Files';
+      final songs = <SongsTableData>[];
+      for (final entry in opened) {
+        int? fileSize;
+        try {
+          fileSize = await entry.file.length();
+        } catch (e, st) {
+          ErrorLogger.log(
+            'Could not read the size of an extracted SACD track',
+            error: e,
+            stackTrace: st,
+            category: 'FileIntentHandler',
+          );
+        }
+        songs.add(
+          SongsTableData(
+            id: _getNextTempId(),
+            title: '$baseName - Track ${entry.track.index}',
+            artist: artist,
+            album: album,
+            durationMs: (entry.track.durationSeconds * 1000).round(),
+            path: entry.file.path,
+            uri: entry.file.path,
+            source: SongSource.local,
+            fileSize: fileSize,
+            isFavorite: false,
+            isMissing: false,
+            isDownloaded: false,
+            playCount: 0,
+            lastPositionMs: 0,
+          ),
+        );
+      }
+      return songs;
+    } catch (e, st) {
+      ErrorLogger.log('Could not expand SACD image: $path',
+          error: e, stackTrace: st, category: 'FileIntentHandler');
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text(ctx.l10n.fileIntentLoadTrackFailed(e.toString())),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return const <SongsTableData>[];
+    }
+  }
+
+  /// Decodes and normalises an incoming path/URI for local file access.
+  static String _decodeLocalPath(String uriOrPath) {
     String cleanPath;
     try {
       cleanPath = Uri.decodeFull(uriOrPath);
@@ -413,6 +542,14 @@ class FileIntentHandler {
         cleanPath = cleanPath.replaceFirst('file://', '');
       }
     }
+    return cleanPath;
+  }
+
+  Future<SongsTableData?> _resolveSongForUri(
+    String uriOrPath, {
+    bool showUnsupportedToast = false,
+  }) async {
+    final cleanPath = _decodeLocalPath(uriOrPath);
 
     // Determine whether this is a proxy/text payload (only relevant when it
     // isn't a recognized audio file).
@@ -500,7 +637,14 @@ class FileIntentHandler {
         if (await file.exists()) {
           fileSize = await file.length();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Could not read the size of an external audio file',
+          error: e,
+          stackTrace: st,
+          category: 'FileIntentHandler',
+        );
+      }
     }
 
     return SongsTableData(

@@ -170,17 +170,24 @@ class SsdpClient {
   }
 
   /// Parses one raw SSDP reply. Returns `null` when it is not a usable
-  /// response (missing or empty `LOCATION`).
+  /// `HTTP/1.1 200` response, when `LOCATION` is missing, non-HTTP(S), or
+  /// points at a host that is neither the responder nor on the private LAN.
   ///
   /// Header names are matched case-insensitively and both CRLF and LF line
-  /// endings are accepted. [sourceAddress] is recorded on the result so the
-  /// caller can resolve a relative `LOCATION` if a device sends one.
+  /// endings are accepted. [sourceAddress] is the datagram sender and is
+  /// recorded on the result for diagnostics.
   static SsdpResponse? parseResponse(
     String raw, {
     required String sourceAddress,
   }) {
     final lines = raw.split(RegExp(r'\r?\n'));
     if (lines.isEmpty) return null;
+
+    // Only a successful search response may be consumed. NOTIFY, M-SEARCH and
+    // error datagrams all share the SSDP port and must be ignored.
+    if (!RegExp(r'^HTTP/1\.1\s+200(?:\s|$)').hasMatch(lines.first.trim())) {
+      return null;
+    }
 
     final headers = <String, String>{};
     for (final line in lines.skip(1)) {
@@ -197,6 +204,11 @@ class SsdpClient {
     final location = headers['location'];
     if (location == null || location.isEmpty) return null;
 
+    final parsed = Uri.tryParse(location);
+    if (parsed == null || !isAllowedDescriptionLocation(parsed, sourceAddress)) {
+      return null;
+    }
+
     return SsdpResponse(
       location: location,
       searchTarget: headers['st'] ?? '',
@@ -205,6 +217,46 @@ class SsdpClient {
       maxAgeSeconds: _parseMaxAge(headers['cache-control']),
       sourceAddress: sourceAddress,
     );
+  }
+
+  /// True when [location] is an absolute http(s) URL whose host matches the
+  /// responder [sourceAddress] or is on the same private LAN. Hostnames are
+  /// rejected because they cannot be verified without a DNS lookup.
+  static bool isAllowedDescriptionLocation(
+    Uri location,
+    String sourceAddress,
+  ) {
+    final scheme = location.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') return false;
+    if (!location.hasAuthority || location.host.isEmpty) return false;
+
+    final target = InternetAddress.tryParse(location.host);
+    if (target == null) return false;
+
+    final source = InternetAddress.tryParse(sourceAddress);
+    if (source != null && target.address == source.address) return true;
+    return source != null &&
+        _isPrivateOrLocal(source) &&
+        _isPrivateOrLocal(target);
+  }
+
+  /// RFC 1918 / link-local / loopback IPv4 and ULA / link-local IPv6.
+  static bool _isPrivateOrLocal(InternetAddress address) {
+    final bytes = address.rawAddress;
+    if (address.type == InternetAddressType.IPv4) {
+      return bytes[0] == 10 ||
+          (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+          (bytes[0] == 192 && bytes[1] == 168) ||
+          (bytes[0] == 169 && bytes[1] == 254) ||
+          bytes[0] == 127;
+    }
+    if (address.type == InternetAddressType.IPv6) {
+      return (bytes[0] & 0xfe) == 0xfc ||
+          (bytes[0] == 0xfe && (bytes[1] & 0xc0) == 0x80) ||
+          bytes.every((byte) => byte == 0) ||
+          (bytes.sublist(0, 15).every((byte) => byte == 0) && bytes[15] == 1);
+    }
+    return false;
   }
 
   static int? _parseMaxAge(String? cacheControl) {

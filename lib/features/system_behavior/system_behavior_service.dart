@@ -11,11 +11,13 @@
 
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart'
+    show AudioHandler, PlaybackState;
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../core/utils/error_logger.dart';
-import '../../data/audio/audio_handler.dart';
+import '../../data/audio/interruption_state_machine.dart';
 import '../../data/audio/playback_interruption_manager.dart';
 import '../../data/services/usb_exclusive_service.dart';
 import 'system_behavior_policy.dart';
@@ -26,6 +28,9 @@ import 'system_behavior_settings.dart';
 /// Kept as a narrow interface so the service can be tested with a recording
 /// fake and so the audio handler stays the only owner of playback state.
 abstract interface class SystemPlaybackPort {
+  /// Resumes playback from the handler's own resume path.
+  Future<void> play();
+
   /// Pauses playback, keeping the queue and position.
   Future<void> pause();
 
@@ -39,23 +44,59 @@ abstract interface class SystemPlaybackPort {
   Future<void> setVolume(double volume);
 }
 
-/// [SystemPlaybackPort] over the live [PulsrAudioHandler].
+/// Software-volume read/write pair an audio handler can expose.
+///
+/// `AudioHandler` itself has no volume members, so the app supplies the two
+/// closures its handler already has. Without them the fade degrades to a plain
+/// pause and every other operation still works.
+@immutable
+class AudioHandlerVolumeControls {
+  /// Creates the pair from a reader and a writer.
+  const AudioHandlerVolumeControls({
+    required this.read,
+    required this.write,
+  });
+
+  /// Current volume on the 0..1 linear gain scale.
+  final double Function() read;
+
+  /// Applies a volume on the 0..1 linear gain scale.
+  final Future<void> Function(double volume) write;
+}
+
+/// [SystemPlaybackPort] over the live audio handler.
 ///
 /// Every call is guarded: a transport failure must never escape into the
 /// interruption stream listener, where it would kill the subscription.
 class AudioHandlerSystemPlaybackPort implements SystemPlaybackPort {
-  /// Wraps [handler]; [currentVolume] and [isPlaying] are read by the fade and
-  /// interruption paths, nothing else is touched.
-  AudioHandlerSystemPlaybackPort(this.handler);
+  /// Wraps [handler]; [volume] supplies the software volume the handler's
+  /// `AudioHandler` interface does not publish.
+  AudioHandlerSystemPlaybackPort(this.handler, {this.volume});
 
   /// The handler this port drives.
-  final PulsrAudioHandler handler;
+  final AudioHandler handler;
+
+  /// Optional software-volume access; null disables fades only.
+  final AudioHandlerVolumeControls? volume;
 
   /// Current handler volume on the 0..1 scale, used as the fade start level.
-  double get currentVolume => handler.volume;
+  /// Null when no volume controls were supplied.
+  double? get currentVolume => volume?.read();
+
+  /// Latest handler playback state snapshot.
+  PlaybackState get playbackState => handler.playbackState.value;
 
   /// Whether the handler is playing right now.
   bool get isPlaying => handler.playbackState.value.playing;
+
+  @override
+  Future<void> play() async {
+    try {
+      await handler.play();
+    } catch (e, st) {
+      _logPortFailure('play', e, st);
+    }
+  }
 
   @override
   Future<void> pause() async {
@@ -86,8 +127,10 @@ class AudioHandlerSystemPlaybackPort implements SystemPlaybackPort {
 
   @override
   Future<void> setVolume(double volume) async {
+    final AudioHandlerVolumeControls? controls = this.volume;
+    if (controls == null) return;
     try {
-      await handler.setVolume(volume);
+      await controls.write(volume);
     } catch (e, st) {
       _logPortFailure('setVolume', e, st);
     }
@@ -214,9 +257,8 @@ class SystemBehaviorService with WidgetsBindingObserver {
   /// [volumeReader] and [isPlaying] are the only readings the service needs
   /// from the audio stack; without them the fade and the interruption guard
   /// degrade to a plain pause / no-op instead of guessing.
-  /// [resumePlayback] is how a resume reaches the handler (`play()` has no
-  /// place in [SystemPlaybackPort] because playback must always be resumed
-  /// through the handler's own resume path).
+  /// [resumePlayback] overrides the port's own [SystemPlaybackPort.play] when
+  /// the caller needs the handler's dedicated resume path.
   SystemBehaviorService({
     required SystemBehaviorSettings settings,
     required SystemPlaybackPort port,
@@ -251,6 +293,7 @@ class SystemBehaviorService with WidgetsBindingObserver {
   StreamSubscription<void>? _noisySub;
   bool _started = false;
   bool _disposed = false;
+  bool _usbReleasedForBackground = false;
 
   /// Whether a fade-out ramp is currently running.
   bool get isFading => _fade.isRunning;
@@ -258,14 +301,20 @@ class SystemBehaviorService with WidgetsBindingObserver {
   /// Whether the platform subscriptions are installed.
   bool get isStarted => _started;
 
-  /// Installs the audio-interruption, becoming-noisy and lifecycle listeners.
+  /// Installs the lifecycle listener and, unless [subscribeInterruptions] is
+  /// false, the audio-interruption and becoming-noisy listeners.
   ///
-  /// Idempotent. A missing audio session (unit tests, desktop) is logged and
-  /// leaves the manual `handle*` entry points fully usable.
-  Future<void> start() async {
+  /// The audio handler already owns those two streams (its duck/pause path is
+  /// wired into crossfade, replay gain and the duck-depth counter). Production
+  /// starts this service with [subscribeInterruptions] false to avoid handling
+  /// one focus event twice; the manual `handle*` methods remain available for a
+  /// future unification. Idempotent. A missing audio session (unit tests,
+  /// desktop) is logged and leaves the manual entry points fully usable.
+  Future<void> start({bool subscribeInterruptions = true}) async {
     if (_started || _disposed) return;
     _started = true;
     WidgetsBinding.instance.addObserver(this);
+    if (!subscribeInterruptions) return;
     try {
       final AudioSession session = await AudioSession.instance;
       _interruptionSub = session.interruptionEventStream.listen(
@@ -304,13 +353,15 @@ class SystemBehaviorService with WidgetsBindingObserver {
   ///
   /// The interruption manager decides whether playback should pause at all;
   /// only then does the policy choose the delivery (fade, USB release, pause).
+  ///
+  /// Both variants are recorded as [InterruptionKind.pause] because this path
+  /// always delivers a pause. Recording a duck and ending a pause used to leave
+  /// the manager stuck in the duck state, so no later gain could ever resume.
   Future<void> handleAudioFocusLoss({required bool permanent}) async {
     if (_disposed) return;
     final bool playing = _playing;
-    final InterruptionDecision decision = permanent
-        ? _interruption.onPauseInterruptionBegin(isPlaying: playing)
-        : _interruption
-            .onDuckBegin(isPlaying: playing, shouldPauseInstead: true);
+    final InterruptionDecision decision =
+        _interruption.onPauseInterruptionBegin(isPlaying: playing);
     if (decision != InterruptionDecision.pause) {
       ErrorLogger.addBreadcrumb(
         'Focus loss ignored: playback was not running',
@@ -327,11 +378,21 @@ class SystemBehaviorService with WidgetsBindingObserver {
 
   /// Handles the end of a focus loss: restores the pre-fade volume and lets
   /// the interruption manager decide whether playback resumes.
+  ///
+  /// Ends whichever kind is actually active. A duck-only event ends as a duck;
+  /// everything else ends as a pause, so the state can never stay half-open.
   Future<void> handleAudioFocusGain() async {
     if (_disposed) return;
     final SystemBehaviorSettingsSnapshot snapshot = _settings.snapshot;
-    final InterruptionDecision decision = _interruption
-        .onPauseInterruptionEnd(resumeAllowed: snapshot.resumeAfterCall);
+    final InterruptionDecision decision =
+        _interruption.activeKind == InterruptionKind.duck
+            ? _interruption.onDuckEnd(
+                shouldPauseInstead: true,
+                resumeAllowed: snapshot.resumeAfterCall,
+              )
+            : _interruption.onPauseInterruptionEnd(
+                resumeAllowed: snapshot.resumeAfterCall,
+              );
     _fade.cancelTimer();
     await _fade.restore();
     if (decision == InterruptionDecision.resume) await _resume();
@@ -383,18 +444,59 @@ class SystemBehaviorService with WidgetsBindingObserver {
   Future<void> handleVolumeKeyDoublePress() =>
       _run(SystemEvent.volumeKeyDoublePress);
 
-  /// Releases the exclusive USB claim when the user asked for that.
-  Future<void> handleAppBackgrounded() async {
-    if (_disposed) return;
-    if (!_settings.snapshot.closeUsbWhenBackgrounded) return;
+  /// Releases the exclusive USB claim when the user asked for that, but only
+  /// while nothing is playing.
+  ///
+  /// The playing guard is the important half: Android reports
+  /// [AppLifecycleState.paused] on screen-off too, and releasing the claim then
+  /// would tear down the live USB stream and cut the music. A paused player can
+  /// hand the DAC back to the system.
+  Future<void> handleAppBackgrounded() => releaseUsbWhenBackgrounded();
+
+  /// Releases the claim if `closeUsbWhenBackgrounded` is on and playback is
+  /// idle. Returns whether a release was attempted.
+  Future<bool> releaseUsbWhenBackgrounded() async {
+    if (_disposed) return false;
+    if (!_settings.snapshot.closeUsbWhenBackgrounded) return false;
+    if (_playing) {
+      ErrorLogger.addBreadcrumb(
+        'USB claim kept while backgrounded: playback is running',
+        category: 'system_behavior',
+      );
+      return false;
+    }
+    if (_usbReleasedForBackground) return false;
+    _usbReleasedForBackground = true;
     await _releaseUsb();
+    return true;
   }
 
-  /// Cancels a running fade and restores the level the user had before it.
+  /// Cancels a running fade, restores the level the user had before it and
+  /// re-claims the USB device if backgrounding released it.
   Future<void> handleAppResumed() async {
     if (_disposed) return;
     _fade.cancelTimer();
     await _fade.restore();
+    await reclaimUsbOnResume();
+  }
+
+  /// Re-claims the USB device after a background release. Returns whether a
+  /// claim was attempted.
+  Future<bool> reclaimUsbOnResume() async {
+    if (_disposed || !_usbReleasedForBackground) return false;
+    _usbReleasedForBackground = false;
+    try {
+      await _usbRelease(true);
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Re-claiming the exclusive USB stream failed',
+        error: e,
+        stackTrace: st,
+        category: 'SystemBehavior',
+      );
+      return false;
+    }
   }
 
   @override
@@ -510,14 +612,7 @@ class SystemBehaviorService with WidgetsBindingObserver {
   }
 
   Future<void> _resume() async {
-    final Future<void> Function()? resume = _resumePlayback;
-    if (resume == null) {
-      ErrorLogger.addBreadcrumb(
-        'Resume requested but no playback handler was wired',
-        category: 'system_behavior',
-      );
-      return;
-    }
+    final Future<void> Function() resume = _resumePlayback ?? _port.play;
     try {
       await resume();
     } catch (e, st) {

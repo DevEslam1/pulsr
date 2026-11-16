@@ -3,27 +3,28 @@
   <img src="assets/app_icon/app_icon.svg" width="128" height="128" alt="Pulsr Music Logo" />
 
   # Pulsr Music
-  ### Premium Offline-First Local Music Player for Android & Beyond
+  ### Premium Offline-First Audiophile Player for Android
 
   <p align="center">
-    <strong>Studio-grade DSP Suite • 10/32/64-Band AutoEQ • Room Correction • Synced LRC Lyrics • 9 Aura Themes • Quran Mode • Group Listening (Pulsr Party) • Offline-First &amp; Private (Pulsr Pure)</strong>
+    <strong>20-Stage Native C++ DSP • 10/32/64-Band EQ • 652 AutoEQ Profiles • DSD512 • 11 Player Themes • Pulsr Party • Quran Mode • Cast &amp; Remote Sources • Zero Telemetry</strong>
   </p>
 
   <p align="center">
-    <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"></a>
-    <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart"></a>
-    <a href="#"><img src="https://img.shields.io/badge/Android-14%20%2F%2015%20Ready-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 14/15"></a>
+    <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.41%2B-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"></a>
+    <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.6%2B-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Android-9%2B%20%2F%20API%2028-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 9+"></a>
     <a href="https://github.com/DevEslam1/pulsr/releases"><img src="https://img.shields.io/github/downloads/DevEslam1/pulsr/total?style=for-the-badge&color=blueviolet&logo=github" alt="GitHub Total Downloads"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License GPLv3"></a>
   </p>
 
   <p align="center">
+    <a href="#-overview">Overview</a> •
     <a href="#-key-features">Features</a> •
-    <a href="#-landing-website">Website</a> •
+    <a href="#-headphone-calibration--autoeq">AutoEQ</a> •
     <a href="#-architecture--tech-stack">Architecture</a> •
-    <a href="#-headphone-calibration--autoeq">AutoEQ Profiles</a> •
-    <a href="#-getting-started--build-guide">Getting Started</a> •
-    <a href="#-permissions--privacy-matrix">Privacy Matrix</a>
+    <a href="#-getting-started--build-guide">Build</a> •
+    <a href="#-privacy--permissions">Privacy</a> •
+    <a href="#-known-limits">Limits</a>
   </p>
 
 </div>
@@ -32,237 +33,264 @@
 
 ## 🌟 Overview
 
-**Pulsr Music** is an audiophile-grade, offline-first music player engineered with Flutter, Dart, BLoC, and Drift SQLite. It strips away cloud bloat, algorithmic subscriptions, and privacy-invasive analytics to deliver an ultra-fast, local music playback experience with dynamic aesthetics and hardware-accelerated DSP.
+**Pulsr Music** is an offline-first audiophile player for Android, built with Flutter, Dart, BLoC and Drift SQLite. A native C++20 engine handles real-time DSP, while a small Go server powers synchronized group listening.
 
-Whether you're listening to 24-bit/192kHz lossless FLAC albums or organizing your local MP3 catalog, Pulsr provides bit-perfect audio decoding, a complete studio DSP chain (10/32-band EQ, spatializer, dynamics, convolution reverb and room correction), interactive karaoke lyrics, and a fluid Aura design system.
+It combines a 20-stage DSP chain, bit-perfect USB-DAC output, 11 Now Playing themes, karaoke with live pitch tracking, an offline 114-surah Quran Mode, DLNA casting and SMB/WebDAV/FTP remote sources. The **Pure** build is provably offline: the INTERNET permission is removed at manifest level. The optional **Plus** build adds YouTube Music behind a compile-time flag.
+
+> This README summarizes the shipped surface. For the source-verified count-by-count inventory, see [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md). Dated audit documents are snapshots, not current promises — see [docs/README.md](docs/README.md).
+
+---
+
+## 📊 At a Glance
+
+| Area | Shipped capability |
+|---|---|
+| **DSP** | 20 native stages, 16 concurrent engines, 64-band parametric EQ, 8-band dynamic EQ, 4-band compressor, true-peak limiter, 9 reverb programs, crossfeed, saturation, bass management, 2–8 channel manager |
+| **Hi-Res** | DSD64–DSD512 decode to 768 kHz PCM, DoP carriers, SACD ISO extraction, USB-DAC exclusive output, AAudio direct, 32-bit float path |
+| **Experience** | 11 Now Playing themes + Theme Studio, 8 visualizer styles + Milkdrop shader, karaoke pitch highway, synced lyrics, ambient mixer |
+| **Library** | Reactive Drift SQLite index, 8 views, tag/artwork editor, 16-field smart playlists, duplicate cleanup, CUE sheets, 3 queue slots, 500-station radio store |
+| **Network** | Optional YouTube Music, resumable chunked downloads, proxy/DoH, DLNA/UPnP casting, SMB/WebDAV/FTP sources |
+| **Social** | Pulsr Party (Go WebSocket server, 2–10 members), Last.fm/ListenBrainz/Libre.fm/webhook scrobbling, Discord Rich Presence |
+| **Privacy** | Pure build removes INTERNET at manifest level; no ads, analytics or accounts |
+| **Locales** | English, Arabic (RTL) and Spanish, 3,082 messages each |
 
 ---
 
 ## 🌐 Landing Website
 
-Pulsr comes with an interactive landing website located in [`website/`](website/):
+The static landing page lives in [`website/`](website/) and opens directly in any modern browser:
 
-- **Live Interactive Player Mockup**: Real-time HTML5 audio visualizer, seekbar, and dynamic Aura theme switcher.
-- **Parametric 10-Band EQ Sandbox**: Interactive frequency response curve renderer with headphone target presets.
-- **Karaoke Lyrics Scroller**: Millisecond-synced lyrics with tap-to-seek preview.
-- **Audio Format Compatibility Matrix**: FLAC, ALAC, WAV, AAC, MP3, OPUS, and OGG.
-- **Direct APK & SHA-256 Download Hub**: Universal release verification.
-- **Complete DSP Suite Showcase**: Every stage of the audio chain, from 10/32-band EQ and room correction to spatializer, dynamics and convolution reverb.
-- **Editions, Library Tools & Sync**: Pulsr Pure vs Pulsr Plus, smart playlists, duplicate cleanup, and scrobbling/automation.
+- Interactive player cockpit with spectrum visualizer, seekbar and Aura palette switching.
+- 10/32/64-band EQ and AutoEQ sandbox with a live frequency-response curve.
+- New sections for **Pulsr Party**, **Quran Mode**, **Karaoke & Visuals**, and **Pro Audio / Chain of Custody**.
+- DSP, themes, editions, library, integrations, comparison, downloads and FAQ.
 
-> To preview the website locally, open [`website/index.html`](website/index.html) in any modern web browser or serve via `npx serve website` / GitHub Pages.
+```bash
+# preview locally
+npx serve website
+```
 
 ---
 
 ## ✨ Key Features
 
-### 🎧 1. Audiophile Audio Engine & DSP
-- **10 / 32 / 64-Band Parametric Equalizer**: Switch between the classic 10-band graphic curve (±12 dB, 31 Hz–16 kHz), a 32-band, or a 64-band parametric engine with a custom frequency editor, A/B flat compare, and four recallable A/B/C/D slots.
-- **AutoEQ Headphone Calibration**: Bundled compensation curves for industry-leading headphones (*Harman Target 2019/2018, Apple AirPods Pro, Sony WH-1000XM4/XM5, Sennheiser HD600, Beyerdynamic*), an online AutoEQ search, and per-song auto-apply by name.
-- **Full Effects Chain**: Bass boost, per-band mute/solo, manual preamp, 3D spatial virtualizer, multiband dynamics, studio compressor, lookahead brickwall limiter, crossfeed, convolution reverb with custom WAV impulse responses, harmonic saturation/exciter, mid/side stereo width, Fletcher–Munson loudness contour, subwoofer crossover, dynamic EQ, multichannel Channel Manager (2–8 channels with per-channel gain trim and delay), native DSD512 decoder (to 768 kHz PCM), high-quality sinc resampler, and TPDF dither.
-- **Room Correction Wizard**: Stepped-sine sweep measurement with mic capture, auto-fitted correction curve, optional stacking with a headphone AutoEQ profile, and linear-phase FIR export.
-- **ReplayGain & Per-Song Overrides**: Track/album ReplayGain with preamp, plus per-song EQ, volume and BPM overrides and per-album DSP memory.
-- **Bit-Perfect Hi-Res Badging & Output**: Detection for sample rates (44.1 kHz–192 kHz, DSD64–DSD512 up to 768 kHz) and bit depths (16/24/32-bit float), bit-perfect mode, **strict no-resample mode**, **follow-track sample-rate switching**, float DSP path, AAudio direct output, USB-DAC negotiation, **DSD over PCM (DoP)** output, cached topology snapshots (`allowCached: true`) preventing Bluetooth/startup timeouts, and Bluetooth codec monitor + in-app LDAC/aptX request (tap a codec chip; falls back to Developer Options where the platform refuses).
-- **DSP Inspector & Conflict Guards**: A live view of every active/degraded stage, with protection against mutually exclusive effects (e.g. ReplayGain vs bit-perfect).
-- **Audiophile Playback Controls**: Gapless playback with encoder-delay trims, crossfade transitions (curves + BPM sync), variable pitch/playback speed, A-B loop, per-track delay, long-form bookmarks, silence skip, SponsorBlock auto-skip, and sleep timer (duration / end of track / after N tracks / end of queue).
+### 🎧 1. Audio Engine & DSP
 
-### 💎 2. Aura Dynamic Design System
-- **Album-Art Color Extraction**: Dynamic UI palettes generated in real time from album artwork using `palette_generator`, with Material You system seeds and custom accent fallback.
-- **9 Now Playing Themes** (`PlayerThemeMode` in `lib/features/settings/cubit/settings_state.dart`, mapped in `lib/features/player/presentation/themes/theme_registry.dart`):
-  1. *Classic*: Deep blur overlays and ambient neon glow.
-  2. *Card Deck*: Tactile card elevation with swipeable queue gestures.
-  3. *Circle / Modern Vinyl*: Rotating vinyl turntable with acoustic concentric rings.
-  4. *Minimalist*: Clean typography and distraction-free audio controls.
-  5. *Retro Vinyl*: Classic turntable variant (`vinyl_player_theme.dart`).
-  6. *CD Player*: Iridescent reflection, optical tray spin, and tactile compact disc jewel-case aesthetics (`cd_player_theme.dart`).
-  7. *Retro Cassette Deck*: Spinning spools and a magnetic tape counter (`cassette_player_theme.dart`).
-  8. *Full-Bleed Waveform*: Audio-reactive glowing waveform backdrop (`waveform_player_theme.dart`).
-  9. *Lyrics Focus / Karaoke Immersion*: Magnified, lyrics-first singing view (`lyrics_player_theme.dart`).
-- **Custom Theme Studio**: `custom_theme_builder_screen.dart` — build, export and share your own radius/glow/accent overrides on top of any of the 9 modes (accent, radius, glow toggles in `SettingsState`).
-- **AMOLED Pure Black & Light Modes**: True `#000000` AMOLED mode plus a high-contrast accessibility theme.
-- **Edge-to-Edge Experience**: Fully transparent status bar and gesture navigation bar on Android 14+.
-- **Theme Scheduler**: Optional automatic light/dark switching by time of day.
+- **20-stage native C++ chain** with a bit-perfect fast path, lock-free render handoff and 16 concurrent engines. A governor degrades stages by real-time factor and thermal level instead of glitching.
+- **10 / 32 / 64-band EQ**: 10-band graphic, 32-band and 64-band parametric modes; eight biquad filter types; ±15 dB bands; per-band solo/mute; 1,024-node arbitrary-response FIR EQ; 12 presets.
+- **652 bundled AutoEQ profiles**: five-band compensation curves matched to the connected headphone by name, with online search, user imports and a computed preamp.
+- **Dynamics**: 8-band dynamic EQ, 4-band multiband compressor with Linkwitz-Riley crossovers, 4× oversampled true-peak lookahead limiter, dynamic bass and ReplayGain.
+- **Tone and space**: four crossfeed modes (BS2B, Chu Moy, Jan Meier, custom), 3-band stereo imager with bass mono, three harmonic-saturation models, loudness contour, sub crossover and a balance/mono panner.
+- **Convolution reverb**: nine programs from Studio 0.35 s to Cathedral 5.0 s, custom impulse responses up to 2,000,000 samples / 10 s, wet/dry, predelay and damping.
+- **Voicing and scripting**: DAC Voicing (Sharp, Slow, Minimum-phase) with harmonic warmth; ViPER-DDC `.vdc` profiles with up to 256 sections; LiveProg EEL/JSFX subset.
+- **DSD and SACD**: DSD64–DSD512 to PCM up to 768 kHz, DoP at 176.4/352.8/705.6 kHz, native DSD modes where advertised, SACD ISO indexing and DSF extraction.
+- **Playback extras**: gapless preload, linear/exponential crossfade, Automix BPM/key analysis (40–240 BPM), A-B loop, per-track delay, bookmarks, silence skip and sleep timer.
+- **Ambient mixer**: nine loops (rain, fire, forest, ocean, wind, thunder, birds, café, white noise), up to four at once with independent volume.
 
-### ⚡ 3. SQLite-Indexed Smart Music Library
-- **Blazing Fast Scanning**: Powered by Drift SQLite, scanning and indexing 10,000+ local tracks in under 2 seconds.
-- **Multi-Dimensional Navigation**: Browse by *Songs, Albums, Artists, Genres, Folders, Playlists, Years, and Favorites*.
-- **Advanced Folder Browser**: Flat or hierarchical folder tree with breadcrumbs, `.nomedia` compliance and custom blacklist folder exclusions.
-- **Intelligent Search**: FTS5 full-text search with Arabic diacritic/Latin accent normalization plus whole-library fuzzy fallback.
-- **Smart Auto-Playlists**: *Most Played, Recently Added, Recently Played, Forgotten Gems, Top Rated, Long Tracks* — plus a rule builder with combined criteria including BPM.
-- **Library Power Tools**: Duplicate finder with keep/delete resolution, missing-artwork online backfill, full-library statistics, an artwork wall, and **CUE sheet playback** (single-file album images expand into virtual tracks).
-- **Three Independent Queue Slots (0–2)**: Persisted via `QueueSlotCodec` (`lib/features/player/cubit/queue_slot_codec.dart`, `maxSlotIndex = 2`) with drag reorder, add-next/add-last, debounced off-isolate JSON persistence, and YTM session position restore.
-- **Internet Radio**: Add HTTP/HTTPS stream URLs (with `.m3u` stream-list import) and play them with a dedicated radio management screen (`lib/features/radio/`, `lib/domain/models/radio_station.dart`).
+### 🔌 2. Output, Bit-Perfect & Custody
 
-### 🎤 4. Millisecond Synced LRC Lyrics
-- **Kinetic Karaoke Autoscroll**: Millisecond-precision scrolling that tracks the active vocal line, with a dedicated full-screen karaoke view.
-- **Interactive Tap-to-Seek**: Tap any lyric line to jump directly to that song timestamp.
-- **Offset Calibration**: On-the-fly latency adjuster (±50ms steps) to fix out-of-sync files.
-- **Universal Fallback**: Automatic detection of external `.lrc` files, embedded ID3 tags, LRCLIB, YouTube Music, and unsynced plain text lyrics.
-- **Lyrics Editor**: Edit and persist synced lyrics to a sidecar `.lrc` file.
+- **Three output modes** in the vendored Media3 sink: `DEFAULT → FLOAT → AAUDIO`, with automatic fallback and re-prepare.
+- **AAudio direct**: 16-bit, float32, 24-bit packed and API 31+ exclusive 32-bit; maximum two channels; 150 ms default target buffer.
+- **USB-DAC exclusive** plus a native UAC2 isochronous sink (S16_LE / S24_3LE / S32_LE). The native UAC2 sink is marked experimental in source.
+- **32-bit float DSP path** with TPDF requantization when a 16-bit sink boundary is required.
+- **Honest bit-perfect policy**:
+  - Lossless sources are eligible: FLAC, ALAC, WAV, AIFF, DSD/DSF/DFF and integer PCM. The policy also recognizes WavPack, APE and TTA, but this build does not bundle their decoders.
+  - Lossy sources and live radio are blocked from a bit-perfect claim.
+  - Ambiguous containers (`.m4a`, `.mp4`, `.ogg`, `.oga`, `.mka`, `.webm`) report `source_codec_unconfirmed` instead of pretending to be verified.
+  - 32-bit float conversion reports `source_32bit_float_conversion_not_lossless`.
+  - Bluetooth is blocked because it re-encodes.
+- **Chain of custody**: 4,096 frames × 2 channels hashed at input and output, with an exportable JSON certificate. `bitExactMeasured` is only reported when the digests match.
+- **Diagnostics**: 19 telemetry slots, xrun counters, thermal/RTF state, safe mode, self-test and a redacted support bundle.
 
-### 🏷️ 5. Embedded ID3 & Cover Art Editor
-- **Direct In-Place Editing**: Modify Title, Artist, Album, Genre, Year, Track Number, and Disc Number directly in the audio files, including batch multi-select editing.
-- **Artwork Injector**: Pick high-res album covers from your gallery or camera and embed them into MP3, FLAC, M4A, OGG, and WAV containers, with optional online metadata matching.
+### 💎 3. Aura Design & 11 Player Themes
 
-### 📱 6. Deep Android OS Integration
-- **Android Home Screen Widgets**: Interactive home screen playback widgets (`home_widget`) with live album art and transport controls.
-- **MediaStyle Notifications**: Full notification shade and lockscreen controls with real-time seekbars.
-- **Hardware & Headset Events**: Auto-pause on headphone disconnection (wired + BT noisy route), media notification metadata, and audio ducking during GPS navigation/calls.
-- **Audio File Intent Handler**: Instantly opens and plays `.mp3`, `.flac`, `.wav`, `.m4a` files opened from file managers or chat apps.
+Themes are real player surfaces, not colour swaps (`ThemeRegistry`):
 
-### 🛡️ 7. Privacy-First & Offline-Capable
-- **Pulsr Pure (prod flavor) — 100% Offline Operation**: No account creation, no `INTERNET` permission, no trackers, and no ad SDKs. All online initializers are skipped at startup.
-- **Standard builds** optionally use network for YouTube Music streaming/downloads, artwork/lyrics metadata, scrobbling, and cloud backup — all gated behind `Offline-only mode` in Settings.
-- **Data Safety**: All library indexes, ratings, and playlists remain strictly on your device unless you opt into cloud sync.
+1. **Classic Standard** — traditional high-density layout with ambient glow.
+2. **Card Glass Overlay** — full-bleed artwork with frosted glass controls.
+3. **Vinyl Circle** — centered circular artwork with a continuous spin.
+4. **Minimalist Waveform** — spacious studio focus on the waveform.
+5. **Vinyl Turntable Studio** — grooved record, center label and tonearm.
+6. **CD Turntable** — iridescent disc with stylus and track index.
+7. **Retro Cassette Deck** — spinning spools and magnetic tape.
+8. **Full-Bleed Waveform** — audio-reactive waveform backdrop.
+9. **Karaoke Lyrics Immersion** — full-screen synchronized lyrics.
+10. **Clean Modern Flow** — borderless artwork, capsule slider and quick actions.
+11. **Milkdrop Visualizer** — GPU shader visuals behind the artwork.
 
-### 📡 8. Pulsr Pure & Pulsr Plus (Optional Online)
-- **Flavors** (`android/app/build.gradle.kts`): `dev` (`.plus`, Pulsr Plus), `prod` (Pulsr Music / Pure), `ytm` (`.ytm`, off-Play distribution). `dev`/`ytm` compile `src/ytmEnabled` (NewPipeExtractor v0.27.1 + Cast SDK); `prod` compiles only `src/ytmDisabled` stubs and is guarded by `validateProdIsolation` + `scripts/check_prod_flavor.py`.
-- **Pulsr Pure**: The Play-Store `prod` build with `ENABLE_YTM=false` ships with the `INTERNET` permission removed at the manifest level (`src/prod/AndroidManifest.xml`), no Firebase/Sentry, no DownloadService, and no YouTube code. Verified at runtime via `AppConfig.verifyPureNoInternet()`.
-- **Pulsr Plus (`ENABLE_YTM=true`, `dev`/`ytm` flavors)**: Optional account sign-in, search, browse, real radio/mixes, streaming and offline downloads, gated behind a build flag so production builds never expose it. Includes modern Rhino JS signature transform (`solveSig`) + `n`-throttling solver (`solveN`) that survive YouTube player rewrites, plus signed-in `WEB` client fallback to stream and download age-restricted (+18) tracks.
-- **Downloads Architecture** (`lib/core/services/yt_download_*`, `lib/features/downloads/`): Resumable chunked background downloading with dedicated Android foreground service (`yt_download_foreground_controller.dart`), thread-safe pause registry, download quality picker sheet, storage stats, and MediaStore export, plus proxy/Wi-Fi-only/adaptive-quality controls.
+**Theme Studio** adds palette, corner radius and ambient glow controls, live preview and JSON export/import. AMOLED pure black, light and high-contrast modes are included, plus a scheduled light/dark switch.
 
-### 🔄 9. Sync, Scrobble & Automate
-- **Scrobbling** (`lib/core/services/scrobbler_service.dart`): Last.fm, Libre.fm, ListenBrainz and custom webhook endpoints with a resilient offline queue, throttle, secure-storage credential migration, and a listening-stats dashboard.
-- **Optional Cloud Backup**: Google sign-in to sync favorites and playlists to Firestore — inactive in Pure builds, opt-in elsewhere. Local JSON export/import via `ExportBackupUseCase`/`ImportBackupUseCase` (`lib/domain/usecases/backup_usecases.dart`, 10 MB cap), plus Android `backup_rules.xml` / `data_extraction_rules.xml`.
-- **Device Profiles**: Auto-apply EQ, effects and output settings per connected device, with Bluetooth/headphone automation triggers (`lib/domain/services/device_profile_service.dart`, `lib/core/services/automation_trigger_service.dart`).
-- **Settings Profiles**: Save and recall complete configuration bundles.
+### 🎤 4. Lyrics, Karaoke & Visualizers
 
-### 📖 10. Quran Mode & Mushaf Experience
-- **Offline Tanzil 1.1 Uthmani Text**: All 114 Surahs compiled into the app for 100% offline recitation without downloading extra assets.
-- **Authentic Mushaf Reader**: Beautiful Arabic Mushaf page presentation (`quran_mushaf_view.dart`), home hero recitation carousel (`quran_radio_hero_carousel.dart`), and reciter style presets (Murattal, Mujawwad).
-- **Acoustic Sanctuary**: Reverb tuned for mosque acoustics, vocal warmth EQ, ayah repeat loops, and persistent ayah bookmarks.
+- LRC parsing with tap-to-seek lines, millisecond offset editor and an in-app lyrics editor.
+- LRCLIB lookup when local lyrics are missing.
+- Online translation and romanization into the app's current language.
+- Shareable lyric cards.
+- **Karaoke mode**: YIN live pitch detection, pitch highway, ±12 semitone shift, per-line practice loop and a 0–100 score with session average.
+- **Eight visualizer styles + Off**: Frequency Bars, Smooth Wave, Radial Pulse, Ambient Particles, 3D Terrain, Album-Art Reactive, Custom JSON and Milkdrop.
+- Milkdrop runs `shaders/milkdrop.frag` on the GPU and falls back to a Canvas painter under GPU Saver; `.milk` and `.json` presets can be imported.
+- Animated canvas artwork from Apple Music, Tidal and community sources where available.
 
-### 📻 11. Internet Radio & Directory
-- **Global Radio Station Directory**: Search and stream thousands of online stations powered by radio-browser.info (`radio_directory_sheet.dart`).
-- **Stream Format & Health Validation**: Pre-flight HTTP ranged stream checks, ICY metadata stream titles, custom URL and `.m3u` playlist imports.
+### 📚 5. Library & Organisation
 
-### 👥 12. Pulsr Party (Listen Together)
-- **Real-Time Group Playback**: Up to 5 synchronized listeners with sub-millisecond NTP drift clock sync (`server/pulsr_party/`).
-- **Flexible Room Controls**: 6-character room codes, host-only or collaborative queue management, zero cloud account lock-in.
+- Reactive Drift SQLite database with eight views: Songs, Downloaded, Albums, Artists, Favorites, Folders, Genres and Years.
+- Folder tree and flat folder browser, hidden-folder exclusions and `.nomedia` compliance.
+- **Tag & artwork editor**: title, artist, album, genre, year, track/disc number, comment and embedded artwork; multi-select batch editing with checkpoint/retry and undo; online metadata matching.
+- **Smart playlists**: 16 fields × 8 operators, match-all/any, limits, live preview and seeded presets.
+- **Duplicate finder**: metadata/duration passes followed by content checksum verification; keep-best, bulk delete and reclaimable-bytes estimate.
+- **Missing artwork backfill** via the iTunes Search API with rate limiting and exponential backoff.
+- **Library statistics**, artwork grid, favorites and recents.
+- **Three persisted queue slots** (Q1/Q2/Q3) with drag reorder, add-next/add-last and save-as-playlist.
+- **CUE sheet playback**: a single-file album image with a sibling `.cue` expands into virtual tracks with correct boundaries.
+- **Internet radio**: 40 curated stations imported on demand, 500-station user cap, live radio-browser search across three mirrors and M3U import.
+- **Remote sources**: WebDAV, FTP and SMB (SMB on Android) with byte-range reads, local cache index, local HTTP stream server and a 100-source cap.
+- **DLNA/UPnP casting**: SSDP discovery, AVTransport play/pause/seek, position polling and a local media HTTP server. Google Cast discovery runs over mDNS.
 
-### 🌍 13. Localization
-- Full English, Spanish and Arabic (RTL) UI with an in-app language switcher.
+### 🕌 6. Quran Mode
+
+- All 114 surahs of **Tanzil Uthmani 1.1** bundled offline (1.5 MB XML plus Dart mirror).
+- Surah index, reading-only mode and a **Mushaf page reader**.
+- Five reciter styles: Murattal, Mujawwad, Tarawih, Memorization and Sleep.
+- **Hifz blind recall** (tap to reveal) and ayah repeat (single or range).
+- Tempo at 0.5×, 0.75× and 1.0× with mosque ambience reverb and vocal warmth.
+- Bookmarks, resume prompts and recitation auto-detection that survives restarts.
+
+### 🎉 7. Pulsr Party
+
+- Go WebSocket server in [`server/pulsr_party/`](server/pulsr_party/) with protocol v1: 13 frame types and 15 control actions (12 host-gated).
+- Six-character room codes, nickname join, host promotion, kick and a 2–10 member room (default 5).
+- Monotonic server clock plus an NTP-style client offset built from a 12-sample window; minimum-RTT sample wins, 120 s TTL and a 10 s ping loop.
+- Host-only or democratic queue; the autoplay supplier survives a host leaving.
+- Host speaker-delay alignment and seek/watch deadbands.
+- Self-hostable; the default endpoint is user-overridable.
+
+### 📱 8. Android Integration & Tools
+
+- **Home-screen widget**: five layouts and nine actions (play/pause, prev/next, favorite, shuffle, repeat, queue, open, main).
+- **Quick Settings** playback tile and a search-suggestions provider.
+- MediaSession, lock-screen controls and a foreground media playback service.
+- File intents: `VIEW`, `SEND`, `SEND_MULTIPLE`, `MUSIC_PLAYER` and `MEDIA_PLAY_FROM_SEARCH`.
+- **Assistant bridge**: four launcher shortcuts and five resolver intents (play playlist, resume album, shuffle favorites, artist radio, search).
+- **Command palette** with 27 commands and 13 keyboard shortcuts on desktop/tablet shells.
+- **Spoken announcements** via Android TTS with delay, volume, ducking, cast and bit-perfect gates.
+- **System behaviour**: audio focus, USB release policy, background USB close, volume-rocker track switch, linear/log volume and fade-out on pause.
+- **USB ergonomics**: per-DAC VID/PID quirk profile, settle silence, force 16-bit, alt-setting reset, HID claim and transfer size.
+- **Diagnostics**: device/output summary, DSP stage list, xrun counters, safe mode, self-test and a redacted `bundle.json` / `bundle.log` export.
+- **Audio profiles**: capture, apply, share and import complete DSP snapshots with ten rolling backups.
+- In-app update check against GitHub Releases.
+
+### 🛡️ 9. Privacy, Editions & Online
+
+- **Pulsr Pure** (`prod` flavor) removes `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_LOCAL_NETWORK` and `FOREGROUND_SERVICE_DATA_SYNC` at manifest level, and excludes Firebase, Sentry, the download service and YouTube code.
+- **Pulsr Plus** (`dev` / `ytm` flavors, `ENABLE_YTM=true`) optionally adds YouTube Music search, browse, streaming and downloads.
+- **YTM stack**: InnerTube `WEB_REMIX` search; Rhino signature and `n`-transform solving with cached rules; PoToken and visitor tokens; `signatureTimestamp`; authenticated `WEB` fallback for age-restricted tracks; geo/egress classification and per-signal circuit breakers.
+- **Downloads**: three concurrent downloads, four-way chunked fetch, Range resume, 403 re-resolution, cancel tokens and a foreground service. Quality tiers: 256 / 128 / 64 kbps.
+- **Network control**: HTTP/SOCKS5 proxy pool, DNS-over-HTTPS, cellular failover, Wi-Fi-only and offline-only modes.
+- **SponsorBlock**: six categories, per-category toggles and a 256-entry LRU cache.
+- **Pure is not a mode** — it is a separate build with no network permission to fall back on.
+
+### 🔄 10. Sync, Integrations & Localization
+
+- **Scrobbling** to Last.fm, ListenBrainz, Libre.fm and a custom webhook, with secure credential storage, offline queue replay and a stats screen.
+- **Discord Rich Presence** through a built-in Gateway v9 client.
+- **Optional cloud backup** to Firestore plus local JSON export/import. Firestore is hard-off in Pure builds.
+- **Device profiles** and four automation triggers: Bluetooth connected, headphones plugged, USB DAC connected and charging.
+- **Hearing safety**: seven-day sound dose based on EN 62368-1 / WHO-ITU H.870, four budgets and a −6 dB native ceiling.
+- **Bluetooth latency calibration**: tap test plus round-trip probe blended with a ten-codec table, clamped to 0–500 ms.
+- **Theme scheduler**, gesture remapping, experience mode and a 3-source dynamic palette.
+- **Localized** in English, Arabic (RTL) and Spanish — 3,082 messages per locale.
 
 ---
 
 ## 🎧 Headphone Calibration & AutoEQ
 
-Pulsr includes built-in parametric target profiles based on the AutoEQ database and Harman research:
+Pulsr ships **652 five-band compensation profiles** in `assets/eq_profiles/headphone_profiles.json`.
 
-| Profile | Category | Target Curve / Focus | Preamp |
-|---|---|---|---|
-| **Harman In-Ear (2019)** | Target Curve | Harman Target In-Ear Benchmark | -3.5 dB |
-| **Harman Over-Ear (2018)**| Target Curve | Harman Acoustic Target (Over-Ear) | -2.5 dB |
-| **Apple AirPods Pro (2nd Gen)** | TWS Earbuds | Neutralized mids + sub-bass extension | -1.5 dB |
-| **Apple AirPods Max** | Over-Ear | High-frequency smoothing | -1.5 dB |
-| **Sony WH-1000XM5** | Over-Ear ANC | Mid-bass de-bloat & vocal clarity | -2.0 dB |
-| **Sony WF-1000XM4** | TWS Earbuds | Upper-treble resonance compensation | -2.0 dB |
-| **Sennheiser HD 600** | Open-Back | Sub-bass extension + neutral midrange | -1.5 dB |
-| **Beyerdynamic DT 770 Pro** | Studio Monitor| Treble spike smoothing at 6-8kHz | -3.0 dB |
-| **Club Bass Boost** | Dynamic DSP | Elevated sub-bass & punchy 60-120Hz | -3.0 dB |
-| **Studio Flat** | Bypass | 0dB Bit-perfect neutral bypass | 0.0 dB |
+How it behaves:
+
+- Matches the connected headphone by normalized device name and applies the profile with a computed preamp.
+- Supports a manual profile search, per-song auto-apply and user-imported profiles.
+- Can be stacked with a separately measured room-correction curve.
+- Is independent of ViPER-DDC `.vdc` device correction, which is a separate processor.
+
+Typical profile families include Harman in-ear/over-ear targets, TWS earbuds, over-ear ANC headphones, open-back reference models, studio monitors and bass/studio presets. Exact model coverage is whatever the bundled JSON contains; the app does not claim a fixed number beyond **652**.
 
 ---
 
 ## 🏗️ Architecture & Tech Stack
 
-Pulsr is architected around **Clean Architecture** and the **BLoC (Cubit)** state management pattern to ensure testability, separation of concerns, and rock-solid reliability.
+Pulsr follows Clean Architecture with a feature-first presentation layer and a native real-time audio core.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      PRESENTATION LAYER                     │
-│  Flutter Widgets • Aura Design Tokens • GoRouter Navigation  │
-│  LibraryCubit • PlayerCubit • PlaylistCubit • SettingsCubit │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ (calls use cases)
-┌──────────────────────────────▼──────────────────────────────┐
-│                         DOMAIN LAYER                        │
-│  Entities • Use Cases (Search, Playlists, Scanners, Audio)  │
-│  Repository Interfaces • Functional Failure Types (fpdart)  │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ (implements interfaces)
-┌──────────────────────────────▼──────────────────────────────┐
-│                          DATA LAYER                         │
-│  Drift SQLite Database • Media Scanner • AudioHandler (DSP) │
-│  JustAudio Player • AudioSession • HomeWidget Service       │
-└─────────────────────────────────────────────────────────────┘
+```text
+Presentation (Flutter)
+  GoRouter · AppShell · Now Playing (11 themes) · Cubits/Freezed
+        │
+Domain
+  Entities · use cases · repository interfaces · SmartAudioPlan · bit-perfect policy
+        │
+Data
+  Drift SQLite · MusicRepository · MediaScanner · PulsrAudioHandler ·
+  DownloadRepository · collaborative audio controllers
+        │
+        ├── Native C++20 DSP engine (android/app/src/main/cpp)
+        │     AAudioSink · UsbAudioSink · 20-stage AudioDspEngine ·
+        │     EQ / dynamics / reverb / DSD / custody
+        │
+        └── Go party server (server/pulsr_party)
+              WebSocket hub · rooms · monotonic clock · protocol v1
 ```
 
-### Tech Stack Summary
-- **UI Framework**: [Flutter 3.x](https://flutter.dev) & [Dart 3.x](https://dart.dev) (requires Flutter `>= 3.41.0`)
-- **State Management**: [`flutter_bloc`](https://pub.dev/packages/flutter_bloc) (Cubit)
-- **Database & Persistence**: [`drift`](https://pub.dev/packages/drift) (Type-safe SQLite) + [`shared_preferences`](https://pub.dev/packages/shared_preferences) + [`flutter_secure_storage`](https://pub.dev/packages/flutter_secure_storage)
-- **Audio Engine**: vendored [`just_audio`](https://pub.dev/packages/just_audio) (`third_party/just_audio` — adds `NativeDspAudioProcessor` to the ExoPlayer sink), [`audio_service`](https://pub.dev/packages/audio_service), [`audio_session`](https://pub.dev/packages/audio_session), [`mutex`](https://pub.dev/packages/mutex) for pipeline serialization
-- **Media Indexing**: [`on_audio_query`](https://pub.dev/packages/on_audio_query) + direct Storage File Scanner
-- **Dynamic Palette**: [`palette_generator`](https://pub.dev/packages/palette_generator)
-- **Animations**: [`flutter_animate`](https://pub.dev/packages/flutter_animate)
-- **Routing**: [`go_router`](https://pub.dev/packages/go_router)
-- **Dependency Injection**: [`get_it`](https://pub.dev/packages/get_it) + [`injectable`](https://pub.dev/packages/injectable)
-- **Code Generation**: [`build_runner`](https://pub.dev/packages/build_runner), [`freezed`](https://pub.dev/packages/freezed), [`drift_dev`](https://pub.dev/packages/drift_dev)
-- **Functional Programming**: [`fpdart`](https://pub.dev/packages/fpdart)
+### Tech stack
+
+| Layer | Technology |
+|---|---|
+| UI | Flutter 3.41+, Dart 3.6+ effective (vendored `just_audio` requires `^3.6.0`), Material 3 |
+| State | `flutter_bloc` Cubits, `freezed` immutable states, `fpdart` results |
+| DI | `get_it` + `injectable` |
+| Persistence | `drift` SQLite, `shared_preferences`, `flutter_secure_storage` |
+| Audio | Vendored `just_audio` fork with `PulsrAudioSink`, `AAudioAudioSink`, `FloatDspAudioSink`, `NativeDspAudioProcessor`; `audio_service`; `audio_session` |
+| DSP | C++20 + CMake/NDK, JNI bridges, per-stage native processors |
+| Party | Go 1.22+, WebSockets, monotonic clock, hub/party/protocol packages |
+| Media scanning | `on_audio_query` plus a direct file scanner |
+| Routing | `go_router` |
+| Codegen | `build_runner`, `freezed`, `drift_dev` |
+| Online | Kotlin InnerTube client, Rhino JS engine, PoToken WebView, NewPipeExtractor fallback |
 
 ---
 
 ## 📁 Project Structure
 
-```
+```text
 pulsr/
+├── android/
+│   └── app/src/main/
+│       ├── cpp/                 # C++20 DSP engine (20 stages, AAudio, USB, DSD, EQ, reverb)
+│       └── kotlin/              # MethodChannel plugins (USB, visualizer, widgets, TTS, SMB)
 ├── assets/
-│   ├── app_icon/             # High-res SVG and PNG app icons
-│   ├── eq_profiles/          # headphone_profiles.json (AutoEQ calibrations)
-│   └── fonts/                # Manrope variable typography
+│   ├── app_icon/
+│   ├── eq_profiles/             # 652 bundled AutoEQ profiles
+│   ├── quran/                   # Tanzil Uthmani 1.1 text
+│   └── sounds/                  # ambient loops
 ├── docs/
-│   └── adr/                  # Architecture Decision Records (001–015, 16 records incl. two 007)
-├── DESIGN.md                       # Design system single source of truth
-├── RUNBOOK.md                      # YTM streaming-latency runbook + verification gates
+│   ├── adr/                     # 16 Architecture Decision Records
+│   ├── gaps/                    # gap-closure handoffs and status
+│   ├── qa/                      # device validation checklist
+│   ├── FEATURE_MATRIX.md        # current source-verified capability list
+│   └── README.md                # documentation index
 ├── lib/
-│   ├── core/
-│   │   ├── bloc/             # Shared BlocObserver / base cubits
-│   │   ├── config/           # AppConfig (ENV, FLAVOR, ENABLE_YTM, Sentry gates)
-│   │   ├── constants/        # Colors, radii, spacing, typography, icons, timing
-│   │   ├── di/               # GetIt + injectable setup
-│   │   ├── errors/           # AppError sealed taxonomy + resolvers
-│   │   ├── motion/           # PulsrMotion tokens (context.motionMs)
-│   │   ├── network/          # HTTP overrides, proxy, connectivity monitor
-│   │   ├── performance/      # GPU budget, frame guards
-│   │   ├── responsive/       # Breakpoints + adaptive helpers
-│   │   ├── router/           # GoRouter route definitions
-│   │   ├── services/         # YTM, scrobbler, auth, lyrics, artwork cache, intents
-│   │   ├── telemetry/        # PlaybackLatencyTracker, Sentry wrappers
-│   │   ├── theme/            # AuraTheme + PulsrPalette + DynamicThemeCubit
-│   │   ├── utils/            # Adaptive, LRC/CUE parsers, formatters
-│   │   └── widgets/          # 37 shared widgets (sheets, dialogs, sliders, tiles)
-│   ├── data/
-│   │   ├── audio/            # PulsrAudioHandler, DSP, queue, YTM resolvers
-│   │   ├── db/               # Drift SQLite schema, tables, DAOs, health check
-│   │   ├── lyrics/           # Lyrics offset store
-│   │   ├── repositories/     # MusicRepository, prefs, downloads, smart playlists
-│   │   ├── scanner/          # MediaStore & direct file scanner
-│   │   └── visualizer/       # Milkdrop / visualizer preset stores
-│   ├── domain/
-│   │   ├── boundaries.dart   # Bounded-context interfaces
-│   │   ├── interfaces/       # Widget pusher, scrobble sink, proxy, lyrics, artwork
-│   │   ├── models/           # Song/Album/Artist/Playlist, EQ, lyrics, radio, downloads, Quran
-│   │   ├── repositories/     # Abstract repository interfaces
-│   │   ├── services/         # AutoEQ, room correction, hires, cast/USB, smart plan
-│   │   └── usecases/         # 19 use cases (search, playlists, backup, folders, downloads)
-│   ├── features/
-│   │   ├── home/ · library/ · search/ · playlists/ · playlist_detail/
-│   │   ├── album_detail/ · artist_detail/ · genre_detail/ · year_detail/ · folder_detail/
-│   │   ├── player/           # PlayerCubit facade + controllers/ + managers/ + 9 themes + widgets
-│   │   ├── queue/ · sheets/ · shell/ · smart_playlist_builder/
-│   │   ├── settings/         # SettingsCubit/State + category screens + widgets
-│   │   ├── tag_editor/       # In-place ID3 tag & cover art editor
-│   │   ├── downloads/ · radio/ · quran_mode/ · onboarding/ · splash/
-│   │   ├── auth/ · ytm_search/ · ytm_browse/ · widgets/
-│   ├── l10n/                 # ARB localizations (EN, ES, AR) + generated Dart
-│   └── main.dart             # App entrypoint & initialization
-├── test/                     # 704 *_test.dart files (unit, Cubit, fuzz, perf, a11y, security)
-├── website/                  # Landing website (index.html, styles.css, app.js, assets/)
-│   └── assets/               # Branding vectors
-├── android/                  # dev (.plus) / prod (Pure) / ytm (.ytm) flavors + native DSP (C++)
-├── third_party/just_audio/   # Vendored just_audio fork (NativeDspAudioProcessor sink)
-└── pubspec.yaml              # Package dependencies & assets config
+│   ├── core/                    # DI, router, theme, services, network, widgets
+│   ├── data/                    # Drift DB, audio pipeline, scanner, repositories
+│   ├── domain/                  # entities, interfaces, use cases, bit-perfect policy
+│   ├── features/                # 37 feature modules (player, library, party, quran, tools...)
+│   ├── l10n/                    # EN / ES / AR ARB files and generated code
+│   └── main.dart
+├── scripts/                     # native DSP tests, audio smoke tests, flavor checks
+├── server/pulsr_party/          # Go WebSocket party server
+├── shaders/milkdrop.frag        # GPU visualizer shader
+├── test/                        # 833 Dart test files
+├── third_party/just_audio/      # vendored sink fork with native PCM hook
+├── website/                     # landing page
+└── pubspec.yaml
 ```
 
 ---
@@ -271,119 +299,168 @@ pulsr/
 
 | Document | Purpose |
 |---|---|
-| [`docs/adr/`](docs/adr/) | Architecture Decision Records (001–015, 16 records): player decomposition, AppError taxonomy, concurrency, artwork cache, DSP chain, queue slots, dependency injection, UI sound design, router, responsive layout, network/proxy, telemetry, settings state, playlists, domain layering, database encryption |
-| [`DESIGN.md`](DESIGN.md) | Design system single source of truth (tokens, motion, components, a11y) |
-| [`RUNBOOK.md`](RUNBOOK.md) | YTM tap-to-sound latency runbook + verification gates |
+| [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) | Source-verified capabilities, counts and explicit limitations |
+| [`docs/README.md`](docs/README.md) | Index of living references, dated audits and gap handoffs |
+| [`docs/adr/`](docs/adr/) | 16 Architecture Decision Records (001–015, two 007s) |
+| [`docs/player_architecture.md`](docs/player_architecture.md) | Volume authority, interruption manager and player hardening |
+| [`docs/NATIVE_AUDIO_MATRIX.md`](docs/NATIVE_AUDIO_MATRIX.md) | Native host test matrix (DSD512, channel manager, DoP) |
+| [`docs/gaps/README.md`](docs/gaps/README.md) | Gap-closure status versus USB Audio Player PRO |
+| [`docs/qa/dsp-device-validation.md`](docs/qa/dsp-device-validation.md) | Manual device validation checklist |
+| [`DESIGN.md`](DESIGN.md) | Design system source of truth |
+| [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md) | Palette, typography, player chrome and theme inventory |
+| [`RUNBOOK.md`](RUNBOOK.md) | YTM latency runbook and verification gates |
+| [`CLAUDE.md`](CLAUDE.md) | Codebase and architecture guide for AI agents |
+
+Date-stamped documents under `docs/` are audit snapshots. They are intentionally not rewritten; see the labels in [`docs/README.md`](docs/README.md).
 
 ---
 
-## 🏆 Architecture & Quality Audit (10/10 Across All Categories)
+## 🏆 Quality Gates
 
-Pulsr underwent an exhaustive 11-dimension architectural audit and hardening sprint, reaching a verifiable **10/10** rating across every category with 0 errors, 0 warnings, and 0 infos (`flutter analyze --fatal-infos --fatal-warnings`):
+Pulsr keeps a strict static-analysis and test baseline. Run the gates from the repository root:
 
-| Dimension | Score | Key Hardening Highlights | Verification Suite |
-|---|:---:|---|---|
-| **Architecture** | **10/10** | `PlayerCubit` facade + 22 files under `player/cubit/controllers/` and 4 under `player/cubit/managers/` (transport, queue + `QueueSlotCodec` slots 0–2, DSP/effects/profiles, metadata, playback-options/lyrics/Quran, widget bridge); formal bounded context interfaces in `lib/domain/boundaries.dart` + `lib/domain/interfaces/`. | `test/architecture/player_controller_decomposition_test.dart` |
-| **Bug Density** | **10/10** | 10,000-iteration fuzzer over LRC, CUE, M3U, AutoEQ parsers; randomized property-based invariant testing. | `test/fuzz/parser_fuzz_test.dart`, `test/property/state_property_test.dart` |
-| **State Management** | **10/10** | Elimination of redundant rebuilds; formal state machines for `TagEditorCubit` and `YtmSearchState.phase`; single-source-of-truth emissions. | `test/perf/rebuild_audit_test.dart` |
-| **Error Handling** | **10/10** | Exhaustive sealed class taxonomy `AppError` (`Network/Storage/Audio/Ytm/Permission/Generic` + `resolveAppError`) replacing string errors; centralized mapper with compile-time pattern matching. | `test/errors/app_error_taxonomy_test.dart` |
-| **Performance** | **10/10** | Bounded cache ceilings; sub-millisecond queue slice generation on 10,000-item queues; 60fps frame budget preservation. | `test/perf/frame_budget_test.dart` |
-| **Memory Safety** | **10/10** | Dual-tier LRU + `WeakReference` artwork cache preventing OOM; explicit disposal audits across controllers and stream subscriptions. | `test/lifecycle/disposal_audit_test.dart` |
-| **Concurrency** | **10/10** | Monotonic generation counters (`_mediaItemResolutionGen`, `_localMatchSwapGen`) and mutex locks eliminating race conditions during rapid skipping. | `test/concurrency/concurrency_hardening_test.dart` |
-| **Code Hygiene** | **10/10** | Zero raw `print()` calls; strict empty catch ratchet; `prefer_final_locals` enforced; all controllers strictly < 400 lines. | `test/architecture/code_hygiene_test.dart` |
-| **Security** | **10/10** | Encrypted `FlutterSecureStorage` with plaintext wipe; IPv6-mapped IPv4 SSRF defense; ReDoS regex guards; JSON recursion depth caps; Web login sandbox hardening. | `test/security/security_hardening_test.dart` |
-| **Accessibility** | **10/10** | WCAG 2.1 AA luminance contrast ($\ge 4.5:1$); minimum 48x48 touch targets; decorative visualizers excluded from semantics; full 2.0x Dynamic Type scaling. | `test/a11y/accessibility_compliance_test.dart` |
-| **CI / DX / ADR** | **10/10** | Automated GitHub Actions CI pipeline with fatal linting; 16 Architecture Decision Records (ADRs, 001–015 incl. two 007) under `docs/adr/`. | `.github/workflows/ci.yml`, `docs/adr/` |
+```bash
+flutter analyze
+flutter test
+dart format --set-exit-if-changed lib test
+```
+
+Additional suites:
+
+| Gate | Command | Notes |
+|---|---|---|
+| Native DSP host suite | `./scripts/run_native_dsp_tests.sh` | DSD512, channel manager, DoP, limiter, stress; see `docs/NATIVE_AUDIO_MATRIX.md` for the current 13/14 result and its known dither-tolerance failure |
+| Audio bridge smoke | `scripts/run_audio_bridge_smoke.ps1` | Windows host harnesses for JNI and sink transitions |
+| Playback smoke | `scripts/run_audio_playback_smoke.ps1` | Cold-start local playback, progress, pause and resume |
+| Party server | `cd server/pulsr_party && go test ./...` | Go unit tests |
+| Production isolation | `python scripts/check_prod_flavor.py` | Verifies the Pure build excludes online code |
+
+The repository contains **833 Dart test files** across unit, cubit, fuzz, property, performance, accessibility, concurrency and security suites. Test counts are intentionally not hardcoded in CI output here because they change as features land.
 
 ---
 
 ## 🚀 Getting Started & Build Guide
 
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (`>= 3.41.0` / Dart `>= 3.0.0 < 4.0.0`, per `pubspec.yaml`)
-- [Android Studio](https://developer.android.com/studio) with Android SDK & NDK
-- Java Development Kit (JDK 17)
 
-### 1. Clone & Install Dependencies
+- Flutter `>= 3.41.0`.
+- Dart `>= 3.6.0 < 4.0.0` effective floor. The root `pubspec.yaml` declares `>=3.0.0`, but `third_party/just_audio` requires `^3.6.0`.
+- Android Studio with Android SDK and NDK.
+- JDK 17.
+- Go 1.22+ only if you want to run the party server.
+
+### 1. Clone and install
+
 ```bash
 git clone https://github.com/DevEslam1/pulsr.git
 cd pulsr
 flutter pub get
 ```
 
-### 2. Run Code Generation
-Generate Drift SQLite database code, Freezed models, and Injectable DI bindings:
+### 2. Generate code
+
 ```bash
 dart run build_runner build --delete-conflicting-outputs
 ```
 
-### 3. Run in Debug Mode
-Connect an Android device or emulator with USB debugging enabled:
+### 3. Run
+
+Connect an Android device or emulator with USB debugging:
+
 ```bash
 flutter run
 ```
 
-### 4. Run Automated Tests
-Execute unit tests, Cubit state tests, and repository mocks (704 `*_test.dart` files: unit, Cubit, fuzz, property, perf, a11y, security, concurrency):
-```bash
-flutter test
-```
-Static analysis should be clean:
+### 4. Test
+
 ```bash
 flutter analyze
+flutter test
 ```
 
-### 5. Build Release Artifacts
+Native host tests (bash / Git Bash):
 
-> **Production builds must pass `--dart-define=ENV=prod`** so the Dart layer runs in production mode (correct app title, reduced Sentry trace sampling). Sentry only initializes when a DSN is supplied via `--dart-define=SENTRY_DSN=<your-dsn>`; omit it to build without crash reporting. The Gradle `--flavor prod` alone does **not** set the Dart environment.
-
-#### Build Universal APK
 ```bash
-flutter build apk --flavor prod --release --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
-```
-*Output: `build/app/outputs/flutter-apk/app-prod-release.apk`*
-
-#### Build Split Per-ABI APKs (Smaller file size)
-```bash
-flutter build apk --flavor prod --release --split-per-abi --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
+./scripts/run_native_dsp_tests.sh
 ```
 
-#### Build Google Play App Bundle (AAB)
+### 5. Build release artifacts
+
+> Production builds should pass `--dart-define=ENV=prod`. Sentry initializes only when `SENTRY_DSN` is supplied; omit it for a build without crash reporting. The Gradle `prod` flavor does not set the Dart environment by itself.
+
 ```bash
-flutter build appbundle --flavor prod --release --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
+# Universal APK
+flutter build apk --flavor prod --release --dart-define=ENV=prod
+
+# Split per ABI
+flutter build apk --flavor prod --release --split-per-abi --dart-define=ENV=prod
+
+# Play Store bundle
+flutter build appbundle --flavor prod --release --dart-define=ENV=prod
 ```
-*Output: `build/app/outputs/bundle/prodRelease/app-prod-release.aab`*
+
+For the optional online build, use the `dev` or `ytm` flavor and `--dart-define=ENABLE_YTM=true`.
+
+### 6. Run the party server locally
+
+```bash
+cd server/pulsr_party
+go run main.go
+```
 
 ---
 
-## 🔒 Privacy & Permissions Matrix
+## 🔒 Privacy & Permissions
 
-Pulsr adheres strictly to Google Play Store data safety and permission guidelines:
-
-| Permission | Android Level | Category | Usage Justification |
+| Permission | Android level | Category | Usage |
 |---|---|---|---|
-| `READ_MEDIA_AUDIO` | API 33+ (Android 13+) | Storage | Discover and index user audio files locally. |
-| `READ_EXTERNAL_STORAGE` | API &le; 32 (Legacy) | Storage | Read audio files on older Android devices. |
-| `WRITE_EXTERNAL_STORAGE` | API &le; 29 (Legacy) | Storage | Save edited tags / exported artwork on pre-scoped-storage devices. |
-| `FOREGROUND_SERVICE` | API 28+ | Background | Continuous audio playback while the screen is locked. |
-| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | API 34+ (Android 14+) | Background | Mandated by Android 14 for media player services. |
-| `POST_NOTIFICATIONS` | API 33+ | Notifications| Display MediaStyle playback controls and scrub bars. |
-| `RECORD_AUDIO` | All | Optional | Live audio visualizer DSP analysis *(Denied fallback: synthetic waveforms)*. |
-| `MODIFY_AUDIO_SETTINGS` | All | Playback | Configure the equalizer and audio output session. |
-| `WRITE_SETTINGS` | All | Optional | Set a track as the system ringtone *(user-initiated only, runtime-gated)*. |
-| `WAKE_LOCK` | All | Playback | Prevents CPU sleep while streaming local audio. |
-| `INTERNET` | All (removed in Pure/prod) | Network | YTM streaming, artwork/lyrics metadata, scrobbling, cloud sync. Not present in Pulsr Pure. |
-| `FOREGROUND_SERVICE_DATA_SYNC` | API 34+ | Background | Keeps YTM downloads alive (removed in Pure/prod). |
-| `BLUETOOTH_CONNECT` / `BLUETOOTH` | API 31+ / ≤30 | Playback | A2DP device names and codec info for Hi-Res output. |
+| `READ_MEDIA_AUDIO` | API 33+ | Storage | Discover and index local audio |
+| `READ_EXTERNAL_STORAGE` | API ≤ 32 | Storage | Read audio on older devices |
+| `WRITE_EXTERNAL_STORAGE` | API ≤ 29 | Storage | Save edited tags or exported artwork |
+| `FOREGROUND_SERVICE` | API 28+ | Playback | Continue audio while the screen is locked |
+| `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | API 34+ | Playback | Media playback service type |
+| `FOREGROUND_SERVICE_DATA_SYNC` | API 34+ | Downloads | Keep YTM downloads alive; removed in Pure |
+| `POST_NOTIFICATIONS` | API 33+ | Notifications | MediaStyle controls and progress |
+| `RECORD_AUDIO` | All | Optional | Room-correction sweep capture and visualizer taps; optional |
+| `MODIFY_AUDIO_SETTINGS` | All | Playback | Equalizer and audio session configuration |
+| `WRITE_SETTINGS` | All | Optional | Set a track as the system ringtone; user-initiated |
+| `WAKE_LOCK` | All | Playback | Prevent CPU sleep during playback |
+| `ACCESS_NETWORK_STATE` | All | Network | Connectivity state; removed in Pure |
+| `ACCESS_WIFI_STATE` | All | Network | Wi-Fi-only download policy; removed in Pure |
+| `ACCESS_LOCAL_NETWORK` | All | Network | DLNA discovery, SMB/WebDAV/FTP, local stream servers; removed in Pure |
+| `INTERNET` | All | Network | Optional YTM, metadata, scrobbling and cloud sync; removed in Pure |
+| `BLUETOOTH_CONNECT` / `BLUETOOTH` | API 31+ / ≤ 30 | Playback | Device names and codec information |
+| `com.pulsr.music.permission.WIDGET_CONTROL` | App-defined | Widget | Allow widget buttons to control playback |
+
+USB host support is declared as an optional feature (`android.hardware.usb.host`), not a required permission.
 
 ---
 
-## 🌍 Localization (i18n)
+## ⚠️ Known Limits
 
-Pulsr natively supports multiple languages with full RTL layout support:
-- 🇺🇸 **English** (`en`)
-- 🇪🇸 **Spanish** (`es`)
-- 🇸🇦 **Arabic** (`ar` - Right-to-Left)
+These are deliberate, source-verified limits — not roadmap promises:
+
+- **Bit-perfect is USB-DAC only.** Bluetooth is blocked because it re-encodes; lossy sources are blocked from a bit-perfect claim; ambiguous containers report `unverified`.
+- **AAudio is stereo-only.** More than two channels, non-default speed/pitch or silence skip suspend AAudio back to AudioTrack.
+- **Android system EQ/LoudnessEnhancer do not affect AAudio.** They are bound to the AudioTrack session.
+- **Sinc playback resampling is not user-enableable.** `hasSincResampler = false`; enabling returns `DSP_UNSUPPORTED`. Rate conversion happens in the tap-side SRC and the platform.
+- **The spatial panner is balance/mono**, not a binaural or HRTF renderer.
+- **The native UAC2 sink is experimental** and marked as not validated against every DAC in source.
+- **APE, WMA, TTA, TAK, WavPack, MPC, MOD, IT, XM and S3M are recognized but not decodable** in this build. SACD ISO is supported through extraction to DSF.
+- **MQA is core unfold only**; no authenticated render is claimed.
+- **No blind A/B/X UI ships.** `DspAbxHelper` exists as an unreferenced domain helper.
+- **Desktop and iOS are not shipped.** Their directories contain stock Flutter runners; all native integrations are Android.
+- **Pulsr Party needs a server.** The default endpoint is overridable and the Go server is self-hostable; room size is 2–10, default 5.
+
+---
+
+## 🌍 Localization
+
+- 🇺🇸 English (`en`) — template locale.
+- 🇸🇦 Arabic (`ar`) — full RTL layout.
+- 🇪🇸 Spanish (`es`).
+
+Each locale carries 3,082 messages, with an in-app language switcher.
 
 ---
 
@@ -391,7 +468,7 @@ Pulsr natively supports multiple languages with full RTL layout support:
 
 This project is free software licensed under the **[GNU General Public License v3.0](LICENSE)**.
 
-```
+```text
 Copyright (C) 2026 Pulsr Music Contributors.
 
 This program is free software: you can redistribute it and/or modify
@@ -408,7 +485,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ```
 
-> **Why GPLv3?** The YouTube Music integration is powered by [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor), which is licensed under GPLv3. Linking it obliges the combined work to be released under the same license, so Pulsr as a whole is GPLv3.
+> **Why GPLv3?** The optional YouTube Music integration links NewPipeExtractor, which is GPLv3. The combined work is therefore GPLv3, and the extraction bridge is excluded from the Pure build.
 
 ---
 

@@ -14,6 +14,7 @@ class _FakeTtsEngine implements TtsEngine {
 
   final bool available;
   final List<String> spoken = <String>[];
+  final List<bool> duckRequests = <bool>[];
   int stopCount = 0;
 
   @override
@@ -23,8 +24,13 @@ class _FakeTtsEngine implements TtsEngine {
   Future<bool> init() async => available;
 
   @override
-  Future<void> speak(String text, {double volume = 1.0}) async {
+  Future<void> speak(
+    String text, {
+    double volume = 1.0,
+    bool duckAudio = false,
+  }) async {
     spoken.add(text);
+    duckRequests.add(duckAudio);
   }
 
   @override
@@ -265,5 +271,74 @@ void main() {
     await _wait();
 
     expect(harness.engine.spoken, isEmpty);
+  });
+
+  test('stops live speech when the media item changes', () async {
+    final harness = await _Harness.create(delayMs: 120);
+    harness.states.add(_playing());
+    harness.items.add(_track('a'));
+    await _wait(200);
+    expect(harness.engine.spoken, ['Track A, Artist A']);
+    expect(harness.announcer.isSpeechLive, isTrue);
+
+    harness.items.add(_track('b'));
+    await _wait(20);
+
+    expect(harness.engine.stopCount, greaterThanOrEqualTo(1));
+    expect(harness.announcer.isSpeechLive, isFalse);
+
+    await _wait(200);
+    expect(harness.engine.spoken, ['Track A, Artist A', 'Track B, Artist B']);
+  });
+
+  test('does not reschedule timers for a track that composes no text',
+      () async {
+    final harness = await _Harness.create();
+    harness.settings.setElements(const <AnnouncementElement>[]);
+    harness.states.add(_playing());
+    harness.items.add(_track('a'));
+    await _wait();
+
+    expect(harness.engine.spoken, isEmpty);
+    expect(harness.announcer.announcedMediaId, 'a');
+    expect(harness.announcer.hasPendingAnnouncement, isFalse);
+
+    harness.states.add(_playing());
+    harness.states.add(_playing());
+    await _wait(20);
+
+    expect(harness.announcer.hasPendingAnnouncement, isFalse);
+    expect(harness.engine.spoken, isEmpty);
+  });
+
+  test('dispose cancels subscriptions and stops speech', () async {
+    final harness = await _Harness.create();
+    harness.states.add(_playing());
+    harness.items.add(_track('a'));
+    await _wait();
+    expect(harness.engine.spoken, hasLength(1));
+
+    await harness.announcer.dispose();
+    expect(harness.announcer.isStarted, isFalse);
+    expect(harness.announcer.isSpeechLive, isFalse);
+    expect(harness.engine.stopCount, greaterThanOrEqualTo(1));
+
+    harness.items.add(_track('b'));
+    harness.states.add(_playing());
+    await _wait();
+    expect(harness.engine.spoken, hasLength(1));
+  });
+
+  test('forwards the duck setting to the engine', () async {
+    final harness = await _Harness.create();
+    harness.states.add(_playing());
+    harness.items.add(_track('a'));
+    await _wait();
+    expect(harness.engine.duckRequests, [true]);
+
+    harness.settings.setDuckAudio(false);
+    harness.items.add(_track('b'));
+    await _wait();
+    expect(harness.engine.duckRequests, [true, false]);
   });
 }

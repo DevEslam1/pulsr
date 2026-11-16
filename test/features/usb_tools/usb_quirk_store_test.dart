@@ -32,9 +32,6 @@ void main() {
     vid: 0x1d6b,
     pid: 0x0104,
     label: 'Melo DAC',
-    silenceMs: 250,
-    bufferMs: 40,
-    transferSizeBytes: 8192,
     hidEnabled: true,
   );
 
@@ -98,7 +95,7 @@ void main() {
         vid: 0,
         pid: 0,
         label: 'Slow DACs',
-        silenceMs: 500,
+        hidEnabled: true,
       );
 
       expect(await store.setGlobalDefaults(globals), isTrue);
@@ -120,7 +117,7 @@ void main() {
     test('clearing the defaults removes them', () async {
       final store = await _newStore();
       await store.setGlobalDefaults(
-        UsbQuirkProfile(vid: 0, pid: 0, label: 'Fallback', bufferMs: 20),
+        UsbQuirkProfile(vid: 0, pid: 0, label: 'Fallback', hidEnabled: false),
       );
       expect(store.globalDefaults, isNotNull);
 

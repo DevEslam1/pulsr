@@ -99,6 +99,7 @@ class ErgonomicsState {
     this.deviceLabel,
     this.deviceVid,
     this.devicePid,
+    this.deviceId,
     this.quirk,
     this.busSpeedMbps,
     this.hid = HidStatus.none,
@@ -119,6 +120,12 @@ class ErgonomicsState {
 
   /// USB product id of the attached device, when known.
   final int? devicePid;
+
+  /// Android `UsbDevice.deviceId` of the attached device, when known.
+  ///
+  /// Used to probe the exact physical device instead of the first sysfs entry
+  /// with the same vendor/product ids.
+  final int? deviceId;
 
   /// Profile resolved for the attached device (per-device entry, else global
   /// defaults, else null for "no profile stored").
@@ -145,6 +152,7 @@ class ErgonomicsState {
     String? deviceLabel,
     int? deviceVid,
     int? devicePid,
+    Object? deviceId = _unset,
     Object? quirk = _unset,
     Object? busSpeedMbps = _unset,
     HidStatus? hid,
@@ -155,6 +163,9 @@ class ErgonomicsState {
       deviceLabel: deviceLabel ?? this.deviceLabel,
       deviceVid: deviceVid ?? this.deviceVid,
       devicePid: devicePid ?? this.devicePid,
+      deviceId: identical(deviceId, _unset)
+          ? this.deviceId
+          : deviceId as int?,
       quirk: identical(quirk, _unset) ? this.quirk : quirk as UsbQuirkProfile?,
       busSpeedMbps: identical(busSpeedMbps, _unset)
           ? this.busSpeedMbps
@@ -174,6 +185,7 @@ class ErgonomicsState {
           other.deviceLabel == deviceLabel &&
           other.deviceVid == deviceVid &&
           other.devicePid == devicePid &&
+          other.deviceId == deviceId &&
           other.quirk == quirk &&
           other.busSpeedMbps == busSpeedMbps &&
           other.hid == hid &&
@@ -185,6 +197,7 @@ class ErgonomicsState {
         deviceLabel,
         deviceVid,
         devicePid,
+        deviceId,
         quirk,
         busSpeedMbps,
         hid,
@@ -336,6 +349,7 @@ class UsbErgonomicsService extends ChangeNotifier {
     final result = await _invoke(probeMethod, <String, Object?>{
       'vid': vid,
       'pid': pid,
+      'deviceId': _state.deviceId,
     });
     final mbps = _readDouble(result, 'mbps');
     if (mbps == null) {
@@ -406,6 +420,7 @@ class UsbErgonomicsService extends ChangeNotifier {
         deviceLabel: label,
         deviceVid: vid,
         devicePid: pid,
+        deviceId: null,
         quirk: quirk,
         busSpeedMbps: null,
         hid: HidStatus.none,
@@ -418,6 +433,7 @@ class UsbErgonomicsService extends ChangeNotifier {
       deviceLabel: label,
       deviceVid: vid,
       devicePid: pid,
+      deviceId: status.deviceId,
       quirk: quirk,
     ));
     await _applyActive(force: false);
@@ -446,12 +462,7 @@ class UsbErgonomicsService extends ChangeNotifier {
     final result = await _invoke(applyMethod, <String, Object?>{
       'vid': vid ?? profile.vid,
       'pid': pid ?? profile.pid,
-      'silenceMs': profile.silenceMs,
-      'force16Bit': profile.force16Bit,
-      'altResetOnStop': profile.altResetOnStop,
       'hidEnabled': profile.hidEnabled,
-      'transferSizeBytes': profile.transferSizeBytes,
-      'bufferMs': profile.bufferMs,
     });
     if (result is Map) {
       final error = result['error'];
@@ -473,11 +484,7 @@ class UsbErgonomicsService extends ChangeNotifier {
     final q = quirk;
     return <String>[
       '${vid ?? -1}:${pid ?? -1}',
-      if (q == null)
-        'none'
-      else
-        '${q.silenceMs}/${q.bufferMs}/${q.transferSizeBytes}/'
-            '${q.force16Bit}/${q.altResetOnStop}/${q.hidEnabled}',
+      if (q == null) 'none' else 'hid:${q.hidEnabled}',
     ].join('|');
   }
 

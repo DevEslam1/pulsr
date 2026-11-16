@@ -48,6 +48,11 @@ abstract final class ExtrasStrings {
   static const String supportSubtitle =
       'Move a tuned setup between devices, or export a diagnostics bundle.';
 
+  static const String assistantTitle = 'Assistant & search';
+  static const String assistantSubtitle =
+      'Opt in to local playback suggestions in system search; nothing leaves '
+      'the device.';
+
   static const String profilesTitle = 'Audio profiles';
   static const String profilesSubtitle =
       'Capture the DSP chain, EQ, crossfeed and output mode as one file.';

@@ -15,8 +15,10 @@ import 'sacd_toc.dart';
 /// Returns true when [path] looks like a SACD ISO image.
 ///
 /// The check is structural, not extension based alone: the image must expose a
-/// `SACD` directory containing at least one `.TOC` file. Unreadable, missing or
-/// malformed images return false; the cause is logged, never thrown.
+/// `SACD` directory containing at least one `.TOC` file. This is a probe used
+/// on untrusted files, so it never throws: unreadable, missing, malformed or
+/// hostile images (RangeError from a mutated header included) return false and
+/// the cause is logged.
 Future<bool> isSacdIso(String path) async {
   if (!AudioFormats.isSacdIsoPath(path)) return false;
   final file = File(path);
@@ -33,21 +35,27 @@ Future<bool> isSacdIso(String path) async {
       }
     }
     return false;
-  } on IsoFormatException catch (error) {
+  } catch (error, stack) {
+    // Catch Object, not just IsoFormatException/FileSystemException: the probe
+    // must also survive a platform file error or a programming bug in a parser
+    // without failing a library scan.
     ErrorLogger.log(
       'Rejected image without a usable ISO9660/SACD structure',
       error: error,
-      category: 'SacdIso',
-    );
-    return false;
-  } on FileSystemException catch (error) {
-    ErrorLogger.log(
-      'Could not read image while probing for SACD',
-      error: error,
+      stackTrace: stack,
       category: 'SacdIso',
     );
     return false;
   } finally {
-    await reader?.close();
+    try {
+      await reader?.close();
+    } catch (error, stack) {
+      ErrorLogger.log(
+        'Could not close a probed SACD image',
+        error: error,
+        stackTrace: stack,
+        category: 'SacdIso',
+      );
+    }
   }
 }

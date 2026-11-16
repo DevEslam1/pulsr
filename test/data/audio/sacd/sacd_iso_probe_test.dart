@@ -1,6 +1,7 @@
 // test/data/audio/sacd/sacd_iso_probe_test.dart
 
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -75,5 +76,34 @@ void main() {
     final path = '${temp.path}${Platform.pathSeparator}missing.iso';
     expect(await isSacdIso(path), isFalse);
     expect(await isSacdIso(''), isFalse);
+  });
+
+  test('never throws on truncated or mutated images', () async {
+    final fixture = SacdIsoFixture();
+    final random = Random(777);
+    for (var round = 0; round < 40; round++) {
+      final cut =
+          round.isEven ? random.nextInt(fixture.bytes.length + 1) : fixture.bytes.length;
+      final mutated = Uint8List.fromList(
+        Uint8List.sublistView(fixture.bytes, 0, cut),
+      );
+      final mutations = 1 + random.nextInt(6);
+      if (mutated.isNotEmpty) {
+        for (var i = 0; i < mutations; i++) {
+          mutated[random.nextInt(mutated.length)] = random.nextInt(256);
+        }
+      }
+      final file = await writeImage('fuzz$round.iso', mutated);
+      expect(await isSacdIso(file.path), isA<bool>(),
+          reason: 'round $round must return a bool, never throw');
+    }
+
+    // Purely random garbage under the .iso extension.
+    for (var round = 0; round < 10; round++) {
+      final garbage =
+          Uint8List.fromList(List<int>.generate(4096, (_) => random.nextInt(256)));
+      final file = await writeImage('garbage$round.iso', garbage);
+      expect(await isSacdIso(file.path), isFalse);
+    }
   });
 }

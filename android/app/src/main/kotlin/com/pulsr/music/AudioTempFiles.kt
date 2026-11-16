@@ -38,6 +38,7 @@ object AudioTempFiles {
         "audio/x-dsf" to ".dsf",
         "audio/x-dff" to ".dff",
         "audio/3gpp" to ".3gp",
+        "application/x-iso9660-image" to ".iso",
     )
 
     /**
@@ -54,6 +55,7 @@ object AudioTempFiles {
         ".wv",
         ".aif",
         ".mp4",
+        ".iso",
     )
 
     fun extensionFor(context: Context, uri: Uri): String {

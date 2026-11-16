@@ -77,6 +77,7 @@ class FtpFsProvider implements RemoteFsProvider {
             parentPath: path,
           );
         } on RemoteProtocolError catch (e, st) {
+          if (!_session.isConnected) rethrow;
           // Plenty of embedded servers reject `LIST <path>` but answer NLST.
           ErrorLogger.log(
             'FTP LIST with a path was rejected; retrying with NLST',
@@ -101,9 +102,7 @@ class FtpFsProvider implements RemoteFsProvider {
         final control = _session.requireControl();
         final absolute = _resolve(path);
         final relative = _relative(path);
-        final name = relative.isEmpty
-            ? absolute.split('/').where((s) => s.isNotEmpty).last
-            : relative.split('/').last;
+        final name = _entryName(relative, absolute);
         int? size;
         DateTime? modified;
         final sizeReply = await control.command('SIZE $absolute');
@@ -194,6 +193,21 @@ class FtpFsProvider implements RemoteFsProvider {
         if (bytes.isNotEmpty) yield bytes;
         if (remaining == 0) break;
       }
+      // Close the data socket before awaiting the completion reply: a server
+      // that writes `226` only after the data connection disappears would
+      // otherwise deadlock against us. `completeTransfer` accepts 426 (the
+      // normal answer to an early close) as a healthy completion.
+      try {
+        await data.close();
+      } on IOException catch (e, st) {
+        ErrorLogger.log(
+          'FTP data socket did not close cleanly at the end of a read',
+          error: e,
+          stackTrace: st,
+          category: 'RemoteSources',
+        );
+      }
+      data = null;
       completed = await _session.completeTransfer();
     } on AppError {
       rethrow;
@@ -334,6 +348,34 @@ class FtpFsProvider implements RemoteFsProvider {
     while (value.endsWith('/')) {
       value = value.substring(0, value.length - 1);
     }
+    for (final segment in value.split('/')) {
+      if (_isTraversalSegment(segment)) {
+        throw RemoteProtocolError(
+          code: 'FTP_PATH_TRAVERSAL',
+          userMessage: 'That path is not allowed.',
+        );
+      }
+    }
     return value;
+  }
+
+  /// Display name for a `stat` call; `''` is the configured root itself.
+  String _entryName(String relative, String absolute) {
+    if (relative.isNotEmpty) return relative.split('/').last;
+    final segments =
+        absolute.split('/').where((segment) => segment.isNotEmpty).toList();
+    return segments.isEmpty ? '/' : segments.last;
+  }
+
+  static bool _isTraversalSegment(String segment) {
+    if (segment.isEmpty) return false;
+    if (segment == '..') return true;
+    try {
+      return Uri.decodeComponent(segment) == '..';
+    } on ArgumentError {
+      return true;
+    } on FormatException {
+      return true;
+    }
   }
 }

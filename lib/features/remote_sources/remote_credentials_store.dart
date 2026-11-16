@@ -125,6 +125,36 @@ class RemoteCredentialsStore {
     }
   }
 
+  /// Writes [incoming] for [sourceId], keeping the stored password when the
+  /// caller left it blank, and never deleting an existing secret.
+  ///
+  /// This is the save path used by the editor. "Blank password" means "keep
+  /// the saved one" there, and replacing a source by id (an added endpoint that
+  /// normalizes to an existing id) must not silently wipe the secret that
+  /// belongs to it. Deletion is explicit: [delete], used when the source itself
+  /// is removed.
+  Future<RemoteCredentials> mergeAndSave(
+    String sourceId,
+    RemoteCredentials incoming,
+  ) async {
+    final existing = await read(sourceId);
+    final password = incoming.password.isNotEmpty
+        ? incoming.password
+        : (existing?.password ?? '');
+    final merged = RemoteCredentials(
+      username: incoming.username,
+      password: password,
+    );
+    if (merged.isEmpty) return merged;
+    if (merged.password.isEmpty && existing == null) {
+      // Anonymous access: nothing secret to write, and writing an empty blob
+      // over a slot that could not be read would destroy it.
+      return merged;
+    }
+    await save(sourceId, merged);
+    return merged;
+  }
+
   /// Reads the credentials for [sourceId], or `null` when none are stored.
   Future<RemoteCredentials?> read(String sourceId) async {
     try {

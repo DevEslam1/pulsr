@@ -71,4 +71,7 @@
 
     <!-- Quick Settings Tile -->
     <string name="tile_playback_label">Pulsr Music</string>
+
+    <!-- Must match ${applicationId}.suggestions (overridden per flavor). -->
+    <string name="search_suggestions_authority" translatable="false">com.pulsr.music.suggestions</string>
 </resources>

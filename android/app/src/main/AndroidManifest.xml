@@ -58,6 +58,10 @@
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
+        <!-- Makes MainActivity the app's searchable activity for system search. -->
+        <meta-data
+            android:name="android.app.default_searchable"
+            android:value=".MainActivity" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -88,6 +92,10 @@
             </intent-filter>
             <intent-filter>
                 <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <intent-filter>
@@ -156,6 +164,20 @@
                 <data android:pathPattern=".*\\..*\\.dff" />
                 <data android:pathPattern=".*\\..*\\..*\\.dff" />
             </intent-filter>
+            <!-- SACD ISO images: the mime type is inconsistent across file
+                 managers, so match by path with a permissive type. -->
+            <intent-filter android:label="${appName}">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.iso" />
+                <data android:pathPattern=".*\\..*\\.iso" />
+                <data android:pathPattern=".*\\..*\\..*\\.iso" />
+            </intent-filter>
             <!-- Intent filter to receive shared text/audio/URLs via Android share sheet -->
             <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.SEND" />
@@ -221,10 +243,14 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Readable only by the privileged system search UI; the app itself
+             (same UID) and the system launcher can query it. Suggestions are
+             pushed only after the user opts in. -->
         <provider
             android:name=".SearchSuggestionsProvider"
-            android:authorities="com.pulsr.music.suggestions"
+            android:authorities="${applicationId}.suggestions"
             android:exported="true"
+            android:readPermission="android.permission.GLOBAL_SEARCH"
             android:grantUriPermissions="false" />
 
         <meta-data
@@ -245,6 +271,10 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Android 11+ package visibility: TextToSpeech must see engine services. -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
         <intent>
             <action android:name="com.android.music.metachanged" />

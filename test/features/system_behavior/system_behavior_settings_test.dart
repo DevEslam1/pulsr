@@ -5,6 +5,7 @@
 // and no notifications after dispose.
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/features/system_behavior/system_behavior_settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,7 +26,11 @@ void main() {
     expect(settings.snapshot, SystemBehaviorSettingsSnapshot.defaults);
     expect(settings.usbReleaseOnFocusLoss, UsbReleaseOnFocusLoss.never);
     expect(settings.closeUsbWhenBackgrounded, isFalse);
-    expect(settings.pauseOnNotificationSound, isTrue);
+    expect(
+      settings.pauseOnNotificationSound,
+      isFalse,
+      reason: 'the app default ducking mode is duck',
+    );
     expect(settings.stopWhenTaskRemoved, isFalse);
     expect(settings.volumeRockerTrackSwitch, isFalse);
     expect(settings.fadeOutOnPauseMs, 0);
@@ -34,17 +39,79 @@ void main() {
     expect(settings.resumeAfterCall, isTrue);
   });
 
+  test('the notification policy reads the app duckingMode pref', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      PrefsKeys.duckingMode: 'pause',
+    });
+
+    final SystemBehaviorSettings settings = SystemBehaviorSettings();
+    await settings.load();
+
+    expect(settings.pauseOnNotificationSound, isTrue);
+    expect(settings.snapshot.pauseOnNotificationSound, isTrue);
+  });
+
+  test('a stored audio duckingMode change is reflected without reload',
+      () async {
+    final SystemBehaviorSettings settings = SystemBehaviorSettings();
+    await settings.load();
+    expect(settings.pauseOnNotificationSound, isFalse);
+
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.duckingMode, 'pause');
+
+    expect(
+      settings.pauseOnNotificationSound,
+      isTrue,
+      reason: 'the screen must not keep a stale copy of the audio setting',
+    );
+    expect(settings.snapshot.pauseOnNotificationSound, isTrue);
+  });
+
+  test('a legacy sysbeh policy key cannot override duckingMode', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'sysbeh_pause_on_notification_sound': true,
+      PrefsKeys.duckingMode: 'duck',
+    });
+
+    final SystemBehaviorSettings settings = SystemBehaviorSettings();
+    await settings.load();
+
+    expect(settings.pauseOnNotificationSound, isFalse);
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool('sysbeh_pause_on_notification_sound'), isTrue,
+        reason: 'the old key is ignored, never read or migrated');
+    expect(prefs.getString(PrefsKeys.duckingMode), 'duck');
+  });
+
+  test('setPauseOnNotificationSound writes duckingMode, not a new pref',
+      () async {
+    final SystemBehaviorSettings settings = SystemBehaviorSettings();
+    await settings.load();
+
+    await settings.setPauseOnNotificationSound(true);
+
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString(PrefsKeys.duckingMode), 'pause');
+    expect(prefs.containsKey('sysbeh_pause_on_notification_sound'), isFalse);
+    expect(settings.pauseOnNotificationSound, isTrue);
+
+    await settings.setPauseOnNotificationSound(false);
+    expect(prefs.getString(PrefsKeys.duckingMode), 'duck');
+    expect(settings.pauseOnNotificationSound, isFalse);
+  });
+
   test('every value round-trips through prefs', () async {
     SharedPreferences.setMockInitialValues(<String, Object>{
       SystemBehaviorPrefsKeys.usbReleaseOnFocusLoss: 'transient',
       SystemBehaviorPrefsKeys.closeUsbWhenBackgrounded: true,
-      SystemBehaviorPrefsKeys.pauseOnNotificationSound: false,
+      PrefsKeys.duckingMode: 'pause',
       SystemBehaviorPrefsKeys.stopWhenTaskRemoved: true,
       SystemBehaviorPrefsKeys.volumeRockerTrackSwitch: true,
       SystemBehaviorPrefsKeys.fadeOutOnPauseMs: 750,
       SystemBehaviorPrefsKeys.softwareVolumeCurve: 'logarithmic',
       SystemBehaviorPrefsKeys.volumeStepPercent: 8,
-      SystemBehaviorPrefsKeys.resumeAfterCall: false,
+      PrefsKeys.resumeAfterInterruption: false,
     });
 
     final SystemBehaviorSettings settings = SystemBehaviorSettings();
@@ -53,7 +120,7 @@ void main() {
     expect(settings.snapshot.usbReleaseOnFocusLoss,
         UsbReleaseOnFocusLoss.transient);
     expect(settings.snapshot.closeUsbWhenBackgrounded, isTrue);
-    expect(settings.snapshot.pauseOnNotificationSound, isFalse);
+    expect(settings.snapshot.pauseOnNotificationSound, isTrue);
     expect(settings.snapshot.stopWhenTaskRemoved, isTrue);
     expect(settings.snapshot.volumeRockerTrackSwitch, isTrue);
     expect(settings.snapshot.fadeOutOnPauseMs, 750);
@@ -68,7 +135,7 @@ void main() {
 
     await first.setUsbReleaseOnFocusLoss(UsbReleaseOnFocusLoss.permanent);
     await first.setCloseUsbWhenBackgrounded(true);
-    await first.setPauseOnNotificationSound(false);
+    await first.setPauseOnNotificationSound(true);
     await first.setStopWhenTaskRemoved(true);
     await first.setVolumeRockerTrackSwitch(true);
     await first.setFadeOutOnPauseMs(320);
@@ -81,8 +148,7 @@ void main() {
         'permanent');
     expect(prefs.getBool(SystemBehaviorPrefsKeys.closeUsbWhenBackgrounded),
         isTrue);
-    expect(prefs.getBool(SystemBehaviorPrefsKeys.pauseOnNotificationSound),
-        isFalse);
+    expect(prefs.getString(PrefsKeys.duckingMode), 'pause');
     expect(prefs.getBool(SystemBehaviorPrefsKeys.stopWhenTaskRemoved), isTrue);
     expect(prefs.getBool(SystemBehaviorPrefsKeys.volumeRockerTrackSwitch),
         isTrue);
@@ -90,7 +156,7 @@ void main() {
     expect(prefs.getString(SystemBehaviorPrefsKeys.softwareVolumeCurve),
         'logarithmic');
     expect(prefs.getInt(SystemBehaviorPrefsKeys.volumeStepPercent), 7);
-    expect(prefs.getBool(SystemBehaviorPrefsKeys.resumeAfterCall), isFalse);
+    expect(prefs.getBool(PrefsKeys.resumeAfterInterruption), isFalse);
 
     final SystemBehaviorSettings restarted = SystemBehaviorSettings();
     await restarted.load();
@@ -111,7 +177,7 @@ void main() {
     expect(settings.softwareVolumeCurve, SoftwareVolumeCurve.linear);
     // The rest of the file still loads.
     expect(settings.fadeOutOnPauseMs, 500);
-    expect(settings.pauseOnNotificationSound, isTrue);
+    expect(settings.pauseOnNotificationSound, isFalse);
   });
 
   test('unknown enum names never throw on parse', () {

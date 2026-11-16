@@ -76,6 +76,8 @@ All focus losses, noisy unplug events, system sound dings, and call interruption
 7. `PlayerThemeMode.cassette` — `CassettePlayerTheme` (animated magnetic tape spools and tape counter)
 8. `PlayerThemeMode.waveform` — `WaveformPlayerTheme`
 9. `PlayerThemeMode.lyricsFocus` — `LyricsPlayerTheme`
+10. `PlayerThemeMode.clean` — `CleanPlayerTheme`
+11. `PlayerThemeMode.milkdrop` — `MilkdropPlayerTheme` (GPU shader surface with Canvas fallback)
 
 Each theme composes `PlayerThemeScaffold` and `PlayerThemeChrome` with dedicated canvas painters under `themes/painters/`.
 
@@ -102,7 +104,7 @@ Queue persistence across application restarts is managed via `QueueSlotCodec` (`
 ## 8. Quran Mode Architecture (`QuranModeService`)
 
 - Offline Tanzil 1.1 Uthmani Quran catalog (`assets/quran/`) provides all 114 Surahs offline without network assets.
-- `QuranModeService` coordinates persistent reciter profiles, style presets (Murattal, Mujawwad), mosque ambience convolution reverb, vocal warmth EQ, and ayah-precision bookmarks.
+- `QuranModeService` coordinates persistent reciter profiles, five style presets (Murattal, Mujawwad, Tarawih, Memorization, Sleep), mosque ambience convolution reverb, vocal warmth EQ, tempo steps and ayah-precision bookmarks.
 - Supported in UI by `QuranMushafView` (`lib/features/player/presentation/widgets/quran_mushaf_view.dart`) and `QuranRadioHeroCarousel` (`lib/features/home/presentation/widgets/quran_radio_hero_carousel.dart`).
 
 ---

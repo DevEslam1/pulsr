@@ -65,6 +65,8 @@ import 'dsd_header_probe.dart';
 import 'dsd_transport_resolver.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../features/player/cubit/queue_slot_codec.dart';
+import '../../features/diagnostics/safe_mode_controller.dart';
+import '../../features/settings/cubit/settings_cubit.dart';
 import 'collaborators/float_output_controller.dart';
 import 'collaborators/tap_src_controller.dart';
 import 'dac_voicing_service.dart';
@@ -704,6 +706,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const String outputModeNoticePrefix = '__pulsr_output_mode__:';
   static const String failureCascadeHaltPrefix = '__pulsr_cascade_halt__:';
   String? _lastOutputModeNotice;
+  SafeModeController? _safeModeController;
+  bool _safeModeApplyInFlight = false;
   int? _currentAudioSessionId;
   final StreamController<int?> _audioSessionIdSubject =
       StreamController<int?>.broadcast();
@@ -1064,6 +1068,68 @@ class PulsrAudioHandler extends BaseAudioHandler
       return await service.getAudioOutputInfo();
     } catch (_) {
       return null;
+    }
+  }
+
+  /// Publishes the app-scoped [SafeModeController] once preferences exist.
+  ///
+  /// The diagnostics screen can also build a private controller; the default
+  /// reloader below is static, so both refresh SettingsCubit after a fallback
+  /// or reset.
+  void _installSafeModeController() {
+    final prefs = _cachedPrefs;
+    if (prefs == null) return;
+    SafeModeController controller;
+    if (getIt.isRegistered<SafeModeController>()) {
+      controller = getIt<SafeModeController>();
+    } else {
+      controller = SafeModeController(prefs: prefs);
+      getIt.registerSingleton<SafeModeController>(controller);
+    }
+    _safeModeController = controller;
+    SafeModeController.defaultReloader = () async {
+      if (!getIt.isRegistered<SettingsCubit>()) return;
+      await getIt<SettingsCubit>().reloadSettings();
+    };
+  }
+
+  /// Records one output failure for the active device and applies the fallback
+  /// once the threshold is reached.
+  ///
+  /// Fire-and-forget from the player streams: a missing controller (tests,
+  /// desktop) is a no-op and failures never escape into the audio path.
+  Future<void> _recordSafeModeFailure(String reason) async {
+    if (_disposed) return;
+    final controller = _safeModeController ??
+        (getIt.isRegistered<SafeModeController>()
+            ? getIt<SafeModeController>()
+            : null);
+    if (controller == null) return;
+    try {
+      final info = await _currentOutputInfo();
+      final deviceKey = info == null
+          ? 'default'
+          : '${info.isUsbDac ? 'usb' : info.isBluetooth ? 'bluetooth' : info.activeDeviceType}_${info.deviceName}';
+      await controller.recordFailure(deviceKey, reason);
+      if (!controller.shouldFallback(deviceKey) ||
+          controller.isFallbackActive(deviceKey) ||
+          _safeModeApplyInFlight) {
+        return;
+      }
+      _safeModeApplyInFlight = true;
+      final description = await controller.applyFallback(deviceKey);
+      if (!_errorSubject.isClosed) {
+        _errorSubject.add('$outputModeNoticePrefix$description');
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Safe-mode output failure handling failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioHandler',
+      );
+    } finally {
+      _safeModeApplyInFlight = false;
     }
   }
 
@@ -2054,6 +2120,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> _init() async {
     AudioMemoryManager.adaptBudgetToSystemRam();
     await _initPrefs();
+    _installSafeModeController();
     // Restore the 24/32-bit float DSP path before any other player call so the
     // native sink is built with the persisted preference. Defaults ON so hi-res
     // sources are never truncated to 16-bit; 16-bit content is unaffected.
@@ -2336,6 +2403,13 @@ class PulsrAudioHandler extends BaseAudioHandler
                     'output; using 16-bit output.'
                 : "Direct (AAudio) output isn't available on this output; "
                     'using the standard audio output.';
+            // Safe mode (P1-10): a rejected direct output is a real sink
+            // failure, so feed the consecutive-failure counter on every event
+            // (not only on the first notice) or the threshold could never be
+            // reached. No-op without a controller.
+            unawaited(
+              _recordSafeModeFailure('output-mode:${effect.reason}'),
+            );
             if (message == _lastOutputModeNotice) return;
             _lastOutputModeNotice = message;
             ErrorLogger.log(
@@ -2381,6 +2455,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           onError: (e, st) {
             ErrorLogger.log('Player playbackEventStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
+            unawaited(_recordSafeModeFailure('playback-event:$e'));
           },
         ),
       );

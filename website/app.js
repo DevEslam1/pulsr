@@ -30,10 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const heroBtnText = document.getElementById('heroDetectedText');
 
         if (isAndroid) {
-            if (detectorEl) detectorEl.textContent = '✓ Android Device Detected • Direct ARM64 (v8a) APK • 100% Offline';
+            if (detectorEl) detectorEl.textContent = '✓ Android Device Detected • Direct ARM64 (v8a) APK • Android 9+';
             if (heroBtnText) heroBtnText.textContent = 'Download Android APK (ARM64)';
         } else {
-            if (detectorEl) detectorEl.textContent = '✓ Android (5.0+) Live Build • Direct ARM64 (v8a) APK';
+            if (detectorEl) detectorEl.textContent = '✓ Android 9+ Live Build • Direct ARM64 (v8a) APK';
             if (heroBtnText) heroBtnText.textContent = 'Download Android APK (ARM64)';
         }
     };
@@ -130,13 +130,13 @@ document.addEventListener('DOMContentLoaded', () => {
         {
             title: "Resonance (Hyperdrive Mix)",
             artist: "Aura Soundworks • Cybernetic Echoes",
-            bitrate: "FLAC 24-Bit / 192kHz",
+            bitrate: "FLAC 32-Bit / 768kHz",
             duration: 236 // 3:56
         },
         {
             title: "Midnight Tokyo Drift",
             artist: "Kavinsky Wave • Synth Outrun",
-            bitrate: "FLAC 24-Bit / 96kHz",
+            bitrate: "DSD256 / 11.2MHz",
             duration: 218 // 3:38
         },
         {
@@ -551,7 +551,97 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 10. --- CLIPBOARD COPY HANDLERS ---
+    // 10. --- PULSR PARTY, QURAN MODE & VISUALIZER DEMOS ---
+    const partyRoomCode = document.getElementById('partyRoomCode');
+    const partyCopyCode = document.getElementById('partyCopyCode');
+    if (partyRoomCode && partyCopyCode) {
+        partyCopyCode.addEventListener('click', () => {
+            const code = partyRoomCode.textContent.trim();
+            const done = () => showToast(`Room code ${code} copied`);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(done).catch(done);
+            } else {
+                done();
+            }
+        });
+    }
+
+    document.querySelectorAll('.party-toggle').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+            document.querySelectorAll('.party-toggle').forEach(other => other.classList.remove('active'));
+            toggle.classList.add('active');
+            const note = document.getElementById('partyModeNote');
+            if (note) {
+                note.textContent = toggle.dataset.partyMode === 'democratic'
+                    ? 'Any member can add to the queue; transport control stays with the host.'
+                    : 'Only the host can change the track, seek or skip.';
+            }
+            showToast(toggle.dataset.partyMode === 'democratic' ? 'Democratic queue enabled' : 'Host-only queue enabled');
+        });
+    });
+
+    const partyDrift = document.getElementById('partyDrift');
+    if (partyDrift) {
+        setInterval(() => {
+            const drift = (0.2 + Math.random() * 0.8).toFixed(1);
+            partyDrift.textContent = `${drift} ms offset`;
+        }, 2400);
+    }
+
+    const quranConsole = document.getElementById('quranConsole');
+    const quranHifzToggle = document.getElementById('quranHifzToggle');
+    if (quranConsole && quranHifzToggle) {
+        let hifzEnabled = false;
+        quranHifzToggle.addEventListener('click', () => {
+            hifzEnabled = !hifzEnabled;
+            quranConsole.classList.toggle('hifz', hifzEnabled);
+            quranHifzToggle.textContent = hifzEnabled ? 'Disable Hifz' : 'Enable Hifz';
+            quranConsole.querySelectorAll('.quran-ayah.revealed').forEach(ayah => ayah.classList.remove('revealed'));
+            showToast(hifzEnabled ? 'Hifz mode: tap an ayah to reveal' : 'Hifz mode off');
+        });
+
+        quranConsole.querySelectorAll('.quran-ayah').forEach(ayah => {
+            ayah.addEventListener('click', () => {
+                if (hifzEnabled) ayah.classList.toggle('revealed');
+            });
+        });
+    }
+
+    document.querySelectorAll('.quran-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.quran-chip').forEach(other => other.classList.remove('active'));
+            chip.classList.add('active');
+            showToast(`Reciter style: ${chip.textContent.trim()}`);
+        });
+    });
+
+    document.querySelectorAll('.quran-segment button').forEach(button => {
+        button.addEventListener('click', () => {
+            document.querySelectorAll('.quran-segment button').forEach(other => other.classList.remove('active'));
+            button.classList.add('active');
+            showToast(`Ayah repeat: ${button.textContent.trim()}`);
+        });
+    });
+
+    document.querySelectorAll('.viz-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            document.querySelectorAll('.viz-chip').forEach(other => other.classList.remove('active'));
+            chip.classList.add('active');
+            const status = document.getElementById('vizStatus');
+            if (status) status.textContent = `Style: ${chip.textContent.trim()}`;
+            showToast(`Visualizer: ${chip.textContent.trim()}`);
+        });
+    });
+
+    const karaokeScore = document.getElementById('karaokeScore');
+    if (karaokeScore) {
+        setInterval(() => {
+            if (document.hidden) return;
+            karaokeScore.textContent = String(88 + Math.floor(Math.random() * 10));
+        }, 5200);
+    }
+
+    // 11. --- CLIPBOARD COPY HANDLERS ---
     document.querySelectorAll('.copy-checksum-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const hash = btn.dataset.copy;
@@ -563,7 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 11. --- SHARE MODAL ---
+    // 12. --- SHARE MODAL ---
     const shareModalBackdrop = document.getElementById('shareModalBackdrop');
     const openShareModal = document.getElementById('openShareModal');
     const mobileShareBtn = document.getElementById('mobileShareBtn');
@@ -576,7 +666,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (navigator.share) {
             navigator.share({
                 title: 'Pulsr Music — Premium Offline Audiophile Player',
-                text: 'Check out Pulsr Music — bit-perfect offline player with 10-band AutoEQ, synced lyrics, and zero telemetry!',
+                text: 'Check out Pulsr Music — 20-stage DSP, DSD512, 11 player themes, Pulsr Party, Quran Mode, and zero telemetry!',
                 url: window.location.href
             }).catch(() => {
                 showShareModal();
@@ -630,7 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 12. --- FAQ ACCORDION ---
+    // 13. --- FAQ ACCORDION ---
     document.querySelectorAll('.faq-item').forEach(item => {
         const questionBtn = item.querySelector('.faq-question');
         const answer = item.querySelector('.faq-answer');
@@ -650,7 +740,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 13. --- GITHUB STATS & DYNAMIC RELEASES ARCHIVE ---
+    // 14. --- GITHUB STATS & DYNAMIC RELEASES ARCHIVE ---
     async function fetchGitHubStats() {
         try {
             const res = await fetch('https://api.github.com/repos/DevEslam1/pulsr');
@@ -765,7 +855,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     fetchGitHubStats();
 
-    // 14. --- SCROLL BEHAVIOR & REVEALS ---
+    // 15. --- SCROLL BEHAVIOR & REVEALS ---
     const navHeader = document.getElementById('navHeader');
     const backToTop = document.getElementById('backToTop');
     const revealEls = document.querySelectorAll('.reveal');

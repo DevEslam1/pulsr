@@ -21,8 +21,11 @@ import org.json.JSONObject
  * `SearchManager.SUGGEST_COLUMN_*` columns. Queries run on a binder thread and
  * never touch the music database.
  *
- * Wiring: declare the provider with [AUTHORITY] in AndroidManifest and point
- * `res/xml/searchable.xml` at the same authority.
+ * Wiring: declare the provider with `${applicationId}.suggestions` in
+ * AndroidManifest and point `res/xml/searchable.xml` at the same authority for
+ * each flavor. [authority] derives the runtime value from the installed
+ * package, so a flavor with an `applicationIdSuffix` never looks at another
+ * flavor's cache.
  */
 class SearchSuggestionsProvider : ContentProvider() {
 
@@ -38,10 +41,10 @@ class SearchSuggestionsProvider : ContentProvider() {
         val providerContext = context
         if (providerContext == null) {
             Log.w(TAG, "Suggestion query without a provider context")
-            return null
+            return emptyCursor(projection)
         }
         return try {
-            buildCursor(providerContext, uri, projection)
+            buildCursor(providerContext, uri, projection, selection, selectionArgs)
         } catch (e: Exception) {
             Log.w(TAG, "Suggestion query failed: ${e.message}")
             emptyCursor(projection)
@@ -50,38 +53,34 @@ class SearchSuggestionsProvider : ContentProvider() {
 
     override fun getType(uri: Uri): String? = CONTENT_TYPE
 
-    override fun insert(uri: Uri, values: ContentValues?): Uri? {
-        throw UnsupportedOperationException("Suggestions are written through pushSuggestions")
-    }
+    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
 
     override fun delete(
         uri: Uri,
         selection: String?,
         selectionArgs: Array<out String>?
-    ): Int {
-        throw UnsupportedOperationException("Suggestions are read-only")
-    }
+    ): Int = 0
 
     override fun update(
         uri: Uri,
         values: ContentValues?,
         selection: String?,
         selectionArgs: Array<out String>?
-    ): Int {
-        throw UnsupportedOperationException("Suggestions are read-only")
-    }
+    ): Int = 0
 
     /** Builds the suggestion cursor for one `search_suggest_query` request. */
     private fun buildCursor(
         context: Context,
         uri: Uri,
-        projection: Array<out String>?
+        projection: Array<out String>?,
+        selection: String?,
+        selectionArgs: Array<out String>?
     ): Cursor {
         val columns = columnsFor(projection)
         val cursor = MatrixCursor(columns)
         val rows = readRows(context)
         if (rows.isEmpty()) return cursor
-        val term = queryTerm(uri)
+        val term = queryTerm(uri, selection, selectionArgs)
         val limit = limitOf(uri)
         var accepted = 0
         for (row in rows) {
@@ -100,18 +99,38 @@ class SearchSuggestionsProvider : ContentProvider() {
         MatrixCursor(columnsFor(projection))
 
     /**
-     * Suggestion queries arrive as `.../search_suggest_query/<term>`; the term
-     * can also be supplied as an `?query=` parameter by some launchers.
+     * Resolves the search term.
+     *
+     * The search framework passes `selection = " ?"` plus the typed text in
+     * `selectionArgs`; launchers sometimes append the term to the URI instead.
+     * Honour the args first, then the path/query forms.
      */
-    private fun queryTerm(uri: Uri): String {
+    private fun queryTerm(
+        uri: Uri,
+        selection: String?,
+        selectionArgs: Array<out String>?
+    ): String {
+        val fromArgs = selectionArgs
+            ?.asSequence()
+            ?.firstOrNull { it.isNotBlank() }
+        if (fromArgs != null) return normalizeTerm(fromArgs)
         val last = uri.lastPathSegment
         val raw = when {
             last == null || last == PATH_QUERY || last == PATH_SHORTCUT ->
-                uri.getQueryParameter(SearchManager.SUGGEST_PARAMETER_QUERY).orEmpty()
+                uri.getQueryParameter(SearchManager.QUERY)
+                    .orEmpty()
             else -> last
         }
-        return raw.trim().lowercase().removePrefix("play ").trim()
+        if (raw.isBlank() && !selection.isNullOrBlank() && selection != SELECTION_PLACEHOLDER) {
+            // A few hosts put the term in selection without args; it is data,
+            // never executed as SQL.
+            return normalizeTerm(selection)
+        }
+        return normalizeTerm(raw)
     }
+
+    private fun normalizeTerm(raw: String): String =
+        raw.trim().lowercase().removePrefix("play ").trim()
 
     /** Honours the `limit` parameter the search framework appends. */
     private fun limitOf(uri: Uri): Int {
@@ -151,14 +170,34 @@ class SearchSuggestionsProvider : ContentProvider() {
     }
 
     companion object {
-        /** Provider authority; `res/xml/searchable.xml` must match it. */
+        /**
+         * Provider authority suffix.
+         *
+         * The manifest declares `${applicationId}.suggestions`; resolving it
+         * from [Context.getPackageName] at runtime keeps dev/ytm flavors (which
+         * add an `applicationIdSuffix`) on their own cache.
+         */
+        const val AUTHORITY_SUFFIX = ".suggestions"
+
+        /**
+         * Production authority, retained for documentation and older callers.
+         * Never use it to build a Uri at runtime; use [authority] instead.
+         */
+        @Deprecated("Use authority(context) so flavors keep separate caches")
         const val AUTHORITY = "com.pulsr.music.suggestions"
+
+        /** Runtime authority for the installed flavor. */
+        fun authority(context: Context): String =
+            "${context.packageName}$AUTHORITY_SUFFIX"
 
         /** `SearchRecentSuggestions.SUGGEST_URI_PATH_QUERY`. */
         const val PATH_QUERY = "search_suggest_query"
 
         /** `SearchRecentSuggestions.SUGGEST_URI_PATH_SHORTCUT`. */
         const val PATH_SHORTCUT = "search_suggest_shortcut"
+
+        /** `android:searchSuggestSelection` value used by the search UI. */
+        private const val SELECTION_PLACEHOLDER = " ?"
 
         private const val CONTENT_TYPE = "vnd.android.cursor.dir/vnd.android.search_suggestions"
         private const val TAG = "SearchSuggestions"

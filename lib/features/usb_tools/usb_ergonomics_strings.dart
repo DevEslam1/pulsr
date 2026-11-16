@@ -43,53 +43,6 @@ abstract final class UsbErgonomicsStrings {
       'VID 0x${vid.toRadixString(16).toUpperCase().padLeft(4, '0')}  ·  '
       'PID 0x${pid.toRadixString(16).toUpperCase().padLeft(4, '0')}';
 
-  /// Label of the silence slider.
-  static const String silenceLabel = 'Silence before first frame';
-
-  /// Hint of the silence slider.
-  static const String silenceHint =
-      'Waits for the DAC to settle so the first frames are not clipped.';
-
-  /// Value readout of the silence slider.
-  static String silenceValue(int ms) => '$ms ms';
-
-  /// Label of the buffer slider.
-  static const String bufferLabel = 'Buffer depth';
-
-  /// Hint of the buffer slider.
-  static const String bufferHint = 'Larger buffers survive a busy bus; smaller '
-      'buffers start faster.';
-
-  /// Value readout of the buffer slider.
-  static String bufferValue(int ms) => '$ms ms';
-
-  /// Label of the transfer-size dropdown.
-  static const String transferLabel = 'Transfer size';
-
-  /// Hint of the transfer-size dropdown.
-  static const String transferHint =
-      'Size of each isochronous transfer. Auto lets the sink decide.';
-
-  /// Dropdown entry for the automatic transfer size.
-  static const String transferAuto = 'Auto';
-
-  /// Value readout of the transfer-size dropdown.
-  static String transferValue(int bytes) => '$bytes bytes';
-
-  /// Switch title for resetting the alternate setting on stop.
-  static const String altResetTitle = 'Reset alt setting on stop';
-
-  /// Switch hint for resetting the alternate setting on stop.
-  static const String altResetHint =
-      'Some DACs only restart cleanly from alternate setting 0.';
-
-  /// Switch title for forcing 16-bit.
-  static const String force16Title = 'Force 16-bit';
-
-  /// Switch hint for forcing 16-bit.
-  static const String force16Hint =
-      'Fixed 16-bit wire format for DACs that misreport their depth.';
-
   /// Switch title for HID media keys.
   static const String hidTitle = 'HID media keys';
 

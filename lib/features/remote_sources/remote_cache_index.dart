@@ -24,6 +24,8 @@ class RemoteCacheEntry {
     required this.sizeBytes,
     required this.lastAccess,
     required this.pinned,
+    this.etag,
+    this.modifiedAt,
   });
 
   /// Logical key: `<sourceId>/<path>`.
@@ -41,12 +43,21 @@ class RemoteCacheEntry {
   /// Pinned entries are exempt from eviction.
   bool pinned;
 
+  /// Server validator captured when the file was downloaded, if any.
+  final String? etag;
+
+  /// Server modification time captured when the file was downloaded.
+  final DateTime? modifiedAt;
+
   /// Serializes the record for the index file.
   Map<String, dynamic> toJson() => {
         'file': fileName,
         'size': sizeBytes,
         'lastAccess': lastAccess.millisecondsSinceEpoch,
         'pinned': pinned,
+        if (etag != null) 'etag': etag,
+        if (modifiedAt != null)
+          'modifiedAt': modifiedAt!.millisecondsSinceEpoch,
       };
 }
 
@@ -102,6 +113,7 @@ class RemoteCacheIndex {
         final value = item.value;
         if (value is! Map<String, dynamic>) continue;
         final lastAccessMs = (value['lastAccess'] as num?)?.toInt() ?? 0;
+        final modifiedAtMs = (value['modifiedAt'] as num?)?.toInt();
         final digest = sha256.convert(utf8.encode(item.key)).toString();
         final fileName = value['file'] as String? ?? '$digest.bin';
         final file = File(p.join(directory.path, fileName));
@@ -112,6 +124,10 @@ class RemoteCacheIndex {
           sizeBytes: await file.length(),
           lastAccess: DateTime.fromMillisecondsSinceEpoch(lastAccessMs),
           pinned: value['pinned'] as bool? ?? false,
+          etag: value['etag'] as String?,
+          modifiedAt: modifiedAtMs == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(modifiedAtMs),
         );
       }
     } catch (e, st) {

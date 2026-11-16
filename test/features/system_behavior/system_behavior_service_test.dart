@@ -242,7 +242,27 @@ void main() {
     service.dispose();
   });
 
-  test('backgrounding releases the USB claim only when configured', () async {
+  test('transient focus loss can resume on gain (no stuck duck state)',
+      () async {
+    final SystemBehaviorSettings settings = await loadSettings();
+    final RecordingPlaybackPort port = RecordingPlaybackPort();
+    int resumes = 0;
+    final SystemBehaviorService service = buildService(
+      settings: settings,
+      port: port,
+      resumePlayback: () async => resumes += 1,
+    );
+
+    await service.handleAudioFocusLoss(permanent: false);
+    await service.handleAudioFocusGain();
+
+    expect(port.pauseCount, 1);
+    expect(resumes, 1, reason: 'the interruption kind must not stay open');
+    service.dispose();
+  });
+
+  test('backgrounding releases the USB claim only when configured and idle',
+      () async {
     final SystemBehaviorSettings offSettings = await loadSettings();
     final List<bool> offCalls = <bool>[];
     final SystemBehaviorService offService = buildService(
@@ -262,7 +282,7 @@ void main() {
     final List<bool> onCalls = <bool>[];
     final SystemBehaviorService onService = buildService(
       settings: onSettings,
-      port: RecordingPlaybackPort(),
+      port: RecordingPlaybackPort(playing: false),
       usbRelease: (bool enabled) async {
         onCalls.add(enabled);
         return true;
@@ -273,8 +293,54 @@ void main() {
     onService.dispose();
   });
 
+  test('screen-off keeps the USB claim while playback is running', () async {
+    final SystemBehaviorSettings settings =
+        await loadSettings(closeUsbWhenBackgrounded: true);
+    final List<bool> usbCalls = <bool>[];
+    final RecordingPlaybackPort port = RecordingPlaybackPort(playing: true);
+    final SystemBehaviorService service = buildService(
+      settings: settings,
+      port: port,
+      usbRelease: (bool enabled) async {
+        usbCalls.add(enabled);
+        return true;
+      },
+    );
+
+    expect(await service.releaseUsbWhenBackgrounded(), isFalse);
+    expect(usbCalls, isEmpty);
+
+    // Once the user pauses, the same event may hand the DAC back.
+    port.playing = false;
+    expect(await service.releaseUsbWhenBackgrounded(), isTrue);
+    expect(usbCalls, <bool>[false]);
+    expect(await service.reclaimUsbOnResume(), isTrue);
+    expect(usbCalls, <bool>[false, true]);
+    service.dispose();
+  });
+
+  test('resume does not re-claim when nothing was released', () async {
+    final SystemBehaviorSettings settings =
+        await loadSettings(closeUsbWhenBackgrounded: true);
+    final List<bool> usbCalls = <bool>[];
+    final SystemBehaviorService service = buildService(
+      settings: settings,
+      port: RecordingPlaybackPort(playing: true),
+      usbRelease: (bool enabled) async {
+        usbCalls.add(enabled);
+        return true;
+      },
+    );
+
+    await service.handleAppResumed();
+
+    expect(usbCalls, isEmpty);
+    service.dispose();
+  });
+
   test('a notification-sound pause keeps the USB claim', () async {
     final SystemBehaviorSettings settings = await loadSettings(
+      pauseOnNotificationSound: true,
       usbReleaseOnFocusLoss: UsbReleaseOnFocusLoss.transient,
     );
     final RecordingPlaybackPort port = RecordingPlaybackPort();

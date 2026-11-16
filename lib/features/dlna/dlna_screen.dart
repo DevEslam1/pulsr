@@ -4,13 +4,19 @@
 // and an explicit semantics label.
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:get_it/get_it.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:path/path.dart' as p;
 
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/theme/aura_theme.dart';
+import '../../core/utils/error_logger.dart';
 import '../../core/utils/l10n_extensions.dart';
+import '../../core/utils/safe_file_path.dart';
 import '../../core/widgets/pulsr_progress.dart';
+import '../../data/audio/audio_handler.dart';
 import 'dlna_renderer_service.dart';
 import 'dlna_strings.dart';
 import 'upnp_device.dart';
@@ -28,6 +34,28 @@ class DlnaScreen extends StatefulWidget {
 }
 
 class _DlnaScreenState extends State<DlnaScreen> {
+  /// Extensions offered by the cast-file picker and accepted from the current
+  /// track. Kept in sync with MediaHttpServer.contentTypeFor.
+  static const List<String> _castExtensions = <String>[
+    'mp3',
+    'm4a',
+    'm4b',
+    'mp4',
+    'aac',
+    'flac',
+    'wav',
+    'ogg',
+    'oga',
+    'opus',
+    'wma',
+    'aiff',
+    'aif',
+    'dsf',
+    'dff',
+    'ape',
+    'wv',
+  ];
+
   late final DlnaRendererService _service =
       widget.service ?? DlnaRendererService();
   late final bool _ownsService = widget.service == null;
@@ -54,12 +82,95 @@ class _DlnaScreenState extends State<DlnaScreen> {
   }
 
   Future<void> _retry() async {
-    final device = _service.selectedDevice;
-    if (device == null) {
-      await _scan();
-    } else {
-      await _connect(device);
+    setState(() => _seekPreviewMs = null);
+    await _service.retry();
+  }
+
+  Future<void> _pickAndCast() async {
+    PlatformFile? picked;
+    try {
+      picked = await FilePicker.pickFile(
+        dialogTitle: DlnaStrings.castFile,
+        type: FileType.custom,
+        allowedExtensions: _castExtensions,
+      );
+    } catch (error, stackTrace) {
+      ErrorLogger.log(
+        'DLNA file pick failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'DLNA',
+      );
+      return;
     }
+    final file = SafeFilePath.validate(
+      picked?.path,
+      allowedExtensions: _castExtensions,
+    );
+    if (file == null || !mounted) return;
+
+    await _pauseLocalPlayback();
+    if (!mounted) return;
+    await _service.playFile(
+      file.path,
+      title: p.basenameWithoutExtension(file.path),
+    );
+  }
+
+  Future<void> _castCurrentTrack(_LocalTrack track) async {
+    final file = SafeFilePath.validate(
+      track.path,
+      allowedExtensions: _castExtensions,
+    );
+    if (file == null) return;
+    await _pauseLocalPlayback();
+    if (!mounted) return;
+    await _service.playFile(
+      file.path,
+      title: track.title,
+      artist: track.artist,
+      album: track.album,
+      duration: track.duration,
+    );
+  }
+
+  /// Pauses on-device playback so the same audio is not played twice. The
+  /// local player is never resumed automatically when casting stops.
+  Future<void> _pauseLocalPlayback() async {
+    try {
+      final registry = GetIt.instance;
+      if (!registry.isRegistered<PulsrAudioHandler>()) return;
+      await registry<PulsrAudioHandler>().pause();
+    } catch (error, stackTrace) {
+      ErrorLogger.log(
+        'DLNA local playback pause failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'DLNA',
+      );
+    }
+  }
+
+  /// Resolves the current track only when the handler exposes an actual
+  /// local file path in its media item extras. Streams and remote tracks have
+  /// no such path and therefore offer no cast action.
+  _LocalTrack? _currentLocalTrack() {
+    final registry = GetIt.instance;
+    if (!registry.isRegistered<PulsrAudioHandler>()) return null;
+    final item = registry<PulsrAudioHandler>().mediaItem.value;
+    final extras = item?.extras;
+    if (item == null || extras == null) return null;
+    final rawPath = extras['path'];
+    if (rawPath is! String) return null;
+    final path = rawPath.trim();
+    if (path.isEmpty || path.contains('://')) return null;
+    return _LocalTrack(
+      path: path,
+      title: item.title,
+      artist: item.artist,
+      album: item.album,
+      duration: item.duration,
+    );
   }
 
   @override
@@ -97,6 +208,7 @@ class _DlnaScreenState extends State<DlnaScreen> {
     final selected = _service.selectedDevice;
     final error = _service.lastError;
     final title = _service.nowPlayingTitle;
+    final localTrack = _currentLocalTrack();
 
     final children = <Widget>[
       Text(
@@ -130,6 +242,50 @@ class _DlnaScreenState extends State<DlnaScreen> {
         ),
       ),
     ];
+
+    children.addAll(<Widget>[
+      const SizedBox(height: AppSpacing.sm),
+      SizedBox(
+        height: 48,
+        width: double.infinity,
+        child: Semantics(
+          button: true,
+          enabled: !busy && selected != null,
+          label: DlnaStrings.castFileSemantics,
+          child: OutlinedButton.icon(
+            onPressed:
+                busy || selected == null ? null : _pickAndCast,
+            icon: const Icon(Icons.audio_file_rounded),
+            label: const Text(DlnaStrings.castFile),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: palette.accent,
+              minimumSize: const Size(0, 48),
+            ),
+          ),
+        ),
+      ),
+      if (selected != null && localTrack != null) ...<Widget>[
+        const SizedBox(height: AppSpacing.xs),
+        SizedBox(
+          height: 48,
+          width: double.infinity,
+          child: Semantics(
+            button: true,
+            enabled: !busy,
+            label: DlnaStrings.castCurrentSemantics,
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : () => _castCurrentTrack(localTrack),
+              icon: const Icon(Icons.cast_connected_rounded),
+              label: const Text(DlnaStrings.castCurrentTrack),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: palette.accent,
+                minimumSize: const Size(0, 48),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ]);
 
     if (state == DlnaState.discovering) {
       children.addAll(<Widget>[
@@ -517,4 +673,21 @@ class _NowPlayingCard extends StatelessWidget {
     final minutePart = (minutes % 60).toString().padLeft(2, '0');
     return '$hours:$minutePart:$remainder';
   }
+}
+
+/// A local file that can be cast, resolved from the audio handler's media item.
+class _LocalTrack {
+  const _LocalTrack({
+    required this.path,
+    this.title,
+    this.artist,
+    this.album,
+    this.duration,
+  });
+
+  final String path;
+  final String? title;
+  final String? artist;
+  final String? album;
+  final Duration? duration;
 }

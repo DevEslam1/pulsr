@@ -89,8 +89,10 @@ void main() {
 
   group('service fade-out', () {
     test('ramps to zero in the configured time, then pauses', () async {
-      final SystemBehaviorSettings settings =
-          await loadSettings(fadeOutOnPauseMs: 640);
+      final SystemBehaviorSettings settings = await loadSettings(
+        pauseOnNotificationSound: true,
+        fadeOutOnPauseMs: 640,
+      );
       final RecordingPlaybackPort port = RecordingPlaybackPort(volume: 0.8);
       final SystemBehaviorService service =
           buildService(settings: settings, port: port);
@@ -119,8 +121,10 @@ void main() {
 
     test('resuming restores the exact pre-fade volume and stops the ramp',
         () async {
-      final SystemBehaviorSettings settings =
-          await loadSettings(fadeOutOnPauseMs: 640);
+      final SystemBehaviorSettings settings = await loadSettings(
+        pauseOnNotificationSound: true,
+        fadeOutOnPauseMs: 640,
+      );
       final RecordingPlaybackPort port = RecordingPlaybackPort(volume: 0.73);
       final SystemBehaviorService service =
           buildService(settings: settings, port: port);
@@ -145,8 +149,10 @@ void main() {
     });
 
     test('a disabled fade pauses immediately', () async {
-      final SystemBehaviorSettings settings =
-          await loadSettings(fadeOutOnPauseMs: 0);
+      final SystemBehaviorSettings settings = await loadSettings(
+        pauseOnNotificationSound: true,
+        fadeOutOnPauseMs: 0,
+      );
       final RecordingPlaybackPort port = RecordingPlaybackPort(volume: 0.9);
       final SystemBehaviorService service =
           buildService(settings: settings, port: port);
@@ -159,8 +165,10 @@ void main() {
     });
 
     test('an unreadable volume degrades to a plain pause', () async {
-      final SystemBehaviorSettings settings =
-          await loadSettings(fadeOutOnPauseMs: 640);
+      final SystemBehaviorSettings settings = await loadSettings(
+        pauseOnNotificationSound: true,
+        fadeOutOnPauseMs: 640,
+      );
       final RecordingPlaybackPort port = RecordingPlaybackPort();
       final SystemBehaviorService service = SystemBehaviorService(
         settings: settings,

@@ -27,17 +27,18 @@ void _writeBe64(Uint8List target, int offset, int value) {
   }
 }
 
-Uint8List _dsfHeader(int sampleRate) {
+Uint8List _dsfHeader(int sampleRate, {int channels = 2, int bitsPerSample = 1}) {
   final bytes = Uint8List(0x60);
   bytes.setRange(0, 4, _ascii('DSD '));
   bytes.setRange(0x1C, 0x20, _ascii('fmt '));
-  _writeLe32(bytes, 0x20, 52);
-  _writeLe32(bytes, 0x24, 1); // format version
-  _writeLe32(bytes, 0x28, 0); // format id (DSD raw)
-  _writeLe32(bytes, 0x2C, 2); // channel type
-  _writeLe32(bytes, 0x30, 2); // channel count
-  _writeLe32(bytes, 0x34, sampleRate);
-  _writeLe32(bytes, 0x38, 1); // bits per sample
+  _writeLe32(bytes, 0x20, 52); // fmt chunk size, low 32 bits
+  _writeLe32(bytes, 0x24, 0); // fmt chunk size, high 32 bits
+  _writeLe32(bytes, 0x28, 1); // format version (fmt +12)
+  _writeLe32(bytes, 0x2C, 0); // format id (DSD raw, fmt +16)
+  _writeLe32(bytes, 0x30, 2); // channel type (fmt +20)
+  _writeLe32(bytes, 0x34, channels); // channel count (fmt +24)
+  _writeLe32(bytes, 0x38, sampleRate); // sampling frequency (fmt +28)
+  _writeLe32(bytes, 0x3C, bitsPerSample); // bits per sample (fmt +32)
   return bytes;
 }
 
@@ -88,6 +89,35 @@ void main() {
     test('rejects an unknown multiple such as DSD32', () {
       expect(DsdHeaderProbe.parseDsfMultiple(_dsfHeader(1411200)), 0);
     });
+
+    test('reads the declared bit order from fmt +32, not the channel count', () {
+      // The rate lives at 0x38 and bits at 0x3C; reading the rate at 0x34
+      // (channel count) made every stereo DSF probe as "unknown rate".
+      expect(
+        DsdHeaderProbe.parseDsfMultiple(_dsfHeader(2822400, channels: 2)),
+        64,
+      );
+      expect(DsdHeaderProbe.parseDsfBitsPerSample(_dsfHeader(2822400)), 1);
+      expect(
+        DsdHeaderProbe.parseDsfBitsPerSample(
+          _dsfHeader(2822400, bitsPerSample: 8),
+        ),
+        8,
+      );
+      expect(
+        DsdHeaderProbe.parseDsfBitsPerSample(
+          _dsfHeader(2822400, bitsPerSample: 4),
+        ),
+        0,
+      );
+      final truncated = _dsfHeader(2822400);
+      expect(
+        DsdHeaderProbe.parseDsfBitsPerSample(
+          Uint8List.sublistView(truncated, 0, 0x3F),
+        ),
+        0,
+      );
+    });
   });
 
   group('DFF header', () {
@@ -125,12 +155,14 @@ void main() {
 
     test('reads a real DSF file and ignores other extensions', () async {
       final dsf = File('${tempDir.path}/track.dsf');
-      await dsf.writeAsBytes(_dsfHeader(5644800));
+      await dsf.writeAsBytes(_dsfHeader(5644800, bitsPerSample: 8));
       expect(await DsdHeaderProbe.probeMultiple(dsf.path), 128);
+      expect(await DsdHeaderProbe.probeBitsPerSample(dsf.path), 8);
 
       final flac = File('${tempDir.path}/track.flac');
       await flac.writeAsBytes(_dsfHeader(2822400));
       expect(await DsdHeaderProbe.probeMultiple(flac.path), 0);
+      expect(await DsdHeaderProbe.probeBitsPerSample(flac.path), 0);
     });
 
     test('returns 0 instead of throwing for a missing file', () async {

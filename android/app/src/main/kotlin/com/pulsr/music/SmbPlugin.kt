@@ -11,6 +11,7 @@ import com.hierynomus.mssmb2.SMBApiException
 import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2ShareAccess
 import com.hierynomus.smbj.SMBClient
+import com.hierynomus.smbj.SmbConfig
 import com.hierynomus.smbj.auth.AuthenticationContext
 import com.hierynomus.smbj.connection.Connection
 import com.hierynomus.smbj.session.Session
@@ -18,10 +19,12 @@ import com.hierynomus.smbj.share.DiskShare
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.security.MessageDigest
 import java.util.EnumSet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -29,16 +32,27 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * Methods: `probe`, `list`, `stat`, `openReadChunk`, `close`.
  *
+ * Path contract with `SmbFsProvider` (Dart):
+ *  - `basePath` is the share-relative root of the source ("" or "Music").
+ *  - `path` is *also* share-relative ("" or "Albums/a.mp3") and must never
+ *    include `basePath`; this side performs the single join in [joinPath].
+ *  - Replies carry native paths that include `basePath`; Dart strips it.
+ * Prepending the base on both sides resolves every request to
+ * "Music/Music/...", so the Dart tests assert the joined result explicitly.
+ *
  * Design notes:
  *  - Every SMB call runs on one dedicated executor, because smbj objects are not
  *    safe for concurrent use from several threads and NTLM re-authentication is
  *    chatty. Channel replies are posted back to the main looper.
- *  - Sessions are cached per `host:port/share/user` and reused until the
- *    connection drops, so browsing a folder tree does not re-authenticate for
- *    every request.
+ *  - Sessions are cached per `host:port/share/user` *and a digest of the
+ *    password*, so editing a password never reuses an authenticated session
+ *    opened with the old one. The digest is never logged.
  *  - Credentials are never logged. Only host, port and share appear in logs.
  *  - `openReadChunk` opens, reads and closes the file per call: simple and
  *    leak-free, at the cost of one extra round-trip per chunk.
+ *  - Connect/login timeouts come from [SmbConfig]; smbj 0.13 exposes no
+ *    per-call connect timeout, and an unbounded connect would pin the single
+ *    executor thread (and therefore every later call) indefinitely.
  *
  * The `com.hierynomus:smbj` Gradle dependency is added by the app wiring; without
  * it the class fails to load and `register()` must not be called.
@@ -67,6 +81,7 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         const val CHANNEL_NAME = "com.pulsr.music/smb"
         private const val DEFAULT_PORT = 445
         private const val MAX_CHUNK_BYTES = 4 * 1024 * 1024
+        private const val CONNECT_TIMEOUT_MS = 15_000L
 
         /**
          * Registers the channel on [engine]. Safe to call once per engine; the
@@ -242,8 +257,11 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         val username = (args["username"] as? String).orEmpty()
         val password = (args["password"] as? String).orEmpty()
         val domain = (args["domain"] as? String).orEmpty()
-        val key = "${host.lowercase()}:$port/$shareName/" +
-            if (domain.isEmpty()) username else "$domain\\$username"
+        val userKey = if (domain.isEmpty()) username else "$domain\\$username"
+        // The password digest is part of the key: a session authenticated with
+        // an old secret must never be reused after the user changed it.
+        val key = "${host.lowercase()}:$port/$shareName/$userKey#" +
+            secretDigest(domain, username, password)
         val cached = sessions[key]
         if (cached != null) {
             if (cached.connection.isConnected) return cached.share
@@ -251,7 +269,12 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
             closeQuietly(cached)
         }
         Log.d(TAG, "Opening SMB session to $host:$port/$shareName")
-        val client = SMBClient()
+        val client = SMBClient(
+            SmbConfig.builder()
+                .withTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .withSoTimeout(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                .build()
+        )
         try {
             val connection = client.connect(host, port)
             val authentication = AuthenticationContext(
@@ -388,6 +411,7 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         return value
     }
 
+    /** Joins a share-relative [rawPath] onto [basePath] exactly once. */
     private fun joinPath(basePath: String, rawPath: String?): String {
         var value = (rawPath ?: "").replace('\\', '/').trim()
         while (value.startsWith("/")) value = value.substring(1)
@@ -404,6 +428,22 @@ class SmbPlugin private constructor() : MethodChannel.MethodCallHandler {
         if (segments.any { it == ".." }) {
             throw IllegalArgumentException("Path traversal is not allowed.")
         }
+    }
+
+    /**
+     * Stable, non-reversible fingerprint of the logon secret.
+     *
+     * Used only as a session-cache key component; the plaintext password is
+     * never stored on this side.
+     */
+    private fun secretDigest(domain: String, username: String, password: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest("$domain\\$username:$password".toByteArray(Charsets.UTF_8))
+        val hex = StringBuilder(digest.size * 2)
+        for (byte in digest) {
+            hex.append("%02x".format(byte.toInt() and 0xff))
+        }
+        return hex.toString()
     }
 
     private fun shareNameOf(args: Map<*, *>): String = args["share"] as? String ?: ""

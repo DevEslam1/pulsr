@@ -394,15 +394,23 @@ class Iso9660Reader {
     if (identifierLength.isEven) position += 1;
     final end = recordOffset + recordLength;
     final buffer = BytesBuilder(copy: false);
-    while (position + 4 <= end) {
+    while (position + 4 <= end && position + 4 <= data.length) {
       final signature = String.fromCharCodes(data, position, position + 2);
       final entryLength = data[position + 2];
-      if (entryLength < 4 || position + entryLength > end) break;
+      if (entryLength < 4 ||
+          position + entryLength > end ||
+          position + entryLength > data.length) {
+        break;
+      }
       if (signature == 'ST') break;
       if (signature == 'NM') {
+        // An NM entry is at least 5 bytes (signature, length, version, flags).
+        // A 4-byte NM at the very end of the extent used to read one byte past
+        // the buffer here; a malformed entry is ignored, never read.
+        if (entryLength < 5) break;
         final flags = data[position + 4];
         final nameStart = position + 5;
-        if (nameStart <= position + entryLength) {
+        if (nameStart < position + entryLength) {
           buffer.add(
             Uint8List.sublistView(data, nameStart, position + entryLength),
           );

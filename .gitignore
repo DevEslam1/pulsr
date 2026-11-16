@@ -37,7 +37,9 @@ test/golden/failures/
 /coverage/
 .opencode/
 .zwork/
-docs/
+docs/*
+!docs/README.md
+!docs/FEATURE_MATRIX.md
 scratch/
 tool/
 

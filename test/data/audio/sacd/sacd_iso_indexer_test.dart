@@ -98,6 +98,33 @@ void main() {
     expect(indexer.index(File(path)), throwsA(isA<IsoFormatException>()));
   });
 
+  test('exposes only the stereo area for playback', () async {
+    final fixture = SacdIsoFixture();
+    final iso = await writeIso('disc.iso', fixture.bytes);
+    final index = await SacdIsoIndexer().indexIso(iso);
+
+    expect(index.stereoToc, isNotNull);
+    expect(index.stereoToc!.fileName, 'SACD_2CH.TOC');
+    expect(index.stereoTracks, hasLength(2));
+    expect(index.stereoTracks.every((track) => track.channels == 2), isTrue);
+    expect(index.hasOnlyMultichannel, isFalse);
+  });
+
+  test('an image with only a multichannel area has no stereo tracks', () async {
+    final fixture = SacdIsoFixture(
+      channels: 6,
+      tocFileNames: const <String>['SACD_MCH.TOC'],
+      areaFlags: 0x02,
+    );
+    final iso = await writeIso('mch.iso', fixture.bytes);
+    final index = await SacdIsoIndexer().indexIso(iso);
+
+    expect(index.preferred!.channels, 6);
+    expect(index.stereoToc, isNull);
+    expect(index.stereoTracks, isEmpty);
+    expect(index.hasOnlyMultichannel, isTrue);
+  });
+
   test('rejects an ISO without a SACD directory', () async {
     final fixture = SacdIsoFixture(includeSacdDirectory: false);
     final iso = await writeIso('plain.iso', fixture.bytes);

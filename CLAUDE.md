@@ -14,7 +14,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                            PRESENTATION LAYER                               │
-│  GoRouter · AppShell · MiniPlayer · NowPlayingScreen (10 Themes)            │
+│  GoRouter · AppShell · MiniPlayer · NowPlayingScreen (11 Themes)            │
 │  BLoC / Cubits: PlayerCubit, LibraryCubit, SettingsCubit, DownloadsCubit... │
 └──────────────────────────────────────┬──────────────────────────────────────┘
                                        │
@@ -62,9 +62,9 @@
 | **Native C++ DSP Engine** | 10-band graphic & arbitrary frequency EQ, 64-band parametric EQ (`MAX_NATIVE_EQ_BANDS`), multichannel Channel Manager (2–8 channels, per-channel trim and delay), DSD512 decoder (to 768 kHz PCM), convolution reverb (IR files), lookahead peak limiter, 4-band multiband compressor, dynamic bass boost, loudness contour, spatial panner, stereo widener, ViPER-DDC presets, and LiveProg JSFX scripting. *(Sinc resampler is delegated/unsupported in `AudioEffectsPlugin`: `hasSincResampler = false`, enabling returns `DSP_UNSUPPORTED`.)* | `android/app/src/main/cpp/`, `lib/features/player/cubit/controllers/` |
 | **Local Music Library** | Complete MediaStore & filesystem scanner, metadata enrichment, embedded ID3 tag editor with artwork extraction, album/artist/genre/folder/year indexer, duplicate audio finder, and library statistics. | `lib/data/scanner/`, `lib/features/library/`, `lib/features/tag_editor/` |
 | **YouTube Music Integration** | InnerTube catalog search, stream pre-resolution, modern Rhino JS signature transform (`solveSig`) + `n`-throttling solver (`solveN`), authenticated `WEB` client fallback for age-restricted (+18) tracks, chunked background audio downloader with resumable storage, rate limiting, circuit breaker, OAuth / WebView session login, and geo-block recovery. | `lib/core/services/ytm_*`, `lib/core/services/yt_download_*`, `lib/features/ytm_search/` |
-| **Player Themes** | 10 distinct Now Playing designs: Clean (modern borderless), Vinyl Deck (spinning disc), Cassette Tape (custom animated spools), CD Player (reflective surface), Circle, Classic, Minimal, Card, Waveform, and Lyrics-focused. Custom Theme Builder included. | `lib/features/player/presentation/themes/` |
+| **Player Themes** | 11 distinct Now Playing designs: Classic, Card, Circle, Minimal, Vinyl Turntable, CD Turntable, Cassette Deck, Full-Bleed Waveform, Karaoke Lyrics, Clean Modern Flow, and Milkdrop Visualizer. Custom Theme Studio included. | `lib/features/player/presentation/themes/` |
 | **Synchronized Lyrics & Karaoke** | Real-time synchronized LRC parser, LRCLIB API client, millisecond offset manual editor, multi-language lyrics translation, lyric card sharing, and Karaoke mode screen. | `lib/data/lyrics/`, `lib/features/player/presentation/widgets/lyrics*` |
-| **Pulsr Party (Listen Together)** | Low-latency room-based group listening over WebSockets; sub-millisecond drift clock synchronization, host-only or democratic queue control. | `server/pulsr_party/`, `lib/data/party/`, `lib/features/party/` |
+| **Pulsr Party (Listen Together)** | WebSocket group listening with protocol v1 (13 frame types, 15 actions, 12 host-gated); 2–10 members (default 5), six-character room codes, host-only or democratic queue, 12-sample NTP-style offset and 10 s ping loop. | `server/pulsr_party/`, `lib/data/party/`, `lib/features/party/` |
 | **Visualizers & Shaders** | Real-time audio reactive Milkdrop visualizer powered by a custom OpenGL fragment shader (`shaders/milkdrop.frag`) and platform audio visualizer taps. | `shaders/milkdrop.frag`, `lib/features/player/presentation/widgets/visualizer/` |
 | **Smart Playlists** | Dynamic rule-based query engine filtering by play count, rating, bitrate, date added, duration, genre, and artist. | `lib/data/repositories/smart_playlist_engine.dart`, `lib/features/smart_playlist_builder/` |
 | **Quran Mode** | Specialized recitation experience with surah/ayah tracking, offline Tanzil 1.1 Uthmani text (all 114 Surahs), Mushaf page reader view, reciter audio profiles, mosque ambience reverb, bookmarking, and automated state restoration. | `lib/core/services/quran_mode_service.dart`, `lib/features/quran_mode/` |
@@ -190,7 +190,7 @@ pulsr/
 - **`data/audio/equalizer_manager.dart`**: Coordinates graphic, parametric, and arbitrary EQ bands. Restores EQ states across app launches.
 - **`data/audio/crossfade_manager.dart`**: Executes linear or exponential crossfading between consecutive tracks.
 - **`data/audio/gain_staging_budget.dart` & `replay_gain_math.dart`**: Computes peak-normalized headroom to prevent digital clipping when applying heavy EQ bass boost.
-- **`data/audio/headphone_profiles_repository.dart`**: Parses and provides over 4,000 AutoEq frequency compensation profiles for specific headphone models.
+- **`data/audio/headphone_profiles_repository.dart`**: Parses and provides the 652 bundled AutoEq five-band compensation profiles, plus user-imported profiles.
 - **`data/audio/multi_output_router.dart`**: Listens to Android audio routing changes (Headphones plugged/unplugged, Bluetooth connected).
 - **`data/audio/ab_loop_manager.dart`**: Precise A-B loop point management with microsecond accuracy.
 - **`data/audio/silence_skip_controller.dart`**: Fast-forwards through dead silence at track starts and ends.
@@ -237,7 +237,7 @@ pulsr/
 - **`features/player/cubit/controllers/`**: Granular controllers handling specific player sub-tasks (`player_dsp_controller.dart`, `player_queue_controller.dart`, `player_lyrics_manager.dart`, `player_sponsorblock_manager.dart`, `player_quran_manager.dart`).
 - **`features/player/presentation/now_playing_screen.dart`**: Main player screen supporting swipe-down dismissal, lyrics view, queue overlay, and responsive layouts.
 - **`features/player/presentation/mini_player.dart`**: Persistent bottom mini player widget with progress bar, play/pause, and swipe to skip.
-- **`features/player/presentation/themes/` (The 10 Player Themes)**:
+- **`features/player/presentation/themes/` (The 11 Player Themes)**:
   - `clean_player_theme.dart`: Modern borderless design with edge-to-edge album artwork.
   - `vinyl_player_theme.dart`: Realistic rotating vinyl record on turntable deck.
   - `cassette_player_theme.dart`: Retro cassette tape with spinning spools and magnetic tape rendering.
@@ -248,7 +248,8 @@ pulsr/
   - `card_player_theme.dart`: Elevated floating cover art card.
   - `lyrics_player_theme.dart`: Fullscreen scrolling lyrics with playback controls anchored at bottom.
   - `waveform_player_theme.dart`: Dynamic audio waveform track visualization.
-  - `custom_theme_builder_screen.dart`: Visual tool allowing users to customize player layout and colors.
+  - `milkdrop_player_theme.dart`: Full-screen GPU Milkdrop visualizer surface with Canvas fallback.
+  - `custom_theme_builder_screen.dart`: Visual tool allowing users to customize player palette, radius, glow and layout.
 - **`features/player/presentation/widgets/`**:
   - `equalizer_sheet.dart` & `arbitrary_eq_sheet.dart`: Interactive 10-band & parametric EQ sliders with frequency curve preview (`eq_curve_visualizer.dart`).
   - `autoeq_search_sheet.dart`: Headphone search sheet to import AutoEq frequency profiles.
@@ -338,7 +339,7 @@ pulsr/
 - **`DynamicBass.cpp / .h` & `DynamicEQ.cpp / .h`**: Psychoacoustic bass enhancer and dynamic EQ adjusting curve based on listening volume.
 - **`LoudnessContour.cpp / .h`**: ISO 226 equal-loudness contour compensation for low-volume listening.
 - **`SincResampler.cpp / .h`**: Legacy sinc interpolation resampler (delegated/unsupported in `AudioEffectsPlugin`: `hasSincResampler = false`, enable requests return `DSP_UNSUPPORTED`).
-- **`SpatialPanner.cpp / .h` & `StereoWidth.cpp / .h`**: Binaural spatial audio panner and M/S matrix stereo width expansion.
+- **`SpatialPanner.cpp / .h` & `StereoWidth.cpp / .h`**: Balance/mono panner (not HRTF) and M/S matrix stereo width expansion, including a 3-band imager.
 - **`ViperDdc.cpp / .h`**: Parser and convolver for ViPER4Android `.vdc` Device Dynamic Correction files.
 - **`LiveProg.cpp / .h`**: Embedded JSFX-compatible dynamic audio scripting engine.
 - **`DsdDecoder.cpp / .h`**: Converts 1-bit DSD (DSD64/DSD128/DSD256/DSD512) bitstreams into 24-bit/32-bit linear PCM.
@@ -350,7 +351,7 @@ pulsr/
 - **`main.go`**: Entrypoint initializing the HTTP server and WebSocket upgrade endpoints (`/ws`).
 - **`hub/hub.go`**: Central in-memory registry managing active party rooms and message fan-out.
 - **`party/party.go`**: Room lifecycle manager maintaining current track, queue, playing state, host ID, and member permissions.
-- **`clock/clock.go`**: Implements NTP-style timestamp exchange to establish sub-millisecond clock synchronization across clients over high-latency networks.
+- **`clock/clock.go`**: Monotonic server clock plus NTP-style timestamp exchange; clients keep the minimum-RTT offset from a 12-sample window with a 10 s ping loop.
 - **`protocol/protocol.go`**: JSON frame definitions (`welcome`, `sync`, `control`, `state`, `queue`, `ping`, `pong`).
 
 #### `shaders/`

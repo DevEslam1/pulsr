@@ -20,17 +20,16 @@ import '../../../core/utils/error_logger.dart';
 import '../../announcements/announcement_screen.dart';
 import '../../announcements/announcement_settings.dart';
 import '../../announcements/tts_engine.dart';
+import '../../assistant/assistant_settings.dart';
+import '../../assistant/assistant_settings_screen.dart';
 import '../../audio_profiles/audio_profile_service.dart';
 import '../../audio_profiles/audio_profiles_screen.dart';
 import '../../diagnostics/diagnostics_bundle_service.dart';
 import '../../diagnostics/diagnostics_screen.dart';
 import '../../diagnostics/safe_mode_controller.dart';
+import '../../dlna/dlna_renderer_service.dart';
 import '../../dlna/dlna_screen.dart';
-import '../../remote_sources/remote_cache_store.dart';
-import '../../remote_sources/remote_credentials_store.dart';
-import '../../remote_sources/remote_provider_factory.dart';
 import '../../remote_sources/remote_sources_screen.dart';
-import '../../remote_sources/remote_stream_server.dart';
 import '../../../data/db/app_database.dart' show SongSource, SongsTableData;
 import '../../../domain/models/remote_source.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -42,6 +41,7 @@ import '../../system_behavior/system_behavior_settings.dart';
 import '../../usb_tools/usb_ergonomics_screen.dart';
 import '../../usb_tools/usb_ergonomics_service.dart';
 import '../../usb_tools/usb_quirk_store.dart';
+import '../remote_playback_runtime.dart';
 import 'extras_strings.dart';
 
 /// Hub for the parity-gap tools that do not belong inside one settings category
@@ -60,13 +60,14 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   SafeModeController? _safeMode;
   AnnouncementSettings? _announcements;
   MethodChannelTtsEngine? _ttsEngine;
+  AssistantSettings? _assistantSettings;
   SystemBehaviorSettings? _systemBehavior;
   UsbErgonomicsService? _usbErgonomics;
-  RemoteCacheStore? _remoteCache;
-  RemoteStreamServer? _remoteStreams;
-  RemoteCredentialsStore? _remoteCredentials;
+  RemotePlaybackRuntime? _remoteRuntime;
   bool _ownsSystemBehavior = false;
   bool _ownsUsbErgonomics = false;
+  bool _ownsSafeMode = false;
+  bool _ownsRemoteRuntime = false;
   bool _loading = true;
   String? _loadError;
 
@@ -84,7 +85,12 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         prefs: prefs,
         outputDevice: _outputDeviceSnapshot,
       );
-      final safeMode = SafeModeController(prefs: prefs);
+      // The audio handler publishes the app-scoped controller so the failure
+      // streak and the manual Enter/Exit controls share one active-device map.
+      final ownsSafeMode = !getIt.isRegistered<SafeModeController>();
+      final safeMode = ownsSafeMode
+          ? SafeModeController(prefs: prefs)
+          : getIt<SafeModeController>();
       // Reuse the app-level instances started with the audio handler; only build
       // private ones when the bootstrap has not published them (tests, early
       // navigation). Ownership follows creation so nothing is disposed twice.
@@ -98,17 +104,34 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
           ? UsbErgonomicsService(store: UsbQuirkStore(prefs: prefs))
           : getIt<UsbErgonomicsService>();
       if (ownsUsb) await usbErgonomics.start();
-      final announcements = await AnnouncementSettings.load();
-      final engine = MethodChannelTtsEngine();
-      await engine.init();
+      // Same app-level pair the live announcer uses. Creating here first is
+      // fine: the bootstrap picks up whatever is registered, so edits always
+      // reach one shared instance instead of a screen-local copy.
+      final announcements = getIt.isRegistered<AnnouncementSettings>()
+          ? getIt<AnnouncementSettings>()
+          : await AnnouncementSettings.load();
+      final engine = getIt.isRegistered<MethodChannelTtsEngine>()
+          ? getIt<MethodChannelTtsEngine>()
+          : MethodChannelTtsEngine();
+      if (!getIt.isRegistered<AnnouncementSettings>()) {
+        getIt.registerSingleton<AnnouncementSettings>(announcements);
+      }
+      if (!getIt.isRegistered<MethodChannelTtsEngine>()) {
+        getIt.registerSingleton<MethodChannelTtsEngine>(engine);
+        await engine.init();
+      }
       engine.voiceId = announcements.voiceId;
       engine.localeId = announcements.localeId;
+      final assistant = getIt.isRegistered<AssistantSettings>()
+          ? getIt<AssistantSettings>()
+          : await AssistantSettings.load();
+      if (!getIt.isRegistered<AssistantSettings>()) {
+        getIt.registerSingleton<AssistantSettings>(assistant);
+      }
       if (!mounted) {
         if (ownsBehavior) behavior.dispose();
         if (ownsUsb) usbErgonomics.dispose();
-        await engine.dispose();
-        announcements.dispose();
-        await safeMode.dispose();
+        if (ownsSafeMode) await safeMode.dispose();
         return;
       }
       setState(() {
@@ -119,8 +142,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         _usbErgonomics = usbErgonomics;
         _announcements = announcements;
         _ttsEngine = engine;
+        _assistantSettings = assistant;
         _ownsSystemBehavior = ownsBehavior;
         _ownsUsbErgonomics = ownsUsb;
+        _ownsSafeMode = ownsSafeMode;
         _loading = false;
         _loadError = null;
       });
@@ -178,16 +203,21 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   /// same HTTP path the player already uses for radio streams.
   Future<void> _openRemoteSources() async {
     try {
-      if (_remoteStreams == null) {
-        final cache = RemoteCacheStore();
-        final server = RemoteStreamServer(cache: cache);
-        await server.start();
-        _remoteCache = cache;
-        _remoteStreams = server;
-        _remoteCredentials = RemoteCredentialsStore();
-      }
+      final registered = getIt.isRegistered<RemotePlaybackRuntime>();
+      final runtime = registered
+          ? getIt<RemotePlaybackRuntime>()
+          : (_remoteRuntime ??= RemotePlaybackRuntime());
+      _remoteRuntime = runtime;
+      _ownsRemoteRuntime = !registered;
+      await runtime.ensureStarted();
       if (!mounted) return;
-      _push(RemoteSourcesScreen(onPlay: _playRemoteFile));
+      // One cache index and one credential store for browsing and playback;
+      // a second instance would rewrite index.json behind the first one.
+      _push(RemoteSourcesScreen(
+        onPlay: _playRemoteFile,
+        cache: runtime.cache,
+        credentials: runtime.credentials,
+      ));
     } catch (e, st) {
       ErrorLogger.log(
         'Network library stream server failed to start',
@@ -217,19 +247,14 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   /// connection is reused for seeks instead of reopened per range request.
   Future<void> _playRemoteFile(RemoteSource source, String path) async {
     try {
-      final server = _remoteStreams;
-      final cache = _remoteCache;
-      final credentials = _remoteCredentials;
-      if (server == null || cache == null || credentials == null) {
+      final runtime = _remoteRuntime ??
+          (getIt.isRegistered<RemotePlaybackRuntime>()
+              ? getIt<RemotePlaybackRuntime>()
+              : null);
+      if (runtime == null) {
         throw StateError('Network library server is not running');
       }
-      final provider = createRemoteProvider(
-        source,
-        await credentials.read(source.id),
-      );
-      server.registerProvider(provider);
-      await cache.pin(source.id, path);
-      final uri = server.uriFor(source, path);
+      final uri = await runtime.prepareUri(source, path);
       final name = path.split('/').last;
       final song = SongsTableData(
         id: -DateTime.now().millisecondsSinceEpoch,
@@ -273,15 +298,13 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
 
   @override
   void dispose() {
-    // The announcer in the app shell keeps its own TTS engine reference; the
-    // hub only owns the safe-mode stream, the system-behaviour store, the USB
-    // ergonomics subscription and the loopback stream server.
-    _safeMode?.dispose();
+    // Announcement settings and the TTS engine are app-level singletons (the
+    // live announcer holds the same references), so they are not disposed here.
+    if (_ownsSafeMode) _safeMode?.dispose();
     if (_ownsSystemBehavior) _systemBehavior?.dispose();
     if (_ownsUsbErgonomics) _usbErgonomics?.dispose();
-    final server = _remoteStreams;
-    if (server != null) {
-      unawaited(server.stop());
+    if (_ownsRemoteRuntime) {
+      unawaited(_remoteRuntime?.dispose() ?? Future<void>.value());
     }
     super.dispose();
   }
@@ -334,6 +357,19 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                       ),
                       settingsCardDivider(p),
                       SettingsNavTile(
+                        Icons.manage_search_rounded,
+                        ExtrasStrings.assistantTitle,
+                        ExtrasStrings.assistantSubtitle,
+                        onTap: _assistantSettings == null
+                            ? null
+                            : () => _push(
+                                  AssistantSettingsScreen(
+                                    settings: _assistantSettings!,
+                                  ),
+                                ),
+                      ),
+                      settingsCardDivider(p),
+                      SettingsNavTile(
                         Icons.tune_rounded,
                         ExtrasStrings.systemBehaviorTitle,
                         ExtrasStrings.systemBehaviorSubtitle,
@@ -369,7 +405,13 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                         Icons.cast_rounded,
                         ExtrasStrings.dlnaTitle,
                         ExtrasStrings.dlnaSubtitle,
-                        onTap: () => _push(const DlnaScreen()),
+                        onTap: () => _push(
+                          getIt.isRegistered<DlnaRendererService>()
+                              ? DlnaScreen(
+                                  service: getIt<DlnaRendererService>(),
+                                )
+                              : const DlnaScreen(),
+                        ),
                       ),
                       settingsCardDivider(p),
                       SettingsNavTile(

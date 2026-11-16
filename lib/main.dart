@@ -80,7 +80,11 @@ import 'features/downloads/cubit/downloads_cubit.dart';
 import 'features/announcements/announcement_settings.dart';
 import 'features/announcements/track_announcer.dart';
 import 'features/announcements/tts_engine.dart';
+import 'features/assistant/assistant_settings.dart';
 import 'features/assistant/assistant_suggestion_sync.dart';
+import 'features/dlna/dlna_renderer_service.dart';
+import 'features/extras/remote_playback_runtime.dart';
+import 'features/system_behavior/system_behavior_runtime.dart';
 import 'features/system_behavior/system_behavior_settings.dart';
 import 'features/usb_tools/usb_ergonomics_service.dart';
 import 'features/usb_tools/usb_quirk_store.dart';
@@ -476,9 +480,13 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   AnnouncementSettings? _announcementSettings;
   TtsEngine? _ttsEngine;
   TrackAnnouncer? _trackAnnouncer;
+  AssistantSettings? _assistantSettings;
   SystemBehaviorSettings? _systemBehaviorSettings;
   VoidCallback? _systemBehaviorSettingsListener;
+  SystemBehaviorRuntime? _systemBehaviorRuntime;
   UsbErgonomicsService? _usbErgonomics;
+  RemotePlaybackRuntime? _remotePlaybackRuntime;
+  DlnaRendererService? _dlnaRendererService;
   VoidCallback? _platformBridgeDegradedListener;
   DateTime? _lastAuthExpiredPrompt;
   bool _dependenciesReady = false;
@@ -504,6 +512,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _startTrackAnnouncements();
     _startAssistantSuggestions();
     _startSystemAndUsbServices();
+    _registerRemotePlaybackRuntime();
     _watchPlatformBridgeHealth();
     _verifyPureMode();
   }
@@ -635,17 +644,13 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     }
   }
 
-  /// System-behaviour policies (P1-7) and USB DAC quirks (P0-3).
+  /// System-behaviour policies (P1-7), USB DAC quirks (P0-3) and the live
+  /// playback adapter they act through.
   ///
-  /// `SystemBehaviorService` intentionally does NOT call `start()` here: the
-  /// audio handler already owns `AudioSession.interruptionEventStream` and its
-  /// duck/pause path is wired into crossfade, replay gain and the duck-depth
-  /// counter. A second subscriber would cut audio before a fade could play, so
-  /// interruption ownership stays with the handler until that path is unified.
-  /// The behaviours that do not conflict are applied here instead: the
-  /// notification policy maps onto the handler's existing ducking mode, the
-  /// task-removal flag goes to the native plugin, and USB release on background
-  /// is driven from the lifecycle observer.
+  /// [SystemBehaviorRuntime] owns the audio-session subscriptions, the native
+  /// task-removal mirror and USB release/reclaim on background transitions.
+  /// The notification policy is still routed through [SettingsCubit] so the
+  /// in-memory state, persisted preference and audio handler stay in sync.
   void _startSystemAndUsbServices() {
     unawaited(() async {
       try {
@@ -656,7 +661,21 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
           store: UsbQuirkStore(prefs: prefs),
         );
         await usbErgonomics.start();
+        final handler = await _resolveDependency<PulsrAudioHandler>()
+            .timeout(const Duration(seconds: 30));
         if (!mounted) {
+          behaviorSettings.dispose();
+          usbErgonomics.dispose();
+          return;
+        }
+        final runtime = await SystemBehaviorRuntime.start(
+          settings: behaviorSettings,
+          handler: handler,
+          readVolume: () => handler.volume,
+          writeVolume: handler.setVolume,
+        );
+        if (!mounted) {
+          runtime.dispose();
           behaviorSettings.dispose();
           usbErgonomics.dispose();
           return;
@@ -668,6 +687,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
           getIt.registerSingleton<UsbErgonomicsService>(usbErgonomics);
         }
         _systemBehaviorSettings = behaviorSettings;
+        _systemBehaviorRuntime = runtime;
         _usbErgonomics = usbErgonomics;
         _systemBehaviorSettingsListener = () => unawaited(
               _applySystemBehaviorGlue(behaviorSettings),
@@ -685,31 +705,38 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     }());
   }
 
-  /// Applies the system-behaviour choices that map onto mechanisms the app
-  /// already has, so the settings are real rather than decorative.
+  /// Owns the network-library stream server for the process lifetime, so a
+  /// playing remote track keeps its URL after the Extras screen is popped.
+  void _registerRemotePlaybackRuntime() {
+    if (!getIt.isRegistered<RemotePlaybackRuntime>()) {
+      final runtime = RemotePlaybackRuntime();
+      getIt.registerSingleton<RemotePlaybackRuntime>(runtime);
+      _remotePlaybackRuntime = runtime;
+    }
+    if (!getIt.isRegistered<DlnaRendererService>()) {
+      final dlna = DlnaRendererService();
+      getIt.registerSingleton<DlnaRendererService>(dlna);
+      _dlnaRendererService = dlna;
+    }
+  }
+
+  /// Mirrors the notification policy into [SettingsCubit], whose state is what
+  /// the audio handler reads. `SystemBehaviorSettings` delegates the same pref,
+  /// so this is idempotent and never overwrites an independent setting.
   Future<void> _applySystemBehaviorGlue(SystemBehaviorSettings settings) async {
     try {
-      // "Pause on notification sound" is the handler's existing ducking policy
-      // (pause/duck). Routing through SettingsCubit keeps its in-memory state,
-      // the persisted preference and the audio handler in sync.
       if (getIt.isRegistered<SettingsCubit>()) {
         final desired = settings.pauseOnNotificationSound ? 'pause' : 'duck';
         final cubit = getIt<SettingsCubit>();
         if (cubit.state.duckingMode != desired) {
           await cubit.setDuckingMode(desired);
         }
+        if (cubit.state.resumeAfterInterruption != settings.resumeAfterCall) {
+          await cubit.setResumeAfterInterruption(settings.resumeAfterCall);
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to sync notification policy',
-          error: e, stackTrace: st, category: 'SystemBehavior');
-    }
-    try {
-      await const MethodChannel('com.pulsr.music/system_behavior').invokeMethod(
-        'setStopWhenTaskRemoved',
-        <String, Object>{'enabled': settings.stopWhenTaskRemoved},
-      );
-    } catch (e, st) {
-      ErrorLogger.log('Failed to push task-removal policy',
           error: e, stackTrace: st, category: 'SystemBehavior');
     }
   }
@@ -721,9 +748,20 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       try {
         await getIt.allReady().timeout(const Duration(seconds: 30));
         if (!getIt.isRegistered<IMusicRepository>()) return;
-        await AssistantSuggestionSync(repository: getIt<IMusicRepository>())
-            .pushRecent()
-            .timeout(const Duration(seconds: 10));
+        // One settings instance for the process: the Extras toggle writes it
+        // and this sync reads it, so flipping the opt-in takes effect without
+        // a restart.
+        final settings = getIt.isRegistered<AssistantSettings>()
+            ? getIt<AssistantSettings>()
+            : await AssistantSettings.load();
+        if (!getIt.isRegistered<AssistantSettings>()) {
+          getIt.registerSingleton<AssistantSettings>(settings);
+        }
+        _assistantSettings = settings;
+        await AssistantSuggestionSync(
+          repository: getIt<IMusicRepository>(),
+          settings: settings,
+        ).pushRecent().timeout(const Duration(seconds: 10));
       } catch (e, st) {
         ErrorLogger.log(
           'Search suggestion sync skipped',
@@ -743,11 +781,24 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       try {
         final handler = await _resolveDependency<PulsrAudioHandler>()
             .timeout(const Duration(seconds: 30));
-        final settings = await AnnouncementSettings.load();
-        final engine = MethodChannelTtsEngine();
+        // One settings/engine pair for the whole process. The Extras hub edits
+        // these same instances, so toggles and voice changes reach the live
+        // announcer without a restart.
+        final settings = getIt.isRegistered<AnnouncementSettings>()
+            ? getIt<AnnouncementSettings>()
+            : await AnnouncementSettings.load();
+        final engine = getIt.isRegistered<MethodChannelTtsEngine>()
+            ? getIt<MethodChannelTtsEngine>()
+            : MethodChannelTtsEngine();
         await engine.init();
         engine.voiceId = settings.voiceId;
         engine.localeId = settings.localeId;
+        if (!getIt.isRegistered<AnnouncementSettings>()) {
+          getIt.registerSingleton<AnnouncementSettings>(settings);
+        }
+        if (!getIt.isRegistered<MethodChannelTtsEngine>()) {
+          getIt.registerSingleton<MethodChannelTtsEngine>(engine);
+        }
         final announcer = TrackAnnouncer(
           mediaItemStream: handler.mediaItem,
           playbackStateStream: handler.playbackState,
@@ -783,12 +834,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _pausedSinceStart = true;
-      // P1-7: release the exclusive USB claim when the app is backgrounded, but
-      // only when the user asked for it. Playback itself keeps the claim, so
-      // this is a deliberate trade (other apps can use the DAC while paused).
-      if (_systemBehaviorSettings?.closeUsbWhenBackgrounded ?? false) {
-        unawaited(UsbExclusiveService().setExclusive(false));
-      }
+      // USB release/reclaim is owned by SystemBehaviorRuntime, which checks
+      // whether playback is active before dropping the exclusive claim.
       // Flush the debounced queue-slot write before the process can be killed.
       try {
         if (_isDependencyReady<PlayerCubit>()) {
@@ -950,11 +997,17 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     unawaited(_trackAnnouncer?.dispose() ?? Future<void>.value());
     unawaited(_ttsEngine?.dispose() ?? Future<void>.value());
     _announcementSettings?.dispose();
+    _assistantSettings?.dispose();
     if (_systemBehaviorSettingsListener != null) {
       _systemBehaviorSettings?.removeListener(_systemBehaviorSettingsListener!);
     }
+    _systemBehaviorRuntime?.dispose();
     _systemBehaviorSettings?.dispose();
     _usbErgonomics?.dispose();
+    unawaited(
+      _remotePlaybackRuntime?.dispose() ?? Future<void>.value(),
+    );
+    _dlnaRendererService?.dispose();
     if (_platformBridgeDegradedListener != null &&
         _isDependencyReady<PulsrAudioHandler>()) {
       getIt<PulsrAudioHandler>()

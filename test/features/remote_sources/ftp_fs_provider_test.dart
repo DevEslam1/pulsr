@@ -16,18 +16,31 @@ const String _unixListing = 'drwxr-xr-x    2 ftp      ftp          4096 Jan 02 0
 /// client's command sequencing, passive mode, REST offset and error mapping.
 class _FakeFtpServer {
   _FakeFtpServer({
-    this.password = 'secret',
     this.useEpsv = false,
     this.rejectRest = false,
-    this.listing = _unixListing,
-    this.fileContent = const [97, 98, 99, 100],
+    this.pasvHost = '127.0.0.1',
+    this.holdDataUntilClientCloses = false,
+    this.closeControlOnFirstList = false,
+    this.malformedListing = false,
+    this.malformedControlReplyOnce = false,
+    this.failFirstConnection = false,
   });
 
-  final String password;
+  final String password = 'secret';
   final bool useEpsv;
   final bool rejectRest;
-  final String listing;
-  final List<int> fileContent;
+  final String listing = _unixListing;
+  final List<int> fileContent = const [97, 98, 99, 100];
+  final String pasvHost;
+  final bool holdDataUntilClientCloses;
+  final bool closeControlOnFirstList;
+  final bool malformedListing;
+  final bool malformedControlReplyOnce;
+  final bool failFirstConnection;
+
+  bool _closedFirstList = false;
+  bool _sentMalformedReply = false;
+  bool _failedFirstConnection = false;
 
   final List<String> commands = <String>[];
   final List<Socket> _sockets = <Socket>[];
@@ -43,6 +56,13 @@ class _FakeFtpServer {
     _control = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     _control!.listen((socket) {
       _sockets.add(socket);
+      if (failFirstConnection && !_failedFirstConnection) {
+        _failedFirstConnection = true;
+        // Die before the greeting: the client sees FtpClosedError while
+        // reading the welcome reply and must retry on a fresh connection.
+        socket.destroy();
+        return;
+      }
       _pending = '';
       socket.write('220-Welcome to the fake FTP\r\n220-ready\r\n');
       socket.write('220 Ready\r\n');
@@ -93,14 +113,32 @@ class _FakeFtpServer {
           _reply(socket, '229 Entering Extended Passive Mode (|||$port|)');
         }
       case 'PASV':
-        final port = await _openPassiveServer();
+        final dataPort = await _openPassiveServer();
         _reply(
           socket,
-          '227 Entering Passive Mode (127,0,0,1,${port ~/ 256},${port % 256})',
+          '227 Entering Passive Mode '
+          '(${pasvHost.replaceAll('.', ',')},${dataPort ~/ 256},'
+          '${dataPort % 256})',
         );
       case 'LIST':
+        if (closeControlOnFirstList && !_closedFirstList) {
+          _closedFirstList = true;
+          socket.destroy();
+          return;
+        }
+        if (malformedControlReplyOnce && !_sentMalformedReply) {
+          _sentMalformedReply = true;
+          // 0xff is never valid UTF-8: the client must drop the session instead
+          // of reading half a reply.
+          socket.add(<int>[0xff, 0xfe, 0x0d, 0x0a]);
+          return;
+        }
         _reply(socket, '150 Here comes the directory listing');
-        await _writeData(utf8.encode(listing));
+        if (malformedListing) {
+          await _writeData(const <int>[0xff, 0xfe, 0x0a]);
+        } else {
+          await _writeData(utf8.encode(listing));
+        }
         _reply(socket, '226 Transfer complete');
       case 'NLST':
         _reply(socket, '150 Here comes the directory listing');
@@ -109,7 +147,9 @@ class _FakeFtpServer {
       case 'SIZE':
         _reply(
           socket,
-          argument.contains('Albums') ? '550 Not a plain file' : '213 4',
+          argument.contains('Albums') || argument == '/music'
+              ? '550 Not a plain file'
+              : '213 4',
         );
       case 'MDTM':
         _reply(socket, '213 20240102030405');
@@ -127,8 +167,12 @@ class _FakeFtpServer {
         final body = offset >= fileContent.length
             ? const <int>[]
             : fileContent.sublist(offset);
-        await _writeData(body);
-        _reply(socket, '226 Transfer complete');
+        if (holdDataUntilClientCloses) {
+          await _holdData(body, socket);
+        } else {
+          await _writeData(body);
+          _reply(socket, '226 Transfer complete');
+        }
       case 'NOOP':
         _reply(socket, '200 NOOP ok');
       case 'QUIT':
@@ -158,6 +202,25 @@ class _FakeFtpServer {
     await socket.flush();
     await socket.close();
     _pendingData = null;
+  }
+
+  /// Writes the payload but keeps the data connection open; `226` is only sent
+  /// after the client closes its end. A client that awaits the reply before
+  /// closing the data socket deadlocks here (until its own timeout).
+  Future<void> _holdData(List<int> bytes, Socket control) async {
+    final completer = _pendingData;
+    if (completer == null) return;
+    _pendingData = null;
+    final dataSocket = await completer.future;
+    dataSocket.add(bytes);
+    await dataSocket.flush();
+    // A paused socket stream never observes the peer's FIN, so listen (and
+    // discard) to learn when the client closes its end.
+    dataSocket.listen(
+      (_) {},
+      onError: (Object _) {},
+      onDone: () => _reply(control, '226 Transfer complete'),
+    );
   }
 
   void _reply(Socket socket, String line) {
@@ -460,6 +523,96 @@ void main() {
       await provider.close();
 
       expect(server.commands, contains('QUIT'));
+    });
+
+    test('openRead closes the data socket before awaiting the 226', () async {
+      // The server only sends 226 once the client closes the data connection;
+      // a client that awaits the reply first deadlocks until its timeout.
+      await start(_FakeFtpServer(holdDataUntilClientCloses: true));
+
+      final bytes = await provider
+          .openRead('song.mp3', start: 0, end: 0)
+          .expand((chunk) => chunk)
+          .toList()
+          .timeout(const Duration(seconds: 5));
+
+      expect(bytes, [97]);
+    });
+
+    test('reconnects once when the first connection dies during login',
+        () async {
+      await start(_FakeFtpServer(failFirstConnection: true));
+
+      final entries = await provider.list('');
+
+      expect(entries.map((e) => e.name), ['Albums', 'song.mp3']);
+    });
+
+    test('a dead control socket is dropped and the next call reconnects',
+        () async {
+      await start(_FakeFtpServer(closeControlOnFirstList: true));
+
+      await expectLater(
+        provider.list(''),
+        throwsA(isA<RemoteUnavailableError>()),
+      );
+
+      final entries = await provider.list('');
+      expect(entries.map((e) => e.name), ['Albums', 'song.mp3']);
+    });
+
+    test('PASV ignores an advertised private address and uses the peer',
+        () async {
+      await start(_FakeFtpServer(pasvHost: '10.9.9.9'));
+
+      final entries = await provider.list('');
+
+      expect(entries.map((e) => e.name), ['Albums', 'song.mp3']);
+      expect(server.commands, contains('PASV'));
+    });
+
+    test('a malformed UTF-8 listing is decoded leniently', () async {
+      await start(_FakeFtpServer(malformedListing: true));
+
+      final entries = await provider.list('');
+
+      // The bad bytes do not throw; the empty LIST result falls back to NLST.
+      expect(entries.map((e) => e.name), ['Albums', 'song.mp3']);
+      expect(server.commands, contains('NLST'));
+    });
+
+    test('a malformed control reply aborts the session; the next call reconnects',
+        () async {
+      await start(_FakeFtpServer(malformedControlReplyOnce: true));
+
+      await expectLater(
+        provider.list(''),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+
+      final entries = await provider.list('');
+      expect(entries.map((e) => e.name), ['Albums', 'song.mp3']);
+    });
+
+    test('stat on the source root reports the root directory', () async {
+      await start(_FakeFtpServer());
+
+      final entry = await provider.stat('');
+
+      expect(entry, isNotNull);
+      expect(entry!.isDirectory, isTrue);
+      expect(entry.path, '');
+      expect(entry.name, 'music');
+    });
+
+    test('a .. segment is rejected before any transfer command', () async {
+      await start(_FakeFtpServer());
+
+      await expectLater(
+        provider.openRead('../etc/passwd').toList(),
+        throwsA(isA<RemoteProtocolError>()),
+      );
+      expect(server.commands, isNot(contains('RETR')));
     });
   });
 }

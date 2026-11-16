@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 
 import '../errors/app_error.dart';
-import '../../features/diagnostics/diagnostics_log_buffer.dart';
+import 'log_ring_buffer.dart';
 
 class ErrorLogger {
   static void Function(dynamic error, StackTrace? stackTrace, String category)?
@@ -21,7 +21,7 @@ class ErrorLogger {
       r'(?:/Users/|/home/|[A-Za-z]:\\Users\\)[^/\\\s\n\r"\)]+',
       caseSensitive: false);
   static final _deviceStoragePathRegex = RegExp(
-      r'/(?:data/user/\d+|storage/emulated/\d+)/[^/\s\n\r"\)]+',
+      r'/(?:data/user/\d+|data/data|storage/emulated/\d+)(?:/[^\s\n\r"\)]*)?',
       caseSensitive: false);
   static final _userIdRegex = RegExp(
       r'\b(userId|user_id|memberId)\s*[:=]\s*["' ']?[A-Za-z0-9_-]+["' ']?',
@@ -57,10 +57,11 @@ class ErrorLogger {
     Map<String, dynamic>? meta,
   }) {
     final sanitizedMessage = redactPii(message);
-    // Diagnostics bundle (P1-10): keep the last 200 classified lines in a ring
-    // buffer so a support export can attach them without reading logcat. The
-    // buffer stores only redacted text and never grows past its cap.
-    DiagnosticsLogBuffer.add(
+    // Diagnostics bundle (P1-10): keep the last 200 classified lines in a core
+    // ring buffer so a support export can attach them without reading logcat.
+    // The buffer stores only redacted text and never grows past its cap; living
+    // in core keeps the logger free of feature imports.
+    LogRingBuffer.add(
       sanitizedMessage,
       level: error != null ? 'ERROR' : 'INFO',
       category: category,

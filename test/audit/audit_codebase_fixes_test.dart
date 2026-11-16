@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/data/audio/adaptive_quality_manager.dart';
 import 'package:pulsr/data/audio/dsd_decoder_helper.dart';
+import 'package:pulsr/data/audio/sacd/sacd_limits.dart';
 import 'package:pulsr/data/audio/gapless_trim_handler.dart';
 import 'package:pulsr/data/audio/mqa_decoder_helper.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -17,9 +18,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Audit Codebase Fixes Tests', () {
-    test('Bug 6 & 18: DsdDecoderHelper rejects oversized file > 300MB',
-        () async {
-      expect(DsdDecoderHelper.kMaxInMemoryDecodeBytes, 300 * 1024 * 1024);
+    test('Bug 6 & 18: DsdDecoderHelper rejects oversized files', () async {
+      expect(DsdDecoderHelper.kMaxInMemoryDecodeBytes, kMaxDsdFileBytes);
 
       final tempDir = await Directory.systemTemp.createTemp('dsd_test_');
       final fakeLargeDsf = File('${tempDir.path}/huge.dsf');
@@ -49,7 +49,7 @@ void main() {
         throwsA(isA<DsdUnsupportedException>().having(
           (e) => e.message,
           'message',
-          contains('exceeds max in-memory decode size of 300 MB'),
+          contains('150 MB'),
         )),
       );
 

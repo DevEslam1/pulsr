@@ -106,10 +106,13 @@ void main() {
       expect(plan.isFallback, isTrue);
     });
 
-    test('falls back to DoP when the pipeline is not bit-perfect', () {
+    test('falls back to PCM when the pipeline is not bit-perfect', () {
+      // DoP embeds 0x05/0xFA markers that DSP/volume math corrupts, so a
+      // non-bit-perfect fallback must never smuggle DoP in.
       final plan = resolve(mode: 'native', bitPerfect: false, rate: 64);
-      expect(plan.transport, DsdTransport.dop);
+      expect(plan.transport, DsdTransport.pcm);
       expect(plan.reason, DsdTransportReason.requiresBitPerfect);
+      expect(plan.isFallback, isTrue);
     });
 
     test('falls straight to PCM when neither native nor DoP is usable', () {
@@ -121,6 +124,52 @@ void main() {
     test('falls to PCM when native fails and the rate has no DoP carrier', () {
       final plan = resolve(mode: 'native', native: false, rate: 512);
       expect(plan.transport, DsdTransport.pcm);
+    });
+  });
+
+  group('planFallback bit-perfect gate', () {
+    test('DoP requires an active bit-perfect pipeline', () {
+      final blocked = planFallback(
+        requested: DsdTransport.native,
+        reason: DsdTransportReason.deviceLacksNativeDsd,
+        dopCapable: true,
+        dsdRateMultiple: 128,
+        bitPerfectActive: false,
+      );
+      expect(blocked.transport, DsdTransport.pcm);
+
+      final allowed = planFallback(
+        requested: DsdTransport.native,
+        reason: DsdTransportReason.deviceLacksNativeDsd,
+        dopCapable: true,
+        dsdRateMultiple: 128,
+        bitPerfectActive: true,
+      );
+      expect(allowed.transport, DsdTransport.dop);
+    });
+
+    test('DoP request never upgrades to Native and degrades to PCM', () {
+      final plan = planFallback(
+        requested: DsdTransport.dop,
+        reason: DsdTransportReason.deviceLacksDop,
+        dopCapable: true,
+        dsdRateMultiple: 64,
+        bitPerfectActive: true,
+      );
+      expect(plan.transport, DsdTransport.pcm);
+    });
+
+    test('an unusable carrier or unknown rate stays on PCM', () {
+      for (final rate in <int>[0, 512]) {
+        final plan = planFallback(
+          requested: DsdTransport.native,
+          reason: DsdTransportReason.deviceLacksNativeDsd,
+          dopCapable: true,
+          dsdRateMultiple: rate,
+          bitPerfectActive: true,
+        );
+        expect(plan.transport, DsdTransport.pcm, reason: 'rate $rate');
+      }
     });
   });
 }

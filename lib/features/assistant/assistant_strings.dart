@@ -29,4 +29,22 @@ abstract final class AssistantStrings {
   /// Message shown when a library callback failed.
   static const String libraryUnavailable =
       'Could not read your library. Try again.';
+
+  /// Settings screen title.
+  static const String settingsTitle = 'Assistant & search';
+
+  /// Suggestion toggle title.
+  static const String suggestionsTitle = 'Search suggestions';
+
+  /// Suggestion toggle subtitle.
+  static const String suggestionsSubtitle =
+      'Show recent library tracks in the system search box. Off by default: '
+      'the cache is readable by the privileged search UI.';
+
+  /// Section label above the toggle.
+  static const String suggestionsSection = 'System search';
+
+  /// Shown while suggestions are off and cached rows are removed.
+  static const String suggestionsOffNotice =
+      'Suggestions are off. Any cached rows were cleared.';
 }

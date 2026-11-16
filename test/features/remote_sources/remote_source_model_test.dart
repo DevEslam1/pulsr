@@ -22,7 +22,6 @@ void main() {
       expect(source.useTls, isTrue);
       expect(source.isValid, isTrue);
       expect(source.authority, 'nas.local:443');
-      expect(source.secretKey, source.id);
     });
 
     test('falls back to the host when the name is blank', () {
@@ -112,12 +111,12 @@ void main() {
         port: 445,
         rootPath: '/Music/Studio',
         username: 'eslam',
-        credentialKey: 'slot-1',
         createdAt: DateTime.fromMillisecondsSinceEpoch(1700000000000),
       );
 
       final json = source.toJson();
       expect(json.containsKey('password'), isFalse);
+      expect(json.containsKey('credentialKey'), isFalse);
       expect(json['kind'], 'smb');
 
       final restored = RemoteSource.fromJson(json);
@@ -128,9 +127,7 @@ void main() {
       expect(restored.port, 445);
       expect(restored.rootPath, '/Music/Studio');
       expect(restored.username, 'eslam');
-      expect(restored.credentialKey, 'slot-1');
       expect(restored.createdAt, source.createdAt);
-      expect(restored.secretKey, 'slot-1');
     });
 
     test('rejects an unknown kind so the store can skip it', () {
@@ -174,6 +171,32 @@ void main() {
       expect(RemoteSource.validateHost('nas.local:80'), isNotNull);
       expect(RemoteSource.validateHost('nas.local'), isNull);
       expect(RemoteSource.validateHost('192.168.1.10'), isNull);
+    });
+
+    test('validateHost accepts a bracketless IPv6 literal', () {
+      expect(RemoteSource.validateHost('fd00::1'), isNull);
+      expect(RemoteSource.validateHost('fe80::1'), isNull);
+      expect(RemoteSource.validateHost('2001:db8::ff00:42:8329'), isNull);
+      expect(RemoteSource.validateHost('::1'), isNull);
+      expect(RemoteSource.validateHost('[fd00::1]'), isNull);
+      // Not IPv6: these are still "port in the host" mistakes.
+      expect(RemoteSource.validateHost('nas.local:80'), isNotNull);
+      expect(RemoteSource.validateHost('1:2'), isNotNull);
+      expect(RemoteSource.validateHost('2001:db8::1::2'), isNotNull);
+    });
+
+    test('isIpv6Literal and bracketed authority are consistent', () {
+      expect(RemoteSource.isIpv6Literal('fd00::1'), isTrue);
+      expect(RemoteSource.isIpv6Literal('nas.local'), isFalse);
+      final source = RemoteSource.create(
+        kind: RemoteSourceKind.webdav,
+        displayName: 'v6',
+        host: '[fd00::1]',
+        port: 5000,
+        rootPath: '/',
+      );
+      expect(source.host, 'fd00::1');
+      expect(source.authority, '[fd00::1]:5000');
     });
 
     test('validatePort only accepts 1..65535', () {

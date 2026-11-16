@@ -1,10 +1,11 @@
 // lib/features/dlna/media_http_server.dart
 //
-// Loopback-bound HTTP file server used as the DLNA media source. URLs carry an
-// opaque token only: the server resolves tokens through its registry and never
-// turns a URL path into a filesystem path.
+// HTTP file server used as the DLNA media source. URLs carry an opaque token
+// only: the server resolves tokens through its registry and never turns a URL
+// path into a filesystem path.
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import '../../core/utils/error_logger.dart';
 
@@ -43,11 +44,12 @@ class MediaSource {
   }
 }
 
-/// Serves registered [MediaSource]s over HTTP 1.1 with single byte ranges.
+/// Serves registered [MediaSource]s over HTTP 1.1 with byte ranges.
 ///
 /// Tokens are registered by the renderer service, capped at [maxEntries] and
-/// expire after [tokenTtl]. Every request is answered from the registry; the
-/// URL never selects a file on its own.
+/// expire after [tokenTtl]. Every request must carry a registered token; the
+/// URL never selects a file on its own. Use [newToken] to create
+/// cryptographically random tokens.
 class MediaHttpServer {
   /// Largest number of tokens kept alive at once.
   final int maxEntries;
@@ -55,21 +57,34 @@ class MediaHttpServer {
   /// How long a token stays valid after registration.
   final Duration tokenTtl;
 
-  final InternetAddress _bindAddress;
+  /// Largest number of requests handled at once. Further requests get 503.
+  final int maxConcurrentRequests;
+
+  /// Longest request path accepted, in characters.
+  static const int maxRequestPathLength = 512;
+
+  static final Random _secureRandom = Random.secure();
+  static final RegExp _tokenPattern = RegExp(r'^[A-Za-z0-9_-]+$');
+
+  final InternetAddress _defaultBindAddress;
   final Map<String, _MediaEntry> _entries = <String, _MediaEntry>{};
 
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _subscription;
   String _host = InternetAddress.loopbackIPv4.address;
+  int _activeRequests = 0;
 
-  /// Creates a server. [bindAddress] defaults to all IPv4 interfaces so a LAN
-  /// renderer can reach it.
+  /// Creates a server. [bindAddress] is used when [start] is called without an
+  /// explicit address; both defaults serve every IPv4 interface so a LAN
+  /// renderer can reach the server.
   MediaHttpServer({
     this.maxEntries = 32,
     this.tokenTtl = const Duration(hours: 6),
+    this.maxConcurrentRequests = 8,
     InternetAddress? bindAddress,
   })  : assert(maxEntries > 0, 'maxEntries must be positive'),
-        _bindAddress = bindAddress ?? InternetAddress.anyIPv4;
+        assert(maxConcurrentRequests > 0, 'maxConcurrentRequests must be positive'),
+        _defaultBindAddress = bindAddress ?? InternetAddress.anyIPv4;
 
   /// Bound port, or `null` before [start].
   int? get port => _server?.port;
@@ -77,13 +92,84 @@ class MediaHttpServer {
   /// True between [start] and [stop].
   bool get isRunning => _server != null;
 
+  /// Address the advertised URL uses, or the loopback fallback before [start].
+  String get host => _host;
+
+  /// Generates a 128-bit token as 32 lowercase hex characters using
+  /// [Random.secure]. [random] is injectable for deterministic tests.
+  static String newToken({Random? random}) {
+    final rng = random ?? _secureRandom;
+    final buffer = StringBuffer();
+    for (var index = 0; index < 16; index++) {
+      buffer.write(rng.nextInt(256).toRadixString(16).padLeft(2, '0'));
+    }
+    return buffer.toString();
+  }
+
+  /// Returns the local address the OS would use to reach [host], or `null`
+  /// when it cannot be determined. Used to bind the server to the interface
+  /// that actually faces the renderer instead of guessing.
+  ///
+  /// A short TCP connect to the renderer's control port reveals the chosen
+  /// source address without sending any application data.
+  static Future<InternetAddress?> localAddressFacing(
+    String host,
+    int port,
+  ) async {
+    Socket? socket;
+    try {
+      socket = await Socket.connect(
+        host,
+        port,
+        timeout: const Duration(seconds: 2),
+      );
+      final local = socket.address;
+      if (local.isLoopback || _isUnspecified(local)) return null;
+      return local;
+    } on SocketException catch (error, stackTrace) {
+      ErrorLogger.log(
+        'DLNA local address detection failed',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'DLNA',
+      );
+      return null;
+    } finally {
+      socket?.destroy();
+    }
+  }
+
   /// Starts listening on an ephemeral port. Safe to call twice.
-  Future<void> start() async {
+  ///
+  /// [bindAddress] overrides the constructor address. When it is a concrete
+  /// interface the advertised URL uses exactly that interface; when the server
+  /// binds the wildcard address the best local address is detected.
+  Future<void> start({InternetAddress? bindAddress}) async {
     if (_server != null) return;
     try {
-      final server = await HttpServer.bind(_bindAddress, 0);
+      final target = bindAddress ?? _defaultBindAddress;
+      HttpServer server;
+      try {
+        server = await HttpServer.bind(target, 0);
+      } on SocketException catch (error, stackTrace) {
+        if (target.address == InternetAddress.anyIPv4.address) rethrow;
+        // The interface chosen by the resolver disappeared between discovery
+        // and binding; fall back to all interfaces rather than failing a cast.
+        ErrorLogger.log(
+          'DLNA media server could not bind ${target.address}; '
+          'falling back to all interfaces',
+          error: error,
+          stackTrace: stackTrace,
+          category: 'DLNA',
+        );
+        server = await HttpServer.bind(InternetAddress.anyIPv4, 0);
+      }
+      // Bound per-connection idle handling so a stalled client cannot pin a
+      // request handler (and a concurrency slot) forever.
+      server.idleTimeout = const Duration(seconds: 30);
       _server = server;
-      _host = await _detectHost();
+      final bound = server.address;
+      _host = _isUnspecified(bound) ? await _detectHost() : bound.address;
       _subscription = server.listen(
         (request) {
           unawaited(_handle(request));
@@ -109,9 +195,16 @@ class MediaHttpServer {
   }
 
   /// Registers [source] under [token], evicting expired and oldest entries.
+  ///
+  /// [token] must be URL-safe; the server rejects request paths that could be
+  /// read as filesystem traversal before it ever looks the token up.
   void register(String token, MediaSource source) {
-    if (token.isEmpty) {
-      throw ArgumentError.value(token, 'token', 'Token must not be empty');
+    if (!_isValidToken(token)) {
+      throw ArgumentError.value(
+        token,
+        'token',
+        'Token must be 1-$maxRequestPathLength URL-safe characters',
+      );
     }
     _entries[token] = _MediaEntry(
       source: source,
@@ -145,6 +238,7 @@ class MediaHttpServer {
     final server = _server;
     _server = null;
     _entries.clear();
+    _host = InternetAddress.loopbackIPv4.address;
     if (server != null) await server.close(force: true);
   }
 
@@ -167,19 +261,37 @@ class MediaHttpServer {
         return 'audio/wav';
       case 'ogg':
       case 'oga':
-      case 'opus':
         return 'audio/ogg';
+      case 'opus':
+        return 'audio/opus';
       case 'wma':
         return 'audio/x-ms-wma';
       case 'aiff':
       case 'aif':
         return 'audio/aiff';
+      case 'dsf':
+        return 'audio/x-dsf';
+      case 'dff':
+        return 'audio/x-dff';
+      case 'ape':
+        return 'audio/x-ape';
+      case 'wv':
+        return 'audio/x-wavpack';
       default:
         return 'application/octet-stream';
     }
   }
 
   Future<void> _handle(HttpRequest request) async {
+    if (_activeRequests >= maxConcurrentRequests) {
+      try {
+        await _writeEmpty(request.response, HttpStatus.serviceUnavailable);
+      } catch (_) {
+        // The request is already gone; nothing else to release.
+      }
+      return;
+    }
+    _activeRequests += 1;
     try {
       await _dispatch(request);
     } catch (error, stackTrace) {
@@ -200,6 +312,8 @@ class MediaHttpServer {
           category: 'DLNA',
         );
       }
+    } finally {
+      _activeRequests -= 1;
     }
   }
 
@@ -214,15 +328,29 @@ class MediaHttpServer {
       return;
     }
 
+    // Reject anything that could be interpreted as a filesystem path before
+    // consulting the token registry. `Uri.path` keeps percent-encoding, so a
+    // request for `%2e%2e` is rejected even though `pathSegments` decodes it.
+    final rawPath = request.uri.path;
+    if (rawPath.length > maxRequestPathLength ||
+        rawPath.contains('%') ||
+        rawPath.contains(r'\') ||
+        rawPath.contains('..')) {
+      await _writeEmpty(request.response, HttpStatus.forbidden);
+      return;
+    }
+
     final segments = request.uri.pathSegments;
-    if (segments.length != 2 || segments.first != 'media') {
-      await _writeEmpty(request.response, HttpStatus.notFound);
+    if (segments.length != 2 ||
+        segments.first != 'media' ||
+        !_isValidToken(segments[1])) {
+      await _writeEmpty(request.response, HttpStatus.forbidden);
       return;
     }
 
     final entry = _lookup(segments[1]);
     if (entry == null) {
-      await _writeEmpty(request.response, HttpStatus.notFound);
+      await _writeEmpty(request.response, HttpStatus.forbidden);
       return;
     }
 
@@ -313,13 +441,16 @@ class MediaHttpServer {
     }
   }
 
+  /// Parses a Range header. Multi-range requests are served as their first
+  /// range (a valid single-range response) instead of a 416.
   _RangeOutcome _parseRange(String? header, int size) {
     if (header == null || header.isEmpty) return const _RangeOutcome.none();
     if (!header.toLowerCase().startsWith('bytes=')) {
       return const _RangeOutcome.none();
     }
-    final spec = header.substring(6).trim();
-    if (spec.isEmpty || spec.contains(',')) {
+    final specs = header.substring(6).split(',');
+    final spec = specs.first.trim();
+    if (spec.isEmpty) {
       return const _RangeOutcome.unsatisfiable();
     }
     final dash = spec.indexOf('-');
@@ -374,6 +505,15 @@ class MediaHttpServer {
     }
     return InternetAddress.loopbackIPv4.address;
   }
+
+  static bool _isUnspecified(InternetAddress address) =>
+      address.type == InternetAddressType.IPv4 &&
+      address.rawAddress.every((byte) => byte == 0);
+
+  static bool _isValidToken(String token) =>
+      token.isNotEmpty &&
+      token.length <= maxRequestPathLength &&
+      _tokenPattern.hasMatch(token);
 }
 
 class _MediaEntry {

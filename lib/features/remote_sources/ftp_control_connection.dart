@@ -45,19 +45,67 @@ class FtpControlConnection {
 
   /// Whether the socket is still writable.
   bool get isOpen => !_closed;
+
+  /// Whether the channel can still be trusted for the next command.
+  ///
+  /// Set to `false` on *any* transport or decoding failure: once a reply line
+  /// was lost or could not be decoded, the reply stream is out of step with
+  /// the server and the only safe recovery is a fresh connection.
+  bool get isHealthy => !_closed && !_broken;
   bool _closed = false;
+  bool _broken = false;
+
+  /// Marks the channel unusable and drops the socket.
+  void invalidate() {
+    if (_broken && _closed) return;
+    _broken = true;
+    try {
+      _socket.destroy();
+    } catch (e, st) {
+      ErrorLogger.log(
+        'FTP control socket did not close after an error',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+      );
+    }
+  }
 
   /// Reads one complete reply.
-  Future<FtpReply> readReply() => FtpReply.readReply(_nextLine);
+  Future<FtpReply> readReply() async {
+    try {
+      return await FtpReply.readReply(_nextLine);
+    } on FtpClosedError {
+      invalidate();
+      rethrow;
+    } on FtpFormatError {
+      invalidate();
+      rethrow;
+    } on SocketException {
+      invalidate();
+      rethrow;
+    } on TimeoutException {
+      invalidate();
+      rethrow;
+    }
+  }
 
   /// Sends [command] without waiting for the reply.
   ///
   /// Callers must never pass a password in a log line; this method does not log
   /// commands at all so a `PASS` cannot leak.
   Future<void> send(String command) async {
-    if (_closed) throw const FtpClosedError();
-    _socket.add(utf8.encode('$command\r\n'));
-    await _socket.flush().timeout(_timeout);
+    if (!isHealthy) throw const FtpClosedError();
+    try {
+      _socket.add(utf8.encode('$command\r\n'));
+      await _socket.flush().timeout(_timeout);
+    } on SocketException {
+      invalidate();
+      rethrow;
+    } on TimeoutException {
+      invalidate();
+      rethrow;
+    }
   }
 
   /// Sends [command] and reads exactly one reply.
@@ -70,6 +118,7 @@ class FtpControlConnection {
   Future<void> destroy() async {
     if (_closed) return;
     _closed = true;
+    _broken = true;
     try {
       await _lines.cancel();
     } catch (e, st) {
@@ -93,7 +142,21 @@ class FtpControlConnection {
   }
 
   Future<String?> _nextLine() async {
-    final hasNext = await _lines.moveNext().timeout(_timeout);
-    return hasNext ? _lines.current : null;
+    if (!isHealthy) throw const FtpClosedError();
+    try {
+      final hasNext = await _lines.moveNext().timeout(_timeout);
+      return hasNext ? _lines.current : null;
+    } on FormatException catch (e, st) {
+      // A malformed UTF-8 byte sequence means the line framing was lost; keep
+      // going would read half a reply and desynchronise every later command.
+      ErrorLogger.log(
+        'FTP control reply was not valid UTF-8; dropping the session',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+      );
+      invalidate();
+      throw const FtpFormatError('FTP reply is not valid UTF-8');
+    }
   }
 }

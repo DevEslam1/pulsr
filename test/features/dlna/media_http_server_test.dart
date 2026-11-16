@@ -105,10 +105,66 @@ void main() {
     expect(response.body, isEmpty);
   });
 
-  test('returns 404 for an unknown token', () async {
+  test('returns 403 for an unknown token', () async {
     final response = await fetch('/media/missing-token');
 
-    expect(response.status, 404);
+    expect(response.status, 403);
+  });
+
+  test('returns 403 when the token is missing or the path is not a token', () async {
+    final withoutToken = await fetch('/media');
+    final extraSegment = await fetch('/media/token-1/extra');
+
+    expect(withoutToken.status, 403);
+    expect(extraSegment.status, 403);
+  });
+
+  test('rejects percent-encoded and raw traversal attempts', () async {
+    for (final path in <String>[
+      '/media/%2e%2e',
+      '/media/..%2F..%2Fsecret.mp3',
+      '/media/%2e%2e%2f%2e%2e%2ftrack.mp3',
+      r'/media/..\track.mp3',
+    ]) {
+      final response = await fetch(path);
+      expect(response.status, 403, reason: 'path $path must be rejected');
+    }
+  });
+
+  test('rejects methods other than GET and HEAD with 405', () async {
+    final response = await fetch('/media/token-1', method: 'POST');
+
+    expect(response.status, 405);
+    expect(response.headers['allow'], 'GET, HEAD');
+  });
+
+  test('serves only the first range of a multi-range request', () async {
+    final response =
+        await fetch('/media/token-1', range: 'bytes=0-9, 20-29, 40-49');
+
+    expect(response.status, 206);
+    expect(response.body, sourceBytes.sublist(0, 10));
+    expect(response.headers['content-range'], 'bytes 0-9/1000');
+    expect(response.headers['content-length'], '10');
+  });
+
+  test('creates cryptographically random 128-bit hex tokens', () {
+    final first = MediaHttpServer.newToken();
+    final second = MediaHttpServer.newToken();
+
+    expect(first, matches(RegExp(r'^[0-9a-f]{32}$')));
+    expect(second, matches(RegExp(r'^[0-9a-f]{32}$')));
+    expect(first, isNot(second));
+  });
+
+  test('a generated token authenticates a request', () async {
+    final token = MediaHttpServer.newToken();
+    server.register(token, MediaSource.file(mediaFile.path));
+
+    final response = await fetch('/media/$token');
+
+    expect(response.status, 200);
+    expect(response.body, sourceBytes);
   });
 
   test('serves a byte-callback source with its declared MIME type', () async {
@@ -155,8 +211,18 @@ void main() {
     final after = await client.getUrl(shortUri);
     final afterResponse = await after.close();
     await afterResponse.drain<void>();
-    expect(afterResponse.statusCode, 404);
+    expect(afterResponse.statusCode, 403);
     await shortLived.stop();
+  });
+
+  test('stopping the server drops every registered token', () async {
+    server.register('token-drop', MediaSource.file(mediaFile.path));
+    await server.stop();
+    await server.start();
+
+    final response = await fetch('/media/token-drop');
+
+    expect(response.status, 403);
   });
 
   test('evicts the oldest token when the registry is full', () async {
@@ -175,7 +241,7 @@ void main() {
       return response.statusCode;
     }
 
-    expect(await statusOf('a'), 404);
+    expect(await statusOf('a'), 403);
     expect(await statusOf('b'), 200);
     expect(await statusOf('c'), 200);
     await bounded.stop();
@@ -185,6 +251,14 @@ void main() {
     expect(MediaHttpServer.contentTypeFor('a.mp3'), 'audio/mpeg');
     expect(MediaHttpServer.contentTypeFor('a.FLAC'), 'audio/flac');
     expect(MediaHttpServer.contentTypeFor('a.m4a'), 'audio/mp4');
-    expect(MediaHttpServer.contentTypeFor('no-extension'), 'application/octet-stream');
+    expect(MediaHttpServer.contentTypeFor('a.opus'), 'audio/opus');
+    expect(MediaHttpServer.contentTypeFor('a.dsf'), 'audio/x-dsf');
+    expect(MediaHttpServer.contentTypeFor('a.dff'), 'audio/x-dff');
+    expect(MediaHttpServer.contentTypeFor('a.ape'), 'audio/x-ape');
+    expect(MediaHttpServer.contentTypeFor('a.wv'), 'audio/x-wavpack');
+    expect(
+      MediaHttpServer.contentTypeFor('no-extension'),
+      'application/octet-stream',
+    );
   });
 }

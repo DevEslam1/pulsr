@@ -133,6 +133,10 @@ class AssistantIntentService {
               category: 'Assistant',
             );
           }
+        case 'isReady':
+          // Native readiness probe before it routes warm search intents here.
+          // The handler existing is the whole answer.
+          break;
         default:
           ErrorLogger.log(
             'Unhandled assistant channel method: ${call.method}',

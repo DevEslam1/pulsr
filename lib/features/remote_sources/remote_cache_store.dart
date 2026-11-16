@@ -79,11 +79,27 @@ class RemoteCacheStore {
   Future<void> ensureInitialized() => _initFuture ??= _initialize();
 
   /// Returns the cached file for [sourceId]/[path], or `null` on a miss.
-  Future<File?> lookup(String sourceId, String path) async {
+  ///
+  /// [etag] and [modifiedAt] are the validators the provider just reported for
+  /// the file. When a cached entry carries a validator and the server now
+  /// reports a different one, the entry is stale: it is deleted and treated as
+  /// a miss so playback re-downloads instead of serving old audio. A `null`
+  /// validator means "the server did not say", not "changed", so an entry is
+  /// kept in that case.
+  Future<File?> lookup(
+    String sourceId,
+    String path, {
+    String? etag,
+    DateTime? modifiedAt,
+  }) async {
     await ensureInitialized();
     final key = keyFor(sourceId, path);
     final entry = _entries[key];
     if (entry == null) return null;
+    if (!_matchesValidators(entry, etag: etag, modifiedAt: modifiedAt)) {
+      await _deleteEntry(key);
+      return null;
+    }
     final file = File(p.join(_root!.path, entry.fileName));
     if (!await file.exists()) {
       _entries.remove(key);
@@ -96,6 +112,9 @@ class RemoteCacheStore {
   }
 
   /// Whether [sourceId]/[path] is fully cached.
+  ///
+  /// Validators are not checked here: callers that care about staleness use
+  /// [lookup] with the provider's etag/mtime.
   Future<bool> contains(String sourceId, String path) async =>
       await lookup(sourceId, path) != null;
 
@@ -113,6 +132,8 @@ class RemoteCacheStore {
     String sourceId,
     String path, {
     bool pin = false,
+    String? etag,
+    DateTime? modifiedAt,
   }) async {
     await ensureInitialized();
     final root = _root;
@@ -132,6 +153,8 @@ class RemoteCacheStore {
       store: this,
       pinned: pin,
       maxEntryBytes: maxEntryBytes,
+      etag: etag,
+      modifiedAt: modifiedAt,
     );
   }
 
@@ -144,10 +167,18 @@ class RemoteCacheStore {
     String path,
     Stream<List<int>> bytes, {
     bool pin = false,
+    String? etag,
+    DateTime? modifiedAt,
   }) async {
     RemoteCacheSink? sink;
     try {
-      sink = await beginWrite(sourceId, path, pin: pin);
+      sink = await beginWrite(
+        sourceId,
+        path,
+        pin: pin,
+        etag: etag,
+        modifiedAt: modifiedAt,
+      );
       await for (final chunk in bytes) {
         if (!sink.isActive) break;
         sink.add(chunk);
@@ -176,13 +207,27 @@ class RemoteCacheStore {
     String path, {
     required Stream<List<int>> Function() openStream,
     bool pin = false,
+    String? etag,
+    DateTime? modifiedAt,
   }) async {
     final key = keyFor(sourceId, path);
-    final hit = await lookup(sourceId, path);
+    final hit = await lookup(
+      sourceId,
+      path,
+      etag: etag,
+      modifiedAt: modifiedAt,
+    );
     if (hit != null) return hit;
     final pending = _inFlight[key];
     if (pending != null) return pending;
-    final future = store(sourceId, path, openStream(), pin: pin);
+    final future = store(
+      sourceId,
+      path,
+      openStream(),
+      pin: pin,
+      etag: etag,
+      modifiedAt: modifiedAt,
+    );
     _inFlight[key] = future;
     try {
       return await future;
@@ -300,6 +345,8 @@ class RemoteCacheStore {
     required File partial,
     required int bytes,
     required bool pinned,
+    String? etag,
+    DateTime? modifiedAt,
   }) async {
     await ensureInitialized();
     final root = _root;
@@ -318,6 +365,8 @@ class RemoteCacheStore {
       sizeBytes: bytes,
       lastAccess: _clock(),
       pinned: pinned || (existing?.pinned ?? false),
+      etag: etag,
+      modifiedAt: modifiedAt,
     );
     await _persistIndex();
     await evictIfNeeded(protectKey: key);
@@ -350,6 +399,28 @@ class RemoteCacheStore {
       total += entry.sizeBytes;
     }
     return total;
+  }
+
+  /// True when the cached validators still describe the server's file.
+  ///
+  /// Seconds are compared, not milliseconds: HTTP `Last-Modified` and FTP
+  /// `MDTM` only carry second precision, so a whole-second difference is real
+  /// while a sub-second one is encoding noise.
+  static bool _matchesValidators(
+    RemoteCacheEntry entry, {
+    String? etag,
+    DateTime? modifiedAt,
+  }) {
+    final cachedEtag = entry.etag;
+    if (etag != null && cachedEtag != null && etag != cachedEtag) return false;
+    final cachedModified = entry.modifiedAt;
+    if (modifiedAt != null &&
+        cachedModified != null &&
+        modifiedAt.millisecondsSinceEpoch ~/ 1000 !=
+            cachedModified.millisecondsSinceEpoch ~/ 1000) {
+      return false;
+    }
+    return true;
   }
 
   Future<void> _initialize() async {

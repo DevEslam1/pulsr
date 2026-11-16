@@ -3,7 +3,9 @@
 // File-backed store for shareable audio profiles plus the only code path that
 // writes a profile into the live audio settings. Each apply takes a snapshot
 // first, keeps a durable backup of it, and restores the snapshot when any key
-// fails to write.
+// fails to write. A successful apply, rollback or import refreshes the live
+// settings (SettingsCubit) and re-pushes the DSP effect state so the UI and the
+// audio engine see the new values without an app restart.
 
 import 'dart:io';
 import 'dart:math';
@@ -14,8 +16,11 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/config/app_config.dart';
+import '../../core/di/injection.dart';
 import '../../core/errors/app_error.dart';
 import '../../core/utils/error_logger.dart';
+import '../../data/audio/equalizer_manager.dart';
+import '../settings/cubit/settings_cubit.dart';
 import 'audio_profile.dart';
 import 'audio_profile_keys.dart';
 import 'audio_profile_strings.dart';
@@ -30,16 +35,21 @@ class AudioProfileStoreError extends AppError {
   });
 }
 
+/// Per-key outcome of [AudioProfileService.apply].
+enum AudioProfileApplyStatus { applied, skipped, failed }
+
 /// Raised when [AudioProfileService.apply] could not write every setting.
 ///
 /// [rolledBack] reports whether the pre-apply snapshot was restored and
-/// [appliedKeys] lists the keys that had been written before the failure.
+/// [results] carries the per-key outcome, so the caller can show exactly which
+/// settings failed instead of a single aggregate count.
 class AudioProfileApplyError extends AppError {
   const AudioProfileApplyError({
     required super.code,
     required super.userMessage,
     this.rolledBack = false,
-    this.appliedKeys = const <String>[],
+    this.results = const <String, AudioProfileApplyStatus>{},
+    this.liveStateRefreshed = false,
     super.cause,
     super.stackTrace,
   });
@@ -47,26 +57,70 @@ class AudioProfileApplyError extends AppError {
   /// Whether the previous settings were restored.
   final bool rolledBack;
 
-  /// Settings written before the failure.
-  final List<String> appliedKeys;
+  /// Outcome of every key the profile carried.
+  final Map<String, AudioProfileApplyStatus> results;
+
+  /// Whether the live settings/effects were refreshed after the rollback.
+  final bool liveStateRefreshed;
+
+  /// Keys written before the snapshot was restored (see [rolledBack]).
+  List<String> get appliedKeys => _keysWith(AudioProfileApplyStatus.applied);
+
+  /// Keys the preference setter refused.
+  List<String> get failedKeys => _keysWith(AudioProfileApplyStatus.failed);
+
+  /// Keys outside [AudioProfileKeys.whitelist].
+  List<String> get skippedKeys => _keysWith(AudioProfileApplyStatus.skipped);
+
+  /// Status recorded for [key], or `null` when the profile did not carry it.
+  AudioProfileApplyStatus? statusOf(String key) => results[key];
+
+  List<String> _keysWith(AudioProfileApplyStatus status) =>
+      List<String>.unmodifiable(
+        results.entries
+            .where((entry) => entry.value == status)
+            .map((entry) => entry.key),
+      );
 }
 
 /// Outcome of a successful [AudioProfileService.apply].
 class AudioProfileApplyReport {
-  const AudioProfileApplyReport({
-    required this.appliedCount,
-    required this.skippedKeys,
+  AudioProfileApplyReport({
+    required Map<String, AudioProfileApplyStatus> results,
     required this.backupSaved,
-  });
+    this.liveStateRefreshed = true,
+  }) : results = Map<String, AudioProfileApplyStatus>.unmodifiable(results);
 
-  /// Number of settings written to shared preferences.
-  final int appliedCount;
-
-  /// Profile keys that are outside [AudioProfileKeys.whitelist].
-  final List<String> skippedKeys;
+  /// Outcome of every key the profile carried.
+  final Map<String, AudioProfileApplyStatus> results;
 
   /// Whether the durable pre-apply backup was written.
   final bool backupSaved;
+
+  /// Whether the live settings and effect state were refreshed.
+  final bool liveStateRefreshed;
+
+  /// Number of settings written to shared preferences.
+  int get appliedCount => appliedKeys.length;
+
+  /// Keys written to shared preferences.
+  List<String> get appliedKeys => _keysWith(AudioProfileApplyStatus.applied);
+
+  /// Profile keys that are outside [AudioProfileKeys.whitelist].
+  List<String> get skippedKeys => _keysWith(AudioProfileApplyStatus.skipped);
+
+  /// Keys the preference setter refused.
+  List<String> get failedKeys => _keysWith(AudioProfileApplyStatus.failed);
+
+  /// Status recorded for [key], or `null` when the profile did not carry it.
+  AudioProfileApplyStatus? statusOf(String key) => results[key];
+
+  List<String> _keysWith(AudioProfileApplyStatus status) =>
+      List<String>.unmodifiable(
+        results.entries
+            .where((entry) => entry.value == status)
+            .map((entry) => entry.key),
+      );
 }
 
 /// Captures, stores, exports and applies [AudioProfile]s.
@@ -76,16 +130,26 @@ class AudioProfileService {
     Future<Directory> Function()? rootDirectory,
     String Function()? appVersion,
     DateTime Function()? clock,
+    Future<void> Function()? reloadSettings,
+    Future<void> Function()? resyncEffects,
   })  : _prefs = prefs,
         _rootDirectory = rootDirectory ?? getApplicationSupportDirectory,
         _appVersion = appVersion ?? (() => AppConfig.appVersion),
-        _clock = clock ?? DateTime.now;
+        _clock = clock ?? DateTime.now,
+        _reloadSettings = reloadSettings ?? _defaultReloadSettings,
+        _resyncEffects = resyncEffects ?? _defaultResyncEffects;
 
   /// Folder under the app support directory that holds the profile files.
   static const String directoryName = 'audio_profiles';
 
   /// Sub-folder that holds the automatic pre-apply backups.
   static const String backupDirectoryName = 'backups';
+
+  /// Preference key holding the id of the profile marked as the default.
+  ///
+  /// This is scheduler metadata, not a profile setting, so it is deliberately
+  /// kept outside [AudioProfileKeys.whitelist].
+  static const String defaultProfileKey = 'audio_profile_default_id';
 
   /// How many pre-apply backups are kept; older ones are pruned.
   static const int maxBackups = 10;
@@ -97,10 +161,54 @@ class AudioProfileService {
   final Future<Directory> Function() _rootDirectory;
   final String Function() _appVersion;
   final DateTime Function() _clock;
+  final Future<void> Function() _reloadSettings;
+  final Future<void> Function() _resyncEffects;
+
+  /// Temporary export folders created by [export] and not cleaned up yet.
+  final Set<String> _pendingExports = <String>{};
+
   late final _ProfileBackups _backups = _ProfileBackups(
     directory: () => _directory(backups: true),
     clock: _clock,
   );
+
+  /// Default live-state hooks: every guard is optional because tests and early
+  /// navigation can run without the app-level singletons.
+  static Future<void> _defaultReloadSettings() async {
+    if (!getIt.isRegistered<SettingsCubit>()) return;
+    await getIt<SettingsCubit>().reloadSettings();
+  }
+
+  static Future<void> _defaultResyncEffects() async {
+    if (!getIt.isRegistered<EqualizerManager>()) return;
+    await getIt<EqualizerManager>().resyncActiveEffects();
+  }
+
+  /// Id of the profile marked as the device default, if any.
+  String? get defaultProfileId {
+    final id = _prefs.getString(defaultProfileKey);
+    return id != null && _safeId.hasMatch(id) ? id : null;
+  }
+
+  /// Marks [profileId] as the default profile; `null` clears the selection.
+  ///
+  /// Returns `false` when [profileId] is not a saved profile (the preference is
+  /// left untouched), and throws [AudioProfileStoreError] for an unsafe id.
+  Future<bool> setGlobalDefaults(String? profileId) async {
+    if (profileId == null) {
+      return _prefs.remove(defaultProfileKey);
+    }
+    if (!_safeId.hasMatch(profileId)) {
+      throw const AudioProfileStoreError(
+        code: 'audio-profile-invalid-id',
+        userMessage: AudioProfileStrings.formatInvalidId,
+      );
+    }
+    final directory = await _directory(create: false);
+    final file = File(p.join(directory.path, '$profileId.json'));
+    if (!await file.exists()) return false;
+    return _prefs.setString(defaultProfileKey, profileId);
+  }
 
   /// Every saved profile, newest first. Unreadable files are logged and
   /// skipped so one corrupt profile cannot hide the rest.
@@ -180,14 +288,27 @@ class AudioProfileService {
 
   /// Writes [profile] to a fresh temporary `.json` file and returns it, ready
   /// to hand to the share sheet.
+  ///
+  /// The returned file lives in a private temp folder that is tracked by this
+  /// service; call [cleanupExport] once sharing finishes. User-chosen files
+  /// (imports/backups) are never touched by that cleanup.
   Future<File> export(AudioProfile profile) async {
+    Directory? directory;
     try {
-      final directory =
-          await Directory.systemTemp.createTemp('pulsr_audio_profile_');
+      directory = await Directory.systemTemp.createTemp('pulsr_audio_profile_');
+      _pendingExports.add(p.canonicalize(directory.path));
       final file = File(p.join(directory.path, _exportFileName(profile)));
       await file.writeAsString(profile.toJsonString(), flush: true);
       return file;
     } catch (e, st) {
+      if (directory != null) {
+        _pendingExports.remove(p.canonicalize(directory.path));
+        try {
+          await directory.delete(recursive: true);
+        } catch (_) {
+          // Best effort: the temp folder may already be gone.
+        }
+      }
       ErrorLogger.log(
         'Exporting audio profile failed',
         error: e,
@@ -204,12 +325,39 @@ class AudioProfileService {
     }
   }
 
+  /// Deletes the temporary folder that [export] created for [file].
+  ///
+  /// Returns `true` when a tracked export folder was removed. Anything that was
+  /// not produced by [export] (for example a user-selected import or backup
+  /// file) is left untouched.
+  Future<bool> cleanupExport(File file) async {
+    final key = p.canonicalize(file.parent.path);
+    if (!_pendingExports.remove(key)) return false;
+    try {
+      if (await file.parent.exists()) {
+        await file.parent.delete(recursive: true);
+      }
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Cleaning up an exported audio profile failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioProfileService',
+        meta: <String, dynamic>{'file': p.basename(file.path)},
+      );
+      return false;
+    }
+  }
+
   /// Applies [profile] to the live settings.
   ///
   /// Only keys inside [AudioProfileKeys.whitelist] are written; anything else
-  /// is reported in [AudioProfileApplyReport.skippedKeys]. The current values
-  /// are snapshotted (and backed up as a file) before the first write, and the
-  /// snapshot is restored if a write fails part-way through.
+  /// is reported as [AudioProfileApplyStatus.skipped]. The current values are
+  /// snapshotted (and backed up as a file) before the first write. Every key is
+  /// attempted and its individual outcome is reported; if any write fails the
+  /// snapshot is restored and [AudioProfileApplyError.results] carries the
+  /// per-key status.
   Future<AudioProfileApplyReport> apply(AudioProfile profile) async {
     final snapshot = <String, Object?>{
       for (final key in AudioProfileKeys.whitelist) key: _prefs.get(key),
@@ -229,54 +377,86 @@ class AudioProfileService {
     );
     final backupSaved = await _backups.save(backup);
 
-    final applied = <String>[];
-    final skipped = <String>[];
-    try {
-      for (final entry in profile.values.entries) {
-        if (!AudioProfileKeys.isWhitelisted(entry.key)) {
-          skipped.add(entry.key);
-          continue;
-        }
-        final written = await writeKeyValue(entry.key, entry.value);
-        if (!written) {
-          throw _WriteRejected(entry.key);
-        }
-        applied.add(entry.key);
+    final results = <String, AudioProfileApplyStatus>{};
+    Object? firstFailure;
+    StackTrace? firstStackTrace;
+    for (final entry in profile.values.entries) {
+      if (!AudioProfileKeys.isWhitelisted(entry.key)) {
+        results[entry.key] = AudioProfileApplyStatus.skipped;
+        continue;
       }
-      return AudioProfileApplyReport(
-        appliedCount: applied.length,
-        skippedKeys: List<String>.unmodifiable(skipped),
-        backupSaved: backupSaved,
-      );
-    } catch (e, st) {
+      try {
+        final written = await writeKeyValue(entry.key, entry.value);
+        results[entry.key] = written
+            ? AudioProfileApplyStatus.applied
+            : AudioProfileApplyStatus.failed;
+        if (!written) {
+          firstFailure ??= _WriteRejected(entry.key);
+        }
+      } catch (e, st) {
+        results[entry.key] = AudioProfileApplyStatus.failed;
+        firstFailure ??= e;
+        firstStackTrace ??= st;
+        ErrorLogger.log(
+          'Writing an audio setting failed',
+          error: e,
+          stackTrace: st,
+          category: 'AudioProfileService',
+          meta: <String, dynamic>{'key': entry.key},
+        );
+      }
+    }
+
+    final applied = results.values
+        .where((status) => status == AudioProfileApplyStatus.applied)
+        .length;
+    final failed = results.values
+        .where((status) => status == AudioProfileApplyStatus.failed)
+        .length;
+
+    if (failed > 0) {
       final rolledBack = await _restore(snapshot);
+      final refreshed = await _refreshLiveState();
       ErrorLogger.log(
         'Applying audio profile failed${rolledBack ? ' (rolled back)' : ' (rollback incomplete)'}',
-        error: e,
-        stackTrace: st,
+        error: firstFailure,
+        stackTrace: firstStackTrace,
         category: 'AudioProfileService',
         meta: <String, dynamic>{
           'profileId': profile.id,
-          'appliedKeys': applied.length,
+          'appliedKeys': applied,
+          'failedKeys': failed,
         },
       );
       throw AudioProfileApplyError(
-        code: e is _WriteRejected
+        code: firstFailure is _WriteRejected
             ? 'audio-profile-write-rejected'
             : 'audio-profile-apply-failed',
-        userMessage: AudioProfileStrings.applyFailed,
+        userMessage: rolledBack
+            ? AudioProfileStrings.applyFailedRolledBack(failed)
+            : AudioProfileStrings.applyFailedRollbackIncomplete(failed),
         rolledBack: rolledBack,
-        appliedKeys: List<String>.unmodifiable(applied),
-        cause: e,
-        stackTrace: st,
+        results: Map<String, AudioProfileApplyStatus>.unmodifiable(results),
+        liveStateRefreshed: refreshed,
+        cause: firstFailure,
+        stackTrace: firstStackTrace,
       );
     }
+
+    final refreshed = await _refreshLiveState();
+    return AudioProfileApplyReport(
+      results: results,
+      backupSaved: backupSaved,
+      liveStateRefreshed: refreshed,
+    );
   }
 
   /// Reads a profile from the file at [path] and stores it as a new profile.
   ///
   /// A file that already uses a taken id is re-keyed, so importing the same
-  /// profile twice keeps both copies.
+  /// profile twice keeps both copies. Settings that are not whitelisted or
+  /// carry corrupt values are dropped (see [AudioProfile.ignoredKeys]); the
+  /// live settings are refreshed after a successful import.
   Future<AudioProfile> importFromFile(String path) async {
     try {
       final file = File(path);
@@ -286,9 +466,10 @@ class AudioProfileService {
           userMessage: AudioProfileStrings.importMissing,
         );
       }
-      final bytes = await file.readAsBytes();
-      final profile = AudioProfile.decodeBytes(bytes);
-      return await _persist(profile);
+      final profile = await _readProfile(file);
+      final stored = await _persist(profile);
+      await _refreshLiveState();
+      return stored;
     } on AppError {
       rethrow;
     } catch (e, st) {
@@ -308,6 +489,9 @@ class AudioProfileService {
   }
 
   /// Deletes the profile whose id is [id]. Missing files are treated as done.
+  ///
+  /// Deleting the profile that is currently marked as the default also clears
+  /// the default selection so it can never point at a missing file.
   Future<void> delete(String id) async {
     try {
       if (!_safeId.hasMatch(id)) {
@@ -319,6 +503,9 @@ class AudioProfileService {
       final directory = await _directory(create: false);
       final file = File(p.join(directory.path, '$id.json'));
       if (await file.exists()) await file.delete();
+      if (defaultProfileId == id) {
+        await _prefs.remove(defaultProfileKey);
+      }
     } on AppError {
       rethrow;
     } catch (e, st) {
@@ -352,13 +539,46 @@ class AudioProfileService {
     return false;
   }
 
+  /// Reloads the settings state and re-pushes the effect state to the live
+  /// audio session. Both hooks are best-effort: a failure is logged and
+  /// reported through the returned flag, never through the profile write.
+  Future<bool> _refreshLiveState() async {
+    var refreshed = true;
+    try {
+      await _reloadSettings();
+    } catch (e, st) {
+      refreshed = false;
+      ErrorLogger.log(
+        'Reloading settings after an audio profile change failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioProfileService',
+      );
+    }
+    try {
+      await _resyncEffects();
+    } catch (e, st) {
+      refreshed = false;
+      ErrorLogger.log(
+        'Resyncing audio effects after an audio profile change failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioProfileService',
+      );
+    }
+    return refreshed;
+  }
+
   Future<AudioProfile> _persist(AudioProfile profile) async {
     try {
       final directory = await _directory();
       var target = profile;
+      if (!AudioProfile.isValidId(target.id)) {
+        target = profile.withId(_newId());
+      }
       var file = File(p.join(directory.path, '${target.id}.json'));
       if (await file.exists()) {
-        target = profile.withId(_newId());
+        target = target.withId(_newId());
         file = File(p.join(directory.path, '${target.id}.json'));
       }
       await file.writeAsString(target.toJsonString(), flush: true);

@@ -3,7 +3,6 @@ package com.pulsr.music
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbDeviceConnection
@@ -33,47 +32,41 @@ private const val MEDIA_BUTTON_RECEIVER = "androidx.media.session.MediaButtonRec
 /** UAC interface subclass that carries the isochronous audio endpoints. */
 private const val AUDIO_SUBCLASS_STREAMING = 2
 
-private const val MAX_SILENCE_MS = 2500
-private const val MAX_BUFFER_MS = 500
-private const val MIN_TRANSFER_BYTES = 512
-private const val MAX_TRANSFER_BYTES = 65536
-
 private const val MIN_REPORT_BYTES = 8
 private const val TRANSFER_TIMEOUT_MS = 250
 private const val FAILURE_BACKOFF_MS = 50L
 private const val REPEAT_GUARD_MS = 120L
 
-private const val PREF_VID = "vid"
-private const val PREF_PID = "pid"
-private const val PREF_SILENCE_MS = "silenceMs"
-private const val PREF_FORCE_16 = "force16Bit"
-private const val PREF_ALT_RESET = "altResetOnStop"
-private const val PREF_HID_ENABLED = "hidEnabled"
-private const val PREF_TRANSFER_BYTES = "transferSizeBytes"
-private const val PREF_BUFFER_MS = "bufferMs"
-private const val PREF_UPDATED_AT = "updatedAtMs"
+private const val ARG_VID = "vid"
+private const val ARG_PID = "pid"
+private const val ARG_DEVICE_ID = "deviceId"
+private const val ARG_HID_ENABLED = "hidEnabled"
 
 /**
- * USB ergonomics plugin: remembers the per-device quirk profile where a native
- * audio path can read it, measures the USB bus speed, and optionally takes over
- * the DAC's HID consumer-control interface to turn its media buttons into the
- * same `ACTION_MEDIA_BUTTON` broadcasts the app's media session already handles.
+ * USB ergonomics plugin: measures the USB bus speed, returns the device to
+ * alternate setting 0, and optionally takes over the DAC's HID
+ * consumer-control interface to turn its media buttons into the same
+ * `ACTION_MEDIA_BUTTON` broadcasts the app's media session already handles.
  *
  * SCOPE (honest):
- *  - The profile is persisted to [PREFS_NAME] and is the process-level default a
- *    native audio path reads through [readPersistedQuirk]. It is *advice*: this
- *    plugin never opens the AudioStreaming interface for streaming and never
- *    writes PCM.
- *  - Bus speed comes from `/sys/bus/usb/devices/<dev>/speed`. Android's
- *    `UsbDevice` API does not publish it, so sysfs is the only source; some
- *    kernels and locked-down builds do not expose the file.
+ *  - Only knobs with a real consumer are exposed: the HID consumer-control
+ *    claim. The former silence/buffer/transfer-size/16-bit/alt-reset-on-stop
+ *    values were persisted but no audio path ever read them, so they were
+ *    removed instead of staying write-only.
+ *  - Bus speed comes from `/sys/bus/usb/devices/<dev>/speed`, resolved through
+ *    the selected [UsbDevice]'s bus/dev address. Android's `UsbDevice` API does
+ *    not publish the speed, so sysfs is the only source; some kernels and
+ *    locked-down builds do not expose the file, in which case the probe reports
+ *    "unknown" instead of borrowing another device's speed.
  *  - The HID claim force-detaches the kernel HID driver for that interface only
  *    (never the audio interface). While claimed, the DAC's media buttons reach
  *    this plugin instead of the generic HID input path.
- *  - Consumer report layouts differ per device. Reports are decoded both as an
- *    array of consumer usage ids and as a usage bitmap (see
- *    [UsbConsumerUsage.decode]); a DAC using report IDs or a vendor page will
- *    not decode until a matching layout exists.
+ *  - HID sessions are generation-tagged. A stale reader thread can never
+ *    resurrect or tear down a newer claim: only the owning session may mutate
+ *    the shared connection state, and its reports are decoded as either an
+ *    array report or a bitmap report (never both, which double-counted).
+ *  - Consumer report layouts differ per device. A DAC using report IDs or a
+ *    vendor page will not decode until a matching layout exists.
  *
  * Device-unverified: it compiles against platform APIs this app already uses,
  * but no DAC has exercised it on hardware yet.
@@ -85,12 +78,14 @@ class UsbErgonomicsPlugin private constructor(
 
     private val usbManager: UsbManager? =
         context.getSystemService(Context.USB_SERVICE) as? UsbManager
-    private val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val workerThread = HandlerThread("UsbErgonomicsIo").apply { start() }
     private val workerHandler = Handler(workerThread.looper)
     private val hidLock = Any()
     private val lastBroadcastAtMs = java.util.concurrent.ConcurrentHashMap<Int, Long>()
+
+    /** Generation of the live HID session; incremented by every stop. */
+    @Volatile private var hidSession: Long = 0L
 
     @Volatile private var hidThread: HandlerThread? = null
     @Volatile private var hidConnection: UsbDeviceConnection? = null
@@ -99,7 +94,6 @@ class UsbErgonomicsPlugin private constructor(
     @Volatile private var consumerSeen = false
     @Volatile private var lastUsageName: String? = null
     @Volatile private var hidDetail: String? = null
-    @Volatile private var hidStop = true
     @Volatile private var disposed = false
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -116,7 +110,7 @@ class UsbErgonomicsPlugin private constructor(
         }
     }
 
-    /** Stops the HID reader and the worker thread. Safe to call twice. */
+    /** Stops the HID reader (closing the live claim) and the worker thread. */
     fun dispose() {
         disposed = true
         synchronized(hidLock) { stopHidLocked() }
@@ -135,29 +129,15 @@ class UsbErgonomicsPlugin private constructor(
     // ---- applyQuirks ----
 
     private fun handleApplyQuirks(call: MethodCall, result: MethodChannel.Result) {
-        val vid = call.argument<Int>(PREF_VID)
-        val pid = call.argument<Int>(PREF_PID)
-        val requestedTransfer = call.argument<Int>(PREF_TRANSFER_BYTES) ?: 0
         val quirk = QuirkConfig(
-            vid = vid,
-            pid = pid,
-            silenceMs = boundedInt(call, PREF_SILENCE_MS, 0, MAX_SILENCE_MS),
-            force16Bit = call.argument<Boolean>(PREF_FORCE_16) == true,
-            altResetOnStop = call.argument<Boolean>(PREF_ALT_RESET) == true,
-            hidEnabled = call.argument<Boolean>(PREF_HID_ENABLED) == true,
-            transferSizeBytes = if (requestedTransfer == 0) {
-                0
-            } else {
-                requestedTransfer.coerceIn(MIN_TRANSFER_BYTES, MAX_TRANSFER_BYTES)
-            },
-            bufferMs = boundedInt(call, PREF_BUFFER_MS, 0, MAX_BUFFER_MS),
+            vid = call.argument<Int>(ARG_VID),
+            pid = call.argument<Int>(ARG_PID),
+            hidEnabled = call.argument<Boolean>(ARG_HID_ENABLED) == true,
         )
-        UsbQuirkPrefs.persist(prefs, quirk)
         runAsync(result) {
             applyHid(quirk)
             mapOf<String, Any?>(
                 "ok" to true,
-                "persisted" to true,
                 "hid" to hidStatusMap(),
             )
         }
@@ -166,49 +146,68 @@ class UsbErgonomicsPlugin private constructor(
     // ---- probeBusSpeed ----
 
     private fun handleProbeBusSpeed(call: MethodCall, result: MethodChannel.Result) {
-        val vid = call.argument<Int>(PREF_VID)
-        val pid = call.argument<Int>(PREF_PID)
-        runAsync(result) { UsbSysfs.busSpeedMbps(vid, pid) }
+        val vid = call.argument<Int>(ARG_VID)
+        val pid = call.argument<Int>(ARG_PID)
+        val deviceId = call.argument<Int>(ARG_DEVICE_ID)
+        runAsync(result) {
+            // Prefer the exact UsbDevice id the Dart side resolved from the
+            // status stream; fall back to the vid/pid match only when absent.
+            val device = UsbDeviceLookup.audioDeviceById(usbManager, deviceId)
+                ?: UsbDeviceLookup.audioDevice(usbManager, vid, pid)
+                ?: return@runAsync mapOf("mbps" to null, "detail" to "no_audio_device")
+            UsbSysfs.busSpeedMbps(device)
+        }
     }
 
     // ---- resetAltSetting ----
 
     private fun handleResetAltSetting(call: MethodCall, result: MethodChannel.Result) {
-        val vid = call.argument<Int>(PREF_VID)
-        val pid = call.argument<Int>(PREF_PID)
+        val vid = call.argument<Int>(ARG_VID)
+        val pid = call.argument<Int>(ARG_PID)
         runAsync(result) { usbResetAltSetting(usbManager, vid, pid) }
     }
 
     // ---- HID consumer control ----
 
+    /**
+     * Invalidates the previous session, then starts a new one when enabled.
+     *
+     * The generation bump happens before the old thread is told to stop, so the
+     * old reader can never pass an ownership check afterwards.
+     */
     private fun applyHid(quirk: QuirkConfig) {
         synchronized(hidLock) {
             stopHidLocked()
+            if (disposed) {
+                hidDetail = "disposed"
+                return
+            }
             if (!quirk.hidEnabled) {
                 hidDetail = "disabled"
                 return
             }
-            hidStop = false
+            val session = hidSession
             hidDetail = "starting"
             val thread = HandlerThread("UsbErgonomicsHid").apply { start() }
             hidThread = thread
-            Handler(thread.looper).post { claimAndRead(quirk) }
+            Handler(thread.looper).post { claimAndRead(quirk, session) }
         }
     }
 
+    /**
+     * Ends the current HID session: invalidates its generation, closes the live
+     * claim (which unblocks a pending interrupt transfer) and stops its thread.
+     * Must be called with [hidLock] held.
+     */
     private fun stopHidLocked() {
-        hidStop = true
-        // Closing the connection is what unblocks a pending interrupt transfer.
-        try {
-            hidConnection?.close()
-        } catch (e: Exception) {
-            Log.w(TAG, "Closing the HID connection failed: ${e.message}")
-        }
+        hidSession += 1
+        val connection = hidConnection
+        val thread = hidThread
         hidConnection = null
         hidDevice = null
         hidClaimed = false
-        val thread = hidThread
         hidThread = null
+        closeQuietly(connection)
         try {
             thread?.quitSafely()
         } catch (e: Exception) {
@@ -216,29 +215,38 @@ class UsbErgonomicsPlugin private constructor(
         }
     }
 
-    private fun markHidStopped(detail: String) {
-        hidClaimed = false
-        hidDetail = detail
+    /** Whether [session] still owns the shared HID state. */
+    private fun isCurrentSession(session: Long): Boolean =
+        !disposed && hidSession == session
+
+    /** Marks the session stopped without letting a stale session write. */
+    private fun markHidStopped(session: Long, detail: String) {
+        synchronized(hidLock) {
+            if (hidSession != session) return
+            hidClaimed = false
+            hidDetail = detail
+        }
     }
 
-    private fun claimAndRead(quirk: QuirkConfig) {
+    private fun claimAndRead(quirk: QuirkConfig, session: Long) {
+        if (!isCurrentSession(session)) return
         val device = UsbDeviceLookup.audioDevice(usbManager, quirk.vid, quirk.pid)
         if (device == null) {
-            markHidStopped("no_audio_device")
+            markHidStopped(session, "no_audio_device")
             return
         }
         if (usbManager?.hasPermission(device) != true) {
-            markHidStopped("permission_required")
+            markHidStopped(session, "permission_required")
             return
         }
         val hidInterface = UsbDeviceLookup.hidInterface(device)
         if (hidInterface == null) {
-            markHidStopped("no_hid_interface")
+            markHidStopped(session, "no_hid_interface")
             return
         }
         val endpoint = UsbDeviceLookup.interruptInput(hidInterface)
         if (endpoint == null) {
-            markHidStopped("no_hid_input_endpoint")
+            markHidStopped(session, "no_hid_input_endpoint")
             return
         }
         val connection = try {
@@ -252,7 +260,11 @@ class UsbErgonomicsPlugin private constructor(
             null
         }
         if (connection == null) {
-            markHidStopped("open_failed")
+            markHidStopped(session, "open_failed")
+            return
+        }
+        if (!isCurrentSession(session)) {
+            closeQuietly(connection)
             return
         }
         val claimed = try {
@@ -265,38 +277,42 @@ class UsbErgonomicsPlugin private constructor(
             false
         }
         if (!claimed) {
-            try {
-                connection.close()
-            } catch (e: Exception) {
-                Log.w(TAG, "Closing the unclaimed HID connection failed: ${e.message}")
-            }
-            markHidStopped("hid_interface_busy")
+            closeQuietly(connection)
+            markHidStopped(session, "hid_interface_busy")
             return
         }
-        hidConnection = connection
-        hidDevice = device
-        hidClaimed = true
-        hidDetail = null
-        lastUsageName = null
+        val registered = synchronized(hidLock) {
+            if (hidSession != session || disposed) {
+                false
+            } else {
+                hidConnection = connection
+                hidDevice = device
+                hidClaimed = true
+                hidDetail = null
+                lastUsageName = null
+                true
+            }
+        }
+        if (!registered) {
+            // A newer session (or dispose) won the race: drop our claim only.
+            releaseAndClose(connection, hidInterface)
+            return
+        }
         try {
-            readReports(connection, endpoint, device)
+            readReports(connection, endpoint, device, session)
         } catch (e: Exception) {
             Log.w(TAG, "The HID report loop failed: ${e.message}")
-            hidDetail = "read_failed"
+            markHidStopped(session, "read_failed")
         } finally {
-            hidClaimed = false
-            try {
-                connection.releaseInterface(hidInterface)
-            } catch (e: Exception) {
-                Log.w(TAG, "Releasing the HID interface failed: ${e.message}")
+            synchronized(hidLock) {
+                if (hidSession == session) {
+                    hidClaimed = false
+                    hidConnection = null
+                    hidDevice = null
+                    hidThread = null
+                }
             }
-            try {
-                connection.close()
-            } catch (e: Exception) {
-                Log.w(TAG, "Closing the HID connection failed: ${e.message}")
-            }
-            hidConnection = null
-            hidDevice = null
+            releaseAndClose(connection, hidInterface)
         }
     }
 
@@ -304,12 +320,13 @@ class UsbErgonomicsPlugin private constructor(
         connection: UsbDeviceConnection,
         endpoint: UsbEndpoint,
         device: UsbDevice,
+        session: Long,
     ) {
         val buffer = ByteArray(maxOf(endpoint.maxPacketSize, MIN_REPORT_BYTES))
         var previous = ByteArray(0)
-        while (!hidStop) {
+        while (isCurrentSession(session)) {
             if (usbManager?.deviceList?.containsValue(device) != true) {
-                hidDetail = "device_detached"
+                markHidStopped(session, "device_detached")
                 return
             }
             val read = try {
@@ -318,7 +335,7 @@ class UsbErgonomicsPlugin private constructor(
                 Log.w(TAG, "HID transfer failed: ${e.message}")
                 -1
             }
-            if (hidStop) return
+            if (!isCurrentSession(session)) return
             if (read <= 0) {
                 try {
                     Thread.sleep(FAILURE_BACKOFF_MS)
@@ -330,16 +347,18 @@ class UsbErgonomicsPlugin private constructor(
                 continue
             }
             val report = buffer.copyOf(read)
-            dispatchReport(report, previous)
+            dispatchReport(report, previous, session)
             previous = report
         }
     }
 
     /**
      * Broadcasts the media key for every consumer usage that appeared in this
-     * report and was not in the previous one.
+     * report and was not in the previous one. Only the owning session may
+     * update the diagnostics state.
      */
-    private fun dispatchReport(report: ByteArray, previous: ByteArray) {
+    private fun dispatchReport(report: ByteArray, previous: ByteArray, session: Long) {
+        if (!isCurrentSession(session)) return
         val pressed = UsbConsumerUsage.decode(report)
         if (pressed.isEmpty()) return
         val before = UsbConsumerUsage.decode(previous)
@@ -350,6 +369,7 @@ class UsbErgonomicsPlugin private constructor(
             val last = lastBroadcastAtMs[keyCode] ?: 0L
             if (now - last < REPEAT_GUARD_MS) continue
             lastBroadcastAtMs[keyCode] = now
+            if (!isCurrentSession(session)) return
             consumerSeen = true
             lastUsageName = UsbConsumerUsage.nameOf(usage)
             broadcastMediaButton(keyCode)
@@ -359,23 +379,51 @@ class UsbErgonomicsPlugin private constructor(
     /**
      * Sends ACTION_MEDIA_BUTTON to the same receiver the widgets use, so the
      * existing audio-service session handles a DAC button exactly like a headset
-     * button.
+     * button. The key events carry [KeyEvent.FLAG_FROM_SYSTEM] so the receiver
+     * treats them as hardware input instead of an app-internal broadcast.
      */
     private fun broadcastMediaButton(keyCode: Int) {
         try {
             val down = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
                 setComponent(ComponentName(context, MEDIA_BUTTON_RECEIVER))
-                putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                putExtra(Intent.EXTRA_KEY_EVENT, systemKeyEvent(KeyEvent.ACTION_DOWN, keyCode))
             }
             context.sendBroadcast(down)
             val up = Intent(Intent.ACTION_MEDIA_BUTTON).apply {
                 setComponent(ComponentName(context, MEDIA_BUTTON_RECEIVER))
-                putExtra(Intent.EXTRA_KEY_EVENT, KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                putExtra(Intent.EXTRA_KEY_EVENT, systemKeyEvent(KeyEvent.ACTION_UP, keyCode))
             }
             context.sendBroadcast(up)
         } catch (e: Exception) {
             Log.w(TAG, "Broadcasting media key $keyCode failed: ${e.message}")
         }
+    }
+
+    private fun systemKeyEvent(action: Int, keyCode: Int): KeyEvent =
+        KeyEvent.changeFlags(
+            KeyEvent(action, keyCode),
+            KeyEvent.FLAG_FROM_SYSTEM,
+        )
+
+    private fun closeQuietly(connection: UsbDeviceConnection?) {
+        if (connection == null) return
+        try {
+            connection.close()
+        } catch (e: Exception) {
+            Log.w(TAG, "Closing the HID connection failed: ${e.message}")
+        }
+    }
+
+    private fun releaseAndClose(
+        connection: UsbDeviceConnection,
+        hidInterface: UsbInterface,
+    ) {
+        try {
+            connection.releaseInterface(hidInterface)
+        } catch (e: Exception) {
+            Log.w(TAG, "Releasing the HID interface failed: ${e.message}")
+        }
+        closeQuietly(connection)
     }
 
     private fun hidStatusMap(): Map<String, Any?> = mapOf(
@@ -386,11 +434,6 @@ class UsbErgonomicsPlugin private constructor(
     )
 
     // ---- plumbing ----
-
-    private fun boundedInt(call: MethodCall, key: String, min: Int, max: Int): Int {
-        val value = call.argument<Int>(key) ?: min
-        return value.coerceIn(min, max)
-    }
 
     /** Runs [block] on the IO worker and replies on the main thread. */
     private fun runAsync(result: MethodChannel.Result, block: () -> Map<String, Any?>) {
@@ -409,12 +452,6 @@ class UsbErgonomicsPlugin private constructor(
         /** Method channel name handled by this plugin. */
         const val METHOD_CHANNEL = "com.pulsr.music/usb_ergonomics"
 
-        /**
-         * SharedPreferences file that holds the process-level quirk. A native
-         * audio path reads the same keys through [readPersistedQuirk].
-         */
-        const val PREFS_NAME = "pulsr_usb_ergonomics"
-
         private const val METHOD_APPLY = "applyQuirks"
         private const val METHOD_PROBE = "probeBusSpeed"
         private const val METHOD_HID = "getHidStatus"
@@ -432,15 +469,6 @@ class UsbErgonomicsPlugin private constructor(
             channel.setMethodCallHandler(plugin)
             return plugin
         }
-
-        /**
-         * Reads the last applied quirk without instantiating the plugin, for the
-         * native audio path. Returns -1 for an unknown device id, and null when
-         * nothing has ever been applied.
-         */
-        @JvmStatic
-        fun readPersistedQuirk(context: Context): Map<String, Any?>? =
-            UsbQuirkPrefs.read(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
     }
 }
 
@@ -448,71 +476,23 @@ class UsbErgonomicsPlugin private constructor(
 private data class QuirkConfig(
     val vid: Int?,
     val pid: Int?,
-    val silenceMs: Int,
-    val force16Bit: Boolean,
-    val altResetOnStop: Boolean,
     val hidEnabled: Boolean,
-    val transferSizeBytes: Int,
-    val bufferMs: Int,
 )
-
-/**
- * Writes and reads the quirk document in [UsbErgonomicsPlugin.PREFS_NAME].
- *
- * The keys are the contract a native audio path depends on: `vid`, `pid`,
- * `silenceMs`, `force16Bit`, `altResetOnStop`, `hidEnabled`,
- * `transferSizeBytes`, `bufferMs`, plus `updatedAtMs` as the "written at least
- * once" stamp. Writes use `apply()` so a channel call never blocks on disk.
- */
-private object UsbQuirkPrefs {
-
-    fun persist(prefs: SharedPreferences, quirk: QuirkConfig) {
-        try {
-            prefs.edit()
-                .putInt(PREF_VID, quirk.vid ?: -1)
-                .putInt(PREF_PID, quirk.pid ?: -1)
-                .putInt(PREF_SILENCE_MS, quirk.silenceMs)
-                .putBoolean(PREF_FORCE_16, quirk.force16Bit)
-                .putBoolean(PREF_ALT_RESET, quirk.altResetOnStop)
-                .putBoolean(PREF_HID_ENABLED, quirk.hidEnabled)
-                .putInt(PREF_TRANSFER_BYTES, quirk.transferSizeBytes)
-                .putInt(PREF_BUFFER_MS, quirk.bufferMs)
-                .putLong(PREF_UPDATED_AT, System.currentTimeMillis())
-                .apply()
-        } catch (e: Exception) {
-            Log.w(
-                TAG,
-                "Persisting the quirk for vid=${quirk.vid} pid=${quirk.pid} failed: ${e.message}",
-            )
-        }
-    }
-
-    fun read(prefs: SharedPreferences): Map<String, Any?>? {
-        if (!prefs.contains(PREF_UPDATED_AT)) return null
-        return mapOf(
-            PREF_VID to prefs.getInt(PREF_VID, -1),
-            PREF_PID to prefs.getInt(PREF_PID, -1),
-            PREF_SILENCE_MS to prefs.getInt(PREF_SILENCE_MS, 0),
-            PREF_FORCE_16 to prefs.getBoolean(PREF_FORCE_16, false),
-            PREF_ALT_RESET to prefs.getBoolean(PREF_ALT_RESET, false),
-            PREF_HID_ENABLED to prefs.getBoolean(PREF_HID_ENABLED, false),
-            PREF_TRANSFER_BYTES to prefs.getInt(PREF_TRANSFER_BYTES, 0),
-            PREF_BUFFER_MS to prefs.getInt(PREF_BUFFER_MS, 0),
-            PREF_UPDATED_AT to prefs.getLong(PREF_UPDATED_AT, 0L),
-        )
-    }
-}
 
 /**
  * Reads the negotiated link speed for one device from sysfs.
  *
- * Best effort by design: a missing file, an unreadable directory or a kernel
- * that does not publish `speed` all report "not published" instead of failing
- * the channel call. Every IO failure is logged once.
+ * The device is located by its own bus/device address (derived from
+ * `UsbDevice.deviceName`) instead of matching the first sysfs directory with
+ * the same vendor/product ids, so two identical DACs cannot report each
+ * other's speed. A device whose address cannot be resolved, or a kernel that
+ * does not publish `speed`, reports "unknown" instead of guessing.
  */
 private object UsbSysfs {
 
-    fun busSpeedMbps(vid: Int?, pid: Int?): Map<String, Any?> {
+    fun busSpeedMbps(device: UsbDevice): Map<String, Any?> {
+        val address = busAndDeviceAddress(device)
+            ?: return mapOf("mbps" to null, "detail" to "device_address_unknown")
         val entries = try {
             File(SYS_USB_DEVICES).listFiles()
         } catch (e: IOException) {
@@ -527,15 +507,30 @@ private object UsbSysfs {
         }
         for (entry in entries) {
             if (!entry.isDirectory) continue
-            val deviceVid = readHex(File(entry, "idVendor")) ?: continue
-            val devicePid = readHex(File(entry, "idProduct")) ?: continue
-            if (vid != null && deviceVid != vid) continue
-            if (pid != null && devicePid != pid) continue
-            val speed = readDouble(File(entry, "speed")) ?: continue
+            if (readHex(File(entry, "busnum")) != address.first) continue
+            if (readHex(File(entry, "devnum")) != address.second) continue
+            val speed = readDouble(File(entry, "speed"))
+                ?: return mapOf("mbps" to null, "detail" to "speed_not_published")
             return mapOf("mbps" to speed)
         }
         return mapOf("mbps" to null, "detail" to "speed_not_published")
     }
+
+    /** Bus and device numbers parsed from `/dev/bus/usb/<bus>/<device>`. */
+    private fun busAndDeviceAddress(device: UsbDevice): Pair<Int, Int>? {
+        val name = try {
+            device.deviceName
+        } catch (e: Exception) {
+            Log.w(TAG, "Reading the USB device name failed: ${e.message}")
+            null
+        } ?: return null
+        val match = BUS_DEVICE_PATTERN.find(name) ?: return null
+        val bus = match.groupValues[1].toIntOrNull() ?: return null
+        val dev = match.groupValues[2].toIntOrNull() ?: return null
+        return Pair(bus, dev)
+    }
+
+    private val BUS_DEVICE_PATTERN = Regex("""bus/usb/(\d+)/(\d+)""")
 
     private fun readHex(file: File): Int? {
         val text = readTextFile(file) ?: return null
@@ -583,6 +578,15 @@ private object UsbDeviceLookup {
         return null
     }
 
+    /** Exact device by `UsbDevice.deviceId`; null when absent or not audio. */
+    fun audioDeviceById(usbManager: UsbManager?, deviceId: Int?): UsbDevice? {
+        if (deviceId == null) return null
+        val device = usbManager?.deviceList?.values
+            ?.firstOrNull { it.deviceId == deviceId }
+            ?: return null
+        return if (hasAudioInterface(device)) device else null
+    }
+
     fun hidInterface(device: UsbDevice): UsbInterface? {
         for (index in 0 until device.interfaceCount) {
             val iface = device.getInterface(index)
@@ -618,7 +622,9 @@ private object UsbDeviceLookup {
  *
  * Two layouts are covered because cheap DACs use both: an array report whose
  * bytes are usage ids, and a bitmap report where bit n of byte i stands for
- * usage `i * 8 + n`. A report that matches neither yields no usages.
+ * usage `i * 8 + n`. Exactly one layout is decoded per report: decoding both
+ * made a bitmap byte that happens to equal a usage id register as a second,
+ * phantom button.
  */
 private object UsbConsumerUsage {
 
@@ -627,16 +633,29 @@ private object UsbConsumerUsage {
     fun nameOf(usage: Int): String = USAGE_NAMES[usage] ?: "usage_0x${usage.toString(16)}"
 
     fun decode(report: ByteArray): Set<Int> {
+        val array = arrayUsages(report)
+        if (array.isNotEmpty()) return array
+        return bitmapUsages(report)
+    }
+
+    private fun arrayUsages(report: ByteArray): Set<Int> {
+        val usages = HashSet<Int>()
+        for (byte in report) {
+            val value = byte.toInt() and 0xFF
+            if (value != 0 && KEY_CODES.containsKey(value)) usages.add(value)
+        }
+        return usages
+    }
+
+    private fun bitmapUsages(report: ByteArray): Set<Int> {
         val usages = HashSet<Int>()
         for (index in report.indices) {
             val value = report[index].toInt() and 0xFF
             if (value == 0) continue
-            if (KEY_CODES.containsKey(value)) usages.add(value)
             for (bit in 0 until 8) {
-                if (value and (1 shl bit) != 0) {
-                    val usage = index * 8 + bit
-                    if (KEY_CODES.containsKey(usage)) usages.add(usage)
-                }
+                if (value and (1 shl bit) == 0) continue
+                val usage = index * 8 + bit
+                if (KEY_CODES.containsKey(usage)) usages.add(usage)
             }
         }
         return usages

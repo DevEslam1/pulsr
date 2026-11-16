@@ -40,6 +40,9 @@ abstract final class RemoteSourcesStrings {
   static const String hostHint = '192.168.1.10 or nas.local';
   static const String portLabel = 'Port';
   static const String tlsLabel = 'Use HTTPS';
+  static const String cleartextWarning =
+      'HTTPS is off: your password and library traffic will be sent '
+      'unencrypted. Enable it unless the server has no TLS support.';
   static const String rootLabel = 'Root folder';
   static const String rootHint = '/Music';
   static const String rootHintShare = '/Share/Folder';

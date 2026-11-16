@@ -20,6 +20,15 @@ RemoteSource _smbSource({String root = '/Music/Studio'}) {
   );
 }
 
+/// Mirrors `SmbPlugin.joinPath`: the native side joins `basePath` once.
+String _nativeJoin(Map<Object?, Object?> args) {
+  final base = (args['basePath'] as String? ?? '');
+  final path = (args['path'] as String? ?? '');
+  if (path.isEmpty) return base;
+  if (base.isEmpty) return path;
+  return '$base/$path';
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -59,7 +68,8 @@ void main() {
     );
   });
 
-  test('list sends host, port, share and the share-relative path', () async {
+  test('list sends a share-relative path and lets native join the base once',
+      () async {
     install((call) async {
       if (call.method == 'list') {
         return <Map<String, Object?>>[
@@ -95,7 +105,10 @@ void main() {
     expect(args['port'], 445);
     expect(args['share'], 'Music');
     expect(args['basePath'], 'Studio');
-    expect(args['path'], 'Studio');
+    // `path` is share-relative only. SmbPlugin.joinPath() prepends basePath
+    // exactly once, so the final native path is basePath + '/' + path.
+    expect(args['path'], '');
+    expect(_nativeJoin(args), 'Studio');
     expect(args['username'], r'WORKGROUP\media');
     expect(args['password'], 's3cret');
     expect(args['domain'], 'WORKGROUP');
@@ -105,6 +118,22 @@ void main() {
     expect(entries.last.path, 'song.mp3');
     expect(entries.last.sizeBytes, 1234);
     expect(entries.last.modifiedAt, isNotNull);
+  });
+
+  test('a nested path is never prefixed with basePath by Dart', () async {
+    install((call) async {
+      if (call.method == 'list') return <Map<String, Object?>>[];
+      return null;
+    });
+    final provider = SmbFsProvider(_smbSource(), chunkSize: 4);
+
+    await provider.list('Albums/2024');
+
+    final args = calls.single.arguments as Map<Object?, Object?>;
+    expect(args['basePath'], 'Studio');
+    expect(args['path'], 'Albums/2024');
+    expect(args['path'], isNot(startsWith('Studio')));
+    expect(_nativeJoin(args), 'Studio/Albums/2024');
   });
 
   test('a logon failure becomes RemoteAuthError', () async {
@@ -144,7 +173,9 @@ void main() {
         .map((call) => call.arguments as Map<Object?, Object?>)
         .toList();
     expect(chunkCalls.map((args) => args['offset']), [0, 4, 8]);
-    expect(chunkCalls.every((args) => args['path'] == 'Studio/song.mp3'), isTrue);
+    expect(chunkCalls.every((args) => args['path'] == 'song.mp3'), isTrue);
+    expect(chunkCalls.every((args) => _nativeJoin(args) == 'Studio/song.mp3'),
+        isTrue);
   });
 
   test('openRead stops at end and never reads past it', () async {

@@ -5,8 +5,9 @@
 //
 // Pure Dart (no Flutter, no plugins) so the model is unit-testable without a
 // binding. Secrets are deliberately absent: the password lives in
-// RemoteCredentialsStore, and [RemoteSource] only carries the opaque
-// [RemoteSource.credentialKey] that names the secure-storage slot.
+// RemoteCredentialsStore under the source id, and [RemoteSource] never carries
+// a credential slot of its own (an old `credentialKey` field was never read by
+// the store and has been removed).
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
@@ -71,7 +72,6 @@ class RemoteSource {
     String rootPath = '/',
     this.useTls = false,
     this.username,
-    this.credentialKey,
   }) : rootPath = normalizeRootPath(rootPath);
 
   /// Builds a source from raw editor input, normalizing the host and root.
@@ -87,7 +87,6 @@ class RemoteSource {
     String rootPath = '/',
     bool useTls = false,
     String? username,
-    String? credentialKey,
     String? id,
     DateTime? createdAt,
   }) {
@@ -117,7 +116,6 @@ class RemoteSource {
       rootPath: normalizedRoot,
       useTls: useTls,
       username: _nullIfBlank(username),
-      credentialKey: credentialKey,
       createdAt: createdAt ?? DateTime.now(),
     );
   }
@@ -148,7 +146,6 @@ class RemoteSource {
       rootPath: normalizeRootPath(json['rootPath'] as String? ?? '/'),
       useTls: json['useTls'] as bool? ?? false,
       username: _nullIfBlank(json['username'] as String?),
-      credentialKey: _nullIfBlank(json['credentialKey'] as String?),
       createdAt: createdAtMs is num
           ? DateTime.fromMillisecondsSinceEpoch(createdAtMs.toInt())
           : DateTime.fromMillisecondsSinceEpoch(0),
@@ -179,17 +176,47 @@ class RemoteSource {
   /// Login name, `null` for anonymous access.
   final String? username;
 
-  /// Secure-storage slot holding the password; defaults to [id].
-  final String? credentialKey;
-
   /// Creation timestamp, used only to keep list ordering stable.
   final DateTime createdAt;
 
-  /// Secure-storage key that holds this source's secret.
-  String get secretKey => credentialKey ?? id;
+  /// `host:port`, handy for list subtitles and error messages. IPv6 literals
+  /// are bracketed so the result is unambiguous.
+  String get authority =>
+      isIpv6Literal(host) ? '[$host]:$port' : '$host:$port';
 
-  /// `host:port`, handy for list subtitles and error messages.
-  String get authority => '$host:$port';
+  /// Whether [host] is a syntactic IPv6 literal (no brackets).
+  static bool isIpv6Literal(String host) {
+    final value = normalizeHost(host).toLowerCase();
+    if (!value.contains(':') || value.contains(' ')) return false;
+    if (!RegExp(r'^[0-9a-f:.]+$').hasMatch(value)) return false;
+    if (value.contains(':::')) return false;
+    final compression = value.indexOf('::');
+    if (compression != -1 && value.indexOf('::', compression + 2) != -1) {
+      return false;
+    }
+    final groups = value.split(':').where((part) => part.isNotEmpty).toList();
+    var ipv4Groups = 0;
+    for (var i = 0; i < groups.length; i++) {
+      final group = groups[i];
+      if (group.contains('.')) {
+        // A dotted tail is only legal in the final 32 bits.
+        if (i != groups.length - 1) return false;
+        final octets = group.split('.');
+        if (octets.length != 4) return false;
+        for (final octet in octets) {
+          final parsed = int.tryParse(octet);
+          if (parsed == null || parsed < 0 || parsed > 255) return false;
+        }
+        ipv4Groups = 1;
+        continue;
+      }
+      if (group.length > 4) return false;
+      if (int.tryParse(group, radix: 16) == null) return false;
+    }
+    final groupCount = groups.length + ipv4Groups;
+    if (compression == -1) return groupCount == 8;
+    return groupCount < 8;
+  }
 
   /// Whether this record can be used to open a connection.
   bool get isValid => validationError == null;
@@ -212,7 +239,6 @@ class RemoteSource {
     bool? useTls,
     String? username,
     bool clearUsername = false,
-    String? credentialKey,
     DateTime? createdAt,
   }) {
     return RemoteSource(
@@ -224,7 +250,6 @@ class RemoteSource {
       rootPath: rootPath ?? this.rootPath,
       useTls: useTls ?? this.useTls,
       username: clearUsername ? null : (username ?? this.username),
-      credentialKey: credentialKey ?? this.credentialKey,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -239,7 +264,6 @@ class RemoteSource {
         'rootPath': rootPath,
         'useTls': useTls,
         if (username != null) 'username': username,
-        if (credentialKey != null) 'credentialKey': credentialKey,
         'createdAt': createdAt.millisecondsSinceEpoch,
       };
 
@@ -283,11 +307,14 @@ class RemoteSource {
   }
 
   /// Returns an error message for [host], or `null` when acceptable.
+  ///
+  /// A colon is only legal inside a real IPv6 literal; `nas.local:80` still
+  /// means "the port belongs in the port field".
   static String? validateHost(String host) {
     final value = normalizeHost(host);
     if (value.isEmpty) return 'Host is required.';
     if (value.contains(' ')) return 'Host must not contain spaces.';
-    if (value.contains(':')) {
+    if (value.contains(':') && !isIpv6Literal(value)) {
       return 'Enter the port in the port field, not in the host.';
     }
     return null;

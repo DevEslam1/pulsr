@@ -26,6 +26,8 @@ class RemoteCacheSink {
     required RemoteCacheStore store,
     required this.pinned,
     required int maxEntryBytes,
+    this.etag,
+    this.modifiedAt,
   })  : _partialFile = partialFile,
         _sink = sink,
         _store = store,
@@ -36,6 +38,12 @@ class RemoteCacheSink {
 
   /// Whether the entry is pinned on commit.
   final bool pinned;
+
+  /// Server validator captured when this download started.
+  final String? etag;
+
+  /// Server modification time captured when this download started.
+  final DateTime? modifiedAt;
 
   final File _partialFile;
   final RemoteCacheStore _store;
@@ -108,6 +116,8 @@ class RemoteCacheSink {
         partial: _partialFile,
         bytes: _bytes,
         pinned: pinned,
+        etag: etag,
+        modifiedAt: modifiedAt,
       );
     } catch (e, st) {
       ErrorLogger.log(

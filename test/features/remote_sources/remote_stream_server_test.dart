@@ -16,7 +16,10 @@ class _FakeProvider implements RemoteFsProvider {
   final RemoteSource source;
 
   final Map<String, List<int>> files;
+  String? etag;
+  DateTime? modifiedAt;
   int openReadCount = 0;
+  int closeCount = 0;
   final List<({int start, int? end})> requests = <({int start, int? end})>[];
 
   @override
@@ -31,6 +34,8 @@ class _FakeProvider implements RemoteFsProvider {
       name: path.split('/').last,
       isDirectory: false,
       sizeBytes: data.length,
+      etag: etag,
+      modifiedAt: modifiedAt,
     );
   }
 
@@ -45,7 +50,7 @@ class _FakeProvider implements RemoteFsProvider {
         userMessage: 'No such file.',
       );
     }
-    final stop = end == null ? data.length - 1 : end;
+    final stop = end ?? data.length - 1;
     yield data.sublist(start, stop + 1);
   }
 
@@ -53,14 +58,16 @@ class _FakeProvider implements RemoteFsProvider {
   Future<bool> testConnection() async => true;
 
   @override
-  Future<void> close() async {}
+  Future<void> close() async {
+    closeCount++;
+  }
 }
 
-RemoteSource _source() {
+RemoteSource _source({String host = '127.0.0.1'}) {
   return RemoteSource.create(
     kind: RemoteSourceKind.webdav,
     displayName: 'Fake',
-    host: '127.0.0.1',
+    host: host,
     port: 80,
     rootPath: '/',
   );
@@ -140,7 +147,7 @@ void main() {
           maxBytes: 1024 * 1024,
         ),
       );
-      server.registerProvider(provider);
+      await server.registerProvider(provider);
       await server.start();
       client = HttpClient();
     });
@@ -169,24 +176,38 @@ void main() {
       );
     });
 
-    test('uriFor encodes the path as base64url', () {
+    test('uriFor carries a random 128-bit token and the base64url path', () {
       final uri = server.uriFor(_source(), 'Music/a.mp3');
+      final again = server.uriFor(_source(), 'Music/a.mp3');
 
       expect(uri.host, '127.0.0.1');
+      expect(uri.pathSegments, hasLength(4));
       expect(uri.pathSegments.first, 'stream');
       expect(uri.pathSegments[1], _source().id);
+      final token = uri.pathSegments[2];
+      expect(token, matches(RegExp(r'^[A-Za-z0-9_-]{22}$')));
+      expect(base64Url.decode(base64Url.normalize(token)), hasLength(16));
       expect(
-        utf8.decode(base64Url.decode(base64Url.normalize(uri.pathSegments[2]))),
+        utf8.decode(
+          base64Url.decode(base64Url.normalize(uri.pathSegments[3])),
+        ),
         'Music/a.mp3',
       );
+      expect(again.pathSegments[2], token,
+          reason: 'a source keeps one token across seeks');
     });
 
-    test('a full GET answers 200 with the whole file', () async {
+    test('a full GET answers 200 with the whole file as a chunked body',
+        () async {
       final response = await send('Music/a.mp3');
       final body = await response.expand((chunk) => chunk).toList();
 
       expect(response.statusCode, HttpStatus.ok);
-      expect(response.headers.value(HttpHeaders.contentLengthHeader), '64');
+      expect(
+        response.headers.value(HttpHeaders.contentLengthHeader),
+        isNull,
+        reason: 'a live provider stream is not length-verified: use chunked',
+      );
       expect(response.headers.value(HttpHeaders.acceptRangesHeader), 'bytes');
       expect(body, payload);
     });
@@ -201,12 +222,16 @@ void main() {
         response.headers.value(HttpHeaders.contentRangeHeader),
         'bytes 10-19/64',
       );
+      expect(
+        response.headers.value(HttpHeaders.contentLengthHeader),
+        isNull,
+      );
       expect(body, payload.sublist(10, 20));
       expect(provider.requests.single.start, 10);
       expect(provider.requests.single.end, 19);
     });
 
-    test('HEAD answers headers without a body', () async {
+    test('HEAD answers a metadata content length without a body', () async {
       final response = await send('Music/a.mp3', method: 'HEAD');
       final body = await response.expand((chunk) => chunk).toList();
 
@@ -226,15 +251,86 @@ void main() {
       await response.drain<void>();
     });
 
-    test('an unknown source id answers 404', () async {
+    test('an unknown source id answers 404 even with a well-formed token', () async {
       final uri = Uri.parse(
-        'http://127.0.0.1:${server.port}/stream/unknown/${base64UrlEncode(utf8.encode('a.mp3'))}',
+        'http://127.0.0.1:${server.port}/stream/unknown/'
+        '${'a' * 22}/${base64UrlEncode(utf8.encode('a.mp3'))}',
       );
       final request = await client.getUrl(uri);
       final response = await request.close();
 
       expect(response.statusCode, HttpStatus.notFound);
       await response.drain<void>();
+    });
+
+    test('a URL without the token segment is rejected', () async {
+      final uri = Uri.parse(
+        'http://127.0.0.1:${server.port}/stream/${_source().id}/'
+        '${base64UrlEncode(utf8.encode('Music/a.mp3'))}',
+      );
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+
+      expect(response.statusCode, HttpStatus.notFound);
+      await response.drain<void>();
+    });
+
+    test('a wrong token answers 403 and never reaches the provider', () async {
+      final uri = Uri.parse(
+        'http://127.0.0.1:${server.port}/stream/${_source().id}/'
+        '${'b' * 22}/${base64UrlEncode(utf8.encode('Music/a.mp3'))}',
+      );
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+
+      expect(response.statusCode, HttpStatus.forbidden);
+      expect(provider.openReadCount, 0);
+      await response.drain<void>();
+    });
+
+    test('a decoded ../ traversal is rejected before the provider', () async {
+      final uri = Uri.parse(
+        'http://127.0.0.1:${server.port}/stream/${_source().id}/'
+        '${server.uriFor(_source(), 'x').pathSegments[2]}/'
+        '${base64UrlEncode(utf8.encode('../../etc/passwd'))}',
+      );
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+
+      expect(response.statusCode, HttpStatus.badRequest);
+      expect(provider.openReadCount, 0);
+      await response.drain<void>();
+    });
+
+    test('unregisterSource revokes the token and closes the provider', () async {
+      final uri = server.uriFor(_source(), 'Music/a.mp3');
+
+      await server.unregisterSource(_source().id);
+
+      expect(provider.closeCount, 1);
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      expect(response.statusCode, HttpStatus.notFound);
+      await response.drain<void>();
+    });
+
+    test('registerProvider closes the previous provider and keeps the token',
+        () async {
+      final token = server.uriFor(_source(), 'Music/a.mp3').pathSegments[2];
+      final replacement = _FakeProvider(_source(), <String, List<int>>{
+        'Music/a.mp3': List<int>.filled(64, 9),
+      });
+
+      await server.registerProvider(replacement);
+
+      expect(provider.closeCount, 1);
+      final uri = server.uriFor(_source(), 'Music/a.mp3');
+      expect(uri.pathSegments[2], token);
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      final body = await response.expand((chunk) => chunk).toList();
+      expect(body, List<int>.filled(64, 9));
+      expect(replacement.openReadCount, 1);
     });
 
     test('a missing file surfaces the provider error as 404', () async {
@@ -251,7 +347,7 @@ void main() {
         maxBytes: 1024 * 1024,
       );
       final warming = RemoteStreamServer(cache: cache);
-      warming.registerProvider(provider);
+      await warming.registerProvider(provider);
       await warming.start();
       try {
         final first = await client.getUrl(warming.uriFor(_source(), 'Music/a.mp3'));
@@ -282,8 +378,52 @@ void main() {
           1,
           reason: 'the cached file must serve the range without a provider read',
         );
+        expect(
+          secondResponse.headers.value(HttpHeaders.contentLengthHeader),
+          '4',
+          reason: 'a cached file proves the byte count',
+        );
       } finally {
         await warming.stop();
+      }
+    });
+
+    test('a changed etag invalidates the cached file', () async {
+      final cache = RemoteCacheStore(
+        directoryProvider: () async => tempDir,
+        maxBytes: 1024 * 1024,
+      );
+      final revalidating = RemoteStreamServer(cache: cache);
+      provider.etag = 'v1';
+      await revalidating.registerProvider(provider);
+      await revalidating.start();
+      try {
+        final first =
+            await client.getUrl(revalidating.uriFor(_source(), 'Music/a.mp3'));
+        await (await first.close()).drain<void>();
+
+        var cached = false;
+        for (var attempt = 0; attempt < 40 && !cached; attempt++) {
+          cached = await cache.contains(_source().id, 'Music/a.mp3');
+          if (!cached) {
+            await Future<void>.delayed(const Duration(milliseconds: 25));
+          }
+        }
+        expect(cached, isTrue);
+
+        // The server now reports a different validator for the same path.
+        provider.etag = 'v2';
+        provider.files['Music/a.mp3'] = List<int>.filled(64, 3);
+
+        final second =
+            await client.getUrl(revalidating.uriFor(_source(), 'Music/a.mp3'));
+        final body = await (await second.close()).expand((c) => c).toList();
+
+        expect(provider.openReadCount, 2,
+            reason: 'a stale cache entry must be re-downloaded');
+        expect(body, List<int>.filled(64, 3));
+      } finally {
+        await revalidating.stop();
       }
     });
   });

@@ -115,4 +115,69 @@ void main() {
       isTrue,
     );
   });
+
+  test('mergeAndSave keeps a stored password when the draft left it blank',
+      () async {
+    final storage = _FakeStorage();
+    final store = RemoteCredentialsStore(storage);
+    await store.save(
+      'a',
+      const RemoteCredentials(username: 'media', password: 's3cret'),
+    );
+
+    final merged = await store.mergeAndSave(
+      'a',
+      const RemoteCredentials(username: 'media', password: ''),
+    );
+
+    expect(merged.password, 's3cret');
+    expect((await store.read('a'))?.password, 's3cret');
+  });
+
+  test('mergeAndSave uses a newly typed password', () async {
+    final storage = _FakeStorage();
+    final store = RemoteCredentialsStore(storage);
+    await store.save(
+      'a',
+      const RemoteCredentials(username: 'media', password: 'old'),
+    );
+
+    await store.mergeAndSave(
+      'a',
+      const RemoteCredentials(username: 'media', password: 'new'),
+    );
+
+    expect((await store.read('a'))?.password, 'new');
+  });
+
+  test('mergeAndSave never deletes a secret for an empty draft', () async {
+    final storage = _FakeStorage();
+    final store = RemoteCredentialsStore(storage);
+    // Simulates replacing a source by id: the editor has no password to offer
+    // and no username either.
+    await store.save(
+      'a',
+      const RemoteCredentials(username: 'media', password: 's3cret'),
+    );
+
+    await store.mergeAndSave(
+      'a',
+      const RemoteCredentials(username: '', password: ''),
+    );
+
+    expect(await store.read('a'), isNotNull);
+    expect((await store.read('a'))?.password, 's3cret');
+  });
+
+  test('mergeAndSave writes no empty blob for anonymous access', () async {
+    final storage = _FakeStorage();
+    final store = RemoteCredentialsStore(storage);
+
+    await store.mergeAndSave(
+      'new',
+      const RemoteCredentials(username: '', password: ''),
+    );
+
+    expect(storage.values, isEmpty);
+  });
 }

@@ -95,48 +95,71 @@ void main() {
       );
     });
 
-    test('ignores unknown top-level keys but keeps unknown settings', () {
+    test('ignores unknown top-level keys and drops non-whitelisted settings',
+        () {
       final Map<String, Object?> json = _baseJson(
         values: <String, Object?>{
           PrefsKeys.eqEnabled: false,
           'future_setting': 7,
+          'library_path': '/music',
         },
       )..['futureSection'] = <String, Object?>{'a': 1};
 
       final profile = AudioProfile.fromJson(json);
 
       expect(profile.values[PrefsKeys.eqEnabled], isFalse);
-      expect(profile.values['future_setting'], 7);
+      expect(profile.values.containsKey('future_setting'), isFalse);
+      expect(profile.values.containsKey('library_path'), isFalse);
+      expect(
+          profile.ignoredKeys,
+          containsAll(<String>[
+            'future_setting',
+            'library_path',
+          ]));
       expect(profile.toJson().containsKey('futureSection'), isFalse);
+      expect(
+        profile.values.keys.every(AudioProfileKeys.isWhitelisted),
+        isTrue,
+      );
     });
 
-    test('rejects unsupported value types', () {
-      expect(
-        () => AudioProfile.fromJson(
-          _baseJson(
-            values: <String, Object?>{
-              'bad': <Object?>[1, 2],
-            },
-          ),
+    test('drops corrupt settings instead of failing the import', () {
+      final profile = AudioProfile.fromJson(
+        _baseJson(
+          values: <String, Object?>{
+            PrefsKeys.eqEnabled: true,
+            PrefsKeys.eqGains: <Object?>[1, 2],
+            PrefsKeys.eqPreamp: <String, Object?>{'nested': true},
+            PrefsKeys.eqBandCount: null,
+          },
         ),
-        throwsA(isA<ProfileFormatError>()),
       );
-      expect(
-        () => AudioProfile.fromJson(
-          _baseJson(
-            values: <String, Object?>{
-              'bad': <String, Object?>{'nested': true},
-            },
-          ),
-        ),
-        throwsA(isA<ProfileFormatError>()),
-      );
-      expect(
-        () => AudioProfile.fromJson(
-          _baseJson(values: <String, Object?>{'bad': null}),
-        ),
-        throwsA(isA<ProfileFormatError>()),
-      );
+
+      expect(profile.values[PrefsKeys.eqEnabled], isTrue);
+      expect(profile.values.containsKey(PrefsKeys.eqGains), isFalse);
+      expect(profile.values.containsKey(PrefsKeys.eqPreamp), isFalse);
+      expect(profile.values.containsKey(PrefsKeys.eqBandCount), isFalse);
+      expect(profile.ignoredKeys, contains(PrefsKeys.eqGains));
+      expect(profile.ignoredKeys, contains(PrefsKeys.eqPreamp));
+      expect(profile.ignoredKeys, contains(PrefsKeys.eqBandCount));
+    });
+
+    test('degrades corrupt optional metadata but keeps required fields', () {
+      final Map<String, Object?> json = _baseJson(
+        values: <String, Object?>{PrefsKeys.eqEnabled: true},
+      )
+        ..['appVersion'] = 42
+        ..['deviceVid'] = 'not-a-number'
+        ..['devicePid'] = -3
+        ..['deviceName'] = <String, Object?>{'nested': true};
+
+      final profile = AudioProfile.fromJson(json);
+
+      expect(profile.appVersion, 'unknown');
+      expect(profile.deviceVid, isNull);
+      expect(profile.devicePid, isNull);
+      expect(profile.deviceName, isNull);
+      expect(profile.values[PrefsKeys.eqEnabled], isTrue);
     });
 
     test('exposes values as an unmodifiable map', () {
@@ -213,6 +236,38 @@ void main() {
         () => AudioProfile.fromJson(emptyName),
         throwsA(isA<ProfileFormatError>()),
       );
+    });
+
+    test('rejects an empty setting key', () {
+      expect(
+        () => AudioProfile.fromJson(
+          _baseJson(values: <String, Object?>{'': 1}),
+        ),
+        throwsA(
+          isA<ProfileFormatError>().having(
+            (error) => error.code,
+            'code',
+            'audio-profile-empty-key',
+          ),
+        ),
+      );
+    });
+
+    test('rejects an id that could escape the profile folder', () {
+      for (final id in <String>['../escape', 'a/b', 'a\\b', 'x' * 81]) {
+        final json = _baseJson()..['id'] = id;
+        expect(
+          () => AudioProfile.fromJson(json),
+          throwsA(
+            isA<ProfileFormatError>().having(
+              (error) => error.code,
+              'code',
+              'audio-profile-id-invalid',
+            ),
+          ),
+          reason: 'id "$id" must be rejected',
+        );
+      }
     });
   });
 

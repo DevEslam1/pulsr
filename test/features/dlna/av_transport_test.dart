@@ -132,6 +132,37 @@ void main() {
         '</DIDL-Lite>',
       );
     });
+
+    test('adds res@size and res@duration when known and escapes them', () {
+      final metadata = AvTransportClient.buildDidlLiteMetadata(
+        url: 'http://192.168.1.5:5555/media/abc?x=1&y=2',
+        title: 'A & B <C>',
+        artist: 'Artist "Q"',
+        album: "Album's",
+        mimeType: 'audio/flac',
+        size: 123456,
+        duration: const Duration(minutes: 3, seconds: 45),
+        itemId: 'a&b',
+      );
+
+      expect(
+        metadata,
+        contains(
+          '<item id="a&amp;b" parentID="0" restricted="1">',
+        ),
+      );
+      expect(metadata, contains('<dc:title>A &amp; B &lt;C&gt;</dc:title>'));
+      expect(metadata, contains('<dc:creator>Artist &quot;Q&quot;</dc:creator>'));
+      expect(metadata, contains('<upnp:album>Album&apos;s</upnp:album>'));
+      expect(
+        metadata,
+        contains(
+          '<res protocolInfo="http-get:*:audio/flac:*" size="123456" '
+          'duration="00:03:45">'
+          'http://192.168.1.5:5555/media/abc?x=1&amp;y=2</res>',
+        ),
+      );
+    });
   });
 
   group('AvTransportClient requests', () {
@@ -224,6 +255,62 @@ void main() {
                 'errorDescription',
                 'Illegal seek target',
               ),
+        ),
+      );
+    });
+
+    test('fails on an HTTP status >= 400 with a malformed body', () async {
+      final av = AvTransportClient(
+        controlUrl,
+        client: MockClient(
+          (_) async => http.Response('Internal Server Error', 500),
+        ),
+      );
+      addTearDown(av.close);
+
+      await expectLater(
+        av.play(),
+        throwsA(
+          isA<UpnpActionError>()
+              .having((error) => error.code, 'code', 'DLNA_HTTP_500')
+              .having((error) => error.action, 'action', 'Play'),
+        ),
+      );
+    });
+
+    test('does not treat the word Fault in a normal response as a fault',
+        () async {
+      const body = '<?xml version="1.0"?>'
+          '<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">'
+          '<s:Body><u:GetPositionInfoResponse>'
+          '<RelTime>0:00:07</RelTime>'
+          '<CurrentTrackURI>http://host/Fault</CurrentTrackURI>'
+          '</u:GetPositionInfoResponse></s:Body></s:Envelope>';
+      final av = AvTransportClient(
+        controlUrl,
+        client: MockClient((_) async => http.Response(body, 200)),
+      );
+      addTearDown(av.close);
+
+      final info = await av.getPositionInfo();
+
+      expect(info.position, const Duration(seconds: 7));
+      expect(info.trackUri, 'http://host/Fault');
+    });
+
+    test('recognizes a namespaced SOAP Fault even on HTTP 500', () async {
+      final av = AvTransportClient(
+        controlUrl,
+        client: MockClient((_) async => http.Response(_faultResponse, 500)),
+      );
+      addTearDown(av.close);
+
+      await expectLater(
+        av.play(),
+        throwsA(
+          isA<UpnpActionError>()
+              .having((error) => error.errorCode, 'errorCode', 714)
+              .having((error) => error.code, 'code', 'DLNA_UPNP_ERROR_714'),
         ),
       );
     });
