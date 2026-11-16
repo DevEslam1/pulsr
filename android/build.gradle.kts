@@ -4,7 +4,7 @@ import org.gradle.api.tasks.compile.JavaCompile
  * Pulsr Music - Root Build Configuration
  *
  * Requirements:
- * - Android Gradle Plugin (AGP): 9.0.1+
+ * - Android Gradle Plugin (AGP): 9.1.1+
  * - Gradle: 8.11+ / 9.0+
  * - Kotlin: 2.0+ (JVM Target 17)
  * - Java / JDK: 17
