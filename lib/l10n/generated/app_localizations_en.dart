@@ -10560,4 +10560,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get databaseHealthSearchRepairFailed => 'Search index repair failed';
+
+  @override
+  String get radioRecommendations => 'Radio Recommendations';
+
+  @override
+  String get alwaysOnRadio => 'Always on Radio';
+
+  @override
+  String get alwaysOnRadioDesc =>
+      'Automatically enable during radio; disable for local and online tracks';
+
+  @override
+  String get styleDefaultNotice =>
+      'Default: Tajweed • Changes saved as default';
+
+  @override
+  String ambientVolumePercent(int percent) {
+    return 'Volume: $percent%';
+  }
 }

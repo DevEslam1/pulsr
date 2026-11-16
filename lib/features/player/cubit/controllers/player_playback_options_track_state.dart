@@ -58,6 +58,7 @@ extension PlayerPlaybackOptionsTrackState on PlayerPlaybackOptionsController {
       }
     }
     _syncAbLoopFromHandler();
+    AmbientSoundService().onCurrentSongChanged(song);
     await handleTrackChangeQuranMode(song);
     await _applyPerSongEqForTrack(song);
   }

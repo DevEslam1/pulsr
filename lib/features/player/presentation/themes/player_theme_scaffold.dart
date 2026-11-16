@@ -20,6 +20,7 @@ import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
 import '../widgets/player_volume_bar.dart';
+import '../widgets/radio_now_playing_recommendations.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -542,7 +543,17 @@ class PlayerThemeScaffold extends StatelessWidget {
                     SizedBox(height: metrics.spacingTrackToSeek),
                   ],
                   resolvedSeekBar,
-                  SizedBox(height: metrics.spacingSeekToControls),
+                  if (song?.source == SongSource.radio) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    RadioNowPlayingRecommendations(
+                      props: props,
+                      cubit: cubit,
+                      metrics: metrics,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                  ] else ...[
+                    SizedBox(height: metrics.spacingSeekToControls),
+                  ],
                   resolvedControls,
                   if (isInSplitView && !metrics.isVeryShortHeight)
                     PlayerVolumeBar(cubit: cubit, activeColor: activeColor),

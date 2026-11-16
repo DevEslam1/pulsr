@@ -1,5 +1,6 @@
 // lib/data/services/usb_exclusive_service.dart
 import 'dart:async';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
@@ -285,6 +286,10 @@ class UsbExclusiveService {
     _last = status;
     if (!_controller.isClosed) _controller.add(status);
   }
+
+  /// Test seam: drive the same broadcast path the platform event channel uses.
+  @visibleForTesting
+  void debugPublishStatus(UsbExclusiveStatus status) => _publish(status);
 
   // Null means unknown, not a confirmed inactive stream. Never use the cache
   // to acknowledge a start/stop or a hardware volume write.

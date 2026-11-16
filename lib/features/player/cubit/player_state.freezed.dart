@@ -3491,7 +3491,7 @@ class _DspSlice extends DspSlice {
       this.hasOemAudio = false,
       List<String> detectedOemEngines = const [],
       this.isQuranModeEnabled = false,
-      this.quranReciterStyle = QuranReciterStyle.murattal})
+      this.quranReciterStyle = QuranReciterStyle.mujawwad})
       : _multibandCompressorBands = multibandCompressorBands,
         _dynamicEqBands = dynamicEqBands,
         _detectedOemEngines = detectedOemEngines,

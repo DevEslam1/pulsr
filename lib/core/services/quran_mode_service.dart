@@ -16,8 +16,19 @@ class QuranModeService {
   static const String _keyStyle = 'quran_reciter_style';
   static const String _keyStyleTunings = 'quran_reciter_style_tunings_v1';
   static const String _keyUserOverride = 'quran_mode_user_override_v1';
+  static const String _keyAlwaysOnRadio = 'quran_mode_always_on_radio';
 
   QuranModeService();
+
+  Future<bool> isAlwaysOnRadio() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_keyAlwaysOnRadio) ?? false;
+  }
+
+  Future<void> setAlwaysOnRadio(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyAlwaysOnRadio, value);
+  }
 
   Future<bool> isEnabled() async {
     final prefs = await SharedPreferences.getInstance();

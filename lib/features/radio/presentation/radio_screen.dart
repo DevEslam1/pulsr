@@ -2,9 +2,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/services/radio_station_store.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/pulsr_haptics.dart';
 import '../../../core/utils/search_algorithm_utils.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
@@ -15,6 +17,7 @@ import '../../../core/widgets/pulsr_toast.dart';
 import '../../../domain/models/radio_station.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
+import '../../sheets/sort_filter_sheet.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -49,6 +52,8 @@ class _RadioScreenState extends State<RadioScreen> {
         setState(() => _searchQuery = text);
       }
     });
+    RadioStationStore.radioSortBy.addListener(_onSortChanged);
+    RadioStationStore.radioSortAsc.addListener(_onSortChanged);
     _store.ready.then((_) {
       if (!mounted) return;
       setState(() {
@@ -61,12 +66,24 @@ class _RadioScreenState extends State<RadioScreen> {
 
   @override
   void dispose() {
+    RadioStationStore.radioSortBy.removeListener(_onSortChanged);
+    RadioStationStore.radioSortAsc.removeListener(_onSortChanged);
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onSortChanged() {
+    if (!mounted) return;
+    setState(() => _cachedFilterKey = null);
+  }
+
   void _refresh() {
-    if (mounted) setState(() => _stations = _store.list);
+    if (mounted) {
+      setState(() {
+        _stations = _store.list;
+        _cachedFilterKey = null;
+      });
+    }
   }
 
   Future<void> _reload() async {
@@ -76,6 +93,7 @@ class _RadioScreenState extends State<RadioScreen> {
       _stations = _store.list;
       _loading = false;
       _loadFailed = _store.loadFailed;
+      _cachedFilterKey = null;
     });
   }
 
@@ -98,8 +116,10 @@ class _RadioScreenState extends State<RadioScreen> {
   List<RadioStation>? _cachedFilteredStations;
 
   List<RadioStation> get _filteredStations {
+    final sortBy = RadioStationStore.radioSortBy.value;
+    final sortAscending = RadioStationStore.radioSortAsc.value;
     final key =
-        '$_selectedGenre|$_searchQuery|${_stations.length}|${identityHashCode(_stations)}';
+        '$_selectedGenre|$_searchQuery|$sortBy|$sortAscending|${_stations.length}|${identityHashCode(_stations)}';
     if (_cachedFilterKey == key && _cachedFilteredStations != null) {
       return _cachedFilteredStations!;
     }
@@ -121,6 +141,40 @@ class _RadioScreenState extends State<RadioScreen> {
       }
       return true;
     }).toList();
+
+    final langCode = Localizations.localeOf(context).languageCode;
+    switch (sortBy) {
+      case 'name':
+        filtered.sort((a, b) {
+          final nameA = RadioStationStore.localizedStationName(a, langCode);
+          final nameB = RadioStationStore.localizedStationName(b, langCode);
+          final cmp = nameA.toLowerCase().compareTo(nameB.toLowerCase());
+          return sortAscending ? cmp : -cmp;
+        });
+        break;
+      case 'recent':
+      case 'lastPlayed':
+        filtered.sort((a, b) {
+          final timeA = a.lastPlayed ?? 0;
+          final timeB = b.lastPlayed ?? 0;
+          if (timeA != timeB) {
+            final cmp = timeB.compareTo(timeA);
+            return sortAscending ? -cmp : cmp;
+          }
+          return 0;
+        });
+        break;
+      case 'default':
+      default:
+        if (!sortAscending) {
+          final reversed = filtered.reversed.toList();
+          filtered
+            ..clear()
+            ..addAll(reversed);
+        }
+        break;
+    }
+
     _cachedFilterKey = key;
     _cachedFilteredStations = filtered;
     return filtered;
@@ -227,30 +281,71 @@ class _RadioScreenState extends State<RadioScreen> {
     _refresh();
   }
 
+  void _openSortFilterSheet() {
+    PulsrHaptics.selectionClick();
+    SortFilterSheet.show(
+      context,
+      currentSort: RadioStationStore.radioSortBy.value,
+      ascending: RadioStationStore.radioSortAsc.value,
+      options: [
+        SortOptionSpec(
+          key: 'default',
+          label: context.l10n.sortRadioCardsDefault,
+          icon: Icons.auto_awesome_rounded,
+        ),
+        SortOptionSpec(
+          key: 'name',
+          label: context.l10n.sortAZ,
+          icon: Icons.sort_by_alpha_rounded,
+        ),
+        SortOptionSpec(
+          key: 'recent',
+          label: context.l10n.sortRadioCardsRecent,
+          icon: Icons.history_rounded,
+        ),
+      ],
+      onApply: (sortBy, ascending) async {
+        await RadioStationStore.setRadioSort(
+          sortBy: sortBy,
+          ascending: ascending,
+        );
+      },
+    );
+  }
+
   Future<void> _showStationActions(RadioStation station) async {
+    PulsrHaptics.heavyImpact();
+    final langCode = Localizations.localeOf(context).languageCode;
+    final displayStationName =
+        RadioStationStore.localizedStationName(station, langCode);
+
     await PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      builder: (sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.edit_rounded),
-            title: Text(context.l10n.radioEdit),
-            onTap: () {
-              Navigator.of(sheetContext).pop();
-              _showAddDialog(initial: station);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.delete_outline_rounded),
-            title: Text(context.l10n.radioDelete),
-            onTap: () {
-              Navigator.of(sheetContext).pop();
-              _confirmDelete(station);
-            },
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
+      builder: (sheetContext) => _RadioStationActionsSheet(
+        station: station,
+        displayStationName: displayStationName,
+        onEdit: () {
+          Navigator.of(sheetContext).pop();
+          _showAddDialog(initial: station);
+        },
+        onDelete: () {
+          Navigator.of(sheetContext).pop();
+          _confirmDelete(station);
+        },
+        onOpenSortSheet: () {
+          Navigator.of(sheetContext).pop();
+          _openSortFilterSheet();
+        },
+        onSelectSort: (sortBy, ascending) async {
+          PulsrHaptics.selectionClick();
+          await RadioStationStore.setRadioSort(
+            sortBy: sortBy,
+            ascending: ascending,
+          );
+          if (sheetContext.mounted) {
+            Navigator.of(sheetContext).pop();
+          }
+        },
       ),
     );
   }
@@ -599,6 +694,7 @@ class _RadioScreenState extends State<RadioScreen> {
             text: displayStationName,
             textAlign: TextAlign.start,
             allowUserPause: false,
+            showTooltip: false,
             velocity: 28.0,
             blankSpace: 36.0,
             style: TextStyle(
@@ -637,6 +733,7 @@ class _RadioScreenState extends State<RadioScreen> {
                       : _stationFallbackSubtitle(station, isArabic: isArabic),
                   textAlign: TextAlign.start,
                   allowUserPause: false,
+                  showTooltip: false,
                   velocity: 24.0,
                   blankSpace: 32.0,
                   style: TextStyle(
@@ -896,6 +993,24 @@ class _RadioScreenState extends State<RadioScreen> {
                       isSuccess: true,
                     );
                   },
+                );
+              },
+            ),
+            ValueListenableBuilder<String>(
+              valueListenable: RadioStationStore.radioSortBy,
+              builder: (context, activeSort, _) {
+                final isCustomSort = activeSort != 'default';
+                return IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  tooltip: context.l10n.sortRadioCardsTitle,
+                  icon: Icon(
+                    Icons.sort_rounded,
+                    color: isCustomSort ? p.accent : null,
+                  ),
+                  onPressed: _openSortFilterSheet,
                 );
               },
             ),
@@ -1666,6 +1781,274 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _RadioStationActionsSheet extends StatelessWidget {
+  final RadioStation station;
+  final String displayStationName;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onOpenSortSheet;
+  final void Function(String sortBy, bool ascending) onSelectSort;
+
+  const _RadioStationActionsSheet({
+    required this.station,
+    required this.displayStationName,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onOpenSortSheet,
+    required this.onSelectSort,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+
+    return Material(
+      color: Colors.transparent,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.sm,
+          ),
+          child: ValueListenableBuilder<String>(
+            valueListenable: RadioStationStore.radioSortBy,
+            builder: (context, activeSort, _) {
+              return ValueListenableBuilder<bool>(
+                valueListenable: RadioStationStore.radioSortAsc,
+                builder: (context, activeAsc, _) {
+                  final isCustomSort = activeSort != 'default' || !activeAsc;
+
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header
+                      Row(
+                        children: [
+                          _StationArtwork(station: station, isPlaying: false),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  displayStationName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: AppFontSize.title,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  station.genre != null &&
+                                          station.genre!.isNotEmpty
+                                      ? station.genre!
+                                      : station.url,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.caption,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Divider(color: p.hairline, height: 1),
+                      const SizedBox(height: AppSpacing.xs),
+
+                      // Edit tile
+                      ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.r12All,
+                        ),
+                        leading: const Icon(Icons.edit_rounded),
+                        title: Text(context.l10n.radioEdit),
+                        onTap: onEdit,
+                      ),
+
+                      // Delete tile
+                      ListTile(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.r12All,
+                        ),
+                        leading: const Icon(Icons.delete_outline_rounded),
+                        title: Text(context.l10n.radioDelete),
+                        onTap: onDelete,
+                      ),
+
+                      const SizedBox(height: AppSpacing.xs),
+                      Divider(color: p.hairline, height: 1),
+                      const SizedBox(height: AppSpacing.sm),
+
+                      // Sort section header
+                      Row(
+                        children: [
+                          Icon(Icons.sort_rounded, size: 16, color: p.accent),
+                          const SizedBox(width: AppSpacing.xs),
+                          Text(
+                            context.l10n.sortRadioCardsTitle,
+                            style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (isCustomSort)
+                            TextButton.icon(
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                              ),
+                              onPressed: () {
+                                onSelectSort('default', true);
+                                PulsrToast.show(
+                                  context,
+                                  message:
+                                      context.l10n.radioCardOrderResetToast,
+                                  isSuccess: true,
+                                );
+                              },
+                              icon: Icon(
+                                Icons.restart_alt_rounded,
+                                size: 15,
+                                color: p.accent,
+                              ),
+                              label: Text(
+                                context.l10n.resetRadioCardOrder,
+                                style: TextStyle(
+                                  color: p.accent,
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+
+                      // Row of sort chips: Default, A-Z (or Z-A), Recent
+                      Row(
+                        children: [
+                          _RadioSortOptionChip(
+                            icon: Icons.auto_awesome_rounded,
+                            label: context.l10n.sortRadioCardsDefault,
+                            selected: activeSort == 'default' && activeAsc,
+                            onTap: () => onSelectSort('default', true),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          _RadioSortOptionChip(
+                            icon: Icons.sort_by_alpha_rounded,
+                            label: (activeSort == 'name' && !activeAsc)
+                                ? 'Z–A'
+                                : context.l10n.sortRadioCardsAlphabetical,
+                            selected: activeSort == 'name',
+                            onTap: () {
+                              final nextAsc =
+                                  activeSort == 'name' ? !activeAsc : true;
+                              onSelectSort('name', nextAsc);
+                            },
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                          _RadioSortOptionChip(
+                            icon: Icons.history_rounded,
+                            label: context.l10n.sortRadioCardsRecent,
+                            selected: activeSort == 'recent' ||
+                                activeSort == 'lastPlayed',
+                            onTap: () => onSelectSort('recent', false),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RadioSortOptionChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _RadioSortOptionChip({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadii.r12All,
+        child: InkWell(
+          borderRadius: AppRadii.r12All,
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: context.motion(PulsrMotion.layout),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: selected
+                  ? p.accent.withValues(alpha: 0.16)
+                  : p.surfaceContainerHigh.withValues(alpha: 0.55),
+              borderRadius: AppRadii.r12All,
+              border: Border.all(
+                color: selected
+                    ? p.accent.withValues(alpha: 0.60)
+                    : p.hairline.withValues(alpha: 0.7),
+                width: selected ? 1.2 : 0.8,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? p.accent : p.textSecondary,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected ? p.accent : p.textPrimary,
+                    fontSize: AppFontSize.caption,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

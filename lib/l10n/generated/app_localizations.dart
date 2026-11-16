@@ -18565,6 +18565,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Search index repair failed'**
   String get databaseHealthSearchRepairFailed;
+
+  /// Header for recommendations displayed when playing radio
+  ///
+  /// In en, this message translates to:
+  /// **'Radio Recommendations'**
+  String get radioRecommendations;
+
+  /// Setting title to automatically activate feature during radio
+  ///
+  /// In en, this message translates to:
+  /// **'Always on Radio'**
+  String get alwaysOnRadio;
+
+  /// Description for always on radio feature
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically enable during radio; disable for local and online tracks'**
+  String get alwaysOnRadioDesc;
+
+  /// Notice that Tajweed is default and user choices become new default
+  ///
+  /// In en, this message translates to:
+  /// **'Default: Tajweed • Changes saved as default'**
+  String get styleDefaultNotice;
+
+  /// Ambient volume percentage label
+  ///
+  /// In en, this message translates to:
+  /// **'Volume: {percent}%'**
+  String ambientVolumePercent(int percent);
 }
 
 class _AppLocalizationsDelegate

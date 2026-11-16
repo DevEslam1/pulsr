@@ -10483,4 +10483,22 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get databaseHealthSearchRepairFailed => 'فشل إصلاح فهرس البحث';
+
+  @override
+  String get radioRecommendations => 'توصيات الراديو';
+
+  @override
+  String get alwaysOnRadio => 'تشغيل دائم مع الراديو';
+
+  @override
+  String get alwaysOnRadioDesc =>
+      'تشغيل تلقائي مع الراديو؛ وإيقاف عند تشغيل المقاطع المحلية أو عبر الإنترنت';
+
+  @override
+  String get styleDefaultNotice => 'الافتراضي: تجويد • حفظ اختيارك كافتراضي';
+
+  @override
+  String ambientVolumePercent(int percent) {
+    return 'مستوى الصوت: $percent٪';
+  }
 }

@@ -1082,7 +1082,13 @@ internal object UsbAudioProtocol {
         val wireChannels: Int = channels,
     ) {
         fun matches(rate: Int, depth: Int, count: Int, nativeActive: Boolean): Boolean =
-            nativeActive && sampleRate == rate && bitDepth == depth && channels == count
+            // A request that fits the already-open wire container is the same
+            // stream: a 16- or 24-bit track can share a 24/32-bit endpoint by
+            // zero-padding, so changing depth must not tear the endpoint down
+            // (each restart is an audible gap). Only a request wider than the
+            // container needs a new alt setting.
+            nativeActive && sampleRate == rate && channels == count &&
+                depth in 16..wireBitDepth
     }
 
     /**

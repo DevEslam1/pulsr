@@ -233,7 +233,7 @@ abstract class DspSlice with _$DspSlice {
     @Default(false) bool hasOemAudio,
     @Default([]) List<String> detectedOemEngines,
     @Default(false) bool isQuranModeEnabled,
-    @Default(QuranReciterStyle.murattal) QuranReciterStyle quranReciterStyle,
+    @Default(QuranReciterStyle.mujawwad) QuranReciterStyle quranReciterStyle,
   }) = _DspSlice;
 
   bool get isDspActive =>

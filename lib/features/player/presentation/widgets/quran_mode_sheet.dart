@@ -69,11 +69,15 @@ class _QuranModePanelState extends State<QuranModePanel> {
   bool _bookmarkBusy = false;
   String? _bookmarkError;
   String? _lastLoadedTrackUri;
+  bool _alwaysOnRadio = false;
 
   @override
   void initState() {
     super.initState();
     _capsFuture = context.read<PlayerCubit>().detectEarbudCapabilities();
+    unawaited(context.read<PlayerCubit>().isQuranAlwaysOnRadio().then((v) {
+      if (mounted) setState(() => _alwaysOnRadio = v);
+    }));
   }
 
   void _refreshCaps() {
@@ -274,7 +278,51 @@ class _QuranModePanelState extends State<QuranModePanel> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.s6),
+            const SizedBox(height: AppSpacing.xs),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s20),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.radio_rounded,
+                    size: 20,
+                    color: _alwaysOnRadio ? p.accent : p.textSecondary,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.alwaysOnRadio,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          context.l10n.alwaysOnRadioDesc,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.caption,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  PulsrSwitch(
+                    value: _alwaysOnRadio,
+                    onChanged: (v) {
+                      PulsrHaptics.selectionClick();
+                      setState(() => _alwaysOnRadio = v);
+                      unawaited(cubit.setQuranAlwaysOnRadio(v));
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.s8),
 
             // Reciter styles
             Padding(

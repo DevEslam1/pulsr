@@ -47,6 +47,7 @@ import '../widgets/player_more_sheet.dart';
 import '../widgets/player_seek_bar.dart';
 import '../widgets/player_volume_bar.dart';
 import '../widgets/quran_mode_sheet.dart';
+import '../widgets/radio_now_playing_recommendations.dart';
 import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_scaffold.dart' show PlayerThemeMetrics;
@@ -1850,7 +1851,15 @@ class PlayerControlsColumn extends StatelessWidget {
           waveformHeight: resolvedWaveformHeight,
           onSeek: (pos) => cubit.seek(pos),
         ),
-        if (state.bookmarkPosition != null) ...[
+        if (state.currentSong?.source == SongSource.radio) ...[
+          const SizedBox(height: AppSpacing.xs),
+          RadioNowPlayingRecommendations(
+            props: props,
+            cubit: cubit,
+            metrics: metrics,
+          ),
+          const SizedBox(height: AppSpacing.xs),
+        ] else if (state.bookmarkPosition != null) ...[
           SizedBox(height: spacingSeekToAdvanced),
           PlayerBookmarkPromptBanner(
             cubit: cubit,

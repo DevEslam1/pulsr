@@ -1542,6 +1542,27 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _reapplyActiveVolume();
   }
 
+  /// The native DSP applies [directUsbGain] on the ordinary path as well, not
+  /// only during the direct-USB tee. If the sink stops (disabled, unplugged or
+  /// a fault) while that software gain is still below unity, normal playback
+  /// stays attenuated — and a gain of 0 leaves it silent after Bit-Perfect is
+  /// turned off. Reset the native stage to unity and re-apply the app volume.
+  Future<void> _resetDirectUsbGainAfterStop() async {
+    try {
+      await AudioEffectsChannel().setDirectUsbVolume(1.0);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reset direct USB software gain',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+    if (_disposed) return;
+    try {
+      await setVolume(_volume);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to re-apply volume after direct USB stop',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
   /// Software gain may only be released when the DAC itself is holding the
   /// level: a saved preference plus a USB route proves neither permission,
   /// capability, nor a value that actually landed in the hardware register.
@@ -2220,7 +2241,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       wasDirectStreaming = status.streamingActive;
       if (!status.streamingActive) {
         _externalHardwareVolumeSet = false;
+        final hadDirectGain = _lastDirectUsbVolume >= 0.0;
         _lastDirectUsbVolume = -1.0;
+        if (hadDirectGain) {
+          unawaited(_resetDirectUsbGainAfterStop());
+        }
       }
       if (startedStreaming) {
         unawaited(_onDirectUsbStreamingStarted(status));

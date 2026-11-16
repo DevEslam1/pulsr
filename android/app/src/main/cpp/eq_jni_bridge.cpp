@@ -1421,10 +1421,14 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
     if (reinterpret_cast<uintptr_t>(floatBuffer) % alignof(float) != 0) return 0;
     auto& usb = pulsr::UsbAudioSink::instance();
-    const bool exclusive = usb.IsExclusive();
+    // A worker that has already stopped (device unplugged, drain fault) can
+    // leave the exclusive flag latched until teardown. Gate the tee on the live
+    // stream too: otherwise the tap keeps zeroing the float buffer (muting the
+    // HAL path) and returns silence after Direct USB is disabled.
+    const bool exclusive = usb.IsExclusive() && usb.IsActive();
     const size_t blockBytes = static_cast<size_t>(frameCount) * channels * sizeof(float);
     const auto reject = [&](int error) -> jint {
-        if (exclusive || usb.IsExclusive()) {
+        if (exclusive) {
             usb.ReportWriteError(error);
             return INT32_MIN; // Java emits independent silence; retained PCM may alias.
         }
@@ -1482,7 +1486,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
     try {
         const jint processed = static_cast<jint>(engine->processInterleaved(
             floatBuffer, frameCount, channels, transportGains));
-        if (exclusive || usb.IsExclusive()) {
+        if (exclusive) {
             if (processed != frameCount) return reject(EIO);
             const bool raw = engine->wasLastBlockBitPerfect();
             bool written = false;

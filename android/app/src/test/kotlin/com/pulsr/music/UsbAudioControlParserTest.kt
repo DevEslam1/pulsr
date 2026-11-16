@@ -9,6 +9,26 @@ import org.junit.Test
 
 class UsbAudioControlParserTest {
 
+    @Test
+    fun streamFormatReusesAWiderWireContainerWithoutRestart() {
+        val container = UsbAudioProtocol.StreamFormat(
+            sampleRate = 48000,
+            bitDepth = 16,
+            channels = 2,
+            wireBitDepth = 24,
+            wireChannels = 2,
+        )
+        // 16-bit source opened in a 24-bit container: repeated and 24-bit tracks
+        // both fit and must reuse the stream instead of restarting the endpoint.
+        assertTrue(container.matches(48000, 16, 2, nativeActive = true))
+        assertTrue(container.matches(48000, 24, 2, nativeActive = true))
+        // A wider source or a different rate/channel layout needs a new alt.
+        assertFalse(container.matches(48000, 32, 2, nativeActive = true))
+        assertFalse(container.matches(44100, 16, 2, nativeActive = true))
+        assertFalse(container.matches(48000, 16, 1, nativeActive = true))
+        assertFalse(container.matches(48000, 16, 2, nativeActive = false))
+    }
+
     private fun uac2Config(): ByteArray = byteArrayOf(
         // Audio Control interface (class 0x01 / subclass 0x01 / protocol 0x20)
         9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,

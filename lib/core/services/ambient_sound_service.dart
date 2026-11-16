@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../data/db/app_database.dart';
 import '../../l10n/generated/app_localizations.dart';
 import '../utils/error_logger.dart';
 
@@ -142,11 +143,14 @@ class AmbientSoundService extends ChangeNotifier {
   static const _keyVolumePrefix = 'ambient_volume_';
   static const _keyMaster = 'ambient_master_volume';
   static const _keyAllowQuran = 'ambient_allow_during_quran';
+  static const _keyAlwaysOnRadio = 'ambient_always_on_radio';
+  static const _keySavedEffects = 'ambient_saved_user_effects';
   static const _keyMixes = 'ambient_saved_mixes_v1';
 
   // ─── State ─────────────────────────────────────────────────────────────────
   final Set<AmbientSoundEffect> _activeEffects = {};
   Set<AmbientSoundEffect> _lastActiveEffects = {AmbientSoundEffect.rain};
+  final Set<AmbientSoundEffect> _savedUserEffects = {AmbientSoundEffect.rain};
   final Map<AmbientSoundEffect, double> _volumes = {
     for (final e in AmbientSoundEffect.values) e: 0.5,
   };
@@ -155,17 +159,60 @@ class AmbientSoundService extends ChangeNotifier {
   bool _isPlayerPlaying = false;
   bool _quranModeActive = false;
   bool _allowDuringQuran = false;
+  bool _alwaysOnRadio = false;
+  bool _isRadioPlaying = false;
 
   /// True when the sounds should currently be audible: at least one effect is active,
-  /// the main player is playing, and Quran Mode is not asking for a clean, undisturbed recitation.
+  /// the main player is playing, and Quran Mode is not asking for a clean, undisturbed recitation,
+  /// or when always-on radio mode is active while radio is playing.
   bool get _shouldPlay =>
-      isEnabled && _isPlayerPlaying && (!_quranModeActive || _allowDuringQuran);
+      isEnabled &&
+      _isPlayerPlaying &&
+      (!_quranModeActive || _allowDuringQuran || (_alwaysOnRadio && _isRadioPlaying));
 
   /// Whether ambient sounds keep playing while Quran Mode is on.
   bool get allowDuringQuran => _allowDuringQuran;
 
+  /// Whether ambient sounds are automatically enabled during radio and disabled for local/online tracks.
+  bool get alwaysOnRadio => _alwaysOnRadio;
+
+  /// The user's saved/chosen ambient effects, persisted across enable/disable.
+  Set<AmbientSoundEffect> get savedUserEffects =>
+      Set.unmodifiable(_savedUserEffects);
+
   /// True when ambient sounds are held back because Quran Mode is on.
-  bool get isSuppressedByQuran => _quranModeActive && !_allowDuringQuran;
+  bool get isSuppressedByQuran =>
+      _quranModeActive && !_allowDuringQuran && !(_alwaysOnRadio && _isRadioPlaying);
+
+  /// Called when the player track changes. Handles auto-enable / auto-disable
+  /// when [alwaysOnRadio] is active.
+  void onCurrentSongChanged(SongsTableData? song) {
+    if (song == null) return;
+    final isRadio = song.source == SongSource.radio;
+    _isRadioPlaying = isRadio;
+    if (_alwaysOnRadio) {
+      if (isRadio && !isEnabled) {
+        unawaited(setEnabled(true));
+      } else if (!isRadio && isEnabled) {
+        unawaited(setEnabled(false));
+      }
+    }
+  }
+
+  /// Sets whether ambient sounds should always play during radio and be disabled on local/online.
+  Future<void> setAlwaysOnRadio(bool value) async {
+    if (_alwaysOnRadio == value) return;
+    _alwaysOnRadio = value;
+    notifyListeners();
+    _persist();
+    if (value) {
+      if (_isRadioPlaying && !isEnabled) {
+        await setEnabled(true);
+      } else if (!_isRadioPlaying && isEnabled) {
+        await setEnabled(false);
+      }
+    }
+  }
 
   /// Called by the player when Quran Mode turns on or off.
   void setQuranModeActive(bool active) {
@@ -417,6 +464,7 @@ class AmbientSoundService extends ChangeNotifier {
   Future<void> toggleEffect(AmbientSoundEffect effect) async {
     if (_activeEffects.contains(effect)) {
       _activeEffects.remove(effect);
+      _savedUserEffects.remove(effect);
       if (_activeEffects.isEmpty) {
         _lastActiveEffects = {effect};
       } else {
@@ -428,9 +476,11 @@ class AmbientSoundService extends ChangeNotifier {
       if (_activeEffects.length >= maxConcurrentEffects) {
         final oldest = _activeEffects.first;
         _activeEffects.remove(oldest);
+        _savedUserEffects.remove(oldest);
         unawaited(_stopEffectPlayer(oldest));
       }
       _activeEffects.add(effect);
+      _savedUserEffects.add(effect);
       _lastActiveEffects = Set.from(_activeEffects);
       notifyListeners();
       await _startEffectPlayer(effect);
@@ -470,6 +520,8 @@ class AmbientSoundService extends ChangeNotifier {
     if (!enabled) {
       if (_activeEffects.isNotEmpty) {
         _lastActiveEffects = Set.from(_activeEffects);
+        _savedUserEffects.clear();
+        _savedUserEffects.addAll(_activeEffects);
       }
       final toStop = List.of(_activeEffects);
       _activeEffects.clear();
@@ -479,13 +531,17 @@ class AmbientSoundService extends ChangeNotifier {
       }
       _persist();
     } else {
-      final toRestore = _lastActiveEffects.isNotEmpty
-          ? _lastActiveEffects
-          : {AmbientSoundEffect.rain};
+      final toRestore = _savedUserEffects.isNotEmpty
+          ? _savedUserEffects
+          : (_lastActiveEffects.isNotEmpty
+              ? _lastActiveEffects
+              : {AmbientSoundEffect.rain});
       for (final e in toRestore) {
         _activeEffects.add(e);
         unawaited(_startEffectPlayer(e));
       }
+      _savedUserEffects.clear();
+      _savedUserEffects.addAll(_activeEffects);
       notifyListeners();
       _persist();
     }
@@ -549,6 +605,7 @@ class AmbientSoundService extends ChangeNotifier {
 
       _masterVolume = (prefs.getDouble(_keyMaster) ?? 1.0).clamp(0.0, 1.0);
       _allowDuringQuran = prefs.getBool(_keyAllowQuran) ?? false;
+      _alwaysOnRadio = prefs.getBool(_keyAlwaysOnRadio) ?? false;
       final rawMixes = prefs.getString(_keyMixes);
       if (rawMixes != null && rawMixes.isNotEmpty) {
         try {
@@ -570,6 +627,23 @@ class AmbientSoundService extends ChangeNotifier {
       for (final effect in AmbientSoundEffect.values) {
         final v = prefs.getDouble('$_keyVolumePrefix${effect.name}');
         if (v != null) _volumes[effect] = v.clamp(0.0, 1.0);
+      }
+
+      // Load saved user effects
+      final savedNames = prefs.getStringList(_keySavedEffects) ?? [];
+      if (savedNames.isNotEmpty) {
+        _savedUserEffects.clear();
+        for (final name in savedNames) {
+          final effect = AmbientSoundEffect.values
+              .cast<AmbientSoundEffect?>()
+              .firstWhere(
+                (e) => e?.name == name,
+                orElse: () => null,
+              );
+          if (effect != null) {
+            _savedUserEffects.add(effect);
+          }
+        }
       }
 
       // Load active effects
@@ -726,6 +800,11 @@ class AmbientSoundService extends ChangeNotifier {
       await Future.wait<bool>([
         prefs.setDouble(_keyMaster, _masterVolume),
         prefs.setBool(_keyAllowQuran, _allowDuringQuran),
+        prefs.setBool(_keyAlwaysOnRadio, _alwaysOnRadio),
+        prefs.setStringList(
+          _keySavedEffects,
+          _savedUserEffects.map((e) => e.name).toList(),
+        ),
         prefs.setString(_keyMixes, jsonEncode(_mixes)),
         prefs.setStringList(
           _keyActiveEffects,

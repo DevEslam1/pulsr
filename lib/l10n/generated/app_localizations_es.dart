@@ -10642,4 +10642,23 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get databaseHealthSearchRepairFailed =>
       'Error al reparar el índice de búsqueda';
+
+  @override
+  String get radioRecommendations => 'Recomendaciones de radio';
+
+  @override
+  String get alwaysOnRadio => 'Siempre en la radio';
+
+  @override
+  String get alwaysOnRadioDesc =>
+      'Activar automáticamente con la radio; desactivar para pistas locales y en línea';
+
+  @override
+  String get styleDefaultNotice =>
+      'Predeterminado: Tayweed • Se guarda tu elección como predeterminada';
+
+  @override
+  String ambientVolumePercent(int percent) {
+    return 'Volumen: $percent%';
+  }
 }

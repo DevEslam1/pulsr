@@ -38,6 +38,10 @@ class RadioStationStore {
       'setting_radio_hero_pinned_urls_v1';
   static const String prefsKeyHeroSortMode =
       'setting_radio_hero_sort_mode_v1';
+  static const String prefsKeyRadioSortBy =
+      'setting_radio_screen_sort_by_v1';
+  static const String prefsKeyRadioSortAsc =
+      'setting_radio_screen_sort_asc_v1';
   static const int maxEntries = 500;
 
   /// Global reactive visibility notifier for homescreen radio hero cards.
@@ -50,6 +54,13 @@ class RadioStationStore {
   /// Active sort mode for unpinned cards in the homescreen radio hero carousel.
   static final ValueNotifier<QuranHeroSortMode> heroSortMode =
       ValueNotifier<QuranHeroSortMode>(QuranHeroSortMode.curated);
+
+  /// Active sort mode for stations on the Radio screen ('default', 'name', 'recent').
+  static final ValueNotifier<String> radioSortBy =
+      ValueNotifier<String>('default');
+
+  /// Active sort direction for stations on the Radio screen.
+  static final ValueNotifier<bool> radioSortAsc = ValueNotifier<bool>(true);
 
   /// Toggles and persists whether the homescreen radio hero carousel is visible.
   static Future<void> setHeroCardsVisible(bool visible) async {
@@ -102,6 +113,20 @@ class RadioStationStore {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(prefsKeyHeroPinnedUrls);
       await prefs.remove(prefsKeyHeroSortMode);
+    } catch (_) {}
+  }
+
+  /// Sets and persists the sort mode and direction for the Radio screen.
+  static Future<void> setRadioSort({
+    required String sortBy,
+    required bool ascending,
+  }) async {
+    radioSortBy.value = sortBy;
+    radioSortAsc.value = ascending;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(prefsKeyRadioSortBy, sortBy);
+      await prefs.setBool(prefsKeyRadioSortAsc, ascending);
     } catch (_) {}
   }
 
@@ -763,6 +788,8 @@ class RadioStationStore {
     heroCardsVisible.value = true;
     heroPinnedUrls.value = const [];
     heroSortMode.value = QuranHeroSortMode.curated;
+    radioSortBy.value = 'default';
+    radioSortAsc.value = true;
     _instance = null;
     _sharedReady = null;
     _loadFailed = false;
@@ -914,6 +941,14 @@ class RadioStationStore {
       final storedSort = prefs.getString(prefsKeyHeroSortMode);
       if (storedSort != null) {
         heroSortMode.value = QuranHeroSortMode.fromStorage(storedSort);
+      }
+      final storedRadioSort = prefs.getString(prefsKeyRadioSortBy);
+      if (storedRadioSort != null) {
+        radioSortBy.value = storedRadioSort;
+      }
+      final storedRadioAsc = prefs.getBool(prefsKeyRadioSortAsc);
+      if (storedRadioAsc != null) {
+        radioSortAsc.value = storedRadioAsc;
       }
       final raw = prefs.getString(prefsKey);
       // The station list is process-static, so an empty/missing store must

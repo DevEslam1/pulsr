@@ -41,6 +41,7 @@ import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_volume_bar.dart';
 import '../widgets/quran_mode_sheet.dart';
+import '../widgets/radio_now_playing_recommendations.dart';
 import '../widgets/speed_picker_sheet.dart';
 import '../widgets/waveform_seek_bar.dart';
 import '../../../../core/services/waveform_service.dart';
@@ -494,7 +495,14 @@ class CleanPlayerTheme extends StatelessWidget {
                             if (visualizer != null) visualizer,
                             SizedBox(height: spacingTrackToSeek),
                             cleanSeekBar,
-                            if (bookmarkBanner != null) ...[
+                            if (song?.source == SongSource.radio) ...[
+                              const SizedBox(height: AppSpacing.xs),
+                              RadioNowPlayingRecommendations(
+                                props: props,
+                                cubit: cubit,
+                              ),
+                              const SizedBox(height: AppSpacing.xs),
+                            ] else if (bookmarkBanner != null) ...[
                               const SizedBox(height: 8.0),
                               bookmarkBanner,
                               const SizedBox(height: 8.0),
@@ -540,7 +548,14 @@ class CleanPlayerTheme extends StatelessWidget {
                         if (visualizer != null) visualizer,
                         SizedBox(height: spacingTrackToSeek),
                         cleanSeekBar,
-                        if (bookmarkBanner != null) ...[
+                        if (song?.source == SongSource.radio) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          RadioNowPlayingRecommendations(
+                            props: props,
+                            cubit: cubit,
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                        ] else if (bookmarkBanner != null) ...[
                           const SizedBox(height: 8.0),
                           bookmarkBanner,
                           const SizedBox(height: 8.0),

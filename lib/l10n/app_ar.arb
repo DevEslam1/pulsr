@@ -5940,5 +5940,10 @@
   "databaseEncryptionDisabled": "معطّل",
   "databaseHealthRepairSearch": "إصلاح فهرس البحث",
   "databaseHealthSearchRepaired": "تم إصلاح فهرس البحث",
-  "databaseHealthSearchRepairFailed": "فشل إصلاح فهرس البحث"
+  "databaseHealthSearchRepairFailed": "فشل إصلاح فهرس البحث",
+  "radioRecommendations": "توصيات الراديو",
+  "alwaysOnRadio": "تشغيل دائم مع الراديو",
+  "alwaysOnRadioDesc": "تشغيل تلقائي مع الراديو؛ وإيقاف عند تشغيل المقاطع المحلية أو عبر الإنترنت",
+  "styleDefaultNotice": "الافتراضي: تجويد • حفظ اختيارك كافتراضي",
+  "ambientVolumePercent": "مستوى الصوت: {percent}٪"
 }

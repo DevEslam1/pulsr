@@ -381,7 +381,49 @@ class _AmbientSoundPanelState extends State<AmbientSoundPanel> {
           ),
         ],
 
-        // ── Options (Quran mode behaviour) ────────────────────────────────────
+        // ── Options (Quran mode behaviour & Radio) ───────────────────────────
+        const SizedBox(height: AppSpacing.s10),
+        Divider(height: 1, color: p.hairline),
+        const SizedBox(height: AppSpacing.s10),
+        Row(
+          children: [
+            Icon(
+              Icons.radio_rounded,
+              size: 20,
+              color: _service.alwaysOnRadio ? p.accent : p.textSecondary,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    context.l10n.alwaysOnRadio,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    context.l10n.alwaysOnRadioDesc,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.caption,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            PulsrSwitch(
+              value: _service.alwaysOnRadio,
+              onChanged: (v) {
+                PulsrHaptics.selectionClick();
+                unawaited(_service.setAlwaysOnRadio(v));
+              },
+            ),
+          ],
+        ),
         const SizedBox(height: AppSpacing.s10),
         Divider(height: 1, color: p.hairline),
         const SizedBox(height: AppSpacing.s10),

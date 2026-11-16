@@ -719,6 +719,8 @@ void UsbAudioSink::workerLoop() {
     setpriority(PRIO_PROCESS, 0, -19);
 #endif
     int repeatedReadyPolls = 0;
+    int consecutiveOutFaults = 0;
+    constexpr int kMaxConsecutiveOutFaults = 3;
     while (running_.load(std::memory_order_acquire)) {
         struct usbdevfs_urb* urb = nullptr;
         int r = ioctl(fd_, USBDEVFS_REAPURBNDELAY, &urb);
@@ -794,10 +796,19 @@ void UsbAudioSink::workerLoop() {
         }
         if (fault != 0) {
             ReportWriteError(fault);
-            break; // short/error OUT is not successfully delivered audio
+            // One short/failed isochronous OUT is usually a transient
+            // controller/DAC hiccup. Killing the worker turns it into a hard
+            // silent stream; requeue the URB instead, using the ring's current
+            // audio (or silence when it is empty). A genuinely gone device
+            // keeps faulting and crosses the consecutive budget below.
+            if (++consecutiveOutFaults >= kMaxConsecutiveOutFaults) {
+                break;
+            }
+        } else {
+            consecutiveOutFaults = 0;
+            rawPcmStatus_.store((urbDeliveryEpoch_[urbIndex] << 8) |
+                static_cast<uint64_t>(urbRawDepth_[urbIndex]), std::memory_order_release);
         }
-        rawPcmStatus_.store((urbDeliveryEpoch_[urbIndex] << 8) |
-            static_cast<uint64_t>(urbRawDepth_[urbIndex]), std::memory_order_release);
 
         // OUT URB: recompute every packet length from the fractional sample
         // accumulator stepped by the current (feedback-adjusted) rate, clamped

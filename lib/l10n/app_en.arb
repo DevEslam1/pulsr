@@ -8364,5 +8364,30 @@
   "databaseHealthSearchRepairFailed": "Search index repair failed",
   "@databaseHealthSearchRepairFailed": {
     "description": "FTS repair failed"
+  },
+  "radioRecommendations": "Radio Recommendations",
+  "@radioRecommendations": {
+    "description": "Header for recommendations displayed when playing radio"
+  },
+  "alwaysOnRadio": "Always on Radio",
+  "@alwaysOnRadio": {
+    "description": "Setting title to automatically activate feature during radio"
+  },
+  "alwaysOnRadioDesc": "Automatically enable during radio; disable for local and online tracks",
+  "@alwaysOnRadioDesc": {
+    "description": "Description for always on radio feature"
+  },
+  "styleDefaultNotice": "Default: Tajweed • Changes saved as default",
+  "@styleDefaultNotice": {
+    "description": "Notice that Tajweed is default and user choices become new default"
+  },
+  "ambientVolumePercent": "Volume: {percent}%",
+  "@ambientVolumePercent": {
+    "description": "Ambient volume percentage label",
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
   }
 }

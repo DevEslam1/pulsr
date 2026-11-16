@@ -67,6 +67,23 @@ class PlayerQuranManager {
         action: (s) => s.getStyle(),
       );
 
+  Future<bool> isAlwaysOnRadio() => _guard(
+        'Failed to get always on radio setting',
+        whenMissing: false,
+        onError: false,
+        action: (s) => s.isAlwaysOnRadio(),
+      );
+
+  Future<bool> setAlwaysOnRadio(bool value) => _guard(
+        'Failed to set always on radio setting: $value',
+        whenMissing: true,
+        onError: false,
+        action: (s) async {
+          await s.setAlwaysOnRadio(value);
+          return true;
+        },
+      );
+
   /// Persists the reciter style. Returns false when the write failed.
   Future<bool> setStyle(QuranReciterStyle style) => _guard(
         'Failed to set Quran reciter style: $style',

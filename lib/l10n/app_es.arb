@@ -5940,5 +5940,10 @@
   "databaseEncryptionDisabled": "Desactivado",
   "databaseHealthRepairSearch": "Reparar índice de búsqueda",
   "databaseHealthSearchRepaired": "Índice de búsqueda reparado",
-  "databaseHealthSearchRepairFailed": "Error al reparar el índice de búsqueda"
+  "databaseHealthSearchRepairFailed": "Error al reparar el índice de búsqueda",
+  "radioRecommendations": "Recomendaciones de radio",
+  "alwaysOnRadio": "Siempre en la radio",
+  "alwaysOnRadioDesc": "Activar automáticamente con la radio; desactivar para pistas locales y en línea",
+  "styleDefaultNotice": "Predeterminado: Tayweed • Se guarda tu elección como predeterminada",
+  "ambientVolumePercent": "Volumen: {percent}%"
 }

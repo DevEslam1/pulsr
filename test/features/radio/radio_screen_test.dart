@@ -184,4 +184,115 @@ void main() {
 
     expect(find.text('Import .m3u'), findsNothing);
   });
+
+
+  testWidgets(
+      'long-pressing a radio card opens station actions sheet with sorting options',
+      (tester) async {
+    final s1 = RadioStation.create(
+      name: 'Zeta Station',
+      url: 'https://z.example.com/live',
+      genre: 'Ambient',
+    );
+    final s2 = RadioStation.create(
+      name: 'Alpha Station',
+      url: 'https://a.example.com/live',
+      genre: 'Rock',
+    );
+    SharedPreferences.setMockInitialValues({
+      RadioStationStore.prefsKey: jsonEncode([s1.toJson(), s2.toJson()]),
+    });
+
+    await tester.pumpWidget(_buildTestApp(
+      child: const RadioScreen(),
+      playerCubit: mockPlayerCubit,
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Zeta Station'), findsOneWidget);
+    expect(find.text('Alpha Station'), findsOneWidget);
+
+    // Long press on Zeta Station card
+    await tester.longPress(find.text('Zeta Station'));
+    await tester.pumpAndSettle();
+
+    // Verify sheet contents: Edit, Delete, and Sort Order options
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Sort Order'), findsOneWidget);
+    expect(find.text('Default'), findsOneWidget);
+    expect(find.text('A–Z'), findsOneWidget);
+    expect(find.text('Recent'), findsOneWidget);
+
+    // Tap A-Z sort chip
+    await tester.tap(find.text('A–Z'));
+    await tester.pumpAndSettle();
+
+    // Verify sort state updated
+    expect(RadioStationStore.radioSortBy.value, 'name');
+    expect(RadioStationStore.radioSortAsc.value, isTrue);
+
+    // Verify stations are sorted alphabetically (Alpha first, Zeta second)
+    final listTiles =
+        tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+    final names = listTiles
+        .map((t) => (t.title as dynamic)?.text)
+        .whereType<String>()
+        .toList();
+    final alphaIndex = names.indexOf('Alpha Station');
+    final zetaIndex = names.indexOf('Zeta Station');
+    expect(alphaIndex, isNonNegative);
+    expect(zetaIndex, isNonNegative);
+    expect(alphaIndex, lessThan(zetaIndex));
+  });
+
+  testWidgets(
+      'sorting by recent prioritizes most recently played radio station',
+      (tester) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final s1 = RadioStation.create(
+      name: 'Old Played Station',
+      url: 'https://old.example.com/live',
+      lastPlayed: now - 50000,
+    );
+    final s2 = RadioStation.create(
+      name: 'Recently Played Station',
+      url: 'https://new.example.com/live',
+      lastPlayed: now,
+    );
+    SharedPreferences.setMockInitialValues({
+      RadioStationStore.prefsKey: jsonEncode([s1.toJson(), s2.toJson()]),
+    });
+
+    await tester.pumpWidget(_buildTestApp(
+      child: const RadioScreen(),
+      playerCubit: mockPlayerCubit,
+    ));
+    await tester.pumpAndSettle();
+
+    // Long press on a radio card
+    await tester.longPress(find.text('Old Played Station'));
+    await tester.pumpAndSettle();
+
+    // Select Recent sort
+    await tester.tap(find.text('Recent'));
+    await tester.pumpAndSettle();
+
+    expect(RadioStationStore.radioSortBy.value, 'recent');
+    expect(RadioStationStore.radioSortAsc.value, isFalse);
+
+    // Verify Recently Played Station is ordered first
+    final listTiles =
+        tester.widgetList<ListTile>(find.byType(ListTile)).toList();
+    final names = listTiles
+        .map((t) => (t.title as dynamic)?.text)
+        .whereType<String>()
+        .toList();
+    final recentIndex = names.indexOf('Recently Played Station');
+    final oldIndex = names.indexOf('Old Played Station');
+    expect(recentIndex, isNonNegative);
+    expect(oldIndex, isNonNegative);
+    expect(recentIndex, lessThan(oldIndex));
+  });
 }
+

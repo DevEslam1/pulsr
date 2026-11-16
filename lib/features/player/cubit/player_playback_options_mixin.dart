@@ -118,6 +118,12 @@ mixin PlayerPlaybackOptions on PulsrCubit<PlayerState> {
   Future<void> setQuranModeEnabled(bool enabled) =>
       playbackOptionsController.setQuranModeEnabled(enabled);
 
+  Future<bool> isQuranAlwaysOnRadio() =>
+      playbackOptionsController.isQuranAlwaysOnRadio();
+
+  Future<void> setQuranAlwaysOnRadio(bool value) =>
+      playbackOptionsController.setQuranAlwaysOnRadio(value);
+
   Future<void> setQuranReciterStyle(QuranReciterStyle style) =>
       playbackOptionsController.setQuranReciterStyle(style);
 

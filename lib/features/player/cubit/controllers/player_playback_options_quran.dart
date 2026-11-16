@@ -951,6 +951,27 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     }
   }
 
+  /// Whether Quran Mode is configured to always activate during radio playback
+  /// and automatically deactivate during local or online music playback.
+  Future<bool> isQuranAlwaysOnRadio() async => _quranManager.isAlwaysOnRadio();
+
+  /// Sets whether Quran Mode should always be on when playing radio,
+  /// and automatically disabled when playing local or online tracks.
+  Future<void> setQuranAlwaysOnRadio(bool value) async {
+    await _quranManager.setAlwaysOnRadio(value);
+    final song = _getState().currentSong;
+    if (song != null) {
+      final isRadio = song.source == SongSource.radio;
+      if (value) {
+        if (isRadio && !_getState().isQuranModeEnabled) {
+          await setQuranModeEnabled(true);
+        } else if (!isRadio && _getState().isQuranModeEnabled) {
+          await setQuranModeEnabled(false);
+        }
+      }
+    }
+  }
+
   /// Automatically activates Quran Mode when playing a Quran recitation or radio
   /// broadcast, defaulting to Tajweed (Mujawwad) and preserving user preferences.
   /// Automatically deactivates and restores native DSP when switching to non-Quran tracks.
@@ -961,6 +982,15 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
   /// the wait.
   Future<void> handleTrackChangeQuranMode(SongsTableData song,
       {bool immediate = false}) async {
+    final alwaysOnRadio = await _quranManager.isAlwaysOnRadio();
+    if (alwaysOnRadio) {
+      final isRadio = song.source == SongSource.radio;
+      if (isRadio != _getState().isQuranModeEnabled) {
+        await setQuranModeEnabled(isRadio);
+      }
+      return;
+    }
+
     final gen = ++_quranAutoGen;
     final isQuran = isQuranTrack(song);
     if (isQuran == _getState().isQuranModeEnabled) return;
