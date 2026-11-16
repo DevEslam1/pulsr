@@ -4,9 +4,11 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../domain/models/ytm_track.dart';
+import '../constants/channels.dart';
 import '../telemetry/clock.dart';
 import '../utils/l10n_holder.dart';
 
@@ -84,6 +86,28 @@ class YtmUrlCache {
       LinkedHashMap<String, YtmUrlCacheEntry>();
 
   static const String _diskFileName = 'ytm_url_cache_v1.json';
+  static const MethodChannel _networkChannel =
+      MethodChannel(PulsrChannels.proxy);
+
+  static File _identityFile(File cacheFile) =>
+      File('${cacheFile.path}.network');
+
+  /// Stable hash of the active interface/addresses, or null off-device.
+  Future<String?> _currentNetworkIdentity() async {
+    try {
+      final state = await _networkChannel
+          .invokeMapMethod<String, dynamic>('getNetworkState')
+          .timeout(const Duration(milliseconds: 750));
+      final identity = state?['identity'];
+      if (identity is String && identity.isNotEmpty && identity != 'offline') {
+        return identity;
+      }
+    } catch (_) {
+      // Missing plugin (tests/desktop) or a transient platform error: fall
+      // back to the previous network-agnostic restore behavior.
+    }
+    return null;
+  }
 
   /// Restored entries are only worth keeping if they have meaningful life left;
   /// a URL that expires moments after launch would just 403 on first play.
@@ -123,6 +147,36 @@ class YtmUrlCache {
       final file = File('${dir.path}/$_diskFileName');
       _diskFile = file;
       if (!await file.exists()) return;
+
+      // Signed googlevideo URLs are bound to the egress that minted them. A
+      // restart on a different interface means the persisted body is dead.
+      final identityFile = _identityFile(file);
+      String? storedIdentity;
+      try {
+        if (await identityFile.exists()) {
+          storedIdentity = (await identityFile.readAsString()).trim();
+        }
+      } catch (_) {}
+      final currentIdentity = await _currentNetworkIdentity();
+      if (storedIdentity != null &&
+          storedIdentity.isNotEmpty &&
+          currentIdentity != null &&
+          storedIdentity != currentIdentity) {
+        debugPrint(
+            '[YtmUrlCache] Network identity changed ($storedIdentity -> $currentIdentity); discarding persisted URLs');
+        try {
+          await file.delete();
+        } catch (_) {}
+        try {
+          await identityFile.delete();
+        } catch (_) {}
+        return;
+      }
+      if (currentIdentity != null) {
+        try {
+          await identityFile.writeAsString(currentIdentity, flush: true);
+        } catch (_) {}
+      }
       // Hygiene pass: cap persisted cache restore at 2 MB to avoid OOM/jank.
       final size = await file.length();
       if (size > _maxRestoreBytes) {
@@ -229,6 +283,12 @@ class YtmUrlCache {
         });
       }
       await file.writeAsString(jsonEncode(list), flush: false);
+      final identity = await _currentNetworkIdentity();
+      if (identity != null) {
+        try {
+          await _identityFile(file).writeAsString(identity, flush: false);
+        } catch (_) {}
+      }
     } catch (_) {}
   }
 
