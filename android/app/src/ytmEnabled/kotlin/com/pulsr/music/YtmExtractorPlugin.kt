@@ -157,6 +157,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         executor.execute {
             RateLimiter.shared.resetAfterNetworkChange()
             runCatching { YtmHttpClient.TtlDnsCache.instance.clear() }
+            runCatching { YtmHttpClient.evictConnections() }
             runCatching { PlayerJavaScript.clearCaches() }
             EgressSignals.notify(PoTokenManager.currentEgressId())
         }
@@ -336,6 +337,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 "clearNetworkCaches" -> {
                     runOffMainThread(result, requireExtractorReady = false) {
                         YtmHttpClient.TtlDnsCache.instance.clear()
+                        YtmHttpClient.evictConnections()
                         RateLimiter.shared.resetAfterNetworkChange()
                         PlayerJavaScript.clearCaches()
                         try {

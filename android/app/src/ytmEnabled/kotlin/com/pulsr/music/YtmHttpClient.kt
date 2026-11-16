@@ -214,6 +214,11 @@ internal object YtmHttpClient {
             .build()
     }
 
+    /** Drops keep-alive sockets bound to the previous egress IP. */
+    fun evictConnections() {
+        runCatching { connectionPool.evictAll() }
+    }
+
     /**
      * Asynchronously warms DNS for [url]'s host.
      *
