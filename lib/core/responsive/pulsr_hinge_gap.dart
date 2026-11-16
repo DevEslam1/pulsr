@@ -1,5 +1,5 @@
 // lib/core/responsive/pulsr_hinge_gap.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'pulsr_responsive_tokens.dart';
 
 /// Renders a spacer matching the physical foldable hinge or seam on dual-screen / foldable devices.

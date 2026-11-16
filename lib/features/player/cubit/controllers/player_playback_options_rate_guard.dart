@@ -12,7 +12,7 @@ extension PlaybackRateBitPerfectGuard on PlayerPlaybackOptionsController {
       final s = _getState();
       _emit(s.copyWith(
         playback:
-            s.playback.copyWith(errorMessage: '$feature blocked: $reason'),
+            s.playback.copyWith(error: uiError('$feature blocked: $reason')),
       ));
     }
     return false;

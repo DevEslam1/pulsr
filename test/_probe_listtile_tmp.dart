@@ -2,7 +2,7 @@
 // Pumps the redesigned SettingsScreen in several states and enumerates every
 // ListTile whose nearest Material ancestor is masked by a colored
 // ColoredBox/DecoratedBox — the exact condition the newer Flutter SDK asserts.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +19,7 @@ import 'package:pulsr/features/settings/presentation/settings_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -73,7 +74,7 @@ void main() {
       ],
       child: MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const SettingsScreen(),
       ),

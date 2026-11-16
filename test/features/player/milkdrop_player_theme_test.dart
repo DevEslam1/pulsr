@@ -1,6 +1,6 @@
 // test/features/player/milkdrop_player_theme_test.dart
 import 'dart:ui';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -18,6 +18,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -28,7 +29,8 @@ void main() {
   late _MockPlayerCubit playerCubit;
   late _MockSettingsCubit settingsCubit;
 
-  final testSong = createTestSong(id: 101, title: 'Cosmic Journey', artist: 'Pulsr Dreamer');
+  final testSong =
+      createTestSong(id: 101, title: 'Cosmic Journey', artist: 'Pulsr Dreamer');
 
   setUp(() {
     AudioVisualizer.isTestingOverride = true;
@@ -70,7 +72,7 @@ void main() {
       ],
       child: MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: MediaQuery(
           data: MediaQueryData(size: size),
@@ -106,13 +108,13 @@ void main() {
       final visualizerFinder = find.byType(AudioVisualizer);
       expect(visualizerFinder, findsOneWidget);
 
-      final visualizerWidget =
-          tester.widget<AudioVisualizer>(visualizerFinder);
+      final visualizerWidget = tester.widget<AudioVisualizer>(visualizerFinder);
       expect(visualizerWidget.style, equals(VisualizerStyle.milkdrop));
       expect(visualizerWidget.color, equals(Colors.white));
       expect(visualizerWidget.transparentBackground, isTrue);
 
-      expect(find.byKey(const ValueKey('artwork_view_milkdrop')), findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('artwork_view_milkdrop')), findsOneWidget);
       expect(find.text('MILKDROP'), findsOneWidget);
     });
 

@@ -69,7 +69,6 @@ void main() {
       expect(row.codec, isNull);
       expect(row.remoteId, isNull);
       expect(row.remoteArtworkUrl, isNull);
-      expect(row.pendingDownloadPath, isNull);
       expect(row.cueStartMs, isNull);
       expect(row.cueEndMs, isNull);
       expect(row.cueFile, isNull);
@@ -111,7 +110,6 @@ void main() {
               source: const Value(SongSource.youtube),
               remoteId: const Value('vid1'),
               remoteArtworkUrl: const Value('https://cdn/art.jpg'),
-              pendingDownloadPath: const Value('/pending/file.flac'),
               isDownloaded: const Value(true),
               cueStartMs: const Value(100),
               cueEndMs: const Value(200),
@@ -153,7 +151,6 @@ void main() {
       expect(row.source, SongSource.youtube);
       expect(row.remoteId, 'vid1');
       expect(row.remoteArtworkUrl, 'https://cdn/art.jpg');
-      expect(row.pendingDownloadPath, '/pending/file.flac');
       expect(row.isDownloaded, isTrue);
       expect(row.cueStartMs, 100);
       expect(row.cueEndMs, 200);

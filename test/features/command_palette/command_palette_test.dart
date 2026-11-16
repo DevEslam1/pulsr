@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -10,6 +10,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 Widget _buildHarness({
@@ -17,7 +18,7 @@ Widget _buildHarness({
   PlayerCubit? playerCubit,
 }) {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: ThemeData.dark().copyWith(
       extensions: [AuraTheme.defaultDark],
@@ -42,7 +43,8 @@ void main() {
   });
 
   group('P6 Discoverability — Command Palette Tests', () {
-    testWidgets('Command Palette renders search field and all 3 sections by default',
+    testWidgets(
+        'Command Palette renders search field and all 3 sections by default',
         (tester) async {
       await tester.pumpWidget(
         _buildHarness(
@@ -92,7 +94,8 @@ void main() {
       expect(find.text('Playback & Actions'), findsOneWidget);
 
       // Search for something non-existent
-      await tester.enterText(find.byType(PulsrSearchField), 'xyznonexistent123');
+      await tester.enterText(
+          find.byType(PulsrSearchField), 'xyznonexistent123');
       await tester.pumpAndSettle();
 
       expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
@@ -104,7 +107,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData.dark().copyWith(
             extensions: [AuraTheme.defaultDark],

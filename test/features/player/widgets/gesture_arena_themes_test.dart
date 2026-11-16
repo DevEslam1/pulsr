@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../helpers/screen_harness.dart';
 import '../../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class _MockDynamicThemeCubit extends Mock implements DynamicThemeCubit {}
@@ -108,7 +109,7 @@ void main() {
                 ],
                 child: MaterialApp(
                   localizationsDelegates:
-                      AppLocalizations.localizationsDelegates,
+                      appLocalizationsDelegates,
                   supportedLocales: AppLocalizations.supportedLocales,
                   navigatorKey: navKey,
                   navigatorObservers: [observer],
@@ -167,7 +168,8 @@ void main() {
                 ? scopeFinder.first
                 : find.byType(NowPlayingScreen);
             final center = tester.getCenter(targetFinder);
-            final g = await tester.startGesture(Offset(center.dx + 40, center.dy));
+            final g =
+                await tester.startGesture(Offset(center.dx + 40, center.dy));
             await g.moveBy(const Offset(0, 80));
             await g.moveBy(const Offset(-80, 0));
             await g.up();

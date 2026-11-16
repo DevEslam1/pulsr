@@ -2,7 +2,7 @@
 // (render, cancel, confirm/disconnect and the in-flight busy state).
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
@@ -11,6 +11,7 @@ import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/settings/presentation/widgets/ytm_account_disconnect_dialog.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockYtmAccountService extends Mock implements YtmAccountService {}
 
 void main() {
@@ -34,7 +35,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: Builder(

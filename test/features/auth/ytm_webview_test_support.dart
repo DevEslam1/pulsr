@@ -7,12 +7,13 @@
 // drive the native lifecycle callbacks by hand, without any platform channel
 // traffic. They live in a non-`_test` file so `flutter test` does not treat
 // them as a suite.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 /// A platform web-view widget that renders out to an inert box. The captured
 /// [params] let a test fire `onWebViewCreated` / `onLoadStop` / etc. manually.
 class FakePlatformInAppWebView extends PlatformInAppWebViewWidget {
@@ -155,7 +156,7 @@ FakePlatformInAppWebViewController fakeWebViewController() =>
 /// needs.
 Widget ytmHost(Widget child) => MaterialApp(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: child),
     );

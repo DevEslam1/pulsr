@@ -14,6 +14,7 @@ import 'package:pulsr/data/audio/per_song_eq_store.dart';
 import 'package:pulsr/data/audio/per_song_volume_store.dart';
 import 'package:pulsr/data/audio/song_rating_store.dart';
 import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/data/db/database_encryption.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
@@ -60,6 +61,9 @@ Future<void> configureDependencies({bool warmUpAsync = true}) {
 }
 
 Future<void> _configureDependenciesImpl({required bool warmUpAsync}) async {
+  // Resolve/install the database key and migrate a legacy plaintext database
+  // before the first AppDatabase query. Never throws; degrades to plaintext.
+  await DatabaseEncryptionBootstrap.prepare();
   try {
     getIt.init();
     if (!getIt.isRegistered<DiscordRpcService>()) {

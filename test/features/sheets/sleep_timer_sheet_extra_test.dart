@@ -2,7 +2,7 @@
 // end-of-queue / N-tracks status lines, the turn-off affordance, the mode and
 // preset chips, the custom-minutes dialog (invalid + valid) and the
 // "stop at a specific time" picker.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -12,6 +12,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/sheets/sleep_timer_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
@@ -47,7 +48,7 @@ void main() {
       BlocProvider<PlayerCubit>.value(
         value: cubit,
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(

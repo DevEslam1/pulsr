@@ -5,7 +5,7 @@
 // authenticated / error listener branches. AuthCubit is real; its two
 // dependencies are mocked so no Firebase/network is touched.
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mocktail/mocktail.dart';
@@ -16,6 +16,7 @@ import 'package:pulsr/features/auth/cubit/auth_cubit.dart';
 import 'package:pulsr/features/auth/presentation/auth_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockAuthService extends Mock implements AuthService {}
 
 class MockCloudSyncService extends Mock implements CloudSyncService {}
@@ -45,7 +46,7 @@ void main() {
   Widget host({GlobalKey<NavigatorState>? navKey}) => MaterialApp(
         theme: AuraTheme.darkTheme,
         navigatorKey: navKey,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BlocProvider<AuthCubit>.value(
           value: cubit,
@@ -237,7 +238,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       theme: AuraTheme.darkTheme,
       navigatorKey: navKey,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: const Scaffold(body: SizedBox()),
     ));

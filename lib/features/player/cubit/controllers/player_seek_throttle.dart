@@ -6,6 +6,7 @@ import '../../../../data/audio/audio_handler.dart';
 import '../player_constants.dart';
 import '../player_state.dart';
 
+import '../../../../core/errors/app_error.dart';
 /// Owns the monotonic seek throttle: coalesces rapid seek-bar drags onto one
 /// trailing engine seek and restores the previous position when a seek fails.
 class PlayerSeekThrottle {
@@ -78,7 +79,7 @@ class PlayerSeekThrottle {
                 _emit(s.copyWith(
                   playback: s.playback.copyWith(
                     position: prevPosition,
-                    errorMessage: 'Seek failed, position restored',
+                    error: uiError('Seek failed, position restored'),
                   ),
                 ));
               }
@@ -111,7 +112,7 @@ class PlayerSeekThrottle {
         _emit(s.copyWith(
           playback: s.playback.copyWith(
             position: prevPosition,
-            errorMessage: 'Seek failed, position restored',
+            error: uiError('Seek failed, position restored'),
           ),
         ));
       }

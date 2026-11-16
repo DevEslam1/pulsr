@@ -12,6 +12,8 @@ import '../constants/channels.dart';
 import '../telemetry/clock.dart';
 import '../utils/l10n_holder.dart';
 
+import '../utils/error_logger.dart';
+
 /// Representation of a cached direct stream URL for a YouTube Music track.
 class YtmUrlCacheEntry {
   final String videoId;
@@ -156,7 +158,10 @@ class YtmUrlCache {
         if (await identityFile.exists()) {
           storedIdentity = (await identityFile.readAsString()).trim();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort YtmUrlCache operation failed',
+            error: e, stackTrace: st, category: 'YtmUrlCache');
+      }
       final currentIdentity = await _currentNetworkIdentity();
       if (storedIdentity != null &&
           storedIdentity.isNotEmpty &&
@@ -166,16 +171,25 @@ class YtmUrlCache {
             '[YtmUrlCache] Network identity changed ($storedIdentity -> $currentIdentity); discarding persisted URLs');
         try {
           await file.delete();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort YtmUrlCache operation failed',
+              error: e, stackTrace: st, category: 'YtmUrlCache');
+        }
         try {
           await identityFile.delete();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort YtmUrlCache operation failed',
+              error: e, stackTrace: st, category: 'YtmUrlCache');
+        }
         return;
       }
       if (currentIdentity != null) {
         try {
           await identityFile.writeAsString(currentIdentity, flush: true);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort YtmUrlCache operation failed',
+              error: e, stackTrace: st, category: 'YtmUrlCache');
+        }
       }
       // Hygiene pass: cap persisted cache restore at 2 MB to avoid OOM/jank.
       final size = await file.length();
@@ -287,9 +301,15 @@ class YtmUrlCache {
       if (identity != null) {
         try {
           await _identityFile(file).writeAsString(identity, flush: false);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort YtmUrlCache operation failed',
+              error: e, stackTrace: st, category: 'YtmUrlCache');
+        }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort YtmUrlCache operation failed',
+          error: e, stackTrace: st, category: 'YtmUrlCache');
+    }
   }
 
   String _buildKey(String videoId, String quality) =>
@@ -503,7 +523,10 @@ class YtmUrlCache {
         final ms = rawEpoch >= 100000000000 ? rawEpoch : rawEpoch * 1000;
         return DateTime.fromMillisecondsSinceEpoch(ms);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort YtmUrlCache operation failed',
+          error: e, stackTrace: st, category: 'YtmUrlCache');
+    }
     return null;
   }
 

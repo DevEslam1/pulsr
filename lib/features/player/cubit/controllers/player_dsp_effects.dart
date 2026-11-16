@@ -156,8 +156,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
           error: e, stackTrace: st, category: 'PlayerDspController');
       final s = _getState();
       _emit(s.copyWith(
-          playback: s.playback
-              .copyWith(errorMessage: 'Failed to toggle dynamics bypass: $e')));
+          playback: s.playback.copyWith(
+              error: uiError('Failed to toggle dynamics bypass: $e'))));
     }
   }
 
@@ -447,7 +447,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         final s = _getState();
         _emit(s.copyWith(
             playback: s.playback
-                .copyWith(errorMessage: 'Failed to update DSP effects: $e')));
+                .copyWith(error: uiError('Failed to update DSP effects: $e'))));
       }
     });
   }
@@ -707,8 +707,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
         final s = _getState();
         _emit(s.copyWith(
             playback: s.playback.copyWith(
-                errorMessage:
-                    'Impulse response rejected by the audio engine')));
+                error:
+                    uiError('Impulse response rejected by the audio engine'))));
         return false;
       }
       if (!_isClosed()) {
@@ -718,7 +718,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
             isReverbEnabled: true,
             reverbPreset: ReverbPreset.custom.wireValue,
           ),
-          playback: state.playback.copyWith(errorMessage: null),
+          playback: state.playback.copyWith(error: null),
         ));
       }
       return true;
@@ -726,8 +726,8 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       _syncAudioEffects();
       final s = _getState();
       _emit(s.copyWith(
-          playback: s.playback
-              .copyWith(errorMessage: 'Failed to load impulse response: $e')));
+          playback: s.playback.copyWith(
+              error: uiError('Failed to load impulse response: $e'))));
       return false;
     }
   }
@@ -776,7 +776,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       final s = _getState();
       _emit(s.copyWith(
           playback: s.playback
-              .copyWith(errorMessage: 'Failed to load IR WAV file: $e')));
+              .copyWith(error: uiError('Failed to load IR WAV file: $e'))));
     }
   }
 
@@ -1085,7 +1085,7 @@ extension PlayerDspEffectsExtension on PlayerDspController {
       final s = _getState();
       _emit(s.copyWith(
           playback: s.playback
-              .copyWith(errorMessage: 'Failed to set LiveProg slider: $e')));
+              .copyWith(error: uiError('Failed to set LiveProg slider: $e'))));
     }
   }
 

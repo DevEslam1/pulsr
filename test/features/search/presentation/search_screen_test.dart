@@ -5,7 +5,7 @@
 // widget deterministic.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -22,6 +22,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../helpers/screen_harness.dart';
 import '../../../helpers/test_song_factory.dart';
+
+import 'package:pulsr/core/errors/app_error.dart';
 
 class _SearchCubit extends Mock implements SearchCubit {}
 
@@ -175,13 +177,14 @@ void main() {
     await tester.pump();
     await emit(
       tester,
-      const SearchState(query: 'Beat', errorMessage: 'kaboom'),
+      SearchState(query: 'Beat', error: uiError('kaboom')),
     );
 
     expect(find.byType(PulsrEmptyState), findsOneWidget);
   });
 
-  testWidgets('does not show a dead voice-search mic control when query is empty',
+  testWidgets(
+      'does not show a dead voice-search mic control when query is empty',
       (tester) async {
     await pumpScreen(tester);
 

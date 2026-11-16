@@ -1,5 +1,5 @@
 // lib/core/responsive/pulsr_layout_metrics.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../utils/adaptive.dart';
 import '../widgets/pulsr_dock_tracker.dart';
 import 'breakpoints.dart';

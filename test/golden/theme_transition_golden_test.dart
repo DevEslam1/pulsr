@@ -1,6 +1,6 @@
 // test/golden/theme_transition_golden_test.dart
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -14,6 +14,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -65,9 +66,11 @@ void main() {
         .thenAnswer((_) => const Stream<SettingsState>.empty());
   });
 
-  testWidgets('Theme switching crossfades smoothly mid-transition with continuity',
+  testWidgets(
+      'Theme switching crossfades smoothly mid-transition with continuity',
       (tester) async {
-    final modeNotifier = ValueNotifier<PlayerThemeMode>(PlayerThemeMode.classic);
+    final modeNotifier =
+        ValueNotifier<PlayerThemeMode>(PlayerThemeMode.classic);
 
     final props = PlayerThemeProps(
       state: mockPlayerCubit.state,
@@ -83,7 +86,7 @@ void main() {
           BlocProvider<SettingsCubit>.value(value: mockSettingsCubit),
         ],
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData.dark().copyWith(
             extensions: [AuraTheme.defaultDark],
@@ -130,7 +133,8 @@ void main() {
     // Verify initial theme (classic) rendered
     expect(
       find.byWidgetPredicate(
-        (w) => w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
+        (w) =>
+            w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
       ),
       findsOneWidget,
     );
@@ -145,7 +149,8 @@ void main() {
     // Mid-transition: both outgoing and incoming theme trees coexist in AnimatedSwitcher
     // without hero tag collisions (because tags are per-theme unique)
     final classicHero = find.byWidgetPredicate(
-      (w) => w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
+      (w) =>
+          w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
     );
     final cardHero = find.byWidgetPredicate(
       (w) => w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.card),
@@ -169,7 +174,8 @@ void main() {
     // Outgoing theme removed; only card theme remains
     expect(
       find.byWidgetPredicate(
-        (w) => w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
+        (w) =>
+            w is Hero && w.tag == nowPlayingArtHeroTag(PlayerThemeMode.classic),
       ),
       findsNothing,
     );

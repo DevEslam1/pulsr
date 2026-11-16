@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -125,7 +125,8 @@ class SettingsScreenState extends State<SettingsScreen>
     String? searchQuery,
   }) {
     if (categoryId != null && categoryId.isNotEmpty) {
-      final normalized = SettingsScreenController.normalizeCategoryId(categoryId);
+      final normalized =
+          SettingsScreenController.normalizeCategoryId(categoryId);
       if (normalized != _selectedCategoryId) {
         _selectedCategoryId = normalized;
         SettingsScreenController._sessionCategoryId = normalized;

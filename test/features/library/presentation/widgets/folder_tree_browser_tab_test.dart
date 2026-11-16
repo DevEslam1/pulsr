@@ -1,6 +1,6 @@
 // FolderTreeBrowserTab widget suite: empty library, folder derivation from
 // song paths, breadcrumbs, subfolder navigation, artwork fallback and play.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';

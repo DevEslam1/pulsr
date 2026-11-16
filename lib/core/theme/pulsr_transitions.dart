@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// {@category DesignSystem}
 /// Aurora motion. All builders use `animation.drive(CurveTween)` instead of

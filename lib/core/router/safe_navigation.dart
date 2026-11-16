@@ -19,7 +19,7 @@ import 'package:go_router/go_router.dart';
 extension PulsrSafePush on BuildContext {
   static String? _lastLocation;
   static Object? _lastExtra;
-  static DateTime? _lastPushAt;
+  static bool _windowActive = false;
   static Timer? _clearTimer;
   static const Duration _window = Duration(milliseconds: 600);
   static const DeepCollectionEquality _equality = DeepCollectionEquality();
@@ -63,22 +63,19 @@ extension PulsrSafePush on BuildContext {
   /// Pushes [location] unless an identical push happened within the last
   /// [_window]; returns whether the navigation was actually performed.
   bool pushDebounced(String location, {Object? extra}) {
-    final now = DateTime.now();
-    final last = _lastPushAt;
     if (_lastLocation == location &&
         _areExtrasEqual(_lastExtra, extra) &&
-        last != null &&
-        now.difference(last) < _window) {
+        _windowActive) {
       return false;
     }
     _clearTimer?.cancel();
     _lastLocation = location;
     _lastExtra = extra;
-    _lastPushAt = now;
+    _windowActive = true;
     _clearTimer = Timer(_window, () {
       _lastLocation = null;
       _lastExtra = null;
-      _lastPushAt = null;
+      _windowActive = false;
       _clearTimer = null;
     });
     try {
@@ -88,7 +85,7 @@ extension PulsrSafePush on BuildContext {
       _clearTimer = null;
       _lastLocation = null;
       _lastExtra = null;
-      _lastPushAt = null;
+      _windowActive = false;
       rethrow;
     }
     return true;
@@ -100,6 +97,6 @@ extension PulsrSafePush on BuildContext {
     _clearTimer = null;
     _lastLocation = null;
     _lastExtra = null;
-    _lastPushAt = null;
+    _windowActive = false;
   }
 }

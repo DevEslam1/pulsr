@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,7 +21,8 @@ import 'package:pulsr/features/shell/presentation/widgets/stacked_bottom_dock.da
 import 'package:pulsr/features/smart_playlist_builder/smart_playlist_builder_cubit.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
 import 'package:pulsr/features/widgets/widget_service.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}

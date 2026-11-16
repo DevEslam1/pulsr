@@ -2,7 +2,7 @@
 //
 // Covers the region-restriction banner: detection through the injected JS scan,
 // the Force-Egypt bypass and the YouTube Web fallback.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:mocktail/mocktail.dart';

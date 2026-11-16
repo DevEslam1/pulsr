@@ -1,6 +1,6 @@
 // lib/core/widgets/gesture_hint_overlay.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';

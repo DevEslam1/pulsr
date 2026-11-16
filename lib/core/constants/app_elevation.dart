@@ -1,5 +1,5 @@
 // lib/core/constants/app_elevation.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// {@category DesignSystem}
 /// Standardized elevation scale (e0..e3) mapping to consistent design shadows

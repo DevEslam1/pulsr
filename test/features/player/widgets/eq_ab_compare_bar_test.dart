@@ -5,7 +5,7 @@
 // `EqualizerSheet.build` (guarded by `dart:io`'s `Platform.isAndroid`), so they
 // cannot be mounted by a host widget test. This file pins the reachable
 // fallback contract only.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';

@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/studio_bridge_footer.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/app_radii.dart';
@@ -12,6 +12,7 @@ import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// A subtle Normal-mode bridge that tells the user how many Professional
 /// ("Studio") controls are hidden in the current section, and offers a single
 /// discoverable path to unlock them. Renders nothing in Professional mode.

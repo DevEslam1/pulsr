@@ -1,7 +1,7 @@
 // lib/main.dart
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'core/errors/error_message_resolver.dart';
 import 'core/utils/l10n_extensions.dart';
 import 'core/utils/l10n_holder.dart';
@@ -9,7 +9,8 @@ import 'core/utils/startup_gates.dart';
 import 'package:flutter/services.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -38,6 +39,9 @@ import 'core/router/app_router.dart';
 import 'core/network/network_change_monitor.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/scrobbler_service.dart';
+import 'data/services/cast_service.dart';
+import 'data/services/hires_audio_service.dart';
+import 'data/services/usb_exclusive_service.dart';
 import 'core/services/file_intent_handler.dart';
 import 'core/services/restore_detection_service.dart';
 import 'core/services/ytm_account_service.dart';
@@ -75,6 +79,9 @@ import 'domain/repositories/download_repository_interface.dart';
 import 'features/downloads/cubit/downloads_cubit.dart';
 import 'services/discord/discord_rpc_service.dart';
 import 'services/updater/app_update_service.dart';
+
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 
 /// Readiness helper for DI singletons. `isRegistered` is already true while a
 /// lazy async singleton is still pending, so a plain `getIt<T>()` can throw
@@ -787,6 +794,19 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
           .platformBridgeDegraded
           .removeListener(_platformBridgeDegradedListener!);
     }
+    // The audio-output services are process singletons constructed at call
+    // sites rather than through DI; without this their event subscriptions and
+    // broadcast controllers would live until process exit.
+    try {
+      UsbExclusiveService().dispose();
+      if (getIt.isRegistered<HiResAudioService>()) {
+        getIt<HiResAudioService>().dispose();
+      }
+      CastService().dispose();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to dispose audio output singletons',
+          error: e, stackTrace: st, category: 'PulsrApp');
+    }
     super.dispose();
   }
 
@@ -1021,9 +1041,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                       final isHighContrast = settingsConfig.highContrast ||
                           MediaQuery.highContrastOf(context);
                       final isBoldText = MediaQuery.boldTextOf(context);
-                      final isCalmDensity =
-                          settingsConfig.visualDensityMode ==
-                              VisualDensityMode.calm;
+                      final isCalmDensity = settingsConfig.visualDensityMode ==
+                          VisualDensityMode.calm;
 
                       final lightTheme = isHighContrast
                           ? AuraTheme.highContrastThemeFor(Brightness.light,
@@ -1226,7 +1245,7 @@ class PulsrConfigurationErrorApp extends StatelessWidget {
       title: title,
       debugShowCheckedModeBanner: false,
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: Center(
@@ -1248,7 +1267,8 @@ class PulsrConfigurationErrorApp extends StatelessWidget {
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: AppFontSize.body, height: 1.4),
+                  style:
+                      const TextStyle(fontSize: AppFontSize.body, height: 1.4),
                 ),
               ],
             ),
@@ -1276,7 +1296,7 @@ class _DependencyBootstrapScreen extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: Center(

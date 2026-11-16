@@ -1,5 +1,5 @@
 // test/features/player/milkdrop_renderer_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/milkdrop_preset.dart';
 import 'package:pulsr/features/player/presentation/widgets/visualizer/milkdrop_renderer.dart';

@@ -1,5 +1,5 @@
 // lib/core/constants/pulsr_icons.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// {@category DesignSystem}
 /// Semantic iconography system for Pulsr.

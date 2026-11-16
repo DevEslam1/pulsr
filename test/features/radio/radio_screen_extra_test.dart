@@ -10,7 +10,7 @@
 // widget test that opens it. That is a lib-side invariant, not a test gap.
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -26,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 const _s1 = {
@@ -86,7 +87,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: BlocProvider<PlayerCubit>.value(
           value: player,

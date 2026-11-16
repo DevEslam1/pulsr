@@ -1,5 +1,5 @@
 // lib/features/player/presentation/widgets/quran_mode_badge.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -24,66 +24,76 @@ class QuranModeBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap ?? () => QuranModeSheet.show(context),
-        borderRadius: AppRadii.r20All,
-        child: Ink(
-          padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 12,
-            vertical: compact ? 3 : 6,
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                badgeColor.withValues(alpha: 0.20),
-                badgeColor.withValues(alpha: 0.06),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+    return Semantics(
+      button: true,
+      label: context.l10n.quranMode,
+      child: Material(
+        color: Colors.transparent,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          child: InkWell(
+            onTap: onTap ?? () => QuranModeSheet.show(context),
             borderRadius: AppRadii.r20All,
-            border: Border.all(
-              color: badgeColor.withValues(alpha: 0.45),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: badgeColor.withValues(alpha: 0.14),
-                blurRadius: 8,
-                spreadRadius: -1,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.auto_stories_rounded,
-                  size: compact ? 12 : 14,
-                  color: badgeColor,
+            child: Center(
+              child: Ink(
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 8 : 12,
+                  vertical: compact ? 3 : 6,
                 ),
-                const SizedBox(width: AppSpacing.s6),
-                Text(
-                  context.l10n.quranMode,
-                  style: TextStyle(
-                    color: context.palette.textPrimary,
-                    fontSize: compact ? AppFontSize.caption : AppFontSize.label,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: AppTracking.overline,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      badgeColor.withValues(alpha: 0.20),
+                      badgeColor.withValues(alpha: 0.06),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: AppRadii.r20All,
+                  border: Border.all(
+                    color: badgeColor.withValues(alpha: 0.45),
+                    width: 1.0,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: badgeColor.withValues(alpha: 0.14),
+                      blurRadius: 8,
+                      spreadRadius: -1,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.auto_stories_rounded,
+                        size: compact ? 12 : 14,
+                        color: badgeColor,
+                      ),
+                      const SizedBox(width: AppSpacing.s6),
+                      Text(
+                        context.l10n.quranMode,
+                        style: TextStyle(
+                          color: context.palette.textPrimary,
+                          fontSize:
+                              compact ? AppFontSize.caption : AppFontSize.label,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: AppTracking.overline,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.xxs),
+                      Icon(
+                        Icons.tune_rounded,
+                        size: compact ? 11 : 13,
+                        color: badgeColor.withValues(alpha: 0.8),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xxs),
-                Icon(
-                  Icons.tune_rounded,
-                  size: compact ? 11 : 13,
-                  color: badgeColor.withValues(alpha: 0.8),
-                ),
-              ],
+              ),
             ),
           ),
         ),

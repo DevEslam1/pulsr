@@ -3,7 +3,7 @@
 // Covers the cookie-recovery surface: the manual cookie import dialog (all
 // verdicts), the CookieMismatch auto-navigation and its hard cap, and the
 // scoped cookie/cache wipe.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:mocktail/mocktail.dart';

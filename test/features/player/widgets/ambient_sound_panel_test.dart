@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ambient_sound_service.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
@@ -10,9 +10,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../support/fake_audio_player.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 Widget _wrap(Widget child) {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: SingleChildScrollView(

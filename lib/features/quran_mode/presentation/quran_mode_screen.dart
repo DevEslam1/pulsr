@@ -1,5 +1,5 @@
 // lib/features/quran_mode/presentation/quran_mode_screen.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../core/utils/l10n_extensions.dart';
 
 import '../../../core/theme/aura_theme.dart';

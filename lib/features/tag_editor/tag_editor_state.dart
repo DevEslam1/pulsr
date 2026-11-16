@@ -1,5 +1,6 @@
 // lib/features/tag_editor/tag_editor_state.dart
 import 'dart:typed_data';
+import '../../core/errors/app_error.dart';
 import '../../data/db/app_database.dart';
 
 enum TagEditorStatus { initial, loading, loaded, saving, success, failure }
@@ -22,7 +23,10 @@ class TagEditorState {
   final bool removeArtwork;
   final bool isAutoFetching;
   final double? batchProgress;
-  final String? errorMessage;
+  final AppError? error;
+
+  /// Display copy for the typed failure (existing UI contract).
+  String? get errorMessage => error?.userMessage;
 
   /// Files that failed during the latest batch save. A partially failed batch
   /// still reports [TagEditorStatus.success] (the rest were written), so the
@@ -49,7 +53,7 @@ class TagEditorState {
     this.removeArtwork = false,
     this.isAutoFetching = false,
     this.batchProgress,
-    this.errorMessage,
+    this.error,
     this.batchFailedCount = 0,
   });
 
@@ -74,8 +78,8 @@ class TagEditorState {
     bool? isAutoFetching,
     double? batchProgress,
     bool clearBatchProgress = false,
-    String? errorMessage,
-    bool clearErrorMessage = false,
+    AppError? error,
+    bool clearError = false,
     int? batchFailedCount,
   }) {
     return TagEditorState(
@@ -99,8 +103,7 @@ class TagEditorState {
       isAutoFetching: isAutoFetching ?? this.isAutoFetching,
       batchProgress:
           clearBatchProgress ? null : (batchProgress ?? this.batchProgress),
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      error: clearError ? null : (error ?? this.error),
       batchFailedCount: batchFailedCount ?? this.batchFailedCount,
     );
   }

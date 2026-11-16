@@ -1,6 +1,6 @@
 // lib/features/settings/presentation/widgets/usb_dac_section.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../core/utils/l10n_extensions.dart';

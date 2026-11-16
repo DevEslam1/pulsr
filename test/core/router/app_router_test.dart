@@ -2,7 +2,7 @@
 // per-route redirects, page/builder closures (including not-found and extra
 // branches) and transition builders. Nothing is pumped beyond a bare
 // MaterialApp/Builder context, so no screen state or plugin is exercised.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';

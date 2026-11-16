@@ -2,7 +2,7 @@
 //
 // Covers the empty state, the populated reorderable queue, the overflow menu
 // and forwarding a track tap to PlayerCubit.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

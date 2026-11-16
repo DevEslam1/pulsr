@@ -1,6 +1,7 @@
 import 'package:mutex/mutex.dart';
 import 'dart:async';
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,8 @@ import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/search_music_usecase.dart';
 import 'search_state.dart';
+
+import '../../../core/errors/app_error.dart';
 
 @injectable
 class SearchCubit extends PulsrCubit<SearchState> {
@@ -209,7 +212,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
   // ── Public API: query / filter ──────────────────────────────────────
   void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(error: null));
   }
 
   void setFilter(String filter) {
@@ -279,8 +282,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
     _generation++;
     _cancelSearch();
     _resetResultWindow();
-    safeEmit(state.copyWith(
-        query: '', results: [], isLoading: false, errorMessage: null));
+    safeEmit(
+        state.copyWith(query: '', results: [], isLoading: false, error: null));
   }
 
   // ── Saved searches ──────────────────────────────────────────────────
@@ -445,8 +448,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
       try {
         final prefs = await SharedPreferences.getInstance();
         if (isClosed) return;
-        final existing =
-            prefs.getStringList(_historyKey) ?? List<String>.from(state.history);
+        final existing = prefs.getStringList(_historyKey) ??
+            List<String>.from(state.history);
         final updated = [
           q,
           ...existing.where((h) => h.toLowerCase() != q.toLowerCase())
@@ -526,8 +529,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
 
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
-      safeEmit(
-          state.copyWith(results: [], isLoading: false, errorMessage: null));
+      safeEmit(state.copyWith(results: [], isLoading: false, error: null));
       return;
     }
 
@@ -535,7 +537,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
         ? trimmed.substring(0, maxQueryLength)
         : trimmed;
 
-    safeEmit(state.copyWith(isLoading: true, errorMessage: null));
+    safeEmit(state.copyWith(isLoading: true, error: null));
 
     try {
       final excluded = await _excludedFolders();
@@ -550,13 +552,13 @@ class SearchCubit extends PulsrCubit<SearchState> {
           if (stale()) return;
 
           await result.fold(
-            (failure) async => safeEmit(state.copyWith(
-                isLoading: false, errorMessage: failure.message)),
+            (failure) async =>
+                safeEmit(state.copyWith(isLoading: false, error: failure)),
             (allResults) async {
               final q = normalize(boundedQuery);
               final filter = filterOverride ?? state.selectedFilter;
               var pool = allResults;
-              var filtered = _filterWithFuzzy(pool, q, filter);
+              var filtered = await _filterWithFuzzy(pool, q, filter);
 
               if (pool.isEmpty && boundedQuery.length >= 2) {
                 try {
@@ -572,7 +574,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
                   final candidates =
                       prefixRes.fold((l) => <SongsTableData>[], (r) => r);
                   pool = candidates.take(_searchLimit).toList();
-                  filtered = _filterWithFuzzy(pool, q, filter);
+                  filtered = await _filterWithFuzzy(pool, q, filter);
                 } catch (e, st) {
                   ErrorLogger.log('Fuzzy fallback search failed',
                       error: e, stackTrace: st, category: 'SearchCubit');
@@ -586,7 +588,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
               safeEmit(state.copyWith(
                   results: List<SongsTableData>.unmodifiable(filtered),
                   isLoading: false,
-                  errorMessage: null));
+                  error: null));
             },
           );
         },
@@ -602,17 +604,29 @@ class SearchCubit extends PulsrCubit<SearchState> {
     if (_isStale(generation)) return;
     addError(error, stackTrace);
     final message = error is AppFailure ? error.message : 'Search failed';
-    safeEmit(state.copyWith(isLoading: false, errorMessage: message));
+    safeEmit(state.copyWith(isLoading: false, error: uiError(message)));
   }
 
   /// Backwards-compatible delegate; the implementation lives in
   /// [SearchAlgorithmUtils] so it can be tested without a Cubit.
   static String normalize(String s) => SearchAlgorithmUtils.normalize(s);
 
-  List<SongsTableData> _filterWithFuzzy(
-          List<SongsTableData> songs, String rawQ, String filter) =>
-      SearchAlgorithmUtils.filterWithFuzzy(songs, rawQ, filter,
-          maxResults: _resultLimit);
+  Future<List<SongsTableData>> _filterWithFuzzy(
+      List<SongsTableData> songs, String rawQ, String filter) {
+    // Levenshtein ranking is CPU-bound; keep small result sets inline and
+    // move the large ones off the UI isolate. `SongsTableData` and the query
+    // arguments are plain values, so the closure is sendable — capture the
+    // limit locally so the closure does not reference `this`.
+    final limit = _resultLimit;
+    if (songs.length < 250) {
+      return Future.value(SearchAlgorithmUtils.filterWithFuzzy(
+          songs, rawQ, filter,
+          maxResults: limit));
+    }
+    return Isolate.run(() => SearchAlgorithmUtils.filterWithFuzzy(
+        songs, rawQ, filter,
+        maxResults: limit));
+  }
 
   void _updateHasMore(
       List<SongsTableData> filtered, List<SongsTableData> pool) {
@@ -635,8 +649,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
         ? trimmed.substring(0, maxQueryLength)
         : trimmed;
     final q = normalize(bounded);
-    final filtered =
-        _filterWithFuzzy(pool, q, _lastPoolFilter ?? state.selectedFilter);
+    final filtered = await _filterWithFuzzy(
+        pool, q, _lastPoolFilter ?? state.selectedFilter);
     if (isClosed || generation != _generation) return;
     _updateHasMore(filtered, pool);
     safeEmit(

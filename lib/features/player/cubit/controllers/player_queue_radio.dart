@@ -25,7 +25,8 @@ extension PlayerQueueRadio on PlayerQueueController {
       if (!_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-          playback: s.playback.copyWith(errorMessage: 'Failed to pause radio'),
+          playback:
+              s.playback.copyWith(error: uiError('Failed to pause radio')),
         ));
       }
     }
@@ -54,7 +55,7 @@ extension PlayerQueueRadio on PlayerQueueController {
         _emit(s.copyWith(
           playback: s.playback.copyWith(
             isPlaying: false,
-            errorMessage: 'Failed to start radio',
+            error: uiError('Failed to start radio'),
           ),
         ));
       }
@@ -87,7 +88,7 @@ extension PlayerQueueRadio on PlayerQueueController {
       final s = _getState();
       _emit(s.copyWith(
           playback: s.playback.copyWith(
-              errorMessage: 'Invalid stream URL (must be HTTP/HTTPS)')));
+              error: uiError('Invalid stream URL (must be HTTP/HTTPS)'))));
       return;
     }
     final artwork =
@@ -164,7 +165,6 @@ extension PlayerQueueRadio on PlayerQueueController {
     await fetchAndEnqueueAutoplay(videoId, seedArtist: seedSong.artist);
   }
 
-
   /// Fetches radio tracks via YtmService and appends them to the queue as QueueTier.autoplay.
   ///
   /// The network call runs outside [_queueMutex] (it can take seconds), but
@@ -204,8 +204,9 @@ extension PlayerQueueRadio on PlayerQueueController {
           if (playedAndQueuedIds.contains(track.videoId)) continue;
 
           // Duplicate recording check
-          final hasDup = s.queue.any((q) => PlayerQueueController.isSameRecording(
-                  q.title, q.artist, track.title, track.artist)) ||
+          final hasDup = s.queue.any((q) =>
+                  PlayerQueueController.isSameRecording(
+                      q.title, q.artist, track.title, track.artist)) ||
               s.queueHistory.any((h) => PlayerQueueController.isSameRecording(
                   h.title, h.artist, track.title, track.artist)) ||
               eligible.any((e) => PlayerQueueController.isSameRecording(

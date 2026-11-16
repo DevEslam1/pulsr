@@ -2,6 +2,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../core/errors/app_error.dart';
+
 part 'auth_state.freezed.dart';
 
 enum AuthStatus {
@@ -21,9 +23,13 @@ abstract class AuthState with _$AuthState {
   const factory AuthState({
     @Default(AuthStatus.initial) AuthStatus status,
     User? user,
-    String? errorMessage,
+    AppError? error,
     @Default(SyncStatus.idle) SyncStatus syncStatus,
-    String? syncError,
+    AppError? syncError,
     DateTime? lastSyncedAt,
   }) = _AuthState;
+
+  /// Compatibility accessors: the UI renders the typed error's user copy.
+  String? get errorMessage => error?.userMessage;
+  String? get syncErrorMessage => syncError?.userMessage;
 }

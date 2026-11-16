@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
 
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/utils/error_logger.dart';
@@ -106,7 +107,12 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       // unhandled zone error.
       ErrorLogger.log('Downloads init failed',
           error: e, stackTrace: st, category: 'DownloadsCubit');
-      safeEmit(state.copyWith(errorMessage: 'Failed to load downloads'));
+      safeEmit(state.copyWith(
+        error: const GenericAppError(
+          code: 'DOWNLOADS_INIT_FAILED',
+          userMessage: 'Failed to load downloads',
+        ),
+      ));
     } finally {
       if (!isClosed) {
         safeEmit(state.copyWith(isLoading: false));
@@ -121,13 +127,19 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
         for (final t in tasks) t.videoId: t,
         ...state.tasks,
       };
-      safeEmit(state.copyWith(tasks: Map<String, DownloadTask>.unmodifiable(merged)));
+      safeEmit(state.copyWith(
+          tasks: Map<String, DownloadTask>.unmodifiable(merged)));
     } catch (e, st) {
       // Was `catch (_) {}`: a failed load was indistinguishable from an empty
       // library. Log it and surface it in state.
       ErrorLogger.log('Failed to load initial download tasks',
           error: e, stackTrace: st, category: 'DownloadsCubit');
-      safeEmit(state.copyWith(errorMessage: 'Failed to load downloads'));
+      safeEmit(state.copyWith(
+        error: const GenericAppError(
+          code: 'DOWNLOADS_LOAD_FAILED',
+          userMessage: 'Failed to load downloads',
+        ),
+      ));
     }
   }
 
@@ -371,8 +383,12 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       if (result.isRight()) queued++;
     }
     if (!isClosed && ids.isNotEmpty && queued == 0) {
-      safeEmit(
-          state.copyWith(errorMessage: 'Could not retry failed downloads'));
+      safeEmit(state.copyWith(
+        error: const GenericAppError(
+          code: 'DOWNLOADS_RETRY_FAILED',
+          userMessage: 'Could not retry failed downloads',
+        ),
+      ));
     }
     return queued;
   }
@@ -390,8 +406,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     final result = await _deleteDownloadUseCase(videoId);
     if (isClosed) return;
     await result.fold(
-      (failure) async =>
-          safeEmit(state.copyWith(errorMessage: failure.message)),
+      (failure) async => safeEmit(state.copyWith(error: failure)),
       (_) async {
         await _deleteMutex.protect(() async {
           _lastEmitTimeByVideoId.remove(videoId);
@@ -404,7 +419,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           cachedTaskList: List<DownloadTask>.unmodifiable(
             state.taskList.where((t) => t.videoId != videoId),
           ),
-          clearErrorMessage: true,
+          clearError: true,
         ));
         _scheduleDebouncedStorageStats(); // FIX-A14
       },
@@ -415,8 +430,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   void _applyActionResult<R>(Either<AppFailure, R> result) {
     if (isClosed) return;
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) => safeEmit(state.copyWith(clearErrorMessage: true)),
+      (failure) => safeEmit(state.copyWith(error: failure)),
+      (_) => safeEmit(state.copyWith(clearError: true)),
     );
   }
 

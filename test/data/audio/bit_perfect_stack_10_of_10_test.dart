@@ -17,14 +17,18 @@ import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
 class _MockHiResAudioService extends Mock implements HiResAudioService {}
+
 class _MockMediaScannerService extends Mock implements MediaScannerService {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('BitPerfectChain Verdict Ordering', () {
-    test('1. notRequested takes precedence over active=false and mismatches', () {
+    test('1. notRequested takes precedence over active=false and mismatches',
+        () {
       final res = assessBitPerfectChain(
         requested: false,
         active: false,
@@ -37,7 +41,8 @@ void main() {
       expect(res.isProblem, isFalse);
     });
 
-    test('2. inactive takes precedence over matching or mismatched formats', () {
+    test('2. inactive takes precedence over matching or mismatched formats',
+        () {
       final res = assessBitPerfectChain(
         requested: true,
         active: false,
@@ -52,7 +57,9 @@ void main() {
       expect(res.isProblem, isTrue);
     });
 
-    test('3. DoP carrier takes precedence over sample modification and rate mismatch', () {
+    test(
+        '3. DoP carrier takes precedence over sample modification and rate mismatch',
+        () {
       final res = assessBitPerfectChain(
         requested: true,
         active: true,
@@ -68,7 +75,9 @@ void main() {
       expect(res.isProblem, isFalse);
     });
 
-    test('4. samplesModified takes precedence over channels altered and rate mismatch', () {
+    test(
+        '4. samplesModified takes precedence over channels altered and rate mismatch',
+        () {
       final res = assessBitPerfectChain(
         requested: true,
         active: true,
@@ -112,7 +121,9 @@ void main() {
       expect(res.reasonCode, 'rate_unknown');
     });
 
-    test('7. rate mismatch takes precedence over depth unknown and depth reduction', () {
+    test(
+        '7. rate mismatch takes precedence over depth unknown and depth reduction',
+        () {
       final res = assessBitPerfectChain(
         requested: true,
         active: true,
@@ -127,7 +138,8 @@ void main() {
       expect(res.isProblem, isTrue);
     });
 
-    test('8. source depth unknown (<= 0) takes precedence over depth reduction', () {
+    test('8. source depth unknown (<= 0) takes precedence over depth reduction',
+        () {
       final res = assessBitPerfectChain(
         requested: true,
         active: true,
@@ -168,7 +180,9 @@ void main() {
       expect(res.isProblem, isTrue);
     });
 
-    test('10b. sourceCodecUnconfirmed takes precedence over matching formats and yields unverified', () {
+    test(
+        '10b. sourceCodecUnconfirmed takes precedence over matching formats and yields unverified',
+        () {
       final res = assessBitPerfectChain(
         requested: true,
         active: true,
@@ -226,7 +240,9 @@ void main() {
   });
 
   group('AudioConflicts Block and Bypass Rules', () {
-    test('strictBitPerfectBlockedReason blocks Bluetooth and unconnected devices', () {
+    test(
+        'strictBitPerfectBlockedReason blocks Bluetooth and unconnected devices',
+        () {
       expect(
         AudioConflicts.strictBitPerfectBlockedReason(null),
         isNotNull,
@@ -246,7 +262,8 @@ void main() {
       );
     });
 
-    test('strictBitPerfectBlockedReason allows USB DAC without hard blockers', () {
+    test('strictBitPerfectBlockedReason allows USB DAC without hard blockers',
+        () {
       const usbDevice = AudioOutputInfo(
         deviceName: 'AudioQuest Dragonfly',
         isBluetooth: false,
@@ -277,7 +294,8 @@ void main() {
       );
     });
 
-    test('volumeBoostClippingWarning warns when preamp + boost exceeds 0 dBFS', () {
+    test('volumeBoostClippingWarning warns when preamp + boost exceeds 0 dBFS',
+        () {
       expect(AudioConflicts.volumeBoostClippingWarning(0.1, 0.0), isNotNull);
       expect(AudioConflicts.volumeBoostClippingWarning(0.5, -6.0), isNull);
     });
@@ -296,7 +314,8 @@ void main() {
       hires = _MockHiResAudioService();
       scanner = _MockMediaScannerService();
 
-      when(() => hires.outputDeviceStream).thenAnswer((_) => const Stream.empty());
+      when(() => hires.outputDeviceStream)
+          .thenAnswer((_) => const Stream.empty());
       when(() => hires.currentOutputInfo).thenReturn(const AudioOutputInfo(
         deviceName: 'Test USB DAC',
         isUsbDac: true,
@@ -370,7 +389,8 @@ void main() {
       final futures = <Future>[
         cubit.selectOutputDevice(1),
         cubit.clearOutputDevice(),
-        cubit.setBitPerfectTrackFormat(sampleRate: 48000, bitDepth: 24, channels: 2),
+        cubit.setBitPerfectTrackFormat(
+            sampleRate: 48000, bitDepth: 24, channels: 2),
         cubit.setAaudioOutputEnabled(true),
         cubit.setAaudioOutputEnabled(false),
       ];
@@ -379,7 +399,9 @@ void main() {
       expect(cubit.isClosed, isFalse);
     });
 
-    test('refresh-sequence stale result drop: slow response does not overwrite fresh state', () async {
+    test(
+        'refresh-sequence stale result drop: slow response does not overwrite fresh state',
+        () async {
       final slowCompleter = Completer<AudioOutputInfo>();
       const fastInfo = AudioOutputInfo(
         deviceName: 'Fast Updated DAC',
@@ -416,7 +438,8 @@ void main() {
       expect(cubit.state.currentOutputDevice?.deviceName, 'Fast Updated DAC');
     });
 
-    test('direct mode track refusal suspends without dropping preference (C.1)', () async {
+    test('direct mode track refusal suspends without dropping preference (C.1)',
+        () async {
       // Platform mixer mode refuses bit-perfect so direct USB stream takes over
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => false);
       await cubit.setBitPerfectOutput(true);
@@ -476,7 +499,8 @@ void main() {
       expect(cubit.state.bitPerfectOutput, isTrue);
       // UI state reports inactive with truthful failure reason
       expect(cubit.state.currentOutputDevice?.isBitPerfectActive, isFalse);
-      expect(cubit.state.currentOutputDevice?.bitPerfectFailureReason, isNotNull);
+      expect(
+          cubit.state.currentOutputDevice?.bitPerfectFailureReason, isNotNull);
       expect(cubit.state.errorMessage, contains('Bit-Perfect stays armed'));
 
       // Next track at supported 48000 succeeds
@@ -513,10 +537,13 @@ void main() {
       await cubit.setStrictBitPerfect(true);
       expect(cubit.state.strictBitPerfect, isFalse);
       expect(cubit.state.bitPerfectOutput, isFalse);
-      expect(cubit.state.bypassDspOnBitPerfect, isTrue); // Restores previous value
+      expect(
+          cubit.state.bypassDspOnBitPerfect, isTrue); // Restores previous value
     });
 
-    test('Regression 1: selectOutputDevice returns false and does not switch route when stopStreaming fails', () async {
+    test(
+        'Regression 1: selectOutputDevice returns false and does not switch route when stopStreaming fails',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => false);
       // Start direct USB streaming
       await cubit.setBitPerfectOutput(true);
@@ -538,10 +565,12 @@ void main() {
       final switched = await cubit.selectOutputDevice(2);
       expect(switched, isFalse);
       expect(selectCalled, isFalse);
-      expect(cubit.state.errorMessage, contains('The direct USB stream could not be stopped'));
+      expect(cubit.state.errorMessage,
+          contains('The direct USB stream could not be stopped'));
     });
 
-    test('Regression 2: setBluetoothLatencyOffsetMs per-device vs global prefs', () async {
+    test('Regression 2: setBluetoothLatencyOffsetMs per-device vs global prefs',
+        () async {
       // 1. Current output is USB DAC (not Bluetooth)
       await cubit.setBluetoothLatencyOffsetMs(120);
       final prefs = await SharedPreferences.getInstance();
@@ -561,13 +590,17 @@ void main() {
       expect(cubit.state.currentOutputDevice?.isBluetooth, isTrue);
 
       // Set latency for Bluetooth device - should NOT overwrite global default
-      await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, 50); // set known global
+      await prefs.setInt(
+          PrefsKeys.bluetoothLatencyOffsetMs, 50); // set known global
       await cubit.setBluetoothLatencyOffsetMs(250);
-      expect(prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs), 50); // global unchanged!
+      expect(prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs),
+          50); // global unchanged!
       expect(cubit.state.bluetoothLatencyOffsetMs, 250);
     });
 
-    test('Regression 3: _rollbackBitPerfectEnable restores previous user preferences on failure', () async {
+    test(
+        'Regression 3: _rollbackBitPerfectEnable restores previous user preferences on failure',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => false);
       // User sets bypassDsp to false and followRate to false
       await cubit.setBypassDspOnBitPerfect(false);
@@ -601,7 +634,9 @@ void main() {
       expect(cubit.state.followTrackSampleRate, isFalse);
     });
 
-    test('Regression 4: _setStrictBitPerfect(false) triggers refreshOutputDevice()', () async {
+    test(
+        'Regression 4: _setStrictBitPerfect(false) triggers refreshOutputDevice()',
+        () async {
       var refreshed = false;
       when(() => hires.getAudioOutputInfo()).thenAnswer((_) async {
         refreshed = true;
@@ -619,7 +654,9 @@ void main() {
       expect(cubit.state.currentOutputDevice?.deviceName, 'Refreshed DAC');
     });
 
-    test('Strict disable restores pre-Strict values (enable with false/false -> disable returns false/false)', () async {
+    test(
+        'Strict disable restores pre-Strict values (enable with false/false -> disable returns false/false)',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => true);
       // Start with bypass=false and followRate=false
       await cubit.setBypassDspOnBitPerfect(false);
@@ -640,7 +677,9 @@ void main() {
       expect(cubit.state.followTrackSampleRate, isFalse);
     });
 
-    test('Double-enabling Strict Bit-Perfect preserves original pre-Strict values', () async {
+    test(
+        'Double-enabling Strict Bit-Perfect preserves original pre-Strict values',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => true);
       await cubit.setBypassDspOnBitPerfect(false);
       await cubit.setFollowTrackSampleRate(false);
@@ -662,7 +701,9 @@ void main() {
       expect(cubit.state.followTrackSampleRate, isFalse);
     });
 
-    test('Simulated restart: pre-Strict values loaded from SharedPreferences restore on disable and clear keys', () async {
+    test(
+        'Simulated restart: pre-Strict values loaded from SharedPreferences restore on disable and clear keys',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => true);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(PrefsKeys.strictBitPerfect, true);
@@ -672,7 +713,8 @@ void main() {
       await prefs.setBool(PrefsKeys.preStrictBypass, false);
       await prefs.setBool(PrefsKeys.preStrictFollowRate, false);
 
-      final restartedCubit = SettingsCubit(scannerService: scanner, hiResAudioService: hires);
+      final restartedCubit =
+          SettingsCubit(scannerService: scanner, hiResAudioService: hires);
       await restartedCubit.preferencesReady;
       await pumpEventQueue();
 
@@ -693,7 +735,8 @@ void main() {
       await restartedCubit.close();
     });
 
-    test('Strict disable when never enabled in session does not change values', () async {
+    test('Strict disable when never enabled in session does not change values',
+        () async {
       await cubit.setBypassDspOnBitPerfect(false);
       await cubit.setFollowTrackSampleRate(true);
 
@@ -704,7 +747,9 @@ void main() {
       expect(cubit.state.followTrackSampleRate, isTrue);
     });
 
-    test('Section 6.2: Source classification, policy and per-track re-evaluation', () {
+    test(
+        'Section 6.2: Source classification, policy and per-track re-evaluation',
+        () {
       // 1. Radio flag blocks
       final radioFlagBlock = AudioConflicts.bitPerfectSourceBlockedReason(
         isRadio: true,
@@ -740,7 +785,8 @@ void main() {
         bitDepth: 32,
         path: '/storage/music/master.wav',
       );
-      expect(floatBlock, contains('32-bit floating point audio requires lossy conversion'));
+      expect(floatBlock,
+          contains('32-bit floating point audio requires lossy conversion'));
 
       // 5b. 32-bit integer is not float; it gets its own explanation.
       final int32Block = AudioConflicts.bitPerfectSourceBlockedReason(
@@ -748,7 +794,8 @@ void main() {
         path: '/storage/music/master.wav',
         codec: 'pcm_s32le',
       );
-      expect(int32Block, contains('32-bit integer audio needs a float32 stage'));
+      expect(
+          int32Block, contains('32-bit integer audio needs a float32 stage'));
       final float32CodecBlock = AudioConflicts.bitPerfectSourceBlockedReason(
         bitDepth: 32,
         path: '/storage/music/master.wav',
@@ -792,7 +839,8 @@ void main() {
 
       // Strict mode refuses stream with uac1_rate_readback_unsupported
       expect(
-        AudioConflicts.bitPerfectReasonMessage('uac1_rate_readback_unsupported'),
+        AudioConflicts.bitPerfectReasonMessage(
+            'uac1_rate_readback_unsupported'),
         contains('sample-rate readback'),
       );
       expect(
@@ -801,7 +849,9 @@ void main() {
       );
     });
 
-    test('Section 2.2: Channel counter semantics: mismatch on track A, clean track B gives clean verdict', () {
+    test(
+        'Section 2.2: Channel counter semantics: mismatch on track A, clean track B gives clean verdict',
+        () {
       // Track A had channel mismatch (status.channelMismatchFrames > 0 -> channelsAltered: true)
       final trackAVerdict = assessBitPerfectChain(
         requested: true,
@@ -830,9 +880,12 @@ void main() {
       expect(trackBVerdict.isVerified, isTrue);
     });
 
-    test('Ambiguous containers: ALAC allowed & verifiable, no-codec allowed & unverified, AAC blocked', () {
+    test(
+        'Ambiguous containers: ALAC allowed & verifiable, no-codec allowed & unverified, AAC blocked',
+        () {
       // 1. ALAC in .m4a with codec: 'alac' is allowed through and can be verified
-      final alacState = AudioConflicts.classifySourceCodec(path: '/music/track.m4a', codec: 'alac');
+      final alacState = AudioConflicts.classifySourceCodec(
+          path: '/music/track.m4a', codec: 'alac');
       expect(alacState, AudioSourceCodecState.lossless);
       final alacBlocked = AudioConflicts.bitPerfectSourceBlockedReason(
         path: '/music/track.m4a',
@@ -854,7 +907,8 @@ void main() {
       expect(alacAssessment.isVerified, isTrue);
 
       // 2. Ambiguous .m4a with no codec is allowed through but assessBitPerfectChain marks unverified
-      final unknownState = AudioConflicts.classifySourceCodec(path: '/music/track.m4a');
+      final unknownState =
+          AudioConflicts.classifySourceCodec(path: '/music/track.m4a');
       expect(unknownState, AudioSourceCodecState.unknown);
       final unknownBlocked = AudioConflicts.bitPerfectSourceBlockedReason(
         path: '/music/track.m4a',
@@ -876,7 +930,8 @@ void main() {
       expect(unknownAssessment.isVerified, isFalse);
 
       // 3. AAC in .m4a with codec: 'aac' is blocked per policy
-      final aacState = AudioConflicts.classifySourceCodec(path: '/music/track.m4a', codec: 'aac');
+      final aacState = AudioConflicts.classifySourceCodec(
+          path: '/music/track.m4a', codec: 'aac');
       expect(aacState, AudioSourceCodecState.lossy);
       final aacBlocked = AudioConflicts.bitPerfectSourceBlockedReason(
         path: '/music/track.m4a',
@@ -946,7 +1001,9 @@ void main() {
       await sub.cancel();
     });
 
-    test('1.2: Failed teardown during rollback keeps saved pre-Strict values; successful one clears them', () async {
+    test(
+        '1.2: Failed teardown during rollback keeps saved pre-Strict values; successful one clears them',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => false);
       final prefs = await SharedPreferences.getInstance();
 
@@ -1038,13 +1095,16 @@ void main() {
       expect(prefs.getBool(PrefsKeys.preStrictFollowRate), isNull);
     });
 
-    test('1.3: Fresh cubit sees persisted pre-Strict values and does not overwrite them on re-enable', () async {
+    test(
+        '1.3: Fresh cubit sees persisted pre-Strict values and does not overwrite them on re-enable',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => true);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(PrefsKeys.preStrictBypass, false);
       await prefs.setBool(PrefsKeys.preStrictFollowRate, false);
 
-      final freshCubit = SettingsCubit(scannerService: scanner, hiResAudioService: hires);
+      final freshCubit =
+          SettingsCubit(scannerService: scanner, hiResAudioService: hires);
       await freshCubit.preferencesReady;
       await pumpEventQueue();
 
@@ -1061,7 +1121,9 @@ void main() {
       await freshCubit.close();
     });
 
-    test('1.5: Unrelated error set earlier survives a successful track change; source-block error is cleared', () async {
+    test(
+        '1.5: Unrelated error set earlier survives a successful track change; source-block error is cleared',
+        () async {
       when(() => hires.setBitPerfectMode(true)).thenAnswer((_) async => true);
       when(() => hires.setTargetOutputFormat(
             sampleRate: any(named: 'sampleRate'),
@@ -1071,8 +1133,10 @@ void main() {
       await cubit.setBitPerfectOutput(true);
 
       // Part A: An unrelated error survives a successful track format apply
-      cubit.emit(cubit.state.copyWith(errorMessage: 'Unrelated equalizer preset load failed'));
-      expect(cubit.state.errorMessage, 'Unrelated equalizer preset load failed');
+      cubit.emit(cubit.state
+          .copyWith(error: uiError('Unrelated equalizer preset load failed')));
+      expect(
+          cubit.state.errorMessage, 'Unrelated equalizer preset load failed');
 
       final appliedA = await cubit.setBitPerfectTrackFormat(
         sampleRate: 48000,
@@ -1081,7 +1145,8 @@ void main() {
       );
       expect(appliedA, isTrue);
       // Unrelated error survives!
-      expect(cubit.state.errorMessage, 'Unrelated equalizer preset load failed');
+      expect(
+          cubit.state.errorMessage, 'Unrelated equalizer preset load failed');
 
       // Part B: A source-block error is set and then cleared by a successful track change
       final appliedBlock = await cubit.setBitPerfectTrackFormat(
@@ -1102,7 +1167,9 @@ void main() {
       expect(cubit.state.errorMessage, isNull);
     });
 
-    test('1.6: Scanned FLAC and ALAC tracks reach verified status, not unverified', () {
+    test(
+        '1.6: Scanned FLAC and ALAC tracks reach verified status, not unverified',
+        () {
       // 1. Scanned FLAC track with codec: 'FLAC'
       final flacAssessment = assessBitPerfectChain(
         requested: true,

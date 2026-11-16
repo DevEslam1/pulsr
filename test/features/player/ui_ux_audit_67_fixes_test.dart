@@ -1,5 +1,5 @@
 // test/ui_ux_audit_67_fixes_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme_chrome.dart';
 

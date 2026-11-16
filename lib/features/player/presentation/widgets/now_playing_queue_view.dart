@@ -1,7 +1,7 @@
 import '../../../../core/utils/list_content_diff.dart';
 // lib/features/player/presentation/widgets/now_playing_queue_view.dart
 import 'dart:ui' show lerpDouble;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';

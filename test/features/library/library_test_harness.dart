@@ -5,7 +5,7 @@
 // mocked [LibraryCubit] (state supplied up-front) plus a stubbed [PlayerCubit]
 // and [SettingsCubit]. SharedPreferences is seeded so the song-tile gesture
 // hint never schedules its auto-dismiss timer.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -20,6 +20,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 /// Forces `MediaQuery.disableAnimations` on so no infinite shimmer/ticker loops
 /// keep `pumpAndSettle` from settling.
 void disableAnimations(WidgetTester tester) {
@@ -137,7 +138,7 @@ Widget libraryHarness({
       child: MaterialApp(
         theme: AuraTheme.darkTheme,
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: child,
       ),

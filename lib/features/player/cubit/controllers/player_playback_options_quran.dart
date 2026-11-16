@@ -64,8 +64,9 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     if (!persisted && !isClosed && _getState().quranReciterStyle == style) {
       final current = _getState();
       _emit(current.copyWith(
-        playback: current.playback
-            .copyWith(errorMessage: _quranErrorText('Failed to save Quran style adjustments')),
+        playback: current.playback.copyWith(
+            error: uiError(
+                _quranErrorText('Failed to save Quran style adjustments'))),
       ));
     }
   }
@@ -352,7 +353,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           final st = _getState();
           _emit(st.copyWith(
             playback: st.playback.copyWith(
-                errorMessage: _quranErrorText('Failed to save Quran Mode setting')),
+                error: uiError(
+                    _quranErrorText('Failed to save Quran Mode setting'))),
           ));
         }
         if (isClosed || gen != _quranToggleGen) return;
@@ -371,8 +373,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
             final st = _getState();
             _emit(st.copyWith(
               playback: st.playback.copyWith(
-                  errorMessage:
-                      _quranErrorText('Failed to apply Quran audio profile')),
+                  error: uiError(
+                      _quranErrorText('Failed to apply Quran audio profile'))),
             ));
           }
           return;
@@ -413,7 +415,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       final st = _getState();
       _emit(st.copyWith(
         playback: st.playback.copyWith(
-            errorMessage: _quranErrorText('Failed to save Quran Mode setting')),
+            error:
+                uiError(_quranErrorText('Failed to save Quran Mode setting'))),
       ));
     }
     if (isClosed || gen != _quranToggleGen) return;
@@ -427,8 +430,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         final st = _getState();
         _emit(st.copyWith(
           playback: st.playback.copyWith(
-              errorMessage: _quranErrorText(
-                  'Failed to restore audio settings from Quran Mode')),
+              error: uiError(_quranErrorText(
+                  'Failed to restore audio settings from Quran Mode'))),
         ));
       }
       // Keep both copies until the engine has actually accepted the
@@ -459,8 +462,9 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         final current = _getState();
         _emit(current.copyWith(
           dsp: current.dsp.copyWith(quranReciterStyle: s.quranReciterStyle),
-          playback: current.playback
-              .copyWith(errorMessage: _quranErrorText('Failed to save Quran reciter style')),
+          playback: current.playback.copyWith(
+              error: uiError(
+                  _quranErrorText('Failed to save Quran reciter style'))),
         ));
         return;
       }
@@ -496,7 +500,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         saturationMix: mix,
         saturationTilt: tilt,
       ),
-      playback: s.playback.copyWith(errorMessage: null),
+      playback: s.playback.copyWith(error: null),
     ));
     try {
       if (!_getState().isQuranModeEnabled) return;
@@ -523,8 +527,9 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           saturationMix: prevDsp.saturationMix,
           saturationTilt: prevDsp.saturationTilt,
         ),
-        playback: current.playback
-            .copyWith(errorMessage: _quranErrorText('Failed to set Quran vocal warmth: $e')),
+        playback: current.playback.copyWith(
+            error: uiError(
+                _quranErrorText('Failed to set Quran vocal warmth: $e'))),
       ));
     }
   }
@@ -549,7 +554,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         reverbPreset: profile.reverbPreset.wireValue,
         reverbWetDry: clamped,
       ),
-      playback: s.playback.copyWith(errorMessage: null),
+      playback: s.playback.copyWith(error: null),
     ));
     try {
       if (!_getState().isQuranModeEnabled) return;
@@ -578,8 +583,9 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           reverbPreset: prevDsp.reverbPreset,
           reverbWetDry: prevDsp.reverbWetDry,
         ),
-        playback: current.playback
-            .copyWith(errorMessage: _quranErrorText('Failed to set Quran ambience: $e')),
+        playback: current.playback.copyWith(
+            error:
+                uiError(_quranErrorText('Failed to set Quran ambience: $e'))),
       ));
     }
   }
@@ -660,9 +666,10 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
       if (!isClosed &&
           (expectedGen == null || expectedGen == _quranToggleGen)) {
         final current = _getState();
-        if (_lastQuranError != null && current.errorMessage == _lastQuranError) {
+        if (_lastQuranError != null &&
+            current.errorMessage == _lastQuranError) {
           _emit(current.copyWith(
-            playback: current.playback.copyWith(errorMessage: null),
+            playback: current.playback.copyWith(error: null),
           ));
         }
       }
@@ -824,9 +831,10 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
           _getState().isQuranModeEnabled &&
           _getState().quranReciterStyle == tunedProfile.style) {
         final current = _getState();
-        if (_lastQuranError != null && current.errorMessage == _lastQuranError) {
+        if (_lastQuranError != null &&
+            current.errorMessage == _lastQuranError) {
           _emit(current.copyWith(
-            playback: current.playback.copyWith(errorMessage: null),
+            playback: current.playback.copyWith(error: null),
           ));
         }
       }
@@ -841,7 +849,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         final current = _getState();
         _emit(current.copyWith(
           playback: current.playback.copyWith(
-              errorMessage: _quranErrorText('Failed to apply Quran audio profile')),
+              error: uiError(
+                  _quranErrorText('Failed to apply Quran audio profile'))),
         ));
         return false;
       }
@@ -889,7 +898,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         final current = _getState();
         _emit(current.copyWith(
           playback: current.playback.copyWith(
-              errorMessage: _quranErrorText('Failed to reset Quran style adjustments')),
+              error: uiError(
+                  _quranErrorText('Failed to reset Quran style adjustments'))),
         ));
       }
       return;
@@ -914,8 +924,7 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
     final state = _getState();
     final previous = state.playbackSpeed;
     _emit(state.copyWith(
-      playback:
-          state.playback.copyWith(playbackSpeed: clamped, errorMessage: null),
+      playback: state.playback.copyWith(playbackSpeed: clamped, error: null),
     ));
     try {
       await _audioHandler.setSpeedWithoutPersisting(clamped);
@@ -934,7 +943,8 @@ extension PlayerPlaybackOptionsQuran on PlayerPlaybackOptionsController {
         _emit(current.copyWith(
           playback: current.playback.copyWith(
             playbackSpeed: previous,
-            errorMessage: _quranErrorText('Failed to set Quran learning speed'),
+            error:
+                uiError(_quranErrorText('Failed to set Quran learning speed')),
           ),
         ));
       }

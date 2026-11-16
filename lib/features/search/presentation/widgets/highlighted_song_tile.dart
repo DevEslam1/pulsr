@@ -1,5 +1,5 @@
 // lib/features/search/presentation/widgets/highlighted_song_tile.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
@@ -17,6 +17,7 @@ import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Search result row that highlights every occurrence of the active [query]
 /// in the title and subtitle. Mirrors the standard song row layout (artwork,
 /// title, subtitle, duration, trailing actions) with audiophile active-state
@@ -63,7 +64,9 @@ class HighlightedSongTile extends StatelessWidget {
           height: 1.2,
         );
         final subtitleStyle = TextStyle(
-          color: isActive ? p.textPrimary.withValues(alpha: 0.78) : p.textSecondary,
+          color: isActive
+              ? p.textPrimary.withValues(alpha: 0.78)
+              : p.textSecondary,
           fontSize: AppFontSize.label,
           fontWeight: FontWeight.w500,
           height: 1.25,
@@ -88,9 +91,7 @@ class HighlightedSongTile extends StatelessWidget {
               duration: context.motion(PulsrMotion.state),
               curve: context.motionCurve(PulsrMotion.enter),
               decoration: BoxDecoration(
-                color: isActive
-                    ? p.accent.withValues(alpha: 0.10)
-                    : p.surface,
+                color: isActive ? p.accent.withValues(alpha: 0.10) : p.surface,
                 borderRadius: AppRadii.r16All,
                 border: Border.all(
                   color: isActive

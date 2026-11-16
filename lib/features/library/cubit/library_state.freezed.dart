@@ -30,7 +30,7 @@ mixin _$LibraryState {
   bool get ascending;
   bool get isLoading;
   bool get isLoadingMore;
-  String? get errorMessage;
+  AppError? get error;
   String? get infoMessage;
   Set<int> get selectedSongIds;
   bool get isMultiSelectMode;
@@ -70,8 +70,8 @@ mixin _$LibraryState {
                 other.isLoading == _this.isLoading) &&
             (identical(other.isLoadingMore, _this.isLoadingMore) ||
                 other.isLoadingMore == _this.isLoadingMore) &&
-            (identical(other.errorMessage, _this.errorMessage) ||
-                other.errorMessage == _this.errorMessage) &&
+            (identical(other.error, _this.error) ||
+                other.error == _this.error) &&
             (identical(other.infoMessage, _this.infoMessage) ||
                 other.infoMessage == _this.infoMessage) &&
             const DeepCollectionEquality()
@@ -99,7 +99,7 @@ mixin _$LibraryState {
         _this.ascending,
         _this.isLoading,
         _this.isLoadingMore,
-        _this.errorMessage,
+        _this.error,
         _this.infoMessage,
         const DeepCollectionEquality().hash(_this.selectedSongIds),
         _this.isMultiSelectMode,
@@ -109,7 +109,7 @@ mixin _$LibraryState {
   @override
   String toString() {
     final _this = this as LibraryState;
-    return 'LibraryState(songs: ${_this.songs}, albums: ${_this.albums}, artists: ${_this.artists}, genres: ${_this.genres}, years: ${_this.years}, favorites: ${_this.favorites}, downloadedSongs: ${_this.downloadedSongs}, folders: ${_this.folders}, sortBy: ${_this.sortBy}, ascending: ${_this.ascending}, isLoading: ${_this.isLoading}, isLoadingMore: ${_this.isLoadingMore}, errorMessage: ${_this.errorMessage}, infoMessage: ${_this.infoMessage}, selectedSongIds: ${_this.selectedSongIds}, isMultiSelectMode: ${_this.isMultiSelectMode}, viewMode: ${_this.viewMode})';
+    return 'LibraryState(songs: ${_this.songs}, albums: ${_this.albums}, artists: ${_this.artists}, genres: ${_this.genres}, years: ${_this.years}, favorites: ${_this.favorites}, downloadedSongs: ${_this.downloadedSongs}, folders: ${_this.folders}, sortBy: ${_this.sortBy}, ascending: ${_this.ascending}, isLoading: ${_this.isLoading}, isLoadingMore: ${_this.isLoadingMore}, error: ${_this.error}, infoMessage: ${_this.infoMessage}, selectedSongIds: ${_this.selectedSongIds}, isMultiSelectMode: ${_this.isMultiSelectMode}, viewMode: ${_this.viewMode})';
   }
 }
 
@@ -132,7 +132,7 @@ abstract mixin class $LibraryStateCopyWith<$Res> {
       bool ascending,
       bool isLoading,
       bool isLoadingMore,
-      String? errorMessage,
+      AppError? error,
       String? infoMessage,
       Set<int> selectedSongIds,
       bool isMultiSelectMode,
@@ -163,7 +163,7 @@ class _$LibraryStateCopyWithImpl<$Res> implements $LibraryStateCopyWith<$Res> {
     Object? ascending = null,
     Object? isLoading = null,
     Object? isLoadingMore = null,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
     Object? infoMessage = freezed,
     Object? selectedSongIds = null,
     Object? isMultiSelectMode = null,
@@ -218,10 +218,10 @@ class _$LibraryStateCopyWithImpl<$Res> implements $LibraryStateCopyWith<$Res> {
           ? _self.isLoadingMore
           : isLoadingMore // ignore: cast_nullable_to_non_nullable
               as bool,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
       infoMessage: freezed == infoMessage
           ? _self.infoMessage
           : infoMessage // ignore: cast_nullable_to_non_nullable
@@ -348,7 +348,7 @@ extension LibraryStatePatterns on LibraryState {
             bool ascending,
             bool isLoading,
             bool isLoadingMore,
-            String? errorMessage,
+            AppError? error,
             String? infoMessage,
             Set<int> selectedSongIds,
             bool isMultiSelectMode,
@@ -372,7 +372,7 @@ extension LibraryStatePatterns on LibraryState {
             _that.ascending,
             _that.isLoading,
             _that.isLoadingMore,
-            _that.errorMessage,
+            _that.error,
             _that.infoMessage,
             _that.selectedSongIds,
             _that.isMultiSelectMode,
@@ -410,7 +410,7 @@ extension LibraryStatePatterns on LibraryState {
             bool ascending,
             bool isLoading,
             bool isLoadingMore,
-            String? errorMessage,
+            AppError? error,
             String? infoMessage,
             Set<int> selectedSongIds,
             bool isMultiSelectMode,
@@ -433,7 +433,7 @@ extension LibraryStatePatterns on LibraryState {
             _that.ascending,
             _that.isLoading,
             _that.isLoadingMore,
-            _that.errorMessage,
+            _that.error,
             _that.infoMessage,
             _that.selectedSongIds,
             _that.isMultiSelectMode,
@@ -470,7 +470,7 @@ extension LibraryStatePatterns on LibraryState {
             bool ascending,
             bool isLoading,
             bool isLoadingMore,
-            String? errorMessage,
+            AppError? error,
             String? infoMessage,
             Set<int> selectedSongIds,
             bool isMultiSelectMode,
@@ -493,7 +493,7 @@ extension LibraryStatePatterns on LibraryState {
             _that.ascending,
             _that.isLoading,
             _that.isLoadingMore,
-            _that.errorMessage,
+            _that.error,
             _that.infoMessage,
             _that.selectedSongIds,
             _that.isMultiSelectMode,
@@ -520,7 +520,7 @@ class _LibraryState extends LibraryState {
       this.ascending = true,
       this.isLoading = false,
       this.isLoadingMore = false,
-      this.errorMessage,
+      this.error,
       this.infoMessage,
       Set<int> selectedSongIds = const {},
       this.isMultiSelectMode = false,
@@ -626,7 +626,7 @@ class _LibraryState extends LibraryState {
   @JsonKey()
   final bool isLoadingMore;
   @override
-  final String? errorMessage;
+  final AppError? error;
   @override
   final String? infoMessage;
   final Set<int> _selectedSongIds;
@@ -675,8 +675,7 @@ class _LibraryState extends LibraryState {
                 other.isLoading == isLoading) &&
             (identical(other.isLoadingMore, isLoadingMore) ||
                 other.isLoadingMore == isLoadingMore) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage) &&
+            (identical(other.error, error) || other.error == error) &&
             (identical(other.infoMessage, infoMessage) ||
                 other.infoMessage == infoMessage) &&
             const DeepCollectionEquality()
@@ -703,7 +702,7 @@ class _LibraryState extends LibraryState {
         ascending,
         isLoading,
         isLoadingMore,
-        errorMessage,
+        error,
         infoMessage,
         const DeepCollectionEquality().hash(_selectedSongIds),
         isMultiSelectMode,
@@ -712,7 +711,7 @@ class _LibraryState extends LibraryState {
 
   @override
   String toString() {
-    return 'LibraryState(songs: $songs, albums: $albums, artists: $artists, genres: $genres, years: $years, favorites: $favorites, downloadedSongs: $downloadedSongs, folders: $folders, sortBy: $sortBy, ascending: $ascending, isLoading: $isLoading, isLoadingMore: $isLoadingMore, errorMessage: $errorMessage, infoMessage: $infoMessage, selectedSongIds: $selectedSongIds, isMultiSelectMode: $isMultiSelectMode, viewMode: $viewMode)';
+    return 'LibraryState(songs: $songs, albums: $albums, artists: $artists, genres: $genres, years: $years, favorites: $favorites, downloadedSongs: $downloadedSongs, folders: $folders, sortBy: $sortBy, ascending: $ascending, isLoading: $isLoading, isLoadingMore: $isLoadingMore, error: $error, infoMessage: $infoMessage, selectedSongIds: $selectedSongIds, isMultiSelectMode: $isMultiSelectMode, viewMode: $viewMode)';
   }
 }
 
@@ -737,7 +736,7 @@ abstract mixin class _$LibraryStateCopyWith<$Res>
       bool ascending,
       bool isLoading,
       bool isLoadingMore,
-      String? errorMessage,
+      AppError? error,
       String? infoMessage,
       Set<int> selectedSongIds,
       bool isMultiSelectMode,
@@ -769,7 +768,7 @@ class __$LibraryStateCopyWithImpl<$Res>
     Object? ascending = null,
     Object? isLoading = null,
     Object? isLoadingMore = null,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
     Object? infoMessage = freezed,
     Object? selectedSongIds = null,
     Object? isMultiSelectMode = null,
@@ -824,10 +823,10 @@ class __$LibraryStateCopyWithImpl<$Res>
           ? _self.isLoadingMore
           : isLoadingMore // ignore: cast_nullable_to_non_nullable
               as bool,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
       infoMessage: freezed == infoMessage
           ? _self.infoMessage
           : infoMessage // ignore: cast_nullable_to_non_nullable

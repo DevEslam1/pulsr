@@ -1,6 +1,6 @@
 // lib/core/widgets/pulsr_logo.dart
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../constants/app_colors.dart';
 import '../motion/pulsr_motion.dart';
 

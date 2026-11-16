@@ -22,7 +22,7 @@ mixin _$SmartPlaylistBuilderState {
   bool get isSubmitting;
   bool get isEditing;
   int? get editingPlaylistId;
-  String? get errorMessage;
+  AppError? get error;
 
   /// Create a copy of SmartPlaylistBuilderState
   /// with the given fields replaced by the non-null parameter values.
@@ -51,8 +51,8 @@ mixin _$SmartPlaylistBuilderState {
                 other.isEditing == _this.isEditing) &&
             (identical(other.editingPlaylistId, _this.editingPlaylistId) ||
                 other.editingPlaylistId == _this.editingPlaylistId) &&
-            (identical(other.errorMessage, _this.errorMessage) ||
-                other.errorMessage == _this.errorMessage));
+            (identical(other.error, _this.error) ||
+                other.error == _this.error));
   }
 
   @override
@@ -67,13 +67,13 @@ mixin _$SmartPlaylistBuilderState {
         _this.isSubmitting,
         _this.isEditing,
         _this.editingPlaylistId,
-        _this.errorMessage);
+        _this.error);
   }
 
   @override
   String toString() {
     final _this = this as SmartPlaylistBuilderState;
-    return 'SmartPlaylistBuilderState(name: ${_this.name}, criteria: ${_this.criteria}, previewSongs: ${_this.previewSongs}, previewTruncated: ${_this.previewTruncated}, isSubmitting: ${_this.isSubmitting}, isEditing: ${_this.isEditing}, editingPlaylistId: ${_this.editingPlaylistId}, errorMessage: ${_this.errorMessage})';
+    return 'SmartPlaylistBuilderState(name: ${_this.name}, criteria: ${_this.criteria}, previewSongs: ${_this.previewSongs}, previewTruncated: ${_this.previewTruncated}, isSubmitting: ${_this.isSubmitting}, isEditing: ${_this.isEditing}, editingPlaylistId: ${_this.editingPlaylistId}, error: ${_this.error})';
   }
 }
 
@@ -91,7 +91,7 @@ abstract mixin class $SmartPlaylistBuilderStateCopyWith<$Res> {
       bool isSubmitting,
       bool isEditing,
       int? editingPlaylistId,
-      String? errorMessage});
+      AppError? error});
 }
 
 /// @nodoc
@@ -114,7 +114,7 @@ class _$SmartPlaylistBuilderStateCopyWithImpl<$Res>
     Object? isSubmitting = null,
     Object? isEditing = null,
     Object? editingPlaylistId = freezed,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
   }) {
     return _then(SmartPlaylistBuilderState(
       name: null == name
@@ -145,10 +145,10 @@ class _$SmartPlaylistBuilderStateCopyWithImpl<$Res>
           ? _self.editingPlaylistId
           : editingPlaylistId // ignore: cast_nullable_to_non_nullable
               as int?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
     ));
   }
 }
@@ -254,7 +254,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             bool isSubmitting,
             bool isEditing,
             int? editingPlaylistId,
-            String? errorMessage)?
+            AppError? error)?
         $default, {
     required TResult orElse(),
   }) {
@@ -269,7 +269,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             _that.isSubmitting,
             _that.isEditing,
             _that.editingPlaylistId,
-            _that.errorMessage);
+            _that.error);
       case _:
         return orElse();
     }
@@ -298,7 +298,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             bool isSubmitting,
             bool isEditing,
             int? editingPlaylistId,
-            String? errorMessage)
+            AppError? error)
         $default,
   ) {
     final _that = this;
@@ -312,7 +312,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             _that.isSubmitting,
             _that.isEditing,
             _that.editingPlaylistId,
-            _that.errorMessage);
+            _that.error);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -340,7 +340,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             bool isSubmitting,
             bool isEditing,
             int? editingPlaylistId,
-            String? errorMessage)?
+            AppError? error)?
         $default,
   ) {
     final _that = this;
@@ -354,7 +354,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
             _that.isSubmitting,
             _that.isEditing,
             _that.editingPlaylistId,
-            _that.errorMessage);
+            _that.error);
       case _:
         return null;
     }
@@ -363,7 +363,7 @@ extension SmartPlaylistBuilderStatePatterns on SmartPlaylistBuilderState {
 
 /// @nodoc
 
-class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
+class _SmartPlaylistBuilderState extends SmartPlaylistBuilderState {
   const _SmartPlaylistBuilderState(
       {this.name = '',
       this.criteria = const SmartCriteria(),
@@ -372,8 +372,9 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
       this.isSubmitting = false,
       this.isEditing = false,
       this.editingPlaylistId,
-      this.errorMessage})
-      : _previewSongs = previewSongs;
+      this.error})
+      : _previewSongs = previewSongs,
+        super._();
 
   @override
   @JsonKey()
@@ -402,7 +403,7 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
   @override
   final int? editingPlaylistId;
   @override
-  final String? errorMessage;
+  final AppError? error;
 
   /// Create a copy of SmartPlaylistBuilderState
   /// with the given fields replaced by the non-null parameter values.
@@ -432,8 +433,7 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
                 other.isEditing == isEditing) &&
             (identical(other.editingPlaylistId, editingPlaylistId) ||
                 other.editingPlaylistId == editingPlaylistId) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage));
+            (identical(other.error, error) || other.error == error));
   }
 
   @override
@@ -447,12 +447,12 @@ class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
         isSubmitting,
         isEditing,
         editingPlaylistId,
-        errorMessage);
+        error);
   }
 
   @override
   String toString() {
-    return 'SmartPlaylistBuilderState(name: $name, criteria: $criteria, previewSongs: $previewSongs, previewTruncated: $previewTruncated, isSubmitting: $isSubmitting, isEditing: $isEditing, editingPlaylistId: $editingPlaylistId, errorMessage: $errorMessage)';
+    return 'SmartPlaylistBuilderState(name: $name, criteria: $criteria, previewSongs: $previewSongs, previewTruncated: $previewTruncated, isSubmitting: $isSubmitting, isEditing: $isEditing, editingPlaylistId: $editingPlaylistId, error: $error)';
   }
 }
 
@@ -472,7 +472,7 @@ abstract mixin class _$SmartPlaylistBuilderStateCopyWith<$Res>
       bool isSubmitting,
       bool isEditing,
       int? editingPlaylistId,
-      String? errorMessage});
+      AppError? error});
 }
 
 /// @nodoc
@@ -495,7 +495,7 @@ class __$SmartPlaylistBuilderStateCopyWithImpl<$Res>
     Object? isSubmitting = null,
     Object? isEditing = null,
     Object? editingPlaylistId = freezed,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
   }) {
     return _then(_SmartPlaylistBuilderState(
       name: null == name
@@ -526,10 +526,10 @@ class __$SmartPlaylistBuilderStateCopyWithImpl<$Res>
           ? _self.editingPlaylistId
           : editingPlaylistId // ignore: cast_nullable_to_non_nullable
               as int?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
     ));
   }
 }

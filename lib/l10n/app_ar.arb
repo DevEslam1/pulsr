@@ -5928,5 +5928,17 @@
   "coachMarkUsbDacTitle": "إخراج صوتي فائق الدقة Bit-Perfect",
   "coachMarkUsbDacBody": "البث المباشر للعتاد نشط. تم تجاوز معالج النظام لتشغيل صوتي مطابق للأصل تماماً.",
   "coachMarkDockSwipeTitle": "أنماط شريط التشغيل المخصصة",
-  "coachMarkDockSwipeBody": "اسحب لأعلى على المشغل المصغر أو اضغط مطولاً لتخصيص أوضاع التثبيت."
+  "coachMarkDockSwipeBody": "اسحب لأعلى على المشغل المصغر أو اضغط مطولاً لتخصيص أوضاع التثبيت.",
+  "databaseHealth": "صحة قاعدة البيانات",
+  "databaseHealthChecking": "جارٍ الفحص…",
+  "databaseHealthHealthy": "سليمة",
+  "databaseHealthIssues": "تم اكتشاف مشكلات",
+  "databaseHealthEncryption": "التشفير: {state}",
+  "databaseEncryptionEncrypted": "مشفّرة",
+  "databaseEncryptionPlaintext": "نص صريح",
+  "databaseEncryptionUnavailable": "غير متاح",
+  "databaseEncryptionDisabled": "معطّل",
+  "databaseHealthRepairSearch": "إصلاح فهرس البحث",
+  "databaseHealthSearchRepaired": "تم إصلاح فهرس البحث",
+  "databaseHealthSearchRepairFailed": "فشل إصلاح فهرس البحث"
 }

@@ -344,7 +344,8 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     _emit(s.copyWith(
       dsp: dsp,
       playback: s.playback.copyWith(
-        errorMessage: 'Failed to apply profile — reverted to previous settings',
+        error:
+            uiError('Failed to apply profile — reverted to previous settings'),
       ),
     ));
   }

@@ -1,5 +1,5 @@
 // test/responsive/responsive_source_of_truth_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/responsive/breakpoints.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
@@ -32,7 +32,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('Responsive Single Source of Truth at 600, 720, 840dp', () {
-    testWidgets('600x960 small tablet portrait agrees across tokens and Adaptive API',
+    testWidgets(
+        '600x960 small tablet portrait agrees across tokens and Adaptive API',
         (tester) async {
       late BuildContext capturedContext;
       await tester.pumpWidget(
@@ -80,7 +81,8 @@ void main() {
       expect(Adaptive.trackGridColumns(ctx), 2);
     });
 
-    testWidgets('840x1280 large tablet portrait enters expanded tier consistently',
+    testWidgets(
+        '840x1280 large tablet portrait enters expanded tier consistently',
         (tester) async {
       late BuildContext capturedContext;
       await tester.pumpWidget(
@@ -105,7 +107,8 @@ void main() {
       expect(ctx.isTwoPanePlaylist, isFalse); // Portrait aspect ratio
     });
 
-    testWidgets('1280x800 tablet landscape enables 2-pane playlist and expanded tier',
+    testWidgets(
+        '1280x800 tablet landscape enables 2-pane playlist and expanded tier',
         (tester) async {
       late BuildContext capturedContext;
       await tester.pumpWidget(

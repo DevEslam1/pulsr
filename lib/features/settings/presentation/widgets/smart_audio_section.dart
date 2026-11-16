@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/smart_audio_section.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../data/services/hires_audio_service.dart';

@@ -55,9 +55,8 @@ extension PlayerDspFollowRate on PlayerDspController {
           sourceSampleRate: signalPath.sourceSampleRate > 0
               ? signalPath.sourceSampleRate
               : null,
-          sourceBitDepth: signalPath.sourceBitDepth > 0
-              ? signalPath.sourceBitDepth
-              : null,
+          sourceBitDepth:
+              signalPath.sourceBitDepth > 0 ? signalPath.sourceBitDepth : null,
           decoderSampleRate: signalPath.decoderSampleRate > 0
               ? signalPath.decoderSampleRate
               : null,
@@ -115,7 +114,7 @@ extension PlayerDspFollowRate on PlayerDspController {
           if (_isClosed()) return;
           final s = _getState();
           _emit(s.copyWith(
-            playback: s.playback.copyWith(errorMessage: notice),
+            playback: s.playback.copyWith(error: uiError(notice)),
           ));
           _lastFollowedSampleRate = null;
           return;
@@ -241,7 +240,7 @@ extension PlayerDspFollowRate on PlayerDspController {
           if (_isClosed()) return;
           final s = _getState();
           _emit(s.copyWith(
-            playback: s.playback.copyWith(errorMessage: notice),
+            playback: s.playback.copyWith(error: uiError(notice)),
           ));
           return;
         }
@@ -266,7 +265,7 @@ extension PlayerDspFollowRate on PlayerDspController {
             if (_isClosed()) return;
             final s = _getState();
             _emit(s.copyWith(
-              playback: s.playback.copyWith(errorMessage: notice),
+              playback: s.playback.copyWith(error: uiError(notice)),
             ));
             return;
           }

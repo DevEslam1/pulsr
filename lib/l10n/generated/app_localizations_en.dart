@@ -10522,4 +10522,42 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get coachMarkDockSwipeBody =>
       'Swipe up on the mini player or long-press to customize docking modes.';
+
+  @override
+  String get databaseHealth => 'Database Health';
+
+  @override
+  String get databaseHealthChecking => 'Checking…';
+
+  @override
+  String get databaseHealthHealthy => 'Healthy';
+
+  @override
+  String get databaseHealthIssues => 'Issues detected';
+
+  @override
+  String databaseHealthEncryption(String state) {
+    return 'Encryption: $state';
+  }
+
+  @override
+  String get databaseEncryptionEncrypted => 'Encrypted';
+
+  @override
+  String get databaseEncryptionPlaintext => 'Plaintext';
+
+  @override
+  String get databaseEncryptionUnavailable => 'Unavailable';
+
+  @override
+  String get databaseEncryptionDisabled => 'Disabled';
+
+  @override
+  String get databaseHealthRepairSearch => 'Repair search index';
+
+  @override
+  String get databaseHealthSearchRepaired => 'Search index repaired';
+
+  @override
+  String get databaseHealthSearchRepairFailed => 'Search index repair failed';
 }

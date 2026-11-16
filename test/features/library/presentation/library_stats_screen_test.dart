@@ -1,6 +1,6 @@
 // LibraryStatsScreen widget suite: populated/empty/error states, time-range
 // filtering, leaderboard taps and the clear-history confirmation flow.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';

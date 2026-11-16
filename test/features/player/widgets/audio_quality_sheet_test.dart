@@ -1,5 +1,5 @@
 // test/features/player/widgets/audio_quality_sheet_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -15,6 +15,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'player_sheet_test_support.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 const _usbDevice = AudioDeviceEntry(
   id: 1,
   name: 'USB DAC',
@@ -63,7 +64,7 @@ Widget qualityHost({
 }) {
   return MaterialApp(
     theme: AuraTheme.darkTheme,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: MultiBlocProvider(
       providers: [

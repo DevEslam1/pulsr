@@ -1,6 +1,6 @@
 // lib/features/player/presentation/themes/player_theme_scaffold.dart
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/motion/pulsr_motion.dart';
@@ -184,11 +184,9 @@ class PlayerThemeMetrics {
                         ? 62.0
                         : 66.0 * heightRatio.clamp(0.95, 1.15)))));
 
-    final double sideButtonSize = isTablet
-        ? 48.0
-        : (isLandscape
-            ? 36.0
-            : (isShortHeight ? 38.0 : (isCompactHeight ? 42.0 : 48.0)));
+    // Transport targets are never allowed below the 48 dp accessibility
+    // minimum, regardless of height class.
+    final double sideButtonSize = isTablet ? 52.0 : 48.0;
 
     final double waveformHeight = isTablet
         ? 48.0
@@ -370,7 +368,8 @@ class PlayerThemeScaffold extends StatelessWidget {
   final PlayerDockIconStyle dockIconStyle;
   final bool showLyricsAndQueueOverlays;
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics) body;
-  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)? chrome;
+  final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
+      chrome;
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
       trackInfo;
   final Widget Function(BuildContext context, PlayerThemeMetrics metrics)?
@@ -417,248 +416,245 @@ class PlayerThemeScaffold extends StatelessWidget {
 
     final content = LayoutBuilder(
       builder: (context, constraints) {
-        final metrics =
-            PlayerThemeMetrics.calculate(context, constraints);
+        final metrics = PlayerThemeMetrics.calculate(context, constraints);
 
-                final resolvedSwitcher = viewSwitcher != null
-                    ? viewSwitcher!(context, metrics)
-                    : PlayerViewSwitcher(
-                        state: state,
-                        cubit: cubit,
-                        activeColor: activeColor,
-                        isTablet: metrics.isTablet,
-                        barWidth: metrics.pillBarWidth,
-                        barHeight: metrics.pillBarHeight,
-                        trackIcon: trackIcon,
-                        surfaceFillAlpha: switcherSurfaceFillAlpha,
-                        borderAlpha: switcherBorderAlpha,
-                      );
+        final resolvedSwitcher = viewSwitcher != null
+            ? viewSwitcher!(context, metrics)
+            : PlayerViewSwitcher(
+                state: state,
+                cubit: cubit,
+                activeColor: activeColor,
+                isTablet: metrics.isTablet,
+                barWidth: metrics.pillBarWidth,
+                barHeight: metrics.pillBarHeight,
+                trackIcon: trackIcon,
+                surfaceFillAlpha: switcherSurfaceFillAlpha,
+                borderAlpha: switcherBorderAlpha,
+              );
 
-                final resolvedDock = bottomDock != null
-                    ? bottomDock!(context, metrics)
-                    : PlayerBottomActionDock(
-                        props: props,
-                        isTablet: metrics.isTablet,
-                        barWidth: metrics.pillBarWidth,
-                        barHeight: metrics.dockBarHeight,
-                        dockIconStyle: dockIconStyle,
-                      );
+        final resolvedDock = bottomDock != null
+            ? bottomDock!(context, metrics)
+            : PlayerBottomActionDock(
+                props: props,
+                isTablet: metrics.isTablet,
+                barWidth: metrics.pillBarWidth,
+                barHeight: metrics.dockBarHeight,
+                dockIconStyle: dockIconStyle,
+              );
 
-                final resolvedTopBar = topBar ?? PlayerHeaderBar(props: props);
+        final resolvedTopBar = topBar ?? PlayerHeaderBar(props: props);
 
-                final Widget resolvedChild;
-                if (showLyricsAndQueueOverlays && state.isLyricsVisible) {
-                  resolvedChild = LyricsView(
-                    key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                    lyrics: state.lyrics,
-                    isLoading: state.isLoadingLyrics,
-                    activeColor: activeColor,
-                    source: state.lyricsSource,
-                  );
-                } else if (showLyricsAndQueueOverlays && state.isQueueVisible) {
-                  resolvedChild =
-                      const NowPlayingQueueView(key: ValueKey('queue_view'));
-                } else {
-                  resolvedChild = KeyedSubtree(
-                    key: const ValueKey('stage_body'),
-                    child: body(context, metrics),
-                  );
-                }
+        final Widget resolvedChild;
+        if (showLyricsAndQueueOverlays && state.isLyricsVisible) {
+          resolvedChild = LyricsView(
+            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
+            lyrics: state.lyrics,
+            isLoading: state.isLoadingLyrics,
+            activeColor: activeColor,
+            source: state.lyricsSource,
+          );
+        } else if (showLyricsAndQueueOverlays && state.isQueueVisible) {
+          resolvedChild =
+              const NowPlayingQueueView(key: ValueKey('queue_view'));
+        } else {
+          resolvedChild = KeyedSubtree(
+            key: const ValueKey('stage_body'),
+            child: body(context, metrics),
+          );
+        }
 
-                final Widget resolvedCenter = showLyricsAndQueueOverlays
-                    ? AnimatedSwitcher(
-                        duration: context.motionMs(320),
-                        transitionBuilder: (child, anim) =>
-                            playerOverlayTransitionBuilder(
-                                context, child, anim),
-                        child: resolvedChild,
-                      )
-                    : resolvedChild;
+        final Widget resolvedCenter = showLyricsAndQueueOverlays
+            ? AnimatedSwitcher(
+                duration: context.motionMs(320),
+                transitionBuilder: (child, anim) =>
+                    playerOverlayTransitionBuilder(context, child, anim),
+                child: resolvedChild,
+              )
+            : resolvedChild;
 
-                final Widget resolvedSeekBar = seekBar != null
-                    ? seekBar!(context, metrics)
-                    : PlayerSeekBar(
-                        duration: state.duration,
-                        activeColor: activeColor,
-                        songId: song?.id,
-                        filePath: song?.path,
-                        loopPointA: state.abPointA,
-                        loopPointB: state.abPointB,
-                        showUpNext: metrics.showUpNext,
-                        waveformHeight: metrics.waveformHeight,
-                        onSeek: (pos) => cubit.seek(pos),
-                      );
+        final Widget resolvedSeekBar = seekBar != null
+            ? seekBar!(context, metrics)
+            : PlayerSeekBar(
+                duration: state.duration,
+                activeColor: activeColor,
+                songId: song?.id,
+                filePath: song?.path,
+                loopPointA: state.abPointA,
+                loopPointB: state.abPointB,
+                showUpNext: metrics.showUpNext,
+                waveformHeight: metrics.waveformHeight,
+                onSeek: (pos) => cubit.seek(pos),
+              );
 
-                ExperienceMode mode = ExperienceMode.normal;
-                try {
-                  mode = context.select<SettingsCubit, ExperienceMode>(
-                      (c) => c.state.experienceMode);
-                } catch (_) {}
-                final showAbControls = mode == ExperienceMode.professional ||
-                    state.abPointA != null ||
-                    state.abPointB != null;
+        ExperienceMode mode = ExperienceMode.normal;
+        try {
+          mode = context.select<SettingsCubit, ExperienceMode>(
+              (c) => c.state.experienceMode);
+        } catch (_) {}
+        final showAbControls = mode == ExperienceMode.professional ||
+            state.abPointA != null ||
+            state.abPointB != null;
 
-                final Widget resolvedControls = controls != null
-                    ? controls!(context, metrics)
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (state.bookmarkPosition != null) ...[
-                            _buildBookmarkPrompt(
-                                context, cubit, state.bookmarkPosition!),
-                            const SizedBox(height: 8),
-                          ],
-                          PlayerControls(
-                            isPlaying: state.isPlaying,
-                            isBuffering: state.isBuffering,
-                            isShuffle: state.isShuffle,
-                            repeatMode: state.repeatMode,
-                            hasPrevious: state.hasPreviousNeighbour,
-                            hasNext: state.hasNextNeighbour,
-                            abLoopActive: state.abLoopEnabled,
-                            showAbControls: showAbControls,
-                            abPointA: state.abPointA,
-                            abPointB: state.abPointB,
-                            onSetAbPointA: () => cubit.setAbPointA(),
-                            onSetAbPointB: () => cubit.setAbPointB(),
-                            onToggleAbLoop: () => cubit.toggleAbLoop(),
-                            onClearAbLoop: () => cubit.clearAbLoop(),
-                            primaryColor: activeColor,
-                            mainButtonSize: metrics.mainButtonSize,
-                            sideButtonSize: metrics.sideButtonSize,
-                            onPlayPause: () => cubit.togglePlayPause(),
-                            onNext: () => cubit.next(),
-                            onPrevious: () => cubit.previous(),
-                            onToggleShuffle: () => cubit.toggleShuffle(),
-                            onToggleRepeat: () => cubit.toggleRepeat(),
-                          ),
-                        ],
-                      );
+        final Widget resolvedControls = controls != null
+            ? controls!(context, metrics)
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (state.bookmarkPosition != null) ...[
+                    _buildBookmarkPrompt(
+                        context, cubit, state.bookmarkPosition!),
+                    const SizedBox(height: 8),
+                  ],
+                  PlayerControls(
+                    isPlaying: state.isPlaying,
+                    isBuffering: state.isBuffering,
+                    isShuffle: state.isShuffle,
+                    repeatMode: state.repeatMode,
+                    hasPrevious: state.hasPreviousNeighbour,
+                    hasNext: state.hasNextNeighbour,
+                    abLoopActive: state.abLoopEnabled,
+                    showAbControls: showAbControls,
+                    abPointA: state.abPointA,
+                    abPointB: state.abPointB,
+                    onSetAbPointA: () => cubit.setAbPointA(),
+                    onSetAbPointB: () => cubit.setAbPointB(),
+                    onToggleAbLoop: () => cubit.toggleAbLoop(),
+                    onClearAbLoop: () => cubit.clearAbLoop(),
+                    primaryColor: activeColor,
+                    mainButtonSize: metrics.mainButtonSize,
+                    sideButtonSize: metrics.sideButtonSize,
+                    onPlayPause: () => cubit.togglePlayPause(),
+                    onNext: () => cubit.next(),
+                    onPrevious: () => cubit.previous(),
+                    onToggleShuffle: () => cubit.toggleShuffle(),
+                    onToggleRepeat: () => cubit.toggleRepeat(),
+                  ),
+                ],
+              );
 
-                final Widget resolvedChrome = chrome != null
-                    ? chrome!(context, metrics)
-                    : Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (trackInfo != null) ...[
-                            trackInfo!(context, metrics),
-                            SizedBox(height: metrics.spacingTrackToSeek),
-                          ],
-                          resolvedSeekBar,
-                          SizedBox(height: metrics.spacingSeekToControls),
-                          resolvedControls,
-                          if (isInSplitView && !metrics.isVeryShortHeight)
-                            PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
-                          SizedBox(height: metrics.spacingControlsToDock),
-                          resolvedDock,
-                          SizedBox(height: metrics.spacingBelowDock),
-                        ],
-                      );
+        final Widget resolvedChrome = chrome != null
+            ? chrome!(context, metrics)
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (trackInfo != null) ...[
+                    trackInfo!(context, metrics),
+                    SizedBox(height: metrics.spacingTrackToSeek),
+                  ],
+                  resolvedSeekBar,
+                  SizedBox(height: metrics.spacingSeekToControls),
+                  resolvedControls,
+                  if (isInSplitView && !metrics.isVeryShortHeight)
+                    PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
+                  SizedBox(height: metrics.spacingControlsToDock),
+                  resolvedDock,
+                  SizedBox(height: metrics.spacingBelowDock),
+                ],
+              );
 
+        if (isInSplitView) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                const SizedBox(height: 8),
+                Expanded(child: Center(child: resolvedCenter)),
+                resolvedChrome,
+              ],
+            ),
+          );
+        }
 
-                if (isInSplitView) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: [
-                        const SizedBox(height: 8),
-                        Expanded(child: Center(child: resolvedCenter)),
-                        resolvedChrome,
-                      ],
-                    ),
-                  );
-                }
-
-                if (metrics.isLandscape) {
-                  return Padding(
-                    padding: padding,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          flex: 5,
-                          child: hideTopBarInLandscape
-                              ? Center(child: resolvedCenter)
-                              : Column(
-                                  children: [
-                                    resolvedTopBar,
-                                    Expanded(
-                                      child: Center(child: resolvedCenter),
-                                    ),
-                                  ],
-                                ),
-                        ),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          flex: 5,
-                          child: Center(
-                            key: const ValueKey('track_controls_pane'),
-                            child: SingleChildScrollView(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Padding(
-                                    padding: EdgeInsets.only(
-                                      bottom: metrics.switcherBottomPad,
-                                    ),
-                                    child: resolvedSwitcher,
-                                  ),
-                                  resolvedChrome,
-                                ],
-                              ),
+        if (metrics.isLandscape) {
+          return Padding(
+            padding: padding,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: hideTopBarInLandscape
+                      ? Center(child: resolvedCenter)
+                      : Column(
+                          children: [
+                            resolvedTopBar,
+                            Expanded(
+                              child: Center(child: resolvedCenter),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                }
-
-                // Portrait Mode: Fallback to scrolling on very short screens
-                if (constraints.maxHeight < 560 &&
-                    !state.isLyricsVisible &&
-                    !state.isQueueVisible) {
-                  final double scrollSize =
-                      (constraints.maxHeight * 0.40).clamp(180.0, 300.0);
-                  return SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Padding(
-                      padding: padding,
+                ),
+                const SizedBox(width: 24),
+                Expanded(
+                  flex: 5,
+                  child: Center(
+                    key: const ValueKey('track_controls_pane'),
+                    child: SingleChildScrollView(
                       child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          resolvedTopBar,
-                          SizedBox(height: metrics.switcherTopPad),
-                          resolvedSwitcher,
-                          SizedBox(height: metrics.switcherBottomPad),
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: scrollSize,
-                              maxHeight: scrollSize,
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: metrics.switcherBottomPad,
                             ),
-                            child: resolvedCenter,
+                            child: resolvedSwitcher,
                           ),
                           resolvedChrome,
                         ],
                       ),
                     ),
-                  );
-                }
-
-                return Padding(
-                  padding: padding,
-                  child: Column(
-                    children: [
-                      resolvedTopBar,
-                      SizedBox(height: metrics.switcherTopPad),
-                      resolvedSwitcher,
-                      SizedBox(height: metrics.switcherBottomPad),
-                      Expanded(child: resolvedCenter),
-                      resolvedChrome,
-                    ],
                   ),
-                );
-              },
-            );
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Portrait Mode: Fallback to scrolling on very short screens
+        if (constraints.maxHeight < 560 &&
+            !state.isLyricsVisible &&
+            !state.isQueueVisible) {
+          final double scrollSize =
+              (constraints.maxHeight * 0.40).clamp(180.0, 300.0);
+          return SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: padding,
+              child: Column(
+                children: [
+                  resolvedTopBar,
+                  SizedBox(height: metrics.switcherTopPad),
+                  resolvedSwitcher,
+                  SizedBox(height: metrics.switcherBottomPad),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: scrollSize,
+                      maxHeight: scrollSize,
+                    ),
+                    child: resolvedCenter,
+                  ),
+                  resolvedChrome,
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: padding,
+          child: Column(
+            children: [
+              resolvedTopBar,
+              SizedBox(height: metrics.switcherTopPad),
+              resolvedSwitcher,
+              SizedBox(height: metrics.switcherBottomPad),
+              Expanded(child: resolvedCenter),
+              resolvedChrome,
+            ],
+          ),
+        );
+      },
+    );
 
     if (isInSplitView) {
       return content;

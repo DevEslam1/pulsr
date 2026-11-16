@@ -21,6 +21,8 @@ import 'package:pulsr/domain/models/quran_mode_profile.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
 const PlayerState _base = PlayerState();
 
 PlayerState _diff(DspSlice Function(DspSlice dsp) f) =>
@@ -53,8 +55,8 @@ void main() {
     });
 
     test('errorMessage change forces a rebuild (line 64)', () {
-      const withError =
-          PlayerState(playback: PlaybackSlice(errorMessage: 'boom'));
+      final withError =
+          PlayerState(playback: PlaybackSlice(error: uiError('boom')));
       expect(dspSheetRebuildGate(_base, withError), isTrue);
     });
 

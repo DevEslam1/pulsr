@@ -1,6 +1,6 @@
 // test/property/state_property_test.dart
 // FIX-B1: Property-based state machine tests and edge-case verification for Phase B
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
@@ -20,6 +20,8 @@ import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+
+import 'package:pulsr/core/errors/app_error.dart';
 
 class MockGetSongsUseCase extends Mock implements GetSongsUseCase {}
 
@@ -107,7 +109,7 @@ void main() {
         'audioSessionId':
             base.copyWith(playback: base.playback.copyWith(audioSessionId: 42)),
         'errorMessage': base.copyWith(
-            playback: base.playback.copyWith(errorMessage: 'Network glitch')),
+            playback: base.playback.copyWith(error: uiError('Network glitch'))),
         'abLoopEnabled': base.copyWith(
             playback: base.playback.copyWith(abLoopEnabled: true)),
         'abPointA': base.copyWith(

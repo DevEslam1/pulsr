@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Keeps a label and value readable when space or text scaling is constrained.
 class PulsrKeyValue extends StatelessWidget {

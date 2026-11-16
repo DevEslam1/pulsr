@@ -30,6 +30,10 @@ void main() {
     //     progress/queue value types, Range-ignored marker, part retention)
     //   playlists_screen.dart -12174B (playlists_screen_components part:
     //     hero card, playlist card and the dashed-border wrapper)
+    //
+    // Full coverage tranche: every hand-written source file above 60 KB is
+    // now ratcheted (generated sources and the pure Tanzil text asset excluded),
+    // so no god-file can grow unnoticed.
     const caps = {
       'lib/data/audio/audio_handler.dart': 145000,
       'lib/features/player/cubit/player_cubit.dart': 50000,
@@ -44,6 +48,29 @@ void main() {
       'lib/core/services/yt_download_service.dart': 75731,
       'lib/core/services/ytm_service.dart': 78100,
       'lib/features/playlists/presentation/playlists_screen.dart': 82750,
+      // Full coverage tranche (current sizes).
+      'lib/features/player/presentation/widgets/eq_sheet_shell.dart': 164882,
+      'lib/features/player/presentation/widgets/eq_advanced_controls.dart':
+          163548,
+      'lib/data/repositories/music_repository.dart': 159278,
+      'lib/features/player/presentation/widgets/audio_quality_sheet.dart':
+          129555,
+      'lib/features/player/presentation/mini_player.dart': 105277,
+      'lib/features/home/presentation/widgets/quran_radio_hero_carousel.dart':
+          98417,
+      'lib/features/player/presentation/widgets/tablet_player_bar.dart': 93323,
+      'lib/data/audio/audio_handler_queue_engine.dart': 83446,
+      'lib/features/search/presentation/search_screen.dart': 82962,
+      'lib/features/settings/cubit/settings_audio_actions.dart': 83650,
+      'lib/data/audio/audio_effects_channel.dart': 82584,
+      'lib/features/player/presentation/themes/player_theme_chrome.dart': 70368,
+      'lib/features/onboarding/presentation/onboarding_screen.dart': 64077,
+      'lib/features/playlist_detail/presentation/online_playlist_detail_screen.dart':
+          63553,
+      'lib/data/repositories/download_repository_impl.dart': 63189,
+      'lib/features/folder_detail/presentation/folder_detail_screen.dart':
+          62296,
+      'lib/features/radio/presentation/radio_screen.dart': 61759,
     };
     final offenders = <String>[];
     caps.forEach((path, cap) {

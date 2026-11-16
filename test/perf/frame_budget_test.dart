@@ -1,6 +1,6 @@
 // test/perf/frame_budget_test.dart
 // FIX-E1: Frame budget and memory ceiling tests for Phase E
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';

@@ -1,7 +1,7 @@
 // LibraryScreen manage-tabs + deep-link coverage: adding an inactive tab,
 // removing an active tab, resetting to defaults and the `initialTabName`
 // deep-link that appends and selects a non-default tab.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/widgets/pulsr_switch.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';

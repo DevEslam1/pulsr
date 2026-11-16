@@ -3,7 +3,7 @@
 // Branch coverage for [MiniPlayer]: configured swipe actions (next/prev/none),
 // carousel page completion, the progress-bar scrub handlers + lifecycle, the
 // vinyl theme variant and the interaction notifier drain path.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/spinning_vinyl_disc.dart';

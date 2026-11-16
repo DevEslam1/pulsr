@@ -18,15 +18,16 @@
 //     and the framework asserts; an asynchronous non-OAuthException cannot be
 //     induced without a client injection seam the service does not expose.
 //   * `_copy`, the code body and the success tile: all require a real code.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/auth/presentation/ytm_oauth_login_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 Widget host(Widget child) => MaterialApp(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: child),
     );

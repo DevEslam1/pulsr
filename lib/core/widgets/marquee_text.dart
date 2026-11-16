@@ -1,6 +1,6 @@
 // lib/core/widgets/marquee_text.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../motion/pulsr_motion.dart';
 import '../utils/l10n_extensions.dart';
 import 'pulsr_scroll_edge_fade.dart';

@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/home/presentation/widgets/quick_card.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 /// Row/tile controls used to be bare `InkWell`s with no role, so a screen
 /// reader announced the text but not that it was actionable.
 void main() {
@@ -12,7 +13,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: SizedBox(

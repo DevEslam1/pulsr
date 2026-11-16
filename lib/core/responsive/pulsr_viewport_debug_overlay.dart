@@ -1,6 +1,6 @@
 // lib/core/responsive/pulsr_viewport_debug_overlay.dart
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../constants/app_radii.dart';
 import '../constants/app_typography.dart';
 import 'pulsr_responsive_tokens.dart';

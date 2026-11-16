@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -15,6 +15,7 @@ import 'package:pulsr/features/player/presentation/themes/player_theme_chrome.da
 import 'package:pulsr/features/player/presentation/widgets/waveform_seek_bar.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 /// Calculates the WCAG 2.1 contrast ratio between two colors using relative luminance.
@@ -50,7 +51,7 @@ Widget _buildA11yHarness({
   }
 
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: ThemeData.dark().copyWith(
       extensions: [AuraTheme.defaultDark],

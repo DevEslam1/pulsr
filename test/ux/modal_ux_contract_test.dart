@@ -3,7 +3,7 @@
 // Locks the shared modal/touch-target contract:
 // - adaptive sheets honor their max width and lift above the IME
 // - compact buttons keep a 48dp interactive target even when visually smaller
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_adaptive_sheet.dart';

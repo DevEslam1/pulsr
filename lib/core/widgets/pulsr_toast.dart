@@ -1,7 +1,7 @@
 // lib/core/widgets/pulsr_toast.dart
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';

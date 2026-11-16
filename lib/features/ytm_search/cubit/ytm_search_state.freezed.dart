@@ -20,7 +20,7 @@ mixin _$YtmSearchState {
   bool get isLoading;
   bool get hasSearched;
   bool get loadMoreFailed;
-  String? get errorMessage;
+  AppError? get error;
 
   /// Create a copy of YtmSearchState
   /// with the given fields replaced by the non-null parameter values.
@@ -46,8 +46,8 @@ mixin _$YtmSearchState {
                 other.hasSearched == _this.hasSearched) &&
             (identical(other.loadMoreFailed, _this.loadMoreFailed) ||
                 other.loadMoreFailed == _this.loadMoreFailed) &&
-            (identical(other.errorMessage, _this.errorMessage) ||
-                other.errorMessage == _this.errorMessage));
+            (identical(other.error, _this.error) ||
+                other.error == _this.error));
   }
 
   @override
@@ -60,13 +60,13 @@ mixin _$YtmSearchState {
         _this.isLoading,
         _this.hasSearched,
         _this.loadMoreFailed,
-        _this.errorMessage);
+        _this.error);
   }
 
   @override
   String toString() {
     final _this = this as YtmSearchState;
-    return 'YtmSearchState(query: ${_this.query}, results: ${_this.results}, isLoading: ${_this.isLoading}, hasSearched: ${_this.hasSearched}, loadMoreFailed: ${_this.loadMoreFailed}, errorMessage: ${_this.errorMessage})';
+    return 'YtmSearchState(query: ${_this.query}, results: ${_this.results}, isLoading: ${_this.isLoading}, hasSearched: ${_this.hasSearched}, loadMoreFailed: ${_this.loadMoreFailed}, error: ${_this.error})';
   }
 }
 
@@ -82,7 +82,7 @@ abstract mixin class $YtmSearchStateCopyWith<$Res> {
       bool isLoading,
       bool hasSearched,
       bool loadMoreFailed,
-      String? errorMessage});
+      AppError? error});
 }
 
 /// @nodoc
@@ -103,7 +103,7 @@ class _$YtmSearchStateCopyWithImpl<$Res>
     Object? isLoading = null,
     Object? hasSearched = null,
     Object? loadMoreFailed = null,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
   }) {
     return _then(YtmSearchState(
       query: null == query
@@ -126,10 +126,10 @@ class _$YtmSearchStateCopyWithImpl<$Res>
           ? _self.loadMoreFailed
           : loadMoreFailed // ignore: cast_nullable_to_non_nullable
               as bool,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
     ));
   }
 }
@@ -228,7 +228,7 @@ extension YtmSearchStatePatterns on YtmSearchState {
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
     TResult Function(String query, List<YtmTrack> results, bool isLoading,
-            bool hasSearched, bool loadMoreFailed, String? errorMessage)?
+            bool hasSearched, bool loadMoreFailed, AppError? error)?
         $default, {
     required TResult orElse(),
   }) {
@@ -236,7 +236,7 @@ extension YtmSearchStatePatterns on YtmSearchState {
     switch (_that) {
       case _YtmSearchState() when $default != null:
         return $default(_that.query, _that.results, _that.isLoading,
-            _that.hasSearched, _that.loadMoreFailed, _that.errorMessage);
+            _that.hasSearched, _that.loadMoreFailed, _that.error);
       case _:
         return orElse();
     }
@@ -258,14 +258,14 @@ extension YtmSearchStatePatterns on YtmSearchState {
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
     TResult Function(String query, List<YtmTrack> results, bool isLoading,
-            bool hasSearched, bool loadMoreFailed, String? errorMessage)
+            bool hasSearched, bool loadMoreFailed, AppError? error)
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _YtmSearchState():
         return $default(_that.query, _that.results, _that.isLoading,
-            _that.hasSearched, _that.loadMoreFailed, _that.errorMessage);
+            _that.hasSearched, _that.loadMoreFailed, _that.error);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -286,14 +286,14 @@ extension YtmSearchStatePatterns on YtmSearchState {
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
     TResult? Function(String query, List<YtmTrack> results, bool isLoading,
-            bool hasSearched, bool loadMoreFailed, String? errorMessage)?
+            bool hasSearched, bool loadMoreFailed, AppError? error)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _YtmSearchState() when $default != null:
         return $default(_that.query, _that.results, _that.isLoading,
-            _that.hasSearched, _that.loadMoreFailed, _that.errorMessage);
+            _that.hasSearched, _that.loadMoreFailed, _that.error);
       case _:
         return null;
     }
@@ -309,7 +309,7 @@ class _YtmSearchState extends YtmSearchState {
       this.isLoading = false,
       this.hasSearched = false,
       this.loadMoreFailed = false,
-      this.errorMessage})
+      this.error})
       : _results = results,
         super._();
 
@@ -335,7 +335,7 @@ class _YtmSearchState extends YtmSearchState {
   @JsonKey()
   final bool loadMoreFailed;
   @override
-  final String? errorMessage;
+  final AppError? error;
 
   /// Create a copy of YtmSearchState
   /// with the given fields replaced by the non-null parameter values.
@@ -358,8 +358,7 @@ class _YtmSearchState extends YtmSearchState {
                 other.hasSearched == hasSearched) &&
             (identical(other.loadMoreFailed, loadMoreFailed) ||
                 other.loadMoreFailed == loadMoreFailed) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage));
+            (identical(other.error, error) || other.error == error));
   }
 
   @override
@@ -371,12 +370,12 @@ class _YtmSearchState extends YtmSearchState {
         isLoading,
         hasSearched,
         loadMoreFailed,
-        errorMessage);
+        error);
   }
 
   @override
   String toString() {
-    return 'YtmSearchState(query: $query, results: $results, isLoading: $isLoading, hasSearched: $hasSearched, loadMoreFailed: $loadMoreFailed, errorMessage: $errorMessage)';
+    return 'YtmSearchState(query: $query, results: $results, isLoading: $isLoading, hasSearched: $hasSearched, loadMoreFailed: $loadMoreFailed, error: $error)';
   }
 }
 
@@ -394,7 +393,7 @@ abstract mixin class _$YtmSearchStateCopyWith<$Res>
       bool isLoading,
       bool hasSearched,
       bool loadMoreFailed,
-      String? errorMessage});
+      AppError? error});
 }
 
 /// @nodoc
@@ -415,7 +414,7 @@ class __$YtmSearchStateCopyWithImpl<$Res>
     Object? isLoading = null,
     Object? hasSearched = null,
     Object? loadMoreFailed = null,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
   }) {
     return _then(_YtmSearchState(
       query: null == query
@@ -438,10 +437,10 @@ class __$YtmSearchStateCopyWithImpl<$Res>
           ? _self.loadMoreFailed
           : loadMoreFailed // ignore: cast_nullable_to_non_nullable
               as bool,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
     ));
   }
 }

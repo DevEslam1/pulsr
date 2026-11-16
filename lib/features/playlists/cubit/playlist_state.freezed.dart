@@ -19,7 +19,7 @@ mixin _$PlaylistState {
   List<SongsTableData> get currentPlaylistSongs;
   Map<int, int> get smartPlaylistCounts;
   bool get isLoading;
-  String? get errorMessage;
+  AppError? get error;
 
   /// Create a copy of PlaylistState
   /// with the given fields replaced by the non-null parameter values.
@@ -43,8 +43,8 @@ mixin _$PlaylistState {
                 .equals(other.smartPlaylistCounts, _this.smartPlaylistCounts) &&
             (identical(other.isLoading, _this.isLoading) ||
                 other.isLoading == _this.isLoading) &&
-            (identical(other.errorMessage, _this.errorMessage) ||
-                other.errorMessage == _this.errorMessage));
+            (identical(other.error, _this.error) ||
+                other.error == _this.error));
   }
 
   @override
@@ -56,13 +56,13 @@ mixin _$PlaylistState {
         const DeepCollectionEquality().hash(_this.currentPlaylistSongs),
         const DeepCollectionEquality().hash(_this.smartPlaylistCounts),
         _this.isLoading,
-        _this.errorMessage);
+        _this.error);
   }
 
   @override
   String toString() {
     final _this = this as PlaylistState;
-    return 'PlaylistState(playlists: ${_this.playlists}, currentPlaylistSongs: ${_this.currentPlaylistSongs}, smartPlaylistCounts: ${_this.smartPlaylistCounts}, isLoading: ${_this.isLoading}, errorMessage: ${_this.errorMessage})';
+    return 'PlaylistState(playlists: ${_this.playlists}, currentPlaylistSongs: ${_this.currentPlaylistSongs}, smartPlaylistCounts: ${_this.smartPlaylistCounts}, isLoading: ${_this.isLoading}, error: ${_this.error})';
   }
 }
 
@@ -77,7 +77,7 @@ abstract mixin class $PlaylistStateCopyWith<$Res> {
       List<SongsTableData> currentPlaylistSongs,
       Map<int, int> smartPlaylistCounts,
       bool isLoading,
-      String? errorMessage});
+      AppError? error});
 }
 
 /// @nodoc
@@ -97,7 +97,7 @@ class _$PlaylistStateCopyWithImpl<$Res>
     Object? currentPlaylistSongs = null,
     Object? smartPlaylistCounts = null,
     Object? isLoading = null,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
   }) {
     return _then(PlaylistState(
       playlists: null == playlists
@@ -116,10 +116,10 @@ class _$PlaylistStateCopyWithImpl<$Res>
           ? _self.isLoading
           : isLoading // ignore: cast_nullable_to_non_nullable
               as bool,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
     ));
   }
 }
@@ -222,7 +222,7 @@ extension PlaylistStatePatterns on PlaylistState {
             List<SongsTableData> currentPlaylistSongs,
             Map<int, int> smartPlaylistCounts,
             bool isLoading,
-            String? errorMessage)?
+            AppError? error)?
         $default, {
     required TResult orElse(),
   }) {
@@ -230,7 +230,7 @@ extension PlaylistStatePatterns on PlaylistState {
     switch (_that) {
       case _PlaylistState() when $default != null:
         return $default(_that.playlists, _that.currentPlaylistSongs,
-            _that.smartPlaylistCounts, _that.isLoading, _that.errorMessage);
+            _that.smartPlaylistCounts, _that.isLoading, _that.error);
       case _:
         return orElse();
     }
@@ -256,14 +256,14 @@ extension PlaylistStatePatterns on PlaylistState {
             List<SongsTableData> currentPlaylistSongs,
             Map<int, int> smartPlaylistCounts,
             bool isLoading,
-            String? errorMessage)
+            AppError? error)
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _PlaylistState():
         return $default(_that.playlists, _that.currentPlaylistSongs,
-            _that.smartPlaylistCounts, _that.isLoading, _that.errorMessage);
+            _that.smartPlaylistCounts, _that.isLoading, _that.error);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -288,14 +288,14 @@ extension PlaylistStatePatterns on PlaylistState {
             List<SongsTableData> currentPlaylistSongs,
             Map<int, int> smartPlaylistCounts,
             bool isLoading,
-            String? errorMessage)?
+            AppError? error)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _PlaylistState() when $default != null:
         return $default(_that.playlists, _that.currentPlaylistSongs,
-            _that.smartPlaylistCounts, _that.isLoading, _that.errorMessage);
+            _that.smartPlaylistCounts, _that.isLoading, _that.error);
       case _:
         return null;
     }
@@ -310,7 +310,7 @@ class _PlaylistState extends PlaylistState {
       List<SongsTableData> currentPlaylistSongs = const [],
       Map<int, int> smartPlaylistCounts = const {},
       this.isLoading = false,
-      this.errorMessage})
+      this.error})
       : _playlists = playlists,
         _currentPlaylistSongs = currentPlaylistSongs,
         _smartPlaylistCounts = smartPlaylistCounts,
@@ -349,7 +349,7 @@ class _PlaylistState extends PlaylistState {
   @JsonKey()
   final bool isLoading;
   @override
-  final String? errorMessage;
+  final AppError? error;
 
   /// Create a copy of PlaylistState
   /// with the given fields replaced by the non-null parameter values.
@@ -372,8 +372,7 @@ class _PlaylistState extends PlaylistState {
                 .equals(other.smartPlaylistCounts, _smartPlaylistCounts) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage));
+            (identical(other.error, error) || other.error == error));
   }
 
   @override
@@ -384,12 +383,12 @@ class _PlaylistState extends PlaylistState {
         const DeepCollectionEquality().hash(_currentPlaylistSongs),
         const DeepCollectionEquality().hash(_smartPlaylistCounts),
         isLoading,
-        errorMessage);
+        error);
   }
 
   @override
   String toString() {
-    return 'PlaylistState(playlists: $playlists, currentPlaylistSongs: $currentPlaylistSongs, smartPlaylistCounts: $smartPlaylistCounts, isLoading: $isLoading, errorMessage: $errorMessage)';
+    return 'PlaylistState(playlists: $playlists, currentPlaylistSongs: $currentPlaylistSongs, smartPlaylistCounts: $smartPlaylistCounts, isLoading: $isLoading, error: $error)';
   }
 }
 
@@ -406,7 +405,7 @@ abstract mixin class _$PlaylistStateCopyWith<$Res>
       List<SongsTableData> currentPlaylistSongs,
       Map<int, int> smartPlaylistCounts,
       bool isLoading,
-      String? errorMessage});
+      AppError? error});
 }
 
 /// @nodoc
@@ -426,7 +425,7 @@ class __$PlaylistStateCopyWithImpl<$Res>
     Object? currentPlaylistSongs = null,
     Object? smartPlaylistCounts = null,
     Object? isLoading = null,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
   }) {
     return _then(_PlaylistState(
       playlists: null == playlists
@@ -445,10 +444,10 @@ class __$PlaylistStateCopyWithImpl<$Res>
           ? _self.isLoading
           : isLoading // ignore: cast_nullable_to_non_nullable
               as bool,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
     ));
   }
 }

@@ -1,5 +1,5 @@
 // lib/core/theme/player_material_colors.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Fixed material colours for the skeuomorphic player themes (vinyl, cassette,
 /// turntable hardware).

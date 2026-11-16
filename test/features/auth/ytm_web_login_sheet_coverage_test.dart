@@ -11,7 +11,7 @@
 //   * the Android System-WebView UA probe in _resolveUserAgent()
 //     (defaultTargetPlatform != android keeps EmbeddedBrowserUa.mobile), and
 //   * the YTM-link branch of FileIntentHandler (compile-time ytmEnabled false).
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';

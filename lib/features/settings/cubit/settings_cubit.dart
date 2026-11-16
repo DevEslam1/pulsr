@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -287,7 +287,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
   }
 
   void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(error: null));
   }
 
   Future<void> reloadSettings() async {
@@ -1156,7 +1156,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               await UsbExclusiveService().getStatus();
             }
             final song = getIt.isRegistered<PulsrAudioHandler>()
-                ? getIt<PulsrAudioHandler>().currentSong : null;
+                ? getIt<PulsrAudioHandler>().currentSong
+                : null;
             final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
               path: song?.path,
               codec: song?.codec,
@@ -1166,15 +1167,18 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               ),
               isRadio: song?.source == SongSource.radio,
               integer32DirectUsbEligible: _integer32DirectUsbEligible,
-              requireConfirmedCodec: loadedState.strictBitPerfect && song != null,
+              requireConfirmedCodec:
+                  loadedState.strictBitPerfect && song != null,
             );
             final effectiveRate = effectiveSourceSampleRate(
               tagged: song?.sampleRate ?? 0,
               decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
             );
-            final unknownRate = loadedState.strictBitPerfect && song != null &&
+            final unknownRate = loadedState.strictBitPerfect &&
+                song != null &&
                 (effectiveRate <= 0 ||
-                    !HiResAudioService.validTargetSampleRates.contains(effectiveRate));
+                    !HiResAudioService.validTargetSampleRates
+                        .contains(effectiveRate));
             if (sourceBlock != null || unknownRate) {
               await _rollbackBitPerfectEnable(
                   sourceBlock ?? 'Source sample rate is unconfirmed.');
@@ -1196,9 +1200,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
                       !await _stopDirectUsbStreaming();
                   if (stillClaimed) {
                     safeEmit(state.copyWith(
-                      errorMessage:
+                      error: uiError(
                           'The USB stream could not be confirmed or released. '
-                          'Bit-Perfect stays enabled; turn it off to release the DAC.',
+                          'Bit-Perfect stays enabled; turn it off to release the DAC.'),
                     ));
                   } else {
                     await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
@@ -1235,7 +1239,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         }
         final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
         final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
-        if (!state.strictBitPerfect && !state.followTrackSampleRate &&
+        if (!state.strictBitPerfect &&
+            !state.followTrackSampleRate &&
             !_bitPerfectViaDirectStream &&
             (savedSampleRate > 0 || savedBitDepth > 0)) {
           await _hiResAudioService.setTargetOutputFormat(
@@ -1277,10 +1282,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         state.copyWith(
           gaplessPlayback: true,
           crossfadeSeconds: 0.0,
-          errorMessage: AudioConflicts.gaplessBlockedByCrossfade(
+          error: uiError(AudioConflicts.gaplessBlockedByCrossfade(
                 state.crossfadeSeconds,
               ) ??
-              'Crossfade disabled: gapless requires 0 s.',
+              'Crossfade disabled: gapless requires 0 s.'),
         ),
       );
       try {
@@ -1291,11 +1296,11 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         ErrorLogger.log('Failed to persist gapless/crossfade settings',
             error: e, stackTrace: st, category: 'SettingsCubit');
         safeEmit(previousState.copyWith(
-            errorMessage: 'Failed to persist settings: $e'));
+            error: uiError('Failed to persist settings: $e')));
       }
       return;
     }
-    safeEmit(state.copyWith(gaplessPlayback: value, errorMessage: null));
+    safeEmit(state.copyWith(gaplessPlayback: value, error: null));
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyGapless, value);
@@ -1303,7 +1308,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       ErrorLogger.log('Failed to persist gapless setting',
           error: e, stackTrace: st, category: 'SettingsCubit');
       safeEmit(previousState.copyWith(
-          errorMessage: 'Failed to persist settings: $e'));
+          error: uiError('Failed to persist settings: $e')));
     }
   }
 
@@ -1318,7 +1323,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       aaudioEnabled: state.aaudioOutputEnabled,
     );
     if (clamped > 0.01 && bitPerfectBlock != null) {
-      safeEmit(state.copyWith(errorMessage: bitPerfectBlock));
+      safeEmit(state.copyWith(error: uiError(bitPerfectBlock)));
       return;
     }
     if (clamped > 0.01 && state.gaplessPlayback) {
@@ -1328,8 +1333,8 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         state.copyWith(
           crossfadeSeconds: clamped,
           gaplessPlayback: false,
-          errorMessage: AudioConflicts.crossfadeBlockedByGapless(true) ??
-              'Gapless disabled: crossfade requires gapless OFF.',
+          error: uiError(AudioConflicts.crossfadeBlockedByGapless(true) ??
+              'Gapless disabled: crossfade requires gapless OFF.'),
         ),
       );
       final prefs = await SharedPreferences.getInstance();
@@ -1337,7 +1342,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       await prefs.setBool(_keyGapless, false);
       return;
     }
-    safeEmit(state.copyWith(crossfadeSeconds: clamped, errorMessage: null));
+    safeEmit(state.copyWith(crossfadeSeconds: clamped, error: null));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyCrossfade, clamped);
   }
@@ -1621,7 +1626,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       state.copyWith(
         isScanning: true,
         scanResultCount: null,
-        errorMessage: null,
+        error: null,
       ),
     );
     try {
@@ -1642,7 +1647,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       ErrorLogger.log('Device library scan failed',
           error: e, stackTrace: st, category: 'SettingsCubit');
       safeEmit(
-          state.copyWith(isScanning: false, errorMessage: error.userMessage));
+          state.copyWith(isScanning: false, error: uiError(error.userMessage)));
       return (count: 0, error: error.userMessage);
     }
   }

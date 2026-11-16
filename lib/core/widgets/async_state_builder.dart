@@ -1,5 +1,5 @@
 // lib/core/widgets/async_state_builder.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:fpdart/fpdart.dart' show Either;
 
 import '../errors/error_message_resolver.dart';

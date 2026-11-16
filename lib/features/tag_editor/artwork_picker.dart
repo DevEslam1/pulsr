@@ -1,7 +1,7 @@
 // lib/features/tag_editor/artwork_picker.dart
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/l10n_extensions.dart';

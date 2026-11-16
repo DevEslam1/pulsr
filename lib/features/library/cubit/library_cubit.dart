@@ -1,5 +1,7 @@
 // lib/features/library/cubit/library_cubit.dart
 import 'dart:async';
+import 'dart:isolate';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
@@ -25,6 +27,8 @@ import '../../../domain/usecases/get_favorites_usecase.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import 'library_state.dart';
+
+import '../../../core/errors/app_error.dart';
 
 @injectable
 class LibraryCubit extends PulsrCubit<LibraryState> {
@@ -153,7 +157,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(error: null));
   }
 
   /// Current hidden-folder paths, shared by every library/discovery
@@ -203,9 +207,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             if (isClosed || t != _songsToken) return;
             _isLoadingMoreSongs = false;
             safeEmit(state.copyWith(
-                errorMessage: failure.message,
-                isLoading: false,
-                isLoadingMore: false));
+                error: failure, isLoading: false, isLoadingMore: false));
           },
           (songs) async {
             if (isClosed || t != _songsToken) return;
@@ -234,7 +236,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                   infoMessage: hasHitCap
                       ? 'Displaying top 5,000 rated songs (maximum limit).'
                       : null,
-                  errorMessage: null,
+                  error: null,
                   isLoading: false,
                   isLoadingMore: false));
               return;
@@ -245,7 +247,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             if (isClosed || t != _songsToken) return;
             safeEmit(state.copyWith(
                 songs: List<SongsTableData>.unmodifiable(songs),
-                errorMessage: null,
+                error: null,
                 isLoading: false,
                 isLoadingMore: false));
             if (!_hasMoreSongs) {
@@ -312,15 +314,25 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       }
     }
 
-    final sorted = List<SongsTableData>.from(songs);
-    sorted.sort((a, b) {
-      final rA = ratings[a.id] ?? 0;
-      final rB = ratings[b.id] ?? 0;
-      final cmp = rA.compareTo(rB);
-      if (cmp != 0) return ascending ? cmp : -cmp;
-      return a.title.toLowerCase().compareTo(b.title.toLowerCase());
-    });
-    return sorted;
+    // The rating reads above are prefs-cached (sync). Only the O(n log n)
+    // sort is heavy, so it runs off the UI isolate for large libraries.
+    final keys = List.generate(
+      songs.length,
+      (i) => (
+        index: i,
+        rating: ratings[songs[i].id] ?? 0,
+        title: songs[i].title.toLowerCase(),
+      ),
+      growable: false,
+    );
+    final order = keys.length < 300
+        ? sortSongIndicesByRating(keys, ascending)
+        : await Isolate.run(() => sortSongIndicesByRating(keys, ascending));
+    return List<SongsTableData>.generate(
+      order.length,
+      (i) => songs[order[i]],
+      growable: false,
+    );
   }
 
   /// Grows the songs window by one page. Called from the songs list scroll
@@ -338,9 +350,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     removeFromComposite(_albumsSub);
     _albumsSub = autoSub(_getAlbumsUseCase.watchAlbums(), (result) {
       result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (albums) => safeEmit(state.copyWith(
-            albums: List.unmodifiable(albums))),
+        (failure) => safeEmit(state.copyWith(error: failure)),
+        (albums) => safeEmit(state.copyWith(albums: List.unmodifiable(albums))),
       );
     });
   }
@@ -350,9 +361,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     removeFromComposite(_artistsSub);
     _artistsSub = autoSub(_getArtistsUseCase.watchArtists(), (result) {
       result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (artists) => safeEmit(state.copyWith(
-            artists: List.unmodifiable(artists))),
+        (failure) => safeEmit(state.copyWith(error: failure)),
+        (artists) =>
+            safeEmit(state.copyWith(artists: List.unmodifiable(artists))),
       );
     });
   }
@@ -367,9 +378,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         _getGenresUseCase.watchGenres(excludedFolders: excluded), (result) {
       if (isClosed || t != _genresToken) return;
       result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (genres) => safeEmit(state.copyWith(
-            genres: List.unmodifiable(genres))),
+        (failure) => safeEmit(state.copyWith(error: failure)),
+        (genres) => safeEmit(state.copyWith(genres: List.unmodifiable(genres))),
       );
     });
   }
@@ -384,9 +394,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         (result) {
       if (isClosed || t != _yearsToken) return;
       result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (years) => safeEmit(state.copyWith(
-            years: List.unmodifiable(years))),
+        (failure) => safeEmit(state.copyWith(error: failure)),
+        (years) => safeEmit(state.copyWith(years: List.unmodifiable(years))),
       );
     });
   }
@@ -410,7 +419,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           repo.watchDownloadedSongs(excludedFolders: excluded), (result) {
         if (isClosed || t != _downloadedToken) return;
         result.fold(
-          (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+          (failure) => safeEmit(state.copyWith(error: failure)),
           (songs) => safeEmit(state.copyWith(
             downloadedSongs: List<SongsTableData>.unmodifiable(
               songs.where(isDownloadedOnlineTrack),
@@ -426,7 +435,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     removeFromComposite(_favoritesSub);
     _favoritesSub = autoSub(_getFavoritesUseCase.watchFavorites(), (result) {
       result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (failure) => safeEmit(state.copyWith(error: failure)),
         (favs) {
           if (_pendingFavoriteTargets.isEmpty) {
             safeEmit(state.copyWith(
@@ -475,9 +484,9 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     final result = await _folderUseCases.getFolderHierarchy();
     if (isClosed) return;
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (folders) => safeEmit(state.copyWith(
-          folders: List.unmodifiable(folders))),
+      (failure) => safeEmit(state.copyWith(error: failure)),
+      (folders) =>
+          safeEmit(state.copyWith(folders: List.unmodifiable(folders))),
     );
   }
 
@@ -615,7 +624,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         final failureMessage =
             result.fold<String?>((l) => l.message, (_) => null);
         if (failureMessage == null) {
-          safeEmit(state.copyWith(errorMessage: null));
+          safeEmit(state.copyWith(error: null));
           return;
         }
 
@@ -635,7 +644,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         safeEmit(state.copyWith(
           favorites: reconciled,
           songs: songsWith(wasFav),
-          errorMessage: failureMessage,
+          error: uiError(failureMessage),
         ));
       } finally {
         // Bookkeeping is handled once in the outer finally below.
@@ -658,7 +667,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     if (isClosed) return result;
     final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
     if (failureMessage != null) {
-      safeEmit(state.copyWith(errorMessage: failureMessage));
+      safeEmit(state.copyWith(error: uiError(failureMessage)));
       return result;
     }
     await loadFolders();
@@ -724,7 +733,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           .timeout(const Duration(seconds: 3));
       if (isClosed) return;
       res.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (failure) => safeEmit(state.copyWith(error: failure)),
         (songs) => safeEmit(state.copyWith(
             selectedSongIds: songs.map((s) => s.id).toSet(),
             isMultiSelectMode: true,
@@ -790,7 +799,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             ? getIt<IMusicRepository>()
             : null);
     if (repo == null) {
-      safeEmit(state.copyWith(errorMessage: 'Delete is unavailable right now'));
+      safeEmit(
+          state.copyWith(error: uiError('Delete is unavailable right now')));
       return -1;
     }
     final ids = selected.map((s) => s.id).toList();
@@ -798,7 +808,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     if (isClosed) return 0;
     return result.fold(
       (failure) {
-        safeEmit(state.copyWith(errorMessage: failure.message));
+        safeEmit(state.copyWith(error: failure));
         return -1;
       },
       (_) {
@@ -835,7 +845,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   Future<int> syncYtmAccountLikes() async {
     final accountService = getIt<YtmAccountService>();
     if (!accountService.isLoggedIn) {
-      safeEmit(state.copyWith(errorMessage: 'Not signed in to YouTube Music'));
+      safeEmit(
+          state.copyWith(error: uiError('Not signed in to YouTube Music')));
       throw const YtmException(
           'SIGN_IN_REQUIRED', 'Not signed in to YouTube Music');
     }
@@ -847,8 +858,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       ErrorLogger.log('Failed to sync YTM account likes',
           error: e, stackTrace: st, category: 'LibraryCubit');
       if (!isClosed) {
-        safeEmit(
-            state.copyWith(errorMessage: 'Failed to sync YouTube Music likes'));
+        safeEmit(state.copyWith(
+            error: uiError('Failed to sync YouTube Music likes')));
       }
       rethrow;
     }
@@ -857,7 +868,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     if (count < 0) {
       if (!isClosed) {
         safeEmit(state.copyWith(
-            errorMessage: 'Failed to import YouTube Music liked songs'));
+            error: uiError('Failed to import YouTube Music liked songs')));
       }
       throw const YtmException(
           'YTM_IMPORT_FAILED', 'Failed to import liked songs');
@@ -882,4 +893,22 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 class _SongLock {
   final Mutex mutex = Mutex();
   int refCount = 0;
+}
+
+/// Pure rating sort used both inline (small libraries) and inside
+/// `Isolate.run` (large libraries). Returns song indices in display order.
+@visibleForTesting
+List<int> sortSongIndicesByRating(
+  List<({int index, int rating, String title})> keys,
+  bool ascending,
+) {
+  final sorted = List<int>.generate(keys.length, (i) => i);
+  sorted.sort((ia, ib) {
+    final a = keys[ia];
+    final b = keys[ib];
+    final cmp = a.rating.compareTo(b.rating);
+    if (cmp != 0) return ascending ? cmp : -cmp;
+    return a.title.compareTo(b.title);
+  });
+  return List<int>.generate(sorted.length, (i) => keys[sorted[i]].index);
 }

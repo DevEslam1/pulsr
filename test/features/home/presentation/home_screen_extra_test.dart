@@ -1,7 +1,7 @@
 // HomeScreen branches the primary suite misses: the Focus Flow quick tile, the
 // discovery-tools sheet behind the "More" chip, and the notification banner's
 // Open Settings action.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -161,8 +161,8 @@ void main() {
               limit: any(named: 'limit'),
               excludedFolders: any(named: 'excludedFolders'),
             ))
-        .thenAnswer((_) =>
-            Stream.value(Right([createTestSong(id: 1, title: 'A', playCount: 1)])));
+        .thenAnswer((_) => Stream.value(
+            Right([createTestSong(id: 1, title: 'A', playCount: 1)])));
 
     await pumpScreen(tester);
     await tester.tap(find.text('Focus Flow'));

@@ -1,6 +1,6 @@
 // test/features/perf/phase7_perf_audit_test.dart
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/performance/gpu_budget.dart';

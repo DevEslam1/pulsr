@@ -1,6 +1,7 @@
 // test/features/downloads/storage_stats_header_test.dart
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/features/downloads/presentation/widgets/storage_stats_header.dart';

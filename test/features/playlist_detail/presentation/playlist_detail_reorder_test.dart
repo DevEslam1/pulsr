@@ -1,6 +1,6 @@
 // Reorder mode wiring for local playlists: entering the mode, selecting songs
 // and moving the selection must persist the new id order through the use case.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';

@@ -11,6 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'library_test_harness.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -39,7 +41,7 @@ void main() {
     ));
     await tester.pump();
 
-    controller.add(const LibraryState(errorMessage: 'read failed'));
+    controller.add(LibraryState(error: uiError('read failed')));
     await tester.pumpAndSettle();
 
     expect(find.text('read failed'), findsOneWidget);

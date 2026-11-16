@@ -21,6 +21,7 @@ import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import 'playlist_state.dart';
 
+import '../../../core/errors/app_error.dart';
 // ---------------------------------------------------------------------------
 // Online-playlist value objects (Cached locally in SharedPreferences)
 // ---------------------------------------------------------------------------
@@ -211,14 +212,20 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (_disposed || isClosed) return;
     try {
       ytmOnline.value = update(ytmOnline.value);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort Playlists operation failed',
+          error: e, stackTrace: st, category: 'Playlists');
+    }
   }
 
   void _setOnlineStateDirect(YtmOnlineState newState) {
     if (_disposed || isClosed) return;
     try {
       ytmOnline.value = newState;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort Playlists operation failed',
+          error: e, stackTrace: st, category: 'Playlists');
+    }
   }
 
   PlaylistCubit({required PlaylistUseCases playlistUseCases})
@@ -240,12 +247,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     removeFromComposite(_playlistsSub);
     _playlistsSub = autoSub(_playlistUseCases.watchPlaylists(), (result) {
       result.fold(
-        (failure) => safeEmit(
-            state.copyWith(errorMessage: failure.message, isLoading: false)),
+        (failure) => safeEmit(state.copyWith(error: failure, isLoading: false)),
         (playlists) {
           safeEmit(state.copyWith(
               playlists: List.unmodifiable(playlists),
-              errorMessage: null,
+              error: null,
               isLoading: false));
           _updateSmartCounts(playlists);
           if (!_isSeedingChecked) {
@@ -260,7 +266,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// Re-subscribes to the playlists stream after a failure so the UI can offer
   /// a retry action instead of leaving a stale error on screen.
   void reloadPlaylists() {
-    safeEmit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(error: null));
     _subscribePlaylists();
   }
 
@@ -368,7 +374,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           error: e, stackTrace: st, category: 'PlaylistCubit');
       try {
         await prefs?.remove(_onlineCacheKey);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort Playlists operation failed',
+            error: e, stackTrace: st, category: 'Playlists');
+      }
     } on TypeError catch (e, st) {
       ErrorLogger.log(
           'Type schema mismatch in online playlist cache, clearing cache',
@@ -377,13 +386,19 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           category: 'PlaylistCubit');
       try {
         await prefs?.remove(_onlineCacheKey);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort Playlists operation failed',
+            error: e, stackTrace: st, category: 'Playlists');
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to load online playlist cache, clearing cache',
           error: e, stackTrace: st, category: 'PlaylistCubit');
       try {
         await prefs?.remove(_onlineCacheKey);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort Playlists operation failed',
+            error: e, stackTrace: st, category: 'Playlists');
+      }
     }
   }
 
@@ -547,7 +562,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
   void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(error: null));
   }
 
   void loadPlaylistSongs(int playlistId) {
@@ -557,9 +572,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     _playlistSongsSub =
         autoSub(_playlistUseCases.watchPlaylistSongs(playlistId), (result) {
       result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (songs) => safeEmit(
-            state.copyWith(currentPlaylistSongs: songs, errorMessage: null)),
+        (failure) => safeEmit(state.copyWith(error: failure)),
+        (songs) =>
+            safeEmit(state.copyWith(currentPlaylistSongs: songs, error: null)),
       );
     });
   }
@@ -571,11 +586,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     result.fold(
       (failure) {
         SoundFeedbackService.playError(mirrorHaptics: true);
-        safeEmit(state.copyWith(errorMessage: failure.message));
+        safeEmit(state.copyWith(error: failure));
       },
       (_) {
         SoundFeedbackService.playSuccess(mirrorHaptics: true);
-        safeEmit(state.copyWith(errorMessage: null));
+        safeEmit(state.copyWith(error: null));
       },
     );
   }
@@ -585,11 +600,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     result.fold(
       (failure) {
         SoundFeedbackService.playError(mirrorHaptics: true);
-        safeEmit(state.copyWith(errorMessage: failure.message));
+        safeEmit(state.copyWith(error: failure));
       },
       (_) {
         SoundFeedbackService.playSuccess(mirrorHaptics: true);
-        safeEmit(state.copyWith(errorMessage: null));
+        safeEmit(state.copyWith(error: null));
       },
     );
   }
@@ -608,7 +623,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (newId <= 0) {
       SoundFeedbackService.playError(mirrorHaptics: true);
       final message = result.fold((failure) => failure.message, (_) => '');
-      safeEmit(state.copyWith(errorMessage: message));
+      safeEmit(state.copyWith(error: uiError(message)));
       return null;
     }
     SoundFeedbackService.playSuccess(mirrorHaptics: true);
@@ -616,11 +631,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       final addResult =
           await _playlistUseCases.addSongsToPlaylist(newId, songIds);
       addResult.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (_) => safeEmit(state.copyWith(errorMessage: null)),
+        (failure) => safeEmit(state.copyWith(error: failure)),
+        (_) => safeEmit(state.copyWith(error: null)),
       );
     } else {
-      safeEmit(state.copyWith(errorMessage: null));
+      safeEmit(state.copyWith(error: null));
     }
     return newId;
   }
@@ -636,7 +651,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final result = await _playlistUseCases.deletePlaylist(playlistId);
     return result.fold(
       (failure) {
-        safeEmit(state.copyWith(errorMessage: failure.message));
+        safeEmit(state.copyWith(error: failure));
         if (!isClosed) {
           _updateSmartCounts(state.playlists);
         }
@@ -644,7 +659,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       },
       (_) {
         SoundFeedbackService.playWarning(mirrorHaptics: true);
-        safeEmit(state.copyWith(errorMessage: null));
+        safeEmit(state.copyWith(error: null));
         return true;
       },
     );
@@ -659,11 +674,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         playlistId, name, smartCriteria);
     return result.fold(
       (failure) {
-        safeEmit(state.copyWith(errorMessage: failure.message));
+        safeEmit(state.copyWith(error: failure));
         return false;
       },
       (_) {
-        safeEmit(state.copyWith(errorMessage: null));
+        safeEmit(state.copyWith(error: null));
         return true;
       },
     );
@@ -673,8 +688,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final result =
         await _playlistUseCases.addSongToPlaylist(playlistId, songId);
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) => safeEmit(state.copyWith(errorMessage: null)),
+      (failure) => safeEmit(state.copyWith(error: failure)),
+      (_) => safeEmit(state.copyWith(error: null)),
     );
   }
 
@@ -682,8 +697,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final result =
         await _playlistUseCases.addSongsToPlaylist(playlistId, songIds);
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) => safeEmit(state.copyWith(errorMessage: null)),
+      (failure) => safeEmit(state.copyWith(error: failure)),
+      (_) => safeEmit(state.copyWith(error: null)),
     );
   }
 
@@ -691,8 +706,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final result =
         await _playlistUseCases.removeSongFromPlaylist(playlistId, songId);
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) => safeEmit(state.copyWith(errorMessage: null)),
+      (failure) => safeEmit(state.copyWith(error: failure)),
+      (_) => safeEmit(state.copyWith(error: null)),
     );
   }
 
@@ -701,8 +716,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final result = await _playlistUseCases.reorderPlaylistSongs(
         playlistId, orderedSongIds);
     result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) => safeEmit(state.copyWith(errorMessage: null)),
+      (failure) => safeEmit(state.copyWith(error: failure)),
+      (_) => safeEmit(state.copyWith(error: null)),
     );
   }
 
@@ -1030,7 +1045,6 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
           ));
       if (tracks.isNotEmpty) {
         await _saveOnlineCache();
-
       }
     } on YtmException catch (e) {
       if (_disposed || isClosed) return;
@@ -1116,7 +1130,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     if (onlineState.customPlaylists.any((p) =>
         p.id == input ||
         p.id == targetId ||
-        (canonicalId.isNotEmpty && canonicalYtmPlaylistId(p.id) == canonicalId))) {
+        (canonicalId.isNotEmpty &&
+            canonicalYtmPlaylistId(p.id) == canonicalId))) {
       return Future.value();
     }
     // Two rapid submits both pass the check above before the first await, so
@@ -1134,7 +1149,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     return future;
   }
 
-  Future<void> _runFetchOnlinePlaylistByUrl(String input, {required String targetId}) async {
+  Future<void> _runFetchOnlinePlaylistByUrl(String input,
+      {required String targetId}) async {
     _setOnlineState((s) => s.copyWith(
           customStatus: YtmFetchStatus.loading,
           clearCustomError: true,
@@ -1200,14 +1216,14 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
       // Re-dedupe after the awaits: a concurrent path may have landed the same
       // entry while this fetch was running. Compare canonical IDs.
-      final updated = List<OnlinePlaylistEntry>.from(
-          onlineState.customPlaylists.where((p) {
+      final updated =
+          List<OnlinePlaylistEntry>.from(onlineState.customPlaylists.where((p) {
         final pTarget = canonicalYtmPlaylistId(p.id).isNotEmpty
             ? canonicalYtmPlaylistId(p.id)
             : p.id;
         return pTarget != targetId;
       }))
-        ..add(entry);
+            ..add(entry);
       _setOnlineState((s) => s.copyWith(
             customStatus: YtmFetchStatus.done,
             customPlaylists: updated,
@@ -1264,7 +1280,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   Future<void> _clearCachedOnlineLibrary({bool onlyAccount = false}) async {
     if (!getIt.isRegistered<IMusicRepository>()) return;
     try {
-      await getIt<IMusicRepository>().clearOnlineLibraryCache(onlyAccount: onlyAccount);
+      await getIt<IMusicRepository>()
+          .clearOnlineLibraryCache(onlyAccount: onlyAccount);
     } catch (e, st) {
       ErrorLogger.log('Failed to clear cached online library',
           error: e, stackTrace: st, category: 'PlaylistCubit');
@@ -1313,7 +1330,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         getIt<YtmAccountService>()
             .loginState
             .removeListener(_onYtmLoginStateChanged);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort Playlists operation failed',
+            error: e, stackTrace: st, category: 'Playlists');
+      }
     }
     _cacheSaveQueue.clear();
     _autoFetchInFlight = null;
@@ -1328,7 +1348,10 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     _smartCriteriaJson.clear();
     try {
       ytmOnline.value = const YtmOnlineState();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort Playlists operation failed',
+          error: e, stackTrace: st, category: 'Playlists');
+    }
     ytmOnline.dispose();
     return super.close();
   }

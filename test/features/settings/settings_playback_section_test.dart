@@ -2,7 +2,7 @@
 // the Professional control surface (previously only rendered in Normal mode),
 // the conflict-resolution/info callbacks, the SponsorBlock category picker,
 // the advanced-speed/normalization bridges and the one-tap preset pills.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +25,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/settings_section_harness.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockAudioHandler extends Mock implements PulsrAudioHandler {}
@@ -77,7 +78,7 @@ void main() {
         ],
         child: MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SingleChildScrollView(child: PlaybackSection(state: state)),

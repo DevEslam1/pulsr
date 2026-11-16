@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -13,6 +13,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import '../../helpers/screen_harness.dart';
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockSettings extends Mock implements SettingsCubit {}
 
 /// WCAG 1.4.4: the mini player used to clamp text at 1.3×, so a 200 % OS setting
@@ -55,7 +56,7 @@ void main() {
           ),
           child: MaterialApp(
             theme: AuraTheme.darkTheme,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: Align(

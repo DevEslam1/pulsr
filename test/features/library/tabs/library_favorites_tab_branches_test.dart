@@ -1,7 +1,7 @@
 // LibraryFavoritesTab branch coverage: pull-to-refresh, the quick-play shuffle,
 // the two-swipe dismissible confirmations (play next / remove favorite + undo),
 // multi-select taps and the grid-card tap.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/pulsr_dismissible.dart';

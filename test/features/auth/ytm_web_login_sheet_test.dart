@@ -3,7 +3,7 @@
 // Covers the public surface of YtmWebLoginSheet: the hardened settings builder,
 // the navigation sandbox policy, and the top-level shell states (loading,
 // normal WebView, browse mode, route dismissal).
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:mocktail/mocktail.dart';
@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ytm_webview_test_support.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockYtmAccountService extends Mock implements YtmAccountService {}
 
 void main() {
@@ -173,7 +174,7 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       theme: AuraTheme.darkTheme,
       navigatorKey: navKey,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: const Scaffold(body: SizedBox()),
     ));

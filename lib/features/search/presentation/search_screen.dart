@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -38,6 +38,7 @@ import '../cubit/search_state.dart';
 import 'widgets/highlighted_song_tile.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 const List<String> _onlineTags = [
   'Top Hits',
   'Trending',

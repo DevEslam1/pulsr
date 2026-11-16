@@ -31,6 +31,7 @@ import 'playback_sleep_timer.dart';
 import 'playback_volume_mute.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+import '../../../../core/errors/app_error.dart';
 part 'player_playback_options_lyrics.dart';
 part 'player_playback_options_quran.dart';
 part 'player_playback_options_rate_guard.dart';
@@ -198,7 +199,7 @@ class PlayerPlaybackOptionsController {
       _emit(cur.copyWith(
           playback: cur.playback.copyWith(
         playbackSpeed: prevSpeed,
-        errorMessage: 'Speed change failed',
+        error: uiError('Speed change failed'),
       )));
     }
   }
@@ -237,7 +238,7 @@ class PlayerPlaybackOptionsController {
       _emit(cur.copyWith(
           playback: cur.playback.copyWith(
         playbackPitch: prevPitch,
-        errorMessage: 'Pitch change failed',
+        error: uiError('Pitch change failed'),
       )));
     }
   }

@@ -4,6 +4,8 @@ import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
 void main() {
   group('H-10: dspSheetRebuildGate tests', () {
     test('returns false for identical states', () {
@@ -135,9 +137,9 @@ void main() {
     });
 
     test('triggers rebuild when errorMessage changes', () {
-      const stateA = PlayerState(playback: PlaybackSlice(errorMessage: null));
-      const stateB =
-          PlayerState(playback: PlaybackSlice(errorMessage: 'DSP error'));
+      final stateA = const PlayerState(playback: PlaybackSlice());
+      final stateB =
+          PlayerState(playback: PlaybackSlice(error: uiError('DSP error')));
       expect(dspSheetRebuildGate(stateA, stateB), isTrue);
     });
 

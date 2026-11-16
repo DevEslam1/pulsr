@@ -1,5 +1,5 @@
 // lib/features/playlists/presentation/widgets/playlist_suggestion_card.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../../../core/constants/app_radii.dart';

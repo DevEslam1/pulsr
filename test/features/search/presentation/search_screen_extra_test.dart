@@ -3,7 +3,7 @@
 // the local "show more" expansion.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -160,8 +160,8 @@ void main() {
     // Deleting goes through the bookmark chip in the filter bar, which is the
     // affordance the screen actually offers for a saved query.
     when(() => searchCubit.isSaved(any(), any())).thenReturn(true);
-    await emit(tester,
-        const SearchState(query: 'Rock', selectedFilter: 'Songs'));
+    await emit(
+        tester, const SearchState(query: 'Rock', selectedFilter: 'Songs'));
     await tester.pump();
     await tester.dragUntilVisible(
       find.text('Save Search'),

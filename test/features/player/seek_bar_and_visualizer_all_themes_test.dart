@@ -1,5 +1,5 @@
 // test/features/player/seek_bar_and_visualizer_all_themes_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -17,7 +17,9 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -51,7 +53,8 @@ void main() {
     when(() => mockPlayerCubit.sponsorBlockSegments).thenReturn(const []);
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
 
     // Provide instant mock waveform data so WaveformSeekBar builds synchronously
     PlayerSeekBar.waveformLoaderOverride = (songId, path) async =>
@@ -70,7 +73,7 @@ void main() {
     when(() => mockSettingsCubit.state).thenReturn(settings);
 
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: MediaQuery(
         data: MediaQueryData(size: size),
@@ -126,7 +129,8 @@ void main() {
         });
       }
 
-      testWidgets('Theme $mode renders Waveform Seek Bar when enabled', (tester) async {
+      testWidgets('Theme $mode renders Waveform Seek Bar when enabled',
+          (tester) async {
         final props = PlayerThemeProps(
           state: mockPlayerCubit.state,
           cubit: mockPlayerCubit,
@@ -164,7 +168,8 @@ void main() {
 
     for (final mode in allThemes) {
       for (final style in activeVisualizerStyles) {
-        testWidgets('Theme $mode renders visualizer style $style', (tester) async {
+        testWidgets('Theme $mode renders visualizer style $style',
+            (tester) async {
           final props = PlayerThemeProps(
             state: mockPlayerCubit.state,
             cubit: mockPlayerCubit,

@@ -2,7 +2,7 @@
 // Verifies whether the settings search field keeps focus and its text-input
 // connection when the on-screen keyboard opens (viewInsets.bottom > 0), which
 // swaps _buildTopHeader to its compact subtree in the real screen.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +19,7 @@ import 'package:pulsr/features/settings/presentation/settings_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -66,7 +67,7 @@ void main() {
               .copyWith(viewInsets: EdgeInsets.only(bottom: keyboard)),
           child: child!,
         ),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const SettingsScreen(),
       ),

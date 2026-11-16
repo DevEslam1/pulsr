@@ -8,6 +8,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/errors/app_error.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/repositories/download_repository_interface.dart';
@@ -88,6 +89,7 @@ void main() {
     await pumpEventQueue();
 
     expect(cubit.state.isLoading, isFalse);
+    expect(cubit.state.error, isA<AppError>());
     expect(cubit.state.errorMessage, 'Failed to load downloads');
     await cubit.close();
   });

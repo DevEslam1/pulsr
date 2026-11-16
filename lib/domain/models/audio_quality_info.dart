@@ -1,5 +1,5 @@
 // lib/domain/models/audio_quality_info.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../core/constants/audio_formats.dart';
 import '../../data/audio/mqa_decoder_helper.dart';
 import '../../data/db/app_database.dart';

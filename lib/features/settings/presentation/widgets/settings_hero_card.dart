@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/settings_hero_card.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -366,7 +366,7 @@ class SettingsHeroCard extends StatelessWidget {
                                 const SizedBox(width: AppSpacing.xs),
                                 Expanded(
                                   child: Text(
-                                    state.syncError!,
+                                    state.syncError!.userMessage,
                                     style: TextStyle(
                                       color: p.error,
                                       fontSize: AppFontSize.label,

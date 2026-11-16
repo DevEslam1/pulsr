@@ -6,6 +6,14 @@ version: 1.0.0+1
 environment:
   sdk: '>=3.0.0 <4.0.0'
   flutter: '>=3.41.0'
+
+# Database encryption at rest (ADR 015). package:sqlite3 ships an
+# SQLite3MultipleCiphers build that honours `PRAGMA key`.
+hooks:
+  user_defines:
+    sqlite3:
+      source: sqlite3mc
+
 dependencies:
   flutter:
     sdk: flutter
@@ -22,6 +30,7 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.9.1
   sqlite3_flutter_libs: ^0.6.0+eol
+  sqlite3: ^3.9.1
   palette_generator: ^0.3.3+6
   dynamic_color: ^2.1.0
   flutter_animate: ^4.5.2
@@ -55,6 +64,8 @@ dependencies:
   flutter_lyric: ^4.1.0
   video_player: ^2.14.1
   web_socket_channel: ^3.0.3
+  material_ui: ^1.11.0
+  cupertino_ui: ^1.1.6
 
 # Vendored fork: adds NativeDspAudioProcessor to the ExoPlayer audio sink so
 # libpulsr_dsp receives the decoded PCM stream. Nothing else is changed.

@@ -1,5 +1,5 @@
 // test/features/player/player_hero_continuity_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -14,6 +14,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -74,7 +75,7 @@ void main() {
         BlocProvider<SettingsCubit>.value(value: mockSettingsCubit),
       ],
       child: MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         theme: ThemeData.dark().copyWith(
           extensions: [AuraTheme.defaultDark],
@@ -92,7 +93,8 @@ void main() {
 
   group('P7 Continuity & Delight — Hero Tag Verification across 11 Themes', () {
     for (final mode in PlayerThemeMode.values) {
-      testWidgets('Theme ${mode.name} renders full artwork Hero with tag nowPlayingArtHeroTag(${mode.name})',
+      testWidgets(
+          'Theme ${mode.name} renders full artwork Hero with tag nowPlayingArtHeroTag(${mode.name})',
           (tester) async {
         final expectedTag = nowPlayingArtHeroTag(mode);
         expect(expectedTag, 'now_playing_art_${mode.name}');
@@ -120,10 +122,12 @@ void main() {
           (widget) => widget is Hero && widget.tag == expectedTag,
         );
         expect(heroFinder, findsAtLeastNWidgets(1),
-            reason: 'Theme ${mode.name} must render Hero with tag $expectedTag');
+            reason:
+                'Theme ${mode.name} must render Hero with tag $expectedTag');
       });
 
-      testWidgets('Theme ${mode.name} in Tablet Split View preserves Hero flight tag',
+      testWidgets(
+          'Theme ${mode.name} in Tablet Split View preserves Hero flight tag',
           (tester) async {
         final expectedTag = nowPlayingArtHeroTag(mode);
 
@@ -150,13 +154,19 @@ void main() {
           (widget) => widget is Hero && widget.tag == expectedTag,
         );
         expect(heroFinder, findsAtLeastNWidgets(1),
-            reason: 'Theme ${mode.name} in split view must render Hero with tag $expectedTag');
+            reason:
+                'Theme ${mode.name} in split view must render Hero with tag $expectedTag');
       });
     }
 
-    testWidgets('TabletPlayerBar renders matching Hero tag for active theme mode',
+    testWidgets(
+        'TabletPlayerBar renders matching Hero tag for active theme mode',
         (tester) async {
-      for (final mode in [PlayerThemeMode.classic, PlayerThemeMode.card, PlayerThemeMode.milkdrop]) {
+      for (final mode in [
+        PlayerThemeMode.classic,
+        PlayerThemeMode.card,
+        PlayerThemeMode.milkdrop
+      ]) {
         when(() => mockSettingsCubit.state).thenReturn(
           SettingsState(playerThemeMode: mode),
         );
@@ -177,7 +187,8 @@ void main() {
           (widget) => widget is Hero && widget.tag == expectedTag,
         );
         expect(heroFinder, findsOneWidget,
-            reason: 'TabletPlayerBar must render Hero with tag $expectedTag when mode is ${mode.name}');
+            reason:
+                'TabletPlayerBar must render Hero with tag $expectedTag when mode is ${mode.name}');
       }
     });
   });

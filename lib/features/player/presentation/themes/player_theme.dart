@@ -1,5 +1,5 @@
 // lib/features/player/presentation/themes/player_theme.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';

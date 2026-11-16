@@ -5,7 +5,7 @@
 // images. Skip rather than fail when the reference is absent.
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -122,8 +122,7 @@ void main() {
           hasSong: true,
           mode: mode,
           navBarTotalHeight: PulsrLayoutMetrics.navBarTotalHeight(dockCtx),
-          miniPlayerHeight:
-              StackedBottomDock.scaledMiniPlayerHeight(dockCtx),
+          miniPlayerHeight: StackedBottomDock.scaledMiniPlayerHeight(dockCtx),
         );
         expect(
           tester.getSize(find.byType(StackedBottomDock)).height,

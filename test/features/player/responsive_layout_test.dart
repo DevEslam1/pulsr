@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -16,6 +16,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -136,7 +137,7 @@ void main() {
 
     Widget host(Size size) => MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: MediaQuery(
             data: MediaQueryData(size: size),
@@ -226,7 +227,7 @@ void main() {
           ],
           child: MaterialApp(
             theme: AuraTheme.darkTheme,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: MediaQuery(
               data: const MediaQueryData(size: Size(844, 390)),
@@ -314,11 +315,12 @@ void main() {
               expect(shortMetrics.isShortHeight, isTrue);
               expect(tallMetrics.isShortHeight, isFalse);
 
-              // Buttons scale adaptively
+              // Buttons scale adaptively, but transport targets never go below
+              // the 48 dp accessibility minimum.
               expect(shortMetrics.mainButtonSize,
                   lessThan(tallMetrics.mainButtonSize));
-              expect(shortMetrics.sideButtonSize,
-                  lessThan(tallMetrics.sideButtonSize));
+              expect(shortMetrics.sideButtonSize, greaterThanOrEqualTo(48.0));
+              expect(tallMetrics.sideButtonSize, greaterThanOrEqualTo(48.0));
               expect(shortMetrics.waveformHeight,
                   lessThan(tallMetrics.waveformHeight));
               expect(shortMetrics.dockBarHeight,

@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/errors/app_error.dart';
+import 'package:pulsr/core/services/auth_failure.dart';
 import 'package:pulsr/core/services/auth_service.dart';
 import 'package:pulsr/core/services/cloud_sync_service.dart';
 import 'package:pulsr/features/auth/cubit/auth_cubit.dart';
@@ -110,6 +112,9 @@ void main() {
 
       expect(cubit.state.status, AuthStatus.unauthenticated);
       expect(cubit.state.user, isNull);
+      expect(cubit.state.error, isA<AuthFailure>());
+      expect(
+          (cubit.state.error as AuthFailure).kind, AuthFailureKind.cancelled);
       expect(cubit.state.errorMessage, 'Sign-in was cancelled.');
       verifyNever(() => cloud.syncAll());
       await cubit.close();
@@ -124,6 +129,7 @@ void main() {
       await cubit.signInWithGoogle();
 
       expect(cubit.state.status, AuthStatus.error);
+      expect(cubit.state.error, isA<AuthFailure>());
       expect(cubit.state.errorMessage, 'No account found with this email.');
       await cubit.close();
     });
@@ -263,7 +269,8 @@ void main() {
       await cubit.signInWithGoogle();
 
       expect(cubit.state.syncStatus, SyncStatus.failure);
-      expect(cubit.state.syncError, contains('Failed to sync'));
+      expect(cubit.state.syncError, isA<AppError>());
+      expect(cubit.state.syncErrorMessage, contains('Failed to sync'));
       await cubit.close();
     });
 
@@ -275,7 +282,8 @@ void main() {
       await cubit.signInWithGoogle();
 
       expect(cubit.state.syncStatus, SyncStatus.failure);
-      expect(cubit.state.syncError, contains('Failed to sync'));
+      expect(cubit.state.syncError, isA<AppError>());
+      expect(cubit.state.syncErrorMessage, contains('Failed to sync'));
       await cubit.close();
     });
 

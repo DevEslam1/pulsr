@@ -1,7 +1,7 @@
 // test/features/downloads/downloads_selection_pruning_test.dart
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -12,6 +12,7 @@ import 'package:pulsr/features/downloads/presentation/downloads_screen.dart';
 import 'package:pulsr/features/downloads/presentation/widgets/download_tile.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockDownloadsCubit extends Mock implements DownloadsCubit {}
 
 void main() {
@@ -57,7 +58,7 @@ void main() {
       BlocProvider<DownloadsCubit>.value(
         value: mockDownloads,
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const DownloadsScreen(),
         ),

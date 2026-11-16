@@ -1,5 +1,5 @@
 // lib/core/widgets/pulsr_pressable.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';

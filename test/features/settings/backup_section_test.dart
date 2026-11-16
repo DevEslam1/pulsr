@@ -12,7 +12,7 @@ import 'dart:typed_data';
 
 import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -24,6 +24,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/settings/presentation/widgets/backup_section.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockExport extends Mock implements ExportBackupUseCase {}
 
 class MockImport extends Mock implements ImportBackupUseCase {}
@@ -172,7 +173,7 @@ void main() {
         value: settingsCubit,
         child: MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const Scaffold(body: BackupSection()),
         ),
@@ -197,7 +198,7 @@ void main() {
         value: settingsCubit,
         child: MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Navigator(
             onGenerateRoute: (_) => MaterialPageRoute<void>(

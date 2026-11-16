@@ -479,8 +479,21 @@ class MediaScannerService {
         minSizeBytes: minSizeKb * 1024,
         autoHideSystemMedia: autoHideSystemMedia,
         pathSeparator: Platform.pathSeparator,
+        // Only needed for a truncated pass, and only six fields are read by
+        // the count aggregation: send compact rows instead of a second full
+        // library of MediaStore maps across the isolate boundary.
         allRawSongsForCounts: songsToProcess.length != songs.length
-            ? songs.map((s) => Map<String, dynamic>.from(s.getMap)).toList()
+            ? songs.map((s) {
+                final raw = s.getMap;
+                return <String, dynamic>{
+                  '_id': raw['_id'] ?? raw['id'],
+                  'duration': raw['duration'],
+                  '_size': raw['_size'] ?? raw['size'],
+                  '_data': raw['_data'] ?? raw['data'],
+                  'album_id': raw['album_id'] ?? raw['albumId'],
+                  'artist_id': raw['artist_id'] ?? raw['artistId'],
+                };
+              }).toList()
             : null,
       );
 
@@ -724,9 +737,21 @@ class MediaScannerService {
           double? loudnessRange
         })>[];
 
-        for (int i = 0; i < pendingSongs.length; i++) {
-          if (_progressController.isClosed) break;
-          final song = pendingSongs[i];
+        // Tag reads are platform-channel I/O, not CPU work: overlap a bounded
+        // number of them so a large enrichment pass does not cost
+        // songs × channel-latency sequentially. Batch/flush semantics are
+        // unchanged.
+        const maxConcurrentReads = 4;
+
+        Future<void> flushUpdatesIfNeeded({bool force = false}) async {
+          if (updates.isEmpty) return;
+          if (!force && updates.length < 50) return;
+          await _repository.updateAudioQualityBatch(List.of(updates));
+          updates.clear();
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+
+        Future<void> enrichOne(SongsTableData song) async {
           try {
             final Map<dynamic, dynamic>? tags =
                 await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
@@ -761,25 +786,29 @@ class MediaScannerService {
                 bitrateKbps:
                     bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
                 codec: (codec != null && codec.isNotEmpty)
-            ? codec
-            : path.split('.').last.split('?').first.trim().toUpperCase(),
+                    ? codec
+                    : path
+                        .split('.')
+                        .last
+                        .split('?')
+                        .first
+                        .trim()
+                        .toUpperCase(),
                 loudnessRange: lraVal,
               ));
             }
           } catch (_) {}
-
-          // Flush every 50 songs in a single transaction/batch
-          if (updates.length >= 50) {
-            await _repository.updateAudioQualityBatch(List.of(updates));
-            updates.clear();
-            await Future<void>.delayed(const Duration(milliseconds: 10));
-          }
         }
 
-        if (updates.isNotEmpty) {
-          await _repository.updateAudioQualityBatch(updates);
-          updates.clear();
+        for (var i = 0; i < pendingSongs.length; i += maxConcurrentReads) {
+          if (_progressController.isClosed) break;
+          final end = (i + maxConcurrentReads < pendingSongs.length)
+              ? i + maxConcurrentReads
+              : pendingSongs.length;
+          await Future.wait(pendingSongs.sublist(i, end).map(enrichOne));
+          await flushUpdatesIfNeeded();
         }
+        await flushUpdatesIfNeeded(force: true);
       } catch (e, st) {
         ErrorLogger.log('Background audio quality enrichment failed',
             error: e, stackTrace: st, category: 'MediaScanner');
@@ -938,23 +967,21 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
 
     final String? fileExt =
         parseString(raw['file_extension'])?.trim().toLowerCase();
-    final String? mime = (parseString(raw['mime_type']) ??
-            parseString(raw['mimeType']))
-        ?.trim()
-        .toLowerCase();
+    final String? mime =
+        (parseString(raw['mime_type']) ?? parseString(raw['mimeType']))
+            ?.trim()
+            .toLowerCase();
     final String? displayName =
         parseString(raw['_display_name']) ?? parseString(raw['displayName']);
     String? initialCodec;
     if (fileExt != null && fileExt.isNotEmpty) {
       initialCodec = fileExt.toUpperCase();
     } else if (mime != null && mime.isNotEmpty) {
-      initialCodec =
-          mime.split('/').last.split(';').first.trim().toUpperCase();
+      initialCodec = mime.split('/').last.split(';').first.trim().toUpperCase();
     } else if (displayName != null && displayName.contains('.')) {
       initialCodec = displayName.split('.').last.trim().toUpperCase();
     } else if (path.contains('.')) {
-      initialCodec =
-          path.split('.').last.split('?').first.trim().toUpperCase();
+      initialCodec = path.split('.').last.split('?').first.trim().toUpperCase();
     }
 
     validSongIds.add(id);
@@ -977,11 +1004,11 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
         fileSize: Value(size),
         genre: Value(genre),
         year: Value(year),
-        codec: initialCodec == null
-            ? const Value.absent() : const Value.absent(),
-            // (initialCodec is ignored until header read)
-            // Header-only; populated by enrichAudioQuality rather than file extension
-            // (initialCodec is ignored until header read)
+        codec:
+            initialCodec == null ? const Value.absent() : const Value.absent(),
+        // (initialCodec is ignored until header read)
+        // Header-only; populated by enrichAudioQuality rather than file extension
+        // (initialCodec is ignored until header read)
       ),
     );
 

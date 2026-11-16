@@ -1,5 +1,5 @@
 import 'dart:ui' show DisplayFeature, DisplayFeatureType;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Centralized breakpoint system for Pulsr.
 ///

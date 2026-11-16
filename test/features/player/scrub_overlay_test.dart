@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -13,7 +13,9 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
@@ -45,7 +47,8 @@ void main() {
     mockSettingsCubit = MockSettingsCubit();
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
 
     when(() => mockPlayerCubit.state).thenReturn(
       const PlayerState(
@@ -64,7 +67,7 @@ void main() {
   Widget wrapWithTheme(Widget child) {
     return MaterialApp(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: MediaQuery(
         data: const MediaQueryData(
@@ -84,7 +87,9 @@ void main() {
     );
   }
 
-  testWidgets('0.3 CD stage renders signed seconds with 1 decimal while scrubbing', (tester) async {
+  testWidgets(
+      '0.3 CD stage renders signed seconds with 1 decimal while scrubbing',
+      (tester) async {
     final state = PlayerState(
       playback: PlaybackSlice(
         currentSong: testSong,
@@ -109,9 +114,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // Find the turntable gesture detector with onPanStart
-    final gestureDetector = find.byWidgetPredicate(
-      (w) => w is GestureDetector && w.onPanStart != null,
-    ).first;
+    final gestureDetector = find
+        .byWidgetPredicate(
+          (w) => w is GestureDetector && w.onPanStart != null,
+        )
+        .first;
     final center = tester.getCenter(gestureDetector);
     final gesture = await tester.startGesture(center + const Offset(50, 0));
     await gesture.moveBy(const Offset(0, 50));
@@ -133,7 +140,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   });
 
-  testWidgets('0.3 Vinyl deck renders signed seconds with 1 decimal while scrubbing', (tester) async {
+  testWidgets(
+      '0.3 Vinyl deck renders signed seconds with 1 decimal while scrubbing',
+      (tester) async {
     final state = PlayerState(
       playback: PlaybackSlice(
         currentSong: testSong,
@@ -158,9 +167,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     // Find the platter gesture detector with onPanStart
-    final gestureDetector = find.byWidgetPredicate(
-      (w) => w is GestureDetector && w.onPanStart != null,
-    ).first;
+    final gestureDetector = find
+        .byWidgetPredicate(
+          (w) => w is GestureDetector && w.onPanStart != null,
+        )
+        .first;
     final center = tester.getCenter(gestureDetector);
     final gesture = await tester.startGesture(center + const Offset(50, 0));
     await gesture.moveBy(const Offset(0, 50));

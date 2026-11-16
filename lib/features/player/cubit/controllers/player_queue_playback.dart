@@ -59,8 +59,8 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
             if (!_isClosed()) {
               final s = _getState();
               _emit(s.copyWith(
-                  playback: s.playback
-                      .copyWith(errorMessage: 'Failed to play ${song.title}')));
+                  playback: s.playback.copyWith(
+                      error: uiError('Failed to play ${song.title}'))));
             }
           }
         }
@@ -259,7 +259,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
         // playback. Keep the previous isPlaying value here so the UI does not
         // flicker to "playing" and immediately back to "paused" on a fast navigation.
         isPlaying: state.isPlaying,
-        errorMessage: null,
+        error: null,
       ),
       lyricsSlice: state.lyricsSlice.copyWith(
         lyrics: isSameSong ? state.lyrics : const [],
@@ -332,7 +332,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
               duration: prevDuration,
               position: prevPosition,
               isPlaying: false,
-              errorMessage: 'Failed to play ${song.title}',
+              error: uiError('Failed to play ${song.title}'),
             ),
             lyricsSlice: current.lyricsSlice.copyWith(
               lyrics: prevLyrics,
@@ -345,7 +345,7 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
           // fresh playback and only surface the failure.
           _emit(current.copyWith(
             playback: current.playback
-                .copyWith(errorMessage: 'Failed to play ${song.title}'),
+                .copyWith(error: uiError('Failed to play ${song.title}')),
           ));
         }
         _invalidateQueueSyncResolution();
@@ -386,8 +386,8 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
                 playback: broken.playback.copyWith(
                   currentSong: null,
                   isPlaying: false,
-                  errorMessage:
-                      'Playback unavailable — please pick another track',
+                  error: uiError(
+                      'Playback unavailable — please pick another track'),
                 ),
               ));
             }

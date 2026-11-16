@@ -35,6 +35,7 @@ import 'player_dependencies.dart';
 export 'player_dependencies.dart';
 import 'player_state.dart';
 
+import '../../../core/errors/app_error.dart';
 part 'player_queue_mixin.dart';
 part 'player_transport_mixin.dart';
 part 'player_dsp_mixin.dart';
@@ -534,7 +535,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           currentSong: song,
           duration: duration,
           position: isSameSong ? state.position : Duration.zero,
-          errorMessage: null,
+          error: null,
         ),
         queueSlice: state.queueSlice.copyWith(
           currentIndex: songIndex != -1 ? songIndex : state.currentIndex,
@@ -665,7 +666,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
             currentSong: song,
             duration: duration,
             position: isSameSong ? state.position : Duration.zero,
-            errorMessage: null,
+            error: null,
           ),
           queueSlice: state.queueSlice.copyWith(
             currentIndex: effectiveIndex,
@@ -712,7 +713,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
               isBuffering: false,
               position: Duration.zero,
               duration: Duration.zero,
-              errorMessage: null,
+              error: null,
             ),
             queueSlice: state.queueSlice.copyWith(
               queue: const [],
@@ -968,8 +969,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         // message without counting the track as unplayable or auto-skipping.
         safeEmit(state.copyWith(
             playback: state.playback.copyWith(
-                errorMessage: err
-                    .substring(PulsrAudioHandler.outputModeNoticePrefix.length),
+                error: uiError(err
+                    .substring(PulsrAudioHandler.outputModeNoticePrefix.length)),
                 isBuffering: false)));
         return;
       }
@@ -984,7 +985,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         widgetBridge.onPlaybackError(msg);
         safeEmit(state.copyWith(
             playback: state.playback
-                .copyWith(errorMessage: msg, isBuffering: false)));
+                .copyWith(error: uiError(msg), isBuffering: false)));
         return;
       }
       widgetBridge.onPlaybackError(err);
@@ -992,7 +993,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       if (failed == null) {
         safeEmit(state.copyWith(
             playback: state.playback
-                .copyWith(errorMessage: err, isBuffering: false)));
+                .copyWith(error: uiError(err), isBuffering: false)));
         return;
       }
       if (failed.id == _lastFailedSongId) {
@@ -1017,7 +1018,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         if (exhausted) {
           safeEmit(state.copyWith(
             playback: state.playback.copyWith(
-              errorMessage: 'No playable tracks in the queue',
+              error: uiError('No playable tracks in the queue'),
               isBuffering: false,
             ),
           ));
@@ -1025,7 +1026,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         }
         safeEmit(state.copyWith(
           playback: state.playback.copyWith(
-            errorMessage: 'Skipped ${failed.title} (unplayable)',
+            error: uiError('Skipped ${failed.title} (unplayable)'),
             isBuffering: false,
           ),
         ));
@@ -1034,7 +1035,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
       }
       safeEmit(state.copyWith(
           playback:
-              state.playback.copyWith(errorMessage: err, isBuffering: false)));
+              state.playback.copyWith(error: uiError(err), isBuffering: false)));
     });
 
     autoSub(_audioHandler.sleepTimerRemainingStream, (rem) {
@@ -1109,7 +1110,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
 
   void clearError() {
     safeEmit(
-        state.copyWith(playback: state.playback.copyWith(errorMessage: null)));
+        state.copyWith(playback: state.playback.copyWith(error: null)));
   }
 
   Future<void> persistQueueSlotsNow() => queueController.persistQueueSlotsNow();

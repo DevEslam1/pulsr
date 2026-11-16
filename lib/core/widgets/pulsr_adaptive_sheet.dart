@@ -1,7 +1,7 @@
 // lib/core/widgets/pulsr_adaptive_sheet.dart
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../constants/app_radii.dart';

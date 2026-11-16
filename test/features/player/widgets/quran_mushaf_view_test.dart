@@ -1,5 +1,5 @@
 // test/features/player/widgets/quran_mushaf_view_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/quran/quran_uthmani_text.dart';
 import 'package:pulsr/domain/models/quran_metadata.dart';

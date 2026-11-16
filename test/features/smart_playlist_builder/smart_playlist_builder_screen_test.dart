@@ -2,7 +2,7 @@
 //
 // Drives the create/edit chrome, rule mutation, the limit validator, preset
 // template application, the empty preview and the save validation path.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';

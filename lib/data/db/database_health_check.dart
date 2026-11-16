@@ -1,6 +1,7 @@
 // lib/data/db/database_health_check.dart
 import 'dart:async';
 import 'app_database.dart';
+import 'database_encryption.dart';
 import '../../core/utils/error_logger.dart';
 
 /// Diagnostics report capturing the physical and relational integrity of the SQLite database.
@@ -14,6 +15,16 @@ class DatabaseHealthReport {
   final int databaseSizeBytes;
   final bool ftsHealthy;
 
+  /// True when the v11 constraint migration failed and was rolled back.
+  final bool migrationFailed;
+
+  /// Encryption-at-rest state (ADR 015). `unavailable`/`degraded` are
+  /// reported instead of silently claiming the database is protected.
+  final String encryptionState;
+  final bool encryptionCipherAvailable;
+  final bool? encryptionKeyAvailable;
+  final String? encryptionDegradedReason;
+
   const DatabaseHealthReport({
     required this.isHealthy,
     required this.integrityIssues,
@@ -23,7 +34,17 @@ class DatabaseHealthReport {
     required this.totalHistoryEntries,
     required this.databaseSizeBytes,
     required this.ftsHealthy,
+    this.migrationFailed = false,
+    this.encryptionState = 'disabled',
+    this.encryptionCipherAvailable = false,
+    this.encryptionKeyAvailable,
+    this.encryptionDegradedReason,
   });
+
+  bool get encryptionHealthy =>
+      encryptionState == 'encrypted' ||
+      encryptionState == 'migrated' ||
+      encryptionState == 'disabled';
 
   Map<String, dynamic> toMap() => {
         'isHealthy': isHealthy,
@@ -34,11 +55,17 @@ class DatabaseHealthReport {
         'totalHistoryEntries': totalHistoryEntries,
         'databaseSizeBytes': databaseSizeBytes,
         'ftsHealthy': ftsHealthy,
+        'migrationFailed': migrationFailed,
+        'encryptionState': encryptionState,
+        'encryptionCipherAvailable': encryptionCipherAvailable,
+        'encryptionKeyAvailable': encryptionKeyAvailable,
+        if (encryptionDegradedReason != null)
+          'encryptionDegradedReason': encryptionDegradedReason,
       };
 
   @override
   String toString() =>
-      'DatabaseHealthReport(healthy: $isHealthy, songs: $totalSongs, playlists: $totalPlaylists, size: ${databaseSizeBytes ~/ 1024} KB, fts: $ftsHealthy)';
+      'DatabaseHealthReport(healthy: $isHealthy, songs: $totalSongs, playlists: $totalPlaylists, size: ${databaseSizeBytes ~/ 1024} KB, fts: $ftsHealthy, encryption: $encryptionState)';
 }
 
 /// Comprehensive health inspection engine for [AppDatabase].
@@ -158,6 +185,13 @@ class DatabaseHealthCheck {
       totalHistoryEntries: totalHistoryEntries,
       databaseSizeBytes: dbSizeBytes,
       ftsHealthy: ftsHealthy,
+      migrationFailed: _db.migrationFailed,
+      encryptionState: DatabaseEncryptionBootstrap.status.label,
+      encryptionCipherAvailable:
+          DatabaseEncryptionBootstrap.status.cipherAvailable,
+      encryptionKeyAvailable: DatabaseEncryptionBootstrap.status.keyAvailable,
+      encryptionDegradedReason:
+          DatabaseEncryptionBootstrap.status.degradedReason,
     );
   }
 }

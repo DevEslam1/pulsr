@@ -1,6 +1,6 @@
 // Covers lib/features/settings/presentation/sections/gestures_section.dart
 // via the real SettingsScreen forced onto the "look" category.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/widgets/pulsr_bottom_sheet.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';

@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/headset_controls_section.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/constants/prefs_keys.dart';

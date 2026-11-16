@@ -24,7 +24,7 @@ void main() {
   group('MusicRepository & AppDatabase Tests', () {
     test('AppDatabase schema migration to v12 creates indexes successfully',
         () async {
-      expect(db.schemaVersion, equals(12));
+      expect(db.schemaVersion, equals(13));
 
       // Query pragma index_list for songs table
       final indexes =
@@ -419,7 +419,6 @@ void main() {
       expect(merged.lastPlayed, equals(2000), reason: 'max lastPlayed');
       expect(merged.lastPositionMs, equals(30000),
           reason: 'position from the more-recently-played row');
-      expect(merged.pendingDownloadPath, isNull);
 
       // Children now point at the positive id.
       final songs =

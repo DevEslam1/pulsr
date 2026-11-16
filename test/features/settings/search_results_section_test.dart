@@ -2,7 +2,7 @@
 // through the real SettingsScreen search flow: the empty-state suggestion
 // chips, the PRO badge, and every search entry's onTap (category jumps, inline
 // toggles and the equalizer fallback).
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/sound_feedback_service.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
@@ -197,7 +197,8 @@ void main() {
     };
     expect(canonicalClusters.length, lessThanOrEqualTo(7));
     expect(
-      canonicalClusters.any((c) => find.textContaining(c).evaluate().isNotEmpty),
+      canonicalClusters
+          .any((c) => find.textContaining(c).evaluate().isNotEmpty),
       isTrue,
     );
   });

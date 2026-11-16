@@ -12,6 +12,8 @@ import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
 
+import '../../core/errors/app_error.dart';
+
 class TagEditorCubit extends PulsrCubit<TagEditorState> {
   static const String batchCheckpointKey = 'batch_tag_checkpoint';
   static const MethodChannel _channel = MethodChannel(PulsrChannels.tagEditor);
@@ -287,8 +289,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           if (sizeBytes > 15 * 1024 * 1024) {
             if (!isClosed) {
               safeEmit(state.copyWith(
-                  errorMessage:
-                      'Image is too large (${(sizeBytes / 1048576).toStringAsFixed(1)} MB). Max 15 MB.'));
+                  error: uiError(
+                      'Image is too large (${(sizeBytes / 1048576).toStringAsFixed(1)} MB). Max 15 MB.')));
             }
             return;
           }
@@ -305,11 +307,11 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           e.code == 'photo_access_denied' || e.code == 'camera_access_denied'
               ? 'Permission denied to access gallery'
               : 'Failed to pick artwork image: ${e.message ?? e.code}';
-      safeEmit(state.copyWith(errorMessage: msg));
+      safeEmit(state.copyWith(error: uiError(msg)));
     } catch (e) {
       if (isClosed) return;
       safeEmit(
-          state.copyWith(errorMessage: 'Failed to pick artwork image: $e'));
+          state.copyWith(error: uiError('Failed to pick artwork image: $e')));
     }
   }
 
@@ -338,7 +340,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   /// Applies the selected metadata result to the form state.
   Future<bool> applyMetadataResult(OnlineTrackMetadata match) async {
     if (isClosed) return false;
-    safeEmit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    safeEmit(state.copyWith(isAutoFetching: true, clearError: true));
     try {
       String? downloadedArtPath;
       if (match.artworkUrl != null) {
@@ -388,7 +390,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           error: e, stackTrace: st, category: 'TagEditorCubit');
       safeEmit(state.copyWith(
         isAutoFetching: false,
-        errorMessage: 'Failed to apply metadata: $e',
+        error: uiError('Failed to apply metadata: $e'),
       ));
       return false;
     }
@@ -397,14 +399,14 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
   Future<bool> autoFetchOnlineTags() async {
     if (isClosed) return false;
-    safeEmit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    safeEmit(state.copyWith(isAutoFetching: true, clearError: true));
     try {
       final results = await searchOnlineMatches();
       if (isClosed) return false;
       if (results.isEmpty) {
         safeEmit(state.copyWith(
           isAutoFetching: false,
-          errorMessage: 'No matching online metadata found for this track.',
+          error: uiError('No matching online metadata found for this track.'),
         ));
         return false;
       }
@@ -415,7 +417,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           error: e, stackTrace: st, category: 'TagEditorCubit');
       safeEmit(state.copyWith(
         isAutoFetching: false,
-        errorMessage: 'Failed to auto-fetch online tags: $e',
+        error: uiError('Failed to auto-fetch online tags: $e'),
       ));
       return false;
     }
@@ -428,7 +430,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
   /// Returns the number of tracks resolved.
   Future<int> autoFetchBatchTags({int maxTracks = 20}) async {
     if (isClosed || !state.isBatchMode) return 0;
-    safeEmit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    safeEmit(state.copyWith(isAutoFetching: true, clearError: true));
     try {
       final targets = state.batchSongs.take(maxTracks).toList();
       final artists = <String>[];
@@ -487,8 +489,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         album: album ?? state.album,
         genre: genre ?? state.genre,
         year: year ?? state.year,
-        errorMessage: resolved == 0
-            ? 'No matching online metadata found for these tracks.'
+        error: resolved == 0
+            ? uiError('No matching online metadata found for these tracks.')
             : null,
       ));
       return resolved;
@@ -498,7 +500,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           error: e, stackTrace: st, category: 'TagEditorCubit');
       safeEmit(state.copyWith(
         isAutoFetching: false,
-        errorMessage: 'Failed to auto-fetch online tags: $e',
+        error: uiError('Failed to auto-fetch online tags: $e'),
       ));
       return 0;
     }
@@ -517,7 +519,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
     if (!state.isBatchMode && state.title.trim().isEmpty) {
       safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
-        errorMessage: 'Song title cannot be empty.',
+        error: uiError('Song title cannot be empty.'),
       ));
       return;
     }
@@ -529,7 +531,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       if (yearNum == null || yearNum < 1000 || yearNum > 2100) {
         safeEmit(state.copyWith(
           status: TagEditorStatus.failure,
-          errorMessage: 'Year must be a number between 1000 and 2100.',
+          error: uiError('Year must be a number between 1000 and 2100.'),
         ));
         return;
       }
@@ -540,7 +542,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       if (trackNum == null || trackNum < 0 || trackNum > 9999) {
         safeEmit(state.copyWith(
           status: TagEditorStatus.failure,
-          errorMessage: 'Track number must be a non-negative number.',
+          error: uiError('Track number must be a non-negative number.'),
         ));
         return;
       }
@@ -548,7 +550,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
 
     safeEmit(state.copyWith(
         status: TagEditorStatus.saving,
-        clearErrorMessage: true,
+        clearError: true,
         batchProgress: 0.0,
         batchFailedCount: 0));
     try {
@@ -665,8 +667,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
             status: failedFiles.length == total
                 ? TagEditorStatus.failure
                 : TagEditorStatus.success,
-            errorMessage:
-                'Failed to tag ${failedFiles.length} file${failedFiles.length > 1 ? "s" : ""}: ${failedFiles.take(3).join(", ")}${failedFiles.length > 3 ? "…" : ""}',
+            error: uiError(
+                'Failed to tag ${failedFiles.length} file${failedFiles.length > 1 ? "s" : ""}: ${failedFiles.take(3).join(", ")}${failedFiles.length > 3 ? "…" : ""}'),
             batchFailedCount: failedFiles.length,
             clearBatchProgress: true,
           ));
@@ -679,7 +681,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
               : null;
           safeEmit(state.copyWith(
             status: TagEditorStatus.success,
-            errorMessage: batchLyricsNote,
+            error: batchLyricsNote == null ? null : uiError(batchLyricsNote),
             batchFailedCount: 0,
             clearBatchProgress: true,
           ));
@@ -726,7 +728,7 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         };
         safeEmit(state.copyWith(
           status: TagEditorStatus.failure,
-          errorMessage: errorText,
+          error: uiError(errorText),
         ));
         return;
       }
@@ -749,8 +751,8 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
         _clearHistory();
         safeEmit(state.copyWith(
           status: TagEditorStatus.success,
-          errorMessage:
-              'Note: lyrics truncated to 8192 chars (device tag limit).',
+          error: uiError(
+              'Note: lyrics truncated to 8192 chars (device tag limit).'),
           batchFailedCount: 0,
         ));
       } else {
@@ -764,21 +766,21 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
       if (isClosed) return;
       safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
-        errorMessage:
-            'Tag write was rejected by the system. Check file permissions.',
+        error: uiError(
+            'Tag write was rejected by the system. Check file permissions.'),
       ));
     } on _TagWriteFailedException {
       if (isClosed) return;
       safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
-        errorMessage: 'Tag write failed. Could not write to the audio file.',
+        error: uiError('Tag write failed. Could not write to the audio file.'),
       ));
     } on _UnverifiedTagWriteException {
       if (isClosed) return;
       safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
-        errorMessage:
-            'Tag write could not be verified — file left unchanged when possible. Check storage permission (Android 11+ scoped storage) and WAV limitations.',
+        error: uiError(
+            'Tag write could not be verified — file left unchanged when possible. Check storage permission (Android 11+ scoped storage) and WAV limitations.'),
       ));
     } on PlatformException catch (e) {
       if (isClosed) return;
@@ -786,15 +788,15 @@ class TagEditorCubit extends PulsrCubit<TagEditorState> {
           (e.message ?? '').toLowerCase().contains('permission');
       safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
-        errorMessage: isScopedStorage
+        error: uiError(isScopedStorage
             ? 'Storage permission denied (Android 11+ scoped storage). Grant All-files access and retry — no changes were applied.'
-            : (e.message ?? 'Failed to save tags on this device.'),
+            : (e.message ?? 'Failed to save tags on this device.')),
       ));
     } catch (e) {
       if (isClosed) return;
       safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
-        errorMessage: 'Failed to save tags: $e',
+        error: uiError('Failed to save tags: $e'),
       ));
     } finally {
       // P0-5 follow-up: clear the batch dirty flags on every exit path (success,

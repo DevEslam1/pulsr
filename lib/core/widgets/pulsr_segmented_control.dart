@@ -1,7 +1,7 @@
 // lib/core/widgets/pulsr_segmented_control.dart
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../constants/app_radii.dart';

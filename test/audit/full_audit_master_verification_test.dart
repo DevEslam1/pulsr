@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/errors/error_message_resolver.dart';
 import 'package:pulsr/core/utils/haptic_patterns.dart';

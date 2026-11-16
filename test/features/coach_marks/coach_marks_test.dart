@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
@@ -7,9 +7,10 @@ import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/settings/presentation/widgets/settings_picker_sheets.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 Widget _buildHarness(Widget child) {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: ThemeData.dark().copyWith(
       extensions: [AuraTheme.defaultDark],
@@ -150,7 +151,8 @@ void main() {
   });
 
   group('P6 Discoverability — Version-Gated Whats New Sheet Tests', () {
-    testWidgets('Whats new sheet shows on new version and records last seen version',
+    testWidgets(
+        'Whats new sheet shows on new version and records last seen version',
         (tester) async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();

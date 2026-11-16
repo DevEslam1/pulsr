@@ -1,7 +1,7 @@
 // Coverage for the uncovered branches of lyrics_view.dart.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_lyric/flutter_lyric.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../player_test_support.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -77,7 +78,7 @@ void main() {
   }) {
     return MaterialApp(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(
         body: withProviders
@@ -390,7 +391,8 @@ void main() {
       expect(find.byKey(const ValueKey('lyrics_offset_chip')), findsNothing);
     });
 
-    testWidgets('explicit header + / - buttons adjust, accumulate, and show chip',
+    testWidgets(
+        'explicit header + / - buttons adjust, accumulate, and show chip',
         (tester) async {
       await pumpSynced(tester);
       expect(find.byKey(const ValueKey('lyrics_offset_chip')), findsNothing);

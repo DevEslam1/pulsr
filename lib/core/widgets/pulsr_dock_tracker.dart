@@ -1,5 +1,5 @@
 // lib/core/widgets/pulsr_dock_tracker.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Reserves space only in content that actually shares the shell's dock.
 /// Standalone routes have no scope and do not inherit an offstage dock's height.

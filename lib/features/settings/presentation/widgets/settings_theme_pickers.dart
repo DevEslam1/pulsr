@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/settings_picker_sheets.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -904,7 +904,8 @@ class _ThemeMockupCard extends StatelessWidget {
                 ],
               ),
               child: Center(
-                child: Icon(Icons.music_note_rounded, color: primaryColor, size: 26),
+                child: Icon(Icons.music_note_rounded,
+                    color: primaryColor, size: 26),
               ),
             ),
             const SizedBox(height: 6),

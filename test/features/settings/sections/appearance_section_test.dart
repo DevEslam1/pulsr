@@ -1,7 +1,7 @@
 // Covers lib/features/settings/presentation/sections/appearance_section.dart
 // (theme selector, accent swatches, accessibility toggles) plus the picker
 // sheets it opens, via the real SettingsScreen forced onto "look".
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/services/sound_feedback_service.dart';

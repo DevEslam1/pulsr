@@ -3,12 +3,13 @@
 // Branches the base suite leaves untouched: pinch-to-zoom + reset chip, double
 // tap reset, semantics increase/decrease, the scrub preview bubble, the
 // didUpdateWidget track reset, and the crossfade/A-B marker combinations.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/player/presentation/widgets/waveform_seek_bar.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -26,7 +27,7 @@ void main() {
 
   Widget host(Widget child) => MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: child),
       );

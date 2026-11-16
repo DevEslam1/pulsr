@@ -1,5 +1,5 @@
 // lib/core/widgets/pulsr_scroll_edge_fade.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../constants/app_colors.dart';
 
 /// Fades the trailing edge (and optionally leading edge) of horizontally

@@ -3,7 +3,7 @@
 // Covers the sheet shell: the throttled loading bar, the body branch selection
 // (settings gate → recovery/dead cards → native WebView) and the native
 // lifecycle callbacks that drive loading/error state.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';

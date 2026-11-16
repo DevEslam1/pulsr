@@ -1,5 +1,5 @@
 // test/core/widgets/source_scope_switcher_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
@@ -7,6 +7,7 @@ import 'package:pulsr/core/widgets/source_scope_switcher.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -16,7 +17,7 @@ void main() {
 
   Widget host(Widget child) => MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: Center(child: child)),
       );
@@ -47,7 +48,8 @@ void main() {
 
     expect(selected, SourceScope.online);
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('${PrefsKeys.sourceScopePrefix}favorites'), 'online');
+    expect(
+        prefs.getString('${PrefsKeys.sourceScopePrefix}favorites'), 'online');
   });
 
   testWidgets('restores persisted scope on mount and supports includeAll',

@@ -5,7 +5,7 @@
 // tracks list, empty state and the per-section error/retry paths.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -26,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../helpers/detail_screen_harness.dart';
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _Artists extends Mock implements GetArtistsUseCase {}
 
 /// Never performs a network call, so the widget tests stay deterministic and
@@ -307,7 +308,7 @@ Widget _wrap({required Widget child, PlayerCubit? playerCubit}) {
   return MaterialApp.router(
     theme: AuraTheme.darkTheme,
     routerConfig: router,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     builder: (context, routedChild) {
       return MediaQuery(

@@ -1,5 +1,5 @@
 // F1/F2/F11 controls: AB loop, per-track delay, bookmark resume.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';

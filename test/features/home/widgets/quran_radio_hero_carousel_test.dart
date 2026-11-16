@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +13,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class _FakeRadioStation extends Fake implements RadioStation {}
@@ -55,7 +56,8 @@ void main() {
         ),
         GoRoute(
           path: '/radio',
-          builder: (_, __) => const Scaffold(body: Text('radio-directory-route')),
+          builder: (_, __) =>
+              const Scaffold(body: Text('radio-directory-route')),
         ),
       ],
     );
@@ -65,7 +67,7 @@ void main() {
       child: MaterialApp.router(
         theme: AuraTheme.darkTheme,
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router,
       ),
@@ -108,8 +110,7 @@ void main() {
         ))).called(1);
   });
 
-  testWidgets('swiping card changes to the next Quran station',
-      (tester) async {
+  testWidgets('swiping card changes to the next Quran station', (tester) async {
     await tester.pumpWidget(
       buildHarness(
         child: QuranRadioHeroCarousel(playerCubit: playerCubit),
@@ -189,8 +190,7 @@ void main() {
     verify(() => playerCubit.togglePlayPause()).called(1);
   });
 
-  testWidgets('tapping Radio navigation link routes to /radio',
-      (tester) async {
+  testWidgets('tapping Radio navigation link routes to /radio', (tester) async {
     await tester.pumpWidget(
       buildHarness(
         locale: const Locale('en'),
@@ -208,8 +208,7 @@ void main() {
     expect(find.text('radio-directory-route'), findsOneWidget);
   });
 
-  testWidgets('renders English text when locale is English',
-      (tester) async {
+  testWidgets('renders English text when locale is English', (tester) async {
     await tester.pumpWidget(
       buildHarness(
         locale: const Locale('en'),
@@ -227,7 +226,8 @@ void main() {
     // Windowed dot indicator caps visible dots at 7 even for 11+ stations.
     expect(
       find.byWidgetPredicate(
-        (w) => w is Semantics && (w.properties.label?.endsWith('/ 11') ?? false),
+        (w) =>
+            w is Semantics && (w.properties.label?.endsWith('/ 11') ?? false),
       ),
       findsNWidgets(7),
     );
@@ -259,7 +259,8 @@ void main() {
     expect(firstCardLeft - carouselLeft, lessThanOrEqualTo(6.0));
   });
 
-  test('buildMergedHeroItem localizes curated stations without Custom Station badge',
+  test(
+      'buildMergedHeroItem localizes curated stations without Custom Station badge',
       () {
     const curatedMurattal = RadioStation(
       id: 'cur-quran-minshawi-murattal',
@@ -343,12 +344,14 @@ void main() {
     await tester.pumpAndSettle();
 
     // Long-press and switch sort order to A-Z
-    await tester.longPress(find.text('Sheikh Mohamed Siddiq El-Minshawi').first);
+    await tester
+        .longPress(find.text('Sheikh Mohamed Siddiq El-Minshawi').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('A–Z'));
     await tester.pumpAndSettle();
 
-    expect(RadioStationStore.heroSortMode.value, QuranHeroSortMode.alphabetical);
+    expect(
+        RadioStationStore.heroSortMode.value, QuranHeroSortMode.alphabetical);
     expect(find.text('Holy Quran Radio - Cairo'), findsWidgets);
   });
 

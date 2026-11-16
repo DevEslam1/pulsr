@@ -1,5 +1,5 @@
 // test/features/library/widgets/folder_browser_tab_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/usecases/folder_usecases.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';

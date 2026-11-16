@@ -1,8 +1,10 @@
 import 'dart:ui' show DisplayFeature, DisplayFeatureState, DisplayFeatureType;
 
-import 'package:flutter/material.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
@@ -113,18 +115,47 @@ void main() {
   }
 
   final matrix = <({String name, Size size, Locale locale})>[
-    (name: '360x800 phone', size: const Size(360, 800), locale: const Locale('en')),
-    (name: '390x844 phone', size: const Size(390, 844), locale: const Locale('en')),
-    (name: '390x844 phone ar RTL', size: const Size(390, 844), locale: const Locale('ar')),
-    (name: '600x960 small tablet portrait', size: const Size(600, 960), locale: const Locale('en')),
-    (name: '840x1280 tablet portrait', size: const Size(840, 1280), locale: const Locale('en')),
-    (name: '1280x800 tablet landscape', size: const Size(1280, 800), locale: const Locale('en')),
-    (name: '1280x800 tablet landscape ar RTL', size: const Size(1280, 800), locale: const Locale('ar')),
+    (
+      name: '360x800 phone',
+      size: const Size(360, 800),
+      locale: const Locale('en')
+    ),
+    (
+      name: '390x844 phone',
+      size: const Size(390, 844),
+      locale: const Locale('en')
+    ),
+    (
+      name: '390x844 phone ar RTL',
+      size: const Size(390, 844),
+      locale: const Locale('ar')
+    ),
+    (
+      name: '600x960 small tablet portrait',
+      size: const Size(600, 960),
+      locale: const Locale('en')
+    ),
+    (
+      name: '840x1280 tablet portrait',
+      size: const Size(840, 1280),
+      locale: const Locale('en')
+    ),
+    (
+      name: '1280x800 tablet landscape',
+      size: const Size(1280, 800),
+      locale: const Locale('en')
+    ),
+    (
+      name: '1280x800 tablet landscape ar RTL',
+      size: const Size(1280, 800),
+      locale: const Locale('ar')
+    ),
   ];
 
   for (final entry in matrix) {
     for (final scale in const [1.0, 1.3, 2.0]) {
-      testWidgets('${entry.name} @ ${scale}x text scale renders without overflow',
+      testWidgets(
+          '${entry.name} @ ${scale}x text scale renders without overflow',
           (tester) async {
         tester.view.physicalSize = entry.size;
         tester.view.devicePixelRatio = 1.0;
@@ -186,7 +217,8 @@ void main() {
     expect(overflowErrors, isEmpty);
   });
 
-  testWidgets('TabletSideInspector drag handle is 48dp hit & double-tap resets persisted width',
+  testWidgets(
+      'TabletSideInspector drag handle is 48dp hit & double-tap resets persisted width',
       (tester) async {
     const size = Size(1280, 800);
     tester.view.physicalSize = size;
@@ -231,7 +263,8 @@ void main() {
     expect(SettingsCache().containsKey(key), isFalse);
   });
 
-  testWidgets('PulsrDialog handles Widget, IconData, and String without dynamic',
+  testWidgets(
+      'PulsrDialog handles Widget, IconData, and String without dynamic',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(

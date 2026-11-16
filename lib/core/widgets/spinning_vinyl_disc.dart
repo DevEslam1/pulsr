@@ -1,6 +1,6 @@
 // lib/core/widgets/spinning_vinyl_disc.dart
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../constants/app_colors.dart';
 import '../motion/pulsr_motion.dart';

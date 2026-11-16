@@ -1,5 +1,5 @@
 // test/features/tag_editor/tag_field_widget_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/tag_editor/tag_field_widget.dart';

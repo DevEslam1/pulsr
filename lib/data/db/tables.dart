@@ -76,10 +76,6 @@ class SongsTable extends Table {
   TextColumn get remoteId => text().nullable()();
   TextColumn get remoteArtworkUrl => text().nullable()();
 
-  /// Destination a download is writing to, used to match the row MediaStore
-  /// creates once the file lands.
-  TextColumn get pendingDownloadPath => text().nullable()();
-
   /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
   BoolColumn get isDownloaded => boolean().withDefault(const Constant(false))();
 

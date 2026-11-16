@@ -1,5 +1,5 @@
 // lib/core/widgets/pulsr_artwork_header.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../constants/app_spacing.dart';

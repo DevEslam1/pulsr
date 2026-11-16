@@ -25,7 +25,7 @@ mixin _$PlaybackSlice {
   double get playbackSpeed;
   double get playbackPitch;
   int? get audioSessionId;
-  String? get errorMessage;
+  AppError? get error;
   bool get isExpanded;
   Color? get dominantColor;
   Duration? get sleepTimerRemaining;
@@ -76,8 +76,8 @@ mixin _$PlaybackSlice {
                 other.playbackPitch == _this.playbackPitch) &&
             (identical(other.audioSessionId, _this.audioSessionId) ||
                 other.audioSessionId == _this.audioSessionId) &&
-            (identical(other.errorMessage, _this.errorMessage) ||
-                other.errorMessage == _this.errorMessage) &&
+            (identical(other.error, _this.error) ||
+                other.error == _this.error) &&
             (identical(other.isExpanded, _this.isExpanded) ||
                 other.isExpanded == _this.isExpanded) &&
             (identical(other.dominantColor, _this.dominantColor) ||
@@ -130,7 +130,7 @@ mixin _$PlaybackSlice {
       _this.playbackSpeed,
       _this.playbackPitch,
       _this.audioSessionId,
-      _this.errorMessage,
+      _this.error,
       _this.isExpanded,
       _this.dominantColor,
       _this.sleepTimerRemaining,
@@ -152,7 +152,7 @@ mixin _$PlaybackSlice {
   @override
   String toString() {
     final _this = this as PlaybackSlice;
-    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, isBuffering: ${_this.isBuffering}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, isMuted: ${_this.isMuted}, volume: ${_this.volume})';
+    return 'PlaybackSlice(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, isBuffering: ${_this.isBuffering}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, playbackSpeed: ${_this.playbackSpeed}, playbackPitch: ${_this.playbackPitch}, audioSessionId: ${_this.audioSessionId}, error: ${_this.error}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, sleepTimerRemainingTracks: ${_this.sleepTimerRemainingTracks}, abLoopEnabled: ${_this.abLoopEnabled}, abPointA: ${_this.abPointA}, abPointB: ${_this.abPointB}, trackDelayMs: ${_this.trackDelayMs}, bookmarkPosition: ${_this.bookmarkPosition}, silenceSkipSensitivity: ${_this.silenceSkipSensitivity}, currentSongRating: ${_this.currentSongRating}, currentSongEqOverride: ${_this.currentSongEqOverride}, currentSongVolumeOverrideDb: ${_this.currentSongVolumeOverrideDb}, isMuted: ${_this.isMuted}, volume: ${_this.volume})';
   }
 }
 
@@ -173,7 +173,7 @@ abstract mixin class $PlaybackSliceCopyWith<$Res> {
       double playbackSpeed,
       double playbackPitch,
       int? audioSessionId,
-      String? errorMessage,
+      AppError? error,
       bool isExpanded,
       Color? dominantColor,
       Duration? sleepTimerRemaining,
@@ -214,7 +214,7 @@ class _$PlaybackSliceCopyWithImpl<$Res>
     Object? playbackSpeed = null,
     Object? playbackPitch = null,
     Object? audioSessionId = freezed,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
     Object? isExpanded = null,
     Object? dominantColor = freezed,
     Object? sleepTimerRemaining = freezed,
@@ -272,10 +272,10 @@ class _$PlaybackSliceCopyWithImpl<$Res>
           ? _self.audioSessionId
           : audioSessionId // ignore: cast_nullable_to_non_nullable
               as int?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
       isExpanded: null == isExpanded
           ? _self.isExpanded
           : isExpanded // ignore: cast_nullable_to_non_nullable
@@ -444,7 +444,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             double playbackSpeed,
             double playbackPitch,
             int? audioSessionId,
-            String? errorMessage,
+            AppError? error,
             bool isExpanded,
             Color? dominantColor,
             Duration? sleepTimerRemaining,
@@ -477,7 +477,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.playbackSpeed,
             _that.playbackPitch,
             _that.audioSessionId,
-            _that.errorMessage,
+            _that.error,
             _that.isExpanded,
             _that.dominantColor,
             _that.sleepTimerRemaining,
@@ -524,7 +524,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             double playbackSpeed,
             double playbackPitch,
             int? audioSessionId,
-            String? errorMessage,
+            AppError? error,
             bool isExpanded,
             Color? dominantColor,
             Duration? sleepTimerRemaining,
@@ -556,7 +556,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.playbackSpeed,
             _that.playbackPitch,
             _that.audioSessionId,
-            _that.errorMessage,
+            _that.error,
             _that.isExpanded,
             _that.dominantColor,
             _that.sleepTimerRemaining,
@@ -602,7 +602,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             double playbackSpeed,
             double playbackPitch,
             int? audioSessionId,
-            String? errorMessage,
+            AppError? error,
             bool isExpanded,
             Color? dominantColor,
             Duration? sleepTimerRemaining,
@@ -634,7 +634,7 @@ extension PlaybackSlicePatterns on PlaybackSlice {
             _that.playbackSpeed,
             _that.playbackPitch,
             _that.audioSessionId,
-            _that.errorMessage,
+            _that.error,
             _that.isExpanded,
             _that.dominantColor,
             _that.sleepTimerRemaining,
@@ -670,7 +670,7 @@ class _PlaybackSlice extends PlaybackSlice {
       this.playbackSpeed = 1.0,
       this.playbackPitch = 1.0,
       this.audioSessionId,
-      this.errorMessage,
+      this.error,
       this.isExpanded = false,
       this.dominantColor,
       this.sleepTimerRemaining,
@@ -717,7 +717,7 @@ class _PlaybackSlice extends PlaybackSlice {
   @override
   final int? audioSessionId;
   @override
-  final String? errorMessage;
+  final AppError? error;
   @override
   @JsonKey()
   final bool isExpanded;
@@ -790,8 +790,7 @@ class _PlaybackSlice extends PlaybackSlice {
                 other.playbackPitch == playbackPitch) &&
             (identical(other.audioSessionId, audioSessionId) ||
                 other.audioSessionId == audioSessionId) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage) &&
+            (identical(other.error, error) || other.error == error) &&
             (identical(other.isExpanded, isExpanded) ||
                 other.isExpanded == isExpanded) &&
             (identical(other.dominantColor, dominantColor) ||
@@ -839,7 +838,7 @@ class _PlaybackSlice extends PlaybackSlice {
       playbackSpeed,
       playbackPitch,
       audioSessionId,
-      errorMessage,
+      error,
       isExpanded,
       dominantColor,
       sleepTimerRemaining,
@@ -860,7 +859,7 @@ class _PlaybackSlice extends PlaybackSlice {
 
   @override
   String toString() {
-    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, isBuffering: $isBuffering, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, errorMessage: $errorMessage, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, isMuted: $isMuted, volume: $volume)';
+    return 'PlaybackSlice(currentSong: $currentSong, isPlaying: $isPlaying, isBuffering: $isBuffering, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, playbackSpeed: $playbackSpeed, playbackPitch: $playbackPitch, audioSessionId: $audioSessionId, error: $error, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, sleepTimerRemainingTracks: $sleepTimerRemainingTracks, abLoopEnabled: $abLoopEnabled, abPointA: $abPointA, abPointB: $abPointB, trackDelayMs: $trackDelayMs, bookmarkPosition: $bookmarkPosition, silenceSkipSensitivity: $silenceSkipSensitivity, currentSongRating: $currentSongRating, currentSongEqOverride: $currentSongEqOverride, currentSongVolumeOverrideDb: $currentSongVolumeOverrideDb, isMuted: $isMuted, volume: $volume)';
   }
 }
 
@@ -883,7 +882,7 @@ abstract mixin class _$PlaybackSliceCopyWith<$Res>
       double playbackSpeed,
       double playbackPitch,
       int? audioSessionId,
-      String? errorMessage,
+      AppError? error,
       bool isExpanded,
       Color? dominantColor,
       Duration? sleepTimerRemaining,
@@ -924,7 +923,7 @@ class __$PlaybackSliceCopyWithImpl<$Res>
     Object? playbackSpeed = null,
     Object? playbackPitch = null,
     Object? audioSessionId = freezed,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
     Object? isExpanded = null,
     Object? dominantColor = freezed,
     Object? sleepTimerRemaining = freezed,
@@ -982,10 +981,10 @@ class __$PlaybackSliceCopyWithImpl<$Res>
           ? _self.audioSessionId
           : audioSessionId // ignore: cast_nullable_to_non_nullable
               as int?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
       isExpanded: null == isExpanded
           ? _self.isExpanded
           : isExpanded // ignore: cast_nullable_to_non_nullable

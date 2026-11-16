@@ -1,7 +1,7 @@
 // Shared harness for detail-screen widget tests that need a real Drift
 // database (so the use-case streams are exercised end-to-end) but a stubbed
 // PlayerCubit (the tile's BlocSelector only reads state/stream).
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
@@ -9,6 +9,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 /// A PlayerCubit stub that always reports [state] and yields no state events.
@@ -51,7 +52,7 @@ class _Harness extends StatelessWidget {
       child: MaterialApp(
         theme: AuraTheme.darkTheme,
         locale: locale,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: child,
       ),

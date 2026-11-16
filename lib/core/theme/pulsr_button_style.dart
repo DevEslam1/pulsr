@@ -1,5 +1,5 @@
 // lib/core/theme/pulsr_button_style.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../constants/app_radii.dart';
 import '../../features/settings/cubit/settings_cubit.dart';

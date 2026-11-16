@@ -8311,5 +8311,58 @@
   "coachMarkDockSwipeBody": "Swipe up on the mini player or long-press to customize docking modes.",
   "@coachMarkDockSwipeBody": {
     "description": "Coach mark body for dock styles"
+  },
+  "databaseHealth": "Database Health",
+  "@databaseHealth": {
+    "description": "Title of the database health diagnostics row"
+  },
+  "databaseHealthChecking": "Checking…",
+  "@databaseHealthChecking": {
+    "description": "Shown while the database health check runs"
+  },
+  "databaseHealthHealthy": "Healthy",
+  "@databaseHealthHealthy": {
+    "description": "Database integrity is clean"
+  },
+  "databaseHealthIssues": "Issues detected",
+  "@databaseHealthIssues": {
+    "description": "Database integrity or encryption has a problem"
+  },
+  "databaseHealthEncryption": "Encryption: {state}",
+  "@databaseHealthEncryption": {
+    "description": "Encryption-at-rest state of the library database",
+    "placeholders": {
+      "state": {
+        "type": "String"
+      }
+    }
+  },
+  "databaseEncryptionEncrypted": "Encrypted",
+  "@databaseEncryptionEncrypted": {
+    "description": "Database encryption is active"
+  },
+  "databaseEncryptionPlaintext": "Plaintext",
+  "@databaseEncryptionPlaintext": {
+    "description": "Database is not encrypted"
+  },
+  "databaseEncryptionUnavailable": "Unavailable",
+  "@databaseEncryptionUnavailable": {
+    "description": "This build has no SQLite encryption cipher"
+  },
+  "databaseEncryptionDisabled": "Disabled",
+  "@databaseEncryptionDisabled": {
+    "description": "Database encryption was disabled by build configuration"
+  },
+  "databaseHealthRepairSearch": "Repair search index",
+  "@databaseHealthRepairSearch": {
+    "description": "Action that rebuilds the full-text search index"
+  },
+  "databaseHealthSearchRepaired": "Search index repaired",
+  "@databaseHealthSearchRepaired": {
+    "description": "FTS repair succeeded"
+  },
+  "databaseHealthSearchRepairFailed": "Search index repair failed",
+  "@databaseHealthSearchRepairFailed": {
+    "description": "FTS repair failed"
   }
 }

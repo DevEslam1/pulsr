@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -17,6 +17,7 @@ import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockMusicRepository extends Mock implements IMusicRepository {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -263,7 +264,9 @@ void main() {
       await handler.checkInitialUri();
     });
 
-    test('checkInitialUri plays initial URI and queues remaining SEND_MULTIPLE URIs', () async {
+    test(
+        'checkInitialUri plays initial URI and queues remaining SEND_MULTIPLE URIs',
+        () async {
       messenger.setMockMethodCallHandler(channel, (call) async {
         if (call.method == 'getInitialAudioUris') {
           return ['/music/init.mp3', '/music/second.mp3'];
@@ -435,7 +438,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           routerConfig: router,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
         ),
       );

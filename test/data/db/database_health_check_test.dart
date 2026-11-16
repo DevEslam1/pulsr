@@ -63,7 +63,13 @@ void main() {
             'totalHistoryEntries',
             'databaseSizeBytes',
             'ftsHealthy',
+            'migrationFailed',
+            'encryptionState',
+            'encryptionCipherAvailable',
+            'encryptionKeyAvailable',
           ]));
+      expect(map['migrationFailed'], isFalse);
+      expect(map['encryptionState'], isA<String>());
     });
 
     test('detects an index that drifted from the content table', () async {

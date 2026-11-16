@@ -2,7 +2,7 @@
 // Run explicitly with: flutter test test/_audit_visual.dart --update-goldens
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +19,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'helpers/screen_harness.dart';
 import 'helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   setUpAll(() async {
     await _loadFonts();
@@ -56,7 +57,7 @@ void main() {
         data: const MediaQueryData(size: Size(390, 844)),
         child: MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: MultiBlocProvider(
             providers: [

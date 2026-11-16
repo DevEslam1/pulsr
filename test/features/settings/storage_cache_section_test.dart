@@ -1,7 +1,7 @@
 // Covers lib/features/settings/presentation/widgets/storage_cache_section.dart
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/artwork_cache_manager.dart';
@@ -10,6 +10,7 @@ import 'package:pulsr/features/settings/presentation/widgets/storage_cache_secti
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final l10n = lookupAppLocalizations(const Locale('en'));
@@ -60,7 +61,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(
           body: SingleChildScrollView(child: StorageCacheSection()),

@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/marquee_text.dart';
@@ -32,7 +34,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('MarqueeText Widget Tests', () {
-    testWidgets('renders static text when text fits within bounds', (tester) async {
+    testWidgets('renders static text when text fits within bounds',
+        (tester) async {
       await tester.pumpWidget(_wrap(
         const MarqueeText(text: 'Short'),
       ));
@@ -43,9 +46,11 @@ void main() {
       expect(find.byType(SingleChildScrollView), findsNothing);
     });
 
-    testWidgets('reduced-motion fallback displays static text with ellipsis without scrolling',
+    testWidgets(
+        'reduced-motion fallback displays static text with ellipsis without scrolling',
         (tester) async {
-      const longTitle = 'Extremely Long Symphony Movement Opus 104 in D Minor With Extended Title';
+      const longTitle =
+          'Extremely Long Symphony Movement Opus 104 in D Minor With Extended Title';
 
       await tester.pumpWidget(_wrap(
         const MarqueeText(text: longTitle),
@@ -63,9 +68,11 @@ void main() {
       expect(textWidget.overflow, equals(TextOverflow.ellipsis));
     });
 
-    testWidgets('overflowing text renders marquee scroll layout when motion is enabled',
+    testWidgets(
+        'overflowing text renders marquee scroll layout when motion is enabled',
         (tester) async {
-      const longTitle = 'Extremely Long Symphony Movement Opus 104 in D Minor With Extended Title';
+      const longTitle =
+          'Extremely Long Symphony Movement Opus 104 in D Minor With Extended Title';
 
       await tester.pumpWidget(_wrap(
         const MarqueeText(text: longTitle),

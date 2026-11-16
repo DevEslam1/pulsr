@@ -1,6 +1,6 @@
 // lib/core/widgets/throttled_slider.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// A [Slider] wrapper that provides local smooth preview while throttling
 /// continuous [onChanged] invocations with a 60ms debounce window (matching

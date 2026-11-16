@@ -3,7 +3,7 @@
 // Exercises the standalone Favorites surface: empty/populated local + online
 // buckets, search filtering (match + no-match), row playback, and the inline
 // favorite toggle.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';

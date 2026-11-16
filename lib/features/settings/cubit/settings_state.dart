@@ -1,6 +1,7 @@
 // lib/features/settings/cubit/settings_state.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../domain/models/audio_output_info.dart';
 import '../../../domain/models/ytm_audio_quality.dart';
@@ -43,8 +44,9 @@ enum AppButtonStyle {
   rectangular,
   capsule;
 
-  static AppButtonStyle fromName(String? name) => AppButtonStyle.values
-      .firstWhere((e) => e.name == name, orElse: () => AppButtonStyle.rectangular);
+  static AppButtonStyle fromName(String? name) =>
+      AppButtonStyle.values.firstWhere((e) => e.name == name,
+          orElse: () => AppButtonStyle.rectangular);
 }
 
 enum MiniPlayerSwipeAction { next, prev, volume, none }
@@ -88,8 +90,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(true) bool resumeAfterInterruption,
     @Default(false) bool waveformSeekBarEnabled,
     @Default(AppThemeMode.dark) AppThemeMode themeMode,
-    @Default(VisualDensityMode.comfortable)
-    VisualDensityMode visualDensityMode,
+    @Default(VisualDensityMode.comfortable) VisualDensityMode visualDensityMode,
     @Default(false) bool autoThemeByTime,
     @Default(false) bool highContrast,
     // Eye comfort: when true, peak white text is softened (dim white point)
@@ -166,7 +167,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool dsdDopSupported,
     AudioOutputInfo? currentOutputDevice,
     int? scanResultCount,
-    String? errorMessage,
+    AppError? error,
     // DSP & Sound Quality
     @Default(false) bool crossfeedEnabled,
     @Default(350.0) double crossfeedDelayUs,
@@ -233,6 +234,9 @@ abstract class SettingsState with _$SettingsState {
     // Whether Canvas is rendered as full-screen ambient backdrop (true) or inside album art card (false).
     @Default(false) bool canvasAsBackdrop,
   }) = _SettingsState;
+
+  /// Display copy for the typed failure (existing UI contract).
+  String? get errorMessage => error?.userMessage;
 
   // FIX-L3: Cache Color object for customAccentColorValue to avoid re-instantiating on every getter call
   static final Map<int, Color> _colorCache = {};

@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/bit_perfect_conflict_dialog.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/audio_feature_info.dart';
@@ -10,6 +10,7 @@ import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 
+import '../../../../core/errors/app_error.dart';
 class _Conflict {
   const _Conflict(this.label, this.disable);
   final String label;
@@ -59,7 +60,7 @@ Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
     codec: currentSong?.codec,
   );
   if (sourceBlock != null) {
-    settings.safeEmit(settings.state.copyWith(errorMessage: sourceBlock));
+    settings.safeEmit(settings.state.copyWith(error: uiError(sourceBlock)));
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
       SnackBar(
         content: Text(sourceBlock),

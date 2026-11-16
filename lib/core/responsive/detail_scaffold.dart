@@ -1,5 +1,5 @@
 // lib/core/responsive/detail_scaffold.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../constants/app_spacing.dart';
 import '../theme/aura_theme.dart';
 import '../widgets/pulsr_back_button.dart';

@@ -1,9 +1,10 @@
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/library/presentation/widgets/genre_hierarchy_view.dart';
 import 'package:pulsr/features/sheets/sort_filter_sheet.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 void main() {

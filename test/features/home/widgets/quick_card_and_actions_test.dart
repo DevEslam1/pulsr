@@ -2,7 +2,7 @@
 // tap, the compact-width styling branch, and the three QuickActionsRow layouts
 // (short-height horizontal strip, narrow 3-card two-row stack, and the
 // standard equal-width row).
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/home/presentation/widgets/quick_actions_row.dart';

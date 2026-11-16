@@ -1,5 +1,5 @@
 // lib/features/smart_playlist_builder/smart_playlist_builder_screen.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
@@ -20,6 +20,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../core/utils/pulsr_haptics.dart';
+
 class SmartPlaylistBuilderScreen extends StatelessWidget {
   final PlaylistsTableData? initialPlaylist;
 

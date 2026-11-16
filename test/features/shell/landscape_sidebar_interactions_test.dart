@@ -2,7 +2,7 @@
 // badge counts (incl. the 99+ clamp), the compact/icon-only peek lifecycle,
 // the now-playing bottom tile (expanded + collapsed), the side-inspector
 // shortcut and the collapse/expand triggers.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -13,6 +13,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/shell/presentation/widgets/landscape_sidebar.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 const SongsTableData _song = SongsTableData(
@@ -63,7 +64,7 @@ void main() {
       child: MediaQuery(
         data: MediaQueryData(size: size),
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: LandscapeSidebar(

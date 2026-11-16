@@ -1,6 +1,6 @@
 import 'package:pulsr/core/widgets/pulsr_key_value.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/di/injection.dart';

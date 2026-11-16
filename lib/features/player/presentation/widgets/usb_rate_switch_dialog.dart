@@ -1,5 +1,5 @@
 // lib/features/player/presentation/widgets/usb_rate_switch_dialog.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';

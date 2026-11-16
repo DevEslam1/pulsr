@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/widgets/throttled_slider.dart';
 
@@ -74,7 +74,8 @@ void main() {
       sliderValue = 0.25;
     });
     await tester.pump();
-    expect(tester.widget<Slider>(find.byType(Slider)).value, closeTo(0.25, 1e-6));
+    expect(
+        tester.widget<Slider>(find.byType(Slider)).value, closeTo(0.25, 1e-6));
 
     await gesture.up();
     await tester.pump();

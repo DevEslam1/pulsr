@@ -1,6 +1,6 @@
 // lib/features/player/presentation/themes/cassette_player_theme.dart
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../widgets/audio_visualizer.dart';

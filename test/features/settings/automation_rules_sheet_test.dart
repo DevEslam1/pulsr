@@ -3,7 +3,7 @@
 // gate and the dismiss-to-delete + undo flow.
 import 'dart:convert';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
@@ -15,6 +15,7 @@ import 'package:pulsr/features/settings/presentation/widgets/automation_rules_sh
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockAutomationRulesService extends Mock
     implements AutomationRulesService {}
 
@@ -43,7 +44,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(body: AutomationRulesSheet()),
       ),
@@ -69,7 +70,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: Builder(

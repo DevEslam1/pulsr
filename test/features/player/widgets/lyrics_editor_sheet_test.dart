@@ -1,7 +1,7 @@
 // test/features/player/widgets/lyrics_editor_sheet_test.dart
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -14,6 +14,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'player_sheet_test_support.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 /// Hosts the sheet above a two-route navigator so `Navigator.pop()` inside the
 /// Save handler has a route to return to. The Provider is installed inside the
 /// sheet route itself so the pushed route reliably sees it.
@@ -23,7 +24,7 @@ Widget lyricsHost({
 }) {
   return MaterialApp(
     theme: AuraTheme.darkTheme,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Navigator(
       onGenerateInitialRoutes: (_, __) => [

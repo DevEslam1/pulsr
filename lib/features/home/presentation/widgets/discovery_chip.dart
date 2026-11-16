@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/theme/pulsr_button_style.dart';

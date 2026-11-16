@@ -1,5 +1,5 @@
 // lib/core/widgets/artwork_placeholder.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../theme/aura_theme.dart';
 import 'waveform_logo.dart';
 import 'package:pulsr/core/constants/app_radii.dart';

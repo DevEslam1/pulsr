@@ -4,7 +4,7 @@
 // GoRouter (the screens use `context.push`/`GoRouter.of` directly), the Aura
 // theme so `context.palette` resolves, and the generated localizations so
 // `context.l10n` resolves. Callers pass the BlocProviders the screen reads.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -14,6 +14,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 /// A PlayerCubit stub that always reports [state] and yields no state events.
@@ -92,7 +93,7 @@ Widget screenHarness({
     child: MaterialApp.router(
       theme: AuraTheme.darkTheme,
       locale: locale,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,
     ),

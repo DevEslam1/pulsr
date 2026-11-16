@@ -2,7 +2,7 @@
 // non-attached short-circuit, disabled (no UAC volume) rendering, the hardware
 // volume slider commit, permission grant/deny on enable, exclusive claim and
 // the bit-perfect streaming start/failure paths.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +18,9 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 import 'support/settings_section_harness.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -151,7 +154,7 @@ void main() {
         value: player,
         child: MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: SingleChildScrollView(
@@ -270,7 +273,7 @@ void main() {
     when(() => cubit.state).thenAnswer((_) => state);
     when(() => cubit.setBitPerfectOutput(true)).thenAnswer((_) async {
       modeRequests.add(true);
-      state = state.copyWith(errorMessage: 'claim_failed');
+      state = state.copyWith(error: uiError('claim_failed'));
     });
 
     await tester.tap(find.text(l10n.settingsUsbBitPerfectStreaming));

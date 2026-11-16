@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -18,6 +18,7 @@ import '../nav_destinations.dart';
 import 'package:pulsr/features/command_palette/presentation/command_palette_sheet.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// The 4 navigation rail display modes based on screen width/posture.
 enum SidebarRailMode {
   hidden,
@@ -270,7 +271,8 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                           }
                                         },
                                         onLongPress: item.index == 2
-                                            ? () => CommandPaletteSheet.show(context)
+                                            ? () => CommandPaletteSheet.show(
+                                                context)
                                             : null,
                                       ),
                                       const SizedBox(height: AppSpacing.xxs),
@@ -311,7 +313,8 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
                                           }
                                         },
                                         onLongPress: item.index == 2
-                                            ? () => CommandPaletteSheet.show(context)
+                                            ? () => CommandPaletteSheet.show(
+                                                context)
                                             : null,
                                       ),
                                       const SizedBox(height: AppSpacing.xxs),

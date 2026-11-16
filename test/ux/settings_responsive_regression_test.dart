@@ -1,5 +1,5 @@
 // test/settings_screen_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,13 +16,28 @@ import 'package:pulsr/features/settings/presentation/settings_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockAuthCubit extends Mock implements AuthCubit {}
 
+/// Fonts are loaded once for the whole file: loading them per test schedules a
+/// SystemFontsChange relayout that can outlive the disposed widget tree under
+/// Flutter's test binding.
+Future<void> _loadFonts() async {
+  await (FontLoader('Manrope')
+        ..addFont(rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf')))
+      .load();
+  await (FontLoader('MaterialIcons')
+        ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+      .load();
+}
+
 void main() {
+  setUpAll(_loadFonts);
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   late MockMediaScannerService mockScanner;
@@ -86,7 +101,7 @@ void main() {
                 textScaler: TextScaler.linear(textScale),
                 viewInsets: EdgeInsets.only(bottom: keyboard)),
             child: child!),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const SettingsScreen(),
       ),
@@ -115,13 +130,6 @@ void main() {
             tester.view.resetPhysicalSize();
             tester.view.resetDevicePixelRatio();
           });
-          await (FontLoader('Manrope')
-                ..addFont(rootBundle
-                    .load('assets/fonts/Manrope-VariableFont_wght.ttf')))
-              .load();
-          await (FontLoader('MaterialIcons')
-                ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
-              .load();
           await tester.pumpWidget(buildTestScreen(scale, locale, 0));
           await tester.pump();
           await tester.pump(const Duration(milliseconds: 350));

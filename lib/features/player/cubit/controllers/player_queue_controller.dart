@@ -23,6 +23,7 @@ import '../player_state.dart';
 import '../queue_slot_codec.dart';
 import 'queue_slot_data.dart';
 
+import '../../../../core/errors/app_error.dart';
 part 'player_queue_playback.dart';
 part 'player_queue_slots.dart';
 part 'player_queue_warming.dart';
@@ -38,7 +39,8 @@ class PlayerQueueController {
         .toLowerCase()
         .replaceAll(
             RegExp(r'[\(\[\{].*?[\)\]\}]'), '') // remove parenthesized content
-        .replaceAll(RegExp(r'[\p{P}\p{S}\s]+', unicode: true), '') // strip punctuation, symbols & whitespace
+        .replaceAll(RegExp(r'[\p{P}\p{S}\s]+', unicode: true),
+            '') // strip punctuation, symbols & whitespace
         .trim();
   }
 

@@ -10,7 +10,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:clock/clock.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -59,6 +59,7 @@ import '../helpers/detail_screen_harness.dart' as detail_h;
 import '../helpers/screen_harness.dart' as scr_h;
 import '../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockYtmService extends Mock implements YtmService {}
 
 class _MockYtmAccount extends Mock implements YtmAccountService {}
@@ -328,7 +329,7 @@ void main() {
           child: MaterialApp(
             theme: AuraTheme.darkTheme,
             locale: arLocale,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: const SettingsScreen(),
           ),

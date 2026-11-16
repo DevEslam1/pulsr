@@ -1,5 +1,5 @@
 import 'dart:ui';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
@@ -18,6 +18,7 @@ import 'package:pulsr/features/command_palette/presentation/command_palette_shee
 import 'nav_destinations.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class PulsrBottomNavBar extends StatefulWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
@@ -300,11 +301,14 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                             iconOnly: widget.iconOnly,
                                             onTap: () => widget.onTap(i),
                                             onLongPress: i == 2
-                                                ? () => (widget.onLongPress != null
+                                                ? () => (widget.onLongPress !=
+                                                        null
                                                     ? widget.onLongPress!(i)
-                                                    : CommandPaletteSheet.show(context))
+                                                    : CommandPaletteSheet.show(
+                                                        context))
                                                 : (widget.onLongPress != null
-                                                    ? () => widget.onLongPress!(i)
+                                                    ? () =>
+                                                        widget.onLongPress!(i)
                                                     : null),
                                           ),
                                         ),
@@ -470,71 +474,70 @@ class _NavTabItem extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                          // Selection LED capsule: grows and lights up when active.
-                          AnimatedContainer(
-                            duration: context.motionMs(220),
-                            curve: context.motionCurve(Curves.easeOutCubic),
-                            height: 2.2,
-                            width: isSelected ? 18 : 5,
-                            margin:
-                                const EdgeInsets.only(bottom: AppSpacing.s2),
-                            decoration: BoxDecoration(
+                        // Selection LED capsule: grows and lights up when active.
+                        AnimatedContainer(
+                          duration: context.motionMs(220),
+                          curve: context.motionCurve(Curves.easeOutCubic),
+                          height: 2.2,
+                          width: isSelected ? 18 : 5,
+                          margin: const EdgeInsets.only(bottom: AppSpacing.s2),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? p.accent
+                                : p.textTertiary.withValues(alpha: 0.22),
+                            borderRadius: AppRadii.r2All,
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: p.accent.withValues(alpha: 0.55),
+                                      blurRadius: 6,
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                        ),
+                        AnimatedScale(
+                          scale: isSelected ? 1.08 : 1.0,
+                          duration: context.motionMs(220),
+                          curve: context.motionCurve(Curves.easeOutBack),
+                          child: Icon(
+                            isSelected ? item.activeIcon : item.icon,
+                            size: iconSize,
+                            color: isSelected ? p.accent : p.textTertiary,
+                          ),
+                        ),
+                        const SizedBox(height: 1.5),
+                        Flexible(
+                          child: AnimatedDefaultTextStyle(
+                            duration: context.motionMs(200),
+                            style: TextStyle(
+                              fontSize: isTablet
+                                  ? AppFontSize.label
+                                  : AppFontSize.caption,
+                              height: 1.1,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
                               color: isSelected
                                   ? p.accent
-                                  : p.textTertiary.withValues(alpha: 0.22),
-                              borderRadius: AppRadii.r2All,
-                              boxShadow: isSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: p.accent.withValues(alpha: 0.55),
-                                        blurRadius: 6,
-                                      ),
-                                    ]
-                                  : null,
+                                  : p.textTertiary.withValues(alpha: 0.85),
+                              letterSpacing: isRtl ? 0 : AppTracking.label,
+                              fontFamily: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.fontFamily,
                             ),
-                          ),
-                          AnimatedScale(
-                            scale: isSelected ? 1.08 : 1.0,
-                            duration: context.motionMs(220),
-                            curve: context.motionCurve(Curves.easeOutBack),
-                            child: Icon(
-                              isSelected ? item.activeIcon : item.icon,
-                              size: iconSize,
-                              color: isSelected ? p.accent : p.textTertiary,
-                            ),
-                          ),
-                          const SizedBox(height: 1.5),
-                          Flexible(
-                            child: AnimatedDefaultTextStyle(
-                              duration: context.motionMs(200),
-                              style: TextStyle(
-                                fontSize: isTablet
-                                    ? AppFontSize.label
-                                    : AppFontSize.caption,
-                                height: 1.1,
-                                fontWeight: isSelected
-                                    ? FontWeight.w800
-                                    : FontWeight.w500,
-                                color: isSelected
-                                    ? p.accent
-                                    : p.textTertiary.withValues(alpha: 0.85),
-                                letterSpacing: isRtl ? 0 : AppTracking.label,
-                                fontFamily: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.fontFamily,
-                              ),
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                  item.label,
-                                  maxLines: 1,
-                                ),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                item.label,
+                                maxLines: 1,
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ),

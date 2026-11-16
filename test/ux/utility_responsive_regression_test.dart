@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +18,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockLibrary extends Mock implements LibraryCubit {}
 
 class MockPlayer extends Mock implements PlayerCubit {}
@@ -26,7 +27,21 @@ class MockSettings extends Mock implements SettingsCubit {}
 
 class MockSync extends Mock implements CloudSyncService {}
 
+/// Fonts are loaded once for the whole file: loading them per test schedules a
+/// SystemFontsChange relayout that can outlive the disposed widget tree under
+/// Flutter's test binding.
+Future<void> _loadFonts() async {
+  await (FontLoader('Manrope')
+        ..addFont(rootBundle.load('assets/fonts/Manrope-VariableFont_wght.ttf')))
+      .load();
+  await (FontLoader('MaterialIcons')
+        ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+      .load();
+}
+
 void main() {
+  setUpAll(_loadFonts);
+
   for (final size in [
     const Size(320, 568),
     const Size(844, 390),
@@ -53,13 +68,6 @@ void main() {
               tester.view.resetPhysicalSize();
               tester.view.resetDevicePixelRatio();
             });
-            await (FontLoader('Manrope')
-                  ..addFont(rootBundle
-                      .load('assets/fonts/Manrope-VariableFont_wght.ttf')))
-                .load();
-            await (FontLoader('MaterialIcons')
-                  ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
-                .load();
             final library = MockLibrary();
             final player = MockPlayer();
             final settings = MockSettings();
@@ -92,7 +100,7 @@ void main() {
                     theme: AuraTheme.darkTheme,
                     locale: locale,
                     localizationsDelegates:
-                        AppLocalizations.localizationsDelegates,
+                        appLocalizationsDelegates,
                     supportedLocales: AppLocalizations.supportedLocales,
                     builder: (context, child) => MediaQuery(
                         data: MediaQuery.of(context)

@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/download_settings_tiles.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';

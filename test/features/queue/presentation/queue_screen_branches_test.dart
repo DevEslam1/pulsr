@@ -1,7 +1,7 @@
 // QueueScreen branch coverage: every overflow-menu action (clear/undo,
 // shuffle, auto-mix in all its exits, save-as-playlist success + failure),
 // reordering, and the current/remote row decorations.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';

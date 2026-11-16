@@ -4,7 +4,7 @@
 // home suite only asserts that EmptyLibrary is present, not its behaviour.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +15,7 @@ import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/features/home/presentation/widgets/empty_library.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockScanner extends Mock implements MediaScannerService {}
 
 void main() {
@@ -67,7 +68,7 @@ void main() {
 
     return MaterialApp.router(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,
     );

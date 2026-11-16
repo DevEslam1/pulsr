@@ -3,7 +3,7 @@
 // Drives the WHO sound-dose gauge against a stubbed AudioEffectsChannel:
 // loading -> dose states (optimal / high / limiter active), the safety toggle,
 // and the reset-dose confirmation flow.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/channels.dart';
@@ -14,6 +14,7 @@ import 'package:pulsr/features/settings/presentation/widgets/headphone_safety_sh
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final l10n = lookupAppLocalizations(const Locale('en'));
@@ -78,7 +79,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(body: HeadphoneSafetySheet()),
       ),

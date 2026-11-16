@@ -17,9 +17,9 @@ T _$identity<T>(T value) => value;
 mixin _$AuthState {
   AuthStatus get status;
   User? get user;
-  String? get errorMessage;
+  AppError? get error;
   SyncStatus get syncStatus;
-  String? get syncError;
+  AppError? get syncError;
   DateTime? get lastSyncedAt;
 
   /// Create a copy of AuthState
@@ -38,8 +38,8 @@ mixin _$AuthState {
             (identical(other.status, _this.status) ||
                 other.status == _this.status) &&
             (identical(other.user, _this.user) || other.user == _this.user) &&
-            (identical(other.errorMessage, _this.errorMessage) ||
-                other.errorMessage == _this.errorMessage) &&
+            (identical(other.error, _this.error) ||
+                other.error == _this.error) &&
             (identical(other.syncStatus, _this.syncStatus) ||
                 other.syncStatus == _this.syncStatus) &&
             (identical(other.syncError, _this.syncError) ||
@@ -51,20 +51,14 @@ mixin _$AuthState {
   @override
   int get hashCode {
     final _this = this as AuthState;
-    return Object.hash(
-        runtimeType,
-        _this.status,
-        _this.user,
-        _this.errorMessage,
-        _this.syncStatus,
-        _this.syncError,
-        _this.lastSyncedAt);
+    return Object.hash(runtimeType, _this.status, _this.user, _this.error,
+        _this.syncStatus, _this.syncError, _this.lastSyncedAt);
   }
 
   @override
   String toString() {
     final _this = this as AuthState;
-    return 'AuthState(status: ${_this.status}, user: ${_this.user}, errorMessage: ${_this.errorMessage}, syncStatus: ${_this.syncStatus}, syncError: ${_this.syncError}, lastSyncedAt: ${_this.lastSyncedAt})';
+    return 'AuthState(status: ${_this.status}, user: ${_this.user}, error: ${_this.error}, syncStatus: ${_this.syncStatus}, syncError: ${_this.syncError}, lastSyncedAt: ${_this.lastSyncedAt})';
   }
 }
 
@@ -76,9 +70,9 @@ abstract mixin class $AuthStateCopyWith<$Res> {
   $Res call(
       {AuthStatus status,
       User? user,
-      String? errorMessage,
+      AppError? error,
       SyncStatus syncStatus,
-      String? syncError,
+      AppError? syncError,
       DateTime? lastSyncedAt});
 }
 
@@ -96,7 +90,7 @@ class _$AuthStateCopyWithImpl<$Res> implements $AuthStateCopyWith<$Res> {
   $Res call({
     Object? status = null,
     Object? user = freezed,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
     Object? syncStatus = null,
     Object? syncError = freezed,
     Object? lastSyncedAt = freezed,
@@ -110,10 +104,10 @@ class _$AuthStateCopyWithImpl<$Res> implements $AuthStateCopyWith<$Res> {
           ? _self.user
           : user // ignore: cast_nullable_to_non_nullable
               as User?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
       syncStatus: null == syncStatus
           ? _self.syncStatus
           : syncStatus // ignore: cast_nullable_to_non_nullable
@@ -121,7 +115,7 @@ class _$AuthStateCopyWithImpl<$Res> implements $AuthStateCopyWith<$Res> {
       syncError: freezed == syncError
           ? _self.syncError
           : syncError // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as AppError?,
       lastSyncedAt: freezed == lastSyncedAt
           ? _self.lastSyncedAt
           : lastSyncedAt // ignore: cast_nullable_to_non_nullable
@@ -223,16 +217,16 @@ extension AuthStatePatterns on AuthState {
 
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(AuthStatus status, User? user, String? errorMessage,
-            SyncStatus syncStatus, String? syncError, DateTime? lastSyncedAt)?
+    TResult Function(AuthStatus status, User? user, AppError? error,
+            SyncStatus syncStatus, AppError? syncError, DateTime? lastSyncedAt)?
         $default, {
     required TResult orElse(),
   }) {
     final _that = this;
     switch (_that) {
       case _AuthState() when $default != null:
-        return $default(_that.status, _that.user, _that.errorMessage,
-            _that.syncStatus, _that.syncError, _that.lastSyncedAt);
+        return $default(_that.status, _that.user, _that.error, _that.syncStatus,
+            _that.syncError, _that.lastSyncedAt);
       case _:
         return orElse();
     }
@@ -253,15 +247,15 @@ extension AuthStatePatterns on AuthState {
 
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(AuthStatus status, User? user, String? errorMessage,
-            SyncStatus syncStatus, String? syncError, DateTime? lastSyncedAt)
+    TResult Function(AuthStatus status, User? user, AppError? error,
+            SyncStatus syncStatus, AppError? syncError, DateTime? lastSyncedAt)
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _AuthState():
-        return $default(_that.status, _that.user, _that.errorMessage,
-            _that.syncStatus, _that.syncError, _that.lastSyncedAt);
+        return $default(_that.status, _that.user, _that.error, _that.syncStatus,
+            _that.syncError, _that.lastSyncedAt);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -281,15 +275,15 @@ extension AuthStatePatterns on AuthState {
 
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(AuthStatus status, User? user, String? errorMessage,
-            SyncStatus syncStatus, String? syncError, DateTime? lastSyncedAt)?
+    TResult? Function(AuthStatus status, User? user, AppError? error,
+            SyncStatus syncStatus, AppError? syncError, DateTime? lastSyncedAt)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _AuthState() when $default != null:
-        return $default(_that.status, _that.user, _that.errorMessage,
-            _that.syncStatus, _that.syncError, _that.lastSyncedAt);
+        return $default(_that.status, _that.user, _that.error, _that.syncStatus,
+            _that.syncError, _that.lastSyncedAt);
       case _:
         return null;
     }
@@ -302,7 +296,7 @@ class _AuthState extends AuthState {
   const _AuthState(
       {this.status = AuthStatus.initial,
       this.user,
-      this.errorMessage,
+      this.error,
       this.syncStatus = SyncStatus.idle,
       this.syncError,
       this.lastSyncedAt})
@@ -314,12 +308,12 @@ class _AuthState extends AuthState {
   @override
   final User? user;
   @override
-  final String? errorMessage;
+  final AppError? error;
   @override
   @JsonKey()
   final SyncStatus syncStatus;
   @override
-  final String? syncError;
+  final AppError? syncError;
   @override
   final DateTime? lastSyncedAt;
 
@@ -338,8 +332,7 @@ class _AuthState extends AuthState {
             other is _AuthState &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.user, user) || other.user == user) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage) &&
+            (identical(other.error, error) || other.error == error) &&
             (identical(other.syncStatus, syncStatus) ||
                 other.syncStatus == syncStatus) &&
             (identical(other.syncError, syncError) ||
@@ -350,13 +343,13 @@ class _AuthState extends AuthState {
 
   @override
   int get hashCode {
-    return Object.hash(runtimeType, status, user, errorMessage, syncStatus,
-        syncError, lastSyncedAt);
+    return Object.hash(
+        runtimeType, status, user, error, syncStatus, syncError, lastSyncedAt);
   }
 
   @override
   String toString() {
-    return 'AuthState(status: $status, user: $user, errorMessage: $errorMessage, syncStatus: $syncStatus, syncError: $syncError, lastSyncedAt: $lastSyncedAt)';
+    return 'AuthState(status: $status, user: $user, error: $error, syncStatus: $syncStatus, syncError: $syncError, lastSyncedAt: $lastSyncedAt)';
   }
 }
 
@@ -371,9 +364,9 @@ abstract mixin class _$AuthStateCopyWith<$Res>
   $Res call(
       {AuthStatus status,
       User? user,
-      String? errorMessage,
+      AppError? error,
       SyncStatus syncStatus,
-      String? syncError,
+      AppError? syncError,
       DateTime? lastSyncedAt});
 }
 
@@ -391,7 +384,7 @@ class __$AuthStateCopyWithImpl<$Res> implements _$AuthStateCopyWith<$Res> {
   $Res call({
     Object? status = null,
     Object? user = freezed,
-    Object? errorMessage = freezed,
+    Object? error = freezed,
     Object? syncStatus = null,
     Object? syncError = freezed,
     Object? lastSyncedAt = freezed,
@@ -405,10 +398,10 @@ class __$AuthStateCopyWithImpl<$Res> implements _$AuthStateCopyWith<$Res> {
           ? _self.user
           : user // ignore: cast_nullable_to_non_nullable
               as User?,
-      errorMessage: freezed == errorMessage
-          ? _self.errorMessage
-          : errorMessage // ignore: cast_nullable_to_non_nullable
-              as String?,
+      error: freezed == error
+          ? _self.error
+          : error // ignore: cast_nullable_to_non_nullable
+              as AppError?,
       syncStatus: null == syncStatus
           ? _self.syncStatus
           : syncStatus // ignore: cast_nullable_to_non_nullable
@@ -416,7 +409,7 @@ class __$AuthStateCopyWithImpl<$Res> implements _$AuthStateCopyWith<$Res> {
       syncError: freezed == syncError
           ? _self.syncError
           : syncError // ignore: cast_nullable_to_non_nullable
-              as String?,
+              as AppError?,
       lastSyncedAt: freezed == lastSyncedAt
           ? _self.lastSyncedAt
           : lastSyncedAt // ignore: cast_nullable_to_non_nullable

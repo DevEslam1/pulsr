@@ -1,6 +1,6 @@
 // test/remediation_tranche_audit_test.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/bloc/base_cubit.dart';
 import 'package:pulsr/core/constants/app_timing.dart';
@@ -9,7 +9,8 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/cubit/queue_slot_codec.dart';
 import 'package:pulsr/features/library/presentation/widgets/genre_hierarchy_view.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class _TestPulsrCubit extends PulsrCubit<int> {

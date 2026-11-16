@@ -4,7 +4,7 @@ import 'package:pulsr/domain/models/audio_effects_config.dart';
 // Not a test file (no `_test` suffix): provides mocktail mocks, a canonical
 // [SongsTableData], and a host widget that wires up localization, the Aura
 // theme, and optional PlayerCubit/SettingsCubit providers.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
@@ -16,6 +16,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -62,7 +63,9 @@ const SongsTableData ytSong = SongsTableData(
 );
 
 /// Builds a [MockPlayerCubit] with the minimum stubs every sheet touches.
-class _FakeMbcBandConfig extends Fake implements MultibandCompressorBandConfig {}
+class _FakeMbcBandConfig extends Fake
+    implements MultibandCompressorBandConfig {}
+
 bool _fallbacksRegistered = false;
 void _ensureFallbacks() {
   if (!_fallbacksRegistered) {
@@ -70,6 +73,7 @@ void _ensureFallbacks() {
     registerFallbackValue(_FakeMbcBandConfig());
   }
 }
+
 MockPlayerCubit stubPlayerCubit({
   PlayerState? state,
   Stream<Duration>? positionStream,
@@ -81,19 +85,18 @@ MockPlayerCubit stubPlayerCubit({
   when(() => cubit.rawPositionStream)
       .thenAnswer((_) => positionStream ?? const Stream<Duration>.empty());
   when(() => cubit.setLookaheadLimiter(any(),
-          thresholdDb: any(named: 'thresholdDb'),
-          releaseMs: any(named: 'releaseMs')))
-      .thenAnswer((_) async => true);
+      thresholdDb: any(named: 'thresholdDb'),
+      releaseMs: any(named: 'releaseMs'))).thenAnswer((_) async => true);
   when(() => cubit.setCompressorParams(
-          thresholdDb: any(named: 'thresholdDb'),
-          ratio: any(named: 'ratio'),
-          attackMs: any(named: 'attackMs'),
-          releaseMs: any(named: 'releaseMs'),
-          makeupGainDb: any(named: 'makeupGainDb')))
-      .thenAnswer((_) async => true);
+      thresholdDb: any(named: 'thresholdDb'),
+      ratio: any(named: 'ratio'),
+      attackMs: any(named: 'attackMs'),
+      releaseMs: any(named: 'releaseMs'),
+      makeupGainDb: any(named: 'makeupGainDb'))).thenAnswer((_) async => true);
   when(() => cubit.setMultibandCompressor(any(),
-          f0: any(named: 'f0'), f1: any(named: 'f1'), f2: any(named: 'f2')))
-      .thenAnswer((_) async => true);
+      f0: any(named: 'f0'),
+      f1: any(named: 'f1'),
+      f2: any(named: 'f2'))).thenAnswer((_) async => true);
   when(() => cubit.setMultibandCompressorBand(any(), any()))
       .thenAnswer((_) async => true);
   return cubit;
@@ -116,7 +119,7 @@ Widget sheetHost({
 }) {
   return MaterialApp(
     theme: AuraTheme.darkTheme,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: MultiBlocProvider(

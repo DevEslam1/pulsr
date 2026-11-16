@@ -1,5 +1,5 @@
 // lib/features/playlists/presentation/widgets/spotify_import_dialog.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 

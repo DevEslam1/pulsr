@@ -10603,4 +10603,43 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get coachMarkDockSwipeBody =>
       'Desliza hacia arriba en el mini reproductor o mantén presionado para personalizar los modos de acoplamiento.';
+
+  @override
+  String get databaseHealth => 'Salud de la base de datos';
+
+  @override
+  String get databaseHealthChecking => 'Comprobando…';
+
+  @override
+  String get databaseHealthHealthy => 'Correcta';
+
+  @override
+  String get databaseHealthIssues => 'Problemas detectados';
+
+  @override
+  String databaseHealthEncryption(String state) {
+    return 'Cifrado: $state';
+  }
+
+  @override
+  String get databaseEncryptionEncrypted => 'Cifrada';
+
+  @override
+  String get databaseEncryptionPlaintext => 'Texto plano';
+
+  @override
+  String get databaseEncryptionUnavailable => 'No disponible';
+
+  @override
+  String get databaseEncryptionDisabled => 'Desactivado';
+
+  @override
+  String get databaseHealthRepairSearch => 'Reparar índice de búsqueda';
+
+  @override
+  String get databaseHealthSearchRepaired => 'Índice de búsqueda reparado';
+
+  @override
+  String get databaseHealthSearchRepairFailed =>
+      'Error al reparar el índice de búsqueda';
 }

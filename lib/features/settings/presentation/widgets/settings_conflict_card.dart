@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/settings_conflict_card.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/theme/aura_theme.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';

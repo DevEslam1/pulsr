@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'breakpoints.dart';
 
 /// Layout mode for the main application shell based on screen tier and posture.

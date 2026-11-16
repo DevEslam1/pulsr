@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/widgets/marquee_text.dart';
 
 void main() {
-  testWidgets('MarqueeText renders and scrolls Arabic in RTL and English in LTR',
+  testWidgets(
+      'MarqueeText renders and scrolls Arabic in RTL and English in LTR',
       (tester) async {
     const arabicLong =
         'إذاعة الشيخ محمد صديق المنشاوي (تلاوات نادرة ومحافل خاشعة)';

@@ -1,6 +1,6 @@
 // lib/features/player/presentation/widgets/dsp_inspector_sheet.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';

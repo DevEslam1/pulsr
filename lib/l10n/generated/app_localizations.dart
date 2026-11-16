@@ -18493,6 +18493,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Swipe up on the mini player or long-press to customize docking modes.'**
   String get coachMarkDockSwipeBody;
+
+  /// Title of the database health diagnostics row
+  ///
+  /// In en, this message translates to:
+  /// **'Database Health'**
+  String get databaseHealth;
+
+  /// Shown while the database health check runs
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get databaseHealthChecking;
+
+  /// Database integrity is clean
+  ///
+  /// In en, this message translates to:
+  /// **'Healthy'**
+  String get databaseHealthHealthy;
+
+  /// Database integrity or encryption has a problem
+  ///
+  /// In en, this message translates to:
+  /// **'Issues detected'**
+  String get databaseHealthIssues;
+
+  /// Encryption-at-rest state of the library database
+  ///
+  /// In en, this message translates to:
+  /// **'Encryption: {state}'**
+  String databaseHealthEncryption(String state);
+
+  /// Database encryption is active
+  ///
+  /// In en, this message translates to:
+  /// **'Encrypted'**
+  String get databaseEncryptionEncrypted;
+
+  /// Database is not encrypted
+  ///
+  /// In en, this message translates to:
+  /// **'Plaintext'**
+  String get databaseEncryptionPlaintext;
+
+  /// This build has no SQLite encryption cipher
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get databaseEncryptionUnavailable;
+
+  /// Database encryption was disabled by build configuration
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get databaseEncryptionDisabled;
+
+  /// Action that rebuilds the full-text search index
+  ///
+  /// In en, this message translates to:
+  /// **'Repair search index'**
+  String get databaseHealthRepairSearch;
+
+  /// FTS repair succeeded
+  ///
+  /// In en, this message translates to:
+  /// **'Search index repaired'**
+  String get databaseHealthSearchRepaired;
+
+  /// FTS repair failed
+  ///
+  /// In en, this message translates to:
+  /// **'Search index repair failed'**
+  String get databaseHealthSearchRepairFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -1,6 +1,6 @@
 // lib/core/widgets/staggered_list_item.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../motion/pulsr_motion.dart';
 
 /// {@category DesignSystem}

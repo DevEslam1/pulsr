@@ -3,7 +3,7 @@
 // Exercises the Songs + Downloaded library tabs (mixins on LibraryScreen):
 // empty/loading rendering, populated list + grid, tap-to-play, long-press
 // selection, stream pre-warming and the A-Z quick-scroll rail.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/widgets/shimmer_skeleton.dart';

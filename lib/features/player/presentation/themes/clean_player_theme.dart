@@ -1,7 +1,7 @@
 // lib/features/player/presentation/themes/clean_player_theme.dart
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -835,10 +835,17 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
-              // Centered Lossless badge pill matching Apple Music
-              _CleanLosslessBadgePill(
-                song: widget.song,
-                activeColor: widget.activeColor,
+              // Centered Lossless badge pill matching Apple Music. It is the
+              // longest element in this row, so let it shrink under 200% text
+              // scaling instead of overflowing the timestamps.
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: _CleanLosslessBadgePill(
+                    song: widget.song,
+                    activeColor: widget.activeColor,
+                  ),
+                ),
               ),
               // Right timestamp (toggleable remaining time or duration)
               GestureDetector(

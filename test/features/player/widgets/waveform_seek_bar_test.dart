@@ -1,12 +1,13 @@
 // test/features/player/widgets/waveform_seek_bar_test.dart
 import 'dart:ui' as ui;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/player/presentation/widgets/waveform_seek_bar.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _BoundsRecordingCanvas extends Fake implements Canvas {
   final List<Rect> drawnBounds = <Rect>[];
   Rect? activeClip;
@@ -55,7 +56,7 @@ void main() {
 
   Widget host(Widget child) => MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: child),
       );

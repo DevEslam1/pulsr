@@ -1,6 +1,7 @@
 // test/features/downloads/download_quality_picker_sheet_test.dart
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/ytm_audio_quality.dart';
 import 'package:pulsr/features/downloads/presentation/widgets/download_quality_picker_sheet.dart';

@@ -9,6 +9,7 @@ import '../player_state.dart';
 import 'player_seek_throttle.dart';
 import 'queue_slot_data.dart';
 
+import '../../../../core/errors/app_error.dart';
 /// Owns audio transport controls: play, pause, seek, track skipping, shuffle, repeat, and favorite toggle.
 class PlayerTransportController {
   final PulsrAudioHandler _audioHandler;
@@ -65,7 +66,7 @@ class PlayerTransportController {
         final isPlaying = _audioHandler.playbackState.value.playing;
         _emit(s.copyWith(
             playback:
-                s.playback.copyWith(isPlaying: isPlaying, errorMessage: null)));
+                s.playback.copyWith(isPlaying: isPlaying, error: null)));
       }
     } catch (e, st) {
       ErrorLogger.log('Play failed',
@@ -74,7 +75,7 @@ class PlayerTransportController {
         final s = _getState();
         _emit(s.copyWith(
             playback:
-                s.playback.copyWith(errorMessage: 'Failed to start playback')));
+                s.playback.copyWith(error: uiError('Failed to start playback'))));
       }
     }
   }
@@ -96,7 +97,7 @@ class PlayerTransportController {
         _emit(s.copyWith(
           playback: s.playback.copyWith(
             isPlaying: prevState.isPlaying,
-            errorMessage: 'Failed to pause playback',
+            error: uiError('Failed to pause playback'),
           ),
         ));
       }
@@ -136,7 +137,7 @@ class PlayerTransportController {
         _emit(s.copyWith(
           playback: s.playback.copyWith(
             isPlaying: prevState.isPlaying,
-            errorMessage: 'Playback action failed',
+            error: uiError('Playback action failed'),
           ),
         ));
       }
@@ -157,7 +158,7 @@ class PlayerTransportController {
       if (!_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-            playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+            playback: s.playback.copyWith(error: uiError('Skip failed'))));
       }
     }
   }
@@ -195,7 +196,7 @@ class PlayerTransportController {
                 queueHistory: state.queueHistory,
               ),
               playback: s.playback
-                  .copyWith(errorMessage: 'Skip to previous failed')));
+                  .copyWith(error: uiError('Skip to previous failed'))));
         }
       }
       return;
@@ -209,7 +210,7 @@ class PlayerTransportController {
       if (!_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-            playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+            playback: s.playback.copyWith(error: uiError('Skip failed'))));
       }
     }
   }
@@ -226,7 +227,7 @@ class PlayerTransportController {
       if (!_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-            playback: s.playback.copyWith(errorMessage: 'Skip failed')));
+            playback: s.playback.copyWith(error: uiError('Skip failed'))));
       }
     }
   }
@@ -237,7 +238,7 @@ class PlayerTransportController {
     final next = !prev;
     _emit(state.copyWith(
         playback:
-            state.playback.copyWith(isShuffle: next, errorMessage: null)));
+            state.playback.copyWith(isShuffle: next, error: null)));
     try {
       await _audioHandler.setShuffleMode(
           next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
@@ -252,7 +253,7 @@ class PlayerTransportController {
         final s = _getState();
         _emit(s.copyWith(
             playback: s.playback
-                .copyWith(isShuffle: prev, errorMessage: 'Shuffle failed')));
+                .copyWith(isShuffle: prev, error: uiError('Shuffle failed'))));
       }
     }
   }
@@ -272,7 +273,7 @@ class PlayerTransportController {
     };
     _emit(state.copyWith(
         playback:
-            state.playback.copyWith(repeatMode: next, errorMessage: null)));
+            state.playback.copyWith(repeatMode: next, error: null)));
     try {
       await _audioHandler.setRepeatMode(nextMode);
       // See toggleShuffle: force a full widget push so the repeat icon reflects
@@ -285,7 +286,7 @@ class PlayerTransportController {
         final s = _getState();
         _emit(s.copyWith(
             playback: s.playback
-                .copyWith(repeatMode: prev, errorMessage: 'Repeat failed')));
+                .copyWith(repeatMode: prev, error: uiError('Repeat failed'))));
       }
     }
   }
@@ -316,7 +317,7 @@ class PlayerTransportController {
         (failure) {
           final s = _getState();
           _emit(s.copyWith(
-              playback: s.playback.copyWith(errorMessage: failure.message)));
+              playback: s.playback.copyWith(error: failure)));
         },
         (isFav) {
           // Mirror the favorite change to the media session / OS notification.
@@ -345,7 +346,7 @@ class PlayerTransportController {
               state.copyWith(
                 playback: state.playback.copyWith(
                   currentSong: updatedCurrent,
-                  errorMessage: null,
+                  error: null,
                 ),
                 queueSlice: state.queueSlice.copyWith(
                   queue: List<SongsTableData>.unmodifiable(updatedQueue),
@@ -358,7 +359,7 @@ class PlayerTransportController {
               queueSlice: state.queueSlice.copyWith(
                 queue: List<SongsTableData>.unmodifiable(updatedQueue),
               ),
-              playback: state.playback.copyWith(errorMessage: null),
+              playback: state.playback.copyWith(error: null),
             ));
           }
         },

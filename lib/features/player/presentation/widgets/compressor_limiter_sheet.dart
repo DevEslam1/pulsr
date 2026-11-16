@@ -2,7 +2,7 @@ import 'dart:async';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/widgets/throttled_slider.dart';
 // lib/features/player/presentation/widgets/compressor_limiter_sheet.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';

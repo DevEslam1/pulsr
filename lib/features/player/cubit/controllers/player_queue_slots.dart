@@ -397,7 +397,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
           currentIndex: state.currentIndex,
         ),
         playback: current.playback.copyWith(
-          errorMessage: 'Failed to reorder queue',
+          error: uiError('Failed to reorder queue'),
         ),
       ));
       _invalidateQueueSyncResolution();
@@ -587,7 +587,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       if (validSongs.isEmpty) {
         _emit(state.copyWith(
           playback:
-              state.playback.copyWith(errorMessage: 'Queue slot is empty'),
+              state.playback.copyWith(error: uiError('Queue slot is empty')),
         ));
         return;
       }
@@ -654,7 +654,7 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
               duration: state.duration,
               position: state.position,
               playbackSpeed: state.playbackSpeed,
-              errorMessage: 'Failed to switch queue slot',
+              error: uiError('Failed to switch queue slot'),
             ),
             lyricsSlice: state.lyricsSlice,
           ));
@@ -805,8 +805,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {
       _emit(state.copyWith(
         playback: state.playback.copyWith(
-            errorMessage:
-                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
+            error: uiError(
+                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more')),
       ));
       return;
     }
@@ -819,8 +819,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       if (!_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-          playback:
-              s.playback.copyWith(errorMessage: 'Failed to add ${song.title}'),
+          playback: s.playback
+              .copyWith(error: uiError('Failed to add ${song.title}')),
         ));
       }
       return;
@@ -886,8 +886,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     if (state.queue.length >= PlayerQueueController.maxQueueSize) {
       _emit(state.copyWith(
         playback: state.playback.copyWith(
-            errorMessage:
-                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
+            error: uiError(
+                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more')),
       ));
       return;
     }
@@ -900,8 +900,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       if (!_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-          playback:
-              s.playback.copyWith(errorMessage: 'Failed to add ${song.title}'),
+          playback: s.playback
+              .copyWith(error: uiError('Failed to add ${song.title}')),
         ));
       }
       return;
@@ -943,8 +943,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
     if (room <= 0) {
       _emit(state.copyWith(
         playback: state.playback.copyWith(
-            errorMessage:
-                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
+            error: uiError(
+                'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more')),
       ));
       return;
     }
@@ -963,8 +963,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       if (state.queue.length >= PlayerQueueController.maxQueueSize) {
         _emit(state.copyWith(
           playback: state.playback.copyWith(
-              errorMessage:
-                  'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more'),
+              error: uiError(
+                  'Queue full (${PlayerQueueController.maxQueueSize}) — cannot add more')),
         ));
       }
       return;
@@ -984,8 +984,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
       if (toAdd.isNotEmpty && !_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-          playback:
-              s.playback.copyWith(errorMessage: 'Failed to add songs to queue'),
+          playback: s.playback
+              .copyWith(error: uiError('Failed to add songs to queue')),
         ));
       }
       return;
@@ -1013,8 +1013,8 @@ extension PlayerQueueSlotsExtension on PlayerQueueController {
         trackTiers: updatedTiers,
       ),
       playback: s.playback.copyWith(
-        errorMessage: added.length < toAdd.length
-            ? 'Added ${added.length} of ${toAdd.length} songs'
+        error: added.length < toAdd.length
+            ? uiError('Added ${added.length} of ${toAdd.length} songs')
             : null,
       ),
     ));

@@ -1,5 +1,5 @@
 // lib/core/widgets/highlighted_text.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// {@category DesignSystem}
 /// A widget that renders [text] with substring occurrences of [query] highlighted

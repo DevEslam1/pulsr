@@ -3,15 +3,16 @@
 // Widget coverage for the desktop/tablet keyboard-shortcut reference sheet:
 // every shortcut row renders its key/description/icon, and the static [show]
 // helper opens it in a modal route above the hosting navigator.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/shell/presentation/widgets/shortcut_help_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 Widget host(Widget child) => MaterialApp(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: Scaffold(body: child),
     );

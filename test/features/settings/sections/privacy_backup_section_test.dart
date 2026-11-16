@@ -1,6 +1,6 @@
 // Covers lib/features/settings/presentation/sections/privacy_backup_section.dart
 // (backup + privacy entry points) and the privacy-guarantee sheet it opens.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/settings/presentation/widgets/backup_section.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';

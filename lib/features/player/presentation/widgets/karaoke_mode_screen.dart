@@ -1,7 +1,7 @@
 // lib/features/player/presentation/widgets/karaoke_mode_screen.dart
 import 'dart:async';
 import 'dart:math' as math;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/services/system_ui_controller.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -609,7 +609,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                           hasPrevious: state.hasPreviousNeighbour,
                           hasNext: state.hasNextNeighbour,
                           primaryColor: p.primary,
-                          mainButtonSize: isLandscape ? 46.0 : 56.0,
+                          mainButtonSize: isLandscape ? 48.0 : 56.0,
                           onPlayPause: () =>
                               context.read<PlayerCubit>().togglePlayPause(),
                           onNext: () => context.read<PlayerCubit>().next(),

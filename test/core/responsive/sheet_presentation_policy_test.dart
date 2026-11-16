@@ -2,7 +2,7 @@
 // Before this, PulsrSheetHelper kept bottom sheets on tablets while
 // PulsrAdaptiveSheet/PulsrResponsiveSheet opened centered dialogs, and the
 // readable content rail differed by up to 160dp between screens.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/responsive/detail_scaffold.dart';
 import 'package:pulsr/core/responsive/pulsr_layout_metrics.dart';

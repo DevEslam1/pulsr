@@ -1,11 +1,12 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../domain/models/download_task.dart';
 
 class DownloadsState {
   final Map<String, DownloadTask> tasks;
   final StorageStats storageStats;
   final bool isLoading;
-  final String? errorMessage;
+  final AppError? error;
 
   final List<DownloadTask>? _cachedTaskList;
 
@@ -13,9 +14,12 @@ class DownloadsState {
     this.tasks = const {},
     this.storageStats = const StorageStats(),
     this.isLoading = false,
-    this.errorMessage,
+    this.error,
     List<DownloadTask>? cachedTaskList,
   }) : _cachedTaskList = cachedTaskList;
+
+  /// Display copy for the typed failure (kept for the existing UI contract).
+  String? get errorMessage => error?.userMessage;
 
   List<DownloadTask> get taskList =>
       _cachedTaskList ??
@@ -31,8 +35,8 @@ class DownloadsState {
     Map<String, DownloadTask>? tasks,
     StorageStats? storageStats,
     bool? isLoading,
-    String? errorMessage,
-    bool clearErrorMessage = false,
+    AppError? error,
+    bool clearError = false,
     List<DownloadTask>? cachedTaskList,
   }) {
     final nextTasks = tasks ?? this.tasks;
@@ -45,8 +49,7 @@ class DownloadsState {
       tasks: nextTasks,
       storageStats: storageStats ?? this.storageStats,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      error: clearError ? null : (error ?? this.error),
       cachedTaskList: precomputedList,
     );
   }
@@ -57,7 +60,7 @@ class DownloadsState {
       other is DownloadsState &&
           runtimeType == other.runtimeType &&
           isLoading == other.isLoading &&
-          errorMessage == other.errorMessage &&
+          error == other.error &&
           storageStats == other.storageStats &&
           mapEquals(tasks, other.tasks);
 
@@ -68,6 +71,6 @@ class DownloadsState {
             tasks.entries.map((e) => Object.hash(e.key, e.value))),
         storageStats,
         isLoading,
-        errorMessage,
+        error,
       );
 }

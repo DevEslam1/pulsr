@@ -5,7 +5,7 @@
 // maintenance actions.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -22,6 +22,8 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/settings_section_harness.dart';
+
+import 'package:pulsr/core/errors/app_error.dart';
 
 class MockSecureStorage extends Mock implements FlutterSecureStorage {}
 
@@ -63,7 +65,7 @@ void main() {
       final cubit = make();
       addTearDown(cubit.close);
 
-      cubit.safeEmit(cubit.state.copyWith(errorMessage: 'nope'));
+      cubit.safeEmit(cubit.state.copyWith(error: uiError('nope')));
       cubit.clearError();
       expect(cubit.state.errorMessage, isNull);
 

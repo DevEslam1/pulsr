@@ -1,7 +1,7 @@
 // The reorder-undo snackbar outlives the queue screen on the root messenger.
 // Its action must use the cubit captured before the snackbar was shown, not a
 // lookup from the (possibly deactivated) screen context.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../helpers/screen_harness.dart';
 import '../../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -53,7 +54,7 @@ void main() {
 
     await tester.pumpWidget(MaterialApp.router(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,
     ));

@@ -5,6 +5,8 @@ import '../../../../core/utils/error_logger.dart';
 import '../player_state.dart';
 import 'dsp_slice_descriptors.dart';
 
+import '../../../../core/errors/app_error.dart';
+
 /// Reconciles a failed DSP attempt against its pre-attempt snapshot, restoring
 /// only the fields the attempt actually changed using table-driven descriptors.
 class DspRollbackPolicy {
@@ -63,7 +65,7 @@ class DspEffectApplier {
       final attemptedDsp = updateDsp(previousDsp);
       _emit(state.copyWith(
         dsp: attemptedDsp,
-        playback: state.playback.copyWith(errorMessage: null),
+        playback: state.playback.copyWith(error: null),
       ));
       try {
         await applyAudioHandler();
@@ -88,8 +90,8 @@ class DspEffectApplier {
         _emit(s.copyWith(
           dsp: rolledBackDsp,
           playback: s.playback.copyWith(
-            errorMessage: failureMessage ??
-                'Failed to set ${featureName.toLowerCase()}: $e',
+            error: uiError(failureMessage ??
+                'Failed to set ${featureName.toLowerCase()}: $e'),
           ),
         ));
         return false;

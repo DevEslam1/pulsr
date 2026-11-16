@@ -4,7 +4,7 @@
 // token ladder, hinge gaps, viewport computed tokens and adaptive-grid maths.
 import 'dart:ui' show DisplayFeature, DisplayFeatureState, DisplayFeatureType;
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/responsive/adaptive_grid.dart';
 import 'package:pulsr/core/responsive/breakpoints.dart';

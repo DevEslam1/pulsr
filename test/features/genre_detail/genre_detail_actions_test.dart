@@ -1,7 +1,7 @@
 // GenreDetailScreen action coverage: the shuffle button (as opposed to the
 // play-all path already covered) and the per-track overflow that opens
 // SongInfoSheet.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';

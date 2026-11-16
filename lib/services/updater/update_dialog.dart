@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../core/config/app_config.dart';
 import '../../core/utils/l10n_extensions.dart';
 import '../../core/constants/app_radii.dart';

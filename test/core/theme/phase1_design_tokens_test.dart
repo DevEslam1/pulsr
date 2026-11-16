@@ -1,5 +1,5 @@
 // test/core/theme/phase1_design_tokens_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/app_elevation.dart';
 import 'package:pulsr/core/theme/focus_tokens.dart';

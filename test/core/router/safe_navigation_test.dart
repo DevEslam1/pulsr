@@ -1,5 +1,5 @@
 // test/core/router/safe_navigation_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/router/safe_navigation.dart';
@@ -24,23 +24,21 @@ void main() {
 
     final home = tester.element(find.text('home'));
     expect(home.pushDebounced('/a'), isTrue, reason: 'first push proceeds');
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(milliseconds: 10));
 
     final a = tester.element(find.text('a'));
     expect(a.pushDebounced('/a'), isFalse,
         reason: 'identical destination inside the window is collapsed');
     expect(a.pushDebounced('/b'), isTrue,
         reason: 'a different destination is never blocked');
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(milliseconds: 10));
 
     final b = tester.element(find.text('b'));
-    // The debounce window is wall-clock based, not fake-async based, so the
-    // delay must run in the real async zone.
-    await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 700)));
+    // Advance the fake clock past the debounce timer.
+    await tester.pump(const Duration(milliseconds: 700));
     expect(b.pushDebounced('/b'), isTrue,
         reason: 'the same destination is allowed once the window elapses');
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(milliseconds: 10));
 
     // Pump past the 600ms debounce timer so no fakeAsync timers remain
     await tester.pump(const Duration(milliseconds: 700));
@@ -72,7 +70,7 @@ void main() {
           'tags': ['audiophile', 'flac']
         }),
         isTrue);
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(milliseconds: 10));
 
     final detail = tester.element(find.text('detail: 123'));
     // Distinct Map instance with identical contents within the debounce window
@@ -85,8 +83,7 @@ void main() {
         reason: 'Map with equal deep content must be debounced');
 
     // Wait for the window to elapse (clearing _lastExtra and timer)
-    await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 700)));
+    await tester.pump(const Duration(milliseconds: 700));
 
     // After debounce window, the push is allowed again
     expect(
@@ -97,7 +94,7 @@ void main() {
         isTrue,
         reason:
             'Push is allowed once debounce window expires and clears extra');
-    await tester.pumpAndSettle();
+    await tester.pumpAndSettle(const Duration(milliseconds: 10));
 
     // Pump past the 600ms debounce timer so no fakeAsync timers remain
     await tester.pump(const Duration(milliseconds: 700));

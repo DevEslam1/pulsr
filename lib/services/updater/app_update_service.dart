@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -306,8 +306,8 @@ class AppUpdateService {
     } else if (userInitiated) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.updateUpToDate(
-              'v${AppConfig.appVersion}')),
+          content:
+              Text(context.l10n.updateUpToDate('v${AppConfig.appVersion}')),
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
         ),

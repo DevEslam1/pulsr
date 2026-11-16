@@ -3,7 +3,7 @@ import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:drift/native.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -293,7 +293,11 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
   @override
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry, double? predelayMs, double? damping}) async {}
+  Future<void> setReverb(bool enabled,
+      {int? preset,
+      double? wetDry,
+      double? predelayMs,
+      double? damping}) async {}
   @override
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override

@@ -3,7 +3,7 @@
 // overflow menu, and delete-with-undo.
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -26,6 +26,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../helpers/screen_harness.dart';
 import '../../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _Playlists extends Mock implements PlaylistUseCases {}
 
 class _Export extends Mock implements PlaylistExportUseCase {}
@@ -100,7 +101,7 @@ void main() {
       value: stubPlayerCubit(),
       child: MaterialApp.router(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         routerConfig: router,
       ),

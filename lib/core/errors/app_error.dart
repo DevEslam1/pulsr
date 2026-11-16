@@ -97,6 +97,12 @@ class GenericAppError extends AppError {
   });
 }
 
+/// Wraps a user-facing sentence in the canonical typed error. Feature cubits
+/// use this for validation/notice failures that carry no underlying exception
+/// (an exception path should use [resolveAppError] instead).
+AppError uiError(String message, {String code = 'UI_ERROR', Object? cause}) =>
+    GenericAppError(code: code, userMessage: message, cause: cause);
+
 /// Classifies any arbitrary exception/error into a strongly-typed [AppError].
 AppError resolveAppError(Object error, [StackTrace? stackTrace]) {
   if (error is AppError) return error;

@@ -404,7 +404,10 @@ class SleepTimerManager {
     try {
       final target = (_preFadeVolume! * f).clamp(0.0, 1.0);
       player.setVolume(target);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort SleepTimer operation failed',
+          error: e, stackTrace: st, category: 'SleepTimer');
+    }
   }
 
   /// Short volume ramp used by the track/queue sleep modes at their boundary,
@@ -455,7 +458,10 @@ class SleepTimerManager {
       }
       try {
         player.dspClearGainCurve().catchError((_) => false);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort SleepTimer operation failed',
+            error: e, stackTrace: st, category: 'SleepTimer');
+      }
       _nativeCurveArmed = false;
       _nativeCurveArming = false;
     }
@@ -492,7 +498,10 @@ class SleepTimerManager {
           // right level for the next resume). Never a stale/ducked snapshot.
           try {
             onFadeFactor!(1.0);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Best-effort SleepTimer operation failed',
+                error: e, stackTrace: st, category: 'SleepTimer');
+          }
         } else if (_preFadeVolume != null && player != null) {
           // Standalone mode: restore the pre-fade volume cleanly — but only if
           // the player is still sitting at (or below) the faded level. If the
@@ -502,7 +511,10 @@ class SleepTimerManager {
             if (current <= _preFadeVolume! + 0.02) {
               await player.setVolume(_preFadeVolume!.clamp(0.0, 1.0));
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Best-effort SleepTimer operation failed',
+                error: e, stackTrace: st, category: 'SleepTimer');
+          }
         }
       }
       _preFadeVolume = null;
@@ -542,7 +554,10 @@ class SleepTimerManager {
       if (_nativeCurveArmed || _nativeCurveArming) {
         try {
           player.dspClearGainCurve().catchError((_) => false);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort SleepTimer operation failed',
+              error: e, stackTrace: st, category: 'SleepTimer');
+        }
         _nativeCurveArmed = false;
         _nativeCurveArming = false;
       }
@@ -551,18 +566,27 @@ class SleepTimerManager {
         // clean, duck-aware target (not a possibly-ducked snapshot).
         try {
           onFadeFactor!(1.0);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort SleepTimer operation failed',
+              error: e, stackTrace: st, category: 'SleepTimer');
+        }
         _preFadeVolume = null;
       } else if (_preFadeVolume != null) {
         try {
           player.setVolume(_preFadeVolume!);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort SleepTimer operation failed',
+              error: e, stackTrace: st, category: 'SleepTimer');
+        }
         _preFadeVolume = null;
       }
     } else if (onFadeFactor != null) {
       try {
         onFadeFactor!(1.0);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Best-effort SleepTimer operation failed',
+            error: e, stackTrace: st, category: 'SleepTimer');
+      }
       _preFadeVolume = null;
     }
     _clearPersistedState();

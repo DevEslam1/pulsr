@@ -1,6 +1,6 @@
 // test/cached_artwork_test.dart
 import 'dart:typed_data';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';

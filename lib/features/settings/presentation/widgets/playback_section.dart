@@ -1,5 +1,5 @@
 // lib/features/settings/presentation/widgets/playback_section.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
@@ -27,6 +27,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Playback behavior: sleep timer, gapless, crossfade, resume, waveform seek.
 class PlaybackSection extends StatelessWidget {
   final SettingsState state;

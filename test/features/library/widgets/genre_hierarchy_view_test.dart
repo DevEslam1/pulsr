@@ -3,7 +3,7 @@
 // Exercises the empty/populated/search states, category expansion and chip
 // navigation, the uncategorized group, and the GenreCategory regex cache
 // eviction + clear paths.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
@@ -11,6 +11,7 @@ import 'package:pulsr/domain/models/genre_item.dart';
 import 'package:pulsr/features/library/presentation/widgets/genre_hierarchy_view.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   final l10n = lookupAppLocalizations(const Locale('en'));
@@ -32,7 +33,7 @@ void main() {
     );
     return MaterialApp.router(
       theme: AuraTheme.darkTheme,
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,
     );

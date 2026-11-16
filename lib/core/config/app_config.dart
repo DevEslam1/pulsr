@@ -13,6 +13,12 @@ class AppConfig {
       String.fromEnvironment('SENTRY_DSN', defaultValue: '');
   static const String flavor =
       String.fromEnvironment('FLAVOR', defaultValue: 'dev');
+
+  /// Encrypt the library database at rest (ADR 015). Requires an
+  /// encryption-capable SQLite build; when absent the bootstrap degrades to
+  /// plaintext and reports it in the database health check.
+  static const bool databaseEncryptionEnabled =
+      bool.fromEnvironment('PULSR_DB_ENCRYPTION', defaultValue: true);
   static const String _buildTimeVersion =
       String.fromEnvironment('APP_VERSION', defaultValue: '');
   static String _installedVersion = '1.0.0';

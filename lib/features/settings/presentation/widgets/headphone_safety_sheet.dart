@@ -1,6 +1,6 @@
 // lib/features/settings/presentation/widgets/headphone_safety_sheet.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/prefs_keys.dart';
@@ -332,8 +332,8 @@ class _HeadphoneSafetySheetState extends State<HeadphoneSafetySheet> {
                     Padding(
                       padding: const EdgeInsets.only(top: AppSpacing.xs),
                       child: Text(
-                        context.l10n.doseQuietUntilClear(
-                            _formatQuietTime(quietTime)),
+                        context.l10n
+                            .doseQuietUntilClear(_formatQuietTime(quietTime)),
                         style: TextStyle(
                           color: p.textSecondary,
                           fontSize: AppFontSize.caption,

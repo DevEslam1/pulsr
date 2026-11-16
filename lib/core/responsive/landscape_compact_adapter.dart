@@ -1,5 +1,5 @@
 // lib/core/responsive/landscape_compact_adapter.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'pulsr_responsive_tokens.dart';
 
 /// Mixin for stateful widgets that adapt layout for landscape phone mode (height < 600dp, [PulsrBreakpoint.shortHeightThreshold]).

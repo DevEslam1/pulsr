@@ -2,7 +2,7 @@
 //
 // Exercises the empty/populated wall, album navigation, the zoom controls and
 // the incremental pagination load on scroll.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -16,6 +16,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockLibraryCubit extends Mock implements LibraryCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -76,7 +77,7 @@ void main() {
         ],
         child: MaterialApp.router(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           routerConfig: router,
         ),

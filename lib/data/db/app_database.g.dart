@@ -217,12 +217,6 @@ class $SongsTableTable extends SongsTable
   late final GeneratedColumn<String> remoteArtworkUrl = GeneratedColumn<String>(
       'remote_artwork_url', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
-  static const VerificationMeta _pendingDownloadPathMeta =
-      const VerificationMeta('pendingDownloadPath');
-  @override
-  late final GeneratedColumn<String> pendingDownloadPath =
-      GeneratedColumn<String>('pending_download_path', aliasedName, true,
-          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _isDownloadedMeta =
       const VerificationMeta('isDownloaded');
   @override
@@ -286,7 +280,6 @@ class $SongsTableTable extends SongsTable
         source,
         remoteId,
         remoteArtworkUrl,
-        pendingDownloadPath,
         isDownloaded,
         cueStartMs,
         cueEndMs,
@@ -467,12 +460,6 @@ class $SongsTableTable extends SongsTable
           remoteArtworkUrl.isAcceptableOrUnknown(
               data['remote_artwork_url']!, _remoteArtworkUrlMeta));
     }
-    if (data.containsKey('pending_download_path')) {
-      context.handle(
-          _pendingDownloadPathMeta,
-          pendingDownloadPath.isAcceptableOrUnknown(
-              data['pending_download_path']!, _pendingDownloadPathMeta));
-    }
     if (data.containsKey('is_downloaded')) {
       context.handle(
           _isDownloadedMeta,
@@ -570,8 +557,6 @@ class $SongsTableTable extends SongsTable
           .read(DriftSqlType.string, data['${effectivePrefix}remote_id']),
       remoteArtworkUrl: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}remote_artwork_url']),
-      pendingDownloadPath: attachedDatabase.typeMapping.read(
-          DriftSqlType.string, data['${effectivePrefix}pending_download_path']),
       isDownloaded: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_downloaded'])!,
       cueStartMs: attachedDatabase.typeMapping
@@ -641,10 +626,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final String? remoteId;
   final String? remoteArtworkUrl;
 
-  /// Destination a download is writing to, used to match the row MediaStore
-  /// creates once the file lands.
-  final String? pendingDownloadPath;
-
   /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
   final bool isDownloaded;
 
@@ -694,7 +675,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       required this.source,
       this.remoteId,
       this.remoteArtworkUrl,
-      this.pendingDownloadPath,
       required this.isDownloaded,
       this.cueStartMs,
       this.cueEndMs,
@@ -778,9 +758,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
     }
     if (!nullToAbsent || remoteArtworkUrl != null) {
       map['remote_artwork_url'] = Variable<String>(remoteArtworkUrl);
-    }
-    if (!nullToAbsent || pendingDownloadPath != null) {
-      map['pending_download_path'] = Variable<String>(pendingDownloadPath);
     }
     map['is_downloaded'] = Variable<bool>(isDownloaded);
     if (!nullToAbsent || cueStartMs != null) {
@@ -868,9 +845,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       remoteArtworkUrl: remoteArtworkUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(remoteArtworkUrl),
-      pendingDownloadPath: pendingDownloadPath == null && nullToAbsent
-          ? const Value.absent()
-          : Value(pendingDownloadPath),
       isDownloaded: Value(isDownloaded),
       cueStartMs: cueStartMs == null && nullToAbsent
           ? const Value.absent()
@@ -923,8 +897,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       source: serializer.fromJson<String>(json['source']),
       remoteId: serializer.fromJson<String?>(json['remoteId']),
       remoteArtworkUrl: serializer.fromJson<String?>(json['remoteArtworkUrl']),
-      pendingDownloadPath:
-          serializer.fromJson<String?>(json['pendingDownloadPath']),
       isDownloaded: serializer.fromJson<bool>(json['isDownloaded']),
       cueStartMs: serializer.fromJson<int?>(json['cueStartMs']),
       cueEndMs: serializer.fromJson<int?>(json['cueEndMs']),
@@ -968,7 +940,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'source': serializer.toJson<String>(source),
       'remoteId': serializer.toJson<String?>(remoteId),
       'remoteArtworkUrl': serializer.toJson<String?>(remoteArtworkUrl),
-      'pendingDownloadPath': serializer.toJson<String?>(pendingDownloadPath),
       'isDownloaded': serializer.toJson<bool>(isDownloaded),
       'cueStartMs': serializer.toJson<int?>(cueStartMs),
       'cueEndMs': serializer.toJson<int?>(cueEndMs),
@@ -1010,7 +981,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           String? source,
           Value<String?> remoteId = const Value.absent(),
           Value<String?> remoteArtworkUrl = const Value.absent(),
-          Value<String?> pendingDownloadPath = const Value.absent(),
           bool? isDownloaded,
           Value<int?> cueStartMs = const Value.absent(),
           Value<int?> cueEndMs = const Value.absent(),
@@ -1060,9 +1030,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         remoteArtworkUrl: remoteArtworkUrl.present
             ? remoteArtworkUrl.value
             : this.remoteArtworkUrl,
-        pendingDownloadPath: pendingDownloadPath.present
-            ? pendingDownloadPath.value
-            : this.pendingDownloadPath,
         isDownloaded: isDownloaded ?? this.isDownloaded,
         cueStartMs: cueStartMs.present ? cueStartMs.value : this.cueStartMs,
         cueEndMs: cueEndMs.present ? cueEndMs.value : this.cueEndMs,
@@ -1125,9 +1092,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       remoteArtworkUrl: data.remoteArtworkUrl.present
           ? data.remoteArtworkUrl.value
           : this.remoteArtworkUrl,
-      pendingDownloadPath: data.pendingDownloadPath.present
-          ? data.pendingDownloadPath.value
-          : this.pendingDownloadPath,
       isDownloaded: data.isDownloaded.present
           ? data.isDownloaded.value
           : this.isDownloaded,
@@ -1174,7 +1138,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ..write('source: $source, ')
           ..write('remoteId: $remoteId, ')
           ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
-          ..write('pendingDownloadPath: $pendingDownloadPath, ')
           ..write('isDownloaded: $isDownloaded, ')
           ..write('cueStartMs: $cueStartMs, ')
           ..write('cueEndMs: $cueEndMs, ')
@@ -1218,7 +1181,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         source,
         remoteId,
         remoteArtworkUrl,
-        pendingDownloadPath,
         isDownloaded,
         cueStartMs,
         cueEndMs,
@@ -1261,7 +1223,6 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           other.source == this.source &&
           other.remoteId == this.remoteId &&
           other.remoteArtworkUrl == this.remoteArtworkUrl &&
-          other.pendingDownloadPath == this.pendingDownloadPath &&
           other.isDownloaded == this.isDownloaded &&
           other.cueStartMs == this.cueStartMs &&
           other.cueEndMs == this.cueEndMs &&
@@ -1302,7 +1263,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<String> source;
   final Value<String?> remoteId;
   final Value<String?> remoteArtworkUrl;
-  final Value<String?> pendingDownloadPath;
   final Value<bool> isDownloaded;
   final Value<int?> cueStartMs;
   final Value<int?> cueEndMs;
@@ -1341,7 +1301,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.source = const Value.absent(),
     this.remoteId = const Value.absent(),
     this.remoteArtworkUrl = const Value.absent(),
-    this.pendingDownloadPath = const Value.absent(),
     this.isDownloaded = const Value.absent(),
     this.cueStartMs = const Value.absent(),
     this.cueEndMs = const Value.absent(),
@@ -1381,7 +1340,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.source = const Value.absent(),
     this.remoteId = const Value.absent(),
     this.remoteArtworkUrl = const Value.absent(),
-    this.pendingDownloadPath = const Value.absent(),
     this.isDownloaded = const Value.absent(),
     this.cueStartMs = const Value.absent(),
     this.cueEndMs = const Value.absent(),
@@ -1422,7 +1380,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     Expression<String>? source,
     Expression<String>? remoteId,
     Expression<String>? remoteArtworkUrl,
-    Expression<String>? pendingDownloadPath,
     Expression<bool>? isDownloaded,
     Expression<int>? cueStartMs,
     Expression<int>? cueEndMs,
@@ -1464,8 +1421,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       if (source != null) 'source': source,
       if (remoteId != null) 'remote_id': remoteId,
       if (remoteArtworkUrl != null) 'remote_artwork_url': remoteArtworkUrl,
-      if (pendingDownloadPath != null)
-        'pending_download_path': pendingDownloadPath,
       if (isDownloaded != null) 'is_downloaded': isDownloaded,
       if (cueStartMs != null) 'cue_start_ms': cueStartMs,
       if (cueEndMs != null) 'cue_end_ms': cueEndMs,
@@ -1507,7 +1462,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<String>? source,
       Value<String?>? remoteId,
       Value<String?>? remoteArtworkUrl,
-      Value<String?>? pendingDownloadPath,
       Value<bool>? isDownloaded,
       Value<int?>? cueStartMs,
       Value<int?>? cueEndMs,
@@ -1546,7 +1500,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       source: source ?? this.source,
       remoteId: remoteId ?? this.remoteId,
       remoteArtworkUrl: remoteArtworkUrl ?? this.remoteArtworkUrl,
-      pendingDownloadPath: pendingDownloadPath ?? this.pendingDownloadPath,
       isDownloaded: isDownloaded ?? this.isDownloaded,
       cueStartMs: cueStartMs ?? this.cueStartMs,
       cueEndMs: cueEndMs ?? this.cueEndMs,
@@ -1658,10 +1611,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     if (remoteArtworkUrl.present) {
       map['remote_artwork_url'] = Variable<String>(remoteArtworkUrl.value);
     }
-    if (pendingDownloadPath.present) {
-      map['pending_download_path'] =
-          Variable<String>(pendingDownloadPath.value);
-    }
     if (isDownloaded.present) {
       map['is_downloaded'] = Variable<bool>(isDownloaded.value);
     }
@@ -1713,7 +1662,6 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
           ..write('source: $source, ')
           ..write('remoteId: $remoteId, ')
           ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
-          ..write('pendingDownloadPath: $pendingDownloadPath, ')
           ..write('isDownloaded: $isDownloaded, ')
           ..write('cueStartMs: $cueStartMs, ')
           ..write('cueEndMs: $cueEndMs, ')
@@ -4891,7 +4839,6 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<String> source,
   Value<String?> remoteId,
   Value<String?> remoteArtworkUrl,
-  Value<String?> pendingDownloadPath,
   Value<bool> isDownloaded,
   Value<int?> cueStartMs,
   Value<int?> cueEndMs,
@@ -4931,7 +4878,6 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<String> source,
   Value<String?> remoteId,
   Value<String?> remoteArtworkUrl,
-  Value<String?> pendingDownloadPath,
   Value<bool> isDownloaded,
   Value<int?> cueStartMs,
   Value<int?> cueEndMs,
@@ -5105,10 +5051,6 @@ class $$SongsTableTableFilterComposer
 
   ColumnFilters<String> get remoteArtworkUrl => $composableBuilder(
       column: $table.remoteArtworkUrl,
-      builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<String> get pendingDownloadPath => $composableBuilder(
-      column: $table.pendingDownloadPath,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get isDownloaded => $composableBuilder(
@@ -5303,10 +5245,6 @@ class $$SongsTableTableOrderingComposer
       column: $table.remoteArtworkUrl,
       builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get pendingDownloadPath => $composableBuilder(
-      column: $table.pendingDownloadPath,
-      builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded,
       builder: (column) => ColumnOrderings(column));
@@ -5428,9 +5366,6 @@ class $$SongsTableTableAnnotationComposer
 
   GeneratedColumn<String> get remoteArtworkUrl => $composableBuilder(
       column: $table.remoteArtworkUrl, builder: (column) => column);
-
-  GeneratedColumn<String> get pendingDownloadPath => $composableBuilder(
-      column: $table.pendingDownloadPath, builder: (column) => column);
 
   GeneratedColumn<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded, builder: (column) => column);
@@ -5569,7 +5504,6 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<String> source = const Value.absent(),
             Value<String?> remoteId = const Value.absent(),
             Value<String?> remoteArtworkUrl = const Value.absent(),
-            Value<String?> pendingDownloadPath = const Value.absent(),
             Value<bool> isDownloaded = const Value.absent(),
             Value<int?> cueStartMs = const Value.absent(),
             Value<int?> cueEndMs = const Value.absent(),
@@ -5609,7 +5543,6 @@ class $$SongsTableTableTableManager extends RootTableManager<
             source: source,
             remoteId: remoteId,
             remoteArtworkUrl: remoteArtworkUrl,
-            pendingDownloadPath: pendingDownloadPath,
             isDownloaded: isDownloaded,
             cueStartMs: cueStartMs,
             cueEndMs: cueEndMs,
@@ -5649,7 +5582,6 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<String> source = const Value.absent(),
             Value<String?> remoteId = const Value.absent(),
             Value<String?> remoteArtworkUrl = const Value.absent(),
-            Value<String?> pendingDownloadPath = const Value.absent(),
             Value<bool> isDownloaded = const Value.absent(),
             Value<int?> cueStartMs = const Value.absent(),
             Value<int?> cueEndMs = const Value.absent(),
@@ -5689,7 +5621,6 @@ class $$SongsTableTableTableManager extends RootTableManager<
             source: source,
             remoteId: remoteId,
             remoteArtworkUrl: remoteArtworkUrl,
-            pendingDownloadPath: pendingDownloadPath,
             isDownloaded: isDownloaded,
             cueStartMs: cueStartMs,
             cueEndMs: cueEndMs,

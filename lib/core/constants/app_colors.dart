@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// {@category DesignSystem}
 /// Raw brand values only. Screens must use `context.palette` (semantic tokens),

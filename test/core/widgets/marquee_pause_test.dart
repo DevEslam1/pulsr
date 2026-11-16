@@ -1,13 +1,14 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/widgets/marquee_text.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 /// WCAG 2.2.2 (Pause, Stop, Hide): an auto-scrolling title must be stoppable by
 /// touch and by assistive technology, not only by mouse hover.
 void main() {
   Widget harness(Widget child) => MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: Center(child: SizedBox(width: 120, child: child))),
       );
@@ -20,16 +21,16 @@ void main() {
     await tester.pumpWidget(harness(const MarqueeText(text: longText)));
     await tester.pump();
 
-    final pause = find.byWidgetPredicate((w) =>
-        w is Semantics && w.properties.hint == 'Pause scrolling title');
+    final pause = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.hint == 'Pause scrolling title');
     expect(pause, findsOneWidget);
     expect(tester.widget<Semantics>(pause).properties.onTap, isNotNull);
 
     await tester.tap(pause);
     await tester.pump();
 
-    final resume = find.byWidgetPredicate((w) =>
-        w is Semantics && w.properties.hint == 'Resume scrolling title');
+    final resume = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.hint == 'Resume scrolling title');
     expect(resume, findsOneWidget);
   });
 

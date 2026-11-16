@@ -3,7 +3,7 @@
 // Non-root sheets must register with PulsrModalTracker manually: the root
 // observer cannot see a nested navigator, so without the manual push/pop the
 // mini-player dock stayed over the sheet.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_bottom_sheet.dart';
@@ -126,7 +126,8 @@ void main() {
     expect(find.text('Sheet Header'), findsNothing);
   });
 
-  testWidgets('isDismissible: false prevents tap-above dismissal', (tester) async {
+  testWidgets('isDismissible: false prevents tap-above dismissal',
+      (tester) async {
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {

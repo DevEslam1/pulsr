@@ -1,7 +1,7 @@
 // AddToPlaylistSheet extra coverage: empty + error + populated states, the
 // create-playlist flow (success, insert failure, create failure), adding to an
 // existing playlist (success + failure) and the multi-song (batch) path.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
@@ -11,6 +11,7 @@ import 'package:pulsr/domain/usecases/playlist_usecases.dart';
 import 'package:pulsr/features/sheets/add_to_playlist_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlaylistUseCases extends Mock implements PlaylistUseCases {}
 
 void main() {
@@ -84,7 +85,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Builder(
           builder: (context) => Scaffold(

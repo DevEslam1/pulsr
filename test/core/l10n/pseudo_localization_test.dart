@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -13,6 +13,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import '../../helpers/screen_harness.dart';
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 const Map<String, String> _accentMap = {
   'a': 'á',
   'e': 'é',
@@ -124,7 +125,8 @@ void main() {
       expect(en.smartRuleMatchCount(1), equals('1 match'));
       expect(en.smartRuleMatchCount(5), equals('5 matches'));
 
-      expect(ar.smartRuleMatchCount(1), isNot(equals(ar.smartRuleMatchCount(2))));
+      expect(
+          ar.smartRuleMatchCount(1), isNot(equals(ar.smartRuleMatchCount(2))));
       expect(es.smartRuleMatchCount(1), equals('1 coincidencia'));
       expect(es.smartRuleMatchCount(3), equals('3 coincidencias'));
 
@@ -159,7 +161,7 @@ void main() {
           child: MaterialApp(
             theme: AuraTheme.darkTheme,
             locale: const Locale('ar'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localizationsDelegates: appLocalizationsDelegates,
             supportedLocales: AppLocalizations.supportedLocales,
             home: Scaffold(
               body: SingleChildScrollView(

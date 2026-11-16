@@ -40,6 +40,7 @@ import '../../../settings/cubit/settings_cubit.dart';
 import '../player_state.dart';
 import 'dsp_effect_applier.dart';
 
+import '../../../../core/errors/app_error.dart';
 part 'player_dsp_effects.dart';
 part 'player_dsp_eq.dart';
 part 'player_dsp_profiles.dart';
@@ -281,7 +282,7 @@ class PlayerDspController {
         final state = _getState();
         _emit(state.copyWith(
           playback: state.playback.copyWith(
-            errorMessage: '$feature blocked: $reason',
+            error: uiError('$feature blocked: $reason'),
           ),
         ));
       }

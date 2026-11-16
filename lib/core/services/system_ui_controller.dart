@@ -1,5 +1,5 @@
 // lib/core/services/system_ui_controller.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 /// Single authority for system UI mode (immersive / edge-to-edge) and overlays across the app.

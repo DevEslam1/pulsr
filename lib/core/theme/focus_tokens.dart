@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// WCAG 2.4.7 focus indication + 1.4.11 non-text contrast.
 /// Aurora focus = crisp 2dp accent ring + a 1dp contrast halo so the ring is

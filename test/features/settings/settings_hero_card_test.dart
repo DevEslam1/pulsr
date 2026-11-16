@@ -1,15 +1,17 @@
 // Covers lib/features/settings/presentation/widgets/settings_hero_card.dart
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/errors/app_error.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/features/auth/cubit/auth_cubit.dart';
 import 'package:pulsr/features/auth/cubit/auth_state.dart';
 import 'package:pulsr/features/settings/presentation/widgets/settings_hero_card.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockAuthCubit extends Mock implements AuthCubit {}
 
 class MockUser extends Mock implements User {}
@@ -47,7 +49,7 @@ void main() {
         value: auth,
         child: MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const Scaffold(body: SettingsHeroCard()),
         ),
@@ -194,7 +196,10 @@ void main() {
         status: AuthStatus.authenticated,
         user: user,
         syncStatus: SyncStatus.failure,
-        syncError: 'Network unavailable',
+        syncError: const GenericAppError(
+          code: 'TEST_SYNC',
+          userMessage: 'Network unavailable',
+        ),
       ),
     );
 

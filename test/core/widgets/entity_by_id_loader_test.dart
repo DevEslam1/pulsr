@@ -1,7 +1,7 @@
 // test/core/widgets/entity_by_id_loader_test.dart
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:pulsr/core/errors/failures.dart';

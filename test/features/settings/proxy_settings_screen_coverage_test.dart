@@ -1,7 +1,7 @@
 // Extra coverage for lib/features/settings/presentation/proxy_settings_screen.dart
 // (the existing proxy_settings_screen_test.dart only asserts password sync).
 import 'package:bloc_test/bloc_test.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -11,6 +11,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/settings/presentation/proxy_settings_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockSettingsCubit extends MockCubit<SettingsState>
     implements SettingsCubit {}
 
@@ -62,7 +63,7 @@ void main() {
       BlocProvider<SettingsCubit>.value(
         value: cubit,
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const ProxySettingsScreen(),
         ),

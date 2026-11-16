@@ -23,7 +23,9 @@ void main() {
     // 367 -> 378 reconciled with empty_catch_ratchet_test.dart
     // 378 -> 387 reconciled with empty_catch_ratchet_test.dart
     // 387 -> 386 after the download-cycle logging pass.
-    const int emptyCatchBaseline = 386;
+    // 386 -> 348 after logging the playlist notifier, crash-position,
+    // YTM URL-cache and sleep-timer best-effort failures.
+    const int emptyCatchBaseline = 348;
 
     List<File> dartFilesUnderLib() {
       final dir = Directory('lib');
@@ -212,7 +214,8 @@ void main() {
       expect(slot.position, equals(const Duration(seconds: 45)));
     });
 
-    test('lib/ contains zero watch<PlayerCubit> calls (rebuild prevention)', () {
+    test('lib/ contains zero watch<PlayerCubit> calls (rebuild prevention)',
+        () {
       final watchPlayer = RegExp(r'\bwatch<PlayerCubit\b');
       final offenders = <String>[];
 

@@ -1,5 +1,5 @@
 import 'package:bloc_test/bloc_test.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +12,7 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 SongsTableData _testSong({
@@ -40,7 +41,7 @@ Widget _wrapWithHarness({
   required PlayerCubit playerCubit,
 }) {
   return MaterialApp(
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    localizationsDelegates: appLocalizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: ThemeData.dark().copyWith(
       extensions: [AuraTheme.defaultDark],
@@ -146,7 +147,8 @@ void main() {
       expect(stateObj.currentAnnouncement, equals('Playing'));
     });
 
-    testWidgets('Queue mutation announcements: added, removed, reordered, cleared',
+    testWidgets(
+        'Queue mutation announcements: added, removed, reordered, cleared',
         (tester) async {
       final s1 = _testSong(id: 1, title: 'Song 1', artist: 'Artist 1');
       final s2 = _testSong(id: 2, title: 'Song 2', artist: 'Artist 2');
@@ -192,7 +194,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData.dark().copyWith(
             extensions: [AuraTheme.defaultDark],
@@ -253,7 +255,7 @@ void main() {
         (tester) async {
       await tester.pumpWidget(
         MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           theme: ThemeData.dark().copyWith(
             extensions: [AuraTheme.defaultDark],
@@ -271,13 +273,16 @@ void main() {
       final focusGroups = tester.widgetList<FocusTraversalGroup>(
         find.byType(FocusTraversalGroup),
       );
-      expect(focusGroups.any((g) => g.policy is OrderedTraversalPolicy), isTrue);
+      expect(
+          focusGroups.any((g) => g.policy is OrderedTraversalPolicy), isTrue);
 
       final traversalOrders = tester.widgetList<FocusTraversalOrder>(
         find.byType(FocusTraversalOrder),
       );
       expect(traversalOrders.length, greaterThanOrEqualTo(2));
-      final orders = traversalOrders.map((o) => (o.order as NumericFocusOrder).order).toList();
+      final orders = traversalOrders
+          .map((o) => (o.order as NumericFocusOrder).order)
+          .toList();
       expect(orders, contains(1.0));
       expect(orders, contains(2.0));
     });

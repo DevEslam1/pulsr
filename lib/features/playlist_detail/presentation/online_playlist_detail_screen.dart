@@ -1,7 +1,7 @@
 // lib/features/playlist_detail/presentation/online_playlist_detail_screen.dart
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -43,6 +43,7 @@ import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class OnlinePlaylistDetailArgs {
   final String playlistId;
   final String? title;

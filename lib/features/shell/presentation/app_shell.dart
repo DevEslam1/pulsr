@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -36,6 +36,7 @@ import 'widgets/stacked_bottom_dock.dart';
 import 'widgets/tablet_side_inspector.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class AppShell extends StatefulWidget {
   final StatefulNavigationShell navigationShell;
   const AppShell({super.key, required this.navigationShell});
@@ -497,7 +498,8 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                                 context.motionCurve(Curves.easeInCubic),
                             child: inspectorOpen
                                 ? Row(
-                                    key: const ValueKey('tablet_side_inspector'),
+                                    key:
+                                        const ValueKey('tablet_side_inspector'),
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       VerticalDivider(

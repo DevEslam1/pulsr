@@ -1,5 +1,5 @@
 // test/features/radio/widgets/radio_directory_sheet_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/radio_browser_service.dart';
@@ -9,6 +9,7 @@ import 'package:pulsr/domain/models/radio_station.dart';
 import 'package:pulsr/features/radio/presentation/widgets/radio_directory_sheet.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockRadioBrowserService extends Mock implements RadioBrowserService {}
 
 class _MockRadioStationStore extends Mock implements RadioStationStore {}
@@ -46,7 +47,7 @@ void main() {
 
   Widget host() => MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: RadioDirectorySheet(service: service, store: store),
@@ -54,7 +55,8 @@ void main() {
       );
 
   testWidgets('lists directory results and adds a station', (tester) async {
-    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => [station]);
+    when(() => service.search(query: any(named: 'query')))
+        .thenAnswer((_) async => [station]);
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -70,7 +72,8 @@ void main() {
   });
 
   testWidgets('shows a retry state when the directory fails', (tester) async {
-    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => throw Exception('offline'));
+    when(() => service.search(query: any(named: 'query')))
+        .thenAnswer((_) async => throw Exception('offline'));
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -81,7 +84,8 @@ void main() {
 
   testWidgets('shows the empty state for a query with no matches',
       (tester) async {
-    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => const []);
+    when(() => service.search(query: any(named: 'query')))
+        .thenAnswer((_) async => const []);
 
     await tester.pumpWidget(host());
     await tester.pumpAndSettle();
@@ -91,7 +95,8 @@ void main() {
 
   testWidgets('refuses a station whose stream cannot be reached',
       (tester) async {
-    when(() => service.search(query: any(named: 'query'))).thenAnswer((_) async => [station]);
+    when(() => service.search(query: any(named: 'query')))
+        .thenAnswer((_) async => [station]);
     when(() => service.isReachable(any())).thenAnswer((_) async => false);
 
     await tester.pumpWidget(host());

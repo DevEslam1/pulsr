@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/di/injection.dart';
@@ -15,6 +15,8 @@ import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/widgets/pulsr_progress.dart';
+import 'package:pulsr/data/db/app_database.dart';
 
 /// Storage & Cache section widget: displays album artwork cache size,
 /// YouTube stream cache size (if YTM enabled), cache clearing affordances,
@@ -398,6 +400,8 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
               size: 20, color: p.textTertiary),
           onTap: () => _showMaxCacheLimitPicker(context, manager),
         ),
+        Divider(height: 1, indent: 68, color: p.hairline),
+        const _DatabaseHealthTile(),
       ],
     );
   }
@@ -456,6 +460,143 @@ class _StorageCacheSectionState extends State<StorageCacheSection>
           ),
         );
       },
+    );
+  }
+}
+
+/// Read-only database diagnostics: integrity, FTS health, migration state and
+/// encryption-at-rest state (ADR 015). Failures were previously only logged;
+/// this surfaces them and offers the FTS repair action.
+class _DatabaseHealthTile extends StatefulWidget {
+  const _DatabaseHealthTile();
+
+  @override
+  State<_DatabaseHealthTile> createState() => _DatabaseHealthTileState();
+}
+
+class _DatabaseHealthTileState extends State<_DatabaseHealthTile> {
+  DatabaseHealthReport? _report;
+  bool _checking = true;
+  bool _repairing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (!getIt.isRegistered<AppDatabase>()) {
+      if (mounted) setState(() => _checking = false);
+      return;
+    }
+    try {
+      final report =
+          await DatabaseHealthCheck(getIt<AppDatabase>()).checkHealth();
+      if (mounted) {
+        setState(() {
+          _report = report;
+          _checking = false;
+        });
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Database health check failed',
+          error: e, stackTrace: st, category: 'Database');
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  String _encryptionLabel(BuildContext context) {
+    final state = _report?.encryptionState ?? 'unavailable';
+    return switch (state) {
+      'encrypted' || 'migrated' => context.l10n.databaseEncryptionEncrypted,
+      'disabled' => context.l10n.databaseEncryptionDisabled,
+      'unavailable' => context.l10n.databaseEncryptionUnavailable,
+      _ => context.l10n.databaseEncryptionPlaintext,
+    };
+  }
+
+  Future<void> _repairSearchIndex() async {
+    if (_repairing || !getIt.isRegistered<AppDatabase>()) return;
+    setState(() => _repairing = true);
+    final repaired = await getIt<AppDatabase>().repairFtsIndex(force: true);
+    if (!mounted) return;
+    setState(() => _repairing = false);
+    PulsrToast.show(
+      context,
+      message: repaired
+          ? context.l10n.databaseHealthSearchRepaired
+          : context.l10n.databaseHealthSearchRepairFailed,
+      isSuccess: repaired,
+    );
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_checking) {
+      return ListTile(
+        contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+        leading: SizedBox(
+          width: 38,
+          height: 38,
+          child: Center(
+            child: SizedBox(
+              width: 18,
+              child: PulsrProgressBar.indeterminate(height: 3),
+            ),
+          ),
+        ),
+        title: Text(
+          context.l10n.databaseHealth,
+          style: const TextStyle(
+              fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+        ),
+        subtitle: Text(context.l10n.databaseHealthChecking),
+      );
+    }
+    final report = _report;
+    if (report == null) return const SizedBox.shrink();
+    final p = context.palette;
+    final healthy = report.isHealthy;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: (healthy ? p.accent : p.error).withValues(alpha: 0.15),
+          borderRadius: AppRadii.r12All,
+        ),
+        child: Icon(
+          healthy ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded,
+          color: healthy ? p.accent : p.error,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        context.l10n.databaseHealth,
+        style: const TextStyle(
+            fontWeight: FontWeight.w700, fontSize: AppFontSize.body),
+      ),
+      subtitle: Text(
+        '${healthy ? context.l10n.databaseHealthHealthy : context.l10n.databaseHealthIssues}'
+        ' · ${context.l10n.databaseHealthEncryption(_encryptionLabel(context))}',
+        style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.label),
+      ),
+      trailing: TextButton.icon(
+        style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+        icon: _repairing
+            ? SizedBox(
+                width: 14,
+                child: PulsrProgressBar.indeterminate(height: 3),
+              )
+            : const Icon(Icons.manage_search_rounded, size: 18),
+        label: Text(context.l10n.databaseHealthRepairSearch),
+        onPressed: _repairing ? null : _repairSearchIndex,
+      ),
     );
   }
 }

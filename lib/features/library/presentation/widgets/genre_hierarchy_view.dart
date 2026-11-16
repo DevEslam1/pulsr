@@ -1,7 +1,7 @@
 // lib/features/library/presentation/widgets/genre_hierarchy_view.dart
 import 'dart:async';
 import 'dart:collection';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';

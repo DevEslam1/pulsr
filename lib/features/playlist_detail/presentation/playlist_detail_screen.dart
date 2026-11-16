@@ -1,7 +1,7 @@
 // lib/features/playlist_detail/presentation/playlist_detail_screen.dart
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart' show ArtworkType;
@@ -44,6 +44,7 @@ import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 /// Reactively-loaded playlist contents or the failure that prevented loading,
 /// so a DB error surfaces as a retryable state instead of an empty list.
 class _PlaylistSongsResult {

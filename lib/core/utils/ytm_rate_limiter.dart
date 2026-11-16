@@ -2,25 +2,16 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:clock/clock.dart';
+import 'package:mutex/mutex.dart' as pkg;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'error_logger.dart';
 
-/// Simple asynchronous mutex to serialize token acquisitions.
+/// Thin adapter over `package:mutex` so the app has a single mutex
+/// implementation instead of a hand-rolled future chain.
 class AsyncMutex {
-  Future<void> _last = Future.value();
+  final pkg.Mutex _mutex = pkg.Mutex();
 
-  Future<T> run<T>(Future<T> Function() action) {
-    final completer = Completer<T>();
-    _last = _last.then((_) async {
-      try {
-        final res = await action();
-        completer.complete(res);
-      } catch (e, st) {
-        completer.completeError(e, st);
-      }
-    });
-    return completer.future;
-  }
+  Future<T> run<T>(Future<T> Function() action) => _mutex.protect(action);
 }
 
 /// Dart-side adaptive token-bucket rate limiter for YouTube Music API requests.

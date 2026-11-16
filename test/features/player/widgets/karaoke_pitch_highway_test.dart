@@ -1,5 +1,5 @@
 // test/features/player/widgets/karaoke_pitch_highway_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
 import 'package:pulsr/features/player/presentation/widgets/karaoke_pitch_highway.dart';
@@ -81,7 +81,8 @@ void main() {
     expect(find.byType(KaraokePitchHighway), findsOneWidget);
   });
 
-  testWidgets('displays SIM badge when using simulated pitch (audioBuffer null/empty)',
+  testWidgets(
+      'displays SIM badge when using simulated pitch (audioBuffer null/empty)',
       (tester) async {
     // When audioBuffer is null, simulated pitch is active -> "SIM" badge visible
     await tester.pumpWidget(buildHighway(isPlaying: true, audioBuffer: null));
@@ -94,7 +95,8 @@ void main() {
     expect(find.text('SIM'), findsOneWidget);
 
     // When real audioBuffer is provided -> "SIM" badge hidden
-    final buffer = List<double>.generate(1024, (i) => 0.5 * (i % 32 < 16 ? 1.0 : -1.0));
+    final buffer =
+        List<double>.generate(1024, (i) => 0.5 * (i % 32 < 16 ? 1.0 : -1.0));
     await tester.pumpWidget(buildHighway(isPlaying: true, audioBuffer: buffer));
     await tester.pumpAndSettle();
     expect(find.text('SIM'), findsNothing);

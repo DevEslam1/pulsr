@@ -1,6 +1,6 @@
 import '../../../../core/di/injection.dart';
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';

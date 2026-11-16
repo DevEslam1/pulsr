@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
 import '../../../core/services/ytm_search_cache.dart';
@@ -216,7 +217,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   }
 
   void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(error: null));
   }
 
   Future<void> retry() => _executeSearch(state.query);
@@ -254,7 +255,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       safeEmit(state.copyWith(
           results: List<YtmTrack>.unmodifiable(appended),
           isLoading: false,
-          errorMessage: null));
+          error: null));
     } catch (e, st) {
       if (gen != _generation || isClosed) return;
       ErrorLogger.log('Failed to load more YTM search results',
@@ -269,8 +270,11 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     final notifier = _service.botCooldownNotifier;
     if (_service.isBotCoolingDown) {
       safeEmit(state.copyWith(
-        errorMessage:
-            'YouTube is rate-limiting requests. Please wait a few minutes.',
+        error: const GenericAppError(
+          code: 'YTM_RATE_LIMITED',
+          userMessage:
+              'YouTube is rate-limiting requests. Please wait a few minutes.',
+        ),
       ));
       // Await the service's cooldown signal instead of busy-polling every
       // 500 ms. A generation bump (new query/clear/close) also wakes this.
@@ -310,16 +314,13 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     if (query.trim().isEmpty) {
       _resetPaging();
       safeEmit(state.copyWith(
-          results: [],
-          isLoading: false,
-          hasSearched: false,
-          errorMessage: null));
+          results: [], isLoading: false, hasSearched: false, error: null));
       return;
     }
 
     _resetPaging();
     _showingCachedResults = false;
-    safeEmit(state.copyWith(isLoading: true, errorMessage: null));
+    safeEmit(state.copyWith(isLoading: true, error: null));
     try {
       final videoId = FileIntentHandler.extractYouTubeVideoId(query);
       if (videoId != null) {
@@ -342,8 +343,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           safeEmit(state.copyWith(
               results: List<YtmTrack>.unmodifiable([track]),
               isLoading: false,
-              
-              errorMessage: null));
+              error: null));
           return;
         } catch (e, st) {
           // FIX-A05: Log failure before falling back to regular search
@@ -355,7 +355,8 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
         }
       }
 
-      final results = await _service.searchWithFallback(query, limit: _searchPageSize);
+      final results =
+          await _service.searchWithFallback(query, limit: _searchPageSize);
       if (effectiveGeneration != _generation || isClosed) return;
       _showingCachedResults = false;
 
@@ -372,21 +373,21 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           // shows the history list instead of the no-results state.
           hasSearched: true,
           loadMoreFailed: false,
-          errorMessage: null,
+          error: null,
         ));
         unawaited(_maybeShowCached(query, effectiveGeneration));
         return;
       }
 
       _nextLimit = _searchPageSize;
-      _hasMore = results.length >= _searchPageSize &&
-          _nextLimit < _maxSearchLimit;
+      _hasMore =
+          results.length >= _searchPageSize && _nextLimit < _maxSearchLimit;
       safeEmit(state.copyWith(
           results: List<YtmTrack>.unmodifiable(results),
           isLoading: false,
           hasSearched: true,
           loadMoreFailed: false,
-          errorMessage: null));
+          error: null));
       if (results.isNotEmpty) {
         unawaited(_cache.write(query, results));
       }
@@ -470,8 +471,20 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       final msg = e.isBotBlocked
           ? 'YouTube is rate-limiting requests. Please wait a few minutes.'
           : errorInfo.message;
-      safeEmit(
-          state.copyWith(isLoading: false, results: [], errorMessage: msg));
+      safeEmit(state.copyWith(
+        isLoading: false,
+        results: [],
+        error: e.isBotBlocked
+            ? const GenericAppError(
+                code: 'YTM_BOT_BLOCK',
+                userMessage:
+                    'YouTube is rate-limiting requests. Please wait a few minutes.',
+              )
+            : GenericAppError(
+                code: 'YTM_SEARCH_FAILED',
+                userMessage: msg,
+              ),
+      ));
       // Only a transport failure is answered from the cache. A bot/geo/rate
       // verdict must stay visible: cached cards would play, then fail again.
       if (e.isNetwork ||
@@ -483,7 +496,13 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       if (effectiveGeneration != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
       safeEmit(state.copyWith(
-          isLoading: false, results: [], errorMessage: errorInfo.message));
+        isLoading: false,
+        results: [],
+        error: GenericAppError(
+          code: 'YTM_SEARCH_FAILED',
+          userMessage: errorInfo.message,
+        ),
+      ));
       unawaited(_maybeShowCached(query, effectiveGeneration));
     }
   }
@@ -500,7 +519,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       results: List<YtmTrack>.unmodifiable(cached),
       isLoading: false,
       loadMoreFailed: false,
-      errorMessage: null,
+      error: null,
     ));
   }
 

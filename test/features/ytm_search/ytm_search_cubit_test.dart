@@ -5,6 +5,7 @@ import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/errors/app_error.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
@@ -66,8 +67,12 @@ void main() {
 
   group('SearchPhase getter', () {
     test('reports error, fetching, displaying, noResults and debouncing', () {
-      const withError = YtmSearchState(query: 'x', errorMessage: 'boom');
+      const withError = YtmSearchState(
+        query: 'x',
+        error: GenericAppError(code: 'TEST', userMessage: 'boom'),
+      );
       expect(withError.phase, SearchPhase.error);
+      expect(withError.error, isA<AppError>());
       expect(const YtmSearchState(query: 'x', isLoading: true).phase,
           SearchPhase.fetching);
       expect(YtmSearchState(query: 'x', results: [_track('aaaaaaaaaaa')]).phase,
@@ -76,7 +81,11 @@ void main() {
           SearchPhase.noResults);
       expect(const YtmSearchState(query: 'x').phase, SearchPhase.debouncing);
       expect(const YtmSearchState().phase, SearchPhase.idle);
-      expect(const YtmSearchState(errorMessage: '').phase, SearchPhase.idle);
+      expect(
+          const YtmSearchState(
+            error: GenericAppError(code: 'TEST', userMessage: ''),
+          ).phase,
+          SearchPhase.idle);
     });
 
     test('isTerminal for displaying, noResults and error', () {

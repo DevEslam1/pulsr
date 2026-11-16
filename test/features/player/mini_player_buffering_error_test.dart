@@ -1,11 +1,13 @@
 // Mini-player buffering spinner, seek gating, and the error pill retry path.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/mini_player.dart';
 
 import 'widgets/player_sheet_test_support.dart';
+
+import 'package:pulsr/core/errors/app_error.dart';
 
 PlayerState stateWith({
   bool isPlaying = true,
@@ -20,7 +22,7 @@ PlayerState stateWith({
       isBuffering: isBuffering,
       position: position,
       duration: const Duration(minutes: 3, seconds: 30),
-      errorMessage: errorMessage,
+      error: errorMessage == null ? null : uiError(errorMessage),
     ),
     queueSlice: const QueueSlice(queue: [testSong], currentIndex: 0),
   );

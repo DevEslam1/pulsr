@@ -1,7 +1,7 @@
 // LibraryScreen shell branch coverage: tab selection persistence, the
 // didUpdateWidget deep-link switch, the long-press manage sheet, reordering,
 // the batch-actions sheet (add-to-queue + delete) and the empty-state refresh.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';

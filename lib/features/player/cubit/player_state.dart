@@ -1,7 +1,8 @@
 // lib/features/player/cubit/player_state.dart
 import 'package:flutter/foundation.dart' show mapEquals;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../core/utils/list_content_diff.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/audio_effects_config.dart';
@@ -52,7 +53,7 @@ abstract class PlaybackSlice with _$PlaybackSlice {
     @Default(1.0) double playbackSpeed,
     @Default(1.0) double playbackPitch,
     int? audioSessionId,
-    String? errorMessage,
+    AppError? error,
     @Default(false) bool isExpanded,
     Color? dominantColor,
     Duration? sleepTimerRemaining,
@@ -70,6 +71,9 @@ abstract class PlaybackSlice with _$PlaybackSlice {
     @Default(1.0) double volume,
   }) = _PlaybackSlice;
 
+  /// Display copy for the typed failure (existing UI contract).
+  String? get errorMessage => error?.userMessage;
+
   /// True when every field other than [position] is equal to [other]'s.
   bool differsBeyondPosition(PlaybackSlice other) {
     return currentSong != other.currentSong ||
@@ -81,7 +85,7 @@ abstract class PlaybackSlice with _$PlaybackSlice {
         playbackSpeed != other.playbackSpeed ||
         playbackPitch != other.playbackPitch ||
         audioSessionId != other.audioSessionId ||
-        errorMessage != other.errorMessage ||
+        error?.userMessage != other.error?.userMessage ||
         isExpanded != other.isExpanded ||
         dominantColor != other.dominantColor ||
         ((sleepTimerRemaining == null) != (other.sleepTimerRemaining == null) ||

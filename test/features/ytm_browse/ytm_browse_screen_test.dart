@@ -1,5 +1,5 @@
 // test/features/ytm_browse/ytm_browse_screen_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -13,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../helpers/screen_harness.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockYtmBrowseService extends Mock implements YtmBrowseService {}
 
 void main() {
@@ -40,7 +41,7 @@ void main() {
         providers: [BlocProvider<PlayerCubit>.value(value: stubPlayerCubit())],
         child: MaterialApp(
           theme: AuraTheme.darkTheme,
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: const YtmBrowseScreen(),
         ),

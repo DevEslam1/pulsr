@@ -72,7 +72,7 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
       final validationError =
           validateProxyHostAndPort(host: trimmedHost, port: port);
       if (validationError != null) {
-        safeEmit(state.copyWith(errorMessage: validationError));
+        safeEmit(state.copyWith(error: uiError(validationError)));
         return false;
       }
     }
@@ -132,8 +132,8 @@ mixin SettingsProxyActions on PulsrCubit<SettingsState> {
       if (!isClosed) {
         safeEmit(state.copyWith(
           hasProxyPassword: previousState.hasProxyPassword,
-          errorMessage:
-              'Failed to save proxy password securely. It was not changed.',
+          error: uiError(
+              'Failed to save proxy password securely. It was not changed.'),
         ));
       }
       success = false;

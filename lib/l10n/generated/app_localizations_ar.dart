@@ -10445,4 +10445,42 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get coachMarkDockSwipeBody =>
       'اسحب لأعلى على المشغل المصغر أو اضغط مطولاً لتخصيص أوضاع التثبيت.';
+
+  @override
+  String get databaseHealth => 'صحة قاعدة البيانات';
+
+  @override
+  String get databaseHealthChecking => 'جارٍ الفحص…';
+
+  @override
+  String get databaseHealthHealthy => 'سليمة';
+
+  @override
+  String get databaseHealthIssues => 'تم اكتشاف مشكلات';
+
+  @override
+  String databaseHealthEncryption(String state) {
+    return 'التشفير: $state';
+  }
+
+  @override
+  String get databaseEncryptionEncrypted => 'مشفّرة';
+
+  @override
+  String get databaseEncryptionPlaintext => 'نص صريح';
+
+  @override
+  String get databaseEncryptionUnavailable => 'غير متاح';
+
+  @override
+  String get databaseEncryptionDisabled => 'معطّل';
+
+  @override
+  String get databaseHealthRepairSearch => 'إصلاح فهرس البحث';
+
+  @override
+  String get databaseHealthSearchRepaired => 'تم إصلاح فهرس البحث';
+
+  @override
+  String get databaseHealthSearchRepairFailed => 'فشل إصلاح فهرس البحث';
 }

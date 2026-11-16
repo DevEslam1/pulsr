@@ -1,5 +1,5 @@
 // test/settings_screen_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +18,9 @@ import 'package:pulsr/features/settings/presentation/widgets/settings_hero_card.
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -78,7 +81,7 @@ void main() {
       ],
       child: MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const SettingsScreen(),
       ),
@@ -287,7 +290,7 @@ void main() {
       await pumpScreen(tester);
 
       settingsCubit.safeEmit(settingsCubit.state.copyWith(
-        errorMessage: 'output device could not disable Bit-Perfect',
+        error: uiError('output device could not disable Bit-Perfect'),
       ));
       await settleAnims(tester);
 

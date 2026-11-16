@@ -531,7 +531,8 @@ class MusicRepository implements IMusicRepository {
         final byRemoteId = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.remoteId.equals(remoteId) &
-                  (t.source.equals(SongSource.local) | t.isDownloaded.equals(true)) &
+                  (t.source.equals(SongSource.local) |
+                      t.isDownloaded.equals(true)) &
                   t.path.equals('').not() &
                   t.path.like('ytmusic://%').not() &
                   t.isMissing.equals(false))
@@ -547,7 +548,8 @@ class MusicRepository implements IMusicRepository {
           artist.trim().isNotEmpty) {
         final byMeta = await (_db.select(_db.songsTable)
               ..where((t) =>
-                  (t.source.equals(SongSource.local) | t.isDownloaded.equals(true)) &
+                  (t.source.equals(SongSource.local) |
+                      t.isDownloaded.equals(true)) &
                   t.path.equals('').not() &
                   t.path.like('ytmusic://%').not() &
                   t.isMissing.equals(false) &
@@ -572,8 +574,8 @@ class MusicRepository implements IMusicRepository {
       final uniqueIds = ids.toSet().toList(growable: false);
       final byId = <int, SongsTableData>{};
       for (var i = 0; i < uniqueIds.length; i += chunkSize) {
-        final chunk = uniqueIds.sublist(
-            i, min(i + chunkSize, uniqueIds.length));
+        final chunk =
+            uniqueIds.sublist(i, min(i + chunkSize, uniqueIds.length));
         final rows = await (_db.select(_db.songsTable)
               ..where((t) => t.id.isIn(chunk)))
             .get();
@@ -2006,8 +2008,8 @@ class MusicRepository implements IMusicRepository {
         final uniqueIds = songIds.toSet().toList(growable: false);
         final existingIds = <int>{};
         for (var i = 0; i < uniqueIds.length; i += chunkSize) {
-          final chunk = uniqueIds.sublist(
-              i, min(i + chunkSize, uniqueIds.length));
+          final chunk =
+              uniqueIds.sublist(i, min(i + chunkSize, uniqueIds.length));
           final existingRows = await (_db.selectOnly(_db.songsTable)
                 ..addColumns([_db.songsTable.id])
                 ..where(_db.songsTable.id.isIn(chunk)))
@@ -2801,47 +2803,53 @@ class MusicRepository implements IMusicRepository {
         ..addAll(reverifiedMissing);
       reappearedIds.addAll(reverifiedReappeared);
 
-      // P0-6: Use Drift batch for atomic single-transaction execution
+      // P0-6: The missing/active flag writes and the denormalized
+      // album/artist count rewrites are one transaction: a crash between them
+      // would otherwise leave counts disagreeing with the rows they describe.
       const updateChunkSize = 400;
-      await _db.batch((batch) {
-        if (trulyMissingIds.isNotEmpty) {
-          for (var i = 0; i < trulyMissingIds.length; i += updateChunkSize) {
-            final end = (i + updateChunkSize < trulyMissingIds.length)
-                ? i + updateChunkSize
-                : trulyMissingIds.length;
-            final chunk = trulyMissingIds.sublist(i, end);
-            batch.update(
-              _db.songsTable,
-              const SongsTableCompanion(isMissing: Value(true)),
-              where: (t) => t.id.isIn(chunk),
-            );
+      await _db.transaction(() async {
+        await _db.batch((batch) {
+          if (trulyMissingIds.isNotEmpty) {
+            for (var i = 0; i < trulyMissingIds.length; i += updateChunkSize) {
+              final end = (i + updateChunkSize < trulyMissingIds.length)
+                  ? i + updateChunkSize
+                  : trulyMissingIds.length;
+              final chunk = trulyMissingIds.sublist(i, end);
+              batch.update(
+                _db.songsTable,
+                const SongsTableCompanion(isMissing: Value(true)),
+                where: (t) => t.id.isIn(chunk),
+              );
+            }
           }
-        }
 
-        // Ensure newly/currently scanned songs and reappeared songs are marked active (not missing)
-        final activeIds = [...scannedSongIds, ...reappearedIds];
-        if (activeIds.isNotEmpty) {
-          for (var i = 0; i < activeIds.length; i += updateChunkSize) {
-            final end = (i + updateChunkSize < activeIds.length)
-                ? i + updateChunkSize
-                : activeIds.length;
-            final chunk = activeIds.sublist(i, end);
-            batch.update(
-              _db.songsTable,
-              const SongsTableCompanion(isMissing: Value(false)),
-              where: (t) => t.id.isIn(chunk),
-            );
+          // Ensure newly/currently scanned songs and reappeared songs are marked active (not missing)
+          final activeIds = [...scannedSongIds, ...reappearedIds];
+          if (activeIds.isNotEmpty) {
+            for (var i = 0; i < activeIds.length; i += updateChunkSize) {
+              final end = (i + updateChunkSize < activeIds.length)
+                  ? i + updateChunkSize
+                  : activeIds.length;
+              final chunk = activeIds.sublist(i, end);
+              batch.update(
+                _db.songsTable,
+                const SongsTableCompanion(isMissing: Value(false)),
+                where: (t) => t.id.isIn(chunk),
+              );
+            }
           }
-        }
+        });
+
+        final markedMissingCount = trulyMissingIds.length;
+
+        // Recalculate song counts using active (non-missing) local non-CUE songs
+        // and prune albums/artists whose song_count dropped to 0.
+        await _recalculateAllAlbumAndArtistCounts();
+
+        return markedMissingCount;
       });
 
-      final markedMissingCount = trulyMissingIds.length;
-
-      // Recalculate song counts using active (non-missing) local non-CUE songs
-      // and prune albums/artists whose song_count dropped to 0.
-      await _recalculateAllAlbumAndArtistCounts();
-
-      return Right(markedMissingCount);
+      return Right(trulyMissingIds.length);
     } catch (e) {
       return Left(DatabaseFailure('Failed to cleanup orphaned items', e));
     }
@@ -3016,6 +3024,10 @@ class MusicRepository implements IMusicRepository {
       'UPDATE artists SET song_count = ('
       'SELECT COUNT(*) FROM songs '
       'WHERE songs.artist_id = artists.id AND $_activeLocalNonCueSongSqlPredicate'
+      '), album_count = ('
+      'SELECT COUNT(DISTINCT songs.album_id) FROM songs '
+      'WHERE songs.artist_id = artists.id AND songs.album_id IS NOT NULL '
+      'AND $_activeLocalNonCueSongSqlPredicate'
       ');',
     );
     await _db.customStatement(
@@ -3050,6 +3062,10 @@ class MusicRepository implements IMusicRepository {
         'UPDATE artists SET song_count = ('
         'SELECT COUNT(*) FROM songs '
         'WHERE songs.artist_id = artists.id AND $_activeLocalNonCueSongSqlPredicate'
+        '), album_count = ('
+        'SELECT COUNT(DISTINCT songs.album_id) FROM songs '
+        'WHERE songs.artist_id = artists.id AND songs.album_id IS NOT NULL '
+        'AND $_activeLocalNonCueSongSqlPredicate'
         ') WHERE id = ?;',
         [artistId],
       );
@@ -3292,7 +3308,6 @@ class MusicRepository implements IMusicRepository {
                   isMissing: const Value(false),
                   isDownloaded: const Value(true),
                   dateAdded: Value(resolvedDateAdded),
-                  pendingDownloadPath: const Value(null),
                   uri: contentUri != null && contentUri.isNotEmpty
                       ? Value(contentUri)
                       : const Value.absent(),
@@ -3502,7 +3517,6 @@ class MusicRepository implements IMusicRepository {
             source: const Value(SongSource.local),
             isMissing: const Value(false),
             isDownloaded: const Value(true),
-            pendingDownloadPath: const Value(null),
             uri: contentUri != null && contentUri.isNotEmpty
                 ? Value(contentUri)
                 : const Value.absent(),
@@ -3593,9 +3607,8 @@ class MusicRepository implements IMusicRepository {
         }
         final keepOldPosition =
             (oldData.lastPlayed ?? 0) > (newData.lastPlayed ?? 0);
-        int mergedLastPos = keepOldPosition
-            ? oldData.lastPositionMs
-            : newData.lastPositionMs;
+        int mergedLastPos =
+            keepOldPosition ? oldData.lastPositionMs : newData.lastPositionMs;
         if (extraLastPlayed != null &&
             (mergedLastPlayed == null || extraLastPlayed > mergedLastPlayed)) {
           mergedLastPlayed = extraLastPlayed;
@@ -3651,8 +3664,8 @@ class MusicRepository implements IMusicRepository {
             genre: Value(oldData.genre ?? newData.genre ?? extraGenre),
             isFavorite: Value(
                 oldData.isFavorite || newData.isFavorite || extraFavorite),
-            playCount: Value(
-                oldData.playCount + newData.playCount + extraPlayCount),
+            playCount:
+                Value(oldData.playCount + newData.playCount + extraPlayCount),
             lastPlayed: Value(mergedLastPlayed),
             lastPositionMs: Value(mergedLastPos),
             // Carry the video id and online remoteArtworkUrl
@@ -3663,7 +3676,6 @@ class MusicRepository implements IMusicRepository {
             source: const Value(SongSource.local),
             isMissing: const Value(false),
             isDownloaded: const Value(true),
-            pendingDownloadPath: const Value(null),
             uri: contentUri != null && contentUri.isNotEmpty
                 ? Value(contentUri)
                 : const Value.absent(),

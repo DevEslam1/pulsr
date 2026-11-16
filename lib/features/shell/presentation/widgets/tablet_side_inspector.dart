@@ -1,5 +1,5 @@
 // lib/features/shell/presentation/widgets/tablet_side_inspector.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -19,6 +19,7 @@ import '../../../player/presentation/widgets/lyrics_view.dart';
 import '../../../player/presentation/widgets/now_playing_queue_view.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 @immutable
 class _TabletLyricsData {
   final int? songId;
@@ -308,10 +309,10 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                                                                       .w700
                                                                   : FontWeight
                                                                       .w600,
-                                                          color:
-                                                              safeTabIndex == i
-                                                                  ? p.onAccent
-                                                                  : p.textSecondary,
+                                                          color: safeTabIndex ==
+                                                                  i
+                                                              ? p.onAccent
+                                                              : p.textSecondary,
                                                         ),
                                                       ),
                                               ),
@@ -392,12 +393,15 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                     final downAt = _lastHandlePointerDownAt;
                     final downPos = _lastHandlePointerDownPos;
                     if (downAt == null || downPos == null) return;
-                    final isTap = DateTime.now().difference(downAt).inMilliseconds < 250 &&
-                        (event.position - downPos).distance < 8.0;
+                    final isTap =
+                        DateTime.now().difference(downAt).inMilliseconds <
+                                250 &&
+                            (event.position - downPos).distance < 8.0;
                     if (!isTap) return;
                     final now = DateTime.now();
                     if (_lastHandleTapAt != null &&
-                        now.difference(_lastHandleTapAt!).inMilliseconds < 320) {
+                        now.difference(_lastHandleTapAt!).inMilliseconds <
+                            320) {
                       _lastHandleTapAt = null;
                       PulsrHaptics.selectionClick();
                       setState(() => _customWidth = null);
@@ -413,71 +417,75 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onHorizontalDragStart: (_) {
-                    PulsrHaptics.selectionClick();
-                    _dragDeltaAccumulator = 0.0;
-                    setState(() => _isDragging = true);
-                  },
-                  onHorizontalDragUpdate: (details) {
-                    final isRtl =
-                        Directionality.of(context) == TextDirection.rtl;
-                    final delta = isRtl ? details.delta.dx : -details.delta.dx;
-                    _dragDeltaAccumulator += delta;
-                    if (_dragDeltaAccumulator.abs() >= 1.0) {
-                      final current = _customWidth ?? defaultWidth;
-                      final newWidth = (current + _dragDeltaAccumulator).clamp(
-                        TabletSideInspector.minWidth,
-                        TabletSideInspector.maxWidth,
-                      );
+                      PulsrHaptics.selectionClick();
                       _dragDeltaAccumulator = 0.0;
-                      if (newWidth != _customWidth) {
-                        setState(() {
-                          _customWidth = newWidth;
-                        });
+                      setState(() => _isDragging = true);
+                    },
+                    onHorizontalDragUpdate: (details) {
+                      final isRtl =
+                          Directionality.of(context) == TextDirection.rtl;
+                      final delta =
+                          isRtl ? details.delta.dx : -details.delta.dx;
+                      _dragDeltaAccumulator += delta;
+                      if (_dragDeltaAccumulator.abs() >= 1.0) {
+                        final current = _customWidth ?? defaultWidth;
+                        final newWidth =
+                            (current + _dragDeltaAccumulator).clamp(
+                          TabletSideInspector.minWidth,
+                          TabletSideInspector.maxWidth,
+                        );
+                        _dragDeltaAccumulator = 0.0;
+                        if (newWidth != _customWidth) {
+                          setState(() {
+                            _customWidth = newWidth;
+                          });
+                        }
                       }
-                    }
-                  },
-                  onHorizontalDragEnd: (_) {
-                    _dragDeltaAccumulator = 0.0;
-                    setState(() => _isDragging = false);
-                    if (_customWidth != null) {
-                      final key = PrefsKeys.tabletInspectorWidthKey(
-                        _loadedDeviceClass ??
-                            PulsrViewport.fromContext(context).deviceClass.name,
-                      );
-                      SettingsCache().setDouble(key, _customWidth!);
-                    }
-                  },
-                  onHorizontalDragCancel: () {
-                    _dragDeltaAccumulator = 0.0;
-                    setState(() => _isDragging = false);
-                  },
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: SizedBox(
-                      width: 24,
-                      child: Center(
-                        child: AnimatedContainer(
-                          duration: context.motionMs(150),
-                          width: _isDragging ? 4.5 : 3.0,
-                          height: _isDragging ? 52.0 : 32.0,
-                          decoration: BoxDecoration(
-                            color: _isDragging
-                                ? p.accent
-                                : p.textTertiary.withValues(alpha: 0.32),
-                            borderRadius: AppRadii.r4All,
-                            boxShadow: _isDragging
-                                ? [
-                                    BoxShadow(
-                                      color: p.accent.withValues(alpha: 0.45),
-                                      blurRadius: 8,
-                                    ),
-                                  ]
-                                : null,
+                    },
+                    onHorizontalDragEnd: (_) {
+                      _dragDeltaAccumulator = 0.0;
+                      setState(() => _isDragging = false);
+                      if (_customWidth != null) {
+                        final key = PrefsKeys.tabletInspectorWidthKey(
+                          _loadedDeviceClass ??
+                              PulsrViewport.fromContext(context)
+                                  .deviceClass
+                                  .name,
+                        );
+                        SettingsCache().setDouble(key, _customWidth!);
+                      }
+                    },
+                    onHorizontalDragCancel: () {
+                      _dragDeltaAccumulator = 0.0;
+                      setState(() => _isDragging = false);
+                    },
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: SizedBox(
+                        width: 24,
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: context.motionMs(150),
+                            width: _isDragging ? 4.5 : 3.0,
+                            height: _isDragging ? 52.0 : 32.0,
+                            decoration: BoxDecoration(
+                              color: _isDragging
+                                  ? p.accent
+                                  : p.textTertiary.withValues(alpha: 0.32),
+                              borderRadius: AppRadii.r4All,
+                              boxShadow: _isDragging
+                                  ? [
+                                      BoxShadow(
+                                        color: p.accent.withValues(alpha: 0.45),
+                                        blurRadius: 8,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
                   ),
                 ),
               ),

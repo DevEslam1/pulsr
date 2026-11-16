@@ -3,7 +3,7 @@
 // PulsrViewport.navMode and PulsrLayoutDelegate.resolveMode must agree on the
 // same geometry. An 844x390 landscape phone used to yield sideRailExtended
 // from the viewport token while the shell rendered a wide bottom bar.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/responsive/breakpoints.dart';
 import 'package:pulsr/core/responsive/layout_delegate.dart';

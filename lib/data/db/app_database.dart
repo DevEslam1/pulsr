@@ -1,9 +1,12 @@
 // lib/data/db/app_database.dart
 import 'dart:async';
+import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:injectable/injectable.dart';
 import '../../core/utils/error_logger.dart';
+import 'database_encryption.dart';
 import 'tables.dart';
 
 export 'tables.dart' show SongSource, OnlineLibraryKind;
@@ -130,12 +133,34 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @factoryMethod
-  AppDatabase() : super(driftDatabase(name: 'pulsr_music_db'));
+  AppDatabase() : super(_openDefaultDatabase());
+
+  /// Opens an explicit database file. Used by encryption tests to exercise the
+  /// real drift setup path (including the `PRAGMA key` before any statement).
+  @visibleForTesting
+  AppDatabase.openAt(File file) : super(_openDatabaseAt(file));
 
   AppDatabase.forTesting(super.e);
 
+  static QueryExecutor _openDefaultDatabase() => _openDatabaseAt(null);
+
+  static QueryExecutor _openDatabaseAt(File? file) {
+    // Captured locally: drift sends the setup closure to its database
+    // isolate(s), so a static lookup would read null there.
+    final keyHex = DatabaseEncryptionBootstrap.activeKeyHex;
+    return driftDatabase(
+      name: DatabaseEncryptionBootstrap.databaseName,
+      native: DriftNativeOptions(
+        databasePath: file == null ? null : () async => file.path,
+        tempDirectoryPath:
+            file == null ? null : () async => Directory.systemTemp.path,
+        setup: (raw) => DatabaseEncryptionBootstrap.applyKey(raw, keyHex),
+      ),
+    );
+  }
+
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   static Future<void> _createFtsTable(
       Future<void> Function(String) executeSql) async {
@@ -306,8 +331,6 @@ class AppDatabase extends _$AppDatabase {
       await executeSql(
           'CREATE INDEX IF NOT EXISTS idx_songs_cue ON songs (cue_file, cue_start_ms);');
       await executeSql(
-          'CREATE INDEX IF NOT EXISTS idx_songs_pending_dl ON songs (pending_download_path);');
-      await executeSql(
           'CREATE INDEX IF NOT EXISTS idx_playlists_name ON playlists (name);');
       await executeSql(
           'CREATE INDEX IF NOT EXISTS idx_songs_title_nocase ON songs (title COLLATE NOCASE);');
@@ -365,7 +388,6 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(songsTable, songsTable.source);
             await m.addColumn(songsTable, songsTable.remoteId);
             await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
-            await m.addColumn(songsTable, songsTable.pendingDownloadPath);
           }
           if (from < 6) {
             await m.addColumn(songsTable, songsTable.sampleRate);
@@ -465,6 +487,18 @@ class AppDatabase extends _$AppDatabase {
               await customStatement(
                   'UPDATE playlist_entries SET added_at = $now WHERE added_at <= 0;');
             } catch (_) {}
+          }
+          if (from == 12) {
+            // Drop the dead `pending_download_path` column. Drift recreates the
+            // table from the current definition and copies the surviving
+            // columns; the index over the dropped column must go first.
+            //
+            // Only the fully-current v12 schema is recreated: older databases
+            // can legitimately lack later columns (`uri`) that drift's copy
+            // assumes exist. They keep the nullable dead column instead of
+            // risking a failed upgrade.
+            await customStatement('DROP INDEX IF EXISTS idx_songs_pending_dl;');
+            await m.alterTable(TableMigration(songsTable));
           }
           // Must run after every addColumn above: several indexes cover columns a
           // later branch introduces, so creating them mid-ladder fails on an older

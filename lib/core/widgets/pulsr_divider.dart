@@ -1,5 +1,5 @@
 // lib/core/widgets/pulsr_divider.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../theme/aura_theme.dart';
 
 /// {@category DesignSystem}

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -13,6 +13,7 @@ import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/library/presentation/recents_screen.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockSongs extends Mock implements GetSongsUseCase {}
 
 class MockPlayer extends Mock implements PlayerCubit {}
@@ -46,7 +47,7 @@ void main() {
           value: player,
           child: MaterialApp(
               theme: AuraTheme.darkTheme,
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              localizationsDelegates: appLocalizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
               home: const RecentsScreen())));
       await tester.pump();

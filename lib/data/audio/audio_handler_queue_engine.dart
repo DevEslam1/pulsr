@@ -548,8 +548,7 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
               currentSessionId ?? _activePlayer.androidAudioSessionId);
           await _pushNativeReplayGain(nextSong);
           try {
-            await _activePlayer
-                .setVolume(_calculateReplayGainVolume(nextSong));
+            await _activePlayer.setVolume(_calculateReplayGainVolume(nextSong));
           } catch (e, st) {
             ErrorLogger.log('Failed to apply replay gain volume on swap',
                 error: e, stackTrace: st, category: 'AudioHandler');
@@ -1032,12 +1031,64 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     }
   }
 
+  /// MediaItem instances are reused across queue publishes: rebuilding a
+  /// 10k-track queue on every mutation allocated a full second list and relied
+  /// on audio_service to diff identical objects. Keyed by song id and the
+  /// artwork actually resolved into the item, so artwork refreshes still
+  /// invalidate only the affected rows.
+  final Map<
+      int,
+      ({
+        SongsTableData song,
+        String? artworkKey,
+        MediaItem item,
+      })> _mediaItemCache = {};
+  List<MediaItem>? _lastPublishedQueue;
+
+  MediaItem _cachedMediaItemFor(SongsTableData song) {
+    final artworkKey =
+        ArtworkUriResolver.getCachedArtworkUri(song.id)?.toString();
+    final cached = _mediaItemCache[song.id];
+    if (cached != null &&
+        cached.song == song &&
+        cached.artworkKey == artworkKey) {
+      return cached.item;
+    }
+    final item = PulsrAudioHandler._songToMediaItem(song);
+    _mediaItemCache[song.id] = (
+      song: song,
+      artworkKey: artworkKey,
+      item: item,
+    );
+    return item;
+  }
+
+  bool _queueMatchesLastPublish(List<MediaItem> items) {
+    final last = _lastPublishedQueue;
+    if (last == null || last.length != items.length) return false;
+    for (var i = 0; i < items.length; i++) {
+      if (!identical(last[i], items[i])) return false;
+    }
+    return true;
+  }
+
   void _publishQueueWithArtwork({int windowSize = 5}) {
     final songsSnapshot = List<SongsTableData>.from(_songs);
     final currentIdx = _currentIndex;
     final mediaItems =
-        songsSnapshot.map(PulsrAudioHandler._songToMediaItem).toList();
-    queue.add(mediaItems);
+        songsSnapshot.map(_cachedMediaItemFor).toList(growable: false);
+    if (!_queueMatchesLastPublish(mediaItems)) {
+      final published = List<MediaItem>.unmodifiable(mediaItems);
+      queue.add(published);
+      _lastPublishedQueue = published;
+    }
+
+    // Bound the cache to the live queue when it has churned (queue replacement
+    // keeps ids from previous queues otherwise).
+    if (_mediaItemCache.length > songsSnapshot.length * 2) {
+      final liveIds = songsSnapshot.map((song) => song.id).toSet();
+      _mediaItemCache.removeWhere((id, _) => !liveIds.contains(id));
+    }
 
     unawaited(() async {
       if (songsSnapshot.isEmpty) return;
@@ -1053,7 +1104,13 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
         }
       }
       if (anyResolved && _songs.length == songsSnapshot.length) {
-        queue.add(_songs.map(PulsrAudioHandler._songToMediaItem).toList());
+        final refreshed =
+            _songs.map(_cachedMediaItemFor).toList(growable: false);
+        if (!_queueMatchesLastPublish(refreshed)) {
+          final published = List<MediaItem>.unmodifiable(refreshed);
+          queue.add(published);
+          _lastPublishedQueue = published;
+        }
       }
     }());
   }

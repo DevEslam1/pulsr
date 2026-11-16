@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'
+    hide GlobalMaterialLocalizations, GlobalCupertinoLocalizations;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_toast.dart';
@@ -58,7 +60,8 @@ void main() {
       expect(find.text('Track added to queue'), findsNothing);
     });
 
-    testWidgets('dedupe and refresh: identical message while active keeps single instance and refreshes timer',
+    testWidgets(
+        'dedupe and refresh: identical message while active keeps single instance and refreshes timer',
         (tester) async {
       await tester.pumpWidget(_wrap(
         Builder(

@@ -1,5 +1,5 @@
 // test/core/widgets/gpu_budget_consumer_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/performance/gpu_budget.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';

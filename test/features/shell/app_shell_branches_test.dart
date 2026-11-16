@@ -4,7 +4,7 @@
 // toast and the global keyboard shortcuts.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +25,9 @@ import 'package:pulsr/features/player/presentation/widgets/tablet_player_bar.dar
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -118,7 +121,7 @@ void main() {
       ],
       child: MaterialApp(
         navigatorKey: navigatorKey,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: MediaQuery(
           data: MediaQueryData(size: size, disableAnimations: true),
@@ -321,8 +324,8 @@ void main() {
     await tester.pumpWidget(buildShell());
     await tester.pumpAndSettle();
 
-    controller.add(const PlayerState(
-      playback: PlaybackSlice(errorMessage: 'stream_failed'),
+    controller.add(PlayerState(
+      playback: PlaybackSlice(error: uiError('stream_failed')),
     ));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));

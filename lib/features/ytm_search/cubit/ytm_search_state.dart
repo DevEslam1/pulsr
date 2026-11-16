@@ -1,5 +1,6 @@
 // lib/features/ytm_search/cubit/ytm_search_state.dart
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../domain/models/ytm_track.dart';
 
 part 'ytm_search_state.freezed.dart';
@@ -26,11 +27,15 @@ abstract class YtmSearchState with _$YtmSearchState {
     @Default(false) bool isLoading,
     @Default(false) bool hasSearched,
     @Default(false) bool loadMoreFailed,
-    String? errorMessage,
+    AppError? error,
   }) = _YtmSearchState;
 
+  /// Display copy for the typed failure (existing UI contract).
+  String? get errorMessage => error?.userMessage;
+
   SearchPhase get phase {
-    if (errorMessage != null && errorMessage!.isNotEmpty) {
+    final message = error?.userMessage;
+    if (message != null && message.isNotEmpty) {
       return SearchPhase.error;
     }
     if (isLoading) return SearchPhase.fetching;

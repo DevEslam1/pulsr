@@ -1,5 +1,5 @@
 // lib/features/shell/presentation/widgets/player_shortcut_scope.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/utils/l10n_extensions.dart';
@@ -8,6 +8,7 @@ import '../../../command_palette/presentation/command_palette_sheet.dart';
 import 'shortcut_help_sheet.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Global keyboard shortcuts for desktop/tablet.
 ///
 /// Bindings:

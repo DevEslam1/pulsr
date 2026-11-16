@@ -1,5 +1,5 @@
 // lib/features/ytm_browse/presentation/ytm_browse_screen.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -32,6 +32,7 @@ import '../cubit/ytm_browse_cubit.dart';
 import '../cubit/ytm_browse_state.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class YtmBrowseScreen extends StatelessWidget {
   const YtmBrowseScreen({super.key});
 

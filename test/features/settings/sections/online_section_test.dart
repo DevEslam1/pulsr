@@ -3,7 +3,7 @@
 // NOTE: every offline/wifi/quality/YTM row in this section sits behind the
 // compile-time constant `AppConfig.ytmEnabled` (false in the default test
 // build), so only the always-present proxy row has executable branches here.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';

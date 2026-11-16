@@ -3,7 +3,7 @@
 // Exercises every DownloadStatus variant (icons/labels/progress), artwork vs
 // status-icon leading, cancel button, popup-menu actions, error row, and the
 // title/size fallbacks.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -15,6 +15,7 @@ import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/downloads/presentation/widgets/download_tile.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockDownloadsCubit extends Mock implements DownloadsCubit {}
 
 DownloadTask _task({
@@ -84,7 +85,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: BlocProvider<DownloadsCubit>.value(

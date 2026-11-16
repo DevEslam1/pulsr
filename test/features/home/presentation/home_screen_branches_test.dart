@@ -6,7 +6,7 @@
 // to false in the test environment.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
@@ -124,9 +124,11 @@ void main() {
   testWidgets('a failed quick-action fetch plays nothing and reports the error',
       (tester) async {
     when(() => getSongs.watchTopPlayed(
-          limit: any(named: 'limit'),
-          excludedFolders: any(named: 'excludedFolders'),
-        )).thenAnswer((_) => Stream.value(const Left(DatabaseFailure('offline'))));
+              limit: any(named: 'limit'),
+              excludedFolders: any(named: 'excludedFolders'),
+            ))
+        .thenAnswer(
+            (_) => Stream.value(const Left(DatabaseFailure('offline'))));
 
     await pumpScreen(tester);
     await tester.tap(find.text('Focus Flow'));

@@ -1,7 +1,7 @@
 // test/architecture/ui_ux_10_ratchet_test.dart
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -80,7 +80,8 @@ void main() {
       );
     });
 
-    test('all GoRoutes in app_router.dart use pageBuilder (CustomTransitionPage)',
+    test(
+        'all GoRoutes in app_router.dart use pageBuilder (CustomTransitionPage)',
         () {
       final routerFile = File('lib/core/router/app_router.dart');
       expect(routerFile.existsSync(), isTrue);
@@ -119,8 +120,7 @@ void main() {
       );
     });
 
-    testWidgets(
-        'AppBlur.canBlur honours GpuBudget and MediaQuery.highContrast',
+    testWidgets('AppBlur.canBlur honours GpuBudget and MediaQuery.highContrast',
         (tester) async {
       GpuBudget.setEnabled(false);
       addTearDown(() => GpuBudget.setEnabled(false));

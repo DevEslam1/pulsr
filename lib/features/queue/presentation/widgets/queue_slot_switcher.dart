@@ -1,5 +1,5 @@
 // lib/features/queue/presentation/widgets/queue_slot_switcher.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -63,57 +63,57 @@ class QueueSlotSwitcher extends StatelessWidget {
                     },
                     borderRadius: queueRadius,
                     child: Center(
-                    child: AnimatedContainer(
-                      duration: context.motionMs(180),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isCapsule ? 10.0 : AppSpacing.sm,
-                        vertical: isCapsule ? 4.0 : AppSpacing.s6,
-                      ),
-                      decoration: isCapsule
-                          ? (isSelected
-                              ? BoxDecoration(
-                                  color: p.accent,
-                                  borderRadius: queueRadius,
-                                  border: Border.all(
-                                    color: p.onAccent.withValues(alpha: 0.35),
-                                    width: 0.8,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: p.accent.withValues(alpha: 0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                      child: AnimatedContainer(
+                        duration: context.motionMs(180),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isCapsule ? 10.0 : AppSpacing.sm,
+                          vertical: isCapsule ? 4.0 : AppSpacing.s6,
+                        ),
+                        decoration: isCapsule
+                            ? (isSelected
+                                ? BoxDecoration(
+                                    color: p.accent,
+                                    borderRadius: queueRadius,
+                                    border: Border.all(
+                                      color: p.onAccent.withValues(alpha: 0.35),
+                                      width: 0.8,
                                     ),
-                                  ],
-                                )
-                              : PulsrCapsuleStyle.decoration(
-                                  p,
-                                  borderRadius: queueRadius,
-                                ))
-                          : BoxDecoration(
-                              color: isSelected
-                                  ? p.accent
-                                  : p.surfaceContainerHigh,
-                              borderRadius: AppRadii.r10All,
-                              border: Border.all(
-                                color: isSelected ? p.accent : p.hairline,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: p.accent.withValues(alpha: 0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  )
+                                : PulsrCapsuleStyle.decoration(
+                                    p,
+                                    borderRadius: queueRadius,
+                                  ))
+                            : BoxDecoration(
+                                color: isSelected
+                                    ? p.accent
+                                    : p.surfaceContainerHigh,
+                                borderRadius: AppRadii.r10All,
+                                border: Border.all(
+                                  color: isSelected ? p.accent : p.hairline,
+                                ),
                               ),
-                            ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w800,
-                          color: isSelected
-                              ? p.onAccent
-                              : (isCapsule
-                                  ? PulsrCapsuleStyle.foregroundColor(p)
-                                  : p.textSecondary),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w800,
+                            color: isSelected
+                                ? p.onAccent
+                                : (isCapsule
+                                    ? PulsrCapsuleStyle.foregroundColor(p)
+                                    : p.textSecondary),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
                 ),
               ),
             ),

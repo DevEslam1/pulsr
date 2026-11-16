@@ -1,5 +1,5 @@
 // lib/features/artist_detail/presentation/artist_detail_screen.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/utils/l10n_extensions.dart';

@@ -13,6 +13,8 @@ import 'package:pulsr/features/tag_editor/tag_editor_cubit.dart';
 import 'package:pulsr/features/tag_editor/tag_editor_state.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_state.dart';
 
+import 'package:pulsr/core/errors/app_error.dart';
+
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockMetadataSearchService extends Mock implements MetadataSearchService {}
@@ -151,7 +153,7 @@ void main() {
       // 5. Error
       final errorState = fetchingState.copyWith(
         isLoading: false,
-        errorMessage: 'Network timeout',
+        error: uiError('Network timeout'),
       );
       expect(errorState.phase, equals(SearchPhase.error));
       expect(errorState.phase.isTerminal, isTrue);

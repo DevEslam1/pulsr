@@ -9,6 +9,8 @@ import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../../domain/usecases/playlist_usecases.dart';
 import 'smart_playlist_builder_state.dart';
 
+import '../../core/errors/app_error.dart';
+
 // FIX-A01: Migrate to PulsrCubit
 @injectable
 class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
@@ -54,24 +56,24 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   }
 
   void updateName(String name) {
-    safeEmit(state.copyWith(name: name, errorMessage: null));
+    safeEmit(state.copyWith(name: name, error: null));
   }
 
   /// Replaces the current rule set with a preset template.
   void applyTemplate(SmartCriteria template) {
-    safeEmit(state.copyWith(criteria: template, errorMessage: null));
+    safeEmit(state.copyWith(criteria: template, error: null));
     _updatePreview();
   }
 
   void toggleMatchAll(bool matchAll) {
     final newCriteria = state.criteria.copyWith(matchAll: matchAll);
-    safeEmit(state.copyWith(criteria: newCriteria, errorMessage: null));
+    safeEmit(state.copyWith(criteria: newCriteria, error: null));
     _updatePreview();
   }
 
   void setLimit(int? limit) {
     final newCriteria = state.criteria.copyWith(limit: limit);
-    safeEmit(state.copyWith(criteria: newCriteria, errorMessage: null));
+    safeEmit(state.copyWith(criteria: newCriteria, error: null));
     _updatePreview();
   }
 
@@ -80,7 +82,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       sortBy: sortBy,
       sortAscending: sortAscending ?? state.criteria.sortAscending,
     );
-    safeEmit(state.copyWith(criteria: newCriteria, errorMessage: null));
+    safeEmit(state.copyWith(criteria: newCriteria, error: null));
     _updatePreview();
   }
 
@@ -89,7 +91,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     safeEmit(state.copyWith(
         criteria:
             state.criteria.copyWith(rules: List<SmartRule>.unmodifiable(rules)),
-        errorMessage: null));
+        error: null));
     _updatePreview();
   }
 
@@ -100,7 +102,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     safeEmit(state.copyWith(
         criteria:
             state.criteria.copyWith(rules: List<SmartRule>.unmodifiable(rules)),
-        errorMessage: null));
+        error: null));
     _updatePreview();
   }
 
@@ -110,7 +112,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     safeEmit(state.copyWith(
         criteria:
             state.criteria.copyWith(rules: List<SmartRule>.unmodifiable(rules)),
-        errorMessage: null));
+        error: null));
     _updatePreview();
   }
 
@@ -175,12 +177,12 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   Future<bool> savePlaylist() async {
     final name = state.name.trim();
     if (name.isEmpty) {
-      safeEmit(state.copyWith(errorMessage: 'Please enter a playlist name'));
+      safeEmit(state.copyWith(error: uiError('Please enter a playlist name')));
       return false;
     }
 
     if (state.criteria.rules.isEmpty) {
-      safeEmit(state.copyWith(errorMessage: 'Please add at least one rule'));
+      safeEmit(state.copyWith(error: uiError('Please add at least one rule')));
       return false;
     }
 
@@ -200,7 +202,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       }
       if (rule.value.trim().isEmpty) {
         safeEmit(state.copyWith(
-            errorMessage: 'Please enter a value for rule #${i + 1}'));
+            error: uiError('Please enter a value for rule #${i + 1}')));
         return false;
       }
       normalizedRules.add(rule);
@@ -214,13 +216,13 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     if (invalidRules.isNotEmpty) {
       final index = criteria.rules.indexWhere(invalidRules.contains);
       safeEmit(state.copyWith(
-        errorMessage:
-            'Please enter a valid value for rule #${index >= 0 ? index + 1 : 1}',
+        error: uiError(
+            'Please enter a valid value for rule #${index >= 0 ? index + 1 : 1}'),
       ));
       return false;
     }
 
-    safeEmit(state.copyWith(isSubmitting: true, errorMessage: null));
+    safeEmit(state.copyWith(isSubmitting: true, error: null));
 
     try {
       if (state.isEditing && state.editingPlaylistId != null) {
@@ -249,7 +251,9 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     if (!isClosed) {
       safeEmit(state.copyWith(
         isSubmitting: false,
-        errorMessage: succeeded ? null : failureMessage,
+        error: !succeeded && failureMessage != null
+            ? uiError(failureMessage)
+            : null,
       ));
     }
     return succeeded;

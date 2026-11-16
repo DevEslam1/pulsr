@@ -1,5 +1,5 @@
 // lib/core/widgets/pulsr_error_boundary.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../theme/aura_theme.dart';
 import '../utils/error_logger.dart';
 import 'pulsr_empty_state.dart';

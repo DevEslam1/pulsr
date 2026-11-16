@@ -26,33 +26,41 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   bool get _currentSourceNeedsRawInteger {
     final song = getIt.isRegistered<PulsrAudioHandler>()
-        ? getIt<PulsrAudioHandler>().currentSong : null;
-    return effectiveSourceBitDepth(tagged: song?.bitDepth ?? 0,
-        decoded: state.currentOutputDevice?.decodedBitDepth ?? 0) > 24;
+        ? getIt<PulsrAudioHandler>().currentSong
+        : null;
+    return effectiveSourceBitDepth(
+            tagged: song?.bitDepth ?? 0,
+            decoded: state.currentOutputDevice?.decodedBitDepth ?? 0) >
+        24;
   }
 
   bool get _integer32DirectUsbEligible {
     final usb = UsbExclusiveService().lastStatus;
     return state.currentOutputDevice?.isUsbDac == true &&
-        !state.aaudioOutputEnabled && usb.streamingSupported &&
-        usb.advertisedFormats.any((f) =>
-            ((f['bitResolution'] as num?)?.toInt() ?? 0) >= 32);
+        !state.aaudioOutputEnabled &&
+        usb.streamingSupported &&
+        usb.advertisedFormats
+            .any((f) => ((f['bitResolution'] as num?)?.toInt() ?? 0) >= 32);
   }
 
   Future<bool> validateBitPerfectTrackSource(SongsTableData song) =>
       _audioModeMutex.protect(() async {
         if (!state.bitPerfectOutput) return false;
-        final depth = effectiveSourceBitDepth(tagged: song.bitDepth ?? 0,
+        final depth = effectiveSourceBitDepth(
+            tagged: song.bitDepth ?? 0,
             decoded: state.currentOutputDevice?.decodedBitDepth ?? 0);
         final rate = effectiveSourceSampleRate(
           tagged: song.sampleRate ?? 0,
           decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
         );
         final reason = AudioConflicts.bitPerfectSourceBlockedReason(
-          path: song.path, codec: song.codec, bitDepth: depth,
+          path: song.path,
+          codec: song.codec,
+          bitDepth: depth,
           isRadio: song.source == SongSource.radio,
           integer32DirectUsbEligible: _integer32DirectUsbEligible,
-          requireConfirmedCodec: state.strictBitPerfect || _bitPerfectViaDirectStream,
+          requireConfirmedCodec:
+              state.strictBitPerfect || _bitPerfectViaDirectStream,
         );
         final unknownRate = rate <= 0 ||
             !HiResAudioService.validTargetSampleRates.contains(rate);
@@ -63,7 +71,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         } else if (_bitPerfectViaDirectStream) {
           await _suspendDirectBitPerfectForTrack(message);
         } else {
-          safeEmit(state.copyWith(errorMessage: message));
+          safeEmit(state.copyWith(error: uiError(message)));
         }
         return false;
       });
@@ -102,7 +110,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     if (!PlatformCapabilities.isAndroid) return false;
     // AAudio Direct bypasses the ExoPlayer DSP chain the USB tee lives in.
     if (state.aaudioOutputEnabled) {
-      _lastDirectUsbFailure = 'AAudio Direct output is on — turn it off to use the direct USB path';
+      _lastDirectUsbFailure =
+          'AAudio Direct output is on — turn it off to use the direct USB path';
       return false;
     }
     // The direct sink writes to the USB device it opens; never start it while
@@ -131,11 +140,13 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         }
       }
       if (!status.streamingSupported) {
-        _lastDirectUsbFailure = 'this DAC does not expose a streamable USB Audio interface';
+        _lastDirectUsbFailure =
+            'this DAC does not expose a streamable USB Audio interface';
         return false;
       }
       final song = getIt.isRegistered<PulsrAudioHandler>()
-          ? getIt<PulsrAudioHandler>().currentSong : null;
+          ? getIt<PulsrAudioHandler>().currentSong
+          : null;
       // A track whose format is unknown (0, "not read") is not a format: asking
       // for 0 Hz would be refused with "format_unsupported" and look like a
       // broken DAC rather than unreadable metadata.
@@ -159,7 +170,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         bitDepth: sourceDepth,
         isRadio: song?.source == SongSource.radio,
         integer32DirectUsbEligible: _integer32DirectUsbEligible,
-        requireConfirmedCodec: song != null && (strict || state.strictBitPerfect),
+        requireConfirmedCodec:
+            song != null && (strict || state.strictBitPerfect),
       );
       if (sourceBlock != null) {
         _lastDirectUsbFailure = sourceBlock;
@@ -169,21 +181,29 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         trackBitDepth: sourceDepth,
         streamingBitDepth: status.streamingBitDepth,
         deviceBitDepth: state.currentOutputDevice?.availableDevices
-                .where((d) => d.isCurrent).firstOrNull?.maxBitDepth ??
-            state.currentOutputDevice?.bitDepth ?? 0,
+                .where((d) => d.isCurrent)
+                .firstOrNull
+                ?.maxBitDepth ??
+            state.currentOutputDevice?.bitDepth ??
+            0,
       );
-      if (song != null && (trackRate == null ||
-          !HiResAudioService.validTargetSampleRates.contains(trackRate) ||
-          AudioConflicts.classifySourceCodec(path: song.path, codec: song.codec) ==
-              AudioSourceCodecState.unknown)) {
-        _lastDirectUsbFailure = 'Source format is unconfirmed; direct playback suspended.';
+      if (song != null &&
+          (trackRate == null ||
+              !HiResAudioService.validTargetSampleRates.contains(trackRate) ||
+              AudioConflicts.classifySourceCodec(
+                      path: song.path, codec: song.codec) ==
+                  AudioSourceCodecState.unknown)) {
+        _lastDirectUsbFailure =
+            'Source format is unconfirmed; direct playback suspended.';
         return false;
       }
       // Channels: prefer what the native producer is currently supplying, then
       // the track metadata, then the safe stereo default. Without this the sink
       // always opens in 2-channel mode even for multichannel tracks.
-      final producerChannels = await UsbExclusiveService().getProducerChannels();
-      final effectiveChannels = channels ?? (producerChannels > 0 ? producerChannels : 2);
+      final producerChannels =
+          await UsbExclusiveService().getProducerChannels();
+      final effectiveChannels =
+          channels ?? (producerChannels > 0 ? producerChannels : 2);
       // Retain ownership even after a failed start until teardown is confirmed.
       _bitPerfectViaDirectStream = true;
       final res = await usb.startStreaming(
@@ -213,7 +233,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// A format field is only a fact when it is positive: `0` means "not read",
   /// and forwarding it makes the transport refuse the stream as if the DAC
   /// could not carry the track.
-  static int? _usableRate(int? value) => (value == null || value <= 0) ? null : value;
+  static int? _usableRate(int? value) =>
+      (value == null || value <= 0) ? null : value;
 
   int _directStreamSampleRate() {
     final deviceRate = state.currentOutputDevice?.sampleRate ?? 0;
@@ -242,12 +263,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final stopped = await UsbExclusiveService().stopStreaming();
     if (!isClosed) {
       safeEmit(state.copyWith(
-        errorMessage: stopped
+        error: uiError(stopped
             ? (L10nHolder.current?.directUsbSuspendedArmed(reason) ??
                 '$reason Bit-Perfect stays armed and resumes on a supported track.')
             : (L10nHolder.current?.directUsbStopFailedStillOwns(reason) ??
                 '$reason The direct USB stream could not be stopped; it still '
-                'owns the output. Retry or disable Bit-Perfect.'),
+                    'owns the output. Retry or disable Bit-Perfect.')),
       ));
     }
     await refreshOutputDevice();
@@ -280,8 +301,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         (prefs.containsKey(PrefsKeys.preStrictFollowRate)
             ? prefs.getBool(PrefsKeys.preStrictFollowRate)
             : null);
-    final targetBypass = restoreBypass ?? savedPreBypass ?? state.bypassDspOnBitPerfect;
-    final targetFollowRate = restoreFollowRate ?? savedPreFollow ?? state.followTrackSampleRate;
+    final targetBypass =
+        restoreBypass ?? savedPreBypass ?? state.bypassDspOnBitPerfect;
+    final targetFollowRate =
+        restoreFollowRate ?? savedPreFollow ?? state.followTrackSampleRate;
     if (stopped) {
       _preStrictBypass = null;
       _preStrictFollowRate = null;
@@ -307,11 +330,13 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     safeEmit(state.copyWith(
       bitPerfectOutput: !stopped,
       strictBitPerfect: !stopped && state.strictBitPerfect,
-      bypassDspOnBitPerfect: stopped ? targetBypass : state.bypassDspOnBitPerfect,
-      followTrackSampleRate: stopped ? targetFollowRate : state.followTrackSampleRate,
-      errorMessage: stopped
+      bypassDspOnBitPerfect:
+          stopped ? targetBypass : state.bypassDspOnBitPerfect,
+      followTrackSampleRate:
+          stopped ? targetFollowRate : state.followTrackSampleRate,
+      error: uiError(stopped
           ? explained
-          : '$explained Output teardown failed; retry disabling Bit-Perfect.',
+          : '$explained Output teardown failed; retry disabling Bit-Perfect.'),
     ));
   }
 
@@ -336,7 +361,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           tagged: math.max(song?.bitDepth ?? 0, bitDepth),
           decoded: state.currentOutputDevice?.decodedBitDepth ?? 0,
         );
-        if (sourceDepth > 24 && state.currentOutputDevice?.isUsbDac == true &&
+        if (sourceDepth > 24 &&
+            state.currentOutputDevice?.isUsbDac == true &&
             !state.aaudioOutputEnabled) {
           await UsbExclusiveService().getStatus();
         }
@@ -363,7 +389,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           if (!isClosed) {
             if (_lastSourceBlockReason != sourceBlock) {
               _lastSourceBlockReason = sourceBlock;
-              safeEmit(state.copyWith(errorMessage: sourceBlock));
+              safeEmit(state.copyWith(error: uiError(sourceBlock)));
             }
           }
           await refreshOutputDevice();
@@ -376,9 +402,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           // The mixer/float pipeline cannot carry integer PCM32 unchanged.
           // Do not claim the raw sink until the previous owner confirms release.
           if (!await _hiResAudioService.setBitPerfectMode(false)) {
-            safeEmit(state.copyWith(errorMessage:
-                'Mixer output teardown failed; Bit-Perfect still owns the '
-                'previous output. Retry or disable Bit-Perfect.'));
+            safeEmit(state.copyWith(
+                error: uiError(
+                    'Mixer output teardown failed; Bit-Perfect still owns the '
+                    'previous output. Retry or disable Bit-Perfect.')));
             await refreshOutputDevice();
             return false;
           }
@@ -391,8 +418,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           direct = _bitPerfectViaDirectStream;
         } else if (direct) {
           await UsbExclusiveService().resetChannelMismatchFrames();
-          final producerChannels = await UsbExclusiveService().getProducerChannels();
-          final int effectiveChannels = channels ?? (producerChannels > 0 ? producerChannels : 2);
+          final producerChannels =
+              await UsbExclusiveService().getProducerChannels();
+          final int effectiveChannels =
+              channels ?? (producerChannels > 0 ? producerChannels : 2);
           final res = await UsbExclusiveService().startStreaming(
             sampleRate: sampleRate,
             channels: effectiveChannels,
@@ -403,9 +432,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           _lastDirectUsbFailure = applied ? null : res.toUserMessage();
         } else {
           final targetDepth = sourceDepth > 0 ? sourceDepth : bitDepth;
-          applied =
-              await _hiResAudioService.setTargetOutputFormat(
-                  sampleRate: sampleRate, bitDepth: targetDepth);
+          applied = await _hiResAudioService.setTargetOutputFormat(
+              sampleRate: sampleRate, bitDepth: targetDepth);
         }
         if (applied) {
           _lastDirectUsbFailure = null;
@@ -413,14 +441,15 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
               state.errorMessage == _lastSourceBlockReason;
           _lastSourceBlockReason = null;
           if (wasSourceBlock) {
-            safeEmit(state.copyWith(errorMessage: null));
+            safeEmit(state.copyWith(error: null));
           }
           await refreshOutputDevice();
           return true;
         }
         final detail = _lastDirectUsbFailure;
         final reportedDepth = sourceDepth > 0 ? sourceDepth : bitDepth;
-        final message = 'This output refused $sampleRate Hz / $reportedDepth-bit'
+        final message =
+            'This output refused $sampleRate Hz / $reportedDepth-bit'
             '${detail == null ? '' : ': $detail'}';
         if (state.strictBitPerfect) {
           // Strict promised this track unchanged; the same rule for direct and
@@ -433,7 +462,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           await _suspendDirectBitPerfectForTrack(message);
           return false;
         }
-        if (!isClosed) safeEmit(state.copyWith(errorMessage: message));
+        if (!isClosed) safeEmit(state.copyWith(error: uiError(message)));
         await refreshOutputDevice();
         return false;
       });
@@ -448,7 +477,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         aaudioEnabled: state.aaudioOutputEnabled,
       );
       if (blocked != null) {
-        safeEmit(state.copyWith(errorMessage: blocked));
+        safeEmit(state.copyWith(error: uiError(blocked)));
         return;
       }
     }
@@ -457,7 +486,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // PlayerCubit reacts to this state emission by re-applying the gain. Save
     // first so AudioHandler's cached preferences cannot calculate using the
     // previous mode (which made ReplayGain look enabled but sound unchanged).
-    safeEmit(state.copyWith(replayGainMode: mode, errorMessage: null));
+    safeEmit(state.copyWith(replayGainMode: mode, error: null));
   }
 
   Future<void> setReplayGainPreampWithRg(double db) async {
@@ -517,7 +546,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(SettingsCubit._keyCrossfade, 0.0);
     if (isClosed) return;
-    safeEmit(state.copyWith(crossfadeSeconds: 0.0, errorMessage: reason));
+    safeEmit(state.copyWith(crossfadeSeconds: 0.0, error: uiError(reason)));
   }
 
   Future<void> _forceCrossfadeOffForBitPerfect() => _forceCrossfadeOff(
@@ -533,14 +562,17 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final prevBypass = state.bypassDspOnBitPerfect;
     final prevFollowRate = state.followTrackSampleRate;
     if (enabled) {
-      if (state.currentOutputDevice?.isUsbDac == true && !state.aaudioOutputEnabled) {
+      if (state.currentOutputDevice?.isUsbDac == true &&
+          !state.aaudioOutputEnabled) {
         await UsbExclusiveService().getStatus();
       }
       final song = getIt.isRegistered<PulsrAudioHandler>()
-          ? getIt<PulsrAudioHandler>().currentSong : null;
+          ? getIt<PulsrAudioHandler>().currentSong
+          : null;
       final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
         path: song?.path,
-        bitDepth: effectiveSourceBitDepth(tagged: song?.bitDepth ?? 0,
+        bitDepth: effectiveSourceBitDepth(
+            tagged: song?.bitDepth ?? 0,
             decoded: state.currentOutputDevice?.decodedBitDepth ?? 0),
         isRadio: song?.source == SongSource.radio,
         codec: song?.codec,
@@ -548,14 +580,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         requireConfirmedCodec: state.strictBitPerfect && song != null,
       );
       if (sourceBlock != null) {
-        safeEmit(state.copyWith(errorMessage: sourceBlock));
+        safeEmit(state.copyWith(error: uiError(sourceBlock)));
         return;
       }
       final block = AudioConflicts.bitPerfectBlockedReason(
         state.currentOutputDevice,
       );
       if (block != null) {
-        safeEmit(state.copyWith(errorMessage: block));
+        safeEmit(state.copyWith(error: uiError(block)));
         return;
       }
     }
@@ -566,8 +598,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     if (enabled && !state.floatOutputEnabled) {
       await setFloatOutputEnabled(true);
     }
-    if (enabled && _bitPerfectViaDirectStream && !await _stopDirectUsbStreaming()) {
-      safeEmit(state.copyWith(errorMessage: L10nHolder.current?.directUsbStreamStopFailedRetry ?? 'Could not stop the previous USB stream. Retry disabling Bit-Perfect.'));
+    if (enabled &&
+        _bitPerfectViaDirectStream &&
+        !await _stopDirectUsbStreaming()) {
+      safeEmit(state.copyWith(
+          error: uiError(L10nHolder.current?.directUsbStreamStopFailedRetry ??
+              'Could not stop the previous USB stream. Retry disabling Bit-Perfect.')));
       return;
     }
     var applied = enabled
@@ -576,13 +612,16 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         : await _teardownBitPerfect();
     if (enabled && !applied) applied = await _tryStartDirectUsbStreaming();
     if (enabled && !applied && _bitPerfectViaDirectStream) {
-      await _rollbackBitPerfectEnable('Direct USB startup could not be confirmed.', restoreBypass: prevBypass, restoreFollowRate: prevFollowRate);
+      await _rollbackBitPerfectEnable(
+          'Direct USB startup could not be confirmed.',
+          restoreBypass: prevBypass,
+          restoreFollowRate: prevFollowRate);
       return;
     }
     if (!enabled && !applied) {
       safeEmit(state.copyWith(
-        errorMessage:
-            'The output device could not disable Bit-Perfect. Try again.',
+        error: uiError(
+            'The output device could not disable Bit-Perfect. Try again.'),
       ));
       await refreshOutputDevice();
       return;
@@ -609,15 +648,15 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           strictBitPerfect: false,
           bypassDspOnBitPerfect: prevBypass,
           followTrackSampleRate: prevFollowRate,
-          errorMessage: '$base$directHint',
+          error: uiError('$base$directHint'),
         ));
       }
       await refreshOutputDevice();
       return;
     }
     try {
-      await _pushBitPerfectBypass(enabled &&
-          (state.bypassDspOnBitPerfect || state.strictBitPerfect));
+      await _pushBitPerfectBypass(
+          enabled && (state.bypassDspOnBitPerfect || state.strictBitPerfect));
       if (enabled) await _forceCrossfadeOffForBitPerfect();
     } catch (e, st) {
       ErrorLogger.log('Bit-perfect DSP transition failed',
@@ -627,7 +666,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         // The rollback emits its own message (including a failed teardown);
         // passing the refusal wording in keeps that detail and the platform
         // reason, instead of overwriting both with a generic line afterwards.
-        await _rollbackBitPerfectEnable(refusal, restoreBypass: prevBypass, restoreFollowRate: prevFollowRate);
+        await _rollbackBitPerfectEnable(refusal,
+            restoreBypass: prevBypass, restoreFollowRate: prevFollowRate);
       } else {
         // The transport is already down; do not resurrect it after a failed
         // DSP restore. Keep the UI truthful and allow a subsequent retry.
@@ -636,7 +676,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         safeEmit(state.copyWith(
           bitPerfectOutput: false,
           strictBitPerfect: false,
-          errorMessage: refusal,
+          error: uiError(refusal),
         ));
       }
       await refreshOutputDevice();
@@ -679,7 +719,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           bypassDspOnBitPerfect: restoredBypass ?? state.bypassDspOnBitPerfect,
           followTrackSampleRate:
               restoredFollowRate ?? state.followTrackSampleRate,
-          errorMessage: null,
+          error: null,
         ),
       );
     }
@@ -696,8 +736,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         safeEmit(
           state.copyWith(
             replayGainMode: ReplayGainMode.off,
-            errorMessage:
-                'ReplayGain disabled: not compatible with Bit-Perfect bypass.',
+            error: uiError(
+                'ReplayGain disabled: not compatible with Bit-Perfect bypass.'),
           ),
         );
       }
@@ -711,8 +751,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> _setBypassDspOnBitPerfect(bool enabled) async {
     if (!enabled && state.strictBitPerfect) {
       safeEmit(state.copyWith(
-        errorMessage:
-            'Disable Strict Bit-Perfect before enabling DSP processing.',
+        error: uiError(
+            'Disable Strict Bit-Perfect before enabling DSP processing.'),
       ));
       return;
     }
@@ -720,7 +760,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       try {
         await _pushBitPerfectBypass(enabled);
       } catch (_) {
-        safeEmit(state.copyWith(errorMessage: _bypassUpdateFailedMessage()));
+        safeEmit(state.copyWith(error: uiError(_bypassUpdateFailedMessage())));
         return;
       }
     }
@@ -764,8 +804,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> setFollowTrackSampleRate(bool value) async {
     if (!value && state.strictBitPerfect) {
       safeEmit(state.copyWith(
-        errorMessage:
-            'Strict Bit-Perfect requires following the track sample rate.',
+        error: uiError(
+            'Strict Bit-Perfect requires following the track sample rate.'),
       ));
       return;
     }
@@ -784,14 +824,14 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     markDirty('dsdOutputMode');
     if (mode == DsdOutputMode.dop && !state.dsdDopSupported) {
       safeEmit(state.copyWith(
-        errorMessage:
-            'DoP output requires a connected USB DAC that supports DSD over PCM.',
+        error: uiError(
+            'DoP output requires a connected USB DAC that supports DSD over PCM.'),
       ));
       return;
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefsKeys.dsdOutputMode, mode.name);
-    safeEmit(state.copyWith(dsdOutputMode: mode, errorMessage: null));
+    safeEmit(state.copyWith(dsdOutputMode: mode, error: null));
   }
 
   /// T3: strict bit-perfect (no resample). Enabling forces Bit-Perfect output,
@@ -811,14 +851,17 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final prevBypass = state.bypassDspOnBitPerfect;
     final prevFollowRate = state.followTrackSampleRate;
     if (enabled) {
-      if (state.currentOutputDevice?.isUsbDac == true && !state.aaudioOutputEnabled) {
+      if (state.currentOutputDevice?.isUsbDac == true &&
+          !state.aaudioOutputEnabled) {
         await UsbExclusiveService().getStatus();
       }
       final song = getIt.isRegistered<PulsrAudioHandler>()
-          ? getIt<PulsrAudioHandler>().currentSong : null;
+          ? getIt<PulsrAudioHandler>().currentSong
+          : null;
       final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
         path: song?.path,
-        bitDepth: effectiveSourceBitDepth(tagged: song?.bitDepth ?? 0,
+        bitDepth: effectiveSourceBitDepth(
+            tagged: song?.bitDepth ?? 0,
             decoded: state.currentOutputDevice?.decodedBitDepth ?? 0),
         isRadio: song?.source == SongSource.radio,
         codec: song?.codec,
@@ -829,18 +872,21 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         tagged: song?.sampleRate ?? 0,
         decoded: state.currentOutputDevice?.decodedSampleRate ?? 0,
       );
-      final unknownRate = song != null && (effectiveRate <= 0 ||
-          !HiResAudioService.validTargetSampleRates.contains(effectiveRate));
+      final unknownRate = song != null &&
+          (effectiveRate <= 0 ||
+              !HiResAudioService.validTargetSampleRates
+                  .contains(effectiveRate));
       if (sourceBlock != null || unknownRate) {
-        safeEmit(state.copyWith(errorMessage:
-            sourceBlock ?? 'Source sample rate is unconfirmed.'));
+        safeEmit(state.copyWith(
+            error:
+                uiError(sourceBlock ?? 'Source sample rate is unconfirmed.')));
         return;
       }
       final block = AudioConflicts.strictBitPerfectBlockedReason(
         state.currentOutputDevice,
       );
       if (block != null) {
-        safeEmit(state.copyWith(errorMessage: block));
+        safeEmit(state.copyWith(error: uiError(block)));
         return;
       }
     }
@@ -877,12 +923,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           strictBitPerfect: false,
           bypassDspOnBitPerfect: restoreBypass,
           followTrackSampleRate: restoreFollowRate,
-          errorMessage: null,
+          error: null,
         ));
       } else {
         safeEmit(state.copyWith(
           strictBitPerfect: false,
-          errorMessage: null,
+          error: null,
         ));
       }
       await refreshOutputDevice();
@@ -892,7 +938,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // the strict switch animate ON and snap back OFF whenever exclusive mode
     // was refused.
     if (_bitPerfectViaDirectStream && !await _stopDirectUsbStreaming()) {
-      safeEmit(state.copyWith(errorMessage: L10nHolder.current?.directUsbStreamStopFailed ?? 'Could not stop the previous USB stream.'));
+      safeEmit(state.copyWith(
+          error: uiError(L10nHolder.current?.directUsbStreamStopFailed ??
+              'Could not stop the previous USB stream.')));
       return;
     }
     // Preserve decoder precision before opening either Media3/USB tee or AAudio.
@@ -901,7 +949,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         await _hiResAudioService.setBitPerfectMode(true);
     if (!applied) applied = await _tryStartDirectUsbStreaming(strict: true);
     if (!applied && _bitPerfectViaDirectStream) {
-      await _rollbackBitPerfectEnable('Direct USB startup could not be confirmed.', restoreBypass: prevBypass, restoreFollowRate: prevFollowRate);
+      await _rollbackBitPerfectEnable(
+          'Direct USB startup could not be confirmed.',
+          restoreBypass: prevBypass,
+          restoreFollowRate: prevFollowRate);
       return;
     }
     if (!applied) {
@@ -922,7 +973,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       if (!isClosed) {
         final reason = _hiResAudioService.lastBitPerfectFailureReason;
         final base = AudioConflicts.bitPerfectReasonMessage(reason) ??
-            (L10nHolder.current?.strictBitPerfectUnsupportedDevice ?? 'Strict Bit-Perfect is not supported by the current output device.');
+            (L10nHolder.current?.strictBitPerfectUnsupportedDevice ??
+                'Strict Bit-Perfect is not supported by the current output device.');
         final directHint = _lastDirectUsbFailure == null
             ? ''
             : ' Direct USB streaming also failed: $_lastDirectUsbFailure.';
@@ -931,7 +983,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           bitPerfectOutput: prevBitPerfect,
           bypassDspOnBitPerfect: prevBypass,
           followTrackSampleRate: prevFollowRate,
-          errorMessage: '$base$directHint',
+          error: uiError('$base$directHint'),
         ));
       }
       await refreshOutputDevice();
@@ -942,7 +994,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       await _forceCrossfadeOffForBitPerfect();
     } catch (_) {
       await _rollbackBitPerfectEnable(
-        L10nHolder.current?.dspBypassOrCrossfadeDisableFailed ?? 'Failed to enable the native DSP bypass or disable crossfade.',
+        L10nHolder.current?.dspBypassOrCrossfadeDisableFailed ??
+            'Failed to enable the native DSP bypass or disable crossfade.',
         restoreBypass: prevBypass,
         restoreFollowRate: prevFollowRate,
       );
@@ -950,8 +1003,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       return;
     }
     // Only capture pre-Strict values if they are not already set (prevents double-enable overwrite and survives restarts)
-    final bool hasPersistedBypass = prefs.containsKey(PrefsKeys.preStrictBypass);
-    final bool hasPersistedFollow = prefs.containsKey(PrefsKeys.preStrictFollowRate);
+    final bool hasPersistedBypass =
+        prefs.containsKey(PrefsKeys.preStrictBypass);
+    final bool hasPersistedFollow =
+        prefs.containsKey(PrefsKeys.preStrictFollowRate);
     if (_preStrictBypass == null && !hasPersistedBypass) {
       _preStrictBypass = prevBypass;
       await prefs.setBool(PrefsKeys.preStrictBypass, prevBypass);
@@ -974,7 +1029,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         bitPerfectOutput: true,
         bypassDspOnBitPerfect: true,
         followTrackSampleRate: true,
-        errorMessage: null,
+        error: null,
       ));
     }
     // Software gain would alter the bitstream; turn it off like the normal
@@ -1009,8 +1064,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         // endpoint nobody can tear down.
         if (wasDirect && !await _stopDirectUsbStreaming()) {
           safeEmit(state.copyWith(
-            errorMessage: L10nHolder.current?.directUsbSinkSwitchOwnershipFailed ??
-                'The direct USB stream could not be stopped; the output was not switched and Bit-Perfect still owns the previous DAC output.',
+            error: uiError(L10nHolder
+                    .current?.directUsbSinkSwitchOwnershipFailed ??
+                'The direct USB stream could not be stopped; the output was not switched and Bit-Perfect still owns the previous DAC output.'),
           ));
           return false;
         }
@@ -1035,8 +1091,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
             }
           }
           safeEmit(state.copyWith(
-              errorMessage:
-                  'Could not switch the playback output (${res.error ?? "unavailable"}).'));
+              error: uiError(
+                  'Could not switch the playback output (${res.error ?? "unavailable"}).')));
           await refreshOutputDevice();
           return false;
         }
@@ -1072,7 +1128,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           await prefs.setInt('target_output_sample_rate', sampleRate);
         } else {
           safeEmit(state.copyWith(
-              errorMessage: L10nHolder.current?.outputCannotApplySampleRate ?? 'This output cannot apply the requested sample rate.'));
+              error: uiError(L10nHolder.current?.outputCannotApplySampleRate ??
+                  'This output cannot apply the requested sample rate.')));
         }
         await refreshOutputDevice();
       });
@@ -1088,7 +1145,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           await prefs.setInt('target_output_bit_depth', bitDepth);
         } else {
           safeEmit(state.copyWith(
-              errorMessage: L10nHolder.current?.outputCannotApplyBitDepth ?? 'This output cannot apply the requested bit depth.'));
+              error: uiError(L10nHolder.current?.outputCannotApplyBitDepth ??
+                  'This output cannot apply the requested bit depth.')));
         }
         await refreshOutputDevice();
       });
@@ -1140,7 +1198,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     final opened = await _hiResAudioService.openBluetoothCodecSettings();
     if (!opened) {
       safeEmit(state.copyWith(
-          errorMessage: L10nHolder.current?.cannotOpenBluetoothCodecSettings ?? 'Could not open Bluetooth codec settings.'));
+          error: uiError(L10nHolder.current?.cannotOpenBluetoothCodecSettings ??
+              'Could not open Bluetooth codec settings.')));
     }
     return opened;
   }
@@ -1228,7 +1287,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       // PROPERTY_OUTPUT_SAMPLE_RATE describes the primary output, not the
       // current USB/BT route. Only a live route-specific sink is usable here.
       nativeSampleRate: info?.availableDevices.any((d) => d.isCurrent) == true
-          ? (info?.sampleRate ?? 0) : 0,
+          ? (info?.sampleRate ?? 0)
+          : 0,
       bitPerfectActive: info?.isBitPerfectActive ?? false,
       isBluetooth: info?.isBluetooth ?? false,
       deviceSampleRates: info?.supportedSampleRates ?? const <int>[],
@@ -1267,8 +1327,11 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         targetBufferMs: effectiveBuffer,
       );
     } catch (e, st) {
-      ErrorLogger.log('Failed to apply dynamic BT buffer (${effectiveBuffer}ms)',
-          error: e, stackTrace: st, category: 'Settings');
+      ErrorLogger.log(
+          'Failed to apply dynamic BT buffer (${effectiveBuffer}ms)',
+          error: e,
+          stackTrace: st,
+          category: 'Settings');
     }
   }
 
@@ -1443,8 +1506,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       // Bit-Perfect tee lives in; enabling it would silence the DAC.
       if (_bitPerfectViaDirectStream) {
         safeEmit(state.copyWith(
-            errorMessage:
-                'Turn off Bit-Perfect before enabling AAudio Direct.'));
+            error: uiError(
+                'Turn off Bit-Perfect before enabling AAudio Direct.')));
         return;
       }
     }
@@ -1462,21 +1525,21 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
             targetBufferMs: state.aaudioTargetBufferMs,
           );
           safeEmit(state.copyWith(
-              errorMessage:
-                  'AAudio output was rejected by a playback player.'));
+              error:
+                  uiError('AAudio output was rejected by a playback player.')));
           return;
         }
       }
     } catch (e) {
       safeEmit(
-          state.copyWith(errorMessage: 'Failed to change AAudio output: $e'));
+          state.copyWith(error: uiError('Failed to change AAudio output: $e')));
       return;
     }
     // Only after every player accepted the change: turning crossfade and DVC
     // off beforehand discarded settings for a mode that never came on.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.aaudioOutputEnabled, enabled);
-    safeEmit(state.copyWith(aaudioOutputEnabled: enabled, errorMessage: null));
+    safeEmit(state.copyWith(aaudioOutputEnabled: enabled, error: null));
     if (enabled) {
       await _forceCrossfadeOff(
           reason: 'Crossfade disabled: AAudio Direct bypasses the DSP chain it '
@@ -1493,8 +1556,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         (state.aaudioOutputEnabled ||
             (state.bitPerfectOutput && state.bypassDspOnBitPerfect))) {
       safeEmit(state.copyWith(
-          errorMessage:
-              'Direct Volume Control requires the active DSP output path.'));
+          error: uiError(
+              'Direct Volume Control requires the active DSP output path.')));
       return;
     }
     markDirty('dvcEnabled');
@@ -1627,8 +1690,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// layer's settings observer (and restored on boot by the audio handler).
   Future<void> setFloatOutputEnabled(bool enabled) async {
     if (!enabled && state.strictBitPerfect) {
-      safeEmit(state.copyWith(errorMessage:
-          'Strict Bit-Perfect requires full decoder precision.'));
+      safeEmit(state.copyWith(
+          error:
+              uiError('Strict Bit-Perfect requires full decoder precision.')));
       return;
     }
     markDirty('floatOutputEnabled');
@@ -1731,8 +1795,8 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       if (!isClosed) {
         safeEmit(state.copyWith(
           multiOutputMode: MultiOutputMode.systemDefault.name,
-          errorMessage:
-              'This device cannot play to two outputs at once. Output stays on System default.',
+          error: uiError(
+              'This device cannot play to two outputs at once. Output stays on System default.'),
         ));
       }
       await prefs.setString(
@@ -1740,7 +1804,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       return;
     }
     await prefs.setString(PrefsKeys.multiOutputMode, parsed.name);
-    safeEmit(state.copyWith(multiOutputMode: parsed.name, errorMessage: null));
+    safeEmit(state.copyWith(multiOutputMode: parsed.name, error: null));
   }
 
   Future<void> setDspSnapshotEnabled(bool v) async {
@@ -1768,7 +1832,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         device: state.currentOutputDevice,
       );
       if (blocked != null) {
-        safeEmit(state.copyWith(errorMessage: blocked));
+        safeEmit(state.copyWith(error: uiError(blocked)));
         return;
       }
     }

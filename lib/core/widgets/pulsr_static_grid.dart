@@ -1,5 +1,5 @@
 // lib/core/widgets/pulsr_static_grid.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// {@category DesignSystem}
 /// A static, non-scrollable grid layout implemented via [Column], [Row], and [AspectRatio]/[SizedBox].

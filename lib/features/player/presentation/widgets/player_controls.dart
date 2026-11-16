@@ -1,6 +1,6 @@
 // lib/features/player/presentation/widgets/player_controls.dart
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -126,436 +126,443 @@ class _PlayerControlsState extends State<PlayerControls> {
             ? l10n.repeatAll
             : l10n.repeatOff;
 
-    final resolvedSideSize = widget.sideButtonSize ??
-        (widget.mainButtonSize * 0.72).clamp(38.0, 52.0);
+    final resolvedSideSize =
+        (widget.sideButtonSize ?? (widget.mainButtonSize * 0.72))
+            .clamp(48.0, 72.0);
     final prevNextIconSize = (resolvedSideSize * 0.54).clamp(20.0, 30.0);
     final buttonSpacing = widget.showAbControls
         ? (widget.mainButtonSize * 0.12).clamp(4.0, 10.0)
         : (widget.mainButtonSize * 0.22).clamp(8.0, 18.0);
     final shuffleRepeatIconSize = (resolvedSideSize * 0.48).clamp(18.0, 24.0);
-    final abButtonSize = (resolvedSideSize * 0.78).clamp(32.0, 42.0);
+    final abButtonSize = (resolvedSideSize * 0.78).clamp(48.0, 56.0);
+    final mainHitSize =
+        widget.mainButtonSize < 48.0 ? 48.0 : widget.mainButtonSize;
 
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Shuffle Button with active LED indicator
+        // A Wrap (not FittedBox) so compact widths reflow instead of scaling
+        // every hit target below the 48 dp accessibility minimum.
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          runSpacing: AppSpacing.xs,
+          children: [
+            // Shuffle Button with active LED indicator
+            Semantics(
+              label: shuffleLabel,
+              button: true,
+              child: _ControlButton(
+                tooltip: shuffleLabel,
+                isActive: widget.isShuffle,
+                activeColor: widget.primaryColor,
+                inactiveColor: p.textSecondary,
+                onPressed: () {
+                  PulsrHaptics.selection();
+                  widget.onToggleShuffle();
+                },
+                icon: Icons.shuffle_rounded,
+                iconSize: shuffleRepeatIconSize,
+              ),
+            ),
+
+            if (widget.showAbControls) ...[
+              SizedBox(width: buttonSpacing),
+              // Point A Button (next to Back/Previous)
               Semantics(
-                label: shuffleLabel,
+                label: widget.abPointA != null
+                    ? l10n.abLoopPointA(
+                        Formatters.formatDuration(widget.abPointA!))
+                    : l10n.abLoopSetA,
                 button: true,
-                child: _ControlButton(
-                  tooltip: shuffleLabel,
-                  isActive: widget.isShuffle,
+                child: _AbPointButton(
+                  label: 'A',
+                  point: widget.abPointA,
+                  isActive: widget.abPointA != null,
+                  isLoopActive: widget.abLoopActive,
                   activeColor: widget.primaryColor,
                   inactiveColor: p.textSecondary,
                   onPressed: () {
                     PulsrHaptics.selection();
-                    widget.onToggleShuffle();
+                    if (widget.abPointA != null && widget.abPointB != null) {
+                      widget.onToggleAbLoop?.call();
+                    } else {
+                      widget.onSetAbPointA?.call();
+                    }
                   },
-                  icon: Icons.shuffle_rounded,
-                  iconSize: shuffleRepeatIconSize,
-                ),
-              ),
-
-              if (widget.showAbControls) ...[
-                SizedBox(width: buttonSpacing),
-                // Point A Button (next to Back/Previous)
-                Semantics(
-                  label: widget.abPointA != null
-                      ? l10n.abLoopPointA(
-                          Formatters.formatDuration(widget.abPointA!))
-                      : l10n.abLoopSetA,
-                  button: true,
-                  child: _AbPointButton(
-                    label: 'A',
-                    point: widget.abPointA,
-                    isActive: widget.abPointA != null,
-                    isLoopActive: widget.abLoopActive,
-                    activeColor: widget.primaryColor,
-                    inactiveColor: p.textSecondary,
-                    onPressed: () {
-                      PulsrHaptics.selection();
-                      if (widget.abPointA != null && widget.abPointB != null) {
-                        widget.onToggleAbLoop?.call();
-                      } else {
-                        widget.onSetAbPointA?.call();
-                      }
-                    },
-                    onLongPress: () {
-                      if (widget.abPointA != null || widget.abPointB != null) {
-                        PulsrHaptics.confirm();
-                        widget.onClearAbLoop?.call();
-                        PulsrToast.show(
-                          context,
-                          message: l10n.clearAbLoop,
-                          icon: Icons.clear_rounded,
-                          duration: const Duration(milliseconds: 1200),
-                        );
-                      }
-                    },
-                    tooltip: widget.abPointA != null && widget.abPointB != null
-                        ? l10n.repeat
-                        : widget.abPointA != null
-                            ? '${l10n.loopPointALabel(Formatters.formatDuration(widget.abPointA!))} (${l10n.clearAbLoop})'
-                            : l10n.setLoopPointAHint,
-                    buttonSize: abButtonSize,
-                  ),
-                ),
-              ],
-
-              SizedBox(width: buttonSpacing),
-
-              // Previous Button
-              Semantics(
-                label: l10n.previous,
-                button: true,
-                enabled: widget.hasPrevious,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: _prevNudgeX),
-                  duration: context.motionMs(180),
-                  curve: Curves.easeOutBack,
-                  builder: (context, dx, child) => Transform.translate(
-                    offset: Offset(dx, 0),
-                    child: child,
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    shape: const CircleBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    child: Tooltip(
-                      message: l10n.previous,
-                      excludeFromSemantics: true,
-                      child: InkWell(
-                        onTap: widget.hasPrevious
-                            ? () {
-                                PulsrHaptics.light();
-                                _triggerPrevNudge();
-                                widget.onPrevious();
-                              }
-                            : null,
-                        borderRadius: AppRadii.circular(30),
-                        child: Container(
-                          width: resolvedSideSize,
-                          height: resolvedSideSize,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: widget.hasPrevious
-                                ? LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      p.surfaceContainerHighest,
-                                      p.surfaceContainerHigh,
-                                    ],
-                                  )
-                                : null,
-                            color: widget.hasPrevious
-                                ? null
-                                : p.surfaceContainer.withValues(alpha: 0.45),
-                            border: Border.all(
-                              color: widget.hasPrevious
-                                  ? p.hairline
-                                  : p.hairline.withValues(alpha: 0.4),
-                              width: 1.0,
-                            ),
-                            boxShadow: widget.hasPrevious
-                                ? PulsrElevation.level1(context)
-                                : null,
-                          ),
-                          child: Center(
-                            child: Icon(
-                              Icons.skip_previous_rounded,
-                              color: widget.hasPrevious
-                                  ? p.textPrimary
-                                  : p.textTertiary.withValues(alpha: 0.3),
-                              size: prevNextIconSize,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              SizedBox(width: buttonSpacing),
-
-              // Main Play / Pause Hardware Button
-              Semantics(
-                label: widget.isPlaying ? l10n.pause : l10n.play,
-                button: true,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (_) => setState(() => _isPlayPressed = true),
-                  onTapUp: (_) => setState(() => _isPlayPressed = false),
-                  onTapCancel: () => setState(() => _isPlayPressed = false),
-                  onTap: () {
-                    PulsrHaptics.confirm();
-                    widget.onPlayPause();
+                  onLongPress: () {
+                    if (widget.abPointA != null || widget.abPointB != null) {
+                      PulsrHaptics.confirm();
+                      widget.onClearAbLoop?.call();
+                      PulsrToast.show(
+                        context,
+                        message: l10n.clearAbLoop,
+                        icon: Icons.clear_rounded,
+                        duration: const Duration(milliseconds: 1200),
+                      );
+                    }
                   },
-                  child: AnimatedScale(
-                    scale: _isPlayPressed ? 0.92 : 1.0,
-                    duration: context.motionMs(_isPlayPressed ? 90 : 280),
-                    curve: _isPlayPressed
-                        ? Curves.easeOutCubic
-                        : Curves.easeOutBack,
-                    child: AnimatedContainer(
-                      duration: context.motionMs(200),
-                      width: widget.mainButtonSize,
-                      height: widget.mainButtonSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color.alphaBlend(
-                              Colors.white.withValues(alpha: 0.16),
-                              widget.primaryColor,
-                            ),
-                            widget.primaryColor,
-                          ],
-                        ),
-                        boxShadow: [
-                          ...PulsrElevation.level2(context),
-                          BoxShadow(
-                            color: widget.primaryColor.withValues(
-                              alpha: widget.isPlaying ? 0.36 : 0.18,
-                            ),
-                            blurRadius: widget.isPlaying ? 18 : 10,
-                            spreadRadius: -2,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                        border: Border.all(
-                          color: widget.abLoopActive
-                              ? p.accent
-                              : onPrimaryColor.withValues(alpha: 0.18),
-                          width: widget.abLoopActive ? 2.0 : 1.0,
-                        ),
-                      ),
-                      child: Center(
-                        child: AnimatedSwitcher(
-                          duration: context.motionMs(260),
-                          transitionBuilder: (child, anim) {
-                            final curve = CurveTween(
-                              curve: Curves.easeOutBack,
-                            );
-                            return FadeTransition(
-                              opacity: anim,
-                              child: ScaleTransition(
-                                scale: anim.drive(
-                                  Tween<double>(begin: 0.80, end: 1.0)
-                                      .chain(curve),
-                                ),
-                                child: RotationTransition(
-                                  turns: anim.drive(
-                                    Tween<double>(begin: -0.06, end: 0.0)
-                                        .chain(curve),
-                                  ),
-                                  child: child,
-                                ),
-                              ),
-                            );
-                          },
-                          child: widget.isBuffering
-                              ? SizedBox(
-                                  key: const ValueKey<String>('buffering'),
-                                  width: widget.mainButtonSize * 0.42,
-                                  height: widget.mainButtonSize * 0.42,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 3,
-                                    color: onPrimaryColor,
-                                  ),
-                                )
-                              : Icon(
-                                  widget.isPlaying
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  key: ValueKey(widget.isPlaying),
-                                  color: onPrimaryColor,
-                                  size: widget.mainButtonSize * 0.52,
-                                ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              SizedBox(width: buttonSpacing),
-
-              // Next Button
-              Semantics(
-                label: l10n.next,
-                button: true,
-                enabled: widget.hasNext,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween<double>(begin: 0, end: _nextNudgeX),
-                  duration: context.motionMs(180),
-                  curve: Curves.easeOutBack,
-                  builder: (context, dx, child) => Transform.translate(
-                    offset: Offset(dx, 0),
-                    child: child,
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    shape: const CircleBorder(),
-                    clipBehavior: Clip.antiAlias,
-                    child: Tooltip(
-                      message: l10n.next,
-                      excludeFromSemantics: true,
-                      child: InkWell(
-                        onTap: widget.hasNext
-                            ? () {
-                                PulsrHaptics.light();
-                                _triggerNextNudge();
-                                widget.onNext();
-                              }
-                            : null,
-                        borderRadius: AppRadii.circular(30),
-                        child: Container(
-                          width: resolvedSideSize,
-                          height: resolvedSideSize,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: widget.hasNext
-                                ? LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      p.surfaceContainerHighest,
-                                      p.surfaceContainerHigh,
-                                    ],
-                                  )
-                                : null,
-                            color: widget.hasNext
-                                ? null
-                                : p.surfaceContainer.withValues(alpha: 0.45),
-                            border: Border.all(
-                              color: widget.hasNext
-                                  ? p.hairline
-                                  : p.hairline.withValues(alpha: 0.4),
-                              width: 1.0,
-                            ),
-                            boxShadow: widget.hasNext
-                                ? PulsrElevation.level1(context)
-                                : null,
-                          ),
-                          child: Center(
-                            child: Icon(
-                              Icons.skip_next_rounded,
-                              color: widget.hasNext
-                                  ? p.textPrimary
-                                  : p.textTertiary.withValues(alpha: 0.3),
-                              size: prevNextIconSize,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              if (widget.showAbControls) ...[
-                SizedBox(width: buttonSpacing),
-                // Point B Button (next to Next)
-                Semantics(
-                  label: widget.abPointB != null
-                      ? l10n.abLoopPointB(
-                          Formatters.formatDuration(widget.abPointB!))
-                      : l10n.abLoopSetB,
-                  button: true,
-                  child: _AbPointButton(
-                    label: 'B',
-                    point: widget.abPointB,
-                    isActive: widget.abPointB != null,
-                    isLoopActive: widget.abLoopActive,
-                    activeColor: widget.primaryColor,
-                    inactiveColor: p.textSecondary,
-                    onPressed: () {
-                      PulsrHaptics.selection();
-                      if (widget.abPointA != null && widget.abPointB != null) {
-                        widget.onToggleAbLoop?.call();
-                      } else {
-                        widget.onSetAbPointB?.call();
-                      }
-                    },
-                    onLongPress: () {
-                      if (widget.abPointA != null || widget.abPointB != null) {
-                        PulsrHaptics.confirm();
-                        widget.onClearAbLoop?.call();
-                        PulsrToast.show(
-                          context,
-                          message: l10n.clearAbLoop,
-                          icon: Icons.clear_rounded,
-                          duration: const Duration(milliseconds: 1200),
-                        );
-                      }
-                    },
-                    tooltip: widget.abPointA != null && widget.abPointB != null
-                        ? l10n.repeat
-                        : widget.abPointB != null
-                            ? '${l10n.loopPointBLabel(Formatters.formatDuration(widget.abPointB!))} (${l10n.clearAbLoop})'
-                            : l10n.setLoopPointBHint,
-                    buttonSize: abButtonSize,
-                  ),
-                ),
-              ],
-
-              SizedBox(width: buttonSpacing),
-
-              // Repeat Button with active LED indicator
-              Semantics(
-                label: repeatLabel,
-                button: true,
-                child: _ControlButton(
-                  tooltip: repeatLabel,
-                  isActive: widget.repeatMode != PlayerRepeatMode.off,
-                  activeColor: widget.primaryColor,
-                  inactiveColor: p.textSecondary,
-                  onPressed: () {
-                    PulsrHaptics.selection();
-                    widget.onToggleRepeat();
-                    final nextMode = switch (widget.repeatMode) {
-                      PlayerRepeatMode.off => PlayerRepeatMode.all,
-                      PlayerRepeatMode.all => PlayerRepeatMode.one,
-                      PlayerRepeatMode.one => PlayerRepeatMode.off,
-                    };
-                    final nextLabel = switch (nextMode) {
-                      PlayerRepeatMode.one => l10n.repeatOne,
-                      PlayerRepeatMode.all => l10n.repeatAll,
-                      PlayerRepeatMode.off => l10n.repeatOff,
-                    };
-                    final nextIcon = switch (nextMode) {
-                      PlayerRepeatMode.one => Icons.repeat_one_rounded,
-                      PlayerRepeatMode.all => Icons.repeat_rounded,
-                      PlayerRepeatMode.off => Icons.repeat_rounded,
-                    };
-                    PulsrToast.show(
-                      context,
-                      message: nextLabel,
-                      icon: nextIcon,
-                      duration: const Duration(milliseconds: 1200),
-                    );
-                  },
-                  icon: widget.repeatMode == PlayerRepeatMode.one
-                      ? Icons.repeat_one_rounded
-                      : Icons.repeat_rounded,
-                  iconSize: shuffleRepeatIconSize,
+                  tooltip: widget.abPointA != null && widget.abPointB != null
+                      ? l10n.repeat
+                      : widget.abPointA != null
+                          ? '${l10n.loopPointALabel(Formatters.formatDuration(widget.abPointA!))} (${l10n.clearAbLoop})'
+                          : l10n.setLoopPointAHint,
+                  buttonSize: abButtonSize,
                 ),
               ),
             ],
-          ),
+
+            SizedBox(width: buttonSpacing),
+
+            // Previous Button
+            Semantics(
+              label: l10n.previous,
+              button: true,
+              enabled: widget.hasPrevious,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: _prevNudgeX),
+                duration: context.motionMs(180),
+                curve: Curves.easeOutBack,
+                builder: (context, dx, child) => Transform.translate(
+                  offset: Offset(dx, 0),
+                  child: child,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: Tooltip(
+                    message: l10n.previous,
+                    excludeFromSemantics: true,
+                    child: InkWell(
+                      onTap: widget.hasPrevious
+                          ? () {
+                              PulsrHaptics.light();
+                              _triggerPrevNudge();
+                              widget.onPrevious();
+                            }
+                          : null,
+                      borderRadius: AppRadii.circular(30),
+                      child: Container(
+                        width: resolvedSideSize,
+                        height: resolvedSideSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: widget.hasPrevious
+                              ? LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    p.surfaceContainerHighest,
+                                    p.surfaceContainerHigh,
+                                  ],
+                                )
+                              : null,
+                          color: widget.hasPrevious
+                              ? null
+                              : p.surfaceContainer.withValues(alpha: 0.45),
+                          border: Border.all(
+                            color: widget.hasPrevious
+                                ? p.hairline
+                                : p.hairline.withValues(alpha: 0.4),
+                            width: 1.0,
+                          ),
+                          boxShadow: widget.hasPrevious
+                              ? PulsrElevation.level1(context)
+                              : null,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.skip_previous_rounded,
+                            color: widget.hasPrevious
+                                ? p.textPrimary
+                                : p.textTertiary.withValues(alpha: 0.3),
+                            size: prevNextIconSize,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            SizedBox(width: buttonSpacing),
+
+            // Main Play / Pause Hardware Button
+            Semantics(
+              label: widget.isPlaying ? l10n.pause : l10n.play,
+              button: true,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (_) => setState(() => _isPlayPressed = true),
+                onTapUp: (_) => setState(() => _isPlayPressed = false),
+                onTapCancel: () => setState(() => _isPlayPressed = false),
+                onTap: () {
+                  PulsrHaptics.confirm();
+                  widget.onPlayPause();
+                },
+                child: SizedBox(
+                  width: mainHitSize,
+                  height: mainHitSize,
+                  child: Center(
+                    child: AnimatedScale(
+                      scale: _isPlayPressed ? 0.92 : 1.0,
+                      duration: context.motionMs(_isPlayPressed ? 90 : 280),
+                      curve: _isPlayPressed
+                          ? Curves.easeOutCubic
+                          : Curves.easeOutBack,
+                      child: AnimatedContainer(
+                        duration: context.motionMs(200),
+                        width: widget.mainButtonSize,
+                        height: widget.mainButtonSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color.alphaBlend(
+                                Colors.white.withValues(alpha: 0.16),
+                                widget.primaryColor,
+                              ),
+                              widget.primaryColor,
+                            ],
+                          ),
+                          boxShadow: [
+                            ...PulsrElevation.level2(context),
+                            BoxShadow(
+                              color: widget.primaryColor.withValues(
+                                alpha: widget.isPlaying ? 0.36 : 0.18,
+                              ),
+                              blurRadius: widget.isPlaying ? 18 : 10,
+                              spreadRadius: -2,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: widget.abLoopActive
+                                ? p.accent
+                                : onPrimaryColor.withValues(alpha: 0.18),
+                            width: widget.abLoopActive ? 2.0 : 1.0,
+                          ),
+                        ),
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: context.motionMs(260),
+                            transitionBuilder: (child, anim) {
+                              final curve = CurveTween(
+                                curve: Curves.easeOutBack,
+                              );
+                              return FadeTransition(
+                                opacity: anim,
+                                child: ScaleTransition(
+                                  scale: anim.drive(
+                                    Tween<double>(begin: 0.80, end: 1.0)
+                                        .chain(curve),
+                                  ),
+                                  child: RotationTransition(
+                                    turns: anim.drive(
+                                      Tween<double>(begin: -0.06, end: 0.0)
+                                          .chain(curve),
+                                    ),
+                                    child: child,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: widget.isBuffering
+                                ? SizedBox(
+                                    key: const ValueKey<String>('buffering'),
+                                    width: widget.mainButtonSize * 0.42,
+                                    height: widget.mainButtonSize * 0.42,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 3,
+                                      color: onPrimaryColor,
+                                    ),
+                                  )
+                                : Icon(
+                                    widget.isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    key: ValueKey(widget.isPlaying),
+                                    color: onPrimaryColor,
+                                    size: widget.mainButtonSize * 0.52,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            SizedBox(width: buttonSpacing),
+
+            // Next Button
+            Semantics(
+              label: l10n.next,
+              button: true,
+              enabled: widget.hasNext,
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 0, end: _nextNudgeX),
+                duration: context.motionMs(180),
+                curve: Curves.easeOutBack,
+                builder: (context, dx, child) => Transform.translate(
+                  offset: Offset(dx, 0),
+                  child: child,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: Tooltip(
+                    message: l10n.next,
+                    excludeFromSemantics: true,
+                    child: InkWell(
+                      onTap: widget.hasNext
+                          ? () {
+                              PulsrHaptics.light();
+                              _triggerNextNudge();
+                              widget.onNext();
+                            }
+                          : null,
+                      borderRadius: AppRadii.circular(30),
+                      child: Container(
+                        width: resolvedSideSize,
+                        height: resolvedSideSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: widget.hasNext
+                              ? LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    p.surfaceContainerHighest,
+                                    p.surfaceContainerHigh,
+                                  ],
+                                )
+                              : null,
+                          color: widget.hasNext
+                              ? null
+                              : p.surfaceContainer.withValues(alpha: 0.45),
+                          border: Border.all(
+                            color: widget.hasNext
+                                ? p.hairline
+                                : p.hairline.withValues(alpha: 0.4),
+                            width: 1.0,
+                          ),
+                          boxShadow: widget.hasNext
+                              ? PulsrElevation.level1(context)
+                              : null,
+                        ),
+                        child: Center(
+                          child: Icon(
+                            Icons.skip_next_rounded,
+                            color: widget.hasNext
+                                ? p.textPrimary
+                                : p.textTertiary.withValues(alpha: 0.3),
+                            size: prevNextIconSize,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            if (widget.showAbControls) ...[
+              SizedBox(width: buttonSpacing),
+              // Point B Button (next to Next)
+              Semantics(
+                label: widget.abPointB != null
+                    ? l10n.abLoopPointB(
+                        Formatters.formatDuration(widget.abPointB!))
+                    : l10n.abLoopSetB,
+                button: true,
+                child: _AbPointButton(
+                  label: 'B',
+                  point: widget.abPointB,
+                  isActive: widget.abPointB != null,
+                  isLoopActive: widget.abLoopActive,
+                  activeColor: widget.primaryColor,
+                  inactiveColor: p.textSecondary,
+                  onPressed: () {
+                    PulsrHaptics.selection();
+                    if (widget.abPointA != null && widget.abPointB != null) {
+                      widget.onToggleAbLoop?.call();
+                    } else {
+                      widget.onSetAbPointB?.call();
+                    }
+                  },
+                  onLongPress: () {
+                    if (widget.abPointA != null || widget.abPointB != null) {
+                      PulsrHaptics.confirm();
+                      widget.onClearAbLoop?.call();
+                      PulsrToast.show(
+                        context,
+                        message: l10n.clearAbLoop,
+                        icon: Icons.clear_rounded,
+                        duration: const Duration(milliseconds: 1200),
+                      );
+                    }
+                  },
+                  tooltip: widget.abPointA != null && widget.abPointB != null
+                      ? l10n.repeat
+                      : widget.abPointB != null
+                          ? '${l10n.loopPointBLabel(Formatters.formatDuration(widget.abPointB!))} (${l10n.clearAbLoop})'
+                          : l10n.setLoopPointBHint,
+                  buttonSize: abButtonSize,
+                ),
+              ),
+            ],
+
+            SizedBox(width: buttonSpacing),
+
+            // Repeat Button with active LED indicator
+            Semantics(
+              label: repeatLabel,
+              button: true,
+              child: _ControlButton(
+                tooltip: repeatLabel,
+                isActive: widget.repeatMode != PlayerRepeatMode.off,
+                activeColor: widget.primaryColor,
+                inactiveColor: p.textSecondary,
+                onPressed: () {
+                  PulsrHaptics.selection();
+                  widget.onToggleRepeat();
+                  final nextMode = switch (widget.repeatMode) {
+                    PlayerRepeatMode.off => PlayerRepeatMode.all,
+                    PlayerRepeatMode.all => PlayerRepeatMode.one,
+                    PlayerRepeatMode.one => PlayerRepeatMode.off,
+                  };
+                  final nextLabel = switch (nextMode) {
+                    PlayerRepeatMode.one => l10n.repeatOne,
+                    PlayerRepeatMode.all => l10n.repeatAll,
+                    PlayerRepeatMode.off => l10n.repeatOff,
+                  };
+                  final nextIcon = switch (nextMode) {
+                    PlayerRepeatMode.one => Icons.repeat_one_rounded,
+                    PlayerRepeatMode.all => Icons.repeat_rounded,
+                    PlayerRepeatMode.off => Icons.repeat_rounded,
+                  };
+                  PulsrToast.show(
+                    context,
+                    message: nextLabel,
+                    icon: nextIcon,
+                    duration: const Duration(milliseconds: 1200),
+                  );
+                },
+                icon: widget.repeatMode == PlayerRepeatMode.one
+                    ? Icons.repeat_one_rounded
+                    : Icons.repeat_rounded,
+                iconSize: shuffleRepeatIconSize,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -591,60 +598,63 @@ class _ControlButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: AppRadii.r20All,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s10,
-              vertical: AppSpacing.xs,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: context.motionMs(200),
-                  padding: const EdgeInsets.all(AppSpacing.s6),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isActive
-                        ? activeColor.withValues(alpha: 0.16)
-                        : Colors.transparent,
-                    border: isActive
-                        ? Border.all(
-                            color: activeColor.withValues(alpha: 0.38),
-                            width: 1.0,
-                          )
-                        : null,
-                  ),
-                  child: Icon(
-                    icon,
-                    color: isActive ? activeColor : inactiveColor,
-                    size: iconSize,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                AnimatedOpacity(
-                  opacity: isActive ? 1.0 : 0.0,
-                  duration: context.motionMs(200),
-                  child: AnimatedScale(
-                    scale: isActive ? 1.0 : 0.0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s10,
+                vertical: AppSpacing.xs,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
                     duration: context.motionMs(200),
-                    curve: Curves.easeOutBack,
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: activeColor,
-                        boxShadow: [
-                          BoxShadow(
-                            color: activeColor.withValues(alpha: 0.65),
-                            blurRadius: 4,
-                          ),
-                        ],
+                    padding: const EdgeInsets.all(AppSpacing.s6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isActive
+                          ? activeColor.withValues(alpha: 0.16)
+                          : Colors.transparent,
+                      border: isActive
+                          ? Border.all(
+                              color: activeColor.withValues(alpha: 0.38),
+                              width: 1.0,
+                            )
+                          : null,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: isActive ? activeColor : inactiveColor,
+                      size: iconSize,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  AnimatedOpacity(
+                    opacity: isActive ? 1.0 : 0.0,
+                    duration: context.motionMs(200),
+                    child: AnimatedScale(
+                      scale: isActive ? 1.0 : 0.0,
+                      duration: context.motionMs(200),
+                      curve: Curves.easeOutBack,
+                      child: Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: activeColor,
+                          boxShadow: [
+                            BoxShadow(
+                              color: activeColor.withValues(alpha: 0.65),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -693,59 +703,63 @@ class _AbPointButton extends StatelessWidget {
           onTap: onPressed,
           onLongPress: onLongPress,
           borderRadius: AppRadii.r20All,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xxs,
-              vertical: AppSpacing.xs,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: context.motionMs(200),
-                  width: buttonSize,
-                  height: buttonSize,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isActive
-                        ? effectiveColor.withValues(alpha: 0.16)
-                        : p.surfaceContainerHigh,
-                    border: Border.all(
-                      color: isActive ? effectiveColor : p.hairline,
-                      width: 1.0,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xxs,
+                vertical: AppSpacing.xs,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedContainer(
+                    duration: context.motionMs(200),
+                    width: buttonSize,
+                    height: buttonSize,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isActive
+                          ? effectiveColor.withValues(alpha: 0.16)
+                          : p.surfaceContainerHigh,
+                      border: Border.all(
+                        color: isActive ? effectiveColor : p.hairline,
+                        width: 1.0,
+                      ),
+                      boxShadow:
+                          isActive ? PulsrElevation.level1(context) : null,
                     ),
-                    boxShadow: isActive ? PulsrElevation.level1(context) : null,
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: (buttonSize * 0.44).clamp(11.0, 15.0),
+                        fontWeight: FontWeight.w800,
+                        color: effectiveColor,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                   ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: (buttonSize * 0.44).clamp(11.0, 15.0),
-                      fontWeight: FontWeight.w800,
+                  const SizedBox(height: 3),
+                  AnimatedContainer(
+                    duration: context.motionMs(200),
+                    width: isActive ? 8 : 0,
+                    height: isActive ? 2.5 : 0,
+                    decoration: BoxDecoration(
+                      borderRadius: AppRadii.r2All,
                       color: effectiveColor,
-                      letterSpacing: -0.2,
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: effectiveColor.withValues(alpha: 0.5),
+                                blurRadius: 4,
+                              ),
+                            ]
+                          : null,
                     ),
                   ),
-                ),
-                const SizedBox(height: 3),
-                AnimatedContainer(
-                  duration: context.motionMs(200),
-                  width: isActive ? 8 : 0,
-                  height: isActive ? 2.5 : 0,
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadii.r2All,
-                    color: effectiveColor,
-                    boxShadow: isActive
-                        ? [
-                            BoxShadow(
-                              color: effectiveColor.withValues(alpha: 0.5),
-                              blurRadius: 4,
-                            ),
-                          ]
-                        : null,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 /// Semantic scrims. Aurora adds eased multi-stop gradients so artwork dissolves

@@ -1,10 +1,10 @@
-﻿// PlaylistsScreen widget suite.
+// PlaylistsScreen widget suite.
 //
 // Covers the loading skeleton, error and empty states, the populated local
 // grid, the create-playlist dialog flow and the local/online tab switch.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -19,6 +19,8 @@ import 'package:pulsr/features/playlists/presentation/playlists_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../helpers/screen_harness.dart';
+
+import 'package:pulsr/core/errors/app_error.dart';
 
 class _PlaylistCubit extends Mock implements PlaylistCubit {}
 
@@ -86,8 +88,7 @@ void main() {
   testWidgets('renders the error state with a retry action', (tester) async {
     await pumpScreen(tester);
 
-    await emit(
-        tester, const PlaylistState(isLoading: false, errorMessage: 'boom'));
+    await emit(tester, PlaylistState(isLoading: false, error: uiError('boom')));
 
     expect(find.text('Failed to load playlist.'), findsOneWidget);
     expect(find.text('boom'), findsOneWidget);
@@ -173,8 +174,7 @@ void main() {
 
     final horizontalList = find.byWidgetPredicate(
       (widget) =>
-          widget is ListView &&
-          widget.scrollDirection == Axis.horizontal,
+          widget is ListView && widget.scrollDirection == Axis.horizontal,
     );
     expect(horizontalList, findsOneWidget);
   });

@@ -1,6 +1,6 @@
 // lib/core/widgets/pulsr_slider.dart
 import 'dart:math';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import '../../features/settings/cubit/settings_state.dart' show PlayerSliderStyle;
 import '../constants/app_colors.dart';

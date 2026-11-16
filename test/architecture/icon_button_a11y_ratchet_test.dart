@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/widgets/song_tile.dart';
@@ -50,7 +50,8 @@ void main() {
     expect(
       offenders,
       isEmpty,
-      reason: 'Every IconButton must have a localized tooltip for accessibility.',
+      reason:
+          'Every IconButton must have a localized tooltip for accessibility.',
     );
   });
 

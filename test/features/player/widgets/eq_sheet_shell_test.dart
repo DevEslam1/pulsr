@@ -14,7 +14,7 @@
 // and asserts the Android-only shell controls are absent.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
@@ -29,6 +29,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'player_sheet_test_support.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -79,7 +80,7 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         theme: AuraTheme.darkTheme,
         locale: const Locale('ar'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: const Scaffold(body: EqualizerSheet()),
       ));
@@ -308,7 +309,8 @@ void main() {
       await tester.pumpAndSettle();
     });
 
-    testWidgets('hardware device profile bar does not overflow on 320dp width and 2.0 text scale',
+    testWidgets(
+        'hardware device profile bar does not overflow on 320dp width and 2.0 text scale',
         (tester) async {
       EqualizerSheet.debugForceAndroidSurface = true;
       addTearDown(() => EqualizerSheet.debugForceAndroidSurface = null);

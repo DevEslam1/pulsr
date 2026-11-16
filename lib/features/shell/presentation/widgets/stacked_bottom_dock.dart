@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
@@ -21,6 +21,7 @@ import '../bottom_nav_bar.dart';
 import 'dock_style_picker_sheet.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 enum DockStackMode {
   /// Default: MiniPlayer is placed above BottomNavBar in vertical order.
   defaultLayout,
@@ -594,34 +595,35 @@ class StackedBottomDockState extends State<StackedBottomDock> {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: () => _setMode(targetMode),
-                onVerticalDragStart: (_) {
-                  if (isMini) {
-                    _behindMiniDragDy = 0;
-                  } else {
-                    _behindNavDragDy = 0;
-                  }
-                },
-                onVerticalDragUpdate: (d) {
-                  if (isMini) {
-                    _behindMiniDragDy += d.delta.dy;
-                  } else {
-                    _behindNavDragDy += d.delta.dy;
-                  }
-                },
-                onVerticalDragEnd: (d) {
-                  final v = d.primaryVelocity ?? 0;
-                  final dragDy = isMini ? _behindMiniDragDy : _behindNavDragDy;
-                  if (dragDy > 40 || v > 120) {
-                    _handleSwipeDown();
-                  } else if (dragDy < -40 || v < -120) {
-                    _handleSwipeUp();
-                  }
-                  if (isMini) {
-                    _behindMiniDragDy = 0;
-                  } else {
-                    _behindNavDragDy = 0;
-                  }
-                },
+                  onVerticalDragStart: (_) {
+                    if (isMini) {
+                      _behindMiniDragDy = 0;
+                    } else {
+                      _behindNavDragDy = 0;
+                    }
+                  },
+                  onVerticalDragUpdate: (d) {
+                    if (isMini) {
+                      _behindMiniDragDy += d.delta.dy;
+                    } else {
+                      _behindNavDragDy += d.delta.dy;
+                    }
+                  },
+                  onVerticalDragEnd: (d) {
+                    final v = d.primaryVelocity ?? 0;
+                    final dragDy =
+                        isMini ? _behindMiniDragDy : _behindNavDragDy;
+                    if (dragDy > 40 || v > 120) {
+                      _handleSwipeDown();
+                    } else if (dragDy < -40 || v < -120) {
+                      _handleSwipeUp();
+                    }
+                    if (isMini) {
+                      _behindMiniDragDy = 0;
+                    } else {
+                      _behindNavDragDy = 0;
+                    }
+                  },
                   onVerticalDragCancel: () {
                     if (isMini) {
                       _behindMiniDragDy = 0;

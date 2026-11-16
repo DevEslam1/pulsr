@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,6 +9,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/settings/presentation/widgets/bit_perfect_conflict_dialog.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class _MockSettingsCubit extends Mock implements SettingsCubit {}
 
 class _MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -38,7 +39,7 @@ void main() {
       BlocProvider<SettingsCubit>.value(
         value: cubit,
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
@@ -87,7 +88,7 @@ void main() {
       BlocProvider<SettingsCubit>.value(
         value: cubit,
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
@@ -127,14 +128,15 @@ void main() {
     });
 
     final player = _MockPlayerCubit();
-    when(() => player.state).thenReturn(const PlayerState(dsp: DspSlice(
-          isLimiterEnabled: true,
-          isDynamicEqEnabled: true,
-          isSubCrossoverEnabled: true,
-          isLiveProgEnabled: true,
-          monoMix: true,
-          volumeBoost: 0.4,
-        )));
+    when(() => player.state).thenReturn(const PlayerState(
+        dsp: DspSlice(
+      isLimiterEnabled: true,
+      isDynamicEqEnabled: true,
+      isSubCrossoverEnabled: true,
+      isLiveProgEnabled: true,
+      monoMix: true,
+      volumeBoost: 0.4,
+    )));
     when(() => player.stream).thenAnswer((_) => const Stream.empty());
     when(() => player.setLookaheadLimiter(any(),
         thresholdDb: any(named: 'thresholdDb'),
@@ -171,7 +173,7 @@ void main() {
           BlocProvider<PlayerCubit>.value(value: player),
         ],
         child: MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          localizationsDelegates: appLocalizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
           home: Builder(
             builder: (context) => Scaffold(
@@ -197,8 +199,17 @@ void main() {
     await tester.tap(find.byType(FilledButton));
     await tester.pumpAndSettle();
 
-    expect(disabled, containsAll(['limiter', 'dynamicEq', 'subCrossover',
-        'liveProg', 'monoMix', 'balance', 'volumeBoost']));
+    expect(
+        disabled,
+        containsAll([
+          'limiter',
+          'dynamicEq',
+          'subCrossover',
+          'liveProg',
+          'monoMix',
+          'balance',
+          'volumeBoost'
+        ]));
     // The multiband compressor is only reachable through the master switch, so
     // it has to run whenever anything effect-like is still active.
     expect(disabled, contains('masterEffects'));

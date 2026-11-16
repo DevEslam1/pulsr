@@ -1,5 +1,5 @@
 // test/features/player/player_themes_all_render_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -13,6 +13,7 @@ import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import '../../helpers/test_song_factory.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -46,7 +47,8 @@ void main() {
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
 
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
   });
 
   Widget buildThemeHarness({
@@ -55,7 +57,7 @@ void main() {
     bool isInSplitView = false,
   }) {
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: MediaQuery(
         data: MediaQueryData(size: size),
@@ -92,9 +94,11 @@ void main() {
     PlayerThemeMode.milkdrop,
   ];
 
-  group('All 10 PlayerThemeScaffold Themes Multi-Form-Factor Rendering Tests', () {
+  group('All 10 PlayerThemeScaffold Themes Multi-Form-Factor Rendering Tests',
+      () {
     for (final themeMode in scaffoldThemes) {
-      testWidgets('$themeMode renders without exception in Portrait (390x844)', (tester) async {
+      testWidgets('$themeMode renders without exception in Portrait (390x844)',
+          (tester) async {
         final props = PlayerThemeProps(
           state: mockPlayerCubit.state,
           cubit: mockPlayerCubit,
@@ -114,7 +118,8 @@ void main() {
         expect(find.byType(PlayerThemeScaffold), findsOneWidget);
       });
 
-      testWidgets('$themeMode renders without exception in Landscape (844x390)', (tester) async {
+      testWidgets('$themeMode renders without exception in Landscape (844x390)',
+          (tester) async {
         final props = PlayerThemeProps(
           state: mockPlayerCubit.state,
           cubit: mockPlayerCubit,
@@ -134,7 +139,9 @@ void main() {
         expect(find.byType(PlayerThemeScaffold), findsOneWidget);
       });
 
-      testWidgets('$themeMode renders without exception in Short Screen (360x540)', (tester) async {
+      testWidgets(
+          '$themeMode renders without exception in Short Screen (360x540)',
+          (tester) async {
         final props = PlayerThemeProps(
           state: mockPlayerCubit.state,
           cubit: mockPlayerCubit,
@@ -154,7 +161,8 @@ void main() {
         expect(find.byType(PlayerThemeScaffold), findsOneWidget);
       });
 
-      testWidgets('$themeMode renders without exception in Split-View', (tester) async {
+      testWidgets('$themeMode renders without exception in Split-View',
+          (tester) async {
         final props = PlayerThemeProps(
           state: mockPlayerCubit.state,
           cubit: mockPlayerCubit,

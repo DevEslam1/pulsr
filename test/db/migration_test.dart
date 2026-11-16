@@ -17,9 +17,9 @@ void main() {
       await db.close();
     });
 
-    test('Fresh database opens at schemaVersion 12 and has all indexes',
+    test('Fresh database opens at schemaVersion 13 and has all indexes',
         () async {
-      expect(db.schemaVersion, equals(12));
+      expect(db.schemaVersion, equals(13));
 
       // Test inserting a song with schema v4 fields
       final songId = await db.into(db.songsTable).insert(
@@ -148,7 +148,6 @@ void main() {
           reason: 'the constant default must backfill pre-existing rows');
       expect(song.remoteId, equals(null));
       expect(song.remoteArtworkUrl, equals(null));
-      expect(song.pendingDownloadPath, equals(null));
 
       final entries =
           await upgraded!.select(upgraded!.playlistEntriesTable).get();
@@ -161,7 +160,7 @@ void main() {
 
       final version =
           await upgraded!.customSelect('PRAGMA user_version;').getSingle();
-      expect(version.data['user_version'], equals(12));
+      expect(version.data['user_version'], equals(13));
 
       // The upgraded schema must accept remote rows, not just the fresh one.
       await upgraded!.into(upgraded!.songsTable).insert(
@@ -234,8 +233,9 @@ void main() {
             'idx_songs_path_cue',
             'idx_songs_uri',
             'idx_songs_cue',
-            'idx_songs_pending_dl',
           ]));
+      expect(await songIndexNames(), isNot(contains('idx_songs_pending_dl')),
+          reason: 'the dead pending_download_path index must be gone');
       final plIdx =
           await upgraded!.customSelect('PRAGMA index_list("playlists");').get();
       expect(plIdx.map((r) => r.read<String>('name')),

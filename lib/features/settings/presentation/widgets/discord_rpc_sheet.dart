@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -69,9 +69,8 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
       if (user != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text(context.l10n.discordConnectedAs(
-                    user.globalName, user.username)),
+            content: Text(context.l10n
+                .discordConnectedAs(user.globalName, user.username)),
             behavior: SnackBarBehavior.floating,
           ),
         );

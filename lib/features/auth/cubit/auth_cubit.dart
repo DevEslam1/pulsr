@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/errors/app_error.dart';
 import '../../../core/services/auth_failure.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/cloud_sync_service.dart';
@@ -38,7 +39,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
         safeEmit(state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
-          errorMessage: null,
+          error: null,
           lastSyncedAt: _cloudSyncService.lastSyncTime,
         ));
         // Auto-sync in background on login
@@ -51,7 +52,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
           status: AuthStatus.unauthenticated,
           syncStatus: SyncStatus.idle,
           user: null,
-          errorMessage: null,
+          error: null,
         ));
       }
     });
@@ -67,8 +68,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
   }
 
   Future<void> signInWithGoogle() async {
-    safeEmit(
-        state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
+    safeEmit(state.copyWith(status: AuthStatus.authenticating, error: null));
     try {
       final user = await _authService.signInWithGoogle();
       if (isClosed) return;
@@ -77,7 +77,7 @@ class AuthCubit extends PulsrCubit<AuthState> {
         safeEmit(state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
-          errorMessage: null,
+          error: null,
         ));
         await syncNow();
       } else {
@@ -85,23 +85,26 @@ class AuthCubit extends PulsrCubit<AuthState> {
         // That is not a failure: no error sound, just an informational message.
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
-          errorMessage: 'Sign-in was cancelled.',
+          error: const AuthFailure(
+            code: 'AUTH_CANCELLED',
+            userMessage: 'Sign-in was cancelled.',
+            kind: AuthFailureKind.cancelled,
+            recovery: AuthRecoveryAction.none,
+          ),
         ));
       }
     } catch (e) {
       if (isClosed) return;
       SoundFeedbackService.playError(mirrorHaptics: true);
-      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
-        errorMessage: msg,
+        error: AuthFailure.fromAny(e),
       ));
     }
   }
 
   Future<void> signInWithEmail(String email, String password) async {
-    safeEmit(
-        state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
+    safeEmit(state.copyWith(status: AuthStatus.authenticating, error: null));
     try {
       final user = await _authService.signInWithEmail(email, password);
       if (isClosed) return;
@@ -110,30 +113,31 @@ class AuthCubit extends PulsrCubit<AuthState> {
         safeEmit(state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
-          errorMessage: null,
+          error: null,
         ));
         await syncNow();
       } else {
         SoundFeedbackService.playError(mirrorHaptics: true);
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
-          errorMessage: 'Sign in failed. Please try again.',
+          error: const GenericAppError(
+            code: 'AUTH_SIGN_IN_FAILED',
+            userMessage: 'Sign in failed. Please try again.',
+          ),
         ));
       }
     } catch (e) {
       if (isClosed) return;
       SoundFeedbackService.playError(mirrorHaptics: true);
-      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
-        errorMessage: msg,
+        error: AuthFailure.fromAny(e),
       ));
     }
   }
 
   Future<void> signUpWithEmail(String email, String password) async {
-    safeEmit(
-        state.copyWith(status: AuthStatus.authenticating, errorMessage: null));
+    safeEmit(state.copyWith(status: AuthStatus.authenticating, error: null));
     try {
       final user = await _authService.signUpWithEmail(email, password);
       if (isClosed) return;
@@ -142,23 +146,25 @@ class AuthCubit extends PulsrCubit<AuthState> {
         safeEmit(state.copyWith(
           status: AuthStatus.authenticated,
           user: user,
-          errorMessage: null,
+          error: null,
         ));
         await syncNow();
       } else {
         SoundFeedbackService.playError(mirrorHaptics: true);
         safeEmit(state.copyWith(
           status: AuthStatus.unauthenticated,
-          errorMessage: 'Sign up failed. Please try again.',
+          error: const GenericAppError(
+            code: 'AUTH_SIGN_UP_FAILED',
+            userMessage: 'Sign up failed. Please try again.',
+          ),
         ));
       }
     } catch (e) {
       if (isClosed) return;
       SoundFeedbackService.playError(mirrorHaptics: true);
-      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
         status: AuthStatus.error,
-        errorMessage: msg,
+        error: AuthFailure.fromAny(e),
       ));
     }
   }
@@ -170,13 +176,12 @@ class AuthCubit extends PulsrCubit<AuthState> {
     try {
       await _authService.sendPasswordResetEmail(email);
       if (isClosed) return true;
-      safeEmit(state.copyWith(errorMessage: null));
+      safeEmit(state.copyWith(error: null));
       return true;
     } catch (e) {
       if (isClosed) return false;
-      final msg = AuthCubit.mapAuthError(e);
       safeEmit(state.copyWith(
-        errorMessage: msg,
+        error: AuthFailure.fromAny(e),
       ));
       return false;
     }
@@ -313,7 +318,11 @@ class AuthCubit extends PulsrCubit<AuthState> {
             ..reset();
           safeEmit(state.copyWith(
             syncStatus: SyncStatus.failure,
-            syncError: 'Failed to sync with cloud. Check internet connection.',
+            syncError: const GenericAppError(
+              code: 'AUTH_SYNC_FAILED',
+              userMessage:
+                  'Failed to sync with cloud. Check internet connection.',
+            ),
           ));
         }
       }
@@ -324,7 +333,11 @@ class AuthCubit extends PulsrCubit<AuthState> {
           ..reset();
         safeEmit(state.copyWith(
           syncStatus: SyncStatus.failure,
-          syncError: 'Failed to sync with cloud. Check internet connection.',
+          syncError: const GenericAppError(
+            code: 'AUTH_SYNC_FAILED',
+            userMessage:
+                'Failed to sync with cloud. Check internet connection.',
+          ),
         ));
       }
     } finally {

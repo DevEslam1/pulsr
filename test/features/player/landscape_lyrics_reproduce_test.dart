@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mocktail/mocktail.dart';
@@ -18,6 +18,7 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSettingsCubit extends Mock implements SettingsCubit {}
@@ -68,7 +69,7 @@ void main() {
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
 
     return MaterialApp(
-      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localizationsDelegates: appLocalizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       home: MediaQuery(
         data: MediaQueryData(size: size),
@@ -234,7 +235,8 @@ void main() {
         final portraitControlsRect =
             tester.getRect(find.byIcon(Icons.pause_rounded));
         expect(portraitControlsRect.bottom, lessThanOrEqualTo(844.0),
-            reason: '$themeMode controls pushed below screen bottom in portrait');
+            reason:
+                '$themeMode controls pushed below screen bottom in portrait');
         expect(portraitControlsRect.top, greaterThanOrEqualTo(0.0),
             reason: '$themeMode controls pushed above screen top in portrait');
       } else {
@@ -243,9 +245,11 @@ void main() {
         expect(find.byType(PlayerSeekBar), findsOneWidget,
             reason: '$themeMode missing seekbar in portrait');
 
-        final portraitControlsRect = tester.getRect(find.byType(PlayerControls));
+        final portraitControlsRect =
+            tester.getRect(find.byType(PlayerControls));
         expect(portraitControlsRect.bottom, lessThanOrEqualTo(844.0),
-            reason: '$themeMode controls pushed below screen bottom in portrait');
+            reason:
+                '$themeMode controls pushed below screen bottom in portrait');
         expect(portraitControlsRect.top, greaterThanOrEqualTo(0.0),
             reason: '$themeMode controls pushed above screen top in portrait');
       }

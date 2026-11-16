@@ -4,7 +4,7 @@
 // share an identical Q1/Q2/Q3 queue slot mental model and track ordering.
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -85,13 +85,13 @@ void main() {
     ));
     await tester.pumpAndSettle();
 
-    final firstScreenDy =
-        tester.getTopLeft(find.text('Slot Two First')).dy;
-    final secondScreenDy =
-        tester.getTopLeft(find.text('Slot Two Second')).dy;
+    final firstScreenDy = tester.getTopLeft(find.text('Slot Two First')).dy;
+    final secondScreenDy = tester.getTopLeft(find.text('Slot Two Second')).dy;
     expect(firstScreenDy, lessThan(secondScreenDy));
     expect(
-      tester.widget<QueueSlotSwitcher>(find.byType(QueueSlotSwitcher)).activeSlot,
+      tester
+          .widget<QueueSlotSwitcher>(find.byType(QueueSlotSwitcher))
+          .activeSlot,
       1,
     );
 
@@ -110,7 +110,9 @@ void main() {
     final secondViewDy = tester.getTopLeft(find.text('Slot Two Second')).dy;
     expect(firstViewDy, lessThan(secondViewDy));
     expect(
-      tester.widget<QueueSlotSwitcher>(find.byType(QueueSlotSwitcher)).activeSlot,
+      tester
+          .widget<QueueSlotSwitcher>(find.byType(QueueSlotSwitcher))
+          .activeSlot,
       1,
     );
   });

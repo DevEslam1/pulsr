@@ -2,7 +2,7 @@
 //
 // Invalid production configuration must block startup with a visible screen
 // instead of being logged and ignored.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/main.dart';
 

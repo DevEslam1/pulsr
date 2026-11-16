@@ -1,7 +1,7 @@
 // lib/features/ytm_search/presentation/ytm_search_screen.dart
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
@@ -34,6 +34,7 @@ import '../cubit/ytm_search_state.dart';
 import 'widgets/ytm_download_button.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class YtmSearchScreen extends StatelessWidget {
   const YtmSearchScreen({super.key});
 

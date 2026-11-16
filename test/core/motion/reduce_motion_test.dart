@@ -1,7 +1,7 @@
 // Accessibility regression: the platform "Reduce motion" flag (and the in-app
 // toggle that overrides MediaQuery.disableAnimations) must collapse every
 // PulsrMotion duration to zero while leaving normal motion untouched.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/motion/pulsr_motion.dart';
 

@@ -1,5 +1,5 @@
 // lib/core/responsive/pulsr_typography.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../constants/app_typography.dart';
 import 'responsive_typography.dart';
 

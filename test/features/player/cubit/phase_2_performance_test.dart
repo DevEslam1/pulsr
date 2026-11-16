@@ -1,5 +1,5 @@
 // test/features/player/cubit/phase_2_performance_test.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
@@ -25,6 +25,7 @@ import 'package:pulsr/features/player/presentation/widgets/lyrics/advanced_lyric
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 class MockAudioHandler extends Mock implements PulsrAudioHandler {}
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
@@ -72,7 +73,7 @@ void main() {
 
       await tester.pumpWidget(MaterialApp(
         theme: AuraTheme.darkTheme,
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        localizationsDelegates: appLocalizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: BlocProvider<PlayerCubit>.value(
@@ -132,7 +133,8 @@ void main() {
   });
 
   group('Phase 2.2 — NowPlayingQueueView buildWhen optimization', () {
-    test('listContentDiffers detects real content differences but ignores identical copyWith',
+    test(
+        'listContentDiffers detects real content differences but ignores identical copyWith',
         () {
       const song1 = SongsTableData(
         id: 1,
@@ -198,10 +200,10 @@ void main() {
           currentIndex: 0,
         ),
         playback: const PlayerState().playback.copyWith(
-          currentSong: song,
-          position: Duration.zero,
-          isPlaying: true,
-        ),
+              currentSong: song,
+              position: Duration.zero,
+              isPlaying: true,
+            ),
       );
 
       final nextState = prevState.copyWith(
@@ -211,19 +213,20 @@ void main() {
       );
 
       // Evaluate the buildWhen gate from NowPlayingQueueView:
-      final shouldRebuild = listContentDiffers(
-              prevState.queue, nextState.queue) ||
-          prevState.currentIndex != nextState.currentIndex ||
-          prevState.activeQueueSlot != nextState.activeQueueSlot ||
-          prevState.currentSong?.id != nextState.currentSong?.id ||
-          prevState.isPlaying != nextState.isPlaying;
+      final shouldRebuild =
+          listContentDiffers(prevState.queue, nextState.queue) ||
+              prevState.currentIndex != nextState.currentIndex ||
+              prevState.activeQueueSlot != nextState.activeQueueSlot ||
+              prevState.currentSong?.id != nextState.currentSong?.id ||
+              prevState.isPlaying != nextState.isPlaying;
 
       expect(shouldRebuild, isFalse);
     });
   });
 
   group('Phase 2.3 — Throttled continuous DSP sliders', () {
-    testWidgets('ThrottledSlider coalesces rapid drags into 60ms debounce window',
+    testWidgets(
+        'ThrottledSlider coalesces rapid drags into 60ms debounce window',
         (tester) async {
       final values = <double>[];
 
@@ -287,7 +290,8 @@ void main() {
   });
 
   group('Phase 2.5 — EqCurveVisualizer gains animation', () {
-    testWidgets('EqCurveVisualizer sets tween begin from previous gains on update',
+    testWidgets(
+        'EqCurveVisualizer sets tween begin from previous gains on update',
         (tester) async {
       final initialGains = [0.0, 0.0, 0.0];
       final newGains = [4.0, 6.0, 8.0];
@@ -322,7 +326,8 @@ void main() {
   });
 
   group('Phase 2.6 — EqPreset bandsMap and gains clip-risk refresh', () {
-    test('EqPreset bandsMap does NOT cover active gains for Custom presets', () {
+    test('EqPreset bandsMap does NOT cover active gains for Custom presets',
+        () {
       final presetA = EqPreset(
         name: 'Custom',
         gains: const [0.0, 0.0, 0.0],
@@ -360,7 +365,9 @@ void main() {
   });
 
   group('Phase 2.7 — Latency session finishWithError on loadQueue failure', () {
-    test('finishWithError marks active session as closed and sets failure stage', () {
+    test(
+        'finishWithError marks active session as closed and sets failure stage',
+        () {
       final tracker = PlaybackLatencyTracker();
       tracker.start(videoId: 'video_fail_test');
 
@@ -404,7 +411,8 @@ void main() {
       expect(find.byType(ShaderMask), findsWidgets);
     });
 
-    testWidgets('Bypasses ShaderMask and renders solid Text when GpuBudget is active',
+    testWidgets(
+        'Bypasses ShaderMask and renders solid Text when GpuBudget is active',
         (tester) async {
       GpuBudget.setEnabled(true);
       addTearDown(() => GpuBudget.setEnabled(false));

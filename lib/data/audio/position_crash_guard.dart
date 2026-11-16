@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/utils/error_logger.dart';
+
 class PositionCrashSnapshot {
   final int songId;
   final int queueIndex;
@@ -96,9 +98,15 @@ class PositionCrashGuard {
         await tmpFile.copy(file.path);
         try {
           await tmpFile.delete();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Best-effort PositionCrashGuard operation failed',
+              error: e, stackTrace: st, category: 'PositionCrashGuard');
+        }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort PositionCrashGuard operation failed',
+          error: e, stackTrace: st, category: 'PositionCrashGuard');
+    }
   }
 
   /// Reads the crash recovery snapshot. Prefers the committed file, then falls
@@ -121,7 +129,10 @@ class PositionCrashGuard {
           return PositionCrashSnapshot.fromJson(json);
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort PositionCrashGuard operation failed',
+          error: e, stackTrace: st, category: 'PositionCrashGuard');
+    }
     return null;
   }
 
@@ -136,7 +147,10 @@ class PositionCrashGuard {
       if (tmpFile != null && await tmpFile.exists()) {
         await tmpFile.delete();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort PositionCrashGuard operation failed',
+          error: e, stackTrace: st, category: 'PositionCrashGuard');
+    }
   }
 
   /// Alias for clearSnapshot.
@@ -149,7 +163,10 @@ class PositionCrashGuard {
       await prefs.setInt(
           keyLastCleanShutdownTs, DateTime.now().millisecondsSinceEpoch);
       await clearSnapshot();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort PositionCrashGuard operation failed',
+          error: e, stackTrace: st, category: 'PositionCrashGuard');
+    }
   }
 
   /// Checks if an unclean shutdown occurred and if crash guard snapshot is newer than DB.
@@ -169,7 +186,10 @@ class PositionCrashGuard {
       if (snapshot.timestamp > lastClean) {
         return true;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Best-effort PositionCrashGuard operation failed',
+          error: e, stackTrace: st, category: 'PositionCrashGuard');
+    }
     return false;
   }
 }

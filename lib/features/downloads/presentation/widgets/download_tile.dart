@@ -1,5 +1,5 @@
 // lib/features/downloads/presentation/widgets/download_tile.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/errors/error_message_resolver.dart';

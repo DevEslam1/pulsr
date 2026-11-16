@@ -2,7 +2,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
@@ -110,7 +110,8 @@ void main() {
       await handler.stop();
     });
 
-    test('PlaybackVolumeMute updates volume and isMuted on state without clobbering',
+    test(
+        'PlaybackVolumeMute updates volume and isMuted on state without clobbering',
         () async {
       PlayerState state = const PlayerState();
       final controller = PlaybackVolumeMute(
@@ -182,7 +183,8 @@ void main() {
   });
 
   group('PlayerVolumeBar Widget', () {
-    testWidgets('renders volume controls and responds to PlayerCubit volume state',
+    testWidgets(
+        'renders volume controls and responds to PlayerCubit volume state',
         (tester) async {
       final cubit = stubPlayerCubit(
         state: const PlayerState().copyWith(

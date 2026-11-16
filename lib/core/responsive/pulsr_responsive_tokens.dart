@@ -1,7 +1,7 @@
 // lib/core/responsive/pulsr_responsive_tokens.dart
 import 'dart:math' as math;
 import 'dart:ui' show DisplayFeature;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'breakpoints.dart';
 
 /// Physical and interaction classification of the current device.

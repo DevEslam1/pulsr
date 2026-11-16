@@ -115,7 +115,7 @@ mixin SettingsScreenController on State<SettingsScreen> {
   static bool _settingsBuildWhen(
       SettingsState previous, SettingsState current) {
     SettingsState scrub(SettingsState s) => s.copyWith(
-          errorMessage: null,
+          error: null,
           isTestingAllProxies: false,
           systemEffectsBundles: const <String>[],
         );

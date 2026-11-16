@@ -1,5 +1,5 @@
 // lib/core/widgets/ticker_gated_branch_container.dart
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Keeps every navigation branch mounted (so scroll position and state survive
 /// tab switches) while muting tickers and focus traversal in the branches that

@@ -5928,5 +5928,17 @@
   "coachMarkUsbDacTitle": "Salida de audio Bit-Perfect",
   "coachMarkUsbDacBody": "Transmisión directa por hardware activa. Se omite el remuestreador del sistema para una reproducción exacta.",
   "coachMarkDockSwipeTitle": "Estilos de base personalizables",
-  "coachMarkDockSwipeBody": "Desliza hacia arriba en el mini reproductor o mantén presionado para personalizar los modos de acoplamiento."
+  "coachMarkDockSwipeBody": "Desliza hacia arriba en el mini reproductor o mantén presionado para personalizar los modos de acoplamiento.",
+  "databaseHealth": "Salud de la base de datos",
+  "databaseHealthChecking": "Comprobando…",
+  "databaseHealthHealthy": "Correcta",
+  "databaseHealthIssues": "Problemas detectados",
+  "databaseHealthEncryption": "Cifrado: {state}",
+  "databaseEncryptionEncrypted": "Cifrada",
+  "databaseEncryptionPlaintext": "Texto plano",
+  "databaseEncryptionUnavailable": "No disponible",
+  "databaseEncryptionDisabled": "Desactivado",
+  "databaseHealthRepairSearch": "Reparar índice de búsqueda",
+  "databaseHealthSearchRepaired": "Índice de búsqueda reparado",
+  "databaseHealthSearchRepairFailed": "Error al reparar el índice de búsqueda"
 }

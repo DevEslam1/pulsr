@@ -5,7 +5,7 @@
 // style (which carries the font family), so omitting the family silently
 // falls back to the platform font — a visible typography inconsistency in
 // buttons, chips, tabs and navigation labels.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 
