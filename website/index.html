@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pulsr Music — Premium Offline-First Audiophile Local Music Player</title>
-    <meta name="description" content="Pulsr is a next-generation offline local music player engineered for audiophiles. Bit-perfect Hi-Res playback, 10/32-band EQ, AutoEQ, spatializer, convolution reverb, room correction, synced lyrics, 8 player themes, and zero telemetry.">
-    <meta name="keywords" content="music player, pulsr, audiophile music player, 64-band equalizer, AutoEQ, harman target, offline music player, synced lyrics, FLAC player, Hi-Res audio, room correction, convolution reverb, drift sqlite, flutter music player">
+    <title>Pulsr Music — Audiophile Offline Player, Party, Quran Mode &amp; DSD512</title>
+    <meta name="description" content="Pulsr is an offline-first audiophile player with a 20-stage native C++ DSP chain, 10/32/64-band EQ, 652 AutoEQ profiles, DSD64–512 and USB-DAC exclusive output, 11 Now Playing themes, karaoke, Pulsr Party group listening, 114-surah Quran Mode, DLNA casting, SMB/WebDAV/FTP remote sources, and zero telemetry.">
+    <meta name="keywords" content="music player, pulsr, audiophile music player, 64-band equalizer, AutoEQ, DSD512, USB DAC, bit-perfect, offline music player, synced lyrics, FLAC player, Hi-Res audio, room correction, convolution reverb, pulsr party, quran mode, karaoke, milkdrop, DLNA, WebDAV, drift sqlite, flutter music player">
     <meta name="author" content="DevEslam1">
     <meta name="theme-color" content="#0B0D13">
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://deveslam1.github.io/pulsr/">
-    <meta property="og:title" content="Pulsr Music — Pure Offline Sound. Unrivaled Aura Design.">
-    <meta property="og:description" content="Audiophile-grade offline music player with 10-band EQ, AutoEQ headphone presets, real-time synced lyrics, dynamic Aura theming, and zero telemetry. Free &amp; Open Source.">
+    <meta property="og:title" content="Pulsr Music — Audiophile Offline Player, Party &amp; Quran Mode">
+    <meta property="og:description" content="20-stage native DSP, 652 AutoEQ profiles, DSD512, 11 player themes, Pulsr Party, karaoke, 114-surah Quran Mode, DLNA casting and zero telemetry. Free &amp; Open Source.">
     <meta property="og:image" content="assets/app_icon.svg">
 
     <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="Pulsr Music — Audiophile Offline Music Player">
-    <meta name="twitter:description" content="10/32/64-Band EQ, AutoEQ headphone targets, room correction, synced lyrics, 8 player themes, and zero telemetry.">
+    <meta name="twitter:title" content="Pulsr Music — Audiophile Offline Player + Party + Quran Mode">
+    <meta name="twitter:description" content="10/32/64-band EQ, 652 AutoEQ profiles, DSD512 USB-DAC output, 11 player themes, karaoke, Pulsr Party, Quran Mode, and zero telemetry.">
     <meta name="twitter:image" content="assets/app_icon.svg">
 
     <!-- Favicon -->
@@ -31,7 +31,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="styles.css?v=4.1.0">
+    <link rel="stylesheet" href="styles.css?v=4.2.0">
 </head>
 <body>
     <a href="#main" class="skip-link">Skip to Content</a>
@@ -62,13 +62,13 @@
             <div class="nav-center" id="navLinks">
                 <a href="#features" class="nav-link active">Features</a>
                 <a href="#dsp" class="nav-link">DSP Suite</a>
-                <a href="#equalizer" class="nav-link">Equalizer</a>
-                <a href="#lyrics" class="nav-link">Lyrics</a>
+                <a href="#studio" class="nav-link">Studio</a>
+                <a href="#party" class="nav-link">Party</a>
+                <a href="#quran" class="nav-link">Quran</a>
                 <a href="#themes" class="nav-link">Themes</a>
-                <a href="#online" class="nav-link">Editions</a>
+                <a href="#visuals" class="nav-link">Visuals</a>
                 <a href="#library" class="nav-link">Library</a>
-                <a href="#sync" class="nav-link">Sync</a>
-                <a href="#comparison" class="nav-link">Compare</a>
+                <a href="#online" class="nav-link">Online</a>
                 <a href="#download" class="nav-link">Downloads</a>
                 <a href="#faq" class="nav-link">FAQ</a>
             </div>
@@ -143,13 +143,16 @@
     <!-- Mobile Menu Drawer -->
     <div class="mobile-menu" id="mobileMenu">
         <a href="#features" class="mobile-link">⚡ Core Features</a>
-        <a href="#dsp" class="mobile-link">🎚️ Complete DSP Suite</a>
-        <a href="#equalizer" class="mobile-link">🎛️ 10/32/64-Band EQ &amp; AutoEQ</a>
-        <a href="#lyrics" class="mobile-link">🎤 Synced Lyrics</a>
-        <a href="#themes" class="mobile-link">🎨 8 Player Themes</a>
+        <a href="#dsp" class="mobile-link">🎚️ 20-Stage DSP Suite</a>
+        <a href="#equalizer" class="mobile-link">🎛️ EQ &amp; AutoEQ Sandbox</a>
+        <a href="#studio" class="mobile-link">🎧 Pro Audio &amp; DSD512</a>
+        <a href="#party" class="mobile-link">🎉 Pulsr Party</a>
+        <a href="#quran" class="mobile-link">🕌 Quran Mode</a>
+        <a href="#themes" class="mobile-link">🎨 11 Player Themes</a>
+        <a href="#visuals" class="mobile-link">🎤 Karaoke &amp; Visuals</a>
         <a href="#online" class="mobile-link">📡 Pure &amp; Plus Editions</a>
-        <a href="#library" class="mobile-link">📚 Library Power Tools</a>
-        <a href="#sync" class="mobile-link">🔄 Sync, Scrobble &amp; Automate</a>
+        <a href="#library" class="mobile-link">📚 Library &amp; Remote Sources</a>
+        <a href="#sync" class="mobile-link">🔄 Sync, Scrobble &amp; Integrate</a>
         <a href="#comparison" class="mobile-link">⚖️ Compare Players</a>
         <a href="#download" class="mobile-link">📦 Downloads &amp; Builds</a>
         <a href="#faq" class="mobile-link">❓ FAQ</a>
@@ -172,9 +175,9 @@
                 <div class="hero-content">
                     <div class="hero-badge reveal">
                         <span class="badge-pulsing-dot"></span>
-                        <span class="badge-tag">PULSR // AUDIOPHILE DSP + LIBRARY SUITE</span>
+                        <span class="badge-tag">PULSR // PARTY · QURAN · DSD512 · 11 THEMES</span>
                         <span class="badge-sep">|</span>
-                        <span class="badge-info">10/32/64-Band EQ • Room Correction • 8 Themes</span>
+                        <span class="badge-info">20-Stage Native DSP • 652 AutoEQ Profiles • 114 Surahs</span>
                     </div>
 
                     <h1 class="hero-title reveal">
@@ -183,7 +186,7 @@
                     </h1>
 
                     <p class="hero-description reveal">
-                        A next-generation local music player engineered for audiophiles and design purists. Experience bit-perfect Hi-Res playback, a complete studio DSP chain (10/32-band EQ, spatializer, convolution reverb and room correction), millisecond synced lyrics, and 8 dynamic player themes — 100% offline with zero tracking.
+                        A next-generation local player for audiophiles and design purists. Run a 20-stage native C++ DSP chain with 10/32/64-band EQ, 652 AutoEQ profiles, DSD64–512 and exclusive USB-DAC output — then listen together with Pulsr Party, study with the offline 114-surah Quran Mode, or sing with scored karaoke. Eleven player themes, Milkdrop visuals, DLNA casting and zero telemetry.
                     </p>
 
                     <div class="hero-cta-group reveal">
@@ -207,26 +210,26 @@
 
                     <div class="hero-os-detector reveal">
                         <span class="os-detect-dot"></span>
-                        <span class="os-detect-text" id="osDetectorLabel">✓ Android (5.0+) Compatible • 100% Offline • Zero Telemetry &amp; No Ads</span>
+                        <span class="os-detect-text" id="osDetectorLabel">✓ Android 9+ Compatible • 100% Offline • Zero Telemetry &amp; No Ads</span>
                     </div>
 
                     <!-- Live Highlight Stats Cards -->
                     <div class="hero-stats reveal">
                         <div class="stat-card">
                             <div class="stat-num">10 / 32 / 64</div>
-                            <div class="stat-title">Band Parametric + AutoEQ</div>
+                            <div class="stat-title">Band EQ + 652 AutoEQ Profiles</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-num">24-Bit</div>
-                            <div class="stat-title">192kHz Bit-Perfect Hi-Res</div>
+                            <div class="stat-num">DSD512</div>
+                            <div class="stat-title">Native 1-Bit to 768kHz PCM</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-num">0 ms</div>
-                            <div class="stat-title">Zero Telemetry &amp; Offline</div>
+                            <div class="stat-num">11</div>
+                            <div class="stat-title">Player Themes + Theme Studio</div>
                         </div>
                         <div class="stat-card">
-                            <div class="stat-num">&lt; 2s</div>
-                            <div class="stat-title">10k+ Songs SQLite Scan</div>
+                            <div class="stat-num">114</div>
+                            <div class="stat-title">Offline Quran Surahs</div>
                         </div>
                     </div>
                 </div>
@@ -243,7 +246,7 @@
                             <div class="cockpit-title">Pulsr Signal Deck — Aura Core</div>
                             <div class="cockpit-meter">
                                 <span class="meter-live-indicator"></span>
-                                <span id="heroLiveBitrate">FLAC 24-Bit / 192kHz</span>
+                                <span id="heroLiveBitrate">FLAC 32-Bit / 768kHz</span>
                             </div>
                         </div>
 
@@ -259,7 +262,7 @@
                                             <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(155,158,245,0.4)" stroke-width="1.5"/>
                                             <path d="M44 64 A 8 8 0 1 1 52 56 V 34 H 66 V 42 H 52 V 64 Z" fill="#ffffff" filter="drop-shadow(0 0 8px rgba(0,242,255,0.8))"/>
                                         </svg>
-                                        <span class="hi-res-badge">Hi-Res Lossless</span>
+                                        <span class="hi-res-badge">Native DSD512</span>
                                     </div>
                                 </div>
 
@@ -326,7 +329,7 @@
                             <div class="cockpit-graph-box">
                                 <div class="graph-top-label">
                                     <span>Real-Time DSP Acoustic Curve</span>
-                                    <span class="graph-stat-badge">AutoEQ: Harman 2019 Active</span>
+                                    <span class="graph-stat-badge">AutoEQ: 652 Profiles · Harman 2019</span>
                                 </div>
                                 <svg class="hero-sparkline-svg" viewBox="0 0 360 70" preserveAspectRatio="none">
                                     <defs>
@@ -349,32 +352,32 @@
         <section class="marquee-strip" aria-hidden="true">
             <div class="marquee-track">
                 <div class="marquee-group">
-                    <span class="marquee-item">🎚️ 10/32/64-Band Parametric DSP &amp; AutoEQ</span>
-                    <span class="marquee-item">💎 Bit-Perfect 24-Bit / 192kHz FLAC</span>
-                    <span class="marquee-item">🎤 Real-Time Synced LRC Lyrics</span>
-                    <span class="marquee-item">🎨 8 Player Themes + Theme Studio</span>
-                    <span class="marquee-item">🔊 Spatializer • Dynamics • Convolution Reverb</span>
-                    <span class="marquee-item">🛋️ Room Correction Measurement Wizard</span>
-                    <span class="marquee-item">🗄️ Drift SQLite Sub-2s Scanner</span>
-                    <span class="marquee-item">🏷️ In-Place ID3 Tag &amp; Artwork Editor</span>
-                    <span class="marquee-item">📱 Android Home Screen Widgets</span>
-                    <span class="marquee-item">📥 Optional YTM Streaming &amp; Downloads</span>
+                    <span class="marquee-item">🎚️ 10/32/64-Band EQ + 652 AutoEQ Profiles</span>
+                    <span class="marquee-item">💎 DSD64–DSD512 • DoP • 768 kHz PCM</span>
+                    <span class="marquee-item">🎉 Pulsr Party — NTP-Synced Listening</span>
+                    <span class="marquee-item">🕌 Quran Mode — 114 Surahs Offline</span>
+                    <span class="marquee-item">🎤 Karaoke Pitch Highway + Scored Lines</span>
+                    <span class="marquee-item">🌌 Milkdrop Shader Visuals + 8 Styles</span>
+                    <span class="marquee-item">🎨 11 Player Themes + Theme Studio</span>
+                    <span class="marquee-item">🔊 20-Stage Native C++ DSP Chain</span>
+                    <span class="marquee-item">🎧 USB-DAC Exclusive + AAudio Direct</span>
+                    <span class="marquee-item">📡 DLNA Casting • SMB / WebDAV / FTP</span>
+                    <span class="marquee-item">🗄️ Drift SQLite Library + Smart Playlists</span>
                     <span class="marquee-item">🛡️ 100% Offline &amp; Zero Telemetry</span>
-                    <span class="marquee-item">🌐 English, Spanish &amp; Arabic (RTL)</span>
                 </div>
                 <div class="marquee-group">
-                    <span class="marquee-item">🎚️ 10/32/64-Band Parametric DSP &amp; AutoEQ</span>
-                    <span class="marquee-item">💎 Bit-Perfect 24-Bit / 192kHz FLAC</span>
-                    <span class="marquee-item">🎤 Real-Time Synced LRC Lyrics</span>
-                    <span class="marquee-item">🎨 8 Player Themes + Theme Studio</span>
-                    <span class="marquee-item">🔊 Spatializer • Dynamics • Convolution Reverb</span>
-                    <span class="marquee-item">🛋️ Room Correction Measurement Wizard</span>
-                    <span class="marquee-item">🗄️ Drift SQLite Sub-2s Scanner</span>
-                    <span class="marquee-item">🏷️ In-Place ID3 Tag &amp; Artwork Editor</span>
-                    <span class="marquee-item">📱 Android Home Screen Widgets</span>
-                    <span class="marquee-item">📥 Optional YTM Streaming &amp; Downloads</span>
+                    <span class="marquee-item">🎚️ 10/32/64-Band EQ + 652 AutoEQ Profiles</span>
+                    <span class="marquee-item">💎 DSD64–DSD512 • DoP • 768 kHz PCM</span>
+                    <span class="marquee-item">🎉 Pulsr Party — NTP-Synced Listening</span>
+                    <span class="marquee-item">🕌 Quran Mode — 114 Surahs Offline</span>
+                    <span class="marquee-item">🎤 Karaoke Pitch Highway + Scored Lines</span>
+                    <span class="marquee-item">🌌 Milkdrop Shader Visuals + 8 Styles</span>
+                    <span class="marquee-item">🎨 11 Player Themes + Theme Studio</span>
+                    <span class="marquee-item">🔊 20-Stage Native C++ DSP Chain</span>
+                    <span class="marquee-item">🎧 USB-DAC Exclusive + AAudio Direct</span>
+                    <span class="marquee-item">📡 DLNA Casting • SMB / WebDAV / FTP</span>
+                    <span class="marquee-item">🗄️ Drift SQLite Library + Smart Playlists</span>
                     <span class="marquee-item">🛡️ 100% Offline &amp; Zero Telemetry</span>
-                    <span class="marquee-item">🌐 English, Spanish &amp; Arabic (RTL)</span>
                 </div>
             </div>
         </section>
@@ -385,11 +388,11 @@
                 <div class="section-header reveal">
                     <span class="section-tag">Core Architecture</span>
                     <h2 class="section-title">Engineered For <span class="gradient-text">Audiophile Purity</span></h2>
-                    <p class="section-subtitle">No ads, no accounts, no analytics tracking. Built on Flutter 3, Dart isolate DSP pipelines, and high-performance Drift SQLite indexing.</p>
+                    <p class="section-subtitle">A Flutter app with a C++ real-time DSP core, a Go party server and zero telemetry. Every capability below is backed by shipped source — not a roadmap slide.</p>
                 </div>
 
                 <div class="features-grid">
-                    <!-- Feature 1: 10-Band EQ & AutoEQ -->
+                    <!-- Feature 1: EQ & AutoEQ -->
                     <div class="feature-card feature-highlight reveal">
                         <div class="feature-card-glow"></div>
                         <div class="feature-icon feature-icon-cyan">
@@ -400,11 +403,11 @@
                                 <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line>
                             </svg>
                         </div>
-                        <h3 class="feature-title">10/32/64-Band Graphic DSP &amp; AutoEQ</h3>
-                        <p class="feature-desc">Fine-tune acoustic frequencies with ±12dB sliders from 31Hz to 16kHz. Includes pre-calibrated compensation curves for industry-leading headphones like AirPods Pro, Sony WH-1000XM5, and Sennheiser HD600.</p>
+                        <h3 class="feature-title">10/32/64-Band EQ + 652 AutoEQ Profiles</h3>
+                        <p class="feature-desc">A 10-band graphic curve, 32-band or 64-band parametric engine with eight biquad filter types, ±15 dB bands, per-band solo and mute, twelve presets, and 652 bundled headphone correction profiles.</p>
                         <div class="feature-mini-visual">
                             <div class="threads-visual-bar">
-                                <span>10-Band Frequency Range:</span>
+                                <span>10-band curve · 20 Hz – 20 kHz</span>
                                 <div class="thread-bars-grid">
                                     <div class="t-bar tb-1"></div><div class="t-bar tb-2"></div>
                                     <div class="t-bar tb-3"></div><div class="t-bar tb-4"></div>
@@ -416,7 +419,112 @@
                         </div>
                     </div>
 
-                    <!-- Feature 2: Drift SQLite Library Scanner -->
+                    <!-- Feature 2: Native DSP -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                                <path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">20-Stage Native C++ DSP Chain</h3>
+                        <p class="feature-desc">64-band parametric EQ, 1024-node FIR graphic EQ, 8-band dynamic EQ, 4-band multiband compressor, true-peak limiter, crossfeed, saturation, bass management and more — with RTF and thermal auto-degrade.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">64 bands</span>
+                            <span class="mini-chip">20 stages</span>
+                            <span class="mini-chip">16 engines</span>
+                        </div>
+                    </div>
+
+                    <!-- Feature 3: Themes -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-amber">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2l9 5-9 5-9-5 9-5z"></path>
+                                <path d="M3 12l9 5 9-5"></path>
+                                <path d="M3 17l9 5 9-5"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">11 Player Themes + Theme Studio</h3>
+                        <p class="feature-desc">Eleven real Now Playing surfaces — vinyl, cassette, CD, radial, waveform, lyrics and Milkdrop — plus a studio for palette, corner radius and ambient glow with JSON export and import.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">Vinyl</span>
+                            <span class="mini-chip">Cassette</span>
+                            <span class="mini-chip">Milkdrop</span>
+                        </div>
+                    </div>
+
+                    <!-- Feature 4: Party -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-pink">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Pulsr Party — Listen Together</h3>
+                        <p class="feature-desc">Create or join a room by code, align clocks with an NTP-style exchange, and share transport and queue. Host-only or democratic control, with host speaker-delay compensation.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">13 frames</span>
+                            <span class="mini-chip">15 actions</span>
+                            <span class="mini-chip">10 s ping</span>
+                        </div>
+                    </div>
+
+                    <!-- Feature 5: Quran -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-emerald">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 19.5A2.5 2.5 0 016.5 17H20"></path>
+                                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"></path>
+                                <path d="M9 7h7M9 11h7"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Quran Mode — 114 Surahs Offline</h3>
+                        <p class="feature-desc">Complete Tanzil Uthmani 1.1 text, five reciter styles, ayah repeat, Hifz blind recall, a Mushaf page reader, mosque ambience reverb and resumable bookmarks — no network required.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">114 surahs</span>
+                            <span class="mini-chip">5 styles</span>
+                            <span class="mini-chip">Hifz</span>
+                        </div>
+                    </div>
+
+                    <!-- Feature 6: Karaoke -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-cyan">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="2" width="6" height="11" rx="3"></rect>
+                                <path d="M5 10a7 7 0 0014 0M12 17v4M8 21h8"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Karaoke &amp; Milkdrop Visuals</h3>
+                        <p class="feature-desc">Live YIN vocal pitch, a pitch highway, ±12 semitone shift and 0–100 line scoring. Eight visualizer styles plus a GPU Milkdrop shader with a Canvas fallback under GPU Saver.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">YIN pitch</span>
+                            <span class="mini-chip">8 styles</span>
+                            <span class="mini-chip">GPU shader</span>
+                        </div>
+                    </div>
+
+                    <!-- Feature 7: DSD -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M6 3h12l4 6-10 12L2 9l4-6z"></path>
+                                <path d="M2 9h20M12 21L8 9l4-6 4 6-4 12z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">DSD512 &amp; USB-DAC Exclusive Output</h3>
+                        <p class="feature-desc">Decode DSD64–DSD512 to PCM up to 768 kHz, frame DoP carriers, extract SACD ISO tracks, and drive UAC2 DACs at S16 / S24_3 / S32 through an exclusive AAudio path.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">DSD512</span>
+                            <span class="mini-chip">DoP</span>
+                            <span class="mini-chip">UAC2</span>
+                        </div>
+                    </div>
+
+                    <!-- Feature 8: Library -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-emerald">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -425,57 +533,30 @@
                                 <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
                             </svg>
                         </div>
-                        <h3 class="feature-title">Drift SQLite Sub-2s Scanner</h3>
-                        <p class="feature-desc">Scans and indexes 10,000+ local audio tracks in under 2 seconds. Multi-dimensional sorting by Artists, Albums, Genres, Folders, Years, and smart auto-playlists.</p>
-                    </div>
-
-                    <!-- Feature 3: Hi-Res Bit-Perfect Playback -->
-                    <div class="feature-card reveal">
-                        <div class="feature-icon feature-icon-violet">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                                <polyline points="2 17 12 22 22 17"></polyline>
-                                <polyline points="2 12 12 17 22 12"></polyline>
-                            </svg>
+                        <h3 class="feature-title">Reactive Drift SQLite Library</h3>
+                        <p class="feature-desc">Eight browsing modes, in-place tag and artwork editing, three queue slots, 16-field smart playlists, duplicate cleanup, CUE sheets, radio directory and 500-station storage.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">Drift</span>
+                            <span class="mini-chip">Smart playlists</span>
+                            <span class="mini-chip">CUE</span>
                         </div>
-                        <h3 class="feature-title">24-Bit / 192kHz Bit-Perfect Lossless</h3>
-                        <p class="feature-desc">Hardware DAC pass-through for uncompressed FLAC, ALAC, WAV, AAC, and OPUS containers. Includes gapless playback, crossfade, and pitch control.</p>
                     </div>
 
-                    <!-- Feature 4: Synced LRC Lyrics Engine -->
-                    <div class="feature-card reveal">
-                        <div class="feature-icon feature-icon-amber">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M9 18V5l12-2v13"></path>
-                                <circle cx="6" cy="18" r="3"></circle>
-                                <circle cx="18" cy="16" r="3"></circle>
-                            </svg>
-                        </div>
-                        <h3 class="feature-title">Millisecond Synced LRC Lyrics</h3>
-                        <p class="feature-desc">Kinetic karaoke-style autoscrolling lyrics view with interactive tap-to-seek verse jumping and manual ±50ms sync calibration.</p>
-                    </div>
-
-                    <!-- Feature 5: In-Place Tag & Art Injector -->
-                    <div class="feature-card reveal">
-                        <div class="feature-icon feature-icon-pink">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
-                            </svg>
-                        </div>
-                        <h3 class="feature-title">ID3 Tag &amp; Cover Art Editor</h3>
-                        <p class="feature-desc">Modify Title, Artist, Album, Genre, Year, and Track Number directly in audio files. Inject custom high-res album artwork straight from your photo gallery.</p>
-                    </div>
-
-                    <!-- Feature 6: Zero Telemetry & 100% Offline -->
+                    <!-- Feature 9: Private -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-red">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                                <path d="M9 12l2 2 4-4"></path>
                             </svg>
                         </div>
-                        <h3 class="feature-title">100% Offline &amp; Zero Telemetry</h3>
-                        <p class="feature-desc">Zero external pings, zero advertising SDKs, and zero accounts. Your listening history and music library remain 100% private on your physical device.</p>
+                        <h3 class="feature-title">Offline &amp; Private by Design</h3>
+                        <p class="feature-desc">The Pure build removes the INTERNET permission at manifest level: no ads, no analytics, no accounts, no Sentry and no cloud calls. Your library stays on your device.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">Zero telemetry</span>
+                            <span class="mini-chip">No ads</span>
+                            <span class="mini-chip">No account</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -697,27 +778,60 @@
             <div class="container">
                 <div class="section-header reveal">
                     <span class="section-tag">Aura Design System</span>
-                    <h2 class="section-title">8 Now Playing <span class="gradient-text">Visual Themes</span></h2>
-                    <p class="section-subtitle">Personalize your player with dynamic palettes extracted in real time from album art, pure AMOLED battery-saver modes, a custom theme studio, and fluid 120 FPS animations.</p>
+                    <h2 class="section-title">11 Now Playing <span class="gradient-text">Visual Themes</span></h2>
+                    <p class="section-subtitle">Every theme is a real player surface with its own painters, motion and layout — not a color swap. Pick one, or build your own palette, radius and glow in the Theme Studio.</p>
                 </div>
 
                 <div class="themes-grid reveal">
-                    <!-- Theme 1 -->
+                    <!-- 1. Clean -->
                     <div class="theme-card active">
-                        <div class="theme-card-preview theme-preview-glass">
-                            <div class="mini-player-art"></div>
-                            <div class="mini-player-lines">
-                                <span class="mpl-1"></span>
-                                <span class="mpl-2"></span>
-                            </div>
+                        <div class="theme-card-preview theme-preview-clean">
+                            <div class="clean-art"></div>
+                            <div class="clean-progress"><span></span></div>
                         </div>
                         <div class="theme-card-info">
-                            <h4>Classic Glassmorphism</h4>
-                            <p>Radiant neon lighting with frosted glass blur layers matching the dominant cover art color.</p>
+                            <h4>Clean — Modern Flow</h4>
+                            <p>Borderless edge-to-edge artwork with glass controls and a quiet progress line.</p>
                         </div>
                     </div>
 
-                    <!-- Theme 2 -->
+                    <!-- 2. Classic -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-classic">
+                            <div class="classic-art"></div>
+                            <div class="classic-controls"><span></span><span></span><span></span></div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Classic — Standard Deck</h4>
+                            <p>Dense cover art with the full transport and queue controls always in reach.</p>
+                        </div>
+                    </div>
+
+                    <!-- 3. Card -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-card">
+                            <div class="card-stack"></div>
+                            <div class="card-art"></div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Card — Glass Overlay</h4>
+                            <p>Floating artwork card with soft depth, blurred chrome and swipe gestures.</p>
+                        </div>
+                    </div>
+
+                    <!-- 4. Circle -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-circle">
+                            <div class="circle-ring"></div>
+                            <div class="circle-art"></div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Circle — Radial Stage</h4>
+                            <p>Circular artwork with a radial progress ring and centered transport.</p>
+                        </div>
+                    </div>
+
+                    <!-- 5. Minimal -->
                     <div class="theme-card">
                         <div class="theme-card-preview theme-preview-minimal">
                             <div class="mini-player-art minimal-art"></div>
@@ -727,27 +841,12 @@
                             </div>
                         </div>
                         <div class="theme-card-info">
-                            <h4>Minimalist Typography</h4>
-                            <p>Distraction-free high contrast typography with elegant monochrome waveforms.</p>
+                            <h4>Minimal — Typography First</h4>
+                            <p>Monochrome, distraction-free type with discreet controls and no clutter.</p>
                         </div>
                     </div>
 
-                    <!-- Theme 3 -->
-                    <div class="theme-card">
-                        <div class="theme-card-preview theme-preview-deck">
-                            <div class="mini-player-art deck-art"></div>
-                            <div class="mini-player-lines">
-                                <span class="mpl-1"></span>
-                                <span class="mpl-2"></span>
-                            </div>
-                        </div>
-                        <div class="theme-card-info">
-                            <h4>Card Deck Stack</h4>
-                            <p>Tactile swipeable stacked artwork cards with smooth 3D depth and swipe transitions.</p>
-                        </div>
-                    </div>
-
-                    <!-- Theme 4 -->
+                    <!-- 6. Vinyl -->
                     <div class="theme-card">
                         <div class="theme-card-preview theme-preview-vinyl">
                             <div class="vinyl-disc">
@@ -755,68 +854,95 @@
                             </div>
                         </div>
                         <div class="theme-card-info">
-                            <h4>Modern Vinyl Turntable</h4>
-                            <p>Rotating high-res vinyl disc with acoustic grooves and tonearm needle animations.</p>
+                            <h4>Vinyl — Turntable Studio</h4>
+                            <p>Rotating grooved record with a tonearm and studio deck lighting.</p>
                         </div>
                     </div>
 
-                    <!-- Theme 5 -->
+                    <!-- 7. CD -->
                     <div class="theme-card">
-                        <div class="theme-card-preview theme-preview-deck">
-                            <div class="mini-player-art deck-art"></div>
-                            <div class="mini-player-lines">
-                                <span class="mpl-1"></span>
-                                <span class="mpl-2"></span>
+                        <div class="theme-card-preview theme-preview-cd">
+                            <div class="cd-disc">
+                                <div class="cd-hole"></div>
                             </div>
                         </div>
                         <div class="theme-card-info">
-                            <h4>Retro Cassette Deck</h4>
-                            <p>Vintage cassette tape with spinning spools, magnetic tape counter and tactile transport buttons.</p>
+                            <h4>CD — Reflective Disc</h4>
+                            <p>Iridescent compact disc with a spinning edge and track index.</p>
                         </div>
                     </div>
 
-                    <!-- Theme 6 -->
+                    <!-- 8. Cassette -->
                     <div class="theme-card">
-                        <div class="theme-card-preview theme-preview-minimal">
-                            <div class="mini-player-art minimal-art"></div>
-                            <div class="mini-player-lines">
-                                <span class="mpl-1"></span>
-                                <span class="mpl-2"></span>
+                        <div class="theme-card-preview theme-preview-cassette">
+                            <div class="cassette-shell">
+                                <div class="cassette-reel left"></div>
+                                <div class="cassette-reel right"></div>
+                                <div class="cassette-window"></div>
                             </div>
                         </div>
                         <div class="theme-card-info">
-                            <h4>Full-Bleed Waveform</h4>
-                            <p>Full-screen audio-reactive glowing waveform backdrop that pulses with the live spectrum.</p>
+                            <h4>Cassette — Retro Deck</h4>
+                            <p>Spinning spools, magnetic tape and a tactile transport panel.</p>
                         </div>
                     </div>
 
-                    <!-- Theme 7 -->
+                    <!-- 9. Waveform -->
                     <div class="theme-card">
-                        <div class="theme-card-preview theme-preview-glass">
-                            <div class="mini-player-art"></div>
-                            <div class="mini-player-lines">
-                                <span class="mpl-1"></span>
-                                <span class="mpl-2"></span>
+                        <div class="theme-card-preview theme-preview-waveform">
+                            <div class="wave-bars">
+                                <span></span><span></span><span></span><span></span><span></span>
+                                <span></span><span></span><span></span><span></span><span></span>
                             </div>
                         </div>
                         <div class="theme-card-info">
-                            <h4>Karaoke Lyrics Immersion</h4>
-                            <p>Magnified, lyrics-first karaoke interface with a full-screen singing view and real-time progress.</p>
+                            <h4>Waveform — Full-Bleed Wave</h4>
+                            <p>A reactive waveform backdrop that moves with the live spectrum.</p>
                         </div>
                     </div>
 
-                    <!-- Theme 8 -->
+                    <!-- 10. Lyrics -->
                     <div class="theme-card">
-                        <div class="theme-card-preview theme-preview-deck">
-                            <div class="mini-player-art deck-art"></div>
-                            <div class="mini-player-lines">
-                                <span class="mpl-1"></span>
-                                <span class="mpl-2"></span>
-                            </div>
+                        <div class="theme-card-preview theme-preview-lyrics">
+                            <div class="lyric-preview-line w-90"></div>
+                            <div class="lyric-preview-line w-70"></div>
+                            <div class="lyric-preview-line active w-80"></div>
+                            <div class="lyric-preview-line w-60"></div>
                         </div>
                         <div class="theme-card-info">
-                            <h4>Custom Theme Studio</h4>
-                            <p>Build, export and share your own player theme with custom colors, layout and visualizer style.</p>
+                            <h4>Lyrics — Karaoke Immersion</h4>
+                            <p>Full-screen lyrics with the current line glowing and tap-to-seek verses.</p>
+                        </div>
+                    </div>
+
+                    <!-- 11. Milkdrop -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-milkdrop">
+                            <span class="theme-flag">GPU</span>
+                            <div class="milkdrop-orb"></div>
+                            <div class="milk-blob b1"></div>
+                            <div class="milk-blob b2"></div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Milkdrop — Shader Visualizer</h4>
+                            <p>Audio-reactive GLSL visuals from <code>milkdrop.frag</code>, with a Canvas fallback.</p>
+                        </div>
+                    </div>
+
+                    <!-- 12. Studio -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-studio">
+                            <div class="studio-swatches">
+                                <span style="background:#3B82F6"></span>
+                                <span style="background:#06B6D4"></span>
+                                <span style="background:#8B5CF6"></span>
+                                <span style="background:#EC4899"></span>
+                            </div>
+                            <div class="studio-slider"><i></i></div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Theme Studio — Build Your Own</h4>
+                            <p>Set palette, corner radius and ambient glow, preview live, then export or import JSON.</p>
                         </div>
                     </div>
                 </div>
@@ -829,94 +955,621 @@
                 <div class="section-header reveal">
                     <span class="section-tag">Studio-Grade Processing</span>
                     <h2 class="section-title">The Complete <span class="gradient-text">DSP &amp; Effects Suite</span></h2>
-                    <p class="section-subtitle">A true audio engineering chain, not a toy equalizer. Every stage is independently bypassable with live conflict detection and honest capability reporting.</p>
+                    <p class="section-subtitle">A true audio engineering chain, not a toy equalizer. Twenty native stages, sixteen concurrent engines, live telemetry and honest conflict reporting — every stage independently bypassable.</p>
                 </div>
+
                 <div class="features-grid">
+                    <!-- 1 EQ -->
                     <div class="feature-card feature-highlight reveal">
                         <div class="feature-card-glow"></div>
                         <div class="feature-icon feature-icon-cyan">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
                         </div>
                         <h3 class="feature-title">10/32/64-Band Parametric EQ</h3>
-                        <p class="feature-desc">Switch between the classic 10-band graphic curve, a 32-band, or a 64-band parametric engine with a custom frequency editor. A/B flat compare plus four recallable A/B/C/D slots.</p>
+                        <p class="feature-desc">Switch between a 10-band graphic curve and 32/64-band parametric engines. Eight biquad types, ±15 dB bands, per-band solo and mute, plus a 1024-node linear-phase FIR graphic EQ.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">8 filter types</span>
+                            <span class="mini-chip">±15 dB</span>
+                            <span class="mini-chip">FIR 1024</span>
+                        </div>
                     </div>
+
+                    <!-- 2 AutoEQ -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-violet">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
                         </div>
-                        <h3 class="feature-title">AutoEQ + Custom Profiles</h3>
-                        <p class="feature-desc">Bundled Harman 2019/2018 and flagship headphone compensation curves, an online AutoEQ search, and per-song auto-apply by name. Add your own calibration profiles.</p>
+                        <h3 class="feature-title">652 AutoEQ Headphone Profiles</h3>
+                        <p class="feature-desc">A curated bundle of 652 five-band compensation curves, matched to the connected headphone by name. Search online for more, import your own, and stack a profile with room correction.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">652 bundled</span>
+                            <span class="mini-chip">Device match</span>
+                            <span class="mini-chip">Import</span>
+                        </div>
                     </div>
+
+                    <!-- 3 Native engine -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-emerald">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18M3 12h18"/></svg>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
                         </div>
-                        <h3 class="feature-title">3D Spatializer &amp; Virtualizer</h3>
-                        <p class="feature-desc">Widen the soundstage with head-tracker-aware spatial audio and a stereo virtualizer, tuned per output device.</p>
+                        <h3 class="feature-title">Twenty-Stage Native Engine</h3>
+                        <p class="feature-desc">One bit per stage, sixteen concurrent engines, and a lock-free render handoff. A bit-perfect fast path short-circuits the graph when the chain is clean.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">20 stages</span>
+                            <span class="mini-chip">16 engines</span>
+                            <span class="mini-chip">Lock-free</span>
+                        </div>
                     </div>
+
+                    <!-- 4 Dynamics -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-pink">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
                         </div>
-                        <h3 class="feature-title">Multiband Dynamics &amp; Limiter</h3>
-                        <p class="feature-desc">HAL-backed multiband compressor presets, a studio compressor with ratio/attack/release/makeup, and a lookahead brickwall limiter to prevent clipping.</p>
+                        <h3 class="feature-title">Dynamic EQ &amp; Multiband Dynamics</h3>
+                        <p class="feature-desc">Eight dynamic-EQ bands with threshold, ratio, attack and release. A four-band compressor uses Linkwitz-Riley crossovers, followed by a 4× oversampled true-peak lookahead limiter.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">8 dyn bands</span>
+                            <span class="mini-chip">4-band comp</span>
+                            <span class="mini-chip">True peak</span>
+                        </div>
                     </div>
+
+                    <!-- 5 Reverb -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-amber">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1018 0 9 9 0 00-18 0zm3 0h12"/></svg>
                         </div>
                         <h3 class="feature-title">Convolution Reverb + Custom IR</h3>
-                        <p class="feature-desc">Reverb presets with wet/dry control, plus import your own WAV impulse responses for convolution reverb.</p>
+                        <p class="feature-desc">Nine programs from Studio 0.35 s to Cathedral 5.0 s, plus your own impulse responses up to two million samples / ten seconds. Partitioned FFT convolution with predelay, damping and cross-channel blend.</p>
                     </div>
+
+                    <!-- 6 Crossfeed -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-cyan">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h16M4 6h16M4 18h16"/></svg>
                         </div>
                         <h3 class="feature-title">Crossfeed, Width &amp; Saturation</h3>
-                        <p class="feature-desc">Crossfeed for fatiguing headphone listening, mid/side stereo width, and a harmonic saturation/exciter for analog warmth.</p>
+                        <p class="feature-desc">Four crossfeed modes — BS2B, Chu Moy, Jan Meier and custom. A three-band imager with bass mono, plus Tape, Tube and Class-A saturation with 4× oversampling.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">4 crossfeed modes</span>
+                            <span class="mini-chip">3-band imager</span>
+                            <span class="mini-chip">3 saturation models</span>
+                        </div>
                     </div>
+
+                    <!-- 7 Loudness -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-red">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg>
                         </div>
-                        <h3 class="feature-title">Loudness, Sub-Crossover &amp; Dynamic EQ</h3>
-                        <p class="feature-desc">Fletcher–Munson loudness contour that follows playback level, adjustable subwoofer crossover, and dynamic EQ bands.</p>
+                        <h3 class="feature-title">Loudness, Sub-Crossover &amp; Bass</h3>
+                        <p class="feature-desc">A level-following loudness contour (+10 dB at 100 Hz, +4 dB at 8 kHz), Linkwitz-Riley sub crossover at 60–150 Hz with 12/24 dB slopes, and ViPER-style dynamic bass with nine presets.</p>
                     </div>
+
+                    <!-- 8 DDC / LiveProg -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/><path d="M9 9h6v6H9z"/></svg>
+                        </div>
+                        <h3 class="feature-title">ViPER-DDC &amp; LiveProg Scripting</h3>
+                        <p class="feature-desc">Load <code>.vdc</code> device-correction files with up to 256 sections and dual 44.1/48 kHz coefficient banks. LiveProg runs an EEL/JSFX subset: 8,192 instructions, 2,048 memory slots, eight sliders.</p>
+                    </div>
+
+                    <!-- 9 Voicing / channels -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-emerald">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h4l2-6 4 12 2-6h8"/></svg>
+                        </div>
+                        <h3 class="feature-title">DAC Voicing &amp; Channel Manager</h3>
+                        <p class="feature-desc">Three reconstruction characters — Sharp linear-phase, Slow NOS-like and Minimum-phase — with 0–1 even-harmonic warmth. Manage 2–8 channels with per-channel trim and up to 50 ms delay at 768 kHz.</p>
+                    </div>
+
+                    <!-- 10 Room correction -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-violet">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M8 6l4-4 4 4M8 18l4 4 4-4"/></svg>
                         </div>
                         <h3 class="feature-title">Room Correction Wizard</h3>
-                        <p class="feature-desc">Run a stepped-sine sweep, capture your room with the mic, auto-fit a correction curve, stack it with a headphone AutoEQ profile, or export it as an FIR.</p>
+                        <p class="feature-desc">Measure with 24 log-spaced tones from 20 Hz to 16 kHz, capture a 48 kHz mono response, fit a ±15 dB correction curve with smoothing, stack it with AutoEQ, or export the result as FIR.</p>
                     </div>
+
+                    <!-- 11 Dither / RG -->
                     <div class="feature-card reveal">
-                        <div class="feature-icon feature-icon-emerald">
+                        <div class="feature-icon feature-icon-cyan">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
                         </div>
-                        <h3 class="feature-title">Resampler, Dither &amp; ReplayGain</h3>
-                        <p class="feature-desc">High-quality sinc resampling, TPDF dithering (auto-bypassed on Bluetooth), and ReplayGain track/album modes with preamp.</p>
+                        <h3 class="feature-title">Dither, ReplayGain &amp; Direct Volume</h3>
+                        <p class="feature-desc">TPDF dither at a 16-bit boundary, ReplayGain track/album modes with preamp, and Direct Volume Control that keeps the Android stream at max while attenuating in the float DSP path.</p>
                     </div>
+
+                    <!-- 12 Automix -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-pink">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h3l2-5 3 10 2-5h5"/><path d="M18 6l3 3-3 3"/></svg>
+                        </div>
+                        <h3 class="feature-title">Automix &amp; BPM Analysis</h3>
+                        <p class="feature-desc">Detect 40–240 BPM and one of 24 musical keys, build a 4/4 beat grid with four-bar phrases, and plan a transition. Analysis is cached for 500 tracks and survives restarts.</p>
+                    </div>
+
+                    <!-- 13 Overrides -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-pink">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8L7 17M17 7l2.8-2.8"/></svg>
                         </div>
-                        <h3 class="feature-title">Per-Song Overrides</h3>
-                        <p class="feature-desc">Override EQ, volume and BPM per track, save DSP settings per album, and store reusable device/settings profiles.</p>
+                        <h3 class="feature-title">Per-Song Overrides &amp; Profiles</h3>
+                        <p class="feature-desc">Override EQ, volume and BPM per track, save DSP settings per device, and keep capture/apply snapshots of the whole chain with ten rolling backups.</p>
                     </div>
+
+                    <!-- 14 Output -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-amber">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l4 4-4 4M4 12h16M12 22l-4-4 4-4"/></svg>
                         </div>
                         <h3 class="feature-title">Bit-Perfect &amp; Hi-Res Output</h3>
-                        <p class="feature-desc">Bit-perfect mode, float output path, AAudio direct output, USB-DAC sample-rate/bit-depth negotiation, and Bluetooth codec control (LDAC/aptX).</p>
+                        <p class="feature-desc">DSD64–512, DoP, SACD ISO extraction, float output, AAudio direct and USB-DAC sample-rate negotiation. Lossy sources are blocked from a bit-perfect claim, and ambiguous containers report unverified.</p>
                     </div>
+
+                    <!-- 15 Inspector -->
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-cyan">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg>
                         </div>
-                        <h3 class="feature-title">DSP Inspector &amp; Conflict Guards</h3>
-                        <p class="feature-desc">See every active stage, why a stage was auto-degraded, and get protected from mutually exclusive effects (e.g. ReplayGain vs bit-perfect).</p>
+                        <h3 class="feature-title">DSP Inspector &amp; 19-Channel Telemetry</h3>
+                        <p class="feature-desc">See limiter, dynamic-EQ and multiband gain reduction, rolling RTF, thermal level, active stage mask and EQ headroom. A/B compare level-matches the dry path so loudness doesn't bias the verdict.</p>
                     </div>
+
+                    <!-- 16 Spatial -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18M3 12h18"/></svg>
+                        </div>
+                        <h3 class="feature-title">Stereo Imager &amp; Platform Spatializer</h3>
+                        <p class="feature-desc">Balance and mono panner, three-band stereo width with bass mono, and Android spatializer state surfaced honestly — no binaural claim we can't measure.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pro Audio I/O & Chain of Custody -->
+        <section class="section" id="studio">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-tag">Measured, Not Marketed</span>
+                    <h2 class="section-title">Pro Audio I/O, <span class="gradient-text">Proven End to End</span></h2>
+                    <p class="section-subtitle">DSD512, DoP and an exclusive USB-DAC path — with a chain-of-custody certificate that hashes the samples on both sides of the chain instead of asking you to trust a badge.</p>
+                </div>
+
+                <div class="split-layout studio-layout">
+                    <div class="split-text reveal">
+                        <div class="bullet-features">
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🔌</div>
+                                <div>
+                                    <h4>USB-DAC Exclusive</h4>
+                                    <p>UAC1/2/3 alt-setting selection over usbfs with S16_LE, S24_3LE and S32_LE wire formats, eight packets per URB and async feedback clamped to ±0.1%.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">⚡</div>
+                                <div>
+                                    <h4>AAudio Direct</h4>
+                                    <p>16-bit, float, 24-bit packed and API 31+ exclusive 32-bit output with a 150 ms target buffer — no AudioTrack mixer in the path.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">💿</div>
+                                <div>
+                                    <h4>DSD64 → DSD512</h4>
+                                    <p>Native 1-bit decode to PCM up to 768 kHz, DoP carriers at 176.4/352.8/705.6 kHz, and SACD ISO indexing with DSF extraction.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🔐</div>
+                                <div>
+                                    <h4>Chain of Custody</h4>
+                                    <p>Capture 4,096 frames × 2 channels at input and output, hash both, and export a JSON certificate. <code>bitExactMeasured</code> is only reported when the digests match.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🩺</div>
+                                <div>
+                                    <h4>Diagnostics &amp; Safe Mode</h4>
+                                    <p>Nineteen telemetry slots, per-path xrun counters, a self-test, USB quirk profiles per DAC, and a redacted bundle export for support.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="metric-strip">
+                            <div><strong>768</strong><span>kHz ceiling</span></div>
+                            <div><strong>512</strong><span>DSD rate</span></div>
+                            <div><strong>32-bit</strong><span>float path</span></div>
+                            <div><strong>4096</strong><span>frame verify</span></div>
+                        </div>
+                    </div>
+
+                    <div class="split-visual reveal">
+                        <div class="signal-card">
+                            <div class="signal-head">
+                                <span>CHAIN OF CUSTODY · LIVE</span>
+                                <span class="signal-live"><i></i> MEASURED</span>
+                            </div>
+
+                            <div class="signal-track">
+                                <div class="signal-node">
+                                    <span class="signal-kicker">SOURCE</span>
+                                    <strong>FLAC 24-bit</strong>
+                                    <span>96.0 kHz · 2 ch</span>
+                                </div>
+                                <div class="signal-arrow">→</div>
+                                <div class="signal-node">
+                                    <span class="signal-kicker">DECODER</span>
+                                    <strong>Integer PCM</strong>
+                                    <span>no resample</span>
+                                </div>
+                                <div class="signal-arrow">→</div>
+                                <div class="signal-node">
+                                    <span class="signal-kicker">DSP</span>
+                                    <strong>20 stages</strong>
+                                    <span>bypassed · clean</span>
+                                </div>
+                                <div class="signal-arrow">→</div>
+                                <div class="signal-node">
+                                    <span class="signal-kicker">OUTPUT</span>
+                                    <strong>USB DAC</strong>
+                                    <span>exclusive · 24-bit</span>
+                                </div>
+                            </div>
+
+                            <div class="signal-verdict">
+                                <div>
+                                    <span>VERDICT</span>
+                                    <strong>bitExactMeasured</strong>
+                                </div>
+                                <span class="verdict-badge">✓ VERIFIED</span>
+                            </div>
+
+                            <div class="signal-hashes">
+                                <div><span>IN</span><code>9f2a 41c8 7d13 … e7b3</code></div>
+                                <div><span>OUT</span><code>9f2a 41c8 7d13 … e7b3</code></div>
+                            </div>
+
+                            <div class="signal-foot">4,096 frames × 2 ch · SHA-256 in/out · exportable JSON certificate</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="policy-grid reveal">
+                    <div class="policy-card ok">
+                        <div class="policy-status">ELIGIBLE</div>
+                        <h4>True lossless sources</h4>
+                        <p>FLAC, ALAC, WAV, AIFF, DSD/DSF/DFF, WavPack, APE, TTA and integer PCM prefixes can enter the verified bit-perfect path.</p>
+                    </div>
+                    <div class="policy-card no">
+                        <div class="policy-status">BLOCKED</div>
+                        <h4>Lossy &amp; live streams</h4>
+                        <p>MP3, AAC, Opus, Vorbis, WMA, AC-3, live radio and Bluetooth-transcoded output are blocked with an explicit explanation.</p>
+                    </div>
+                    <div class="policy-card maybe">
+                        <div class="policy-status">UNVERIFIED</div>
+                        <h4>Ambiguous containers</h4>
+                        <p><code>.m4a .mp4 .ogg .oga .mka .webm</code> pass but report <code>source_codec_unconfirmed</code>. 32-bit float conversion is rejected rather than called lossless.</p>
+                    </div>
+                </div>
+
+                <p class="studio-note reveal">A USB UAC2 direct sink exists in the native engine and is marked experimental in source; the verified path is the platform USB-DAC exclusive route with measured custody.</p>
+            </div>
+        </section>
+
+        <!-- Pulsr Party -->
+        <section class="section section-dark" id="party">
+            <div class="container">
+                <div class="split-layout">
+                    <div class="split-text reveal">
+                        <span class="section-tag">Listen Together</span>
+                        <h2 class="section-title">Pulsr Party — <span class="gradient-text">One Room, One Beat</span></h2>
+                        <p class="section-subtitle">A low-latency room protocol built on WebSockets, a monotonic server clock and an NTP-style offset exchange. Create a room, share the code, and keep every member on the same bar.</p>
+
+                        <div class="bullet-features">
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🎟️</div>
+                                <div>
+                                    <h4>Room codes, no account</h4>
+                                    <p>Create or join with a short code and nickname, and point the app at a custom party server when you self-host.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">⏱️</div>
+                                <div>
+                                    <h4>Clock sync, not hope</h4>
+                                    <p>A 12-sample NTP-style window keeps the minimum-RTT offset for 120 seconds; a 10-second ping loop keeps the room aligned as latency moves.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">👑</div>
+                                <div>
+                                    <h4>Host-only or democratic</h4>
+                                    <p>Twelve of fifteen control actions are host-gated; the rest let the room vote with its queue. Host promotion and kick are always host-only.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🔊</div>
+                                <div>
+                                    <h4>Built for real speakers</h4>
+                                    <p>Host speaker-delay alignment compensates for the distance between setups, with seek/watch deadbands instead of constant correction.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="metric-strip">
+                            <div><strong>13</strong><span>frame types</span></div>
+                            <div><strong>15</strong><span>control actions</span></div>
+                            <div><strong>12</strong><span>host-gated</span></div>
+                            <div><strong>10 s</strong><span>ping loop</span></div>
+                        </div>
+                    </div>
+
+                    <div class="split-visual reveal">
+                        <div class="party-console">
+                            <div class="party-console-head">
+                                <div class="party-room-code">ROOM <strong id="partyRoomCode">PULSR-7X</strong></div>
+                                <button class="btn btn-ghost btn-sm" id="partyCopyCode">Copy code</button>
+                            </div>
+
+                            <div class="party-now">
+                                <div class="party-art"><span></span></div>
+                                <div class="party-track">
+                                    <span class="party-eyebrow">NOW PLAYING · HOST</span>
+                                    <strong>Midnight Tokyo Drift</strong>
+                                    <span>Kavinsky Wave · Synth Outrun</span>
+                                </div>
+                                <div class="party-sync-badge"><span class="sync-dot"></span><span id="partyDrift">0.4 ms offset</span></div>
+                            </div>
+
+                            <div class="party-progress"><span></span></div>
+
+                            <div class="party-members">
+                                <div class="party-member host">
+                                    <div class="avatar avatar-cyan">AK</div>
+                                    <div class="member-info"><strong>Ahmed</strong><span>Host · controlling</span></div>
+                                    <span class="member-tag">HOST</span>
+                                </div>
+                                <div class="party-member">
+                                    <div class="avatar avatar-violet">LM</div>
+                                    <div class="member-info"><strong>Layla</strong><span id="partyLatencyA">18 ms round trip</span></div>
+                                    <span class="member-dot"></span>
+                                </div>
+                                <div class="party-member">
+                                    <div class="avatar avatar-amber">OS</div>
+                                    <div class="member-info"><strong>Omar</strong><span id="partyLatencyB">31 ms round trip</span></div>
+                                    <span class="member-dot"></span>
+                                </div>
+                                <div class="party-member">
+                                    <div class="avatar avatar-pink">SR</div>
+                                    <div class="member-info"><strong>Sara</strong><span id="partyLatencyC">24 ms round trip</span></div>
+                                    <span class="member-dot"></span>
+                                </div>
+                            </div>
+
+                            <div class="party-controls">
+                                <button class="party-toggle active" data-party-mode="host">Host queue</button>
+                                <button class="party-toggle" data-party-mode="democratic">Democratic queue</button>
+                            </div>
+                            <p class="party-mode-note" id="partyModeNote">Only the host can change the track, seek or skip.</p>
+
+                            <div class="party-footer">
+                                <span>Protocol v1 · NTP-style clock</span>
+                                <span class="live-dot">LIVE</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quran Mode -->
+        <section class="section" id="quran">
+            <div class="container">
+                <div class="split-layout">
+                    <div class="split-text reveal">
+                        <span class="section-tag">Quran Mode</span>
+                        <h2 class="section-title">The Whole Mushaf, <span class="gradient-text">Fully Offline</span></h2>
+                        <p class="section-subtitle">A dedicated recitation experience with all 114 surahs of Tanzil Uthmani 1.1 bundled in the app, five reciter styles and a Hifz mode that hides the text until you recall it.</p>
+
+                        <div class="bullet-features">
+                            <div class="bullet-item">
+                                <div class="bullet-icon">📖</div>
+                                <div>
+                                    <h4>114 surahs, no network</h4>
+                                    <p>Complete Uthmani text shipped in the APK with Tanzil attribution, plus a surah index and a page-by-page Mushaf reader.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🎙️</div>
+                                <div>
+                                    <h4>Five reciter styles</h4>
+                                    <p>Murattal, Mujawwad, Tarawih, Memorization and Sleep presets, each with its own tuning, tempo and ambience.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🧠</div>
+                                <div>
+                                    <h4>Hifz recall &amp; ayah repeat</h4>
+                                    <p>Tap to reveal a hidden ayah, repeat one ayah or a range, and slow the recitation to 0.5× or 0.75×.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🕌</div>
+                                <div>
+                                    <h4>Mosque ambience &amp; bookmarks</h4>
+                                    <p>Convolution reverb and vocal warmth for a mosque-like space, with saved bookmarks and resume prompts that survive restarts.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="metric-strip">
+                            <div><strong>114</strong><span>surahs</span></div>
+                            <div><strong>5</strong><span>reciter styles</span></div>
+                            <div><strong>3</strong><span>tempo steps</span></div>
+                            <div><strong>0</strong><span>network calls</span></div>
+                        </div>
+                    </div>
+
+                    <div class="split-visual reveal">
+                        <div class="quran-console" id="quranConsole">
+                            <div class="quran-head">
+                                <div>
+                                    <span class="quran-eyebrow">SURAH 01 · AL-FATIHAH</span>
+                                    <strong>سُورَةُ الفَاتِحَة</strong>
+                                </div>
+                                <span class="quran-meta">7 ayahs · Makki</span>
+                            </div>
+
+                            <div class="quran-ayahs" dir="rtl" lang="ar">
+                                <div class="quran-ayah">
+                                    <p class="ayah-arabic">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</p>
+                                    <span class="ayah-translation">In the name of Allah, the Entirely Merciful, the Especially Merciful.</span>
+                                    <span class="ayah-number">١</span>
+                                </div>
+                                <div class="quran-ayah">
+                                    <p class="ayah-arabic">الْحَمْدُ لِلَّهِ رَبِّ الْعَالَمِينَ</p>
+                                    <span class="ayah-translation">All praise is due to Allah, Lord of the worlds.</span>
+                                    <span class="ayah-number">٢</span>
+                                </div>
+                                <div class="quran-ayah">
+                                    <p class="ayah-arabic">الرَّحْمَٰنِ الرَّحِيمِ</p>
+                                    <span class="ayah-translation">The Entirely Merciful, the Especially Merciful.</span>
+                                    <span class="ayah-number">٣</span>
+                                </div>
+                            </div>
+
+                            <div class="quran-hifz-row">
+                                <span>Hifz mode hides translations until tapped</span>
+                                <button class="btn btn-ghost btn-sm" id="quranHifzToggle">Enable Hifz</button>
+                            </div>
+
+                            <div class="quran-reciter-row">
+                                <button class="quran-chip active">Murattal</button>
+                                <button class="quran-chip">Mujawwad</button>
+                                <button class="quran-chip">Tarawih</button>
+                                <button class="quran-chip">Memorization</button>
+                                <button class="quran-chip">Sleep</button>
+                            </div>
+
+                            <div class="quran-repeat-row">
+                                <span class="quran-repeat-label">Ayah repeat</span>
+                                <div class="quran-segment">
+                                    <button class="active">Off</button>
+                                    <button>Ayah</button>
+                                    <button>Range</button>
+                                </div>
+                            </div>
+
+                            <div class="quran-foot">
+                                <span>Tanzil Uthmani 1.1 · bundled offline</span>
+                                <span class="quran-mosque">🕌 Mosque ambience</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Karaoke & Visualizers -->
+        <section class="section section-dark" id="visuals">
+            <div class="container">
+                <div class="split-layout">
+                    <div class="split-text reveal">
+                        <span class="section-tag">Karaoke &amp; Reactive Visuals</span>
+                        <h2 class="section-title">Sing It, <span class="gradient-text">Then See It</span></h2>
+                        <p class="section-subtitle">A live pitch highway listens to your voice with YIN detection, scores each line, and lets you loop the hard part. When you'd rather watch, eight visualizer styles and a Milkdrop shader take over.</p>
+
+                        <div class="bullet-features">
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🎤</div>
+                                <div>
+                                    <h4>Pitch highway &amp; scoring</h4>
+                                    <p>Live vocal pitch against the melody, ±12 semitone shift, a practice loop for one line, and a 0–100 score per line with a session average.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🌌</div>
+                                <div>
+                                    <h4>Milkdrop on the GPU</h4>
+                                    <p>A custom GLSL fragment shader drives the Milkdrop theme, with a parameter-driven Canvas fallback when GPU Saver is on. Import <code>.milk</code> and <code>.json</code> presets.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">📊</div>
+                                <div>
+                                    <h4>Eight visualizer styles</h4>
+                                    <p>Frequency bars, smooth wave, radial pulse, ambient particles, 3D terrain, album-art reactive, custom JSON and Milkdrop — plus Off.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">📝</div>
+                                <div>
+                                    <h4>Lyrics that travel</h4>
+                                    <p>Tap-to-seek LRC, a ±ms offset editor, LRCLIB fetch, online translation or romanization, and shareable lyric cards.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="split-visual reveal">
+                        <div class="karaoke-console">
+                            <div class="karaoke-head">
+                                <div>
+                                    <span class="karaoke-eyebrow">KARAOKE · PITCH GUIDE</span>
+                                    <strong>Midnight Tokyo Drift</strong>
+                                </div>
+                                <div class="karaoke-score"><span>LINE SCORE</span><strong id="karaokeScore">92</strong><small>/ 100</small></div>
+                            </div>
+
+                            <div class="pitch-highway" aria-hidden="true">
+                                <div class="pitch-lane l1"></div>
+                                <div class="pitch-lane l2"></div>
+                                <div class="pitch-lane l3"></div>
+                                <div class="pitch-note n1"></div>
+                                <div class="pitch-note n2"></div>
+                                <div class="pitch-note n3"></div>
+                                <div class="pitch-note n4"></div>
+                                <div class="pitch-target"></div>
+                                <div class="pitch-dot"></div>
+                            </div>
+
+                            <div class="karaoke-lyric">
+                                <span class="done">Frequencies align</span> <span class="active">with the beating drum</span>
+                            </div>
+
+                            <div class="karaoke-chips">
+                                <span class="karaoke-chip">YIN live pitch</span>
+                                <span class="karaoke-chip">Pitch shift +2</span>
+                                <span class="karaoke-chip">Practice loop</span>
+                                <span class="karaoke-chip">±12 semitones</span>
+                            </div>
+
+                            <div class="karaoke-foot">
+                                <span>Score saved per session</span>
+                                <span class="live-dot">LISTENING</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="viz-style-row reveal" aria-label="Visualizer styles">
+                    <span class="viz-label">Visualizer styles:</span>
+                    <button class="viz-chip active" data-viz="bars">Frequency Bars</button>
+                    <button class="viz-chip" data-viz="wave">Smooth Wave</button>
+                    <button class="viz-chip" data-viz="radial">Radial Pulse</button>
+                    <button class="viz-chip" data-viz="particles">Ambient Particles</button>
+                    <button class="viz-chip" data-viz="terrain">3D Terrain</button>
+                    <button class="viz-chip" data-viz="album">Album-Art Reactive</button>
+                    <button class="viz-chip" data-viz="json">Custom JSON</button>
+                    <button class="viz-chip" data-viz="milkdrop">Milkdrop</button>
+                    <button class="viz-chip" data-viz="off">Off</button>
+                    <span class="viz-status" id="vizStatus">Style: Frequency Bars</span>
                 </div>
             </div>
         </section>
@@ -927,7 +1580,7 @@
                 <div class="section-header reveal">
                     <span class="section-tag">Offline First, Online Optional</span>
                     <h2 class="section-title">Two Editions: <span class="gradient-text">Pure &amp; Plus</span></h2>
-                    <p class="section-subtitle">The Play Store build is provably offline. The Plus build optionally adds YouTube Music streaming and downloads behind a build flag.</p>
+                    <p class="section-subtitle">The Play Store build is provably offline. The Plus build adds YouTube Music behind a compile-time flag — with hardened resolution, resumable downloads and no impact on the local player.</p>
                 </div>
                 <div class="features-grid">
                     <div class="feature-card feature-highlight reveal">
@@ -936,42 +1589,74 @@
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                         </div>
                         <h3 class="feature-title">Pulsr Pure — 100% Offline</h3>
-                        <p class="feature-desc">The production build ships with the INTERNET permission removed at the manifest level, no Firebase, no Sentry, no cloud sync and no YouTube code. Zero trackers, zero accounts.</p>
+                        <p class="feature-desc">The production build removes the INTERNET permission at the manifest level: no Firebase, no Sentry, no cloud sync and no YouTube code. Zero trackers, zero accounts.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-red">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
                         </div>
                         <h3 class="feature-title">Pulsr Plus — YouTube Music</h3>
-                        <p class="feature-desc">Optional <code>ENABLE_YTM</code> build adds account sign-in, search, browse, real radio/mixes, streaming, and offline downloads. Disabled by default so Play Store builds never expose it.</p>
-                    </div>
-                    <div class="feature-card reveal">
-                        <div class="feature-icon feature-icon-cyan">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
-                        </div>
-                        <h3 class="feature-title">Offline Downloads Manager</h3>
-                        <p class="feature-desc">Queue, pause, resume and retry downloads with storage stats, resilient parallel fetch, foreground service, and MediaStore export so downloads join your local library.</p>
+                        <p class="feature-desc">An optional <code>ENABLE_YTM</code> build adds account sign-in, catalog search, browse feeds, streaming and offline downloads. Disabled by default so Pure builds never expose it.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+                        </div>
+                        <h3 class="feature-title">InnerTube Catalog &amp; Explore</h3>
+                        <p class="feature-desc">Search and browse through YouTube Music's InnerTube surface with cached results, a stale-feed banner, download actions and three quality tiers — 256, 128 and 64 kbps.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">Cached search</span>
+                            <span class="mini-chip">3 qualities</span>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-cyan">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M4 9h16M9 20V9"/></svg>
                         </div>
-                        <h3 class="feature-title">Proxy, Wi-Fi Only &amp; Adaptive Quality</h3>
-                        <p class="feature-desc">HTTP/SOCKS5 proxy with a rotating pool, Wi-Fi-only mode, hedged stream resolution, adaptive quality step-down, and offline-only mode.</p>
+                        <h3 class="feature-title">Hardened Stream Resolver</h3>
+                        <p class="feature-desc">Rhino signature and <code>n</code>-transform solving with cached rules, PoToken and visitor tokens, <code>signatureTimestamp</code>, authenticated WEB fallback for 18+ tracks, and per-signal circuit breakers for geo or egress blocks.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">Rhino JS</span>
+                            <span class="mini-chip">PoToken</span>
+                            <span class="mini-chip">18+ fallback</span>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-emerald">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></svg>
+                        </div>
+                        <h3 class="feature-title">Resumable Download Manager</h3>
+                        <p class="feature-desc">Three concurrent downloads with four-way chunked fetch, Range resume, 403 re-resolution and cancel tokens. A foreground service owns pause/resume, and completed files join your local library.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">4-way chunks</span>
+                            <span class="mini-chip">Resume</span>
+                            <span class="mini-chip">Foreground</span>
+                        </div>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-amber">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg>
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a5 5 0 015-8 6 6 0 0111 2 4 4 0 010 8H7a3 3 0 01-3-3z"/></svg>
                         </div>
-                        <h3 class="feature-title">SponsorBlock &amp; Smart Skipping</h3>
-                        <p class="feature-desc">Optional auto-skip of sponsor and non-music segments with category selection, plus silence skipping and gapless/crossfade continuity.</p>
+                        <h3 class="feature-title">Proxy, DoH &amp; Wi-Fi Only</h3>
+                        <p class="feature-desc">HTTP/SOCKS5 proxy with a rotating pool, DNS-over-HTTPS resolution, cellular failover, Wi-Fi-only mode, hedged stream resolution and a true offline-only mode.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-pink">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg>
+                        </div>
+                        <h3 class="feature-title">SponsorBlock &amp; Smart Skipping</h3>
+                        <p class="feature-desc">Skip six categories — sponsor, self-promo, interaction, intro, outro and non-music — with per-category toggles, a 256-entry LRU cache and player-side auto-skip.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">6 categories</span>
+                            <span class="mini-chip">Auto-skip</span>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                         </div>
-                        <h3 class="feature-title">Playlist Suggestions &amp; Share</h3>
-                        <p class="feature-desc">Generate smart suggestions from your listening habits and share portable playlists via the built-in share service.</p>
+                        <h3 class="feature-title">Import, Export &amp; Suggestions</h3>
+                        <p class="feature-desc">Import public Spotify playlists by URL, export playlists as M3U or WPL, and surface track suggestions based on what you already play.</p>
                     </div>
                 </div>
             </div>
@@ -983,7 +1668,7 @@
                 <div class="section-header reveal">
                     <span class="section-tag">Organize Everything</span>
                     <h2 class="section-title">Library <span class="gradient-text">Power Tools</span></h2>
-                    <p class="section-subtitle">Beyond playlists: a full set of browsing and maintenance tools built on a fast Drift SQLite index with FTS5 search.</p>
+                    <p class="section-subtitle">Beyond playlists: a reactive Drift SQLite index, in-place tag editing, smart queries, remote sources and casting — all in one library.</p>
                 </div>
                 <div class="features-grid">
                     <div class="feature-card feature-highlight reveal">
@@ -992,125 +1677,215 @@
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
                         </div>
                         <h3 class="feature-title">Rule-Based Smart Playlists</h3>
-                        <p class="feature-desc">Build dynamic playlists with combined rules across play count, ratings, BPM, duration, year, codec and more. Live preview while you build, and six seeded presets.</p>
+                        <p class="feature-desc">Sixteen fields across play count, rating, BPM, LRA, bitrate, duration, year, codec and more, with eight operators, match-all/any, limits and live preview while you build.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">16 fields</span>
+                            <span class="mini-chip">8 operators</span>
+                            <span class="mini-chip">Live preview</span>
+                        </div>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-red">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg>
                         </div>
                         <h3 class="feature-title">Duplicate Finder &amp; Cleanup</h3>
-                        <p class="feature-desc">Detect duplicates by metadata, duration/size and SHA-256 partial checksums, then keep or delete files safely from the full library.</p>
+                        <p class="feature-desc">A two-pass match — metadata with duration tolerance, then duration/size buckets verified by audio checksums — running off the main isolate. Keep the best copy or bulk delete.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-amber">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="4"/></svg>
                         </div>
                         <h3 class="feature-title">Missing Artwork Backfill</h3>
-                        <p class="feature-desc">Find albums without cover art and fetch high-resolution artwork online, persisted straight back into your library.</p>
+                        <p class="feature-desc">Find albums without cover art and fetch high-resolution artwork from the iTunes Search API with rate limiting and exponential backoff, then persist it to the library.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-emerald">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5m0 14h16M8 15l3-3 3 2 4-5"/></svg>
                         </div>
                         <h3 class="feature-title">Library Statistics</h3>
-                        <p class="feature-desc">Full-library totals for tracks, playtime, disk usage, lossless/Hi-Res tiers, plus most-played and top-artist leaderboards.</p>
+                        <p class="feature-desc">Tracks, plays and listening hours, disk usage, lossless-versus-lossy tiers, most-played leaderboards and a time-range filter — with a clear-history action.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-cyan">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h6l2 2h10v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
                         </div>
-                        <h3 class="feature-title">Folder Tree &amp; Genre Hierarchy</h3>
-                        <p class="feature-desc">Browse a real storage tree with breadcrumbs, or switch the Genres tab to a category hierarchy view. Hide folders and respect <code>.nomedia</code>.</p>
+                        <h3 class="feature-title">Folder Tree &amp; Genre Views</h3>
+                        <p class="feature-desc">Browse a real storage tree with breadcrumbs or a flat folder list, hide folders from the library, and switch Genres into a category hierarchy.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-pink">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
                         </div>
                         <h3 class="feature-title">Batch Tag &amp; Artwork Editor</h3>
-                        <p class="feature-desc">Edit ID3 tags and embed cover art in place, including multi-select batch editing and online metadata matching.</p>
+                        <p class="feature-desc">Edit title, artist, album, genre, year, track/disc number, comment and embedded artwork in place. Multi-select batch editing with checkpoint/retry, undo, and online metadata matching.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-violet">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="10" cy="18" r="2"/></svg>
                         </div>
-                        <h3 class="feature-title">Intelligent Search</h3>
-                        <p class="feature-desc">FTS5 full-text search with Arabic diacritic and Latin accent normalization, plus whole-library fuzzy fallback for typos.</p>
+                        <h3 class="feature-title">Unified Search</h3>
+                        <p class="feature-desc">Search All, Local or Online with recent and saved queries, entity rails for songs, albums, artists and playlists, show-more paging and a 200-result cap.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-emerald">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>
                         </div>
                         <h3 class="feature-title">Three Independent Queues</h3>
-                        <p class="feature-desc">Juggle three persisted queue slots, reorder by drag, add-next or add-last, and restore your YTM session position after a restart.</p>
+                        <p class="feature-desc">Switch between Q1, Q2 and Q3, reorder by drag, add-next or add-last, save a queue as a playlist, and restore the last position after a restart.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-amber">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/><path d="M18 15l3 3-3 3"/></svg>
                         </div>
                         <h3 class="feature-title">CUE Sheet Playback</h3>
-                        <p class="feature-desc">Single-file album images with a sibling <code>.cue</code> sheet expand into individual virtual tracks, each playing its own slice with correct start/end boundaries.</p>
+                        <p class="feature-desc">A single-file album image with a sibling <code>.cue</code> sheet expands into virtual tracks, each playing its own slice with correct start and end boundaries.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-red">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49M7.76 16.24a6 6 0 010-8.49M19.07 4.93a10 10 0 010 14.14M4.93 19.07a10 10 0 010-14.14"/></svg>
                         </div>
                         <h3 class="feature-title">Internet Radio</h3>
-                        <p class="feature-desc">Add HTTP/HTTPS stream URLs or import an <code>.m3u</code> stream list, then play them with a dedicated station manager. Playlists also import/export as M3U, PLS and WPL.</p>
+                        <p class="feature-desc">Import forty curated stations on demand, add your own URLs up to 500, or search the live radio-browser directory across three mirrors. M3U playlist import is supported.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-cyan">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v12H4z"/><path d="M2 3h20v4H2zM8 13h8"/></svg>
+                        </div>
+                        <h3 class="feature-title">Remote Sources: SMB, WebDAV &amp; FTP</h3>
+                        <p class="feature-desc">Add WebDAV, FTP or SMB shares (SMB on Android), browse them in-app, and stream with byte-range reads, a local cache index and a local HTTP stream server. Up to 100 sources.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">SMB</span>
+                            <span class="mini-chip">WebDAV</span>
+                            <span class="mini-chip">FTP</span>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 9l3 3-3 3M13 9h4"/></svg>
+                        </div>
+                        <h3 class="feature-title">DLNA &amp; Google Cast</h3>
+                        <p class="feature-desc">Discover MediaRenderers with SSDP M-SEARCH, control AVTransport play/pause/seek, poll position, and serve the file from a local HTTP server. Google Cast is discovered over mDNS.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-pink">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        </div>
+                        <h3 class="feature-title">Artwork Grid, Favorites &amp; Recents</h3>
+                        <p class="feature-desc">A cover-first artwork grid for visual browsing, a dedicated favorites screen, and a recents timeline that remembers what you actually played.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <!-- Sync, Scrobble & Automate -->
+        <!-- Sync, Scrobble & Integrate -->
         <section class="section" id="sync">
             <div class="container">
                 <div class="section-header reveal">
                     <span class="section-tag">Your Data, Your Rules</span>
-                    <h2 class="section-title">Sync, Scrobble &amp; <span class="gradient-text">Automate</span></h2>
-                    <p class="section-subtitle">Everything optional and off by default. Pure builds never contact the network.</p>
+                    <h2 class="section-title">Sync, Scrobble &amp; <span class="gradient-text">Integrate</span></h2>
+                    <p class="section-subtitle">Everything optional and off by default. Pure builds never contact the network; Plus builds only use the integrations you enable.</p>
                 </div>
                 <div class="features-grid">
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-red">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
                         </div>
-                        <h3 class="feature-title">Last.fm &amp; ListenBrainz</h3>
-                        <p class="feature-desc">Direct-API scrobbling with now-playing updates, an offline queue that retries, and a listening-stats dashboard.</p>
+                        <h3 class="feature-title">Four Scrobble Targets</h3>
+                        <p class="feature-desc">Last.fm, ListenBrainz, Libre.fm and a custom webhook, with now-playing updates, secure credential storage, offline queue replay and a scrobble-stats dashboard.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">Last.fm</span>
+                            <span class="mini-chip">ListenBrainz</span>
+                            <span class="mini-chip">Webhook</span>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="4"/><path d="M7 12h4M9 10v4M15 11h.01M18 13h.01"/></svg>
+                        </div>
+                        <h3 class="feature-title">Discord Rich Presence</h3>
+                        <p class="feature-desc">A built-in Discord Gateway v9 client pushes the current track and external-asset artwork to your profile, initialised only when configured and network access is allowed.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-cyan">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16a5 5 0 015-8 6 6 0 0111 2 4 4 0 010 8H7a3 3 0 01-3-3z"/></svg>
                         </div>
-                        <h3 class="feature-title">Optional Cloud Backup</h3>
-                        <p class="feature-desc">Sign in with Google to sync favorites and playlists to Firestore. Disabled and inactive in Pure builds; fully opt-in elsewhere.</p>
+                        <h3 class="feature-title">Cloud or Local Backup</h3>
+                        <p class="feature-desc">Optional Firestore sync with per-record versions and conflict handling, plus local JSON export/import from the backup dashboard. Firestore is hard-off in Pure builds.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-emerald">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>
                         </div>
-                        <h3 class="feature-title">Device Profiles</h3>
-                        <p class="feature-desc">Auto-apply EQ, effects and output settings per connected device, and switch them automatically on Bluetooth/headphone connect.</p>
-                    </div>
-                    <div class="feature-card reveal">
-                        <div class="feature-icon feature-icon-violet">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="5"/></svg>
+                        <h3 class="feature-title">Device Profiles &amp; Automation</h3>
+                        <p class="feature-desc">Save EQ, effects and volume per output and re-apply on connect. Four automation triggers — Bluetooth, headphones, USB DAC and charging — activate a settings profile.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">4 triggers</span>
+                            <span class="mini-chip">30 devices</span>
                         </div>
-                        <h3 class="feature-title">Automation &amp; Theme Scheduler</h3>
-                        <p class="feature-desc">Trigger profiles on device events and switch between light/dark automatically by time of day, with a full custom theme studio.</p>
-                    </div>
-                    <div class="feature-card reveal">
-                        <div class="feature-icon feature-icon-amber">
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/></svg>
-                        </div>
-                        <h3 class="feature-title">Sleep Timer</h3>
-                        <p class="feature-desc">Four modes — duration, end of track, after N tracks, and end of queue — with a smooth native fade-out.</p>
                     </div>
                     <div class="feature-card reveal">
                         <div class="feature-icon feature-icon-pink">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.6l-1-1a5.5 5.5 0 00-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 000-7.8z"/></svg>
+                        </div>
+                        <h3 class="feature-title">Hearing Safety &amp; Sound Dose</h3>
+                        <p class="feature-desc">A seven-day rolling dose based on EN 62368-1 and WHO-ITU H.870, with four budgets and native attenuation at a −6 dB ceiling. Metering works even on the bit-perfect path.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">7-day dose</span>
+                            <span class="mini-chip">−6 dB ceiling</span>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-amber">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M5 5l14 14"/></svg>
+                        </div>
+                        <h3 class="feature-title">Bluetooth Latency Calibration</h3>
+                        <p class="feature-desc">A tap test plus round-trip probe blends measured latency with a ten-codec table — SBC, AAC, aptX, aptX HD, LDAC and LC3 — then clamps the result to 0–500 ms.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-cyan">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        </div>
+                        <h3 class="feature-title">Home Widget &amp; Quick Settings</h3>
+                        <p class="feature-desc">A resizable Android widget with five layouts and nine actions — play/pause, prev/next, favorite, shuffle, repeat, queue and open — plus a Quick Settings playback tile.</p>
+                        <div class="mini-chip-row">
+                            <span class="mini-chip">5 layouts</span>
+                            <span class="mini-chip">9 actions</span>
+                        </div>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M7 12h10M7 16h6"/></svg>
+                        </div>
+                        <h3 class="feature-title">Command Palette &amp; Shortcuts</h3>
+                        <p class="feature-desc">A Ctrl+K palette with 27 navigation, transport and settings commands, keyword matching and 13 desktop keyboard shortcuts for queue, search and playback.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-emerald">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0014 0M12 17v4M8 21h8"/></svg>
+                        </div>
+                        <h3 class="feature-title">Assistant &amp; File Intents</h3>
+                        <p class="feature-desc">Android <code>MEDIA_PLAY_FROM_SEARCH</code> plus four launcher shortcuts resolve to play playlist, resume album, shuffle favorites, artist radio or search. VIEW/SEND audio intents open straight in Pulsr.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-pink">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15 9a4 4 0 010 6M18 6a8 8 0 010 12"/></svg>
+                        </div>
+                        <h3 class="feature-title">Spoken Track Announcements</h3>
+                        <p class="feature-desc">Optional TTS announcements for title, artist, album, year and track number, with a 0–10 s delay, volume, ducking, and automatic skip while casting or in bit-perfect mode.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-amber">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                        </div>
+                        <h3 class="feature-title">Theme Scheduler &amp; Appearance</h3>
+                        <p class="feature-desc">Three color sources — wallpaper, artwork or custom — AMOLED pure black, and a scheduled light/dark switch with start and end hours, plus gesture remapping and an experience mode.</p>
+                    </div>
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-red">
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18"/></svg>
                         </div>
                         <h3 class="feature-title">Localized in 3 Languages</h3>
-                        <p class="feature-desc">English, Spanish and Arabic with full right-to-left layout support and an in-app language switcher.</p>
+                        <p class="feature-desc">English, Arabic and Spanish with 3,082 translated messages each, full right-to-left layout for Arabic, and an in-app language switcher.</p>
                     </div>
                 </div>
             </div>
@@ -1147,60 +1922,92 @@
                                 <td>Subscription ($11.99/mo)</td>
                             </tr>
                             <tr>
-                                <td><strong>10 / 32 / 64-Band EQ &amp; AutoEQ</strong></td>
-                                <td class="col-highlight">✅ AutoEQ + Parametric + Room Correction</td>
-                                <td>✅ 10-32 Band Manual</td>
-                                <td>✅ 5-Band Manual</td>
-                                <td>❌ System EQ Only</td>
-                                <td>❌ 6-Band Basic</td>
+                                <td><strong>EQ &amp; AutoEQ</strong></td>
+                                <td class="col-highlight">✅ 10/32/64-band + 652 profiles</td>
+                                <td>✅ 10–32 band manual</td>
+                                <td>✅ 5-band manual</td>
+                                <td>❌ System EQ only</td>
+                                <td>❌ 6-band basic</td>
                             </tr>
                             <tr>
-                                <td><strong>Synced Lyrics (.LRC)</strong></td>
-                                <td class="col-highlight">✅ Millisecond Autoscroll</td>
-                                <td>⚠️ Basic Text Only</td>
-                                <td>✅ Supported</td>
-                                <td>✅ Supported</td>
-                                <td>❌ Online Streams Only</td>
+                                <td><strong>Native DSP Chain</strong></td>
+                                <td class="col-highlight">✅ 20 stages · 16 engines</td>
+                                <td>⚠️ Tone + EQ stages</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
                             </tr>
                             <tr>
-                                <td><strong>Dynamic Aura Theming</strong></td>
-                                <td class="col-highlight">✅ 8 Player Themes + Studio + AMOLED</td>
-                                <td>⚠️ Skinnable</td>
-                                <td>⚠️ Basic Dark</td>
-                                <td>✅ Material You</td>
-                                <td>❌ Fixed Dark</td>
+                                <td><strong>DSD / USB-DAC Output</strong></td>
+                                <td class="col-highlight">✅ DSD512 · DoP · UAC2</td>
+                                <td>⚠️ Hi-Res output</td>
+                                <td>❌ No exclusive path</td>
+                                <td>❌ No exclusive path</td>
+                                <td>❌ No DSD</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Player Themes</strong></td>
+                                <td class="col-highlight">✅ 11 themes + Theme Studio</td>
+                                <td>⚠️ Skins</td>
+                                <td>⚠️ Basic dark</td>
+                                <td>✅ Material themes</td>
+                                <td>❌ Fixed dark</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Synced Lyrics</strong></td>
+                                <td class="col-highlight">✅ LRC + LRCLIB + translate</td>
+                                <td>⚠️ Basic text</td>
+                                <td>✅ Supported</td>
+                                <td>✅ Supported</td>
+                                <td>❌ Online only</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Karaoke / Visualizers</strong></td>
+                                <td class="col-highlight">✅ YIN pitch + Milkdrop</td>
+                                <td>✅ Visualizer</td>
+                                <td>⚠️ Basic</td>
+                                <td>⚠️ Basic</td>
+                                <td>❌ None</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Group Listening</strong></td>
+                                <td class="col-highlight">✅ Pulsr Party · NTP clock</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
+                                <td>⚠️ Jam (online only)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Quran Mode</strong></td>
+                                <td class="col-highlight">✅ 114 surahs offline</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Casting &amp; Remote Sources</strong></td>
+                                <td class="col-highlight">✅ DLNA + SMB/WebDAV/FTP</td>
+                                <td>⚠️ Basic</td>
+                                <td>❌ None</td>
+                                <td>❌ None</td>
+                                <td>⚠️ Cast only</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Tag Editing</strong></td>
+                                <td class="col-highlight">✅ Batch + artwork + online match</td>
+                                <td>✅ Built-in</td>
+                                <td>✅ Built-in</td>
+                                <td>✅ Built-in</td>
+                                <td>❌ No editing</td>
                             </tr>
                             <tr>
                                 <td><strong>Telemetry / Ads / Trackers</strong></td>
                                 <td class="col-highlight"><span class="badge-win">Zero (0%) Telemetry</span></td>
-                                <td>⚠️ Licensing Checks</td>
+                                <td>⚠️ Licensing checks</td>
                                 <td>Zero</td>
                                 <td>⚠️ Analytics</td>
-                                <td>❌ Heavy Telemetry</td>
-                            </tr>
-                            <tr>
-                                <td><strong>SQLite Sub-2s Scanner</strong></td>
-                                <td class="col-highlight">✅ Drift SQLite Engine</td>
-                                <td>✅ Fast C++ Engine</td>
-                                <td>✅ SQLite</td>
-                                <td>⚠️ Slower MediaStore</td>
-                                <td>❌ Not Indexed</td>
-                            </tr>
-                            <tr>
-                                <td><strong>In-Place ID3 Tag Editor</strong></td>
-                                <td class="col-highlight">✅ Lossless Tag &amp; Art Injector</td>
-                                <td>✅ Built-in</td>
-                                <td>✅ Built-in</td>
-                                <td>✅ Built-in</td>
-                                <td>❌ No Editing</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Home Screen Widgets</strong></td>
-                                <td class="col-highlight">✅ 4 Interactive Widgets</td>
-                                <td>✅ Supported</td>
-                                <td>✅ Supported</td>
-                                <td>✅ Supported</td>
-                                <td>⚠️ Basic Widget</td>
+                                <td>❌ Heavy telemetry</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1493,27 +2300,47 @@
                 <div class="section-header reveal">
                     <span class="section-tag">Frequently Asked Questions</span>
                     <h2 class="section-title">Got Questions? <span class="gradient-text">We Have Answers</span></h2>
-                    <p class="section-subtitle">Everything you need to know about Pulsr's audio engine, AutoEQ, and privacy.</p>
+                    <p class="section-subtitle">Straight answers about the audio engine, Party, Quran Mode, AutoEQ and privacy.</p>
                 </div>
 
                 <div class="faq-accordion-list reveal">
                     <div class="faq-item">
                         <button class="faq-question">
-                            <span>How does AutoEQ headphone calibration work in Pulsr?</span>
+                            <span>What is Pulsr, in one paragraph?</span>
                             <span class="faq-chevron">+</span>
                         </button>
                         <div class="faq-answer">
-                            <p>AutoEQ is a curated open-source acoustic database of frequency response measurements. Pulsr embeds parametric compensation target curves (including Harman Target 2019/2018) for popular audiophile and wireless headphones (AirPods Pro, Sony XM5, Sennheiser HD600) to automatically flatten headphone peaks and restore natural acoustic balance.</p>
+                            <p>Pulsr is an offline-first audiophile music player for Android, built with Flutter and a native C++ DSP engine. It combines a 20-stage DSP chain, bit-perfect USB-DAC output, 11 player themes, Pulsr Party group listening, an offline 114-surah Quran Mode, karaoke and a private Drift SQLite library. A separate Plus build optionally adds YouTube Music.</p>
                         </div>
                     </div>
 
                     <div class="faq-item">
                         <button class="faq-question">
-                            <span>Does Pulsr support 24-bit / 192kHz Hi-Res Lossless files?</span>
+                            <span>How does AutoEQ headphone calibration work?</span>
                             <span class="faq-chevron">+</span>
                         </button>
                         <div class="faq-answer">
-                            <p>Yes. Pulsr supports bit-perfect decoding of uncompressed and lossless formats including FLAC, ALAC, WAV, AAC, MP3, OPUS, and OGG Vorbis up to 24-bit / 192kHz sample rates. If connected to an external USB DAC, audio streams bypass Android's mixer where supported.</p>
+                            <p>Pulsr bundles 652 five-band compensation profiles derived from published headphone measurements. It matches the connected headphone by name, applies the curve with a computed preamp, and lets you search online for more or import your own. You can stack a headphone profile with a separately measured room-correction curve.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Does Pulsr support Hi-Res, DSD and external USB DACs?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes. Pulsr plays 14 file extensions including FLAC, ALAC, WAV, AIFF, DSF and DFF, and decodes DSD64 through DSD512 to PCM at up to 768 kHz. DoP carriers run at 176.4, 352.8 and 705.6 kHz where the DAC advertises them, and SACD ISO images can be indexed and extracted. A USB DAC can be driven exclusively at S16, S24_3 or S32, and AAudio offers a direct low-latency path.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Why can't MP3 or streaming audio be called bit-perfect?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Bit-perfect means the exact source bitstream reaches the DAC. Lossy codecs — MP3, AAC, Opus, Vorbis, WMA, AC-3 and live radio — have already discarded information, so Pulsr blocks them from a bit-perfect claim. Ambiguous containers such as <code>.m4a</code> or <code>.ogg</code> are allowed but report <code>source_codec_unconfirmed</code>, and 32-bit float sources are rejected rather than silently converted. Bluetooth is also blocked because it re-encodes.</p>
                         </div>
                     </div>
 
@@ -1523,27 +2350,67 @@
                             <span class="faq-chevron">+</span>
                         </button>
                         <div class="faq-answer">
-                            <p>Absolutely. Pulsr contains zero advertising SDKs, zero analytics trackers, and zero network telemetry. It does not require any account creation. All metadata scanning, SQLite indexing, and playlist management happen strictly on your local device.</p>
+                            <p>The Pulsr Pure build removes the INTERNET permission at the manifest level and ships without Firebase, Sentry, cloud sync or YouTube code. There are no advertising SDKs, analytics trackers or accounts. Scanning, indexing, playback and playlist management happen on the device. Network features exist only in the optional Plus build and are off by default.</p>
                         </div>
                     </div>
 
                     <div class="faq-item">
                         <button class="faq-question">
-                            <span>How do I load synced (.LRC) lyrics for my songs?</span>
+                            <span>How does Pulsr Party keep everyone in sync?</span>
                             <span class="faq-chevron">+</span>
                         </button>
                         <div class="faq-answer">
-                            <p>Pulsr automatically detects synced LRC files with the same filename in your song folder (e.g. <code>song.lrc</code> next to <code>song.flac</code>) as well as embedded ID3 SYLT/USLT metadata tags. You can also manually adjust lyrics sync with ±50ms latency tuning directly in the Now Playing screen.</p>
+                            <p>Each client exchanges timestamps with the Go party server over WebSockets and keeps the minimum-round-trip offset from a twelve-sample window. The server clock is monotonic, so NTP steps cannot move it backwards. A ten-second ping loop refreshes the estimate, and the client uses seek/watch deadbands instead of correcting on every packet. Rooms can be host-only or democratic, and the server is self-hostable.</p>
                         </div>
                     </div>
 
                     <div class="faq-item">
                         <button class="faq-question">
-                            <span>Can I edit ID3 tags and embed album cover artwork directly?</span>
+                            <span>What is included in Quran Mode?</span>
                             <span class="faq-chevron">+</span>
                         </button>
                         <div class="faq-answer">
-                            <p>Yes. Pulsr includes an in-place metadata tag editor that allows you to modify song titles, artists, albums, genres, years, and track numbers, as well as pick and embed high-resolution album cover artwork directly into audio files.</p>
+                            <p>All 114 surahs of the Tanzil Uthmani 1.1 text are bundled offline. Quran Mode adds five reciter-style presets, ayah repeat (single or range), Hifz blind recall, a Mushaf page reader, mosque ambience reverb and vocal warmth, tempo steps at 0.5×, 0.75× and 1.0×, and bookmarks that survive restarts.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>How many player themes are there?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Eleven: Clean, Classic, Card, Circle, Minimal, Vinyl, CD, Cassette, Waveform, Lyrics and Milkdrop. Each is a real player surface with its own layout and motion. Theme Studio adds custom palette, corner radius and ambient glow controls, with JSON export and import.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>How do synced lyrics, translation and karaoke work?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Pulsr reads embedded lyrics and sibling <code>.lrc</code> files, fetches missing lyrics from LRCLIB, and supports tap-to-seek lines plus a millisecond offset editor. Translation and romanization use online endpoints and target the app's current language. Karaoke mode adds YIN pitch tracking, a pitch highway, ±12 semitone shift and a 0–100 score per line.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Can I cast to a speaker or play from my NAS?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes. DLNA/UPnP casting discovers MediaRenderers over SSDP, controls AVTransport and serves the file from a local HTTP server. Google Cast is discovered over mDNS. Remote sources support WebDAV, FTP and SMB (SMB on Android), with byte-range reads, a local cache and a local stream server.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Can I edit tags and embed cover artwork?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes. The tag editor writes title, artist, album, genre, year, track number, disc number and comment, and embeds artwork from your gallery. It supports multi-select batch editing with checkpoint and retry, undo, and online metadata matching with a best-match picker.</p>
                         </div>
                     </div>
 
@@ -1553,7 +2420,7 @@
                             <span class="faq-chevron">+</span>
                         </button>
                         <div class="faq-answer">
-                            <p>Pulsr supports Android 5.0 (Lollipop) all the way up to Android 14 and Android 15 with full edge-to-edge transparent system navigation, Android Home Screen widgets, and MediaStyle notification shade controls.</p>
+                            <p>Android 9.0 (API 28) and newer, with a target SDK of 37. The app uses MediaSession and a foreground service for playback, a resizable home-screen widget and a Quick Settings tile. Bit-perfect USB output depends on the DAC and the Android audio stack, not only the OS version.</p>
                         </div>
                     </div>
                 </div>

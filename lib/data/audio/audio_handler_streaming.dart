@@ -233,22 +233,40 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
             (prefs.getBool(PrefsKeys.strictBitPerfect) ?? false) ||
                 ((prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false) &&
                     (prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ?? true));
-        // DoP requires an active bit-perfect/bypassed pipeline so DSP/volume
-        // math cannot corrupt the 0x05/0xFA DoP markers into ultrasonic noise.
-        final wantDop = dsdMode == 'dop' && bitPerfectActive;
-        // Native 32-bit raw USB DSD frames are not yet supported on Android's
-        // PCM transfer path; use DoP or PCM decimation only.
-        const wantNative = false;
-        DsdDacCapabilities? caps;
-        if (wantDop) {
-          caps = await DsdDecoderHelper.probeDopCapabilities();
+        // DSD transport decision lives in one pure resolver so the fallback
+        // chain (native -> DoP -> PCM) is testable without a device. Both
+        // wrapped transports need a bypassed pipeline: DSP/volume math would
+        // corrupt the 0x05/0xFA DoP markers, and would also break raw DSD.
+        final caps = (bitPerfectActive &&
+                (dsdMode == 'dop' || dsdMode == 'native'))
+            ? await DsdDecoderHelper.probeDopCapabilities()
+            : DsdDacCapabilities.none;
+        final rateMultiple = await DsdHeaderProbe.probeMultiple(song.path);
+        final plan = resolveDsdTransport(
+          mode: dsdMode,
+          bitPerfectActive: bitPerfectActive,
+          dopCapable: caps.canUseDop,
+          nativeCapable: caps.canUseNativeDsd,
+          dsdRateMultiple: rateMultiple,
+        );
+        final wantDop = plan.isDop;
+        final wantNative = plan.isNative;
+        if (plan.isFallback && plan.transport != DsdTransport.pcm) {
+          ErrorLogger.log(
+            'DSD transport fallback for "${song.title}": $plan',
+            category: 'Audio',
+          );
+        } else if (plan.isFallback) {
+          ErrorLogger.log(
+            'DSD transport unavailable, decoding to PCM: $plan',
+            category: 'Audio',
+          );
         }
-        final forceDop = wantDop && (caps?.canUseDop ?? false);
         final containerBits = prefs.getInt(PrefsKeys.dopContainerBits) ?? 24;
         return DsdDecoderHelper.decodeDsdFile(
           song,
           tag,
-          forceDop: forceDop,
+          forceDop: wantDop,
           forceNativeDsd: wantNative,
           dopCapabilities: caps,
           dopContainerBits: containerBits == 32 ? 32 : 24,

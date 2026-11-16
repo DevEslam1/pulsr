@@ -13,12 +13,13 @@ import '../di/injection.dart';
 import '../errors/failures.dart';
 import '../router/app_router.dart';
 import '../utils/error_logger.dart';
-import 'package:fpdart/fpdart.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
+import '../../features/assistant/assistant_query.dart';
+import '../../features/assistant/assistant_resolver.dart';
 import '../constants/channels.dart';
 import '../network/proxy_config.dart';
 import 'ytm_service.dart';
@@ -209,31 +210,19 @@ class FileIntentHandler {
     }
   }
 
-  /// Assistant / Android voice-search entry point. Resolves [query] against the
-  /// local library and immediately plays the best match; when nothing matches,
-  /// opens the Search screen with the query prefilled so the user can refine.
+  /// Assistant / Android voice-search entry point.
+  ///
+  /// The spoken query is resolved through [AssistantResolver], so "play road
+  /// trip", "resume the last album", "shuffle favourites" and an artist-radio
+  /// all map to a real play plan instead of the first fuzzy song match. When
+  /// nothing resolves, the Search screen opens with the query prefilled so the
+  /// user can refine it.
   Future<void> handleVoiceSearch(String query) async {
     final q = query.trim();
     if (q.isEmpty) return;
     try {
-      final res = await _repository
-          .watchAllSongs(searchQuery: q, limit: 1)
-          .first
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () =>
-                const Left(DatabaseFailure('Voice search query timeout')),
-          );
-      final match =
-          res.fold((_) => null, (songs) => songs.isEmpty ? null : songs.first);
-      if (match != null) {
-        await _playerCubit.playSong(match);
-        final navCtx = rootNavigatorKey.currentContext;
-        if (navCtx != null && navCtx.mounted) {
-          navCtx.push('/now-playing');
-        }
-        return;
-      }
+      final played = await _playAssistantQuery(q);
+      if (played) return;
       final navCtx = rootNavigatorKey.currentContext;
       if (navCtx != null && navCtx.mounted) {
         navCtx.go('/search?q=${Uri.encodeComponent(q)}');
@@ -243,6 +232,89 @@ class FileIntentHandler {
           error: e, stackTrace: st, category: 'FileIntentHandler');
     }
   }
+
+  /// Resolves [rawQuery] into a play plan and starts it. Returns false when the
+  /// query resolves to nothing playable (the caller then opens Search).
+  Future<bool> _playAssistantQuery(String rawQuery) async {
+    final resolver = AssistantResolver(
+      searchSongIds: (term) async => _songIdsOf(
+        await _repository.watchAllSongs(searchQuery: term, limit: 50).first,
+      ),
+      playlistSongIds: (name) async {
+        final lists = (await _repository.getPlaylists())
+            .fold<List<PlaylistsTableData>>((_) => const [], (r) => r);
+        final lower = name.trim().toLowerCase();
+        if (lower.isEmpty) return const <int>[];
+        PlaylistsTableData? match;
+        for (final playlist in lists) {
+          if (playlist.name.trim().toLowerCase() == lower) {
+            match = playlist;
+            break;
+          }
+        }
+        if (match == null) {
+          for (final playlist in lists) {
+            if (playlist.name.toLowerCase().contains(lower)) {
+              match = playlist;
+              break;
+            }
+          }
+        }
+        if (match == null) return const <int>[];
+        return _songIdsOf(await _repository.getPlaylistSongs(match.id));
+      },
+      favoritesSongIds: () async =>
+          _songIdsOf(await _repository.getFavorites()),
+      lastAlbumSongIds: () async {
+        final recent = (await _repository.getRecentlyPlayed(limit: 50))
+            .fold<List<SongsTableData>>((_) => const [], (r) => r);
+        if (recent.isEmpty) return const <int>[];
+        final albumId = recent.first.albumId;
+        if (albumId == null) {
+          return recent.map((song) => song.id).toList();
+        }
+        return recent
+            .where((song) => song.albumId == albumId)
+            .map((song) => song.id)
+            .toList();
+      },
+    );
+
+    final AssistantTextIntent textIntent;
+    try {
+      textIntent = parseAssistantText(rawQuery);
+    } on AssistantQueryError catch (e) {
+      ErrorLogger.log('Assistant query rejected: ${e.reason}',
+          category: 'FileIntentHandler');
+      return false;
+    }
+    final resolution = await resolver.resolveText(textIntent);
+    if (resolution is! AssistantPlayPlan || resolution.songIds.isEmpty) {
+      return false;
+    }
+    final songs = (await _repository.getSongsByIds(resolution.songIds))
+        .fold<List<SongsTableData>>((_) => const [], (r) => r);
+    if (songs.isEmpty) return false;
+    final queue = resolution.shuffle
+        ? (List<SongsTableData>.from(songs)..shuffle())
+        : songs;
+    final index = resolution.startIndex.clamp(0, queue.length - 1);
+    await _playerCubit.playSong(
+      queue[index],
+      queue: queue,
+      queueIndex: index,
+    );
+    final navCtx = rootNavigatorKey.currentContext;
+    if (navCtx != null && navCtx.mounted) {
+      navCtx.push('/now-playing');
+    }
+    return true;
+  }
+
+  List<int> _songIdsOf(Result<List<SongsTableData>> result) => result.fold(
+        (_) => const <int>[],
+        (songs) => songs.map((song) => song.id).toList(),
+      );
 
   Future<void> handleAudioUri(String uriOrPath) async {
     try {

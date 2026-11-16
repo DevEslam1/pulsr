@@ -2,7 +2,6 @@
 import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
@@ -333,8 +332,11 @@ class _RadioNowPlayingRecommendationsState
 
           // Collapse / Expand toggle button
           IconButton(
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
             padding: EdgeInsets.zero,
+            tooltip: _isCollapsed
+                ? 'Expand recommendations'
+                : 'Collapse recommendations',
             icon: Icon(
               _isCollapsed
                   ? Icons.keyboard_arrow_down_rounded
@@ -512,7 +514,7 @@ class _RadioNowPlayingRecommendationsState
             context.l10n.styleDefaultNotice,
             style: TextStyle(
               color: p.textTertiary,
-              fontSize: 10.5,
+              fontSize: AppFontSize.caption,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -653,7 +655,7 @@ class _RadioNowPlayingRecommendationsState
                       showCheckmark: false,
                       avatar: Text(
                         effect.emoji,
-                        style: const TextStyle(fontSize: 13),
+                        style: const TextStyle(fontSize: AppFontSize.bodySmall),
                       ),
                       label: Text(
                         isSelected

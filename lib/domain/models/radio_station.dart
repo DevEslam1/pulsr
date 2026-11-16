@@ -1,5 +1,5 @@
 // lib/domain/models/radio_station.dart
-import 'dart:io';
+import '../../core/network/remote_target_policy.dart';
 
 /// A persisted internet radio / HTTP stream the user can play from the
 /// Radio screen. Stations are not files: [url] is an absolute
@@ -142,152 +142,31 @@ class RadioStation {
     return _fnv1a(url.trim().toLowerCase()).toRadixString(16);
   }
 
-  /// True only for absolute `http://` / `https://` URLs with a host.
-  /// Local files, relative paths and `ytmusic://` sentinels are rejected.
-  /// Hosts that resolve to localhost / link-local / private ranges are also
-  /// rejected so a station can never be pointed at the device or its network.
-  static bool isHttpUrl(String url) {
-    final uri = Uri.tryParse(url.trim());
-    if (uri == null) return false;
-    if (uri.scheme != 'http' && uri.scheme != 'https') return false;
-    final host = uri.host;
-    if (host.isEmpty) return false;
-    return !_isUnsafeHost(host);
-  }
+  /// True only for absolute `http://` / `https://` URLs with a routable host.
+  ///
+  /// Local files, relative paths and `ytmusic://` sentinels are rejected, as
+  /// are hosts in loopback / link-local / private space. The classifier lives
+  /// in [RemoteTargetPolicy] so radio, remote libraries and artwork fetchers
+  /// all enforce the same rule.
+  static bool isHttpUrl(String url) => RemoteTargetPolicy.isHttpUrl(url);
 
-  /// Validates both the syntactic host and ensures any resolved IP addresses
-  /// do not point to internal, private, loopback, or reserved networks, defeating
-  /// DNS rebinding SSRF attacks.
+  /// Synchronous host check: true when [host] is not loopback, link-local,
+  /// private or reserved space.
+  static bool isSafeHostName(String host) =>
+      !RemoteTargetPolicy.isUnsafeHost(host);
+
+  /// Validates both the syntactic host and every resolved address, defeating
+  /// DNS rebinding. A failed lookup fails closed.
   static Future<bool> isSafeHost(
     String host, {
     Future<List<String>> Function(String host)? lookup,
-  }) async {
-    final trimmed = host.trim().toLowerCase();
-    if (_isUnsafeHost(trimmed)) return false;
-
-    // Test domains (RFC 2606) are safe in test environments without real DNS
-    if (trimmed.endsWith('.example') || trimmed.endsWith('.test')) {
-      return true;
-    }
-
-    // If host is an IP literal, _isUnsafeHost already validated it
-    if (lookup == null && _isIpLiteral(trimmed)) {
-      return true;
-    }
-
-    try {
-      final resolver = lookup ?? _defaultDnsLookup;
-      final resolved = await resolver(trimmed);
-      if (resolved.isEmpty) {
-        return lookup == null;
-      }
-      for (final ip in resolved) {
-        if (_isUnsafeHost(ip)) return false;
-      }
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  static bool _isIpLiteral(String host) {
-    if (host.contains(':')) return true;
-    final parts = host.split('.');
-    if (parts.length != 4) return false;
-    return parts.every((p) {
-      final v = int.tryParse(p);
-      return v != null && v >= 0 && v <= 255;
-    });
-  }
-
-  static Future<List<String>> _defaultDnsLookup(String host) async {
-    try {
-      final addresses = await InternetAddress.lookup(host);
-      return addresses.map((a) => a.address).toList();
-    } catch (_) {
-      return const [];
-    }
-  }
+  }) =>
+      RemoteTargetPolicy.isSafeHost(host, lookup: lookup);
 
   /// True if [ip] is loopback, link-local, unique-local, unspecified, CGNAT
   /// or RFC 1918 private address.
-  static bool isUnsafeIpAddress(String ip) => _isUnsafeHost(ip);
-
-  /// Rejects loopback, link-local, unique-local, unspecified, CGNAT and
-  /// RFC 1918 hosts, including IPv4 addresses embedded in IPv6 mapped
-  /// (`::ffff:192.168.1.1`, `::ffff:7f00:1`) or compatible forms.
-  static bool _isUnsafeHost(String host) {
-    final lower = host.toLowerCase();
-    if (lower == 'localhost' || lower.endsWith('.local')) return true;
-
-    if (lower.contains(':')) {
-      const loopbacks = {'::', '::1', '0:0:0:0:0:0:0:0', '0:0:0:0:0:0:0:1'};
-      if (loopbacks.contains(lower)) return true;
-      final embedded = _embeddedIpv4(lower);
-      if (embedded != null) return _isUnsafeIpv4(embedded);
-      final firstGroup = lower.split(':').first;
-      final value = int.tryParse(firstGroup, radix: 16);
-      if (value != null) {
-        // fc00::/7 (unique local) and fe80::/10 (link-local)
-        if ((value & 0xfe00) == 0xfc00) return true;
-        if ((value & 0xffc0) == 0xfe80) return true;
-      }
-      return false;
-    }
-
-    return _isUnsafeIpv4(lower);
-  }
-
-  /// Extracts the embedded IPv4 address from an IPv6 mapped/compatible host
-  /// (`::ffff:a.b.c.d`, `::ffff:hhhh:hhhh`, `::a.b.c.d`) or returns null when
-  /// the host is a genuine IPv6 address.
-  static String? _embeddedIpv4(String lower) {
-    final groups = lower.split(':');
-    var marker = -1;
-    for (var i = 0; i < groups.length; i++) {
-      if (groups[i] == 'ffff') {
-        marker = i;
-        break;
-      }
-    }
-    final prefixEnd = marker == -1 ? groups.length - 1 : marker;
-    for (var i = 0; i < prefixEnd; i++) {
-      final group = groups[i];
-      if (group.isNotEmpty && int.tryParse(group, radix: 16) != 0) return null;
-    }
-    final rest = groups.sublist(marker == -1 ? groups.length - 1 : marker + 1);
-    if (rest.length == 1) {
-      return rest.first.contains('.') ? rest.first : null;
-    }
-    if (rest.length != 2) return null;
-    final high = int.tryParse(rest[0].padLeft(4, '0'), radix: 16);
-    final low = int.tryParse(rest[1].padLeft(4, '0'), radix: 16);
-    if (high == null || low == null || high > 0xffff || low > 0xffff) {
-      return null;
-    }
-    return '${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}';
-  }
-
-  static bool _isUnsafeIpv4(String host) {
-    final parts = host.split('.');
-    if (parts.length != 4) return false;
-    final octets = <int>[];
-    for (final part in parts) {
-      final value = int.tryParse(part);
-      if (value == null || value < 0 || value > 255) return false;
-      octets.add(value);
-    }
-    final a = octets[0];
-    final b = octets[1];
-    if (a == 0) return true; // 0.0.0.0/8 (unspecified)
-    if (a == 127) return true; // 127.0.0.0/8
-    if (a == 10) return true; // 10.0.0.0/8
-    if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
-    if (a == 192 && b == 168) return true; // 192.168.0.0/16
-    if (a == 169 && b == 254) return true; // 169.254.0.0/16
-    if (a == 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10 (CGNAT)
-    return false;
-  }
+  static bool isUnsafeIpAddress(String ip) =>
+      RemoteTargetPolicy.isUnsafeIpAddress(ip);
 
   static String _fallbackName(String url) {
     final uri = Uri.tryParse(url);

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Searchable configuration for the assistant surface.
+  The authority must match SearchSuggestionsProvider.AUTHORITY; the manifest
+  meta-data (android.app.default_searchable) points the media search action at
+  this file. Suggestion taps are delivered as MEDIA_PLAY_FROM_SEARCH so the
+  assistant intent service handles them like a spoken request.
+-->
+<searchable xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="@string/app_name"
+    android:searchSuggestAuthority="com.pulsr.music.suggestions"
+    android:searchSuggestIntentAction="android.media.action.MEDIA_PLAY_FROM_SEARCH"
+    android:searchSuggestSelection=" ?"
+    android:searchSuggestThreshold="1"
+    android:queryAfterZeroResults="false"
+    android:includeInGlobalSearch="false" />

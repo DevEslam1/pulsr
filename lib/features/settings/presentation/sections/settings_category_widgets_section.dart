@@ -229,6 +229,29 @@ mixin SettingsCategoryWidgetsSection
           _buildPrivacyBackupSection(context),
         ];
 
+      case 'tools':
+        return [
+          _section(
+            context,
+            ExtrasStrings.settingsCategoryTitle,
+            ExtrasStrings.settingsCategorySubtitle,
+            [
+              _navTile(
+                context,
+                Icons.handyman_rounded,
+                ExtrasStrings.title,
+                ExtrasStrings.playbackSubtitle,
+                onTap: () => Navigator.of(context, rootNavigator: true).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ExtrasScreen(),
+                  ),
+                ),
+              ),
+            ],
+            key: _catById('tools').key,
+          ),
+        ];
+
       case 'about':
         return [
           _section(

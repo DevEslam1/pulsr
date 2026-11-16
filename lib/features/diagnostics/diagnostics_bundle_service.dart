@@ -1,0 +1,451 @@
+// lib/features/diagnostics/diagnostics_bundle_service.dart
+//
+// Builds the support bundle a user can send after an audio problem: app and
+// device identity, USB diagnostics, DSP stage flags, per-path xrun counters, the
+// recent log tail and a redacted preference snapshot. Everything that leaves
+// the process goes through [DiagnosticsBundleService.redactText], so paths,
+// credentials and tokens never reach the shared file.
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kDebugMode, kReleaseMode;
+import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../core/config/app_config.dart';
+import '../../core/constants/prefs_keys.dart';
+import '../../core/errors/app_error.dart';
+import '../../core/utils/error_logger.dart';
+import '../../data/services/usb_exclusive_service.dart';
+import 'diagnostics_log_buffer.dart';
+import 'diagnostics_strings.dart';
+
+/// Reads an output-device summary from the injected audio layer.
+typedef DiagnosticsMapProbe = Map<String, Object?> Function();
+
+/// Reads a map from an async native probe.
+typedef DiagnosticsAsyncMapProbe = Future<Map<String, Object?>> Function();
+
+/// One built diagnostics bundle.
+class DiagnosticsBundle {
+  const DiagnosticsBundle({
+    required this.generatedAt,
+    required this.app,
+    required this.outputDevice,
+    required this.usb,
+    required this.dspStages,
+    required this.outputPathCounters,
+    required this.logLines,
+    required this.preferences,
+  });
+
+  /// When the bundle was collected.
+  final DateTime generatedAt;
+
+  /// App version, platform and build mode.
+  final Map<String, Object?> app;
+
+  /// Output-device summary supplied by the caller.
+  final Map<String, Object?> outputDevice;
+
+  /// Raw USB diagnostics, empty when the native side is unavailable.
+  final Map<String, Object?> usb;
+
+  /// One entry per DSP stage: `stage`, `enabled`, `detail`.
+  final List<Map<String, Object?>> dspStages;
+
+  /// Per-output-path xrun/underrun counters with a `reported` flag.
+  final Map<String, Object?> outputPathCounters;
+
+  /// Recent log lines, already redacted.
+  final List<String> logLines;
+
+  /// Redacted preference values keyed by preference name.
+  final Map<String, Object?> preferences;
+
+  /// Number of DSP stages that are switched on.
+  int get enabledDspStageCount =>
+      dspStages.where((stage) => stage['enabled'] == true).length;
+
+  /// Serializable form written to `bundle.json`.
+  Map<String, Object?> toJson() => <String, Object?>{
+        'generatedAt': generatedAt.toUtc().toIso8601String(),
+        'app': app,
+        'outputDevice': outputDevice,
+        'usb': usb,
+        'dspStages': dspStages,
+        'outputPaths': outputPathCounters,
+        'logs': logLines,
+        'preferences': preferences,
+      };
+}
+
+/// Raised when the bundle cannot be written to disk.
+class DiagnosticsBundleError extends AppError {
+  const DiagnosticsBundleError({
+    required super.code,
+    required super.userMessage,
+    super.cause,
+    super.stackTrace,
+  });
+}
+
+/// Collects and exports diagnostics bundles.
+class DiagnosticsBundleService {
+  DiagnosticsBundleService({
+    required SharedPreferences prefs,
+    DiagnosticsMapProbe? outputDevice,
+    DiagnosticsAsyncMapProbe? usbDiagnostics,
+    DiagnosticsMapProbe? outputPathCounters,
+    String Function()? appVersion,
+    DateTime Function()? clock,
+    Future<Directory> Function()? tempDirectory,
+  })  : _prefs = prefs,
+        _outputDevice = outputDevice,
+        _usbDiagnostics = usbDiagnostics ?? _defaultUsbDiagnostics,
+        _countersProbe = outputPathCounters,
+        _appVersion = appVersion ?? (() => AppConfig.appVersion),
+        _clock = clock ?? DateTime.now,
+        _tempDirectory = tempDirectory ??
+            (() => Directory.systemTemp.createTemp('pulsr_diagnostics_'));
+
+  /// File name of the JSON bundle.
+  static const String bundleFileName = 'bundle.json';
+
+  /// File name of the plain-text log tail.
+  static const String logFileName = 'bundle.log';
+
+  /// How long a native USB probe may take before it is reported unavailable.
+  static const Duration usbProbeTimeout = Duration(seconds: 2);
+
+  static const List<String> _outputPaths = <String>[
+    'primary',
+    'usb_exclusive',
+    'aaudio',
+  ];
+
+  static final RegExp _windowsPath = RegExp(r'\b[A-Za-z]:\\[^\s"<>|]*');
+  static final RegExp _devicePath =
+      RegExp(r'/(?:storage|sdcard|mnt|system|vendor)/[^\s"<>|]*');
+  static final RegExp _androidDataPath =
+      RegExp(r'/Android/(?:data|obb)/[^\s"<>|]*');
+  static final RegExp _homePath = RegExp(r'(?:/Users/|/home/)[^\s"<>|]*');
+  static final RegExp _fileUri = RegExp(r'\bfile://[^\s"<>|]*');
+  static final RegExp _contentUri = RegExp(r'\bcontent://[^\s"<>|]*');
+  static final RegExp _urlUserInfo =
+      RegExp(r'([A-Za-z][A-Za-z0-9+.\-]*://)[^\s/@]+@');
+  static final RegExp _credentialPair = RegExp(
+    r'\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|'
+    r'client[_-]?secret|authorization|cookie|session[_-]?id)\b\s*[:=]\s*'
+    r'[^\s,;"}]+',
+    caseSensitive: false,
+  );
+  static final RegExp _authorizationScheme =
+      RegExp(r'\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=\-]+', caseSensitive: false);
+  static final RegExp _sensitiveKey = RegExp(
+    r'(password|passwd|pwd|secret|token|cookie|authorization|credential|'
+    r'api[_-]?key|session)',
+    caseSensitive: false,
+  );
+
+  final SharedPreferences _prefs;
+  final DiagnosticsMapProbe? _outputDevice;
+  final DiagnosticsAsyncMapProbe _usbDiagnostics;
+  final DiagnosticsMapProbe? _countersProbe;
+  final String Function() _appVersion;
+  final DateTime Function() _clock;
+  final Future<Directory> Function() _tempDirectory;
+
+  /// Replaces every value that could identify the user or grant access.
+  ///
+  /// Runs [ErrorLogger.redactPii] first (emails, cookies, auth headers, user
+  /// paths) and then this module's own passes for URL user-info, credential
+  /// pairs, bearer tokens, Windows/POSIX home paths, device storage paths and
+  /// file/content URIs.
+  static String redactText(String input) {
+    var output = ErrorLogger.redactPii(input);
+    output = output.replaceAllMapped(
+      _urlUserInfo,
+      (match) => '${match.group(1)}[REDACTED_CREDENTIALS]@',
+    );
+    output = output.replaceAllMapped(
+      _credentialPair,
+      (match) => '${match.group(1)}=[REDACTED_SECRET]',
+    );
+    output = output.replaceAllMapped(
+      _authorizationScheme,
+      (match) => '${match.group(1)} [REDACTED_TOKEN]',
+    );
+    output = output.replaceAllMapped(_fileUri, (_) => 'file://[REDACTED_PATH]');
+    output = output.replaceAllMapped(
+      _contentUri,
+      (_) => 'content://[REDACTED_URI]',
+    );
+    output = output.replaceAllMapped(_windowsPath, (_) => '[REDACTED_PATH]');
+    output = output.replaceAllMapped(_homePath, (_) => '[REDACTED_PATH]');
+    output = output.replaceAllMapped(
+      _androidDataPath,
+      (_) => '[REDACTED_PATH]',
+    );
+    output = output.replaceAllMapped(_devicePath, (_) => '[REDACTED_PATH]');
+    return output;
+  }
+
+  /// Collects one bundle. Native probes are guarded individually, so a missing
+  /// platform channel degrades one section instead of failing the export.
+  Future<DiagnosticsBundle> build() async {
+    final now = _clock();
+    return DiagnosticsBundle(
+      generatedAt: now,
+      app: _appSection(now),
+      outputDevice: _probeMap(
+        _outputDevice,
+        'output device',
+        fallback: <String, Object?>{
+          'status': DiagnosticsStrings.deviceUnknown,
+        },
+      ),
+      usb: await _usbSection(),
+      dspStages: _dspStages(),
+      outputPathCounters: _buildCounters(),
+      logLines: DiagnosticsLogBuffer.snapshot()
+          .map(redactText)
+          .toList(growable: false),
+      preferences: _redactedPreferences(),
+    );
+  }
+
+  /// Writes `bundle.json` and `bundle.log` into a fresh temporary directory and
+  /// returns both as shareable files.
+  Future<List<XFile>> export({DiagnosticsBundle? bundle}) async {
+    final target = bundle ?? await build();
+    try {
+      final directory = await _tempDirectory();
+      final jsonFile = File(p.join(directory.path, bundleFileName));
+      await jsonFile.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(target.toJson()),
+        flush: true,
+      );
+      final logFile = File(p.join(directory.path, logFileName));
+      await logFile.writeAsString(
+        target.logLines.map(redactText).join('\n'),
+        flush: true,
+      );
+      return <XFile>[
+        XFile(jsonFile.path, mimeType: 'application/json'),
+        XFile(logFile.path, mimeType: 'text/plain'),
+      ];
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Exporting the diagnostics bundle failed',
+        error: e,
+        stackTrace: st,
+        category: 'DiagnosticsBundle',
+      );
+      throw DiagnosticsBundleError(
+        code: 'diagnostics-export-failed',
+        userMessage: DiagnosticsStrings.exportFailed,
+        cause: e,
+        stackTrace: st,
+      );
+    }
+  }
+
+  Map<String, Object?> _appSection(DateTime now) => <String, Object?>{
+        'appVersion': _appVersion(),
+        'platform': Platform.operatingSystem,
+        'osVersion': Platform.operatingSystemVersion,
+        'buildMode': kDebugMode
+            ? DiagnosticsStrings.buildModeDebug
+            : kReleaseMode
+                ? DiagnosticsStrings.buildModeRelease
+                : DiagnosticsStrings.buildModeProfile,
+        'flavor': AppConfig.flavor,
+        'locale': Platform.localeName,
+        'generatedAt': now.toUtc().toIso8601String(),
+      };
+
+  Future<Map<String, Object?>> _usbSection() async {
+    try {
+      final raw = await _usbDiagnostics().timeout(usbProbeTimeout);
+      return _sanitizeMap(raw);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'USB diagnostics unavailable for the bundle',
+        error: e,
+        stackTrace: st,
+        category: 'DiagnosticsBundle',
+      );
+      return <String, Object?>{'status': 'unavailable'};
+    }
+  }
+
+  List<Map<String, Object?>> _dspStages() {
+    bool enabled(String key) => _prefs.getBool(key) ?? false;
+    String detail(String key, String fallback) =>
+        _prefs.getString(key) ?? fallback;
+    return <Map<String, Object?>>[
+      <String, Object?>{
+        'stage': 'equalizer',
+        'enabled': enabled(PrefsKeys.eqEnabled),
+        'detail': detail(PrefsKeys.eqPresetName, 'flat'),
+      },
+      <String, Object?>{
+        'stage': 'crossfeed',
+        'enabled': enabled(PrefsKeys.crossfeedEnabled),
+        'detail': detail(PrefsKeys.crossfeedMode, 'off'),
+      },
+      <String, Object?>{
+        'stage': 'saturation',
+        'enabled': enabled(PrefsKeys.saturationEnabled),
+        'detail': detail(PrefsKeys.saturationMode, 'off'),
+      },
+      <String, Object?>{
+        'stage': 'stereo_width',
+        'enabled': enabled(PrefsKeys.stereoWidthEnabled),
+        'detail': enabled(PrefsKeys.stereoWidthMultiband)
+            ? 'multiband'
+            : 'single-band',
+      },
+      <String, Object?>{
+        'stage': 'dynamic_bass',
+        'enabled': enabled(PrefsKeys.dynamicBassEnabled),
+        'detail': detail(PrefsKeys.dynamicBassPreset, 'flat'),
+      },
+      <String, Object?>{
+        'stage': 'multiband_compressor',
+        'enabled': enabled(PrefsKeys.multibandCompressorEnabled),
+        'detail':
+            '${_prefs.getInt(PrefsKeys.multibandCompressorBands) ?? 3} bands',
+      },
+      <String, Object?>{
+        'stage': 'convolution_reverb',
+        'enabled': enabled(PrefsKeys.convolutionReverbEnabled),
+        'detail': detail(PrefsKeys.convolutionReverbPreset, 'none'),
+      },
+      <String, Object?>{
+        'stage': 'limiter',
+        'enabled': enabled(PrefsKeys.lookaheadLimiterEnabled),
+        'detail':
+            '${_prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ?? 0} dB',
+      },
+      <String, Object?>{
+        'stage': 'dither',
+        'enabled': enabled(PrefsKeys.ditherEnabled),
+        'detail': '${_prefs.getInt(PrefsKeys.ditherTargetBitDepth) ?? 24}-bit',
+      },
+      <String, Object?>{
+        'stage': 'dac_voicing',
+        'enabled': enabled(PrefsKeys.dacVoicingEnabled),
+        'detail': detail(PrefsKeys.dacVoicingCharacter, 'neutral'),
+      },
+    ];
+  }
+
+  Map<String, Object?> _buildCounters() {
+    final provided = _probeMap(
+      _countersProbe,
+      'output path counters',
+      fallback: const <String, Object?>{},
+    );
+    if (provided.isNotEmpty) {
+      final paths = provided['paths'];
+      final reported = provided['reported'];
+      return <String, Object?>{
+        'reported': reported is bool ? reported : true,
+        'source': provided['source'] ?? 'native',
+        'paths': paths is Map
+            ? _sanitizeMap(Map<String, Object?>.from(paths))
+            : _sanitizeMap(provided),
+      };
+    }
+    return <String, Object?>{
+      'reported': false,
+      'source': DiagnosticsStrings.pathsNativeNotReported,
+      'paths': <String, Object?>{
+        for (final path in _outputPaths)
+          path: <String, Object?>{
+            'xruns': 0,
+            'underruns': 0,
+            'reported': false,
+            'source': DiagnosticsStrings.pathsNativeNotReported,
+          },
+      },
+    };
+  }
+
+  Map<String, Object?> _redactedPreferences() {
+    final keys = _prefs.getKeys().toList()..sort();
+    return <String, Object?>{
+      for (final key in keys) key: _redactValue(key, _prefs.get(key)),
+    };
+  }
+
+  Object? _redactValue(String key, Object? value) {
+    if (value is String) {
+      return _sensitiveKey.hasMatch(key) ? '[REDACTED]' : redactText(value);
+    }
+    if (value is List) {
+      if (_sensitiveKey.hasMatch(key)) return '[REDACTED]';
+      return <Object?>[
+        for (final item in value) item is String ? redactText(item) : item,
+      ];
+    }
+    if (value is Map) {
+      return <String, Object?>{
+        for (final entry in value.entries)
+          '${entry.key}': _redactValue('${entry.key}', entry.value),
+      };
+    }
+    return value;
+  }
+
+  Map<String, Object?> _probeMap(
+    DiagnosticsMapProbe? probe,
+    String label, {
+    required Map<String, Object?> fallback,
+  }) {
+    if (probe == null) return fallback;
+    try {
+      return _sanitizeMap(probe());
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Reading the $label for the bundle failed',
+        error: e,
+        stackTrace: st,
+        category: 'DiagnosticsBundle',
+      );
+      return fallback;
+    }
+  }
+
+  Map<String, Object?> _sanitizeMap(Map<String, Object?> source) {
+    return <String, Object?>{
+      for (final entry in source.entries)
+        entry.key: _sanitizeValue(entry.key, entry.value),
+    };
+  }
+
+  Object? _sanitizeValue(String key, Object? value) {
+    if (value is String) return redactText(value);
+    if (value is List) {
+      return <Object?>[
+        for (final item in value) _sanitizeValue(key, item),
+      ];
+    }
+    if (value is Map) {
+      return <String, Object?>{
+        for (final entry in value.entries)
+          '${entry.key}': _sanitizeValue('${entry.key}', entry.value),
+      };
+    }
+    return value;
+  }
+
+  static Future<Map<String, Object?>> _defaultUsbDiagnostics() async {
+    final raw = await UsbExclusiveService().getDiagnostics();
+    return Map<String, Object?>.from(raw);
+  }
+}

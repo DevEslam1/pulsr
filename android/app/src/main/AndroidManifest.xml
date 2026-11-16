@@ -104,6 +104,12 @@
             <meta-data
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
+            <!-- Search suggestions (P1-9): the system search UI queries this
+                 provider; it holds only suggestion text (no paths, no
+                 credentials) and is intentionally exported. -->
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable" />
             <!-- Unified intent filter to view/play audio files from file managers, downloads, etc. (BUG-012) -->
             <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.VIEW" />
@@ -214,6 +220,12 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <provider
+            android:name=".SearchSuggestionsProvider"
+            android:authorities="com.pulsr.music.suggestions"
+            android:exported="true"
+            android:grantUriPermissions="false" />
 
         <meta-data
             android:name="flutterEmbedding"

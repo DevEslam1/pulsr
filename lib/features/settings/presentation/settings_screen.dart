@@ -27,6 +27,8 @@ import '../../../core/widgets/pulsr_scroll_edge_fade.dart';
 import '../../../core/widgets/pulsr_slider.dart';
 import '../../../core/widgets/pulsr_switch.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
+import '../../extras/presentation/extras_screen.dart';
+import '../../extras/presentation/extras_strings.dart';
 import '../../shell/presentation/widgets/dock_style_picker_sheet.dart';
 import '../../shell/presentation/widgets/dock_style_controller.dart';
 import '../cubit/settings_accessibility_ext.dart';

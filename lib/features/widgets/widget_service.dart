@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/services/artwork_cache_manager.dart';
+import '../../core/network/remote_target_policy.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/l10n_holder.dart';
 import '../../core/widgets/cached_artwork.dart';
@@ -542,7 +543,8 @@ class WidgetService {
         HttpClient? client;
         try {
           final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
-          if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty) {
+          if (uri != null &&
+              RemoteTargetPolicy.isAllowed(uri.toString(), requireHttps: true)) {
             client = HttpClient()
               ..connectionTimeout = _networkTimeout
               ..idleTimeout = const Duration(seconds: 5);

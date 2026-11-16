@@ -61,7 +61,11 @@ enum ReplayGainMode { off, track, album, auto }
 /// - [pcm]: decode DSD to PCM (default, always available).
 /// - [dop]: frame DSD as DSD-over-PCM for a compatible USB DAC. Never enabled
 ///   automatically; requires an explicit choice plus a detected USB DAC.
-enum DsdOutputMode { pcm, dop }
+/// - [native]: send the raw DSD bitstream so the DAC decodes it itself. Only
+///   usable on a USB DAC that advertises native DSD alt settings and above a
+///   bypassed (bit-perfect) pipeline; playback falls back native -> DoP -> PCM
+///   automatically when the device or the rate cannot carry it.
+enum DsdOutputMode { pcm, dop, native }
 
 /// The app's overall complexity level.
 ///

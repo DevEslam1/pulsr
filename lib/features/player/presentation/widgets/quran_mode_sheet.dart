@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/error_logger.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'ambient_sound_panel.dart';
@@ -75,9 +76,18 @@ class _QuranModePanelState extends State<QuranModePanel> {
   void initState() {
     super.initState();
     _capsFuture = context.read<PlayerCubit>().detectEarbudCapabilities();
-    unawaited(context.read<PlayerCubit>().isQuranAlwaysOnRadio().then((v) {
-      if (mounted) setState(() => _alwaysOnRadio = v);
-    }));
+    try {
+      final future = context.read<PlayerCubit>().isQuranAlwaysOnRadio();
+      unawaited(future.then((v) {
+        if (mounted) setState(() => _alwaysOnRadio = v);
+      }).catchError((Object e, StackTrace st) {
+        ErrorLogger.log('Quran always-on radio read failed',
+            error: e, stackTrace: st, category: 'QuranMode');
+      }));
+    } catch (e, st) {
+      ErrorLogger.log('Quran panel init failed',
+          error: e, stackTrace: st, category: 'QuranMode');
+    }
   }
 
   void _refreshCaps() {

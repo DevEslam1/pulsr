@@ -29,6 +29,10 @@ class PulsrEnginePlugins private constructor(
     val castDiscovery: CastDiscoveryPlugin,
     val castSession: CastSessionPlugin,
     val roomCorrection: RoomCorrectionPlugin,
+    val tts: TtsPlugin,
+    val usbErgonomics: UsbErgonomicsPlugin,
+    val systemBehavior: SystemBehaviorPlugin,
+    val smb: SmbPlugin,
 ) {
     private val cleanedUp = java.util.concurrent.atomic.AtomicBoolean(false)
 
@@ -58,6 +62,10 @@ class PulsrEnginePlugins private constructor(
             "CastDiscovery" to { castDiscovery.dispose() },
             "CastSession" to { castSession.cleanup() },
             "RoomCorrection" to { roomCorrection.cleanup() },
+            "Tts" to { tts.dispose() },
+            "UsbErgonomics" to { usbErgonomics.dispose() },
+            "SystemBehavior" to { systemBehavior.dispose() },
+            "Smb" to { smb.cleanup() },
         )
         for ((name, step) in steps) {
             try {
@@ -109,6 +117,14 @@ class PulsrEnginePlugins private constructor(
                         .also { p -> cleanups.add("CastSession" to { p.cleanup() }) }
                     val roomCorrection = RoomCorrectionPlugin.registerWith(engine, appContext)
                         .also { p -> cleanups.add("RoomCorrection" to { p.cleanup() }) }
+                    val tts = TtsPlugin.register(engine)
+                        .also { p -> cleanups.add("Tts" to { p.dispose() }) }
+                    val usbErgonomics = UsbErgonomicsPlugin.register(engine, appContext)
+                        .also { p -> cleanups.add("UsbErgonomics" to { p.dispose() }) }
+                    val systemBehavior = SystemBehaviorPlugin.register(engine, appContext)
+                        .also { p -> cleanups.add("SystemBehavior" to { p.dispose() }) }
+                    val smb = SmbPlugin.register(engine)
+                        .also { p -> cleanups.add("Smb" to { p.cleanup() }) }
                     val plugins = PulsrEnginePlugins(
                         engine = engine,
                         audioEffects = audioEffects,
@@ -125,6 +141,10 @@ class PulsrEnginePlugins private constructor(
                         castDiscovery = castDiscovery,
                         castSession = castSession,
                         roomCorrection = roomCorrection,
+                        tts = tts,
+                        usbErgonomics = usbErgonomics,
+                        systemBehavior = systemBehavior,
+                        smb = smb,
                     )
                     byEngine[engine] = plugins
                     engine.addEngineLifecycleListener(plugins.lifecycleListener)

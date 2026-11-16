@@ -24,6 +24,7 @@ import java.io.File
 class MainActivity : AudioServiceActivity() {
     private val LYRICS_CHANNEL = "com.pulsr.music/lyrics"
     private val FILE_OPENER_CHANNEL = "com.pulsr.music/file_opener"
+    private val ASSISTANT_CHANNEL = "com.pulsr.music/assistant"
     private val pendingAudioUris = ArrayDeque<String>()
     companion object {
         private const val MAX_PENDING_AUDIO_URIS = 32
@@ -289,7 +290,46 @@ class MainActivity : AudioServiceActivity() {
                 else -> result.notImplemented()
             }
         }
- 
+
+        // Assistant suggestion cache (P1-9): Dart pushes the suggestion rows,
+        // the exported SearchSuggestionsProvider serves them to system search.
+        // The provider is read-only and holds no paths or credentials.
+        val assistantChan = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            ASSISTANT_CHANNEL
+        )
+        assistantChan.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "updateSuggestions" -> {
+                    val rows = (call.arguments as? List<*>)?.mapNotNull { raw ->
+                        val map = raw as? Map<*, *> ?: return@mapNotNull null
+                        mapOf(
+                            "title" to (map["title"] as? String).orEmpty(),
+                            "subtitle" to (map["subtitle"] as? String).orEmpty(),
+                            "query" to (map["query"] as? String).orEmpty()
+                        )
+                    }.orEmpty()
+                    try {
+                        SearchSuggestionsProvider.pushSuggestions(this, rows)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "Failed to cache search suggestions: ${e.message}")
+                        result.error("SUGGESTIONS_FAILED", e.message, null)
+                    }
+                }
+                "clear" -> {
+                    try {
+                        SearchSuggestionsProvider.clearSuggestions(this)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w("MainActivity", "Failed to clear search suggestions: ${e.message}")
+                        result.error("SUGGESTIONS_FAILED", e.message, null)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         val lyricsChan = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LYRICS_CHANNEL)
         lyricsChannel = lyricsChan
         lyricsChan.setMethodCallHandler { call, result ->

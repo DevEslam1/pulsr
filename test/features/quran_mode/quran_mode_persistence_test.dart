@@ -239,7 +239,7 @@ void main() {
 
       await controller.setQuranReciterStyle(QuranReciterStyle.tarawih);
 
-      expect(state.quranReciterStyle, QuranReciterStyle.murattal);
+      expect(state.quranReciterStyle, QuranReciterStyle.mujawwad);
       expect(
           state.errorMessage, contains('Failed to save Quran reciter style'));
     });

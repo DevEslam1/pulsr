@@ -6,6 +6,7 @@ const _categoryIds = [
   'library',
   'network',
   'privacy',
+  'tools',
   'about',
 ];
 
@@ -69,6 +70,13 @@ mixin SettingsCategoryMetadata on State<SettingsScreen> {
         tintColor: AppColors.catPrivacy,
       ),
       _SettingsCategoryItem(
+        id: 'tools',
+        title: ExtrasStrings.settingsCategoryTitle,
+        subtitle: ExtrasStrings.settingsCategorySubtitle,
+        icon: Icons.handyman_rounded,
+        tintColor: AppColors.catAbout,
+      ),
+      _SettingsCategoryItem(
         id: 'about',
         title: context.l10n.about,
         subtitle:
@@ -103,6 +111,9 @@ mixin SettingsCategoryMetadata on State<SettingsScreen> {
         case 'about':
           c.title = context.l10n.about;
           break;
+        case 'tools':
+          c.title = ExtrasStrings.settingsCategoryTitle;
+          break;
         default:
           c.title = id;
           break;
@@ -122,6 +133,7 @@ mixin SettingsCategoryMetadata on State<SettingsScreen> {
         'library' => Icons.library_music_outlined,
         'network' => Icons.cloud_outlined,
         'privacy' => Icons.shield_outlined,
+        'tools' => Icons.handyman_rounded,
         'about' => Icons.info_outline_rounded,
         _ => Icons.circle_outlined,
       };

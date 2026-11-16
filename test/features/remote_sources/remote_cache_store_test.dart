@@ -1,0 +1,188 @@
+// P0-1 remote sources: LRU disk cache, atomic writes and single-flight fetch.
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
+import 'package:pulsr/features/remote_sources/remote_cache_store.dart';
+
+void main() {
+  late Directory tempDir;
+  late DateTime now;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('pulsr_remote_cache_test');
+    now = DateTime(2024, 1, 1, 12);
+  });
+
+  tearDown(() async {
+    if (await tempDir.exists()) await tempDir.delete(recursive: true);
+  });
+
+  RemoteCacheStore buildStore({int maxBytes = 4096, int? maxEntryBytes}) {
+    return RemoteCacheStore(
+      directoryProvider: () async => tempDir,
+      clock: () => now,
+      maxBytes: maxBytes,
+      maxEntryBytes: maxEntryBytes,
+    );
+  }
+
+  List<String> fileNames() {
+    if (!tempDir.existsSync()) return const [];
+    return tempDir
+        .listSync()
+        .whereType<File>()
+        .map((file) => p.basename(file.path))
+        .toList(growable: false);
+  }
+
+  test('store then lookup returns the exact bytes', () async {
+    final store = buildStore();
+    final payload = utf8.encode('audio-bytes');
+
+    final file = await store.store('src', 'Music/a.mp3', Stream.value(payload));
+
+    expect(file, isNotNull);
+    expect(await file!.readAsBytes(), payload);
+    expect(await store.contains('src', 'Music/a.mp3'), isTrue);
+    expect(await store.currentBytes(), payload.length);
+    final looked = await store.lookup('src', 'Music/a.mp3');
+    expect(await looked!.readAsBytes(), payload);
+  });
+
+  test('writes land through a partial file that is renamed away', () async {
+    final store = buildStore();
+
+    await store.store('src', 'a.mp3', Stream.value(utf8.encode('chunk')));
+
+    final names = fileNames();
+    expect(names.any((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
+        isFalse,
+        reason: 'a committed entry must not leave a .partial behind');
+    expect(names, contains(RemoteCacheStore.indexFileName));
+    expect(names.where((name) => name.endsWith('.bin')), hasLength(1));
+  });
+
+  test('least-recently-used entries are evicted past the cap', () async {
+    final store = buildStore(maxBytes: 100);
+
+    await store.store('src', 'first', Stream.value(List<int>.filled(40, 1)));
+    now = now.add(const Duration(minutes: 1));
+    await store.store('src', 'second', Stream.value(List<int>.filled(40, 2)));
+    now = now.add(const Duration(minutes: 1));
+    await store.store('src', 'third', Stream.value(List<int>.filled(40, 3)));
+
+    expect(await store.contains('src', 'first'), isFalse);
+    expect(await store.contains('src', 'second'), isTrue);
+    expect(await store.contains('src', 'third'), isTrue);
+    expect(await store.currentBytes(), lessThanOrEqualTo(100));
+  });
+
+  test('a pinned entry survives eviction', () async {
+    final store = buildStore(maxBytes: 100);
+
+    await store.store(
+      'src',
+      'important',
+      Stream.value(List<int>.filled(40, 1)),
+      pin: true,
+    );
+    now = now.add(const Duration(minutes: 1));
+    await store.store('src', 'second', Stream.value(List<int>.filled(40, 2)));
+    now = now.add(const Duration(minutes: 1));
+    await store.store('src', 'third', Stream.value(List<int>.filled(40, 3)));
+
+    expect(await store.contains('src', 'important'), isTrue);
+    expect(await store.contains('src', 'third'), isTrue);
+  });
+
+  test('an entry larger than the per-entry limit is not cached', () async {
+    final store = buildStore(maxBytes: 4096, maxEntryBytes: 32);
+
+    final file = await store.store(
+      'src',
+      'huge.flac',
+      Stream.value(List<int>.filled(64, 7)),
+    );
+
+    expect(file, isNull);
+    expect(await store.contains('src', 'huge.flac'), isFalse);
+    expect(await store.currentBytes(), 0);
+    expect(
+      fileNames().where((name) => name.endsWith(RemoteCacheStore.partialSuffix)),
+      isEmpty,
+    );
+  });
+
+  test('concurrent fetches for one key download once', () async {
+    final store = buildStore();
+    final controller = StreamController<List<int>>();
+    var opens = 0;
+
+    Stream<List<int>> open() {
+      opens++;
+      return controller.stream;
+    }
+
+    final first = store.fetch('src', 'a.mp3', openStream: open);
+    final second = store.fetch('src', 'a.mp3', openStream: open);
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    controller.add(utf8.encode('shared'));
+    await controller.close();
+
+    final results = await Future.wait([first, second]);
+    expect(opens, 1);
+    expect(results.first, isNotNull);
+    expect(await results.first!.readAsBytes(), utf8.encode('shared'));
+    expect(results.last!.path, results.first!.path);
+  });
+
+  test('the index is rebuilt from disk by a new instance', () async {
+    final first = buildStore();
+    await first.store('src', 'a.mp3', Stream.value(utf8.encode('persisted')));
+    final expectedBytes = await first.currentBytes();
+
+    final second = buildStore();
+    final file = await second.lookup('src', 'a.mp3');
+
+    expect(file, isNotNull);
+    expect(await file!.readAsBytes(), utf8.encode('persisted'));
+    expect(await second.currentBytes(), expectedBytes);
+  });
+
+  test('clear removes every cached file', () async {
+    final store = buildStore();
+    await store.store('src', 'a.mp3', Stream.value(utf8.encode('one')));
+    await store.store('other', 'b.mp3', Stream.value(utf8.encode('two')));
+
+    await store.clear();
+
+    expect(await store.currentBytes(), 0);
+    expect(await store.contains('src', 'a.mp3'), isFalse);
+    expect(fileNames(), isEmpty);
+  });
+
+  test('removeSource deletes only that source', () async {
+    final store = buildStore();
+    await store.store('src', 'a.mp3', Stream.value(utf8.encode('one')));
+    await store.store('other', 'b.mp3', Stream.value(utf8.encode('two')));
+
+    await store.removeSource('src');
+
+    expect(await store.contains('src', 'a.mp3'), isFalse);
+    expect(await store.contains('other', 'b.mp3'), isTrue);
+  });
+
+  test('a leftover partial file is cleaned on the next start', () async {
+    final stale = File(p.join(tempDir.path, 'stale.bin.partial'));
+    await stale.writeAsBytes(List<int>.filled(10, 0));
+
+    final store = buildStore();
+    await store.ensureInitialized();
+
+    expect(await stale.exists(), isFalse);
+    expect(await store.currentBytes(), 0);
+  });
+}

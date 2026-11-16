@@ -171,6 +171,11 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation(project(":media3-decoder-flac"))
 
+    // SMB2/3 client for network libraries (server shares as first-class
+    // sources). Protocol work only: credentials stay in flutter_secure_storage
+    // and are handed to the plugin per call, never persisted by this library.
+    implementation("com.hierynomus:smbj:0.13.0")
+
     // GPL-3.0. Its presence is why Pulsr as a whole is GPL-3.0, and why it is
     // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which
     // solves YouTube's JS signature challenges on-device.

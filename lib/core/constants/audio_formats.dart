@@ -43,6 +43,14 @@ class AudioFormats {
     ...nativeDecodableExtensions,
   };
 
+  /// Container extensions: files that hold audio but are never decoded
+  /// directly. A SACD image (`.iso`) must be probed, indexed and extracted into
+  /// a DSF track before the DSD decoder can see it, so it is deliberately kept
+  /// out of [supportedExtensions] and [isSupportedExtension].
+  static const Set<String> containerExtensions = {
+    'iso',
+  };
+
   static bool isSupportedExtension(String pathOrExt) {
     final ext = extractExtension(pathOrExt);
     return supportedExtensions.contains(ext);
@@ -51,7 +59,47 @@ class AudioFormats {
   static bool isRecognizedExtension(String pathOrExt) {
     final ext = extractExtension(pathOrExt);
     return supportedExtensions.contains(ext) ||
-        nativeDecodableExtensions.contains(ext);
+        nativeDecodableExtensions.contains(ext) ||
+        containerExtensions.contains(ext);
+  }
+
+  /// True when [pathOrExt] names a SACD disc image.
+  ///
+  /// Only the extension is checked here: use `isSacdIso` from
+  /// `lib/data/audio/sacd/sacd_iso_probe.dart` for the structural check.
+  static bool isSacdIsoPath(String pathOrExt) =>
+      _coerceExtension(pathOrExt) == 'iso';
+
+  /// Classifies [pathOrExt] for scanners and the playback chain.
+  ///
+  /// [AudioFormatKind.playable] needs no extraction, [AudioFormatKind.nativeDecoderRequired]
+  /// is recognized but not decodable in this build, [AudioFormatKind.sacdContainer]
+  /// must be indexed and extracted first, and anything else is
+  /// [AudioFormatKind.unknown].
+  static AudioFormatKind kindFor(String pathOrExt) {
+    final ext = _coerceExtension(pathOrExt);
+    if (ext.isEmpty) return AudioFormatKind.unknown;
+    if (supportedExtensions.contains(ext)) return AudioFormatKind.playable;
+    if (nativeDecodableExtensions.contains(ext)) {
+      return AudioFormatKind.nativeDecoderRequired;
+    }
+    if (containerExtensions.contains(ext)) return AudioFormatKind.sacdContainer;
+    return AudioFormatKind.unknown;
+  }
+
+  /// Extension lookup that also accepts a bare container extension ('.iso',
+  /// 'iso'), which [extractExtension] reports as empty because it only
+  /// recognizes playable and native-decoder audio.
+  static String _coerceExtension(String pathOrExt) {
+    final ext = extractExtension(pathOrExt);
+    if (ext.isNotEmpty) return ext;
+    final clean = pathOrExt.trim().toLowerCase();
+    if (clean.isEmpty || clean.contains('/') || clean.contains(r'\')) {
+      return '';
+    }
+    final candidate = clean.startsWith('.') ? clean.substring(1) : clean;
+    if (candidate.isEmpty || candidate.contains('.')) return '';
+    return containerExtensions.contains(candidate) ? candidate : '';
   }
 
   static bool requiresNativeDecoder(String pathOrExt) {
@@ -125,4 +173,20 @@ class AudioFormats {
     }
     return '';
   }
+}
+
+/// How a file extension reaches the playback chain.
+enum AudioFormatKind {
+  /// Decodable as-is by the platform or the bundled DSD decoder.
+  playable,
+
+  /// Recognized, but needs a native decoder this build does not bundle.
+  nativeDecoderRequired,
+
+  /// A container (currently a SACD `.iso`) that must be indexed and extracted
+  /// into a playable track before it can be played.
+  sacdContainer,
+
+  /// Not an audio file this app understands.
+  unknown,
 }

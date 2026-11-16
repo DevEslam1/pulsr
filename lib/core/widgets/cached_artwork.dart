@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
+import '../network/remote_target_policy.dart';
 import '../services/artwork_cache_manager.dart';
 import '../utils/error_logger.dart';
 import '../utils/l10n_extensions.dart';
@@ -371,7 +372,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
             : url);
 
     final uri = Uri.tryParse(targetUrl);
-    if (uri == null || (!uri.isScheme('https') && !uri.isScheme('http'))) {
+    if (uri == null ||
+        !RemoteTargetPolicy.isAllowed(targetUrl, requireHttps: false)) {
       return null;
     }
     HttpClientRequest? request;

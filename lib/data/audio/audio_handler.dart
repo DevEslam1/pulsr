@@ -61,6 +61,8 @@ import 'smart_preload_scheduler.dart';
 import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
 import 'dsd_decoder_helper.dart';
+import 'dsd_header_probe.dart';
+import 'dsd_transport_resolver.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../features/player/cubit/queue_slot_codec.dart';
 import 'collaborators/float_output_controller.dart';

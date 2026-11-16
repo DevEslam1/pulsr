@@ -531,11 +531,13 @@ class AmbientSoundService extends ChangeNotifier {
       }
       _persist();
     } else {
-      final toRestore = _savedUserEffects.isNotEmpty
-          ? _savedUserEffects
-          : (_lastActiveEffects.isNotEmpty
-              ? _lastActiveEffects
-              : {AmbientSoundEffect.rain});
+      final toRestore = Set<AmbientSoundEffect>.from(
+        _savedUserEffects.isNotEmpty
+            ? _savedUserEffects
+            : (_lastActiveEffects.isNotEmpty
+                ? _lastActiveEffects
+                : {AmbientSoundEffect.rain}),
+      );
       for (final e in toRestore) {
         _activeEffects.add(e);
         unawaited(_startEffectPlayer(e));

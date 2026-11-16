@@ -76,6 +76,13 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Pulsr discovers and streams to DLNA/UPnP renderers and network shares on your local network.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_pulsr._tcp</string>
+		<string>_googlecast._tcp</string>
+	</array>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

@@ -815,11 +815,11 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await prefs.setBool(PrefsKeys.followTrackSampleRate, value);
   }
 
-  /// T4: select the DSD (DSF/DFF) output transport.
+  /// Select the DSD (DSF/DFF) output transport.
   ///
   /// Refuses DoP unless the native probe has confirmed a compatible USB DAC, so
-  /// the persisted preference can never claim native DSD on a path that cannot
-  /// carry it. PCM is always allowed and is the default.
+  /// the preference can never claim DoP on a path that cannot carry
+  /// it. Native is stored but gated per track (native -> DoP -> PCM).
   Future<void> setDsdOutputMode(DsdOutputMode mode) async {
     markDirty('dsdOutputMode');
     if (mode == DsdOutputMode.dop && !state.dsdDopSupported) {

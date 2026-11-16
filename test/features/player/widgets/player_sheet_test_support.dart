@@ -87,6 +87,8 @@ MockPlayerCubit stubPlayerCubit({
   when(() => cubit.setLookaheadLimiter(any(),
       thresholdDb: any(named: 'thresholdDb'),
       releaseMs: any(named: 'releaseMs'))).thenAnswer((_) async => true);
+  when(() => cubit.isQuranAlwaysOnRadio()).thenAnswer((_) async => false);
+  when(() => cubit.setQuranAlwaysOnRadio(any())).thenAnswer((_) async {});
   when(() => cubit.setCompressorParams(
       thresholdDb: any(named: 'thresholdDb'),
       ratio: any(named: 'ratio'),

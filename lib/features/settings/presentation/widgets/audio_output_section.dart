@@ -1,5 +1,8 @@
 part of 'audio_sound_section.dart';
 
+/// Native DSD is a transport name, not localizable copy (like LC3/M3U).
+const String _kDsdNativeLabel = 'Native';
+
 /// Collapsible disclosure for rarely-used audiophile controls.
 /// Reuses the animation pattern from [_WhatChangesExpander].
 class _AdvancedDisclosure extends StatefulWidget {
@@ -459,9 +462,21 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                           ),
                         ),
                       ),
+                      ButtonSegment(
+                        value: DsdOutputMode.native,
+                        label: Text(
+                          _kDsdNativeLabel,
+                          style: const TextStyle(
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
                     ],
                     selected: {state.dsdOutputMode},
-                    onSelectionChanged: (!isAndroid || !state.dsdDopSupported)
+                    onSelectionChanged: (!isAndroid ||
+                            !(state.dsdDopSupported ||
+                                (state.currentOutputDevice?.isUsb ?? false)))
                         ? null
                         : (selected) {
                             if (selected.isNotEmpty) {
