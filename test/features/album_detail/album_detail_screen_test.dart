@@ -244,6 +244,9 @@ void main() {
     ]))));
     await tester.pumpAndSettle();
 
+    // Tablet portrait is a single scroll: the tracklist follows the hero.
+    await tester.ensureVisible(find.byType(SongTile).first);
+    await tester.pumpAndSettle();
     await tester.longPress(find.byType(SongTile).first);
     await tester.pumpAndSettle();
 

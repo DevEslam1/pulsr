@@ -14,6 +14,7 @@ import 'glass_container.dart';
 import 'pulsr_modal_tracker.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// Uniform dialog entry-points used across the entire app.
 ///
@@ -50,6 +51,7 @@ class PulsrDialogHelper {
     required WidgetBuilder builder,
     bool useRootNavigator = true,
     bool barrierDismissible = true,
+    Color? barrierColor,
   }) {
     // The root PulsrModalObserver (installed on the root navigator) already
     // counts DialogRoutes via didPush/didPop. Only track manually for a
@@ -62,7 +64,7 @@ class PulsrDialogHelper {
       DialogRoute<T>(
         context: context,
         barrierDismissible: barrierDismissible,
-        barrierColor: AppColors.scrimAt(0.58),
+        barrierColor: barrierColor ?? AppColors.scrimAt(0.58),
         builder: builder,
       ),
     );
@@ -130,13 +132,10 @@ class PulsrDialogHelper {
         ),
         FilledButton(
           onPressed: () {
+            // Feedback follows the action's role, not the button's English
+            // label: a localized "حذف"/"Löschen" must still feel destructive.
             if (isDestructive) {
-              if (confirm.toLowerCase().contains('delete') ||
-                  title.toLowerCase().contains('delete')) {
-                PulsrHaptics.heavyImpact();
-              } else {
-                PulsrHaptics.mediumImpact();
-              }
+              PulsrHaptics.heavyImpact();
             } else {
               PulsrHaptics.selectionClick();
             }

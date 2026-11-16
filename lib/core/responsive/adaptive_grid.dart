@@ -23,7 +23,6 @@ enum GridType {
 class PulsrAdaptiveGrid {
   static const double minCardWidth = 160.0;
   static const double minSongTileWidth = 300.0;
-  static const double maxContentWidth = 1200.0;
 
   /// Calculates the optimal column count for a grid type based on screen tier and posture.
   static int columns(
@@ -34,31 +33,19 @@ class PulsrAdaptiveGrid {
     final vp = PulsrViewport.of(context);
     final breakpoint = vp.sizeClass;
     final isLandscape = vp.isLandscape;
-    final width = vp.width;
 
     switch (type) {
       case GridType.albums:
       case GridType.artists:
       case GridType.playlists:
-        switch (breakpoint) {
-          case PulsrBreakpoint.compact:
-            // A 320dp phone cannot fit two 160dp cards plus page padding.
-            // Fall back to one column instead of squeezing the artwork.
-            final itemWidth =
-                math.max(1.0, (customMinItemWidth ?? minCardWidth).toDouble());
-            final calculated =
-                (math.max(0.0, width - 24.0) / itemWidth).floor();
-            return calculated.clamp(1, isLandscape ? 3 : 2);
-          case PulsrBreakpoint.medium:
-            return isLandscape ? 4 : 3;
-          case PulsrBreakpoint.expanded:
-            return isLandscape ? 5 : 4;
-          case PulsrBreakpoint.large:
-            final itemWidth =
-                math.max(1.0, (customMinItemWidth ?? minCardWidth).toDouble());
-            final calculated = (math.max(0.0, width) / itemWidth).floor();
-            return calculated.clamp(6, 8);
-        }
+        // Derive from the width the cards actually receive, not the raw
+        // viewport: content is capped by [PulsrViewport.contentMaxWidth], so
+        // fixed 6-8 column counts produced sub-minimum cards on wide screens.
+        return columnsFor(
+          context,
+          minItemWidth: (customMinItemWidth ?? minCardWidth).toDouble(),
+          spacing: 14.0,
+        );
 
       case GridType.songs:
         switch (breakpoint) {
@@ -74,6 +61,19 @@ class PulsrAdaptiveGrid {
     }
   }
 
+  /// Width the grid actually receives inside the shell: the viewport capped by
+  /// the readable content rail and reduced by the active navigation rail.
+  static double _contentWidth(BuildContext context) {
+    final vp = PulsrViewport.of(context);
+    final railWidth = switch (vp.navMode) {
+      PulsrNavMode.bottomBar => 0.0,
+      PulsrNavMode.sideRail => 64.0,
+      PulsrNavMode.sideRailExtended =>
+        vp.sizeClass == PulsrBreakpoint.large ? 260.0 : 240.0,
+    };
+    return math.max(0.0, math.min(vp.width - railWidth, vp.contentMaxWidth));
+  }
+
   /// Target-item-width based dynamic column resolver.
   static int columnsFor(
     BuildContext context, {
@@ -83,7 +83,9 @@ class PulsrAdaptiveGrid {
   }) {
     final vp = PulsrViewport.of(context);
     final availableWidth = math.max(
-        0.0, math.min(vp.width, vp.contentMaxWidth) - (vp.pagePadding * 2));
+      0.0,
+      _contentWidth(context) - (vp.pagePadding * 2),
+    );
     final divisor = math.max(1.0, minItemWidth + spacing);
     int cols = (availableWidth / divisor).floor();
     if (maxColumns != null) {
@@ -135,8 +137,7 @@ class PulsrAdaptiveGrid {
   }) {
     final vp = PulsrViewport.of(context);
     final pad = horizontalPadding ?? (vp.pagePadding * 2);
-    final width = math.min(vp.width, vp.contentMaxWidth);
-    final usableWidth = math.max(0.0, width - pad);
+    final usableWidth = math.max(0.0, _contentWidth(context) - pad);
     final divisor = math.max(1.0, minItemWidth);
     final count = (usableWidth / divisor).floor();
     final effectiveMin = math.min(minColumns, maxColumns);

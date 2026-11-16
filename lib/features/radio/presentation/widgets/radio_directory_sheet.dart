@@ -8,6 +8,7 @@ import '../../../../core/services/radio_browser_service.dart';
 import '../../../../core/services/radio_station_store.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_empty_state.dart';
 import '../../../../core/widgets/pulsr_search_field.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
@@ -33,17 +34,20 @@ class RadioDirectorySheet extends StatefulWidget {
     final size = MediaQuery.sizeOf(context);
     final isLandscape = size.width > size.height;
 
-    return showModalBottomSheet<void>(
+    return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      constraints: const BoxConstraints(maxWidth: 820),
-      builder: (_) => FractionallySizedBox(
-        heightFactor: isLandscape ? 0.94 : 0.88,
-        child: RadioDirectorySheet(
-          service: service ?? RadioBrowserService(),
-          store: store ?? RadioStationStore(),
+      wrapWithContainer: false,
+      builder: (_) => Align(
+        alignment: Alignment.bottomCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 820),
+          child: FractionallySizedBox(
+            heightFactor: isLandscape ? 0.94 : 0.88,
+            child: RadioDirectorySheet(
+              service: service ?? RadioBrowserService(),
+              store: store ?? RadioStationStore(),
+            ),
+          ),
         ),
       ),
     );

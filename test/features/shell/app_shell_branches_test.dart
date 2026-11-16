@@ -10,6 +10,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/config/app_config.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/router/app_router.dart';
 import 'package:pulsr/core/widgets/pulsr_modal_tracker.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -64,7 +66,11 @@ void main() {
   });
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    // An existing install must not auto-open the first-run What's New sheet
+    // and block the shell interactions under test.
+    SharedPreferences.setMockInitialValues({
+      PrefsKeys.lastSeenAppVersion: AppConfig.appVersion,
+    });
     PulsrModalTracker.isModalOpen.value = false;
     platformCalls.clear();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -202,7 +208,10 @@ void main() {
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    SharedPreferences.setMockInitialValues({'setting_last_shell_tab': 3});
+    SharedPreferences.setMockInitialValues({
+      'setting_last_shell_tab': 3,
+      PrefsKeys.lastSeenAppVersion: AppConfig.appVersion,
+    });
     final branches = <int>[];
     await tester.pumpWidget(buildShell(
       currentIndex: 0,

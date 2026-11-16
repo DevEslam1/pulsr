@@ -140,7 +140,13 @@ class PulsrLayoutDelegate {
   ///
   /// Delegates to the canonical per-breakpoint value on [PulsrBreakpoint] so
   /// the shell and the content surfaces agree.
-  double get contentMaxWidth => breakpoint.contentMaxWidth;
+  double get contentMaxWidth {
+    if (screenHeight < PulsrBreakpoint.shortHeightThreshold &&
+        screenWidth > screenHeight) {
+      return screenWidth;
+    }
+    return breakpoint.contentMaxWidth;
+  }
 
   /// Effective player bar height for the current layout mode.
   double get playerBarHeight {

@@ -7,6 +7,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/bloc/base_cubit.dart';
+import 'package:pulsr/core/config/app_config.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/shell/presentation/app_shell.dart';
@@ -53,7 +55,11 @@ void main() {
   late MockPlayerCubit mockPlayerCubit;
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    // An existing install must not auto-open the first-run What's New sheet
+    // and block the shell interactions under test.
+    SharedPreferences.setMockInitialValues({
+      PrefsKeys.lastSeenAppVersion: AppConfig.appVersion,
+    });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(SystemChannels.platform,
             (MethodCall methodCall) async {

@@ -598,8 +598,7 @@ class YtDownloadService {
 
         // Download integrity verification (BUG-12)
         if (!await temp.exists()) {
-          return const Left(
-              DownloadFailure('Downloaded file was not created'));
+          return const Left(DownloadFailure('Downloaded file was not created'));
         }
         final tempSize = await temp.length();
         if (tempSize < 1024) {
@@ -799,7 +798,8 @@ class YtDownloadService {
           error: e, stackTrace: st, category: 'YTM');
       return Left(DownloadFailure('Download failed: $e', e));
     } finally {
-      final wasCanceled = task.isCanceled || _canceledVideoIds.contains(videoId);
+      final wasCanceled =
+          task.isCanceled || _canceledVideoIds.contains(videoId);
       _canceledVideoIds.remove(videoId);
       await YtDownloadArtifactStore.cleanupScratch(
         temp: (wasCanceled && bodyCommitted) ? null : temp,
@@ -1762,20 +1762,15 @@ class YtDownloadService {
   Future<void> cleanOrphanPartFiles({
     Set<String>? activePartNames,
     Set<String>? protectedVideoIds,
-  }) async {
-    try {
-      await YtDownloadArtifactStore.sweepOrphans(
-        await getTemporaryDirectory(),
-        busyVideoIds: {
-          ..._activeDownloads.keys,
-          ..._queue.map((t) => t.song.remoteId).whereType<String>(),
-          ...?protectedVideoIds,
-        },
-        activePartNames: activePartNames,
-      );
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+  }) {
+    return _sweepOrphanDownloadParts(
+      busyVideoIds: {
+        ..._activeDownloads.keys,
+        ..._queue.map((t) => t.song.remoteId).whereType<String>(),
+        ...?protectedVideoIds,
+      },
+      activePartNames: activePartNames,
+    );
   }
 
   /// Removes every scratch file for [videoId].
@@ -1784,27 +1779,13 @@ class YtDownloadService {
     // A live download owns its partial; deleting under it would leave the writer
     // appending to an unlinked handle and commit a truncated file.
     if (_activeDownloads.containsKey(videoId)) return;
-    try {
-      await YtDownloadArtifactStore.deleteFor(
-          await getTemporaryDirectory(), videoId);
-    } catch (_) {
-      // Best-effort: failure intentionally ignored on this non-critical path.
-    }
+    await _deleteDownloadArtifacts(videoId);
   }
 
   Future<bool> _tag(String path, SongsTableData song,
       {String? artworkPath, String? lyrics}) {
-    return DownloadService.writeAudioTags(
-      filePath: path,
-      title: song.title,
-      artist: song.artist,
-      album: song.album.isNotEmpty ? song.album : 'Unknown Album',
-      genre: song.genre,
-      year: song.year,
-      trackNumber: song.trackNumber ?? 1,
-      artworkPath: artworkPath,
-      lyrics: lyrics,
-    );
+    return _writeDownloadedSongTags(path, song,
+        artworkPath: artworkPath, lyrics: lyrics);
   }
 
   /// F11: [ext] arrives from the resolver and from byte sniffing and is then

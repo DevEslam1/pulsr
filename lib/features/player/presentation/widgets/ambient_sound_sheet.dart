@@ -10,6 +10,7 @@ import '../../../../core/widgets/pulsr_switch.dart';
 import 'ambient_sound_panel.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Modal bottom sheet allowing users to enable, configure, and adjust volume for
 /// ambient background sounds (Rain, Fire, Forest, Ocean, etc.).
 class AmbientSoundSheet extends StatelessWidget {
@@ -18,7 +19,7 @@ class AmbientSoundSheet extends StatelessWidget {
   static Future<void> show(BuildContext context) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      wrapWithContainer: false,
+      wrapWithContainer: true,
       builder: (_) => const AmbientSoundSheet(),
     );
   }

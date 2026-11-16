@@ -70,3 +70,50 @@ bool _partsWorthKeeping(Object e) {
   }
   return true;
 }
+
+// ── Artifact and tagging bodies ──────────────────────────────────────────────
+// These live in the part file so the service facade keeps shrinking (01-4).
+// The facade keeps public wrappers, so mock-based callers are unchanged.
+
+Future<void> _sweepOrphanDownloadParts({
+  required Set<String> busyVideoIds,
+  Set<String>? activePartNames,
+}) async {
+  try {
+    await YtDownloadArtifactStore.sweepOrphans(
+      await getTemporaryDirectory(),
+      busyVideoIds: busyVideoIds,
+      activePartNames: activePartNames,
+    );
+  } catch (_) {
+    // Best-effort: failure intentionally ignored on this non-critical path.
+  }
+}
+
+Future<void> _deleteDownloadArtifacts(String videoId) async {
+  try {
+    await YtDownloadArtifactStore.deleteFor(
+        await getTemporaryDirectory(), videoId);
+  } catch (_) {
+    // Best-effort: failure intentionally ignored on this non-critical path.
+  }
+}
+
+Future<bool> _writeDownloadedSongTags(
+  String path,
+  SongsTableData song, {
+  String? artworkPath,
+  String? lyrics,
+}) {
+  return DownloadService.writeAudioTags(
+    filePath: path,
+    title: song.title,
+    artist: song.artist,
+    album: song.album.isNotEmpty ? song.album : 'Unknown Album',
+    genre: song.genre,
+    year: song.year,
+    trackNumber: song.trackNumber ?? 1,
+    artworkPath: artworkPath,
+    lyrics: lyrics,
+  );
+}

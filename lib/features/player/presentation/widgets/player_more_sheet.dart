@@ -42,7 +42,7 @@ class PlayerMoreSheet extends StatelessWidget {
     final settingsCubit = context.read<SettingsCubit>();
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      wrapWithContainer: false,
+      wrapWithContainer: true,
       builder: (_) => MultiBlocProvider(
         providers: [
           BlocProvider<PlayerCubit>.value(value: playerCubit),

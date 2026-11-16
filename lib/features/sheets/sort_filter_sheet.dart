@@ -9,6 +9,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../core/utils/pulsr_haptics.dart';
+
 class SortOptionSpec {
   final String key;
   final String label;
@@ -45,7 +46,7 @@ class SortFilterSheet extends StatelessWidget {
   }) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      wrapWithContainer: false,
+      wrapWithContainer: true,
       builder: (_) => SortFilterSheet(
         currentSort: currentSort,
         ascending: ascending,

@@ -149,8 +149,8 @@ class A11yLiveAnnouncerState extends State<A11yLiveAnnouncer> {
         fit: StackFit.passthrough,
         children: [
           widget.child,
-          Positioned(
-            left: 0,
+          PositionedDirectional(
+            start: 0,
             top: 0,
             width: 0,
             height: 0,

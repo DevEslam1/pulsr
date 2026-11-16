@@ -60,12 +60,20 @@ void main() {
       expect(PulsrLayoutMetrics.isPlayerSplitMode(context), isFalse);
     });
 
-    testWidgets('splits a wide landscape viewport', (tester) async {
+    testWidgets('splits a wide tablet landscape viewport', (tester) async {
+      final context = await pumpContext(
+        tester,
+        const MediaQueryData(size: Size(1024, 768)),
+      );
+      expect(PulsrLayoutMetrics.isPlayerSplitMode(context), isTrue);
+    });
+
+    testWidgets('rejects a short landscape viewport', (tester) async {
       final context = await pumpContext(
         tester,
         const MediaQueryData(size: Size(900, 400)),
       );
-      expect(PulsrLayoutMetrics.isPlayerSplitMode(context), isTrue);
+      expect(PulsrLayoutMetrics.isPlayerSplitMode(context), isFalse);
     });
 
     testWidgets('splits a wide tablet with explicit short constraints',
@@ -94,10 +102,18 @@ void main() {
       expect(PulsrLayoutMetrics.shouldUseDialogForSheet(context), isFalse);
     });
 
-    testWidgets('uses a dialog on tablets', (tester) async {
+    testWidgets('keeps a sheet on medium tablet portrait', (tester) async {
       final context = await pumpContext(
         tester,
         const MediaQueryData(size: Size(800, 1000)),
+      );
+      expect(PulsrLayoutMetrics.shouldUseDialogForSheet(context), isFalse);
+    });
+
+    testWidgets('uses a dialog on expanded tablets', (tester) async {
+      final context = await pumpContext(
+        tester,
+        const MediaQueryData(size: Size(1024, 768)),
       );
       expect(PulsrLayoutMetrics.shouldUseDialogForSheet(context), isTrue);
     });
@@ -477,9 +493,10 @@ void main() {
           ),
         ),
       );
-      // 1400 / 160 = 8 (clamped 6..8); 1400 / 200 = 7.
-      expect(standard, 8);
-      expect(custom, 7);
+      // The 1400dp viewport is capped to the 1000dp content rail:
+      // 936dp usable / 174 = 5 standard; / 214 = 4 with a 200dp minimum.
+      expect(standard, 5);
+      expect(custom, 4);
     });
 
     testWidgets('columnsFor clamps to explicit maxColumns', (tester) async {

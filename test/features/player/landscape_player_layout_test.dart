@@ -28,7 +28,8 @@ void main() {
     when(() => mockPlayerCubit.state).thenReturn(const PlayerState());
     when(() => mockPlayerCubit.stream).thenAnswer((_) => const Stream.empty());
     when(() => mockSettingsCubit.state).thenReturn(const SettingsState());
-    when(() => mockSettingsCubit.stream).thenAnswer((_) => const Stream.empty());
+    when(() => mockSettingsCubit.stream)
+        .thenAnswer((_) => const Stream.empty());
   });
 
   Widget buildSubject({
@@ -166,22 +167,23 @@ void main() {
       (tester) async {
         bool? splitNarrow;
         bool? splitWide;
+        bool? splitShortLandscape;
 
         await tester.pumpWidget(
           MaterialApp(
             home: MediaQuery(
               data: const MediaQueryData(
-                size: Size(844, 390),
+                size: Size(1024, 768),
               ),
               child: Builder(
                 builder: (context) {
                   splitNarrow = PulsrLayoutMetrics.isPlayerSplitMode(
                     context,
-                    const BoxConstraints(maxWidth: 450, maxHeight: 390),
+                    const BoxConstraints(maxWidth: 600, maxHeight: 768),
                   );
                   splitWide = PulsrLayoutMetrics.isPlayerSplitMode(
                     context,
-                    const BoxConstraints(maxWidth: 844, maxHeight: 390),
+                    const BoxConstraints(maxWidth: 1024, maxHeight: 768),
                   );
                   return const SizedBox();
                 },
@@ -193,8 +195,28 @@ void main() {
         // Narrow pane (< 620) must NOT split horizontally
         expect(splitNarrow, isFalse);
 
-        // Wide pane (>= 620) in landscape MUST split horizontally
+        // Wide pane (>= 620) in tablet landscape MUST split horizontally
         expect(splitWide, isTrue);
+
+        // Short landscape phones keep the single-column player so 2x text
+        // scale cannot overflow either pane.
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(size: Size(844, 390)),
+              child: Builder(
+                builder: (context) {
+                  splitShortLandscape = PulsrLayoutMetrics.isPlayerSplitMode(
+                    context,
+                    const BoxConstraints(maxWidth: 844, maxHeight: 390),
+                  );
+                  return const SizedBox();
+                },
+              ),
+            ),
+          ),
+        );
+        expect(splitShortLandscape, isFalse);
       },
     );
 

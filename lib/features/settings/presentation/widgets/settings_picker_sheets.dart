@@ -445,8 +445,10 @@ void showWhatsNewSheet(BuildContext context) {
 
   PulsrSheetHelper.showPulsrSheet(
     context: context,
+    // The sheet renders its own Close button below the highlights.
+    showDialogCloseButton: false,
     builder: (ctx) => SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
           mainAxisSize: MainAxisSize.min,

@@ -15,13 +15,14 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../core/utils/pulsr_haptics.dart';
+
 class SleepTimerSheet extends StatelessWidget {
   const SleepTimerSheet({super.key});
 
   static Future<void> show(BuildContext context) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      wrapWithContainer: false,
+      wrapWithContainer: true,
       builder: (_) => const SleepTimerSheet(),
     );
   }

@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_spacing.dart';
 import '../theme/aura_theme.dart';
-import '../utils/adaptive.dart';
 import '../widgets/pulsr_back_button.dart';
 import '../widgets/pulsr_page_pop_scope.dart';
 import 'breakpoints.dart';
@@ -55,9 +54,10 @@ class DetailScaffold extends StatelessWidget {
         'DetailScaffold requires either body or sliverBody');
     final p = context.palette;
     final isLandscape = PulsrBreakpoint.isLandscape(context);
-    final isTablet = Adaptive.isTablet(context);
-    final shouldSplit = landscapeSplit &&
-        (isLandscape || (isTablet && context.screenWidth >= 800));
+    // Portrait tablets keep the single-column hero -> tracklist flow; a
+    // horizontal split at 800dp portrait crushes both panes. Matches the
+    // `isTwoPane` contract used by the rest of the app.
+    final shouldSplit = landscapeSplit && isLandscape;
 
     final effectiveLeading = leading ?? const PulsrBackButton();
     final effectiveTitle =

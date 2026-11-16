@@ -56,8 +56,10 @@ void main() {
         ),
       ),
     );
-    when(() => settings.state)
-        .thenReturn(const SettingsState(waveformSeekBarEnabled: true));
+    when(() => settings.state).thenReturn(const SettingsState(
+      waveformSeekBarEnabled: true,
+      playerSliderStyle: PlayerSliderStyle.normal,
+    ));
   });
 
   tearDown(() {

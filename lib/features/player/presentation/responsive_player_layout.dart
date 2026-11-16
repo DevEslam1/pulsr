@@ -8,8 +8,8 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/motion/pulsr_motion.dart';
+import '../../../core/responsive/pulsr_layout_metrics.dart';
 import '../../../core/theme/aura_theme.dart';
-import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_switch.dart';
@@ -32,6 +32,7 @@ import 'widgets/quran_mushaf_view.dart';
 import 'widgets/player_more_sheet.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 /// Responsive layout coordinator for the Now Playing screen.
 ///
 /// Automatically adapts between:
@@ -160,7 +161,6 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    final width = mediaQuery.size.width;
     final hinge = _findHorizontalHinge(context);
     final p = context.palette;
 
@@ -183,16 +183,10 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
       );
     }
 
-    // 2. Tablet / Desktop Split-View (Apple Music Tablet Landscape)
-    final isLandscapeOrientation =
-        width > mediaQuery.size.height || Adaptive.isLandscape(context);
-    final isTabletLandscape =
-        ((width >= 720 && mediaQuery.size.height >= 460) ||
-                (Adaptive.isTablet(context) &&
-                    width >= 600 &&
-                    mediaQuery.size.height >= 400)) &&
-            isLandscapeOrientation;
-    if (isTabletLandscape) {
+    // 2. Tablet / Desktop Split-View (Apple Music iPad style). The canonical
+    // policy is shared with the rest of the app: no split on short landscape
+    // phones and no split when the available pane is portrait/square.
+    if (PulsrLayoutMetrics.isPlayerSplitMode(context)) {
       _wasSplitView = true;
       final isQuran = widget.state.isQuranModeEnabled ||
           (widget.state.currentSong?.genre?.toLowerCase().contains('quran') ==
@@ -496,7 +490,8 @@ class _FoldableTabletopLayout extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: activeColor.withValues(alpha: p.isDark ? 0.14 : 0.08),
+                    color:
+                        activeColor.withValues(alpha: p.isDark ? 0.14 : 0.08),
                     blurRadius: 24,
                     spreadRadius: -4,
                   ),
@@ -548,8 +543,8 @@ class _FoldableTabletopLayout extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black
-                        .withValues(alpha: p.isDark ? 0.38 : 0.08),
+                    color:
+                        Colors.black.withValues(alpha: p.isDark ? 0.38 : 0.08),
                     blurRadius: 20,
                     offset: const Offset(0, 6),
                   ),
@@ -710,9 +705,7 @@ class _DeckQuickActionButton extends StatelessWidget {
               ? activeColor.withValues(alpha: 0.22)
               : AppColors.specularAt(0.06),
           border: Border.all(
-            color: isActive
-                ? activeColor.withValues(alpha: 0.55)
-                : p.hairline,
+            color: isActive ? activeColor.withValues(alpha: 0.55) : p.hairline,
             width: 1.0,
           ),
         ),
@@ -822,7 +815,8 @@ class _QuickDspControls extends StatelessWidget {
           _DspModuleBentoCard(
             icon: Icons.menu_book_rounded,
             title: l10n.quranMode,
-            subtitle: '${state.quranReciterStyle.name.toUpperCase()} • ${l10n.dspQuranModeOn}',
+            subtitle:
+                '${state.quranReciterStyle.name.toUpperCase()} • ${l10n.dspQuranModeOn}',
             value: true,
             activeColor: AppColors.quranEmerald,
             onChanged: (v) {
@@ -913,9 +907,7 @@ class _SignalChainVisualizerStrip extends StatelessWidget {
         color: AppColors.specularAt(p.isDark ? 0.04 : 0.03),
         borderRadius: AppRadii.r16All,
         border: Border.all(
-          color: anyActive
-              ? activeColor.withValues(alpha: 0.28)
-              : p.hairline,
+          color: anyActive ? activeColor.withValues(alpha: 0.28) : p.hairline,
           width: 1.0,
         ),
       ),
@@ -1038,9 +1030,7 @@ class _SignalConnectorLine extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(2),
-          color: isActive
-              ? activeColor.withValues(alpha: 0.65)
-              : p.hairline,
+          color: isActive ? activeColor.withValues(alpha: 0.65) : p.hairline,
         ),
       ),
     );

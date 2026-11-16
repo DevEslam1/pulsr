@@ -123,8 +123,12 @@ class PulsrViewport {
     };
   }
 
-  /// Maximum content width constraint preventing sprawling lines on wide screens.
-  double get contentMaxWidth => sizeClass.contentMaxWidth;
+  /// Maximum content width constraint preventing sprawling lines on wide
+  /// screens. Short landscape phones keep the full width: horizontal room is
+  /// scarce, vertical scrolling is limited, and a centered rail would fight
+  /// camera cutouts and the wide bottom dock.
+  double get contentMaxWidth =>
+      isShortHeight ? width : sizeClass.contentMaxWidth;
 
   /// BoxConstraints applying [contentMaxWidth].
   BoxConstraints get contentConstraints =>

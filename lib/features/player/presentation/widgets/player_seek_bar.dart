@@ -168,6 +168,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
         context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
     final waveformEnabled = context
         .select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
+    final sliderStyle = context.select<SettingsCubit, PlayerSliderStyle>(
+      (c) => c.state.playerSliderStyle,
+    );
     final isBuffering =
         context.select<PlayerCubit, bool>((c) => c.state.isBuffering);
 
@@ -199,8 +202,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     }
 
     final Widget seekWidget;
-    // Check if Waveform Seek Bar is enabled in settings and song ID is available.
-    final showWaveform = waveformEnabled && effectiveSongId != null;
+    // An explicit capsule/wavy/minimal style wins over the waveform toggle;
+    // enabling the waveform through the settings action already normalizes the
+    // style back to [PlayerSliderStyle.normal].
+    final showWaveform = waveformEnabled &&
+        sliderStyle == PlayerSliderStyle.normal &&
+        effectiveSongId != null;
     if (showWaveform) {
       final instantSamples = WaveformService.instance.getInstantWaveform(
         songId: effectiveSongId,

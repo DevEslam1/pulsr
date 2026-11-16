@@ -9,22 +9,25 @@ import '../constants/app_spacing.dart';
 import '../constants/app_typography.dart';
 import '../motion/pulsr_motion.dart';
 import '../performance/gpu_budget.dart';
-import '../responsive/breakpoints.dart';
+import '../responsive/pulsr_layout_metrics.dart';
 import '../responsive/pulsr_responsive_tokens.dart';
 import '../theme/aura_theme.dart';
+import '../utils/adaptive.dart';
 import '../utils/l10n_extensions.dart';
 import 'pulsr_bottom_sheet.dart';
 import 'pulsr_dialog.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// Viewport-aware adaptive modal container and launcher.
 ///
 /// Automatically switches between:
-/// - Compact bottom sheet on phone portrait (85% max height)
-/// - Floating centered dialog on landscape phones (compact height < 500dp)
-/// - Contained bottom sheet on tablet portrait (max width 600dp, 72% max height)
-/// - Centered floating dialog on tablet landscape and large screens (max width 580dp)
+/// - Compact bottom sheet on phone portrait (88% max height)
+/// - Floating centered dialog on short landscape phones
+/// - Contained bottom sheet on medium tablet portrait
+/// - Centered floating dialog on expanded/large windows (>=840dp) and desktop,
+///   with the shared [PulsrSheetMetrics] width for each tier
 class PulsrAdaptiveSheet extends StatelessWidget {
   final Widget child;
   final Widget? leading;
@@ -34,6 +37,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
   final Widget? trailing;
   final bool showDragHandle;
   final bool isDialog;
+  final bool showDialogCloseButton;
   final double? maxWidth;
   final double? maxHeight;
 
@@ -47,6 +51,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
     this.trailing,
     this.showDragHandle = true,
     this.isDialog = false,
+    this.showDialogCloseButton = true,
     this.maxWidth,
     this.maxHeight,
   });
@@ -63,14 +68,12 @@ class PulsrAdaptiveSheet extends StatelessWidget {
     bool isDismissible = true,
     bool enableDrag = true,
     bool useRootNavigator = true,
+    bool showDialogCloseButton = true,
     double? maxWidth,
     double? maxHeight,
   }) {
     final vp = PulsrViewport.of(context);
-    final isDialogMode = vp.isShortHeight ||
-        vp.isLandscape ||
-        vp.sizeClass >= PulsrBreakpoint.expanded ||
-        vp.deviceClass == PulsrDeviceClass.desktop;
+    final isDialogMode = PulsrSheetMetrics.shouldPresentAsDialog(context);
 
     if (!isDialogMode) {
       // Bottom sheet on phone portrait and tablet portrait
@@ -87,17 +90,17 @@ class PulsrAdaptiveSheet extends StatelessWidget {
           titleText: titleText,
           subtitle: subtitle,
           trailing: trailing,
-          maxWidth: maxWidth ?? (vp.isTablet ? 600.0 : double.infinity),
-          maxHeight: maxHeight ?? (vp.height * (vp.isTablet ? 0.72 : 0.85)),
+          showDialogCloseButton: showDialogCloseButton,
+          maxWidth: maxWidth ?? PulsrSheetMetrics.sheetMaxWidth(context),
+          maxHeight: maxHeight ?? Adaptive.sheetMaxHeight(context),
           child: builder(ctx),
         ),
       );
     } else {
       // Centered dialog mode on landscape phones, tablet landscape, and desktop
-      final dialogWidth = maxWidth ??
-          (vp.isShortHeight ? 500.0 : (vp.isTablet ? 580.0 : 420.0));
+      final dialogWidth = maxWidth ?? PulsrSheetMetrics.dialogMaxWidth(context);
       final dialogHeight =
-          maxHeight ?? (vp.height * (vp.isShortHeight ? 0.88 : 0.75));
+          maxHeight ?? PulsrSheetMetrics.dialogMaxHeight(context);
 
       return PulsrDialogHelper.showCustomDialog<T>(
         context,
@@ -115,32 +118,38 @@ class PulsrAdaptiveSheet extends StatelessWidget {
           );
           final effectiveMaxH = math.min(dialogHeight, availableH);
 
-          return Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: dialogWidth,
-                maxHeight: effectiveMaxH,
-              ),
-              child: Dialog(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                insetPadding: EdgeInsets.symmetric(
-                  horizontal: vp.pagePadding,
-                  vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.md,
+          return AnimatedPadding(
+            duration: ctx.motion(PulsrMotion.state),
+            curve: ctx.motionCurve(PulsrMotion.enter),
+            padding: EdgeInsets.only(bottom: keyboardInset),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: dialogWidth,
+                  maxHeight: effectiveMaxH,
                 ),
-                child: ClipRRect(
-                  borderRadius: AppRadii.dialogRadius,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: PulsrAdaptiveSheet(
-                      isDialog: true,
-                      leading: leading,
-                      title: title,
-                      titleText: titleText,
-                      subtitle: subtitle,
-                      trailing: trailing,
-                      showDragHandle: false,
-                      child: builder(ctx),
+                child: Dialog(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  insetPadding: EdgeInsets.symmetric(
+                    horizontal: vp.pagePadding,
+                    vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.md,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: AppRadii.dialogRadius,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: PulsrAdaptiveSheet(
+                        isDialog: true,
+                        leading: leading,
+                        title: title,
+                        titleText: titleText,
+                        subtitle: subtitle,
+                        trailing: trailing,
+                        showDragHandle: false,
+                        showDialogCloseButton: showDialogCloseButton,
+                        child: builder(ctx),
+                      ),
                     ),
                   ),
                 ),
@@ -156,7 +165,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
     BuildContext context,
     PulsrPalette p,
     PulsrViewport vp,
-    Widget headerTitle, {
+    Widget? headerTitle, {
     required bool effectiveIsDialog,
   }) {
     return Column(
@@ -166,7 +175,9 @@ class PulsrAdaptiveSheet extends StatelessWidget {
         Padding(
           padding: EdgeInsets.symmetric(
             horizontal: vp.isShortHeight ? AppSpacing.sm : AppSpacing.s20,
-            vertical: vp.isShortHeight ? AppSpacing.xs : AppSpacing.sm,
+            vertical: headerTitle == null
+                ? 0
+                : (vp.isShortHeight ? AppSpacing.xs : AppSpacing.sm),
           ),
           child: Row(
             children: [
@@ -175,32 +186,34 @@ class PulsrAdaptiveSheet extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
               ],
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DefaultTextStyle.merge(
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: AppTracking.title,
+                child: headerTitle == null
+                    ? const SizedBox.shrink()
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DefaultTextStyle.merge(
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.title,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: AppTracking.title,
+                            ),
+                            child: headerTitle,
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: AppSpacing.s2),
+                            DefaultTextStyle.merge(
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              child: subtitle!,
+                            ),
+                          ],
+                        ],
                       ),
-                      child: headerTitle,
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: AppSpacing.s2),
-                      DefaultTextStyle.merge(
-                        style: TextStyle(
-                          color: p.textSecondary,
-                          fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        child: subtitle!,
-                      ),
-                    ],
-                  ],
-                ),
               ),
               if (trailing != null) trailing!,
               if (effectiveIsDialog && trailing == null)
@@ -223,7 +236,7 @@ class PulsrAdaptiveSheet extends StatelessWidget {
             ],
           ),
         ),
-        Divider(color: p.hairline, height: 1),
+        if (headerTitle != null) Divider(color: p.hairline, height: 1),
       ],
     );
   }
@@ -320,7 +333,8 @@ class PulsrAdaptiveSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.s8),
               ],
-              if (headerTitle != null)
+              if (headerTitle != null ||
+                  (isDialog && showDialogCloseButton && trailing == null))
                 _buildHeader(
                   context,
                   p,

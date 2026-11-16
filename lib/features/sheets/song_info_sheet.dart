@@ -46,7 +46,7 @@ class SongInfoSheet extends StatefulWidget {
       {required SongsTableData song}) {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      wrapWithContainer: false,
+      wrapWithContainer: true,
       builder: (_) => SongInfoSheet(song: song),
     );
   }
@@ -1212,8 +1212,9 @@ class _AudioOverridesSectionState extends State<_AudioOverridesSection> {
                               maxLines: 1,
                               textAlign: TextAlign.end,
                               style: TextStyle(
-                                color:
-                                    currentEq != null ? p.accent : p.textPrimary,
+                                color: currentEq != null
+                                    ? p.accent
+                                    : p.textPrimary,
                                 fontSize: AppFontSize.label,
                                 fontWeight: FontWeight.w600,
                               ),

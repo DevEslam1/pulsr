@@ -9,6 +9,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import '../constants/app_radii.dart';
 import '../motion/pulsr_motion.dart';
 import '../performance/gpu_budget.dart';
+import '../responsive/pulsr_layout_metrics.dart';
 import '../theme/aura_theme.dart';
 import '../utils/adaptive.dart';
 import '../utils/l10n_extensions.dart';
@@ -16,6 +17,7 @@ import 'pulsr_dialog.dart';
 import 'pulsr_modal_tracker.dart';
 
 import '../utils/pulsr_haptics.dart';
+
 /// {@category DesignSystem}
 /// Shared scope marker so nested sheet containers ([PulsrBottomSheetContainer]
 /// and `PulsrAdaptiveSheet`) never render duplicate outer chrome, borders, or
@@ -46,7 +48,10 @@ class PulsrSheetScope extends InheritedWidget {
 /// - Responsive width clamping on tablet & desktop (`maxWidth: 620`)
 /// - 120fps-optimized surface elevation and hairline border
 /// - Edge-to-edge safe area handling
-/// - Automatically adapts to centered dialog when in landscape on short phone screens
+/// - Centered dialog on expanded tablet windows (>=840dp), desktops and short
+///   landscape viewports, using the same policy as [PulsrAdaptiveSheet]
+/// - Full-bleed builders (`wrapWithContainer: false`) keep their own surface
+///   and stay bottom sheets at every size
 class PulsrSheetHelper {
   /// Opens a unified modal bottom sheet with automatic mini player dock tracking.
   static Future<T?> showPulsrSheet<T>({
@@ -59,58 +64,83 @@ class PulsrSheetHelper {
     Color? barrierColor,
     bool showDragHandle = true,
     bool wrapWithContainer = true,
+    bool showDialogCloseButton = true,
   }) {
-    final size = MediaQuery.sizeOf(context);
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
-
-    // Landscape phone: present as centered dialog to avoid bottom sheet clipping/distortion
-    if (isLandscape && size.height < 480) {
-      final maxW = math.min(size.width * 0.94, 760.0);
-      final maxH = math.min(size.height * 0.94, size.height - 16.0);
+    // Only builder-owned chrome is promoted to a centered dialog. A builder
+    // that set `wrapWithContainer: false` owns its full sheet surface, drag
+    // handle and safe area, so re-wrapping it as a dialog would double the
+    // chrome; those stay bottom sheets on every size.
+    if (wrapWithContainer && PulsrSheetMetrics.shouldPresentAsDialog(context)) {
+      final effectiveBarrier = barrierColor ??
+          AppColors.scrimAt(context.palette.isDark ? 0.62 : 0.40);
       return PulsrDialogHelper.showCustomDialog<T>(
         context,
         useRootNavigator: useRootNavigator,
         barrierDismissible: isDismissible,
+        barrierColor: effectiveBarrier,
         builder: (ctx) {
           final built = builder(ctx);
-          final inner =
-              (!wrapWithContainer || built is PulsrBottomSheetContainer)
-                  ? (built is PulsrBottomSheetContainer && !built.isDialog
-                      ? PulsrBottomSheetContainer(
-                          isDialog: true,
-                          showDragHandle: false,
-                          leading: built.leading,
-                          title: built.title,
-                          titleText: built.titleText,
-                          subtitle: built.subtitle,
-                          trailing: built.trailing,
-                          child: built.child,
-                        )
-                      : built)
-                  : PulsrBottomSheetContainer(
-                      isDialog: true,
-                      showDragHandle: false,
-                      child: built,
-                    );
-          return Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: maxW,
-                maxHeight: maxH,
-              ),
-              child: Dialog(
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                insetPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs,
+          final media = MediaQuery.of(ctx);
+          final keyboardInset = media.viewInsets.bottom;
+          final availableHeight = math.max(
+            AppSpacing.s56,
+            media.size.height -
+                keyboardInset -
+                media.padding.vertical -
+                AppSpacing.xs,
+          );
+          final effectiveMaxHeight = math.min(
+            PulsrSheetMetrics.dialogMaxHeight(ctx),
+            availableHeight,
+          );
+          final Widget inner;
+          if (built is PulsrBottomSheetContainer) {
+            inner = built.isDialog
+                ? built
+                : PulsrBottomSheetContainer(
+                    isDialog: true,
+                    showDragHandle: false,
+                    showDialogCloseButton:
+                        showDialogCloseButton && built.showDialogCloseButton,
+                    leading: built.leading,
+                    title: built.title,
+                    titleText: built.titleText,
+                    subtitle: built.subtitle,
+                    trailing: built.trailing,
+                    child: built.child,
+                  );
+          } else {
+            inner = PulsrBottomSheetContainer(
+              isDialog: true,
+              showDragHandle: false,
+              showDialogCloseButton: showDialogCloseButton,
+              child: built,
+            );
+          }
+          return AnimatedPadding(
+            duration: ctx.motion(PulsrMotion.state),
+            curve: ctx.motionCurve(PulsrMotion.enter),
+            padding: EdgeInsets.only(bottom: keyboardInset),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: PulsrSheetMetrics.dialogMaxWidth(ctx),
+                  maxHeight: effectiveMaxHeight,
                 ),
-                child: ClipRRect(
-                  borderRadius: AppRadii.dialogRadius,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: inner,
+                child: Dialog(
+                  backgroundColor: Colors.transparent,
+                  surfaceTintColor: Colors.transparent,
+                  elevation: 0,
+                  insetPadding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: AppRadii.dialogRadius,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: inner,
+                    ),
                   ),
                 ),
               ),
@@ -139,12 +169,33 @@ class PulsrSheetHelper {
       barrierColor: barrierColor ?? AppColors.scrimAt(p.isDark ? 0.62 : 0.40),
       builder: (ctx) {
         final built = builder(ctx);
-        if (!wrapWithContainer || built is PulsrBottomSheetContainer) {
-          return built;
+        final sheetWidget =
+            (!wrapWithContainer || built is PulsrBottomSheetContainer)
+                ? built
+                : PulsrBottomSheetContainer(
+                    showDragHandle: showDragHandle,
+                    child: built,
+                  );
+        if (!isDismissible) {
+          return sheetWidget;
         }
-        return PulsrBottomSheetContainer(
-          showDragHandle: showDragHandle,
-          child: built,
+        return Stack(
+          children: [
+            Positioned.fill(
+              child: Semantics(
+                label: MaterialLocalizations.of(ctx).modalBarrierDismissLabel,
+                button: true,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    PulsrHaptics.lightImpact();
+                    Navigator.of(ctx).maybePop();
+                  },
+                ),
+              ),
+            ),
+            sheetWidget,
+          ],
         );
       },
     );
@@ -166,6 +217,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
   final String? titleText;
   final Widget? subtitle;
   final Widget? trailing;
+  final bool showDialogCloseButton;
 
   const PulsrBottomSheetContainer({
     super.key,
@@ -177,12 +229,13 @@ class PulsrBottomSheetContainer extends StatelessWidget {
     this.titleText,
     this.subtitle,
     this.trailing,
+    this.showDialogCloseButton = true,
   });
 
   Widget _buildHeader(
     BuildContext context,
     PulsrPalette p,
-    Widget headerTitle, {
+    Widget? headerTitle, {
     required bool effectiveIsDialog,
   }) {
     return Column(
@@ -192,9 +245,11 @@ class PulsrBottomSheetContainer extends StatelessWidget {
         Padding(
           padding: EdgeInsets.symmetric(
             horizontal: AppSpacing.s20,
-            vertical: showDragHandle && !effectiveIsDialog
-                ? AppSpacing.s8
-                : AppSpacing.sm,
+            vertical: headerTitle == null
+                ? 0
+                : (showDragHandle && !effectiveIsDialog
+                    ? AppSpacing.s8
+                    : AppSpacing.sm),
           ),
           child: Row(
             children: [
@@ -203,32 +258,34 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
               ],
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DefaultTextStyle.merge(
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: AppTracking.title,
+                child: headerTitle == null
+                    ? const SizedBox.shrink()
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DefaultTextStyle.merge(
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.title,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: AppTracking.title,
+                            ),
+                            child: headerTitle,
+                          ),
+                          if (subtitle != null) ...[
+                            const SizedBox(height: AppSpacing.s2),
+                            DefaultTextStyle.merge(
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              child: subtitle!,
+                            ),
+                          ],
+                        ],
                       ),
-                      child: headerTitle,
-                    ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: AppSpacing.s2),
-                      DefaultTextStyle.merge(
-                        style: TextStyle(
-                          color: p.textSecondary,
-                          fontSize: AppFontSize.label,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        child: subtitle!,
-                      ),
-                    ],
-                  ],
-                ),
               ),
               if (trailing != null) trailing!,
               if (effectiveIsDialog && trailing == null)
@@ -251,7 +308,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
             ],
           ),
         ),
-        Divider(color: p.hairline, height: 1),
+        if (headerTitle != null) Divider(color: p.hairline, height: 1),
       ],
     );
   }
@@ -260,7 +317,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isTablet = context.isTablet;
-    final maxSheetWidth = isTablet ? 620.0 : double.infinity;
+    final maxSheetWidth = PulsrSheetMetrics.sheetMaxWidth(context);
     final headerTitle = title ?? (titleText != null ? Text(titleText!) : null);
 
     final parentScope = PulsrSheetScope.maybeOf(context);
@@ -389,10 +446,9 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                                   width: AppSpacing.s40,
                                   height: 4.5,
                                   decoration: BoxDecoration(
-                                    color: (p.isDark
-                                            ? Colors.white
-                                            : Colors.black)
-                                        .withValues(alpha: 0.24),
+                                    color:
+                                        (p.isDark ? Colors.white : Colors.black)
+                                            .withValues(alpha: 0.24),
                                     borderRadius: AppRadii.full,
                                   ),
                                 ),
@@ -400,7 +456,10 @@ class PulsrBottomSheetContainer extends StatelessWidget {
                             ),
                             const SizedBox(height: AppSpacing.s8),
                           ],
-                          if (headerTitle != null)
+                          if (headerTitle != null ||
+                              (isDialog &&
+                                  showDialogCloseButton &&
+                                  trailing == null))
                             FocusTraversalOrder(
                               order: const NumericFocusOrder(1.0),
                               child: _buildHeader(

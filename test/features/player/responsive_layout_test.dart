@@ -7,10 +7,18 @@ import 'package:pulsr/core/utils/adaptive.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/responsive_player_layout.dart';
+import 'package:pulsr/features/player/presentation/themes/player_theme.dart';
 import 'package:pulsr/features/player/presentation/themes/player_theme_scaffold.dart';
+import 'package:pulsr/features/player/presentation/themes/theme_registry.dart';
+import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
+import '../../helpers/test_song_factory.dart';
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
+class MockSettingsCubit extends Mock implements SettingsCubit {}
 
 void main() {
   group('Adaptive responsive metrics across screen sizes', () {
@@ -176,6 +184,80 @@ void main() {
 
       verify(() => cubit.resetOverlayViews()).called(1);
       expect(find.text('THEME'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('short landscape phones stay single-pane without overflowing',
+        (tester) async {
+      await tester.pumpWidget(host(const Size(844, 390)));
+      await tester.pumpAndSettle();
+
+      expect(find.text('THEME'), findsOneWidget);
+      // No floating split dock: the short landscape keeps the single column.
+      expect(find.byIcon(Icons.tune_rounded), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('short landscape single-pane fits a real player theme',
+        (tester) async {
+      final state = PlayerState(
+        playback: PlaybackSlice(
+          currentSong: createTestSong(path: ''),
+          isPlaying: false,
+          position: const Duration(seconds: 30),
+          duration: const Duration(minutes: 3),
+        ),
+      );
+      final themeCubit = MockPlayerCubit();
+      when(() => themeCubit.state).thenReturn(state);
+      when(() => themeCubit.stream)
+          .thenAnswer((_) => const Stream<PlayerState>.empty());
+      when(() => themeCubit.resetOverlayViews()).thenAnswer((_) {});
+      final settings = MockSettingsCubit();
+      when(() => settings.state).thenReturn(const SettingsState());
+      when(() => settings.stream)
+          .thenAnswer((_) => const Stream<SettingsState>.empty());
+
+      await tester.pumpWidget(
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<PlayerCubit>.value(value: themeCubit),
+            BlocProvider<SettingsCubit>.value(value: settings),
+          ],
+          child: MaterialApp(
+            theme: AuraTheme.darkTheme,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: MediaQuery(
+              data: const MediaQueryData(size: Size(844, 390)),
+              child: Scaffold(
+                body: SizedBox(
+                  width: 844,
+                  height: 390,
+                  child: ResponsivePlayerLayout(
+                    state: state,
+                    cubit: themeCubit,
+                    themeWidget: ThemeRegistry.build(
+                      PlayerThemeMode.classic,
+                      PlayerThemeProps(
+                        state: state,
+                        cubit: themeCubit,
+                        activeColor: Colors.deepPurple,
+                        bgColor: Colors.black,
+                      ),
+                    ),
+                    activeColor: Colors.deepPurple,
+                    bgColor: Colors.black,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Test Song'), findsWidgets);
       expect(tester.takeException(), isNull);
     });
   });

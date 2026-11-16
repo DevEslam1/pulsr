@@ -8,10 +8,6 @@ enum WindowClass { compact, medium, expanded }
 
 /// Adaptive layout engine: phone → bottom nav, tablet → side rail + grids.
 abstract class Adaptive {
-  static const double compactBreakpoint = 600;
-  static const double tabletBreakpoint = 600;
-  static const double railExtendedBreakpoint = 1000;
-  static const double maxContentWidth = 1160;
   static const double maxSheetWidth = 620;
 
   /// Standard baseline reference screen dimensions used for responsive calculations.
@@ -86,7 +82,8 @@ abstract class Adaptive {
   static bool isTwoPane(BuildContext context) {
     final w = widthOf(context);
     final h = heightOf(context);
-    return isLandscape(context) || (w >= tabletBreakpoint && w > h);
+    return isLandscape(context) ||
+        (w >= PulsrBreakpoint.medium.minWidth && w > h);
   }
 
   /// Returns the display feature corresponding to a foldable hinge / fold if present (D13).
@@ -115,7 +112,10 @@ abstract class Adaptive {
     final w = widthOf(context);
     if (w >= 1200) return 3;
     // In phone landscape, only use 2 columns if width >= 720 (sufficient room alongside sidebar)
-    if (w >= tabletBreakpoint || (isLandscape(context) && w >= 720)) return 2;
+    if (w >= PulsrBreakpoint.medium.minWidth ||
+        (isLandscape(context) && w >= 720)) {
+      return 2;
+    }
     return 1;
   }
 
@@ -129,9 +129,11 @@ abstract class Adaptive {
     final w = widthOf(context);
     final isTab = isTablet(context);
     final railWidth =
-        isTab ? (w >= railExtendedBreakpoint ? 232.0 : 92.0) : 0.0;
-    final available = (w - railWidth).clamp(0.0, maxContentWidth);
-    final usable = available - pagePadding(context) * 2;
+        isTab ? (w >= PulsrBreakpoint.expanded.minWidth ? 232.0 : 92.0) : 0.0;
+    final available = math.max(0.0, w - railWidth);
+    final usable =
+        math.min(available, PulsrViewport.of(context).contentMaxWidth) -
+            pagePadding(context) * 2;
     final calculated = (usable / minItemWidth).floor();
     final requested = calculated.clamp(phoneColumns, maxColumns);
     // Respect the caller's minimum card width on very narrow phones instead of
@@ -145,14 +147,20 @@ abstract class Adaptive {
   static double pagePadding(BuildContext context) =>
       PulsrViewport.of(context).pagePadding;
 
-  /// Center-rail constraint for readable ultra-wide layouts.
+  /// Center-rail constraint for readable ultra-wide layouts. Delegates to the
+  /// canonical per-breakpoint width so every screen shares one content rail.
   static BoxConstraints contentConstraints(BuildContext context) =>
-      const BoxConstraints(maxWidth: maxContentWidth);
+      BoxConstraints(
+        maxWidth: PulsrViewport.of(context).contentMaxWidth,
+      );
 
-  /// Canonical maximum height for bottom sheets to avoid status-bar collisions across all devices.
+  /// Canonical maximum height for bottom sheets to avoid status-bar collisions
+  /// across all devices. Tablet sheets stay shorter so the underlying context
+  /// remains visible; phones use the taller phone rhythm.
   static double sheetMaxHeight(BuildContext context) {
     final h = heightOf(context);
     final isLand = isLandscape(context);
+    if (isTablet(context) && !isLand) return h * 0.72;
     return h * (isLand ? 0.94 : 0.88);
   }
 

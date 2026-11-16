@@ -9,6 +9,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -179,24 +180,28 @@ void main() {
     final settingsCubit = lib_h.stubSettingsCubit();
     final playerCubit = scr_h.stubPlayerCubit();
 
-    await tester.pumpWidget(
-      scr_h.screenHarness(
-        locale: arLocale,
-        size: phoneSize,
-        providers: [
-          BlocProvider<LibraryCubit>.value(value: libraryCubit),
-          BlocProvider<SettingsCubit>.value(value: settingsCubit),
-          BlocProvider<PlayerCubit>.value(value: playerCubit),
-        ],
-        child: HomeScreen(
-          ytmService: ytm,
-          ytmAccountService: account,
-          getSongsUseCase: getSongs,
+    // The header renders today's date and a time-based greeting; freeze the
+    // clock so the golden cannot drift with the run date.
+    await withClock(Clock.fixed(DateTime(2026, 1, 15, 10)), () async {
+      await tester.pumpWidget(
+        scr_h.screenHarness(
+          locale: arLocale,
+          size: phoneSize,
+          providers: [
+            BlocProvider<LibraryCubit>.value(value: libraryCubit),
+            BlocProvider<SettingsCubit>.value(value: settingsCubit),
+            BlocProvider<PlayerCubit>.value(value: playerCubit),
+          ],
+          child: HomeScreen(
+            ytmService: ytm,
+            ytmAccountService: account,
+            getSongsUseCase: getSongs,
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await _verifyRtlAndOptionalGolden(tester, 'rtl_home_screen');
+      );
+      await tester.pumpAndSettle();
+      await _verifyRtlAndOptionalGolden(tester, 'rtl_home_screen');
+    });
   });
 
   // 2. LibraryScreen

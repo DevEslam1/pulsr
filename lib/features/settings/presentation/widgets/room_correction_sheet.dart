@@ -76,6 +76,8 @@ class RoomCorrectionSheet extends StatefulWidget {
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
       wrapWithContainer: false,
+      // The wizard renders its own close button in the header.
+      showDialogCloseButton: false,
       builder: (_) => const RoomCorrectionSheet(),
     );
   }
@@ -603,7 +605,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       children: [
         Text(
           label,
-          style: TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
+          style:
+              TextStyle(color: p.textTertiary, fontSize: AppFontSize.caption),
         ),
         Text(
           value,
@@ -922,7 +925,8 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                             ),
                             const SizedBox(height: AppSpacing.xs),
                             Text(
-                              l10n.rcMoveDeviceTo(_pointNames(l10n)[_currentPoint]),
+                              l10n.rcMoveDeviceTo(
+                                  _pointNames(l10n)[_currentPoint]),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: p.textSecondary,

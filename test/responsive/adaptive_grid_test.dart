@@ -9,6 +9,7 @@ void main() {
       int? compactCols;
       int? mediumCols;
       int? expandedCols;
+      int? smallLandscapeCols;
       int? largeCols;
 
       await tester.pumpWidget(
@@ -51,6 +52,20 @@ void main() {
         ),
       );
 
+      // Small landscape tablet: the expanded side rail eats 240dp.
+      await tester.pumpWidget(
+        MediaQuery(
+          data: const MediaQueryData(size: Size(840, 600)),
+          child: Builder(
+            builder: (context) {
+              smallLandscapeCols =
+                  PulsrAdaptiveGrid.columns(context, type: GridType.albums);
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
       // Large desktop (1440 x 900)
       await tester.pumpWidget(
         MediaQuery(
@@ -67,8 +82,11 @@ void main() {
 
       expect(compactCols, 2);
       expect(mediumCols, 3);
-      expect(expandedCols, 5); // 5 columns in landscape expanded
-      expect(largeCols, 8);
+      // Counts follow the capped content rail, so every card keeps the
+      // 160dp minimum instead of shrinking below it on wide screens.
+      expect(expandedCols, 4); // 860dp rail - padding => 4 x 160dp
+      expect(smallLandscapeCols, 3); // 600dp after the 240dp side rail
+      expect(largeCols, 5); // 1000dp rail - padding => 5 x 160dp
     });
 
     testWidgets(

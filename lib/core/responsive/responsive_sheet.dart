@@ -6,13 +6,12 @@ import '../theme/aura_theme.dart';
 import '../widgets/glass_container.dart';
 import '../widgets/pulsr_bottom_sheet.dart';
 import '../widgets/pulsr_dialog.dart';
-import 'breakpoints.dart';
 import 'pulsr_layout_metrics.dart';
-import 'responsive_values.dart';
 
 /// Adaptive modal presenter that displays:
-/// - Modal bottom sheet on [PulsrBreakpoint.compact] (portrait phone)
-/// - Centered floating dialog on [PulsrBreakpoint.medium], [PulsrBreakpoint.expanded], [PulsrBreakpoint.large], or phone landscape
+/// - Modal bottom sheet on phones and medium tablet portrait
+/// - Centered floating dialog on expanded/large windows (>=840dp), desktop and
+///   short landscape viewports
 class PulsrResponsiveSheet {
   /// Opens an adaptive sheet/dialog based on the current screen breakpoint.
   static Future<T?> show<T>({
@@ -26,9 +25,7 @@ class PulsrResponsiveSheet {
     double? maxWidth,
     double? maxHeight,
   }) {
-    final breakpoint = context.breakpoint;
-    final isDialogMode = !breakpoint.isCompact ||
-        PulsrLayoutMetrics.shouldUseDialogForSheet(context);
+    final isDialogMode = PulsrLayoutMetrics.shouldUseDialogForSheet(context);
 
     if (!isDialogMode) {
       // Bottom Sheet on compact portrait screens
@@ -49,19 +46,14 @@ class PulsrResponsiveSheet {
         context,
         barrierDismissible: isDismissible,
         builder: (ctx) {
-          final double effectiveMaxWidth = maxWidth ??
-              ctx.responsive.value(
-                compact: 400.0,
-                medium: 500.0,
-                expanded: 560.0,
-                large: 620.0,
-              );
+          final double effectiveMaxWidth =
+              maxWidth ?? PulsrSheetMetrics.dialogMaxWidth(ctx);
 
           return Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 maxWidth: effectiveMaxWidth,
-                maxHeight: maxHeight ?? MediaQuery.sizeOf(ctx).height * 0.85,
+                maxHeight: maxHeight ?? PulsrSheetMetrics.dialogMaxHeight(ctx),
               ),
               child: Dialog(
                 backgroundColor: Colors.transparent,

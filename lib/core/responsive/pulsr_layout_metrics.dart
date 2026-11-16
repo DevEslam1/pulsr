@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../utils/adaptive.dart';
 import '../widgets/pulsr_dock_tracker.dart';
 import 'breakpoints.dart';
+import 'pulsr_responsive_tokens.dart';
 
 /// Archetypes for canonical Pulsr screen layouts.
 enum PulsrLayoutArchetype {
@@ -19,12 +20,56 @@ enum PulsrLayoutArchetype {
   immersive,
 }
 
+/// Single source of truth for modal presentation and sizing.
+///
+/// Every sheet entry-point ([PulsrSheetHelper], [PulsrAdaptiveSheet],
+/// [PulsrResponsiveSheet]) reads these decisions so the same conceptual modal
+/// cannot open as a phone sheet in one screen and a tablet dialog in another.
+class PulsrSheetMetrics {
+  static const double shortLandscapeDialogWidth = 500.0;
+  static const double compactDialogWidth = 420.0;
+  static const double mediumDialogWidth = 520.0;
+  static const double expandedDialogWidth = 600.0;
+  static const double largeDialogWidth = 640.0;
+  static const double tabletSheetWidth = 620.0;
+
+  /// Centered dialog on expanded tablet windows (>=840dp), on desktops and on
+  /// short landscape viewports; bottom sheet on phones and medium tablet
+  /// portrait, matching the long-standing sheet entry-point behaviour.
+  static bool shouldPresentAsDialog(BuildContext context) {
+    final vp = PulsrViewport.of(context);
+    return vp.isShortHeight ||
+        vp.sizeClass >= PulsrBreakpoint.expanded ||
+        vp.deviceClass == PulsrDeviceClass.desktop;
+  }
+
+  static double dialogMaxWidth(BuildContext context) {
+    final vp = PulsrViewport.of(context);
+    if (vp.isShortHeight) return shortLandscapeDialogWidth;
+    return switch (vp.sizeClass) {
+      PulsrBreakpoint.compact => compactDialogWidth,
+      PulsrBreakpoint.medium => mediumDialogWidth,
+      PulsrBreakpoint.expanded => expandedDialogWidth,
+      PulsrBreakpoint.large => largeDialogWidth,
+    };
+  }
+
+  static double dialogMaxHeight(BuildContext context) {
+    final vp = PulsrViewport.of(context);
+    final fraction = vp.isShortHeight ? 0.88 : (vp.isTablet ? 0.75 : 0.85);
+    return vp.height * fraction;
+  }
+
+  static double sheetMaxWidth(BuildContext context) =>
+      PulsrViewport.of(context).isTablet ? tabletSheetWidth : double.infinity;
+}
+
 /// Unified source of truth for responsive layout metrics, spacing,
 /// constraints, hero scaling, field sizing, and dock dimensions.
 class PulsrLayoutMetrics {
   // ── Canonical Content Max-Widths (G1 single source of truth) ─────────────
   static double contentMaxWidth(BuildContext context) =>
-      PulsrBreakpoint.of(context).contentMaxWidth;
+      PulsrViewport.of(context).contentMaxWidth;
 
   static BoxConstraints contentConstraints(BuildContext context) =>
       BoxConstraints(maxWidth: contentMaxWidth(context));
@@ -73,8 +118,15 @@ class PulsrLayoutMetrics {
     BuildContext context, [
     BoxConstraints? constraints,
   ]) {
-    final width = constraints?.maxWidth ?? MediaQuery.sizeOf(context).width;
-    final height = constraints?.maxHeight ?? MediaQuery.sizeOf(context).height;
+    final size = MediaQuery.sizeOf(context);
+    final width = constraints?.maxWidth ?? size.width;
+    final height = constraints?.maxHeight ?? size.height;
+    // Short landscape phones keep the single-column player: the split panes
+    // cannot fit 2x text scale, and the shell already uses bottomNavWide there.
+    if (PulsrBreakpoint.isLandscape(context) &&
+        size.height < PulsrBreakpoint.shortHeightThreshold) {
+      return false;
+    }
     // Panes narrower than 620dp cannot comfortably accommodate a horizontal 2-pane split
     // (e.g. tablet player left pane or narrow window). They must remain a single column.
     if (width < 620) return false;
@@ -91,12 +143,8 @@ class PulsrLayoutMetrics {
   }
 
   // ── Sheet / Dialog Adaptive Decisions (Fixes G6, Phase 2.4) ────────────────
-  static bool shouldUseDialogForSheet(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final isLandscapePhone = PulsrBreakpoint.isLandscape(context) &&
-        size.height < PulsrBreakpoint.shortHeightThreshold;
-    return !context.isCompact || isLandscapePhone;
-  }
+  static bool shouldUseDialogForSheet(BuildContext context) =>
+      PulsrSheetMetrics.shouldPresentAsDialog(context);
 }
 
 /// Extension on BuildContext for quick access to PulsrLayoutMetrics.

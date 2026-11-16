@@ -167,7 +167,10 @@ void main() {
     Duration? seeked;
     await tester.pumpWidget(host(
       playerState: stateWith(currentId: 1, isBuffering: true),
-      settingsState: const SettingsState(waveformSeekBarEnabled: true),
+      settingsState: const SettingsState(
+        waveformSeekBarEnabled: true,
+        playerSliderStyle: PlayerSliderStyle.normal,
+      ),
       position: const Duration(seconds: 30),
       onSeek: (d) => seeked = d,
     ));
@@ -226,7 +229,10 @@ void main() {
       (tester) async {
     await tester.pumpWidget(host(
       playerState: stateWith(currentId: 1),
-      settingsState: const SettingsState(waveformSeekBarEnabled: true),
+      settingsState: const SettingsState(
+        waveformSeekBarEnabled: true,
+        playerSliderStyle: PlayerSliderStyle.normal,
+      ),
       position: const Duration(seconds: 30),
     ));
     await tester.pump();

@@ -55,11 +55,117 @@ void main() {
     expect(PulsrModalTracker.isModalOpen.value, isTrue);
 
     // Barrier tap dismisses the sheet and releases the tracker.
-    await tester.tapAt(const Offset(12, 12));
+    await tester.tapAt(const Offset(400, 50));
     await tester.pumpAndSettle();
 
     expect(find.text('Nested sheet'), findsNothing);
     expect(PulsrModalTracker.isModalOpen.value, isFalse);
+  });
+
+  testWidgets('phone portrait tap above sheet dismisses sheet', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    var buttonPressed = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AuraTheme.darkTheme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: ElevatedButton(
+                onPressed: () => PulsrSheetHelper.showPulsrSheet<void>(
+                  context: context,
+                  builder: (_) => Container(
+                    height: 250,
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        const Text('Sheet Header'),
+                        ElevatedButton(
+                          onPressed: () => buttonPressed = true,
+                          child: const Text('Action Button'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sheet Header'), findsOneWidget);
+
+    // 1. Tapping action button inside sheet triggers button and DOES NOT dismiss
+    await tester.tap(find.text('Action Button'));
+    await tester.pumpAndSettle();
+    expect(buttonPressed, isTrue);
+    expect(find.text('Sheet Header'), findsOneWidget);
+
+    // 2. Tapping sheet background inside sheet DOES NOT dismiss
+    final sheetCenter = tester.getCenter(find.text('Sheet Header'));
+    await tester.tapAt(sheetCenter + const Offset(0, 40));
+    await tester.pumpAndSettle();
+    expect(find.text('Sheet Header'), findsOneWidget);
+
+    // 3. Tapping the empty space above the sheet dismisses the sheet
+    await tester.tapAt(const Offset(200, 100));
+    await tester.pumpAndSettle();
+    expect(find.text('Sheet Header'), findsNothing);
+  });
+
+  testWidgets('isDismissible: false prevents tap-above dismissal', (tester) async {
+    tester.view.physicalSize = const Size(400, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AuraTheme.darkTheme,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: ElevatedButton(
+                onPressed: () => PulsrSheetHelper.showPulsrSheet<void>(
+                  context: context,
+                  isDismissible: false,
+                  builder: (_) => const SizedBox(
+                    height: 200,
+                    child: Text('Non-dismissible sheet'),
+                  ),
+                ),
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Non-dismissible sheet'), findsOneWidget);
+
+    // Tap on empty space above sheet: should NOT dismiss
+    await tester.tapAt(const Offset(200, 100));
+    await tester.pumpAndSettle();
+    expect(find.text('Non-dismissible sheet'), findsOneWidget);
   });
 
   testWidgets(

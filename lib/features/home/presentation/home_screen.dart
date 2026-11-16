@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'package:clock/clock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -257,7 +258,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
   }
 
   String _getGreeting(BuildContext context) {
-    final hour = DateTime.now().hour;
+    final hour = clock.now().hour;
     if (hour < 12) return context.l10n.goodMorning;
     if (hour < 17) return context.l10n.goodAfternoon;
     return context.l10n.goodEvening;
@@ -378,7 +379,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent> {
                                 children: [
                                   Text(
                                     MaterialLocalizations.of(context)
-                                        .formatMediumDate(DateTime.now())
+                                        .formatMediumDate(clock.now())
                                         .toUpperCase(),
                                     style: TextStyle(
                                       color: p.textTertiary,

@@ -236,7 +236,9 @@ void main() {
       );
 
       expect(phonePortraitSplit, isFalse);
-      expect(phoneLandscapeSplit, isTrue);
+      // Short landscape phones cannot fit two panes at large text scales;
+      // the shell already collapses to the wide bottom dock there.
+      expect(phoneLandscapeSplit, isFalse);
       expect(tabletPortraitSplit, isFalse);
       expect(tabletLandscapeSplit, isTrue);
     });
@@ -286,7 +288,10 @@ void main() {
 
       expect(phonePortraitSheet, isFalse); // Modal bottom sheet
       expect(phoneLandscapeSheet, isTrue); // Centered dialog
-      expect(tabletSheet, isTrue); // Centered dialog
+      // Medium tablet portrait (600-839dp) keeps the clamped bottom sheet;
+      // centered dialogs start at the expanded tier (840dp), the same policy
+      // PulsrAdaptiveSheet and PulsrSheetHelper now share.
+      expect(tabletSheet, isFalse);
     });
 
     testWidgets('PulsrSearchField renders text field and clear button',
