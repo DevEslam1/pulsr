@@ -312,6 +312,12 @@ object PoTokenManager {
                         ensureReady()
                     }
                 }
+                // Warm the account-bound token too, so the first signed-in
+                // WEB_REMIX resolve never pays the mint inline.
+                val dsid = dataSyncId
+                if (dsid.isNotEmpty() && isReady) {
+                    runCatching { poTokenForSync(dsid) }
+                }
             } catch (t: Throwable) {
                 Log.w(TAG, "Pre-warm failed non-fatally: ${t.message}")
             }
@@ -582,6 +588,18 @@ object PoTokenManager {
             appContext?.let { PoTokenStore.saveDataSyncId(it, normalized) }
             if (old.isNotEmpty()) tokenLru.remove(old)
             tokenLru.remove(normalized)
+        }
+        // If the generator is already warm (the usual case by the time the
+        // account binding arrives), mint the account-bound token now instead of
+        // on the first tap: an inline mint adds seconds to the first WEB_REMIX
+        // resolve, and Dart's bounded mint call demotes that pass to a guest
+        // one when it times out. Never forces a generator spin-up here — the
+        // pre-warm owns that, off the startup critical path.
+        if (hasWarmGenerator) {
+            managerScope.launch {
+                runCatching { poTokenForSync(normalized) }
+                    .onFailure { Log.w(TAG, "Account poToken pre-warm failed non-fatally: ${it.message}") }
+            }
         }
     }
 

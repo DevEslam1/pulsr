@@ -238,13 +238,13 @@ void main() {
           reason: 'a different URL carries a different signature');
     });
 
-    test('putStream never stores a verified entry', () {
+    test('putStream stamps a fresh mint as verified for the probe window', () {
       cache.put('vid1', 'https://x/a', verifiedAt: clock.now());
       expect(cache.isVerified('vid1'), isTrue);
 
       cache.putStream(YtmStream(
         videoId: 'vid1',
-        url: 'https://x/a',
+        url: 'https://x/b',
         mimeType: 'audio/mp4',
         container: 'm4a',
         bitrateKbps: 128,
@@ -253,8 +253,16 @@ void main() {
         artist: 'A',
       ));
 
+      // A URL the resolver just minted skips the pre-flight probe: probing it
+      // added a full round trip (up to the 2 s budget) to every first play of
+      // a pre-resolved track. A dead signature still costs one 403 + the
+      // source's single re-resolve, the same remedy a failed probe triggers.
+      expect(cache.isVerified('vid1'), isTrue,
+          reason: 'fresh mint is the freshest URL the app can hold');
+
+      clock.advance(const Duration(minutes: 5));
       expect(cache.isVerified('vid1'), isFalse,
-          reason: 'the resolver only ever hands over a freshly minted URL');
+          reason: 'outside the window the entry is unproven again');
     });
   });
 }

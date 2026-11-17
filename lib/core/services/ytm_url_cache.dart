@@ -515,9 +515,11 @@ class YtmUrlCache {
     // A verification describes one URL, so it survives only a re-store of that
     // same URL. A different URL carries a different signature and starts
     // unproven, or the probe would be skipped for a URL nobody has fetched.
+    // [carryVerified] only governs *inheritance*: an explicit [verifiedAt]
+    // (a mint-time stamp) always wins.
     final inheritedVerifiedAt = sameUrl ? previous.verifiedAt : null;
     final effectiveVerifiedAt =
-        carryVerified ? (verifiedAt ?? inheritedVerifiedAt) : null;
+        verifiedAt ?? (carryVerified ? inheritedVerifiedAt : null);
 
     final entry = YtmUrlCacheEntry(
       videoId: videoId,
@@ -543,8 +545,13 @@ class YtmUrlCache {
 
   /// Stores a resolved [YtmStream] into the LRU cache.
   ///
-  /// The entry is never stored as verified: `resolveStream` returned a URL
-  /// nobody has fetched yet, so the next playback owes it a probe.
+  /// The entry is stamped as verified at mint time: a URL the resolver just
+  /// obtained from YouTube is the freshest thing this app can hold, and probing
+  /// it before the first play only added a round trip (a full TLS handshake to
+  /// a new edge, up to the probe's 2 s budget) to every tap on a pre-resolved
+  /// track. If the signature is dead anyway, the byte fetch 403s and the lazy
+  /// source's one re-resolve repairs it — the same remedy a failed probe
+  /// triggers, without paying the probe on the healthy path.
   void putStream(
     YtmStream stream, {
     String quality = 'high',
@@ -557,6 +564,7 @@ class YtmUrlCache {
       userAgent: stream.userAgent,
       cookies: stream.cookies,
       stream: stream,
+      verifiedAt: _clock.now(),
       carryVerified: false,
     );
   }

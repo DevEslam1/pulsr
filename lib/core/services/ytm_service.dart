@@ -39,20 +39,17 @@ class YtmService {
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);
   static const Duration _defaultResolveTimeout = Duration(seconds: 15);
 
-  /// How long Tier-1 (the authenticated account InnerTube resolve) runs alone
-  /// before Tier-2 (the native multi-client chain) is started alongside it.
-  /// A warm signed-in resolve is a single InnerTube `/player` round-trip
-  /// (~300-600ms), so this window still lets it win outright and skip a
-  /// redundant native chain in the common case; a slow account hop now delays
-  /// the (usually faster) native tier by at most this window instead of the
-  /// old 1500ms — halving worst-case dead-time on a signed-in cold tap.
-  /// The window only applies to an account-bound pass. Without a dataSyncId
-  /// Tier-1 can only run as a guest, and a guest cannot decipher the formats it
-  /// is handed, so it gets no head start at all: the native tier starts at once
-  /// and the account tier is restricted to the session-bearing client, which
-  /// with no session yet issues nothing. Lowering trades a slightly higher
-  /// chance of spending one extra (uncancellable) native chain for a faster
-  /// start when the account hop lags.
+  /// How long the native multi-client chain runs alone before the Dart account
+  /// tier is started alongside it as a hedge.
+  ///
+  /// The direction is deliberate: every web client now answers with ciphered
+  /// formats, so only the native side can turn them into a stream. Giving the
+  /// Dart tier the head start meant every tap paid its warm-up mints and a
+  /// `/player` request that then handed off, while the extractor waited —
+  /// seconds of dead time on a signed-in cold tap. A warm native resolve is
+  /// typically 300-800 ms, so this window usually settles the race before the
+  /// account hop even starts. Past it the account tier still covers the case
+  /// where the native chain is blocked or slow.
   static const Duration _tier1HedgeDelay = Duration(milliseconds: 700);
 
   final MethodChannel _channel = const MethodChannel(channelName);
@@ -1202,16 +1199,15 @@ class YtmService {
     // Tier-1 (authenticated account InnerTube) and Tier-2 (native multi-client
     // extractor) used to run strictly one after the other, so a slow Tier-1
     // charged its whole 50 s budget before the native chain — normally the
-    // faster of the two — was even started. They now race: an account-bound
-    // Tier-1 gets [_tier1HedgeDelay] alone, so the signed-in path still wins
-    // outright and never pays for a redundant native chain, and past that the
-    // native tier starts alongside it. A guest pass gets no head start: it
-    // cannot decipher a ciphered format, so it could only repeat the native
-    // sweep request for request. First stream back wins; the loser's result is
-    // dropped. Because a MethodChannel call cannot be cancelled once invoked,
-    // the only cost of losing the race is the single extra chain the hedge
-    // already decided to spend.
-    Timer? tierHedge;
+    // faster of the two — was even started. They now race with the native chain
+    // on the hot path and the Dart account tier hedging it, because every web
+    // client now answers with ciphered formats that only the native side can
+    // decipher: a Tier-1 head start was pure added latency (warm-up mints plus
+    // a request that always handed off), not a shortcut. First stream back
+    // wins; the loser's result is dropped. Because a MethodChannel call cannot
+    // be cancelled once invoked, the only cost of losing the race is the single
+    // extra chain the hedge already decided to spend.
+    Timer? accountHedge;
     Object? nativeError;
 
     final accountService = getIt.isRegistered<YtmAccountService>()
@@ -1396,8 +1392,9 @@ class YtmService {
       }
     }
 
+    var accountStarted = false;
+
     void startNativeTier() {
-      tierHedge?.cancel();
       if (nativeStarted || winner.isCompleted) return;
       nativeStarted = true;
       runNativeTier().then((stream) {
@@ -1407,6 +1404,21 @@ class YtmService {
       }).catchError((Object e) {
         debugPrint('[YTM_SERVICE] Native tier crashed: $e');
         nativeDone = true;
+        settle();
+      });
+    }
+
+    void startAccountTier() {
+      accountHedge?.cancel();
+      if (accountStarted || winner.isCompleted) return;
+      accountStarted = true;
+      runAccountTier().then((stream) {
+        accountResult = stream;
+        accountDone = true;
+        settle();
+      }).catchError((Object e) {
+        debugPrint('[YTM_SERVICE] Account tier crashed: $e');
+        accountDone = true;
         settle();
       });
     }
@@ -1421,39 +1433,20 @@ class YtmService {
       accountDone = true;
     }
 
-    // A guest pass gets no head start (see the comment above): a zero delay
-    // starts the native chain on the next event-loop turn, and the account tier
-    // is restricted to the session-bearing client instead of the native chain
-    // waiting out [_tier1HedgeDelay] for a resolve that cannot decipher a
-    // ciphered format. Only an account-bound pass is hedged.
-    tierHedge = Timer(
-        accountBound ? _tier1HedgeDelay : Duration.zero, startNativeTier);
-
-    // The conditional expression is lazy, so a logged-out resolve never starts
-    // the account tier; the null future just keeps the wiring below unchanged.
-    final accountRun =
-        accountLoggedIn ? runAccountTier() : Future<YtmStream?>.value();
-
-    accountRun.then((stream) {
-      accountResult = stream;
-      accountDone = true;
-      tierHedge?.cancel();
-      if (stream != null) {
-        settle();
-      } else {
-        // Tier-1 has nothing to offer: promote the native tier now instead of
-        // waiting out the hedge delay for an answer we already know we need.
-        startNativeTier();
-      }
-    }).catchError((Object e) {
-      debugPrint('[YTM_SERVICE] Account tier crashed: $e');
-      accountDone = true;
-      tierHedge?.cancel();
-      startNativeTier();
-    });
+    // The native extractor owns the hot path: it is the only engine that can
+    // decipher the ciphered formats every web client returns, so it starts on
+    // the next event-loop turn. The Dart account tier hedges *it* instead of
+    // the other way around: giving Tier-1 the head start made every tap pay
+    // its warm-up mints and a WEB_REMIX request that then handed ciphered
+    // formats straight back to the native side, while the extractor was held
+    // behind [_tier1HedgeDelay] — measured as seconds added to tap-to-sound.
+    startNativeTier();
+    if (accountLoggedIn) {
+      accountHedge = Timer(_tier1HedgeDelay, startAccountTier);
+    }
 
     final racedStream = await winner.future;
-    tierHedge.cancel();
+    accountHedge?.cancel();
     if (racedStream != null) return racedStream;
 
     // 2.5 PoToken refresh-and-retry (on-device only, no XDM backend).
