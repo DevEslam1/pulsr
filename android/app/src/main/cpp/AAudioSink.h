@@ -91,8 +91,11 @@ private:
     void CloseLocked(bool waitForWriters = true);
     static void ErrorCallback(AAudioStream* stream, void* userData, aaudio_result_t error);
     bool RecoverDisconnected();
-    void CheckAndAdaptBuffer(AAudioStream* st);
-    void ShrinkBufferIfStable(AAudioStream* st);
+    // Item 12: the buffer governor is a query-and-adjust helper that touches only
+    // atomics and the AAudio C API, so it is const. That removes the const_cast
+    // from XRunDelta() (whose JNI call site keeps its identical signature).
+    void CheckAndAdaptBuffer(AAudioStream* st) const;
+    void ShrinkBufferIfStable(AAudioStream* st) const;
 
     Config config_{};
     std::atomic<AAudioStream*> stream_{nullptr};

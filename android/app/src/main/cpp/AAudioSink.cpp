@@ -444,7 +444,7 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             // underrun. Buffer growth is driven exclusively by real xruns in
             // XRunDelta(), otherwise a briefly busy device ratchets latency up
             // permanently.
-            if (++retries > kMaxRetries) break;
+            if (++retries >= kMaxRetries) break;
             continue;  // loop re-checks releasing_ so Close() is never blocked
         } else if (w == AAUDIO_ERROR_DISCONNECTED) {
             recovery_.markDisconnected();
@@ -550,7 +550,7 @@ int32_t AAudioSink::XRunCount() const {
     return xruns;
 }
 
-void AAudioSink::CheckAndAdaptBuffer(AAudioStream* st) {
+void AAudioSink::CheckAndAdaptBuffer(AAudioStream* st) const {
     if (st == nullptr || releasing_.load(std::memory_order_acquire)) return;
     const int32_t currentSize = AAudioStream_getBufferSizeInFrames(st);
     const int32_t capacity = AAudioStream_getBufferCapacityInFrames(st);
@@ -579,7 +579,7 @@ int32_t AAudioSink::XRunDelta() const {
             std::chrono::steady_clock::now().time_since_epoch()).count();
         if (delta > 0) {
             lastXRunTimestampMs_.store(nowMs, std::memory_order_release);
-            const_cast<AAudioSink*>(this)->CheckAndAdaptBuffer(st);
+            CheckAndAdaptBuffer(st);
         } else {
             // Slow shrink-back: after 30 s with no underruns, give back two
             // bursts, at most once per 30 s, never below the initial size.
@@ -587,7 +587,7 @@ int32_t AAudioSink::XRunDelta() const {
             const int64_t lastShrink = lastShrinkTimestampMs_.load(std::memory_order_acquire);
             if (lastXRun > 0 && nowMs - lastXRun >= 30000 && nowMs - lastShrink >= 30000) {
                 lastShrinkTimestampMs_.store(nowMs, std::memory_order_release);
-                const_cast<AAudioSink*>(this)->ShrinkBufferIfStable(st);
+                ShrinkBufferIfStable(st);
             }
         }
     }
@@ -595,7 +595,7 @@ int32_t AAudioSink::XRunDelta() const {
     return delta;
 }
 
-void AAudioSink::ShrinkBufferIfStable(AAudioStream* st) {
+void AAudioSink::ShrinkBufferIfStable(AAudioStream* st) const {
     if (st == nullptr || releasing_.load(std::memory_order_acquire)) return;
     const int32_t currentSize = AAudioStream_getBufferSizeInFrames(st);
     const int32_t burst = AAudioStream_getFramesPerBurst(st);
