@@ -103,7 +103,10 @@ void runReverbRegressionTest() {
         std::cout << "  ✓ Direct-FIR 1024-tap allocated 0 partitioned history (0 bytes)." << std::endl;
     }
 
-    // 2. Room preset footprint reduction & byte-counter test
+    // 2. Fixed-stride history ring (item 8): the effective count still follows
+    // the IR, but the ring geometry is the fixed MAX_PREALLOC_PARTITIONS stride so
+    // a later IR growth can never reinterpret an existing slot. The byte counter
+    // reports the real (fixed) footprint instead of the old per-preset saving.
     {
         auto roomReverb = std::make_unique<ConvolutionReverb>();
         roomReverb->setSampleRate(48000.0);
@@ -115,13 +118,12 @@ void runReverbRegressionTest() {
         constexpr size_t maxPreallocBytes = 2 * static_cast<size_t>(ConvolutionReverb::MAX_PREALLOC_PARTITIONS) *
             ConvolutionReverb::FFT_SIZE * sizeof(FftUtil::Complex); // 512 * 1024 * 8 * 2 = 8,388,608 bytes
 
-        assert(roomPartitions < ConvolutionReverb::MAX_PREALLOC_PARTITIONS);
         assert(roomPartitions == 80);
-        assert(roomBytes < maxPreallocBytes / 4);
-        assert(roomBytes > 0);
+        assert(roomBytes >= maxPreallocBytes);
 
-        std::cout << "  ✓ Room preset history footprint: " << roomBytes << " bytes ("
-                  << roomPartitions << " partitions) vs MAX_PREALLOC " << maxPreallocBytes << " bytes." << std::endl;
+        std::cout << "  ✓ Fixed history ring: " << roomBytes << " bytes ("
+                  << roomPartitions << " effective / "
+                  << ConvolutionReverb::MAX_PREALLOC_PARTITIONS << " slots)." << std::endl;
     }
 }
 

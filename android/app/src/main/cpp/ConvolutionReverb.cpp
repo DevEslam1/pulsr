@@ -587,14 +587,18 @@ void ConvolutionReverb::accumulatePartitionLeft(
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0 || allocated <= 0) return;
-    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
+    // Item 8: the ring geometry is the FIXED MAX_PREALLOC_PARTITIONS stride, not
+    // the current effective partition count. Growing `allocated` therefore keeps
+    // every existing slot at the same logical history offset.
+    constexpr int kRing = MAX_PREALLOC_PARTITIONS;
+    if (historyHead_ < 0 || historyHead_ >= kRing) historyHead_ = 0;
 
     const auto& irFreqL = ir->irFreqL;
     std::fill(accum.begin(), accum.end(), FftUtil::Complex(0.0f, 0.0f));
 
     for (int p = 0; p < effectivePartitions; ++p) {
-        int histIdx = (historyHead_ - p) % allocated;
-        if (histIdx < 0) histIdx += allocated;
+        int histIdx = historyHead_ - p;
+        if (histIdx < 0) histIdx += kRing;
 
         const auto& inFreqL = inputHistoryFreqL_[histIdx];
         const auto& irBlockL = irFreqL[p];
@@ -650,14 +654,16 @@ void ConvolutionReverb::accumulatePartitionRight(
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0 || allocated <= 0) return;
-    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
+    // Item 8: fixed ring geometry (see accumulatePartitionLeft).
+    constexpr int kRing = MAX_PREALLOC_PARTITIONS;
+    if (historyHead_ < 0 || historyHead_ >= kRing) historyHead_ = 0;
 
     const auto& irFreqR = ir->irFreqR;
     std::fill(accum.begin(), accum.end(), FftUtil::Complex(0.0f, 0.0f));
 
     for (int p = 0; p < effectivePartitions; ++p) {
-        int histIdx = (historyHead_ - p) % allocated;
-        if (histIdx < 0) histIdx += allocated;
+        int histIdx = historyHead_ - p;
+        if (histIdx < 0) histIdx += kRing;
 
         const auto& inFreqR = inputHistoryFreqR_[histIdx];
         const auto& irBlockR = irFreqR[p];
@@ -711,7 +717,9 @@ void ConvolutionReverb::processLeftChannelPartition(int numPartitions) {
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0 || allocated <= 0) return;
-    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
+    // Item 8: fixed ring geometry (see accumulatePartitionLeft).
+    constexpr int kRing = MAX_PREALLOC_PARTITIONS;
+    if (historyHead_ < 0 || historyHead_ >= kRing) historyHead_ = 0;
 
     FftUtil::fft(fftWorkL_);
     inputHistoryFreqL_[historyHead_] = fftWorkL_;
@@ -733,7 +741,9 @@ void ConvolutionReverb::processRightChannelPartition(int numPartitions) {
     const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
     const int effectivePartitions = std::min(numPartitions, allocated);
     if (effectivePartitions <= 0 || allocated <= 0) return;
-    if (historyHead_ < 0 || historyHead_ >= allocated) historyHead_ = 0;
+    // Item 8: fixed ring geometry (see accumulatePartitionLeft).
+    constexpr int kRing = MAX_PREALLOC_PARTITIONS;
+    if (historyHead_ < 0 || historyHead_ >= kRing) historyHead_ = 0;
 
     FftUtil::fft(fftWorkR_);
     inputHistoryFreqR_[historyHead_] = fftWorkR_;
@@ -760,6 +770,14 @@ void ConvolutionReverb::drainRetiredIrs() {
             tail = (tail + 1) % kMaxRetired;
         }
         retiredTail_.store(tail, std::memory_order_release);
+
+        // Item 7: always empty the render-thread emergency stash.
+        if (!emergencyLock_.test_and_set(std::memory_order_acquire)) {
+            for (int i = 0; i < kMaxEmergencyRetained; ++i) {
+                emergencyIr_[i].reset();
+            }
+            emergencyLock_.clear(std::memory_order_release);
+        }
 
         std::lock_guard<std::mutex> ovLock(overflowMutex_);
         if (!retiredOverflow_.empty()) {
@@ -860,26 +878,62 @@ void ConvolutionReverb::updatePreparedIr() {
 void ConvolutionReverb::ensurePartitionCapacity(int numPartitions) {
     if (numPartitions <= 0) return;
     const int targetPartitions = std::min(numPartitions, MAX_PREALLOC_PARTITIONS);
+
+    // Item 8: the ring is allocated once, in full, and never addressed against a
+    // different modulus afterwards. `historyPartitionCount_` only bounds how many
+    // partitions the accumulator reads, so raising it for a longer IR can never
+    // reinterpret an existing slot. The cost is the fixed 512-slot ring
+    // (512 * FFT_SIZE * 2 channels * 8 bytes = ~8 MB), allocated the first time a
+    // partitioned IR is prepared and never on the render thread.
+    if (!historyRingAllocated_) {
+        for (int p = 0; p < kHistoryRingSlots; ++p) {
+            inputHistoryFreqL_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+            inputHistoryFreqR_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+        }
+        historyRingAllocated_ = true;
+        historyHead_ = 0;
+    }
+
     const int currentPartitions = historyPartitionCount_.load(std::memory_order_acquire);
     if (currentPartitions >= targetPartitions) return;
-
-    // Only touch slots the render thread cannot observe yet. Existing slots are
-    // never moved or reallocated: the outer arrays have fixed storage.
-    for (int p = currentPartitions; p < targetPartitions; ++p) {
-        inputHistoryFreqL_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
-        inputHistoryFreqR_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
-    }
     historyPartitionCount_.store(targetPartitions, std::memory_order_release);
 }
 
 size_t ConvolutionReverb::getHistoryAllocatedBytes() const {
+    // Item 8: report the real ring footprint (fixed slots), not the effective
+    // partition count, so the fixed-stride trade-off stays visible.
+    if (!historyRingAllocated_) return 0;
     size_t bytes = 0;
-    const int count = historyPartitionCount_.load(std::memory_order_acquire);
-    for (int p = 0; p < count; ++p) {
+    for (int p = 0; p < kHistoryRingSlots; ++p) {
         bytes += inputHistoryFreqL_[p].capacity() * sizeof(FftUtil::Complex) + sizeof(inputHistoryFreqL_[p]);
         bytes += inputHistoryFreqR_[p].capacity() * sizeof(FftUtil::Complex) + sizeof(inputHistoryFreqR_[p]);
     }
     return bytes;
+}
+
+size_t ConvolutionReverb::getRetiredPendingCount() const {
+    std::lock_guard<std::mutex> drainLock(drainMutex_);
+    size_t pending = 0;
+    int tail = retiredTail_.load(std::memory_order_acquire);
+    const int head = retiredHead_.load(std::memory_order_acquire);
+    while (tail != head) {
+        if (retiredRing_[tail]) ++pending;
+        tail = (tail + 1) % kMaxRetired;
+    }
+    {
+        std::lock_guard<std::mutex> ovLock(overflowMutex_);
+        pending += retiredOverflow_.size();
+    }
+    // The emergency slots are written by the render thread under emergencyLock_, so
+    // read them only while holding the same guard (a diagnostic must not race the
+    // shared_ptr swap).
+    if (!emergencyLock_.test_and_set(std::memory_order_acquire)) {
+        for (int i = 0; i < kMaxEmergencyRetained; ++i) {
+            if (emergencyIr_[i]) ++pending;
+        }
+        emergencyLock_.clear(std::memory_order_release);
+    }
+    return pending;
 }
 
 void ConvolutionReverb::retireIr(std::shared_ptr<const PreparedIr> ir) {
@@ -892,15 +946,46 @@ void ConvolutionReverb::retireIr(std::shared_ptr<const PreparedIr> ir) {
         retiredHead_.store(nextHead, std::memory_order_release);
         return;
     }
-    // Ring full: defer to control-thread overflow vector without freeing on RT thread.
-    std::unique_lock<std::mutex> lock(overflowMutex_, std::try_to_lock);
-    if (lock.owns_lock()) {
-        retiredOverflow_.push_back(std::move(ir));
-    } else {
-        // Control thread only holds overflowMutex_ for a pointer swap; brief
-        // fallback lock guarantees ir is never destroyed on the audio thread.
-        lock.lock();
-        retiredOverflow_.push_back(std::move(ir));
+    // Ring full: defer to the control-thread overflow vector. Item 7: the
+    // render thread must never take overflowMutex_ unconditionally, so this is a
+    // try_lock only.
+    {
+        std::unique_lock<std::mutex> lock(overflowMutex_, std::try_to_lock);
+        if (lock.owns_lock()) {
+            retiredOverflow_.push_back(std::move(ir));
+            return;
+        }
+    }
+    // Item 7 fallback: stash into the bounded emergency pair that
+    // drainRetiredIrs() always empties. The guard is only a few instructions
+    // around the two shared_ptr swaps; it never waits on the control thread.
+    if (!emergencyLock_.test_and_set(std::memory_order_acquire)) {
+        for (int i = 0; i < kMaxEmergencyRetained; ++i) {
+            if (!emergencyIr_[i]) {
+                emergencyIr_[i] = std::move(ir);
+                emergencyLock_.clear(std::memory_order_release);
+                return;
+            }
+        }
+        emergencyLock_.clear(std::memory_order_release);
+    }
+    // Both emergency slots are occupied. Second bounded attempt on the overflow
+    // (the control thread only holds it for a pointer swap), and as the final
+    // act retain the NEWEST pointer in slot 0 by displacing the old entry into
+    // that same vector. Retention bound stays kMaxRetired + overflow + 2; the
+    // displaced IR is the only object that can be released here, and only if the
+    // control thread has not drained 512 ring slots + the overflow + both
+    // emergency slots (it drains on every telemetry block).
+    {
+        std::unique_lock<std::mutex> lock(overflowMutex_, std::try_to_lock);
+        if (lock.owns_lock()) {
+            retiredOverflow_.push_back(std::move(ir));
+            return;
+        }
+    }
+    if (!emergencyLock_.test_and_set(std::memory_order_acquire)) {
+        emergencyIr_[0] = std::move(ir);
+        emergencyLock_.clear(std::memory_order_release);
     }
 }
 
@@ -1063,8 +1148,8 @@ void ConvolutionReverb::preparePartitions() {
 
     // Preserving active audio buffers (inputBlock, prevBlock, accumFreq) during live playback
     // ensures seamless, click-free continuity across IR preset switches.
-    const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
-    if (allocated > 0 && (historyHead_ < 0 || historyHead_ >= allocated)) {
+    // Item 8: the head is bounded by the fixed ring, never by the effective count.
+    if (historyHead_ < 0 || historyHead_ >= kHistoryRingSlots) {
         historyHead_ = 0;
     }
 }
@@ -1105,8 +1190,8 @@ void ConvolutionReverb::reset() {
         std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
         std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
         std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
-        const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
-        for (int p = 0; p < allocated; ++p) {
+        const int ringSlots = historyRingAllocated_ ? kHistoryRingSlots : 0;
+        for (int p = 0; p < ringSlots; ++p) {
             std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
             std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
         }
@@ -1352,11 +1437,17 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 
             float wetSampleL = convL;
             float wetSampleR = convR;
+            // Item 2: the blend may never be gated on the OLD kernel fitting in
+            // the new one. A swap to a SHORTER direct IR (1000 -> 500 taps) used
+            // to skip this whole block, so advanceIrCrossfade() never ran: the old
+            // kernel stayed pinned forever at weight 1 and its shared_ptr was
+            // never retired. Both direct kernels read the same history ring, so
+            // the shared span min(oldTaps, totalTaps) is safe, and the fade always
+            // advances once per frame so it completes and retires the old IR.
             if (isIrCrossfadeActive() && crossfadeIr_ &&
                 crossfadeIr_->numPartitions == 0 &&
-                crossfadeIr_->totalTaps > 0 &&
-                crossfadeIr_->totalTaps <= totalTaps) {
-                const int oldTaps = crossfadeIr_->totalTaps;
+                crossfadeIr_->totalTaps > 0) {
+                const int oldTaps = std::min(crossfadeIr_->totalTaps, totalTaps);
                 const float* oldIrL = crossfadeIr_->irL.data();
                 const float* oldIrR = crossfadeIr_->irR.data();
                 float oldL = 0.0f;
@@ -1507,9 +1598,9 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             std::copy(inputBlockL_.begin(), inputBlockL_.end(), prevBlockL_.begin());
             std::copy(inputBlockR_.begin(), inputBlockR_.end(), prevBlockR_.begin());
 
-            const int allocated = historyPartitionCount_.load(std::memory_order_acquire);
-            if (allocated > 0) {
-                historyHead_ = (historyHead_ + 1) % allocated;
+            const int ringSlots = historyRingAllocated_ ? kHistoryRingSlots : 0;
+            if (ringSlots > 0) {
+                historyHead_ = (historyHead_ + 1) % ringSlots;
             }
             inputBlockPos_ = 0;
         }

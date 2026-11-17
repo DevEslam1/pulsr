@@ -83,15 +83,31 @@ public:
         return static_cast<size_t>(historyPartitionCount_.load(std::memory_order_acquire));
     }
     size_t getHistoryAllocatedBytes() const;
+    // Item 7 diagnostics (control thread): prepared IRs still retained by the
+    // retire ring, the overflow vector and the emergency stash. Zero after
+    // drainRetiredIrs().
+    size_t getRetiredPendingCount() const;
+    // Item 2/8 diagnostics (control thread): the wet path is still blending a
+    // previous IR into the current one.
+    bool isIrCrossfadeActiveForTesting() const { return isIrCrossfadeActive(); }
 
 private:
+    // Item 7: bounded, non-blocking retirement. The audio thread may never block
+    // on overflowMutex_ nor destroy a PreparedIr, so the ring is backed by a
+    // two-slot emergency stash that drainRetiredIrs() always empties. Retention
+    // bound: kMaxRetired (512) ring entries + retiredOverflow_ (reserve 2048) +
+    // kMaxEmergencyRetained (2) stashed IRs.
     static constexpr int kMaxRetired = 512;
+    static constexpr int kMaxEmergencyRetained = 2;
     std::shared_ptr<const PreparedIr> retiredRing_[kMaxRetired];
     std::atomic<int> retiredHead_{0};
     std::atomic<int> retiredTail_{0};
-    std::mutex overflowMutex_;
+    std::shared_ptr<const PreparedIr> emergencyIr_[kMaxEmergencyRetained];
+    // Item 7: the diagnostics getter (const) also needs the stash guard.
+    mutable std::atomic_flag emergencyLock_ = ATOMIC_FLAG_INIT;
+    mutable std::mutex overflowMutex_;
     std::vector<std::shared_ptr<const PreparedIr>> retiredOverflow_;
-    std::mutex drainMutex_;
+    mutable std::mutex drainMutex_;
 
     void updatePreparedIr();
     void setPreparedIrPtr(std::shared_ptr<const PreparedIr> ir);
@@ -173,13 +189,19 @@ private:
     std::vector<float> inputBlockR_;
     int inputBlockPos_ = 0;
 
-    // Overlap-save input history ring buffer: [numPartitions][FFT_SIZE].
-    // The outer arrays are fixed-size so a control-thread capacity grow never
-    // moves existing inner buffers. Only slots [0, historyPartitionCount_) are
-    // visible to the render thread; the count is published with release/acquire.
+    // Overlap-save input history ring buffer: [MAX_PREALLOC_PARTITIONS][FFT_SIZE].
+    // Item 8: every slot is allocated up front (kHistoryRingSlots) and addressed
+    // with the FIXED modulus MAX_PREALLOC_PARTITIONS, so growing the effective
+    // partition count for a longer IR can never reinterpret a slot that already
+    // holds history from a different modulus. `historyPartitionCount_` only
+    // bounds how many partitions the accumulator reads; it does not change the
+    // ring geometry, which is what makes an IR growth mid-stream a clean tail
+    // fade-in instead of a burst of stale blocks.
+    static constexpr int kHistoryRingSlots = MAX_PREALLOC_PARTITIONS;
     std::array<std::vector<FftUtil::Complex>, MAX_PREALLOC_PARTITIONS> inputHistoryFreqL_;
     std::array<std::vector<FftUtil::Complex>, MAX_PREALLOC_PARTITIONS> inputHistoryFreqR_;
     std::atomic<int> historyPartitionCount_{0};
+    bool historyRingAllocated_ = false;
     int historyHead_ = 0;
 
     // Direct convolution ring buffers for short IRs (<= 1024)

@@ -111,9 +111,9 @@ int main() {
         std::cout << "  [PASS] Direct-FIR 1024-tap allocated 0 partitioned history (0 bytes)." << std::endl;
     }
 
-    // 2. Room preset footprint reduction & byte-counter test
+    // 2. Fixed-stride history ring (item 8) and its footprint accounting
     {
-        std::cout << "[TEST] Room preset history footprint reduction byte-counter test..." << std::endl;
+        std::cout << "[TEST] Fixed-stride history ring geometry..." << std::endl;
         auto roomReverb = std::make_unique<ConvolutionReverb>();
         roomReverb->setSampleRate(48000.0);
         roomReverb->setPreset(ReverbPreset::Room);
@@ -124,13 +124,35 @@ int main() {
         constexpr size_t maxPreallocBytes = 2 * static_cast<size_t>(ConvolutionReverb::MAX_PREALLOC_PARTITIONS) *
             ConvolutionReverb::FFT_SIZE * sizeof(FftUtil::Complex); // 512 * 1024 * 8 * 2 = 8,388,608 bytes
 
-        assert(roomPartitions < ConvolutionReverb::MAX_PREALLOC_PARTITIONS);
+        // The effective partition count still follows the IR (80 for Room), but
+        // the ring itself is the FIXED MAX_PREALLOC_PARTITIONS stride so a later
+        // IR growth can never reinterpret a slot. That trades the old per-preset
+        // footprint saving for correctness; the byte counter reports the truth.
         assert(roomPartitions == 80);
-        assert(roomBytes < maxPreallocBytes / 4); // ~1.31 MB vs ~8.39 MB (< 25%)
-        assert(roomBytes > 0);
+        assert(roomBytes >= maxPreallocBytes);
 
-        std::cout << "  [PASS] Room preset history footprint: " << roomBytes << " bytes ("
-                  << roomPartitions << " partitions) vs MAX_PREALLOC " << maxPreallocBytes << " bytes." << std::endl;
+        // Growing the IR mid-stream must keep the ring valid (finite output) and
+        // raise the effective partition count without a new geometry.
+        std::vector<float> growInL(512, 0.1f), growInR(512, 0.1f);
+        std::vector<float> growOutL(512, 0.0f), growOutR(512, 0.0f);
+        roomReverb->setEnabled(true);
+        roomReverb->setWetDry(0.5);
+        for (int b = 0; b < 8; ++b) {
+            roomReverb->process(growInL.data(), growInR.data(), growOutL.data(), growOutR.data(), 512);
+        }
+        roomReverb->setPreset(ReverbPreset::Cathedral);
+        for (int b = 0; b < 8; ++b) {
+            roomReverb->process(growInL.data(), growInR.data(), growOutL.data(), growOutR.data(), 512);
+            for (int i = 0; i < 512; ++i) {
+                assert(std::isfinite(growOutL[i]) && std::isfinite(growOutR[i]));
+            }
+        }
+        assert(roomReverb->getHistoryPartitionCount() > 80);
+
+        std::cout << "  [PASS] Fixed ring: " << roomBytes << " bytes ("
+                  << roomPartitions << " effective / "
+                  << ConvolutionReverb::MAX_PREALLOC_PARTITIONS << " slots), growth intact."
+                  << std::endl;
     }
 
     // 3. Cross-partition-count IR crossfade alignment & overflow retire ring safety
@@ -161,7 +183,11 @@ int main() {
         for (int k = 0; k < 600; ++k) {
             rev->setPreset((k % 2 == 0) ? ReverbPreset::Room : ReverbPreset::Chamber);
         }
+        // Item 7: the bounded emergency stash must never leak a retained IR past a
+        // drain, and the render path must never block on overflowMutex_.
+        assert(rev->getRetiredPendingCount() > 0);
         rev->drainRetiredIrs();
+        assert(rev->getRetiredPendingCount() == 0);
         std::cout << "  [PASS] Cross-partition crossfade & >512 retired-IR overflow drain verified." << std::endl;
     }
     return 0;
