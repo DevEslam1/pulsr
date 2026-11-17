@@ -102,16 +102,21 @@ Widget playerOverlayTransitionBuilder(
   );
 }
 
-/// Visual tokens that differ between the copies of the dock icon button.
+/// Visual tokens for the dock icon button.
 ///
-/// All eight themes build the same button; classic is the one that had already
-/// diverged (active border, larger phone icon, tooltip inside the InkWell,
-/// different badge metrics). Both variants are preserved exactly.
+/// The dock is shared chrome, not a per-theme surface: every theme draws the
+/// same control, so it must look identical in all of them. `classic` used to
+/// carry its own geometry (active border, larger phone icon, tooltip nested
+/// inside the InkWell, different badge metrics) purely because it was built
+/// first. That divergence read as an inconsistency when switching themes, so
+/// every named style now resolves to [common]; the fields stay because the
+/// button still reads them.
 class PlayerDockIconStyle {
   final double inkWellRadius;
 
-  /// true: `Tooltip` wraps the `InkWell` (card, cassette, circle, lyrics,
-  /// minimal, vinyl, waveform). false: `InkWell` wraps the `Tooltip` (classic).
+  /// true: `Tooltip` wraps the `InkWell`. false: `InkWell` wraps the
+  /// `Tooltip`. All shipped styles use true; the variant is kept so the button
+  /// has one code path rather than a special case for a single theme.
   final bool tooltipOutside;
 
   /// Padding on phone-sized layouts; tablets always use 8.
@@ -164,19 +169,9 @@ class PlayerDockIconStyle {
   static const PlayerDockIconStyle vinyl = common;
   static const PlayerDockIconStyle waveform = common;
 
-  static const PlayerDockIconStyle classic = PlayerDockIconStyle(
-    inkWellRadius: 20,
-    tooltipOutside: false,
-    phonePadding: 6,
-    activeFillAlpha: 0.22,
-    activeBorder: true,
-    phoneIconSize: 20,
-    badgeRight: -4,
-    badgeHPadding: 4,
-    badgeRadius: 8,
-    badgeShadow: true,
-    badgeFontSize: 8.5,
-  );
+  // Kept as a name, not a variant: callers still pass it, but the dock must
+  // not change shape when the user switches Now Playing theme.
+  static const PlayerDockIconStyle classic = common;
 }
 
 /// One segment of the Track / Lyrics / Queue pill bar.

@@ -21,62 +21,16 @@ class _VinylTurntableDeck extends StatefulWidget {
 }
 
 class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
-  double _scrubTurns = 0.0;
-  double? _lastDragAngle;
-  double _tonearmSway = 0.0;
-  bool _isScrubbing = false;
+  // One revolution of the record carries 1.8 s at 33 1/3 RPM, so the platter is
+  // dragged at the speed the disc actually spins.
+  final PlatterScrubController _scrub = PlatterScrubController(
+    secondsPerTurn: PlatterScrubController.vinylSecondsPerTurn,
+  );
 
-  void _onPlatterPanStart(DragStartDetails details, double vinylSize) {
-    final center = Offset(vinylSize / 2, vinylSize / 2);
-    _lastDragAngle = math.atan2(
-      details.localPosition.dy - center.dy,
-      details.localPosition.dx - center.dx,
-    );
-    setState(() {
-      _isScrubbing = true;
-      _scrubTurns = 0.0;
-      _tonearmSway = 0.0;
-    });
-  }
-
-  void _onPlatterPanUpdate(DragUpdateDetails details, double vinylSize) {
-    final center = Offset(vinylSize / 2, vinylSize / 2);
-    final currentAngle = math.atan2(
-      details.localPosition.dy - center.dy,
-      details.localPosition.dx - center.dx,
-    );
-    if (_lastDragAngle != null) {
-      double delta = currentAngle - _lastDragAngle!;
-      if (delta > math.pi) delta -= 2 * math.pi;
-      if (delta < -math.pi) delta += 2 * math.pi;
-
-      final prevTurn12 = (_scrubTurns * 12).floor();
-      _scrubTurns += delta / (2 * math.pi);
-      final newTurn12 = (_scrubTurns * 12).floor();
-      if (prevTurn12 != newTurn12) {
-        PulsrHaptics.selection();
-      }
-
-      setState(() {
-        _tonearmSway = (delta * 0.15).clamp(-0.06, 0.06);
-      });
-    }
-    _lastDragAngle = currentAngle;
-  }
-
-  void _onPlatterPanEnd(int durationMs, int positionMs) {
-    if (_isScrubbing && durationMs > 0) {
-      // 1 turn ≈ 1.8 seconds at 33 1/3 RPM
-      final scrubDeltaMs = (_scrubTurns * 1800).round();
-      final targetMs = (positionMs + scrubDeltaMs).clamp(0, durationMs);
-      widget.props.cubit.seek(Duration(milliseconds: targetMs));
-    }
-    setState(() {
-      _isScrubbing = false;
-      _lastDragAngle = null;
-      _scrubTurns = 0.0;
-      _tonearmSway = 0.0;
-    });
+  @override
+  void dispose() {
+    _scrub.dispose();
+    super.dispose();
   }
 
   @override
@@ -86,6 +40,9 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
     final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
+    // The record label and the ring framing it must share one radius, or a
+    // Theme Studio radius would round the clip but leave the frame circular.
+    final artRadius = resolveCustomRadius(context, 999);
 
     return Center(
       child: ConstrainedBox(
@@ -133,7 +90,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                         width: vinylSize * 0.44,
                         height: vinylSize * 0.44,
                         decoration: BoxDecoration(
-                          shape: BoxShape.circle,
+                          borderRadius: AppRadii.circular(artRadius),
                           border: Border.all(
                             color: AppColors.specularAt(0.3),
                             width: 1.5,
@@ -144,19 +101,16 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           alignment: Alignment.center,
                           children: [
                             if (song != null)
-                              PlayerArtworkSemantics(
-                                song: song,
-                                child: CachedArtwork(
-                                  id: song.id,
-                                  albumId: song.albumId,
-                                  remoteUrl:
-                                      song.remoteArtworkUrl ?? song.artworkUri,
-                                  type: ArtworkType.AUDIO,
-                                  size: vinylSize * 0.44,
-                                  borderRadius: 999,
-                                  highQuality: true,
-                                  fallbackIcon: Icons.music_note_rounded,
-                                ),
+                              CachedArtwork(
+                                id: song.id,
+                                albumId: song.albumId,
+                                remoteUrl:
+                                    song.remoteArtworkUrl ?? song.artworkUri,
+                                type: ArtworkType.AUDIO,
+                                size: vinylSize * 0.44,
+                                borderRadius: artRadius,
+                                highQuality: true,
+                                fallbackIcon: Icons.music_note_rounded,
                               ),
                             // Center Spindle Hole
                             Container(
@@ -186,15 +140,18 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                 ),
               );
 
-              // The deck is one play/pause target, but its semantics must not
-              // swallow the cover art: label the button and let the artwork keep
-              // its own image node as a child.
+              // A tap on the deck toggles lyrics like every other theme — the
+              // transport owns play/pause — so the stage describes itself as an
+              // image instead of posing as a button. The platter below is the
+              // deck's single control: an analog scrub published as a slider.
               return Semantics(
-                button: true,
-                label: state.isPlaying ? context.l10n.pause : context.l10n.play,
+                container: true,
+                image: true,
+                label: playerArtworkSemanticLabel(context, song),
+                hint: '${context.l10n.gestureArtworkDoubleTapTitle} — '
+                    '${context.l10n.lyrics}',
                 child: PlayerGestureScope(
                   behavior: HitTestBehavior.deferToChild,
-                  onTap: () => cubit.togglePlayPause(),
                   child: Container(
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
@@ -291,40 +248,42 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           top: vinylTop,
                           width: vinylSize,
                           height: vinylSize,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onPanStart: (d) => _onPlatterPanStart(d, vinylSize),
-                            onPanUpdate: (d) =>
-                                _onPlatterPanUpdate(d, vinylSize),
-                            onPanEnd: (_) {
-                              final current = widget.props.cubit.state;
-                              _onPlatterPanEnd(
-                                current.duration.inMilliseconds,
-                                current.position.inMilliseconds,
-                              );
-                            },
-                            onPanCancel: () {
-                              setState(() {
-                                _isScrubbing = false;
-                                _lastDragAngle = null;
-                                _scrubTurns = 0.0;
-                                _tonearmSway = 0.0;
-                              });
-                            },
-                            child: RepaintBoundary(
-                              child: AnimatedBuilder(
-                                animation: widget.rotationController,
-                                child: vinylDisc,
-                                builder: (context, child) {
-                                  final totalPhase =
-                                      (widget.rotationController.value +
-                                              _scrubTurns) %
-                                          1.0;
-                                  return Transform.rotate(
-                                    angle: totalPhase * 2 * math.pi,
-                                    child: child,
-                                  );
-                                },
+                          child: PlatterScrubSemantics(
+                            cubit: cubit,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onPanStart: (d) =>
+                                  _scrub.start(d.localPosition, vinylSize),
+                              onPanUpdate: (d) =>
+                                  _scrub.update(d.localPosition, vinylSize),
+                              onPanEnd: (_) {
+                                final current = widget.props.cubit.state;
+                                _scrub.end(
+                                  position: current.position,
+                                  duration: current.duration,
+                                  onSeek: widget.props.cubit.seek,
+                                );
+                              },
+                              onPanCancel: _scrub.cancel,
+                              child: RepaintBoundary(
+                                child: AnimatedBuilder(
+                                  // The drag phase and the spin phase are one
+                                  // transform, so both are merged listenables.
+                                  animation: Listenable.merge(
+                                    [widget.rotationController, _scrub],
+                                  ),
+                                  child: vinylDisc,
+                                  builder: (context, child) {
+                                    final totalPhase =
+                                        (widget.rotationController.value +
+                                                _scrub.turnOffset) %
+                                            1.0;
+                                    return Transform.rotate(
+                                      angle: totalPhase * 2 * math.pi,
+                                      child: child,
+                                    );
+                                  },
+                                ),
                               ),
                             ),
                           ),
@@ -349,62 +308,20 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                         ),
 
                         // 3c. Real-time analog scrub delta pill indicator
-                        if (_isScrubbing)
-                          PositionedDirectional(
-                            start: vinylLeft,
-                            top: vinylTop,
-                            width: vinylSize,
-                            height: vinylSize,
+                        PositionedDirectional(
+                          start: vinylLeft,
+                          top: vinylTop,
+                          width: vinylSize,
+                          height: vinylSize,
+                          child: IgnorePointer(
                             child: Center(
-                              child: IgnorePointer(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.sm,
-                                    vertical: AppSpacing.s6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.82),
-                                    borderRadius: AppRadii.full,
-                                    border: Border.all(
-                                      color:
-                                          activeColor.withValues(alpha: 0.65),
-                                      width: 1.2,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color:
-                                            activeColor.withValues(alpha: 0.40),
-                                        blurRadius: 18,
-                                        spreadRadius: 1,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        (_scrubTurns * 1800) >= 0
-                                            ? Icons.rotate_right_rounded
-                                            : Icons.rotate_left_rounded,
-                                        size: 15,
-                                        color: activeColor,
-                                      ),
-                                      const SizedBox(width: AppSpacing.xxs),
-                                      Text(
-                                        '${(_scrubTurns * 1800 / 1000) >= 0 ? '+' : ''}${(_scrubTurns * 1800 / 1000).toStringAsFixed(1)}s',
-                                        style: const TextStyle(
-                                          fontSize: AppFontSize.label,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          letterSpacing: AppTracking.label,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                              child: PlatterScrubPill(
+                                controller: _scrub,
+                                activeColor: activeColor,
                               ),
                             ),
                           ),
+                        ),
 
                         // 4. Animated Tonearm Assembly Layer
                         Positioned.fill(
@@ -428,7 +345,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                       final currentAngle = -0.06 +
                                           ((playAngle - (-0.06)) *
                                               widget.tonearmAnimation.value) +
-                                          _tonearmSway;
+                                          _scrub.tonearmSway;
 
                                       return CustomPaint(
                                         painter: _TonearmPainter(
@@ -452,12 +369,12 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                         PositionedDirectional(
                           bottom: 12,
                           start: 14,
-                          child: GestureDetector(
-                            onTap: () {
-                              PulsrHaptics.lightImpact();
-                              SpeedPickerSheet.show(context);
-                            },
-                            child: Container(
+                          // A printed badge, not a hidden shortcut: tapping the
+                          // deck means lyrics on every theme, and the speed
+                          // picker lives in the dock where it has a label and a
+                          // 48 dp target. A tap handler here swallowed the
+                          // corner of the stage without advertising itself.
+                          child: Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: AppSpacing.s8,
                                   vertical: AppSpacing.xxs),
@@ -486,23 +403,28 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                         : Colors.white38,
                                   ),
                                   const SizedBox(width: AppSpacing.xxs),
-                                  Text(
-                                    state.isPlaying
-                                        ? context.l10n.vinylSpeedRpm
-                                        : context.l10n.dspStandby,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.caption,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: AppTracking.overline,
-                                      color: state.isPlaying
-                                          ? activeColor
-                                          : Colors.white38,
+                                  // Painted plinth legends stay out of the
+                                  // accessibility tree: the stage node names the
+                                  // track, and "STANDBY" bleeding into it made
+                                  // the deck read as a second status line.
+                                  ExcludeSemantics(
+                                    child: Text(
+                                      state.isPlaying
+                                          ? context.l10n.vinylSpeedRpm
+                                          : context.l10n.dspStandby,
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.caption,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: AppTracking.overline,
+                                        color: state.isPlaying
+                                            ? activeColor
+                                            : Colors.white38,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
                         ),
                       ],
                     ),

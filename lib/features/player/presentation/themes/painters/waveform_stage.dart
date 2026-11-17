@@ -1,7 +1,7 @@
 part of '../waveform_player_theme.dart';
 
 // ---------------------------------------------------------------------------
-// Waveform Hero Stage: Concentric Sonic Pulse + Floating Art + Neon Waves
+// Waveform Hero Stage: Real Waveform Overview + Sonic Pulse + Floating Art
 // ---------------------------------------------------------------------------
 class _WaveformHeroStage extends StatelessWidget {
   final SongsTableData? song;
@@ -27,175 +27,194 @@ class _WaveformHeroStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(builder: _buildStage);
+  }
+
+  /// Lays the stage out against its own height.
+  ///
+  /// The overview strip is a preview of the same peaks the seek bar already
+  /// draws, so on a stage squeezed to a few dozen pixels by a 200% text-scale
+  /// chrome it steps aside instead of reserving 48 dp the stage does not have.
+  Widget _buildStage(BuildContext context, BoxConstraints stageConstraints) {
     final song = this.song;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final availableW = constraints.maxWidth - (isTablet ? 20.0 : 4.0);
-        final availableH = constraints.maxHeight - (isTablet ? 16.0 : 2.0);
-        final maxDimension = math.min(availableW, availableH);
+    // The overview gets a lane of its own under the artwork: painted across the
+    // cover it would be unreadable, and a streamed row has no peaks at all.
+    final SongsTableData? overviewSong =
+        _hasLocalAudioPath(song?.path) ? song : null;
+    final bool showOverview =
+        overviewSong != null && stageConstraints.maxHeight >= 96.0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availableW =
+                  constraints.maxWidth - (isTablet ? 20.0 : 4.0);
+              final availableH =
+                  constraints.maxHeight - (isTablet ? 16.0 : 2.0);
+              final maxDimension = math.min(availableW, availableH);
 
-        final double rawSize = maxDimension;
-        final double maxAllowed = isTablet ? 600.0 : 480.0;
-        final double artSize = isLandscape
-            ? (constraints.maxHeight * 0.86).clamp(160.0, 360.0)
-            : (rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed));
+              final double rawSize = maxDimension;
+              final double maxAllowed = isTablet ? 600.0 : 480.0;
+              final double artSize = isLandscape
+                  ? (constraints.maxHeight * 0.86).clamp(160.0, 360.0)
+                  : (rawSize <= 0 ? 0.0 : math.min(rawSize, maxAllowed));
 
-        final double waveBaselineY =
-            (constraints.maxHeight / 2) + (artSize * 0.28);
-
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            // 0. Studio Graphic Spectrum EQ HUD Header (Isolated in RepaintBoundary)
-            PositionedDirectional(
-              top: 4,
-              child: RepaintBoundary(
-                child: _GraphicSpectrumHud(
-                  activeColor: activeColor,
-                  isPlaying: isPlaying,
-                  waveController: waveController,
-                ),
-              ),
-            ),
-
-            // 0. Live FFT Visualizer Waveform Layer (Isolated in RepaintBoundary)
-            Positioned.fill(
-              child: RepaintBoundary(
-                child: Builder(
-                  builder: (context) {
-                    final visualizerStyle =
-                        context.select<SettingsCubit, VisualizerStyle>(
-                            (c) => c.state.visualizerStyle);
-                    if (visualizerStyle == VisualizerStyle.off) {
-                      return const SizedBox.shrink();
-                    }
-                    return Opacity(
-                      opacity: isPlaying ? 0.65 : 0.25,
-                      child: AudioVisualizer(
-                        style: visualizerStyle,
-                        color: activeColor,
-                        isPlaying: isPlaying,
-                        audioSessionId: audioSessionId,
-                        trackId: song?.id,
-                        trackPath: song?.path,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-
-            // 1. Concentric Sonic Pulse Rings expanding from center
-            Positioned.fill(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 0.0, end: isPlaying ? 1.0 : 0.0),
-                duration: context.motionMs(450),
-                curve: Curves.easeOutCubic,
-                builder: (context, fadeMultiplier, _) {
-                  if (fadeMultiplier <= 0.001) return const SizedBox.shrink();
-                  return AnimatedBuilder(
-                    animation: waveController,
-                    builder: (context, _) {
-                      return RepaintBoundary(
-                        child: CustomPaint(
-                          painter: _SonicRipplesPainter(
-                            color: activeColor,
-                            progress: waveController.value,
-                            isPlaying: isPlaying,
-                            baseRadius: artSize * 0.52,
-                            fadeMultiplier: fadeMultiplier,
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-
-            // 2. Full-Width Glowing Fluid Soundwave Spectrum (Spanning Across Stage)
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: waveController,
-                builder: (context, _) {
-                  return RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _FluidAudioWavesPainter(
-                        color: activeColor,
-                        progress: waveController.value,
-                        isPlaying: isPlaying,
-                        baselineY: waveBaselineY,
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  // 1. Live FFT Visualizer Waveform Layer (Isolated in RepaintBoundary)
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      child: Builder(
+                        builder: (context) {
+                          final visualizerStyle = context
+                              .select<SettingsCubit, VisualizerStyle>(
+                                  (c) => c.state.visualizerStyle);
+                          if (visualizerStyle == VisualizerStyle.off) {
+                            return const SizedBox.shrink();
+                          }
+                          return Opacity(
+                            opacity: isPlaying ? 0.65 : 0.25,
+                            child: AudioVisualizer(
+                              style: visualizerStyle,
+                              color: activeColor,
+                              isPlaying: isPlaying,
+                              audioSessionId: audioSessionId,
+                              trackId: song?.id,
+                              trackPath: song?.path,
+                            ),
+                          );
+                        },
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
+                  ),
 
-            // 3. Center Floating Artwork Squircle with Neon Shadow, Border, and 3D Perspective Tilt
-            Positioned(
-              child: _TiltableArtworkSquircle(
-                size: artSize,
-                child: Hero(
-                  tag: heroTag,
-                  child: Container(
-                    width: artSize,
-                    height: artSize,
-                    decoration: BoxDecoration(
-                      borderRadius: AppRadii.circular(
-                          resolveCustomRadius(context, AppRadii.r28)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: activeColor.withValues(
-                              alpha: isPlaying ? 0.42 : 0.22),
-                          blurRadius: isPlaying ? 48 : 28,
-                          spreadRadius: isPlaying ? 4 : 1,
-                          offset: const Offset(0, 12),
-                        ),
-                        BoxShadow(
-                          color: AppColors.scrimAt(0.50),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                      border: Border.all(
-                        color: AppColors.specularAt(isPlaying ? 0.34 : 0.22),
-                        width: 1.5,
-                      ),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: PlayerArtworkSemantics(
-                      song: song,
-                      child: song != null
-                          ? CachedArtwork(
-                              id: song.id,
-                              albumId: song.albumId,
-                              remoteUrl:
-                                  song.remoteArtworkUrl ?? song.artworkUri,
-                              type: ArtworkType.AUDIO,
-                              size: artSize,
-                              borderRadius: 28,
-                              highQuality: true,
-                              fallbackIcon: Icons.music_note_rounded,
-                            )
-                          : ExcludeSemantics(
-                              child: Container(
-                                color: Colors.black26,
-                                child: Icon(
-                                  Icons.music_note_rounded,
-                                  size: artSize * 0.4,
-                                  color: Colors.white54,
+                  // 2. Concentric Sonic Pulse Rings expanding from center
+                  Positioned.fill(
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween<double>(
+                          begin: 0.0, end: isPlaying ? 1.0 : 0.0),
+                      duration: context.motionMs(450),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, fadeMultiplier, _) {
+                        if (fadeMultiplier <= 0.001) {
+                          return const SizedBox.shrink();
+                        }
+                        return AnimatedBuilder(
+                          animation: waveController,
+                          builder: (context, _) {
+                            return RepaintBoundary(
+                              child: CustomPaint(
+                                painter: _SonicRipplesPainter(
+                                  color: activeColor,
+                                  progress: waveController.value,
+                                  isPlaying: isPlaying,
+                                  baseRadius: artSize * 0.52,
+                                  fadeMultiplier: fadeMultiplier,
                                 ),
                               ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 3. Center Floating Artwork Squircle with Neon Shadow,
+                  //    Border, and 3D Perspective Tilt (long-press only).
+                  Positioned(
+                    child: _TiltableArtworkSquircle(
+                      size: artSize,
+                      child: Hero(
+                        tag: heroTag,
+                        child: Container(
+                          width: artSize,
+                          height: artSize,
+                          decoration: BoxDecoration(
+                            borderRadius: AppRadii.circular(
+                                resolveCustomRadius(context, AppRadii.r28)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: activeColor.withValues(
+                                    alpha: isPlaying ? 0.42 : 0.22),
+                                blurRadius: isPlaying ? 48 : 28,
+                                spreadRadius: isPlaying ? 4 : 1,
+                                offset: const Offset(0, 12),
+                              ),
+                              BoxShadow(
+                                color: AppColors.scrimAt(0.50),
+                                blurRadius: 24,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: AppColors.specularAt(
+                                  isPlaying ? 0.34 : 0.22),
+                              width: 1.5,
                             ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: PlayerArtworkSemantics(
+                            song: song,
+                            child: song != null
+                                ? CachedArtwork(
+                                    id: song.id,
+                                    albumId: song.albumId,
+                                    remoteUrl: song.remoteArtworkUrl ??
+                                        song.artworkUri,
+                                    type: ArtworkType.AUDIO,
+                                    size: artSize,
+                                    borderRadius: 28,
+                                    highQuality: true,
+                                    fallbackIcon: Icons.music_note_rounded,
+                                  )
+                                : ExcludeSemantics(
+                                    child: Container(
+                                      color: Colors.black26,
+                                      child: Icon(
+                                        Icons.music_note_rounded,
+                                        size: artSize * 0.4,
+                                        color: Colors.white54,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+        // 4. Real waveform overview. Static, tinted by playback state, and
+        //    only present when there are decoded peaks to show.
+        if (showOverview)
+          Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.xs),
+            child: SizedBox(
+              height: _kOverviewStripHeight,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                    child: _WaveformOverviewStrip(
+                      songId: overviewSong.id,
+                      filePath: overviewSong.path,
+                      activeColor: activeColor,
+                      isPlaying: isPlaying,
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        );
-      },
+          ),
+      ],
     );
   }
 }
@@ -241,27 +260,52 @@ class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reduce Motion: the release snaps flat instead of tweening back.
+    _springController.duration = context.motionMs(350);
+  }
+
+  @override
   void dispose() {
     _springController.dispose();
     super.dispose();
   }
 
-  void _onPanUpdate(DragUpdateDetails details) {
-    if (widget.size <= 0) return;
+  void _tiltTo(Offset dragDelta) {
     final half = widget.size / 2;
-    final dx = ((details.localPosition.dx - half) / half).clamp(-1.0, 1.0);
-    final dy = ((details.localPosition.dy - half) / half).clamp(-1.0, 1.0);
+    if (half <= 0) return;
+    final dx = (dragDelta.dx / half).clamp(-1.0, 1.0);
+    final dy = (dragDelta.dy / half).clamp(-1.0, 1.0);
     setState(() {
       _currentTilt = Offset(dx, dy);
     });
   }
 
-  void _onPanEnd(DragEndDetails details) {
+  void _onLongPressStart(LongPressStartDetails details) {
+    // The hold is what confirms the intent, so it gets the confirmation tap; the
+    // artwork then tilts with the drag instead of jumping to the finger.
+    PulsrHaptics.light();
+    setState(() => _currentTilt = Offset.zero);
+  }
+
+  void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
+    _tiltTo(details.offsetFromOrigin);
+  }
+
+  void _onLongPressEnd(LongPressEndDetails details) {
+    _springBack();
+  }
+
+  void _springBack() {
     _tiltAnim = Tween<Offset>(
       begin: _currentTilt,
       end: Offset.zero,
     ).animate(
-      CurvedAnimation(parent: _springController, curve: Curves.easeOutCubic),
+      CurvedAnimation(
+        parent: _springController,
+        curve: context.motionCurve(Curves.easeOutCubic),
+      ),
     );
     _springController.forward(from: 0.0);
   }
@@ -277,9 +321,18 @@ class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onPanUpdate: _onPanUpdate,
-      onPanEnd: _onPanEnd,
-      onPanCancel: () => _onPanEnd(DragEndDetails()),
+      // A plain pan here fought PlayerGestureScope's horizontal swipe (next /
+      // previous) and the tap that toggles lyrics, so a slightly diagonal swipe
+      // either skipped a track or killed the tilt. A long press claims the
+      // arena only after the finger has held still, which gives each gesture a
+      // recogniser of its own: tap = lyrics, swipe = track change, hold + drag
+      // = tilt.
+      onLongPressStart: _onLongPressStart,
+      onLongPressMoveUpdate: _onLongPressMoveUpdate,
+      onLongPressEnd: _onLongPressEnd,
+      onLongPressCancel: _springBack,
+      // The tilt is decoration; the artwork publishes its own image node.
+      excludeFromSemantics: true,
       child: Transform(
         alignment: FractionalOffset.center,
         transform: transform,
@@ -342,314 +395,177 @@ class _SonicRipplesPainter extends CustomPainter {
 }
 
 // ---------------------------------------------------------------------------
-// Fluid Audio Waves Painter: Harmonic multi-layer neon waves with gradient fills
+// Real Waveform Overview Strip
 // ---------------------------------------------------------------------------
-class _FluidAudioWavesPainter extends CustomPainter {
-  final Color color;
-  final double progress;
-  final bool isPlaying;
-  final double baselineY;
+/// Height of the overview lane under the artwork.
+const double _kOverviewStripHeight = 40.0;
 
-  _FluidAudioWavesPainter({
-    required this.color,
-    required this.progress,
-    required this.isPlaying,
-    required this.baselineY,
-  });
+/// Dips the playhead through 120 steps, so the strip is not rebuilt on every
+/// position tick while still stepping smoothly enough for a thin playhead.
+const int _kOverviewSteps = 120;
 
-  @override
-  void paint(Canvas canvas, Size size) {
-    final width = size.width;
-    final height = size.height;
-    final phase = progress * 2 * math.pi;
-
-    final double midY = baselineY.clamp(height * 0.45, height * 0.85);
-    final double amp1 = isPlaying ? 38.0 : 12.0;
-    final double amp2 = isPlaying ? 26.0 : 8.0;
-
-    // --- Wave Layer 1: Ambient Background Sine (Deeper tone, soft fill) ---
-    final path1 = Path();
-    final fill1 = Path();
-
-    fill1.moveTo(0, height);
-    path1.moveTo(0, midY);
-    fill1.lineTo(0, midY);
-
-    const int steps = 54;
-    for (int i = 0; i <= steps; i++) {
-      final x = (i / steps) * width;
-      final normalX = (i / steps) * 2 * math.pi;
-      final y = midY +
-          math.sin(normalX * 1.6 + phase * 0.8) * amp1 +
-          math.cos(normalX * 0.8 - phase * 0.4) * (amp1 * 0.45);
-      path1.lineTo(x, y);
-      fill1.lineTo(x, y);
-    }
-
-    fill1.lineTo(width, height);
-    fill1.close();
-
-    final fillPaint1 = Paint()
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          color.withValues(alpha: isPlaying ? 0.28 : 0.12),
-          color.withValues(alpha: 0.0),
-        ],
-      ).createShader(
-          Rect.fromLTWH(0, midY - amp1, width, height - (midY - amp1)));
-
-    final strokePaint1 = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..color = color.withValues(alpha: isPlaying ? 0.50 : 0.22);
-
-    canvas.drawPath(fill1, fillPaint1);
-    canvas.drawPath(path1, strokePaint1);
-
-    // --- Wave Layer 2: Foreground Crisp Harmonic (Brighter neon crest) ---
-    final path2 = Path();
-    final fill2 = Path();
-
-    fill2.moveTo(0, height);
-    path2.moveTo(0, midY + 6);
-    fill2.lineTo(0, midY + 6);
-
-    for (int i = 0; i <= steps; i++) {
-      final x = (i / steps) * width;
-      final normalX = (i / steps) * 2 * math.pi;
-      final y = (midY + 6) +
-          math.sin(normalX * 2.2 - phase * 1.2) * amp2 +
-          math.sin(normalX * 1.1 + phase * 0.6) * (amp2 * 0.55);
-      path2.lineTo(x, y);
-      fill2.lineTo(x, y);
-    }
-
-    fill2.lineTo(width, height);
-    fill2.close();
-
-    final fillPaint2 = Paint()
-      ..style = PaintingStyle.fill
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          color.withValues(alpha: isPlaying ? 0.40 : 0.18),
-          Colors.transparent,
-        ],
-      ).createShader(
-          Rect.fromLTWH(0, midY - amp2, width, height - (midY - amp2)));
-
-    // Neon glow underneath
-    final glowPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 7.0
-      ..color = color.withValues(alpha: isPlaying ? 0.35 : 0.12);
-
-    final strokePaint2 = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round
-      ..color = color.withValues(alpha: isPlaying ? 0.95 : 0.50);
-
-    canvas.drawPath(fill2, fillPaint2);
-    canvas.drawPath(path2, glowPaint);
-    canvas.drawPath(path2, strokePaint2);
-
-    // Peak sparkling neon dots
-    if (isPlaying) {
-      final dotPaint = Paint()
-        ..style = PaintingStyle.fill
-        ..color = Colors.white;
-
-      final dotGlow = Paint()
-        ..style = PaintingStyle.fill
-        ..color = color.withValues(alpha: 0.6);
-
-      for (int i = 3; i < steps; i += 6) {
-        final x = (i / steps) * width;
-        final normalX = (i / steps) * 2 * math.pi;
-        final y = (midY + 6) +
-            math.sin(normalX * 2.2 - phase * 1.2) * amp2 +
-            math.sin(normalX * 1.1 + phase * 0.6) * (amp2 * 0.55);
-        canvas.drawCircle(Offset(x, y), 5.0, dotGlow);
-        canvas.drawCircle(Offset(x, y), 2.5, dotPaint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _FluidAudioWavesPainter oldDelegate) {
-    return oldDelegate.progress != progress ||
-        oldDelegate.isPlaying != isPlaying ||
-        oldDelegate.color != color ||
-        oldDelegate.baselineY != baselineY;
-  }
+/// Only a local row has PCM to analyse. [WaveformService.getWaveform] hands back
+/// a generated placeholder for anything streamed, so those rows never reach it:
+/// an invented graph is the exact defect the fake spectrum HUD had, only quieter.
+bool _hasLocalAudioPath(String? path) {
+  if (path == null || path.isEmpty) return false;
+  if (path.startsWith('http')) return false;
+  return !path.startsWith('ytmusic://');
 }
 
-// ---------------------------------------------------------------------------
-// 10-Band Graphic Spectrum EQ HUD (Studio Monitoring Aesthetics)
-// AUDIT-FIX: Clarify spectrum generation nature
-// Synthetic harmonic simulation; not driven by real FFT data.
-// ---------------------------------------------------------------------------
-class _GraphicSpectrumHud extends StatefulWidget {
+/// Peak overview of the current track, drawn from decoded samples.
+///
+/// [WaveformService.getWaveform] is the only source: it returns the cached
+/// native PCM peaks for a local file (the same list the seek bar draws). It is
+/// deliberately not seeded with [WaveformService.getInstantWaveform], whose
+/// synchronous result is the generator's deterministic placeholder, and the
+/// strip renders nothing at all until real peaks exist.
+class _WaveformOverviewStrip extends StatefulWidget {
+  final int songId;
+  final String? filePath;
   final Color activeColor;
   final bool isPlaying;
-  final AnimationController waveController;
 
-  const _GraphicSpectrumHud({
+  const _WaveformOverviewStrip({
+    required this.songId,
+    required this.filePath,
     required this.activeColor,
     required this.isPlaying,
-    required this.waveController,
   });
 
   @override
-  State<_GraphicSpectrumHud> createState() => _GraphicSpectrumHudState();
+  State<_WaveformOverviewStrip> createState() => _WaveformOverviewStripState();
 }
 
-class _GraphicSpectrumHudState extends State<_GraphicSpectrumHud> {
-  static const List<String> _bandLabels = [
-    '32',
-    '64',
-    '125',
-    '250',
-    '500',
-    '1k',
-    '2k',
-    '4k',
-    '8k',
-    '16k',
-  ];
+class _WaveformOverviewStripState extends State<_WaveformOverviewStrip> {
+  Future<List<double>>? _samplesFuture;
+  int? _loadedSongId;
+  String? _loadedPath;
 
-  late final List<double> _peaks;
-  late final List<int> _peakHoldFrames;
+  Future<List<double>> _samplesForCurrentSong() {
+    if (_samplesFuture == null ||
+        _loadedSongId != widget.songId ||
+        _loadedPath != widget.filePath) {
+      _loadedSongId = widget.songId;
+      _loadedPath = widget.filePath;
+      // Default sample count on purpose: it shares the seek bar's cache entry,
+      // so opening Now Playing never decodes the same file twice.
+      _samplesFuture = WaveformService.instance.getWaveform(
+        songId: widget.songId,
+        filePath: widget.filePath,
+      );
+    }
+    return _samplesFuture!;
+  }
 
-  @override
-  void initState() {
-    super.initState();
-    _peaks = List.filled(_bandLabels.length, 0.0);
-    _peakHoldFrames = List.filled(_bandLabels.length, 0);
+  static int _playedStep(PlayerState state) {
+    final durationMs = state.duration.inMilliseconds;
+    if (durationMs <= 0) return 0;
+    final step =
+        (state.position.inMilliseconds / durationMs) * _kOverviewSteps;
+    return step.round().clamp(0, _kOverviewSteps);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppColors.logoInk.withValues(alpha: 0.85),
-        borderRadius: AppRadii.r8All,
-        border: Border.all(
-          color: widget.activeColor.withValues(alpha: 0.28),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: AnimatedBuilder(
-        animation: widget.waveController,
-        builder: (context, _) {
-          final t = widget.waveController.value * 2 * math.pi;
-
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(_bandLabels.length, (index) {
-              // Synthetic harmonic multi-band visualizer simulation based on audio phase
-              final double harmonic = widget.isPlaying
-                  ? (math.sin(t * 1.8 + index * 0.9).abs() * 0.65 +
-                      math.cos(t * 0.9 - index * 0.4).abs() * 0.35)
-                  : 0.12;
-              final double currentSegments = harmonic * 6;
-              final int activeSegments = currentSegments.clamp(1, 6).round();
-
-              if (widget.isPlaying) {
-                if (currentSegments >= _peaks[index]) {
-                  _peaks[index] = currentSegments;
-                  _peakHoldFrames[index] = 14;
-                } else {
-                  if (_peakHoldFrames[index] > 0) {
-                    _peakHoldFrames[index]--;
-                  } else {
-                    _peaks[index] = math.max(1.0, _peaks[index] - 0.14);
-                  }
-                }
-              } else {
-                _peaks[index] = 1.0;
-                _peakHoldFrames[index] = 0;
-              }
-              final int peakSeg = (_peaks[index] - 0.5).round().clamp(0, 5);
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2.2),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Vertical LED segments
-                    for (int seg = 5; seg >= 0; seg--) ...[
-                      Builder(builder: (_) {
-                        final bool isActive = seg < activeSegments;
-                        final bool isPeak = seg == peakSeg && widget.isPlaying;
-                        Color segColor;
-                        if (isActive || isPeak) {
-                          if (seg >= 4) {
-                            segColor = Colors.redAccent;
-                          } else if (seg >= 3) {
-                            segColor = Colors.amberAccent;
-                          } else {
-                            segColor = widget.activeColor;
-                          }
-                          if (!isActive && isPeak) {
-                            segColor = segColor.withValues(alpha: 0.95);
-                          }
-                        } else {
-                          segColor = Colors.white.withValues(alpha: 0.08);
-                        }
-
-                        return Container(
-                          width: 8,
-                          height: 2.2,
-                          margin: const EdgeInsets.symmetric(vertical: 0.6),
-                          decoration: BoxDecoration(
-                            color: segColor,
-                            borderRadius: AppRadii.circular(0.8),
-                            boxShadow: isPeak
-                                ? [
-                                    BoxShadow(
-                                      color: segColor.withValues(alpha: 0.6),
-                                      blurRadius: 2,
-                                    )
-                                  ]
-                                : null,
-                          ),
-                        );
-                      }),
-                    ],
-                    const SizedBox(height: 2),
-                    // Frequency Label
-                    ExcludeSemantics(
-                      child: Text(
-                        _bandLabels[index],
-                        style: const TextStyle(
-                          fontSize: AppFontSize.nano,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white54,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                  ],
+    return ExcludeSemantics(
+      child: FutureBuilder<List<double>>(
+        future: _samplesForCurrentSong(),
+        builder: (context, snapshot) {
+          final samples = snapshot.data;
+          if (samples == null || samples.isEmpty) {
+            // Nothing decoded yet (or the file could not be read): show nothing
+            // rather than filler that pretends to be this recording.
+            return const SizedBox.shrink();
+          }
+          return RepaintBoundary(
+            // Only the strip subscribes to position; the theme itself must not
+            // rebuild for a playhead nudge.
+            child: BlocSelector<PlayerCubit, PlayerState, int>(
+              selector: _playedStep,
+              builder: (context, step) => CustomPaint(
+                size: const Size(double.infinity, _kOverviewStripHeight),
+                painter: _WaveformOverviewPainter(
+                  samples: samples,
+                  progress: (step / _kOverviewSteps).clamp(0.0, 1.0),
+                  activeColor: widget.activeColor,
+                  isPlaying: widget.isPlaying,
                 ),
-              );
-            }),
+              ),
+            ),
           );
         },
       ),
     );
   }
 }
+
+/// Mirrored peak bars with the played part in the accent colour. Static apart
+/// from the played/unplayed boundary, which steps through [_kOverviewSteps]
+/// instead of rebuilding per frame.
+class _WaveformOverviewPainter extends CustomPainter {
+  final List<double> samples;
+  final double progress;
+  final Color activeColor;
+  final bool isPlaying;
+
+  _WaveformOverviewPainter({
+    required this.samples,
+    required this.progress,
+    required this.activeColor,
+    required this.isPlaying,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (samples.isEmpty || size.width <= 0 || size.height <= 0) return;
+
+    final double midY = size.height / 2;
+    final int count = samples.length;
+    final double slot = size.width / count;
+    final double barWidth = math.max(1.0, slot * 0.62);
+    final double playedX = size.width * progress;
+
+    final playedPaint = Paint()
+      ..color = activeColor.withValues(alpha: isPlaying ? 1.0 : 0.70);
+    final unplayedPaint = Paint()
+      ..color = activeColor.withValues(alpha: isPlaying ? 0.26 : 0.16);
+
+    for (int i = 0; i < count; i++) {
+      final double centerX = slot * (i + 0.5);
+      final double barHeight =
+          (samples[i].clamp(0.0, 1.0) * size.height).clamp(1.5, size.height);
+      final rrect = RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(centerX, midY),
+          width: barWidth,
+          height: barHeight,
+        ),
+        Radius.circular(barWidth / 2),
+      );
+      canvas.drawRRect(
+        rrect,
+        centerX <= playedX ? playedPaint : unplayedPaint,
+      );
+    }
+
+    // Playhead: a hairline, so the played/unplayed boundary is unambiguous.
+    final headPaint = Paint()
+      ..color = activeColor.withValues(alpha: isPlaying ? 0.95 : 0.55)
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(playedX, 0),
+      Offset(playedX, size.height),
+      headPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformOverviewPainter oldDelegate) =>
+      oldDelegate.samples != samples ||
+      oldDelegate.progress != progress ||
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.isPlaying != isPlaying;
+}
+

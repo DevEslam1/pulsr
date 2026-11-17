@@ -3,24 +3,13 @@ part of '../minimal_player_theme.dart';
 extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
   Widget _buildBody(BuildContext context) {
     final state = props.state;
-    final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
-    final (
-      :visualizerStyle,
-      :waveformSeekBarEnabled,
-      :playerSliderStyle,
-    ) = context.select<
-        SettingsCubit,
-        ({
-          VisualizerStyle visualizerStyle,
-          bool waveformSeekBarEnabled,
-          PlayerSliderStyle playerSliderStyle,
-        })>((c) => (
-          visualizerStyle: c.state.visualizerStyle,
-          waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
-          playerSliderStyle: c.state.playerSliderStyle,
-        ));
+    // Only the visualizer switch is read here. Selecting the wider settings
+    // record also rebuilt this theme whenever the waveform-seek or slider-style
+    // preferences changed, neither of which the stage paints.
+    final visualizerStyle = context
+        .select<SettingsCubit, VisualizerStyle>((c) => c.state.visualizerStyle);
 
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
         !state.isLyricsVisible &&
@@ -45,66 +34,71 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
         ),
       ),
       stage: (context, metrics) => PlayerGestureScope(
-        onTap: () => cubit.toggleLyricsVisibility(),
         child: LayoutBuilder(
           builder: (context, artConstraints) {
             final visualizerSpace = showVisualizer
                 ? math.min(artConstraints.maxHeight,
                     visualizerStyle == VisualizerStyle.circular ? 70.0 : 46.0)
                 : 0.0;
-            final telemetrySpace = (song != null) ? 50.0 : 0.0;
-            final artworkSize = PlayerThemeMetrics.safeArtworkSize(
-              availableWidth: artConstraints.maxWidth,
-              availableHeight: math.max(0.0,
-                  artConstraints.maxHeight - visualizerSpace - telemetrySpace),
-              isTablet: metrics.isTablet,
-              maxAllowedOverride: metrics.isLandscape ? 280.0 : null,
-            );
+            // The cover yields to the read-out instead of the two guessing at
+            // each other's height: the spec HUD is laid out at its real wrapped
+            // height (three lines on a 320 dp stage at 200% text) and the cover
+            // takes whatever the stage has left. Reserving a flat `50 * scale`
+            // was 17 px short on exactly that case and overflowed the stage.
+            final double artworkCap = metrics.isLandscape
+                ? 280.0
+                : (metrics.isTablet ? 600.0 : 480.0);
             return Column(
               key: const ValueKey('minimal_art_display'),
               mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Center(
-                  child: SizedBox(
-                    width: artworkSize,
-                    height: artworkSize,
-                    child: AspectRatio(
-                      aspectRatio: 1.0,
-                      child: Hero(
-                        tag: props.heroTag,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: AppRadii.circular(
-                                resolveCustomRadius(context, 20)),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: activeColor.withValues(alpha: 0.25),
-                                blurRadius: 28,
-                                spreadRadius: 1,
-                                offset: const Offset(0, 10),
+                Flexible(
+                  // The cover keeps most of the stage when there is room; the
+                  // visualizer only ever gets a fifth of the leftover space.
+                  flex: 4,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: artworkCap,
+                        maxHeight: artworkCap,
+                      ),
+                      child: AspectRatio(
+                        aspectRatio: 1.0,
+                        child: Hero(
+                          tag: props.heroTag,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: AppRadii.circular(
+                                  resolveCustomRadius(context, 20)),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.16),
+                                width: 1.2,
                               ),
-                            ],
-                          ),
-                          child: PlayerArtworkSemantics(
-                            song: song,
-                            child: song != null
-                                ? CachedArtwork(
-                                    id: song.id,
-                                    albumId: song.albumId,
-                                    remoteUrl: song.remoteArtworkUrl ??
-                                        song.artworkUri,
-                                    type: ArtworkType.AUDIO,
-                                    size: double.infinity,
-                                    borderRadius:
-                                        resolveCustomRadius(context, 20),
-                                    highQuality: true,
-                                  )
-                                : const SizedBox.shrink(),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: activeColor.withValues(alpha: 0.25),
+                                  blurRadius: 28,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: PlayerArtworkSemantics(
+                              song: song,
+                              child: song != null
+                                  ? CachedArtwork(
+                                      id: song.id,
+                                      albumId: song.albumId,
+                                      remoteUrl: song.remoteArtworkUrl ??
+                                          song.artworkUri,
+                                      type: ArtworkType.AUDIO,
+                                      size: double.infinity,
+                                      borderRadius:
+                                          resolveCustomRadius(context, 20),
+                                      highQuality: true,
+                                    )
+                                  : const SizedBox.shrink(),
+                            ),
                           ),
                         ),
                       ),
@@ -114,18 +108,36 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                 _MinimalAudiophileTelemetry(
                   song: song,
                   activeColor: activeColor,
+                  // The HUD may use the full stage width so the spec row stays
+                  // on one or two lines at 200% text instead of stacking.
+                  maxWidth: math.min(artConstraints.maxWidth, 420.0),
                 ),
-                if (showVisualizer) ...[
-                  SizedBox(height: math.min(10.0, visualizerSpace)),
-                  AudioVisualizer(
-                    style: visualizerStyle,
-                    color: activeColor,
-                    height: math.max(0.0, visualizerSpace - 10),
-                    isPlaying: state.isPlaying,
-                    audioSessionId: state.audioSessionId,
-                    trackSeed: song?.id,
+                // Flexible, like the cover: the visualizer is decoration and
+                // must yield the same way when a 200% text scale leaves the
+                // stage too short for the read-out. Its height comes from the
+                // space it is actually given, not from the stage estimate.
+                if (showVisualizer)
+                  Flexible(
+                    child: LayoutBuilder(
+                      builder: (context, vizConstraints) {
+                        final double gap = math.min(10.0, visualizerSpace);
+                        final double height =
+                            math.max(0.0, vizConstraints.maxHeight - gap);
+                        if (height <= 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: EdgeInsets.only(top: gap),
+                          child: AudioVisualizer(
+                            style: visualizerStyle,
+                            color: activeColor,
+                            height: height,
+                            isPlaying: state.isPlaying,
+                            audioSessionId: state.audioSessionId,
+                            trackSeed: song?.id,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ],
               ],
             );
           },
@@ -163,33 +175,69 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
 class _MinimalAudiophileTelemetry extends StatelessWidget {
   final SongsTableData? song;
   final Color activeColor;
+  final double maxWidth;
 
   const _MinimalAudiophileTelemetry({
     required this.song,
     required this.activeColor,
+    required this.maxWidth,
   });
+
+  /// Specs come from decoded file headers only.
+  ///
+  /// This widget used to fall back to '44.1 kHz' / '16-BIT' / 'PCM' whenever a
+  /// track had not been enriched yet, printing an invented spec in an app whose
+  /// promise is bit-perfect provenance. Missing fields are omitted now, and the
+  /// file extension is deliberately not used as a codec either: a renamed file
+  /// can claim any format, so only the header value counts.
+  static List<({String label, bool isFormat})> _specsFor(SongsTableData? song) {
+    if (song == null) return const [];
+    final specs = <({String label, bool isFormat})>[];
+
+    final codec = song.codec?.trim();
+    if (codec != null && codec.isNotEmpty) {
+      specs.add((label: codec.toUpperCase(), isFormat: true));
+    }
+
+    final sampleRate = song.sampleRate;
+    if (sampleRate != null && sampleRate > 0) {
+      // Non-breaking space keeps the value and its unit on one line when the
+      // row wraps at large text scales.
+      specs.add((
+        label: '${(sampleRate / 1000).toStringAsFixed(1)}\u00A0kHz',
+        isFormat: false,
+      ));
+    }
+
+    final bitDepth = song.bitDepth;
+    if (bitDepth != null && bitDepth > 0) {
+      specs.add((label: '$bitDepth-BIT', isFormat: false));
+    }
+
+    final bitrateKbps = song.bitrateKbps;
+    if (bitrateKbps != null && bitrateKbps > 0) {
+      specs.add((label: '$bitrateKbps\u00A0kbps', isFormat: false));
+    }
+
+    return specs;
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (song == null) return const SizedBox.shrink();
+    final specs = _specsFor(song);
+    if (specs.isEmpty) return const SizedBox.shrink();
 
     final p = context.palette;
-    final ext = (song!.codec != null && song!.codec!.isNotEmpty)
-        ? song!.codec!.toUpperCase()
-        : (song!.path.contains('.')
-            ? song!.path.split('.').last.toUpperCase()
-            : 'PCM');
-    final sampleRateStr = song!.sampleRate != null && song!.sampleRate! > 0
-        ? '${(song!.sampleRate! / 1000).toStringAsFixed(1)} kHz'
-        : '44.1 kHz';
-    final bitDepthStr = song!.bitDepth != null && song!.bitDepth! > 0
-        ? '${song!.bitDepth}-BIT'
-        : '16-BIT';
-    final bitrateStr = song!.bitrateKbps != null && song!.bitrateKbps! > 0
-        ? '${song!.bitrateKbps} kbps'
-        : null;
+    final textStyle = TextStyle(
+      fontFamily: 'monospace',
+      fontSize: AppFontSize.caption,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.6,
+      height: 1.45,
+    );
 
-    return MediaQuery.withNoTextScaling(
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
       child: Container(
         margin: const EdgeInsets.only(top: AppSpacing.s10),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
@@ -208,51 +256,54 @@ class _MinimalAudiophileTelemetry extends StatelessWidget {
             width: 0.9,
           ),
         ),
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        // One wrapping paragraph instead of a fixed Row: the old
+        // withNoTextScaling + FittedBox pair kept the type at 100% no matter
+        // what the listener asked for, which is exactly the dishonesty this HUD
+        // was meant to avoid. A paragraph wraps at any scale, keeps the
+        // monospace letter-spaced look, and never clips a spec.
+        child: Text.rich(
+          TextSpan(
             children: [
-              Container(
-                width: 5,
-                height: 5,
-                margin: const EdgeInsetsDirectional.only(end: 6),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: activeColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: activeColor.withValues(alpha: 0.6),
-                      blurRadius: 4,
-                    ),
-                  ],
-                ),
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: _buildStatusDot(),
               ),
-              _buildChip(ext, textColor: activeColor),
-              _buildDivider(p.hairline),
-              _buildChip(sampleRateStr, textColor: p.textSecondary),
-              _buildDivider(p.hairline),
-              _buildChip(bitDepthStr, textColor: p.textSecondary),
-              if (bitrateStr != null) ...[
-                _buildDivider(p.hairline),
-                _buildChip(bitrateStr, textColor: p.textSecondary),
+              for (int i = 0; i < specs.length; i++) ...[
+                if (i > 0)
+                  WidgetSpan(
+                    alignment: PlaceholderAlignment.middle,
+                    child: _buildDivider(p.hairline),
+                  ),
+                TextSpan(
+                  text: specs[i].label,
+                  style: textStyle.copyWith(
+                    color: specs[i].isFormat ? activeColor : p.textSecondary,
+                  ),
+                ),
               ],
             ],
           ),
+          textAlign: TextAlign.center,
+          style: textStyle,
         ),
       ),
     );
   }
 
-  Widget _buildChip(String label, {required Color textColor}) {
-    return Text(
-      label,
-      style: TextStyle(
-        fontFamily: 'monospace',
-        fontSize: AppFontSize.caption,
-        fontWeight: FontWeight.w800,
-        color: textColor,
-        letterSpacing: 0.6,
+  Widget _buildStatusDot() {
+    return Container(
+      width: 5,
+      height: 5,
+      margin: const EdgeInsetsDirectional.only(end: 6),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: activeColor,
+        boxShadow: [
+          BoxShadow(
+            color: activeColor.withValues(alpha: 0.6),
+            blurRadius: 4,
+          ),
+        ],
       ),
     );
   }

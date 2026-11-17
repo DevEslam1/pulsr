@@ -7,7 +7,6 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
-import '../../../settings/cubit/settings_state.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/player_gesture_scope.dart';
 import 'player_shape.dart';

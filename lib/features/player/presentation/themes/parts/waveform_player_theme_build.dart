@@ -4,7 +4,6 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
   Widget _buildBody(BuildContext context) {
     final p = context.palette;
     final state = widget.props.state;
-    final cubit = widget.props.cubit;
     final activeColor = widget.props.activeColor;
     final bgColor = widget.props.bgColor;
     final song = state.currentSong;
@@ -53,7 +52,6 @@ extension _WaveformPlayerThemeBuild on _WaveformPlayerThemeState {
         ),
       ),
       stage: (context, metrics) => PlayerGestureScope(
-        onTap: () => cubit.toggleLyricsVisibility(),
         child: _WaveformHeroStage(
           key: const ValueKey('waveform_hero_stage'),
           song: song,

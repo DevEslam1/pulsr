@@ -3,134 +3,124 @@ part of '../classic_player_theme.dart';
 extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
   Widget _buildBody(BuildContext context) {
     final state = props.state;
-    final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
+    final p = context.palette;
 
-    final (
-      :visualizerStyle,
-      :waveformSeekBarEnabled,
-      :playerSliderStyle,
-      :canvasEnabled,
-      :canvasAsBackdrop
-    ) = context.select<
+    // Select only what this theme paints. `waveformSeekBarEnabled` and
+    // `playerSliderStyle` used to be destructured here but never read — the
+    // shared seek bar subscribes to them itself — so they rebuilt the whole
+    // theme for settings Classic cannot show.
+    final (:visualizerStyle, :canvasAsBackdrop) = context.select<
         SettingsCubit,
-        ({
-          VisualizerStyle visualizerStyle,
-          bool waveformSeekBarEnabled,
-          PlayerSliderStyle playerSliderStyle,
-          bool canvasEnabled,
-          bool canvasAsBackdrop,
-        })>((c) => (
-          visualizerStyle: c.state.visualizerStyle,
-          waveformSeekBarEnabled: c.state.waveformSeekBarEnabled,
-          playerSliderStyle: c.state.playerSliderStyle,
-          canvasEnabled: c.state.canvasEnabled,
-          canvasAsBackdrop: c.state.canvasAsBackdrop,
-        ));
+        ({VisualizerStyle visualizerStyle, bool canvasAsBackdrop})>((c) => (
+              visualizerStyle: c.state.visualizerStyle,
+              canvasAsBackdrop: c.state.canvasAsBackdrop,
+            ));
 
-    final artRadius = resolveCustomRadius(context, AppRadii.r28);
+    // Frame, artwork clip and canvas backdrop must share one corner value.
+    // The cover used a hardcoded 26.8 while the frame read
+    // resolveCustomRadius(), so a Theme Studio radius left visible corner
+    // steps where the artwork met its bezel.
+    final double artRadius = resolveCustomRadius(context, AppRadii.r28);
+    final BorderRadius artCorners = AppRadii.circular(artRadius);
 
-    final showVisualizer = visualizerStyle != VisualizerStyle.off &&
+    final bool isPlaying = state.isPlaying;
+    final bool showVisualizer = visualizerStyle != VisualizerStyle.off &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&
         !PlayerSplitViewScope.of(context);
 
     final double vizHeight =
         visualizerStyle == VisualizerStyle.circular ? 60.0 : 34.0;
-    final double visualizerSpace = showVisualizer ? vizHeight + 8.0 : 0.0;
 
-    final visualizer = showVisualizer
-        ? Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 360),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
-                child: AudioVisualizer(
-                  style: visualizerStyle,
-                  color: activeColor,
-                  height: vizHeight,
-                  isPlaying: state.isPlaying,
-                  audioSessionId: state.audioSessionId,
-                  trackSeed: song?.id,
-                ),
-              ),
-            ),
-          )
-        : const SizedBox.shrink();
+    // The deck's light level. The shelf below the cover is tinted from this
+    // same value, so the visualizer is lit by the cover glow instead of being
+    // a separate widget that happens to share the accent colour.
+    final double deckGlowAlpha = isPlaying ? 0.42 : 0.18;
+
+    // The visualizer sits on a lit shelf that belongs to the cover deck, so
+    // its height is reserved before the plate is sized. Reserving it after
+    // would let the shelf push the deck out of the stage.
+    final double shelfHeight =
+        showVisualizer ? vizHeight + AppSpacing.xs : 0.0;
 
     return PlayerThemeScaffold(
       props: props,
       trackIcon: Icons.music_note_rounded,
       dockIconStyle: PlayerDockIconStyle.classic,
+      // No onTap override: the shared gesture scope owns single-tap-to-lyrics,
+      // which keeps Classic on the same convention as every other theme.
       stage: (context, metrics) => PlayerGestureScope(
-        onTap: () => cubit.toggleLyricsVisibility(),
         child: LayoutBuilder(
           builder: (context, artConstraints) {
-            final double dynamicArtSize = PlayerThemeMetrics.safeArtworkSize(
+            final double artSize = PlayerThemeMetrics.safeArtworkSize(
               availableWidth: artConstraints.maxWidth,
               availableHeight:
-                  math.max(0.0, artConstraints.maxHeight - visualizerSpace),
+                  math.max(0.0, artConstraints.maxHeight - shelfHeight),
               isTablet: metrics.isTablet,
               maxAllowedOverride: metrics.isLandscape ? 280.0 : null,
             );
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  key: const ValueKey('artwork_view'),
-                  child: SizedBox(
-                    width: dynamicArtSize,
-                    height: dynamicArtSize,
-                    child: AnimatedScale(
-                      scale: state.isPlaying ? 1.0 : 0.97,
-                      duration: context.motionMs(320),
-                      curve: context.motionCurve(Curves.easeOutCubic),
-                      child: AspectRatio(
-                        aspectRatio: 1.0,
-                        child: Hero(
-                          tag: props.heroTag,
-                          child: AnimatedContainer(
-                            duration: context.motionMs(320),
-                            curve: context.motionCurve(Curves.easeOutCubic),
-                            decoration: BoxDecoration(
-                              borderRadius: AppRadii.circular(artRadius),
-                              border: Border.all(
-                                color: Colors.white.withValues(
-                                  alpha: state.isPlaying ? 0.22 : 0.14,
-                                ),
-                                width: 1.4,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: activeColor.withValues(
-                                    alpha: state.isPlaying ? 0.44 : 0.20,
-                                  ),
-                                  blurRadius: state.isPlaying ? 46 : 28,
-                                  spreadRadius: state.isPlaying ? 3 : 0,
-                                  offset: const Offset(0, 16),
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.42),
-                                  blurRadius: 22,
-                                  offset: const Offset(0, 10),
-                                ),
-                              ],
-                            ),
-                            child: ClipRRect(
-                              borderRadius: AppRadii.circular(artRadius),
+            if (artSize <= 0) return const SizedBox.shrink();
+
+            return Center(
+              key: const ValueKey('artwork_view'),
+              child: SizedBox(
+                width: artSize,
+                height: artSize + shelfHeight,
+                child: AnimatedScale(
+                  scale: isPlaying ? 1.0 : 0.975,
+                  duration: context.motionMs(320),
+                  curve: context.motionCurve(Curves.easeOutCubic),
+                  child: AnimatedContainer(
+                    duration: context.motionMs(320),
+                    curve: context.motionCurve(Curves.easeOutCubic),
+                    decoration: BoxDecoration(
+                      borderRadius: artCorners,
+                      boxShadow: [
+                        // Ambient: the cover's own light, in the exact colour
+                        // the shelf waveform traces and gated by the same
+                        // play state, so the strip below reads as part of this
+                        // deck rather than a second, unrelated widget.
+                        BoxShadow(
+                          color: activeColor.withValues(alpha: deckGlowAlpha),
+                          blurRadius: isPlaying ? 44 : 26,
+                          spreadRadius: isPlaying ? 2 : 0,
+                          offset: const Offset(0, 14),
+                        ),
+                        // Contact: one tight shadow seats the plate on the
+                        // background. The old second ambient layer plus a
+                        // 1.4 px white border were decoration competing with
+                        // the glow for the same job.
+                        BoxShadow(
+                          color: Colors.black.withValues(
+                            alpha: p.isDark ? 0.34 : 0.14,
+                          ),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: artSize,
+                          height: artSize,
+                          child: ClipRRect(
+                            borderRadius: artCorners,
+                            child: Hero(
+                              tag: props.heroTag,
                               child: PlayerArtworkSemantics(
                                 song: song,
-                                child: song != null
-                                    ? (!canvasAsBackdrop
+                                child: song == null
+                                    ? const SizedBox.shrink()
+                                    : (!canvasAsBackdrop
                                         ? CanvasBackdrop(
                                             song: song,
-                                            isPlaying: state.isPlaying,
+                                            isPlaying: isPlaying,
                                             isBackdropMode: false,
-                                            borderRadius:
-                                                AppRadii.circular(artRadius),
+                                            borderRadius: artCorners,
                                             fallbackArtwork: CachedArtwork(
                                               id: song.id,
                                               albumId: song.albumId,
@@ -139,7 +129,7 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                                       song.artworkUri,
                                               type: ArtworkType.AUDIO,
                                               size: double.infinity,
-                                              borderRadius: 26.8,
+                                              borderRadius: artRadius,
                                               highQuality: true,
                                             ),
                                           )
@@ -150,20 +140,42 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                                 song.artworkUri,
                                             type: ArtworkType.AUDIO,
                                             size: double.infinity,
-                                            borderRadius: 26.8,
+                                            borderRadius: artRadius,
                                             highQuality: true,
-                                          ))
-                                    : const SizedBox.shrink(),
+                                          )),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                        if (showVisualizer)
+                          Container(
+                            height: shelfHeight,
+                            alignment: Alignment.center,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            decoration: BoxDecoration(
+                              color: activeColor.withValues(
+                                alpha: deckGlowAlpha * 0.38,
+                              ),
+                              borderRadius: BorderRadius.vertical(
+                                bottom: Radius.circular(artRadius),
+                              ),
+                            ),
+                            child: AudioVisualizer(
+                              style: visualizerStyle,
+                              color: activeColor,
+                              height: vizHeight,
+                              isPlaying: isPlaying,
+                              audioSessionId: state.audioSessionId,
+                              trackSeed: song?.id,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-                if (showVisualizer) visualizer,
-              ],
+              ),
             );
           },
         ),

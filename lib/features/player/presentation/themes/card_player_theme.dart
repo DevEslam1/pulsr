@@ -8,7 +8,6 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../settings/cubit/settings_cubit.dart';
-import '../../../settings/cubit/settings_state.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/canvas_backdrop.dart';
 import '../widgets/player_gesture_scope.dart';

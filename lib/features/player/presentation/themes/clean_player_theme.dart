@@ -49,15 +49,32 @@ import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
 
+part 'parts/clean_player_theme_deck_colors.dart';
+part 'parts/clean_player_theme_header.dart';
+part 'parts/clean_player_theme_stage.dart';
+part 'parts/clean_player_theme_seek_bar.dart';
+part 'parts/clean_player_theme_transport.dart';
+part 'parts/clean_player_theme_dock.dart';
+
 /// Clean Apple Music-inspired Player Theme.
 ///
 /// Features:
 /// 1. Full-bleed edge-to-edge artwork at the top that dissolves smoothly into
 ///    the album's ambient background color via a vertical gradient mask.
-/// 2. Left-aligned track title and artist with frosted action circles (Favorite & More).
-/// 3. Minimal seek bar with tabular timestamps and centered "Lossless" badge pill.
-/// 4. Bare, prominent transport controls (no circular background on Play/Pause).
+/// 2. Left-aligned track title and artist with frosted action circles (Favorite
+///    & More).
+/// 3. Minimal seek bar with tabular timestamps and centered "Lossless" badge
+///    pill.
+/// 4. Bare, prominent transport controls (no circular background on
+///    Play/Pause).
 /// 5. Clean bottom actions dock (Lyrics, AirPlay/Audio Output, Queue).
+///
+/// This file holds the public theme plus the layout composition only; the
+/// private widgets live in `parts/clean_player_theme_*.dart`. That split is not
+/// cosmetic: the deck used to hardcode `Colors.white` in six different widgets,
+/// which is exactly how it drifted into white-on-light in `AuraTheme.lightTheme`.
+/// One [_CleanDeckColors] resolution per widget keeps the foreground palette in
+/// a single, brightness-aware place.
 class CleanPlayerTheme extends StatelessWidget {
   final PlayerThemeProps props;
 
@@ -76,6 +93,7 @@ class CleanPlayerTheme extends StatelessWidget {
       :canvasEnabled,
       :canvasAsBackdrop,
       :themeMode,
+      :visualizerStyle,
     ) = context.select<
         SettingsCubit,
         ({
@@ -83,11 +101,13 @@ class CleanPlayerTheme extends StatelessWidget {
           bool canvasEnabled,
           bool canvasAsBackdrop,
           AppThemeMode themeMode,
+          VisualizerStyle visualizerStyle,
         })>((c) => (
           playerSliderStyle: c.state.playerSliderStyle,
           canvasEnabled: c.state.canvasEnabled,
           canvasAsBackdrop: c.state.canvasAsBackdrop,
           themeMode: c.state.themeMode,
+          visualizerStyle: c.state.visualizerStyle,
         ));
 
     final isInSplitView = PlayerSplitViewScope.of(context);
@@ -125,163 +145,22 @@ class CleanPlayerTheme extends StatelessWidget {
         final metrics = PlayerThemeMetrics.calculate(context, constraints);
         final isLandscape = metrics.isLandscape;
 
-        // 1. Upper stage: Full-bleed Artwork with gradient fade, Lyrics, or Queue
-        // In tablet split-view, the right pane is dedicated to lyrics / queue / DSP.
-        // Therefore, the left deck must ALWAYS display the showcase artwork,
-        // never an inline lyrics or queue overlay.
-        final Widget upperStage;
-        if (!isInSplitView && state.isLyricsVisible) {
-          upperStage = KeyedSubtree(
-            key: const ValueKey('lyrics_stage'),
-            child: SafeArea(
-              top: true,
-              bottom: false,
-              child: SizedBox.expand(
-                child: LyricsView(
-                  key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
-                  lyrics: state.lyrics,
-                  isLoading: state.isLoadingLyrics,
-                  activeColor: activeColor,
-                  source: state.lyricsSource,
-                  transparentBackground: true,
-                ),
-              ),
-            ),
-          );
-        } else if (!isInSplitView && state.isQueueVisible) {
-          upperStage = KeyedSubtree(
-            key: const ValueKey('queue_stage'),
-            child: SafeArea(
-              top: true,
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(
-                  top: AppSpacing.sm,
-                  start: AppSpacing.md,
-                  end: AppSpacing.md,
-                  bottom: AppSpacing.xs,
-                ),
-                child: const SizedBox.expand(
-                  child: NowPlayingQueueView(key: ValueKey('queue_view')),
-                ),
-              ),
-            ),
-          );
-        } else {
-          // Full-bleed edge-to-edge artwork fading seamlessly into the backdrop.
-          // Sizes directly from the rendered stage bounds so landscape split
-          // panes fill edge-to-edge into the camera cutout & corners without
-          // shrinking or letterboxing.
-          final useLandscapeFade = isLandscape && !isInSplitView;
-          upperStage = KeyedSubtree(
-            key: const ValueKey('art_stage'),
-            child: PlayerGestureScope(
-              child: LayoutBuilder(
-                builder: (context, stageConstraints) {
-                  final stageW = stageConstraints.maxWidth.isFinite &&
-                          stageConstraints.maxWidth > 0
-                      ? stageConstraints.maxWidth
-                      : constraints.maxWidth;
-                  final stageH = stageConstraints.maxHeight.isFinite &&
-                          stageConstraints.maxHeight > 0
-                      ? stageConstraints.maxHeight
-                      : stageW;
-                  final artworkSize =
-                      math.max(stageW, stageH).clamp(360.0, 1080.0);
-                  final artAlignment =
-                      useLandscapeFade ? Alignment.center : Alignment.topCenter;
-
-                  final fallbackArt = CachedArtwork(
-                    id: song?.id ?? 0,
-                    albumId: song?.albumId,
-                    remoteUrl: song?.remoteArtworkUrl ?? song?.artworkUri,
-                    type: ArtworkType.AUDIO,
-                    size: artworkSize,
-                    highQuality: true,
-                    borderRadius: 0,
-                    alignment: artAlignment,
-                  );
-
-                  final Widget artworkChild = PlayerArtworkSemantics(
-                    song: song,
-                    child: (canvasEnabled && !canvasAsBackdrop && song != null)
-                        ? CanvasBackdrop(
-                            song: song,
-                            isPlaying: state.isPlaying,
-                            isBackdropMode: false,
-                            borderRadius: BorderRadius.zero,
-                            fallbackArtwork: fallbackArt,
-                          )
-                        : fallbackArt,
-                  );
-
-                  final Widget heroArt = RepaintBoundary(
-                    child: Hero(
-                      tag: props.heroTag,
-                      child: SizedBox(
-                        width: stageW,
-                        height: stageH,
-                        child: artworkChild,
-                      ),
-                    ),
-                  );
-
-                  if (useLandscapeFade) {
-                    final textDirection = Directionality.of(context);
-                    return ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (bounds) => LinearGradient(
-                        begin: AlignmentDirectional.centerStart,
-                        end: AlignmentDirectional.centerEnd,
-                        colors: const [
-                          Colors.white,
-                          Colors.white,
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.68, 1.0],
-                      ).createShader(bounds, textDirection: textDirection),
-                      child: heroArt,
-                    );
-                  }
-
-                  return Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      heroArt,
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  Colors.transparent,
-                                  bottomBg.withValues(alpha: 0.18),
-                                  bottomBg.withValues(alpha: 0.65),
-                                  bottomBg,
-                                ],
-                                stops: const [0.0, 0.52, 0.70, 0.88, 1.0],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          );
-        }
-
+        // 1. Upper stage: full-bleed artwork with gradient fade, lyrics, or
+        // queue.
         final animatedUpperStage = ClipRect(
           child: AnimatedSwitcher(
             duration: context.motionMs(320),
             transitionBuilder: (child, animation) =>
                 playerOverlayTransitionBuilder(context, child, animation),
-            child: upperStage,
+            child: _CleanUpperStage(
+              props: props,
+              isInSplitView: isInSplitView,
+              isLandscape: isLandscape,
+              canvasEnabled: canvasEnabled,
+              canvasAsBackdrop: canvasAsBackdrop,
+              fadeColor: bottomBg,
+              fallbackWidth: constraints.maxWidth,
+            ),
           ),
         );
 
@@ -300,104 +179,15 @@ class CleanPlayerTheme extends StatelessWidget {
         final horizontalPadding =
             (constraints.maxWidth * 0.06).clamp(12.0, 24.0);
 
-        // 2. Track Header: Title and Artist with Download/Add to Playlist, Star (Favorite) & More (...) circles
-        final trackHeader = Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    MarqueeText(
-                      text: song?.title ?? context.l10n.noTrackSelected,
-                      textAlign: TextAlign.start,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize:
-                            (metrics.titleFontSize + 2.0).clamp(16.0, 24.0),
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      song?.artist ?? context.l10n.unknownArtist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize:
-                            (metrics.artistFontSize + 1.0).clamp(12.0, 16.5),
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: -0.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              // Action buttons on right: Download / Add to Playlist, Star (Favorite) & More (...)
-              if (song != null) ...[
-                if (hasDownload)
-                  _CleanActionCircleButton(
-                    tooltip: context.l10n.downloadLabel,
-                    child: YtmDownloadButton(
-                      song: song,
-                      activeColor: activeColor,
-                      iconColor: Colors.white,
-                      iconSize: 19,
-                    ),
-                  )
-                else
-                  _CleanActionCircleButton(
-                    icon: Icons.playlist_add_rounded,
-                    iconColor: Colors.white,
-                    tooltip: context.l10n.addToPlaylist,
-                    onTap: () {
-                      PulsrHaptics.lightImpact();
-                      AddToPlaylistSheet.show(context, song: song);
-                    },
-                  ),
-                const SizedBox(width: 8),
-              ],
-              _CleanActionCircleButton(
-                icon: (song?.isFavorite == true)
-                    ? Icons.star_rounded
-                    : Icons.star_outline_rounded,
-                iconColor: (song?.isFavorite == true)
-                    ? AppColors.amberDeep
-                    : Colors.white,
-                tooltip: (song?.isFavorite == true)
-                    ? context.l10n.unlike
-                    : context.l10n.like,
-                onTap: () {
-                  if (song != null) {
-                    PulsrHaptics.selection();
-                    cubit.toggleFavorite(song.id);
-                  }
-                },
-              ),
-              const SizedBox(width: 8),
-              _CleanActionCircleButton(
-                icon: Icons.more_horiz_rounded,
-                iconColor: Colors.white,
-                tooltip: context.l10n.moreOptions,
-                onTap: () {
-                  if (song != null) {
-                    PulsrHaptics.lightImpact();
-                    SongOptionsSheet.show(context, song: song);
-                  }
-                },
-              ),
-            ],
-          ),
+        // 2. Track header: title and artist with Download/Add to Playlist,
+        // Star (Favorite) & More (...) circles.
+        final trackHeader = _CleanTrackHeader(
+          props: props,
+          metrics: metrics,
+          horizontalPadding: horizontalPadding,
+          hasDownload: hasDownload,
         );
 
-        final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
-            (c) => c.state.visualizerStyle);
         final showVisualizer = visualizerStyle != VisualizerStyle.off &&
             !state.isLyricsVisible &&
             !state.isQueueVisible &&
@@ -420,7 +210,7 @@ class CleanPlayerTheme extends StatelessWidget {
               )
             : null;
 
-        // 3. Apple-style Seek Bar with Lossless badge & timestamps
+        // 3. Apple-style seek bar with Lossless badge & timestamps.
         final cleanSeekBar = _CleanSeekBar(
           props: props,
           duration: state.duration,
@@ -431,7 +221,7 @@ class CleanPlayerTheme extends StatelessWidget {
           isCompact: isShort,
         );
 
-        // Bookmark Prompt Banner (Resume playback from saved position)
+        // Bookmark prompt banner (resume playback from saved position).
         final Widget? bookmarkBanner = state.bookmarkPosition != null
             ? Padding(
                 padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
@@ -442,30 +232,68 @@ class CleanPlayerTheme extends StatelessWidget {
               )
             : null;
 
-        // 4. Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat)
+        // 4. Playback controls (Shuffle, Previous, Play/Pause, Next, Repeat).
         final transportControls = _CleanTransportControls(
           props: props,
           activeColor: activeColor,
           isCompact: isShort,
         );
 
-        // Volume Bar for tablet / split-view
-        final Widget? volumeBar = ((isInSplitView || context.isTablet) &&
-                !isVeryShort)
-            ? Padding(
-                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-                child: PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
-              )
-            : null;
+        // Volume bar for tablet / split-view.
+        final Widget? volumeBar =
+            ((isInSplitView || context.isTablet) && !isVeryShort)
+                ? Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: horizontalPadding),
+                    child: PlayerVolumeBar(
+                      cubit: cubit,
+                      activeColor: activeColor,
+                    ),
+                  )
+                : null;
 
-        // 5. Down Bar (Lyrics, EQ, Speed, Audio Output/Cast, Quran, Ambient, Timer, Queue)
+        // 5. Down bar (Lyrics, EQ, Speed, Audio Output/Cast, Quran, Ambient,
+        // Timer, Queue).
         final downBar = _CleanDownBar(
           props: props,
           activeColor: activeColor,
           horizontalPadding: horizontalPadding,
         );
 
-        // Layout composition
+        // Lower deck shared by the portrait and landscape compositions.
+        final Widget lowerDeck = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            trackHeader,
+            if (visualizer != null) visualizer,
+            SizedBox(height: spacingTrackToSeek),
+            cleanSeekBar,
+            if (song?.source == SongSource.radio) ...[
+              const SizedBox(height: AppSpacing.xs),
+              RadioNowPlayingRecommendations(
+                props: props,
+                cubit: cubit,
+              ),
+              const SizedBox(height: AppSpacing.xs),
+            ] else if (bookmarkBanner != null) ...[
+              const SizedBox(height: 8.0),
+              bookmarkBanner,
+              const SizedBox(height: 8.0),
+            ] else ...[
+              SizedBox(height: spacingSeekToControls),
+            ],
+            transportControls,
+            if (volumeBar != null) ...[
+              const SizedBox(height: 8.0),
+              volumeBar,
+              const SizedBox(height: 8.0),
+            ] else ...[
+              SizedBox(height: spacingControlsToDock),
+            ],
+            downBar,
+          ],
+        );
+
         final Widget content;
         if (isLandscape && !isInSplitView) {
           final isRtl = Directionality.of(context) == TextDirection.rtl;
@@ -489,39 +317,7 @@ class CleanPlayerTheme extends StatelessWidget {
                     child: Center(
                       child: SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            trackHeader,
-                            if (visualizer != null) visualizer,
-                            SizedBox(height: spacingTrackToSeek),
-                            cleanSeekBar,
-                            if (song?.source == SongSource.radio) ...[
-                              const SizedBox(height: AppSpacing.xs),
-                              RadioNowPlayingRecommendations(
-                                props: props,
-                                cubit: cubit,
-                              ),
-                              const SizedBox(height: AppSpacing.xs),
-                            ] else if (bookmarkBanner != null) ...[
-                              const SizedBox(height: 8.0),
-                              bookmarkBanner,
-                              const SizedBox(height: 8.0),
-                            ] else ...[
-                              SizedBox(height: spacingSeekToControls),
-                            ],
-                            transportControls,
-                            if (volumeBar != null) ...[
-                              const SizedBox(height: 8.0),
-                              volumeBar,
-                              const SizedBox(height: 8.0),
-                            ] else ...[
-                              SizedBox(height: spacingControlsToDock),
-                            ],
-                            downBar,
-                          ],
-                        ),
+                        child: lowerDeck,
                       ),
                     ),
                   ),
@@ -532,50 +328,17 @@ class CleanPlayerTheme extends StatelessWidget {
         } else {
           content = Column(
             children: [
-              // Upper Stage: Full-bleed artwork reaching to the top
+              // Upper stage: full-bleed artwork reaching to the top.
               Expanded(
                 child: animatedUpperStage,
               ),
-              // Lower Deck: Metadata, Seek Bar, Transport Controls, and Down Bar
+              // Lower deck: metadata, seek bar, transport and the down bar.
               SafeArea(
                 top: false,
                 bottom: true,
                 child: Padding(
                   padding: EdgeInsets.only(bottom: paddingBottom),
-                  child: RepaintBoundary(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        trackHeader,
-                        if (visualizer != null) visualizer,
-                        SizedBox(height: spacingTrackToSeek),
-                        cleanSeekBar,
-                        if (song?.source == SongSource.radio) ...[
-                          const SizedBox(height: AppSpacing.xs),
-                          RadioNowPlayingRecommendations(
-                            props: props,
-                            cubit: cubit,
-                          ),
-                          const SizedBox(height: AppSpacing.xs),
-                        ] else if (bookmarkBanner != null) ...[
-                          const SizedBox(height: 8.0),
-                          bookmarkBanner,
-                          const SizedBox(height: 8.0),
-                        ] else ...[
-                          SizedBox(height: spacingSeekToControls),
-                        ],
-                        transportControls,
-                        if (volumeBar != null) ...[
-                          const SizedBox(height: 8.0),
-                          volumeBar,
-                          const SizedBox(height: 8.0),
-                        ] else ...[
-                          SizedBox(height: spacingControlsToDock),
-                        ],
-                        downBar,
-                      ],
-                    ),
-                  ),
+                  child: RepaintBoundary(child: lowerDeck),
                 ),
               ),
             ],
@@ -586,7 +349,7 @@ class CleanPlayerTheme extends StatelessWidget {
           return content;
         }
 
-        // Rich, dynamic ambient backdrop matching the artwork palette
+        // Rich, dynamic ambient backdrop matching the artwork palette.
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -604,7 +367,7 @@ class CleanPlayerTheme extends StatelessWidget {
               ),
             ),
             RepaintBoundary(child: content),
-            // Top bar affordance: Grab handle (center)
+            // Top bar affordance: grab handle (center).
             const PositionedDirectional(
               top: 0,
               start: 0,
@@ -625,916 +388,6 @@ class CleanPlayerTheme extends StatelessWidget {
           ],
         );
       },
-    );
-  }
-}
-
-/// Circular frosted translucent button matching the reference photo (Star and More ...)
-class _CleanActionCircleButton extends StatelessWidget {
-  final IconData? icon;
-  final Widget? child;
-  final Color iconColor;
-  final String tooltip;
-  final VoidCallback? onTap;
-
-  const _CleanActionCircleButton({
-    this.icon,
-    this.child,
-    this.iconColor = Colors.white,
-    required this.tooltip,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Ink(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.16),
-            ),
-            child: Center(
-              child: child ?? Icon(icon, size: 20, color: iconColor),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Sleek seek bar with flanking timestamps and centered "Lossless" badge pill
-class _CleanSeekBar extends StatefulWidget {
-  final PlayerThemeProps props;
-  final Duration duration;
-  final SongsTableData? song;
-  final Color activeColor;
-  final PlayerSliderStyle sliderStyle;
-  final double horizontalPadding;
-  final bool isCompact;
-
-  const _CleanSeekBar({
-    required this.props,
-    required this.duration,
-    required this.song,
-    required this.activeColor,
-    required this.sliderStyle,
-    this.horizontalPadding = 24.0,
-    this.isCompact = false,
-  });
-
-  @override
-  State<_CleanSeekBar> createState() => _CleanSeekBarState();
-}
-
-class _CleanSeekBarState extends State<_CleanSeekBar> {
-  double? _dragValue;
-  bool _showRemainingTime = true;
-  Future<List<double>>? _cachedWaveformFuture;
-  int? _lastSongId;
-  String? _lastFilePath;
-
-  @override
-  void didUpdateWidget(covariant _CleanSeekBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.song?.id != oldWidget.song?.id) {
-      _dragValue = null;
-      _cachedWaveformFuture = null;
-    }
-  }
-
-  Widget _buildPulsrSlider(
-    double effectiveValue,
-    double maxDuration,
-    PlayerSliderStyle effectiveStyle,
-    bool isPlaying,
-    bool isBuffering,
-  ) {
-    return SizedBox(
-      height: widget.isCompact ? 22.0 : 28.0,
-      child: PulsrSlider(
-        value: effectiveValue,
-        min: 0.0,
-        max: maxDuration > 0 ? maxDuration : 1.0,
-        height: widget.isCompact ? 22.0 : 28.0,
-        activeColor: Colors.white,
-        inactiveColor: Colors.white.withValues(alpha: 0.22),
-        thumbColor: Colors.white,
-        sliderStyle: effectiveStyle,
-        isWavy: effectiveStyle == PlayerSliderStyle.wavy,
-        animateWave: isPlaying && !isBuffering,
-        onChangeStart: (val) {
-          PulsrHaptics.selectionClick();
-          setState(() => _dragValue = val);
-        },
-        onChanged: (val) {
-          setState(() => _dragValue = val);
-        },
-        onChangeEnd: (val) {
-          widget.props.cubit.seek(Duration(milliseconds: val.round()));
-          setState(() => _dragValue = null);
-        },
-        onChangeCancel: () {
-          setState(() => _dragValue = null);
-        },
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final position =
-        context.select<PlayerCubit, Duration>((c) => c.state.position);
-    final isPlaying =
-        context.select<PlayerCubit, bool>((c) => c.state.isPlaying);
-    final isBuffering =
-        context.select<PlayerCubit, bool>((c) => c.state.isBuffering);
-    final waveformEnabled = context
-        .select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
-
-    final double maxDuration = widget.duration.inMilliseconds.toDouble();
-    final double currentPos = position.inMilliseconds.toDouble();
-    final double effectiveValue = (_dragValue ?? currentPos)
-        .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
-    final isDragging = _dragValue != null;
-    final currentDuration =
-        isDragging ? Duration(milliseconds: _dragValue!.round()) : position;
-
-    final remaining = widget.duration > currentDuration
-        ? widget.duration - currentDuration
-        : Duration.zero;
-
-    final effectiveStyle = widget.sliderStyle;
-    final showWaveform = waveformEnabled && widget.song != null;
-
-    final Widget sliderWidget;
-    if (showWaveform) {
-      final songId = widget.song!.id;
-      final songPath = widget.song!.path;
-      if (_lastSongId != songId || _lastFilePath != songPath) {
-        _lastSongId = songId;
-        _lastFilePath = songPath;
-        _cachedWaveformFuture = null;
-      }
-      final instantSamples = WaveformService.instance.getInstantWaveform(
-        songId: songId,
-        filePath: songPath,
-      );
-      _cachedWaveformFuture ??= WaveformService.instance
-          .getWaveform(songId: songId, filePath: songPath);
-
-      sliderWidget = FutureBuilder<List<double>>(
-        key: ValueKey(songId),
-        initialData: instantSamples,
-        future: _cachedWaveformFuture,
-        builder: (context, snapshot) {
-          final samples = (snapshot.hasData && snapshot.data!.isNotEmpty)
-              ? snapshot.data!
-              : instantSamples;
-          if (samples.isNotEmpty) {
-            return WaveformSeekBar(
-              position: position,
-              duration: widget.duration,
-              onSeek: (pos) => widget.props.cubit.seek(pos),
-              samples: samples,
-              enabled: !isBuffering,
-              activeColor: Colors.white,
-              height: widget.isCompact ? 28.0 : 36.0,
-            );
-          }
-          return _buildPulsrSlider(
-            effectiveValue,
-            maxDuration,
-            effectiveStyle,
-            isPlaying,
-            isBuffering,
-          );
-        },
-      );
-    } else {
-      sliderWidget = _buildPulsrSlider(
-        effectiveValue,
-        maxDuration,
-        effectiveStyle,
-        isPlaying,
-        isBuffering,
-      );
-    }
-
-    Duration clampSeek(Duration delta) {
-      final target = currentDuration + delta;
-      if (target < Duration.zero) return Duration.zero;
-      if (target > widget.duration) return widget.duration;
-      return target;
-    }
-
-    String seekLabelFor(Duration value) =>
-        '${Formatters.formatDuration(value)} / '
-        '${Formatters.formatDuration(widget.duration)}';
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: widget.horizontalPadding),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // PulsrSlider publishes a percentage node of its own; replace it with
-          // an elapsed/total time node so TalkBack and VoiceOver read progress.
-          Semantics(
-            slider: true,
-            label: context.l10n.seekLabel,
-            value: seekLabelFor(currentDuration),
-            increasedValue:
-                seekLabelFor(clampSeek(const Duration(seconds: 10))),
-            decreasedValue:
-                seekLabelFor(clampSeek(const Duration(seconds: -10))),
-            onIncrease: () =>
-                widget.props.cubit.seek(clampSeek(const Duration(seconds: 10))),
-            onDecrease: () => widget.props.cubit
-                .seek(clampSeek(const Duration(seconds: -10))),
-            excludeSemantics: true,
-            child: sliderWidget,
-          ),
-          const SizedBox(height: 3),
-          // Row with: 0:46 (left), Lossless badge pill (center), -1:30 (right)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                Formatters.formatDuration(currentDuration),
-                style: TextStyle(
-                  color: isDragging
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.6),
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              // Centered Lossless badge pill matching Apple Music. It is the
-              // longest element in this row, so let it shrink under 200% text
-              // scaling instead of overflowing the timestamps.
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: _CleanLosslessBadgePill(
-                    song: widget.song,
-                    activeColor: widget.activeColor,
-                  ),
-                ),
-              ),
-              // Right timestamp (toggleable remaining time or duration)
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () =>
-                    setState(() => _showRemainingTime = !_showRemainingTime),
-                child: Text(
-                  _showRemainingTime
-                      ? '-${Formatters.formatDuration(remaining)}'
-                      : Formatters.formatDuration(widget.duration),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: AppFontSize.label,
-                    fontWeight: FontWeight.w600,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Translucent "Lossless" badge pill matching the photo
-class _CleanLosslessBadgePill extends StatelessWidget {
-  final SongsTableData? song;
-  final Color activeColor;
-
-  const _CleanLosslessBadgePill({
-    required this.song,
-    required this.activeColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (song == null) {
-      return const SizedBox(height: 22);
-    }
-
-    final streamingQuality = context.select<SettingsCubit, YtmAudioQuality>(
-      (c) => c.state.streamingQuality,
-    );
-    final info =
-        AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
-
-    final String label = (info.tier == AudioQualityTier.lossless ||
-            info.shortBadgeLabel.toLowerCase().contains('lossless'))
-        ? context.l10n.badgeLossless
-        : (info.tier == AudioQualityTier.hiResLossless
-            ? context.l10n.badgeHiResLossless
-            : info.shortBadgeLabel);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => AudioQualitySheet.show(context, song!, activeColor),
-        borderRadius: BorderRadius.circular(10),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
-              width: 0.8,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.graphic_eq_rounded,
-                size: 12,
-                color: Colors.white.withValues(alpha: 0.88),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.88),
-                  fontSize: AppFontSize.caption,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.1,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Bare Apple Music Transport Controls with Shuffle & Repeat affordances
-class _CleanTransportControls extends StatelessWidget {
-  final PlayerThemeProps props;
-  final Color activeColor;
-  final bool isCompact;
-
-  const _CleanTransportControls({
-    required this.props,
-    required this.activeColor,
-    this.isCompact = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final state = props.state;
-    final cubit = props.cubit;
-    final isPlaying = state.isPlaying;
-    final isBuffering = state.isBuffering;
-    final isShuffle = state.isShuffle;
-    final repeatMode = state.repeatMode;
-    final hasPrev = state.hasPreviousNeighbour;
-    final hasNext = state.hasNextNeighbour;
-
-    final double mainIconSize = isCompact ? 44.0 : 54.0;
-    final double sideIconSize = isCompact ? 32.0 : 40.0;
-    final double auxIconSize = isCompact ? 22.0 : 25.0;
-    final double buttonGap = isCompact ? 10.0 : 18.0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // 1. Shuffle Button
-            IconButton(
-              iconSize: auxIconSize,
-              padding: EdgeInsets.zero,
-              constraints: BoxConstraints(
-                minWidth: auxIconSize + 14,
-                minHeight: auxIconSize + 14,
-              ),
-              icon: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    Icons.shuffle_rounded,
-                    color: isShuffle
-                        ? activeColor
-                        : Colors.white.withValues(alpha: 0.65),
-                  ),
-                  if (isShuffle)
-                    Positioned(
-                      bottom: 0,
-                      child: Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: activeColor,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              tooltip: context.l10n.shuffle,
-              onPressed: () {
-                PulsrHaptics.selection();
-                cubit.toggleShuffle();
-              },
-            ),
-            SizedBox(width: buttonGap),
-
-            // 2. Previous / Rewind Button
-            IconButton(
-              iconSize: sideIconSize,
-              padding: EdgeInsets.zero,
-              constraints: BoxConstraints(
-                minWidth: sideIconSize + 8,
-                minHeight: sideIconSize + 8,
-              ),
-              icon: const Icon(Icons.fast_rewind_rounded),
-              color:
-                  hasPrev ? Colors.white : Colors.white.withValues(alpha: 0.35),
-              tooltip: context.l10n.previous,
-              onPressed: hasPrev
-                  ? () {
-                      PulsrHaptics.selection();
-                      cubit.previous();
-                    }
-                  : null,
-            ),
-            SizedBox(width: buttonGap),
-
-            // 3. Play / Pause Button
-            IconButton(
-              iconSize: mainIconSize,
-              padding: EdgeInsets.zero,
-              constraints: BoxConstraints(
-                minWidth: mainIconSize + 8,
-                minHeight: mainIconSize + 8,
-              ),
-              icon: isBuffering
-                  ? SizedBox(
-                      width: isCompact ? 24 : 32,
-                      height: isCompact ? 24 : 32,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 3,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Icon(
-                      isPlaying
-                          ? Icons.pause_rounded
-                          : Icons.play_arrow_rounded,
-                      color: Colors.white,
-                    ),
-              tooltip: isPlaying ? context.l10n.pause : context.l10n.play,
-              onPressed: () {
-                PulsrHaptics.light();
-                cubit.togglePlayPause();
-              },
-            ),
-            SizedBox(width: buttonGap),
-
-            // 4. Next / Fast-Forward Button
-            IconButton(
-              iconSize: sideIconSize,
-              padding: EdgeInsets.zero,
-              constraints: BoxConstraints(
-                minWidth: sideIconSize + 8,
-                minHeight: sideIconSize + 8,
-              ),
-              icon: const Icon(Icons.fast_forward_rounded),
-              color:
-                  hasNext ? Colors.white : Colors.white.withValues(alpha: 0.35),
-              tooltip: context.l10n.next,
-              onPressed: hasNext
-                  ? () {
-                      PulsrHaptics.selection();
-                      cubit.next();
-                    }
-                  : null,
-            ),
-            SizedBox(width: buttonGap),
-
-            // 5. Repeat Button
-            IconButton(
-              iconSize: auxIconSize,
-              padding: EdgeInsets.zero,
-              constraints: BoxConstraints(
-                minWidth: auxIconSize + 14,
-                minHeight: auxIconSize + 14,
-              ),
-              icon: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    repeatMode == PlayerRepeatMode.one
-                        ? Icons.repeat_one_rounded
-                        : Icons.repeat_rounded,
-                    color: repeatMode != PlayerRepeatMode.off
-                        ? activeColor
-                        : Colors.white.withValues(alpha: 0.65),
-                  ),
-                  if (repeatMode != PlayerRepeatMode.off)
-                    Positioned(
-                      bottom: 0,
-                      child: Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: activeColor,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              tooltip: context.l10n.repeat,
-              onPressed: () {
-                PulsrHaptics.selection();
-                cubit.toggleRepeat();
-                final nextMode = switch (repeatMode) {
-                  PlayerRepeatMode.off => PlayerRepeatMode.all,
-                  PlayerRepeatMode.all => PlayerRepeatMode.one,
-                  PlayerRepeatMode.one => PlayerRepeatMode.off,
-                };
-                final nextLabel = switch (nextMode) {
-                  PlayerRepeatMode.one => context.l10n.repeatOne,
-                  PlayerRepeatMode.all => context.l10n.repeatAll,
-                  PlayerRepeatMode.off => context.l10n.repeatOff,
-                };
-                final nextIcon = switch (nextMode) {
-                  PlayerRepeatMode.one => Icons.repeat_one_rounded,
-                  PlayerRepeatMode.all => Icons.repeat_rounded,
-                  PlayerRepeatMode.off => Icons.repeat_rounded,
-                };
-                PulsrToast.show(
-                  context,
-                  message: nextLabel,
-                  icon: nextIcon,
-                  duration: const Duration(milliseconds: 1200),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Down Bar matching reference photo & loaded with all dock features:
-/// Lyrics, Equalizer, Speed, Output / Cast, Quran, Ambient, Timer, Queue
-class _CleanDownBar extends StatelessWidget {
-  final PlayerThemeProps props;
-  final Color activeColor;
-  final double horizontalPadding;
-
-  const _CleanDownBar({
-    required this.props,
-    required this.activeColor,
-    this.horizontalPadding = 24.0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final state = props.state;
-    final cubit = props.cubit;
-    final outputDevice = context.select<SettingsCubit, AudioOutputInfo?>(
-      (c) => c.state.currentOutputDevice,
-    );
-    final isInSplit = PlayerSplitViewScope.of(context);
-    final splitTabCtrl = PlayerSplitViewScope.tabControllerOf(context);
-
-    final isUsb = outputDevice?.isUsb == true;
-    final IconData deviceOutputIcon = outputDevice == null
-        ? Icons.airplay_rounded
-        : (outputDevice.isUsb
-            ? Icons.usb_rounded
-            : (outputDevice.isBt
-                ? Icons.bluetooth_audio_rounded
-                : (outputDevice.isSpeaker
-                    ? Icons.speaker_rounded
-                    : (outputDevice.isHeadphones
-                        ? Icons.headphones_rounded
-                        : Icons.airplay_rounded))));
-
-    int? remainingTracks;
-    try {
-      remainingTracks = props.state.sleepTimerRemainingTracks ??
-          props.cubit.sleepTimerRemainingTracks;
-    } catch (_) {
-      remainingTracks = props.state.sleepTimerRemainingTracks;
-    }
-    bool isEndQ = false;
-    try {
-      isEndQ = props.cubit.isEndOfQueueSleepTimer == true;
-    } catch (_) {
-      isEndQ = false;
-    }
-    final hasTimer = props.state.sleepTimerRemaining != null ||
-        remainingTracks != null ||
-        isEndQ;
-    final isEqActive = state.isEqEnabled;
-    final speed = state.playbackSpeed;
-
-    Widget buildBar(BuildContext context) {
-      final bool isLyricsActive =
-          isInSplit ? (splitTabCtrl?.index == 0) : state.isLyricsVisible;
-      final bool isQueueActive =
-          isInSplit ? (splitTabCtrl?.index == 1) : state.isQueueVisible;
-
-      return Padding(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 480),
-            child: Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.0),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 1. Lyrics Button (Left)
-                    _DownBarItem(
-                      icon: isLyricsActive
-                          ? Icons.chat_bubble_rounded
-                          : Icons.chat_bubble_outline_rounded,
-                      isActive: isLyricsActive,
-                      activeColor: activeColor,
-                      tooltip: context.l10n.lyrics,
-                      onTap: () {
-                        PulsrHaptics.selection();
-                        if (isInSplit && splitTabCtrl != null) {
-                          splitTabCtrl.animateTo(0);
-                        } else {
-                          cubit.toggleLyricsVisibility();
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 4),
-
-                    // 2. Equalizer & DSP Button
-                    _DownBarItem(
-                      icon: Icons.tune_rounded,
-                      isActive: isEqActive,
-                      activeColor: activeColor,
-                      tooltip: context.l10n.equalizer,
-                      onTap: () {
-                        PulsrHaptics.lightImpact();
-                        EqualizerSheet.show(context);
-                      },
-                    ),
-                    const SizedBox(width: 4),
-
-                    // 3. Playback Speed Button
-                    _DownBarItem(
-                      icon: Icons.speed_rounded,
-                      isActive: speed != 1.0,
-                      badgeText:
-                          speed != 1.0 ? '${speed.toStringAsFixed(1)}x' : null,
-                      activeColor: activeColor,
-                      tooltip: context.l10n.playbackSpeed,
-                      onTap: () {
-                        PulsrHaptics.lightImpact();
-                        SpeedPickerSheet.show(context);
-                      },
-                    ),
-                    const SizedBox(width: 4),
-
-                    // 4. Audio Output / Cast / AirPlay Button
-                    // AUDIT-FIX (P3-24): Listen reactively to CastService so
-                    // CAST badge and icon update immediately on session changes.
-                    ValueListenableBuilder<CastSessionStatus>(
-                      valueListenable: CastService().sessionStatusListenable,
-                      builder: (context, castStatus, _) {
-                        final isCast = castStatus.connected;
-                        return _DownBarItem(
-                          icon: isCast
-                              ? Icons.cast_connected_rounded
-                              : deviceOutputIcon,
-                          isActive: isCast || isUsb,
-                          badgeText: isCast ? 'CAST' : (isUsb ? 'DAC' : null),
-                          activeColor: isCast
-                              ? AppColors.accentCyan
-                              : (isUsb ? AppColors.dacGold : activeColor),
-                          tooltip: isCast
-                              ? context.l10n.googleCast
-                              : context.l10n.audioOutputAndDac,
-                          onTap: () {
-                            PulsrHaptics.lightImpact();
-                            if (state.currentSong != null) {
-                              AudioQualitySheet.show(
-                                  context, state.currentSong!, activeColor);
-                            }
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 4),
-
-                    // 5. Quran Mode Button
-                    _DownBarItem(
-                      icon: Icons.auto_stories_rounded,
-                      isActive: state.isQuranModeEnabled,
-                      activeColor: AppColors.quranEmerald,
-                      tooltip: context.l10n.quranMode,
-                      onTap: () {
-                        PulsrHaptics.lightImpact();
-                        QuranModeSheet.show(context);
-                      },
-                    ),
-                    const SizedBox(width: 4),
-
-                    // 6. Ambient Sounds Button
-                    AnimatedBuilder(
-                      animation: AmbientSoundService(),
-                      builder: (context, _) {
-                        final isAmbientActive = AmbientSoundService().isEnabled;
-                        return _DownBarItem(
-                          icon: Icons.water_drop_rounded,
-                          isActive: isAmbientActive,
-                          activeColor: activeColor,
-                          tooltip: context.l10n.ambientSounds,
-                          onTap: () {
-                            PulsrHaptics.lightImpact();
-                            AmbientSoundSheet.show(context);
-                          },
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 4),
-
-                    // 7. Sleep Timer Button
-                    _DownBarItem(
-                      icon: Icons.timer_outlined,
-                      isActive: hasTimer,
-                      badgeText: hasTimer
-                          ? (remainingTracks != null
-                              ? '$remainingTracks tr'
-                              : (isEndQ
-                                  ? 'End'
-                                  : (state.sleepTimerRemaining != null
-                                      ? formatSleepTimerRemaining(
-                                          state.sleepTimerRemaining!)
-                                      : '')))
-                          : null,
-                      activeColor: activeColor,
-                      tooltip: isEndQ
-                          ? 'Sleep Timer: End of Queue'
-                          : (remainingTracks != null
-                              ? 'Sleep Timer: $remainingTracks tracks remaining'
-                              : (state.sleepTimerRemaining != null
-                                  ? 'Sleep Timer: ${formatSleepTimerRemaining(state.sleepTimerRemaining!)} remaining'
-                                  : context.l10n.sleepTimer)),
-                      onTap: () {
-                        PulsrHaptics.lightImpact();
-                        SleepTimerSheet.show(context);
-                      },
-                    ),
-                    const SizedBox(width: 4),
-
-                    // 8. Queue / Playlist Button (Right)
-                    _DownBarItem(
-                      icon: Icons.format_list_bulleted_rounded,
-                      isActive: isQueueActive,
-                      badgeText: state.queue.isNotEmpty
-                          ? '${state.queue.length}'
-                          : null,
-                      activeColor: activeColor,
-                      tooltip: context.l10n.queue,
-                      onTap: () {
-                        PulsrHaptics.selection();
-                        if (isInSplit && splitTabCtrl != null) {
-                          splitTabCtrl.animateTo(1);
-                        } else {
-                          cubit.toggleQueueVisibility();
-                        }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (isInSplit && splitTabCtrl != null) {
-      return AnimatedBuilder(
-        animation: splitTabCtrl.animation ?? splitTabCtrl,
-        builder: (context, _) => buildBar(context),
-      );
-    }
-    return buildBar(context);
-  }
-}
-
-class _DownBarItem extends StatelessWidget {
-  final IconData icon;
-  final bool isActive;
-  final Color? activeColor;
-  final String? badgeText;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _DownBarItem({
-    required this.icon,
-    required this.isActive,
-    this.activeColor,
-    this.badgeText,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedColor = activeColor ?? Colors.white;
-    return Material(
-      color: Colors.transparent,
-      child: Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              AnimatedContainer(
-                duration: context.motionMs(200),
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  color: isActive
-                      ? resolvedColor.withValues(alpha: 0.22)
-                      : Colors.transparent,
-                  border: isActive
-                      ? Border.all(
-                          color: resolvedColor.withValues(alpha: 0.40),
-                          width: 1.0,
-                        )
-                      : null,
-                ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: isActive
-                      ? resolvedColor
-                      : Colors.white.withValues(alpha: 0.70),
-                ),
-              ),
-              if (badgeText != null && badgeText!.isNotEmpty)
-                PositionedDirectional(
-                  top: -2,
-                  end: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 4.0,
-                      vertical: 1.0,
-                    ),
-                    decoration: BoxDecoration(
-                      color: resolvedColor,
-                      borderRadius: BorderRadius.circular(6.0),
-                    ),
-                    child: Text(
-                      badgeText!,
-                      style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w800,
-                        color: resolvedColor.computeLuminance() > 0.4
-                            ? Colors.black
-                            : Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

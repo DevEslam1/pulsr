@@ -168,13 +168,18 @@ void main() {
       expect(info.recoveryAction, equals(YtmRecoveryAction.none));
     });
 
-    test('classifies 403 Forbidden stream errors correctly', () {
+    test('a bare media-URL 403 spends the link, not the identity', () {
+      // just_audio's proxy reports `HTTP Status Error: 403` with no YouTube
+      // body. Classifying that as a bot challenge armed the global cooldown
+      // and threw away a working poToken over one expired signature — and the
+      // re-mint window then produced unattested URLs that 403'd again.
       final forbiddenErr = Exception('HTTP Status Error: 403');
       final info = YtmErrorClassifier.classify(forbiddenErr);
 
-      expect(info.signal, equals(YtmBlockSignal.botChallenge));
-      expect(info.recoveryAction,
-          equals(YtmRecoveryAction.invalidatePoTokenAndRetry));
+      expect(info.signal, isNull);
+      expect(info.recoveryAction, equals(YtmRecoveryAction.retryWithBackoff));
+      expect(info.message, contains('Stream link expired'));
+      expect(YtmErrorClassifier.isUrlBurned(forbiddenErr), isTrue);
     });
 
     test('classifies 407 Proxy Authentication errors correctly', () {

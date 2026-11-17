@@ -13,7 +13,8 @@ import '../../cubit/player_state.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/player_gesture_scope.dart';
-import '../widgets/speed_picker_sheet.dart';
+import 'painters/platter_scrub.dart';
+import 'player_shape.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
@@ -22,7 +23,6 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/performance/gpu_budget.dart';
-import '../../../../core/utils/pulsr_haptics.dart';
 
 part 'painters/vinyl_deck.dart';
 part 'painters/vinyl_painters.dart';

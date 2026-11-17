@@ -249,12 +249,15 @@ internal class InnertubeClient(
      * streaming (gvs-context) poToken as 'pot='. Matrix-driven so capability
      * overrides update behavior without a release. Idempotent.
      */
-    private fun maybeAppendStreamPot(url: String, client: ClientType): String {
+    private fun maybeAppendStreamPot(url: String, client: ClientType, guestPass: Boolean = false): String? {
         val host = runCatching { Uri.parse(url).host ?: "" }.getOrDefault("")
         if (!host.contains("googlevideo.com")) return url
         if (!ClientCapabilityMatrix.getCapability(client).requiresPoToken) return url
+        // A URL the player request itself already attested needs nothing from us.
+        val existingPot = runCatching { Uri.parse(url).getQueryParameter("pot") }.getOrNull()
+        if (!existingPot.isNullOrEmpty()) return url
         val dataSyncId = PoTokenManager.dataSyncId
-        val isAuthed = client.acceptsSessionAuth && cookieStore.isSessionValid()
+        val isAuthed = !guestPass && client.acceptsSessionAuth && cookieStore.isSessionValid()
         val token = if (isAuthed) {
             // FIX #9: For authenticated session, only use account token if dataSyncId is present.
             // Do NOT fall back to guest streamingPoToken!
@@ -266,14 +269,18 @@ internal class InnertubeClient(
         } else {
             PoTokenManager.streamingPoToken
         }
-        if (token.isEmpty()) return url
+        if (token.isEmpty()) {
+            // GVS answers every fetch of an unattested URL with 403, so
+            // returning it as a "success" only moves the failure into the
+            // player (where it used to arm a false bot cooldown). Fail the
+            // client instead so the chain can try one that does not need a
+            // token, or the poToken recovery path can re-mint and retry.
+            Log.w(TAG, "No streaming poToken for ${client.name}; discarding unattested URL to avoid a guaranteed 403")
+            return null
+        }
 
         return runCatching {
             val uri = Uri.parse(url)
-            val existingPot = uri.getQueryParameter("pot")
-            // FIX #17: If pot is already present and non-empty, do not re-append
-            if (!existingPot.isNullOrEmpty()) return url
-
             // If pot parameter is present but empty (e.g. pot=, ?pot&, or ?pot#), replace it
             val emptyPotPattern = Regex("([?&])pot=?(?=&|#|$)")
             if (emptyPotPattern.containsMatchIn(url)) {
@@ -283,7 +290,7 @@ internal class InnertubeClient(
             } else {
                 uri.buildUpon().appendQueryParameter("pot", token).toString()
             }
-        }.getOrDefault(url)
+        }.getOrNull()
     }
 
     fun resolvePlayerStream(videoId: String, quality: String = "high", preferM4a: Boolean = false): Map<String, Any?> {
@@ -414,7 +421,16 @@ internal class InnertubeClient(
 
         fun attemptClient(
             client: ClientType,
-            ignoreShortCircuit: Boolean = false
+            ignoreShortCircuit: Boolean = false,
+            // Session demotion splits the two ways a player request can run
+            // signed in. True (stream resolution): a valid cookie jar without a
+            // dataSyncId cannot mint an account-bound poToken, and YouTube gates
+            // the media URL on attestation — the session-bearing request would
+            // resolve formats whose URLs answer 403. Such a pass runs as a clean
+            // guest (no cookies, guest visitorData, guest poToken) exactly like
+            // the Dart Tier-1 does. False (datasync bootstrap, age-gate rescue):
+            // those requests exist precisely to use the session.
+            demoteSessionToGuest: Boolean = true,
         ): AttemptResult {
             if (Thread.currentThread().isInterrupted) return AttemptResult.Interrupted
             // FIX #2: Allow bypass during PoToken recovery
@@ -434,12 +450,29 @@ internal class InnertubeClient(
             // FIX #7: Keep default safe and wrap fingerprint store in try block
             var actualRequestUa = client.userAgent
 
+            // A signed-in session with no dataSyncId cannot mint the
+            // account-bound poToken the player request needs; riding the session
+            // without it returns URLs that 403 on first fetch. Run that pass as
+            // a guest instead (see the parameter comment).
+            val guestPass = demoteSessionToGuest &&
+                client.acceptsSessionAuth &&
+                cookieStore.isSessionValid() &&
+                PoTokenManager.dataSyncId.isEmpty()
+            if (guestPass) {
+                Log.i(TAG, "[$traceId] ${client.name} runs as a guest pass for $videoId: " +
+                    "signed-in session has no dataSyncId for an account-bound poToken")
+            }
+
             try {
                 val fp = FingerprintStore.getFingerprint(context)
                 actualRequestUa = fp.buildUserAgent(client)
 
                 Log.d(TAG, "[$traceId] Attempting player resolution for $videoId using client: ${client.name}")
-                val playerJson = requestPlayer(videoId, client, activeCalls, deadlineMs = resolveDeadlineMs)
+                val playerJson = requestPlayer(
+                    videoId, client, activeCalls,
+                    deadlineMs = resolveDeadlineMs,
+                    guestPass = guestPass,
+                )
                 if (Thread.currentThread().isInterrupted) return AttemptResult.Interrupted
 
                 val playability = playerJson.optJSONObject("playabilityStatus")
@@ -645,7 +678,17 @@ internal class InnertubeClient(
                 }
 
                 Log.i(TAG, "[$traceId] Successfully resolved $videoId via ${client.name} (itag: ${selected.optInt("itag")}, bitrate: $selectedBitrate)")
-                val finalUrl = maybeAppendStreamPot(selectedUrl, client)
+                val finalUrl = maybeAppendStreamPot(selectedUrl, client, guestPass)
+                    ?: run {
+                        // Formats came back but the URL could not be attested;
+                        // hand the chain a signal it can act on (poToken
+                        // recovery) instead of a stream that 403s on fetch.
+                        updateBestSignal(YtmBlockSignal.PoTokenInvalid)
+                        return AttemptResult.Failure(
+                            YtmBlockSignal.PoTokenInvalid,
+                            isClientSpecific = false,
+                        )
+                    }
 
                 // FIX #8 & #20: Pre-connect non-blocking, non-fatal, on dedicated executor with wrapped scheduling
                 runCatching {
@@ -675,7 +718,9 @@ internal class InnertubeClient(
                     // the session (same rule as the Dart Tier-1). The media URL of
                     // an age-gated track is the one case where it matters: the
                     // googlevideo edge re-checks the identity that was granted it.
-                    "cookies" to if (client.acceptsSessionAuth) {
+                    // A guest pass resolved without the session must also fetch
+                    // without it.
+                    "cookies" to if (client.acceptsSessionAuth && !guestPass) {
                         cookieStore.getMergedCookieHeader(client.endpointHost)
                     } else null,
                     "activeClient" to client.name,
@@ -750,7 +795,13 @@ internal class InnertubeClient(
             val last = lastDataSyncBootstrapMs.get()
             // FIX #21: Atomic check-and-set for datasync bootstrap
             if (now - last > DATASYNC_BOOTSTRAP_INTERVAL_MS && lastDataSyncBootstrapMs.compareAndSet(last, now)) {
-                val bootstrapped = attemptClient(ClientType.WEB_REMIX, ignoreShortCircuit = true)
+                // The bootstrap exists to harvest the account's dataSyncId, so it
+                // must carry the session even when no dataSyncId is known yet.
+                val bootstrapped = attemptClient(
+                    ClientType.WEB_REMIX,
+                    ignoreShortCircuit = true,
+                    demoteSessionToGuest = false,
+                )
                 // FIX #3 & #14: Comprehensive handling of AttemptResult in datasync bootstrap
                 when (bootstrapped) {
                     is AttemptResult.Success -> {
@@ -793,7 +844,13 @@ internal class InnertubeClient(
         // cookies + SAPISIDHASH + account poToken, then signature and `n`
         // deciphering — which is exactly what a WEB player response needs.
         if (forceClient != null) {
-            val result = attemptClient(forceClient, ignoreShortCircuit = true)
+            // The age-gate rescue only works under the signed-in session, so it
+            // must not be demoted to a guest pass even without a dataSyncId.
+            val result = attemptClient(
+                forceClient,
+                ignoreShortCircuit = true,
+                demoteSessionToGuest = false,
+            )
             when (result) {
                 is AttemptResult.Success -> return result.payload
                 is AttemptResult.Interrupted -> {
@@ -1267,17 +1324,19 @@ internal class InnertubeClient(
         videoId: String,
         clientType: ClientType,
         activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null,
-        deadlineMs: Long = Long.MAX_VALUE
+        deadlineMs: Long = Long.MAX_VALUE,
+        guestPass: Boolean = false,
     ): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
-        val payload = buildPlayerBody(videoId, clientType)
+        val payload = buildPlayerBody(videoId, clientType, guestPass)
         // Resolution uses the tighter-call-timeout client so a single hung edge
         // cannot stall the whole chain for 15s (see YtmHttpClient.resolveOkHttpClient).
         return postWithRetry(
             endpoint, payload, clientType, RateLimiter.Bucket.PLAYER,
             maxAttempts = 2, activeCalls = activeCalls,
             client = YtmHttpClient.resolveOkHttpClient,
-            deadlineMs = deadlineMs
+            deadlineMs = deadlineMs,
+            guestPass = guestPass,
         )
     }
 
@@ -1458,6 +1517,7 @@ internal class InnertubeClient(
         activeCalls: ConcurrentHashMap<ClientType, CopyOnWriteArrayList<okhttp3.Call>>? = null,
         client: okhttp3.OkHttpClient = YtmHttpClient.okHttpClient,
         deadlineMs: Long = Long.MAX_VALUE,
+        guestPass: Boolean = false,
     ): JSONObject {
         var lastError: Exception? = null
         val traceId = UUID.randomUUID().toString()
@@ -1532,7 +1592,7 @@ internal class InnertubeClient(
                     reqBuilder.header("X-Goog-RolloutToken", rollout)
                 }
 
-                val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
+                val authedWeb = !guestPass && clientType.acceptsSessionAuth && cookieStore.isSessionValid()
                 val visitorData = if (authedWeb) {
                     PoTokenManager.sessionVisitorData
                 } else {
@@ -1735,11 +1795,22 @@ internal class InnertubeClient(
     private fun harvestSessionState(json: JSONObject, clientType: ClientType) {
         if (!clientType.acceptsSessionAuth || !cookieStore.isSessionValid()) return
         val responseContext = json.optJSONObject("responseContext") ?: return
-        val dataSyncId = responseContext
-            .optJSONObject("mainAppWebResponseContext")
-            ?.optString("datasyncId")
+        val mainApp = responseContext.optJSONObject("mainAppWebResponseContext")
+        // Same lookup order as the Dart account service: the binding has moved
+        // between responseContext levels before, and a miss here silently
+        // downgrades every later playback to the guest pass.
+        val dataSyncId = mainApp?.optString("datasyncId")?.takeIf { it.isNotBlank() }
+            ?: responseContext.optString("datasyncId").takeIf { it.isNotBlank() }
+            ?: json.optString("datasyncId").takeIf { it.isNotBlank() }
         if (!dataSyncId.isNullOrBlank()) {
             PoTokenManager.setDataSyncId(dataSyncId)
+        } else if (PoTokenManager.dataSyncId.isEmpty() &&
+            dataSyncHarvestDiagnosticLogged.compareAndSet(false, true)
+        ) {
+            // Key names only, never values: this response is authenticated.
+            Log.w(TAG, "Authenticated ${clientType.name} response carried no datasyncId " +
+                "(responseContext keys=${responseContext.keys().asSequence().toList()}, " +
+                "mainAppWebResponseContext keys=${mainApp?.keys()?.asSequence()?.toList()})")
         }
         val visitorData = responseContext.optString("visitorData")
         if (visitorData.isNotBlank()) {
@@ -1747,9 +1818,11 @@ internal class InnertubeClient(
         }
     }
 
-    private fun buildPlayerBody(videoId: String, clientType: ClientType): JSONObject {
+    private val dataSyncHarvestDiagnosticLogged = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    private fun buildPlayerBody(videoId: String, clientType: ClientType, guestPass: Boolean = false): JSONObject {
         val root = JSONObject()
-        root.put("context", buildClientContext(clientType, videoId))
+        root.put("context", buildClientContext(clientType, videoId, guestPass))
         root.put("videoId", videoId)
         root.put("racyCheckOk", true)
         root.put("contentCheckOk", true)
@@ -1776,9 +1849,14 @@ internal class InnertubeClient(
         if (requiresPo) {
             val hasPo = PoTokenManager.isReady ||
                 (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
+            val dataSyncId = PoTokenManager.dataSyncId
             if (hasPo) {
-                val dataSyncId = PoTokenManager.dataSyncId
-                val isAuthed = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
+                // A guest pass never carries the session, so it must never be
+                // handed the session-bound token either: the pair would be
+                // rejected as a mismatch.
+                val isAuthed = !guestPass &&
+                    clientType.acceptsSessionAuth &&
+                    cookieStore.isSessionValid()
                 val poToken = if (isAuthed) {
                     if (dataSyncId.isNotEmpty()) {
                         PoTokenManager.accountPoTokenForSync(dataSyncId)
@@ -1797,21 +1875,30 @@ internal class InnertubeClient(
                     }
                     contentPlaybackContext.put("poToken", poToken)
                     Log.d(TAG, "[$clientType] Attached player poToken (len=${poToken.length}, video=$videoId, isWeb=${clientType.isWeb})")
+                } else {
+                    Log.w(TAG, "[$clientType] Player poToken unavailable (video=$videoId, guestPass=$guestPass, " +
+                        "dataSyncId=${dataSyncId.isNotEmpty()}); request goes out unattested")
                 }
+            } else {
+                Log.w(TAG, "[$clientType] BotGuard not ready; player request goes out unattested (video=$videoId, guestPass=$guestPass)")
             }
         }
 
         return root
     }
 
-    private fun buildClientContext(clientType: ClientType, videoId: String? = null): JSONObject {
+    private fun buildClientContext(
+        clientType: ClientType,
+        videoId: String? = null,
+        guestPass: Boolean = false,
+    ): JSONObject {
         val fp = FingerprintStore.getFingerprint(context)
         val client = JSONObject().apply {
             put("clientName", clientType.clientName)
             put("clientVersion", clientType.effectiveClientVersion)
             put("hl", fp.hl)
             put("gl", fp.gl)
-            val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
+            val authedWeb = !guestPass && clientType.acceptsSessionAuth && cookieStore.isSessionValid()
             val visitorData = if (authedWeb) {
                 PoTokenManager.sessionVisitorData
             } else {

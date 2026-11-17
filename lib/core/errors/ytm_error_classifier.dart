@@ -552,6 +552,21 @@ class YtmErrorClassifier {
       return _mapSignal(YtmBlockSignal.ageRestricted, null, traceId);
     }
 
+    // 0.5 A raw status from the media byte stream (just_audio's proxy throws
+    // `HTTP Status Error: 403` with no YouTube body) spends the URL and says
+    // nothing about the identity. Classifying it as a bot challenge armed the
+    // global cooldown and threw away a working poToken because one signature
+    // expired — and during that re-mint a web player request could go out
+    // unattested, producing yet another dead URL. Keep it signal-less: the
+    // source already retries once with a fresh resolve.
+    if (_mediaFetchStatus(errStr) != null) {
+      return YtmErrorInfo(
+        message: 'Stream link expired. Refreshing…',
+        recoveryAction: YtmRecoveryAction.retryWithBackoff,
+        traceId: traceId,
+      );
+    }
+
     // 1. Bot challenges / verification
     if (_isBotText(errStr)) {
       return YtmErrorInfo(
@@ -681,6 +696,14 @@ class YtmErrorClassifier {
       recoveryAction: YtmRecoveryAction.none,
       traceId: traceId,
     );
+  }
+
+  /// HTTP status carried by just_audio's media-fetch failure
+  /// (`HTTP Status Error: 403`), or null when this is not that shape.
+  static int? _mediaFetchStatus(String lower) {
+    final match =
+        RegExp(r'http status error:\s*(\d{3})').firstMatch(lower);
+    return match == null ? null : int.tryParse(match.group(1)!);
   }
 
   static YtmErrorInfo classifyCode(String code,

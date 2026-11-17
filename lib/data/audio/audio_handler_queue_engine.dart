@@ -1645,7 +1645,15 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     final warmIdx = _activePlayer.shuffleModeEnabled
         ? _getNextIndex(peek: true)
         : (index + 1 < _songs.length ? index + 1 : null);
-    if (warmIdx != null && warmIdx >= 0 && warmIdx < _songs.length) {
+    // A shuffle peek can land back on the track that is already playing. Warming
+    // it builds a second audio source over the same byte-cache path: the two
+    // sinks then fetch the same file concurrently, the later one truncates the
+    // `.part` the first is still writing, and the duplicate GET can come back
+    // 403 — observed as a 1.5 s start followed by a 403 on the same videoId.
+    if (warmIdx != null &&
+        warmIdx != index &&
+        warmIdx >= 0 &&
+        warmIdx < _songs.length) {
       unawaited(_tripleBufferPipeline.preloadNext(_songs[warmIdx]));
     }
     if (depth >= 2 && _songs.length > index + 2) {

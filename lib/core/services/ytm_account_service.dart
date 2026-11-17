@@ -35,6 +35,7 @@ import 'ytm_cookie_codec.dart';
 import 'ytm_media_helpers.dart';
 
 part 'ytm_account_service_parsing.dart';
+part 'ytm_account_service_datasync.dart';
 
 enum SessionValidationResult {
   valid,
@@ -2752,41 +2753,7 @@ class YtmAccountService {
     }
   }
 
-  /// Bootstraps [_dataSyncId] with one lightweight authenticated `browse` call when it is unknown
-  /// (e.g. right after login before any library fetch). The datasyncId is present on any
-  /// authenticated response, so a home browse is enough to harvest it.
-  Future<void> _bootstrapDataSyncId() async {
-    try {
-      final headers = _buildHeaders();
-      final body = jsonEncode({
-        'context': _buildClientContext('WEB_REMIX'),
-        'browseId': 'FEmusic_home',
-      });
-      final res = await _postWithRetry(
-        Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
-        headers: headers,
-        body: body,
-        baseTimeoutSeconds: 8,
-      );
-      if (res.statusCode == 200) {
-        final json = jsonDecode(res.body) as Map<String, dynamic>;
-        final before = _dataSyncId;
-        _harvestSessionState(json);
-        if ((_dataSyncId == null || _dataSyncId!.isEmpty) ||
-            _dataSyncId == before) {
-          debugPrint('[YTM_ACCOUNT] datasyncId bootstrap: HTTP 200 but no '
-              'datasyncId in response (loggedIn=${!_isUnauthenticatedResponse(json)}, '
-              'auth=${isOAuthSession ? 'oauth' : 'cookies'}). Account-bound '
-              'playback will stay on the guest pass.');
-        }
-      } else {
-        debugPrint('[YTM_ACCOUNT] datasyncId bootstrap: HTTP ${res.statusCode} '
-            '(auth=${isOAuthSession ? 'oauth' : 'cookies'})');
-      }
-    } catch (e) {
-      debugPrint('[YTM_ACCOUNT] datasyncId bootstrap failed: $e');
-    }
-  }
+  String _accountMenuDiagnostic = '';
 
   List<YtmTrack> _parseInnertubePlaylistTracks(
     Map<String, dynamic> root, {

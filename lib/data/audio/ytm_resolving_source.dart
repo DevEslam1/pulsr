@@ -228,8 +228,15 @@ class YtmResolvingSource extends StreamAudioSource {
           final classified = YtmErrorClassifier.classify(retryErr);
           debugPrint(
               '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}');
-          if (_isFatalSignal(classified)) {
-            final code = classified.signal?.wireCode ?? 'UNKNOWN';
+          // A freshly resolved URL that is rejected on its first fetch is as
+          // final for this source as a bot challenge: re-entering the resolver
+          // on every proxy retry is the Release→Init→fail spiral the latch
+          // exists to stop. The verdict stays signal-less ("expired"), so the
+          // audio handler does not arm a global cooldown for one dead
+          // signature.
+          final burnedAgain = isUrlBurned(retryErr);
+          if (_isFatalSignal(classified) || burnedAgain) {
+            final code = classified.signal?.wireCode ?? 'YTM_STREAM_EXPIRED';
             final fatalErr = retryErr is YtmException
                 ? retryErr
                 : YtmException(code, classified.message);

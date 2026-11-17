@@ -33,12 +33,13 @@ extension _CdPlayerThemeBuild on _CdPlayerThemeState {
                   height: availableH,
                   child: Hero(
                     tag: widget.props.heroTag,
-                    child: _CdTurntableStage(
+                    child: _CdJewelStage(
                       props: widget.props,
                       isTablet: metrics.isTablet,
                       isLandscape: metrics.isLandscape,
                       rotationController: _rotationController,
-                      tonearmAnimation: _tonearmAnimation,
+                      pickupAnimation: _pickupAnimation,
+                      glossAnimation: _glossController,
                     ),
                   ),
                 ),

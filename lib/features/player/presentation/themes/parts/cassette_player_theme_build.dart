@@ -2,11 +2,23 @@ part of '../cassette_player_theme.dart';
 
 extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
   Widget _buildBody(BuildContext context) {
-    final cubit = widget.props.cubit;
     final state = widget.props.state;
     final activeColor = widget.props.activeColor;
     final visualizerStyle = context
         .select<SettingsCubit, VisualizerStyle>((c) => c.state.visualizerStyle);
+    // The deck is one painted object, so it publishes one semantics node
+    // instead of the label print TalkBack used to read out ("SIDE A",
+    // "TYPE II", "NR • OFF", the painted counter). Title, artist and
+    // transport state come from the chrome header, which stays the accessible
+    // source of truth; the shell only adds what the painting cannot say.
+    final song = state.currentSong;
+    final deckStatus = state.isPlaying
+        ? context.l10n.ambientStatusPlaying
+        : context.l10n.ambientStatusPaused;
+    final deckLabel = song == null
+        ? '${context.l10n.nowPlaying}, $deckStatus'
+        : '${context.l10n.nowPlayingSemantics(song.title, song.artist)}, '
+            '$deckStatus';
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&
@@ -17,7 +29,8 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
       trackIcon: Icons.radio_rounded,
       dockIconStyle: PlayerDockIconStyle.cassette,
       stage: (context, metrics) => PlayerGestureScope(
-        onTap: () => cubit.togglePlayPause(),
+        // No onTap override: the stage convention is tap = toggle lyrics, and
+        // transport already lives on the play/pause button.
         child: LayoutBuilder(
           builder: (context, stageConstraints) {
             final double visualizerH = showVisualizer
@@ -35,14 +48,18 @@ extension _CassettePlayerThemeBuild on _CassettePlayerThemeState {
                   key: const ValueKey('cassette_view'),
                   child: SizedBox(
                     height: availableH,
-                    child: Hero(
-                      tag: widget.props.heroTag,
-                      child: _CassetteBody(
-                        props: widget.props,
-                        activeColor: activeColor,
-                        spoolController: _spoolController,
-                        isLandscape: metrics.isLandscape,
-                        isTablet: metrics.isTablet,
+                    child: Semantics(
+                      container: true,
+                      label: deckLabel,
+                      child: Hero(
+                        tag: widget.props.heroTag,
+                        child: _CassetteBody(
+                          props: widget.props,
+                          activeColor: activeColor,
+                          spoolController: _spoolController,
+                          isLandscape: metrics.isLandscape,
+                          isTablet: metrics.isTablet,
+                        ),
                       ),
                     ),
                   ),

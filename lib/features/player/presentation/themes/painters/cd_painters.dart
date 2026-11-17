@@ -208,300 +208,365 @@ class _CdFlarePainter extends CustomPainter {
       oldDelegate.labelRatio != labelRatio;
 }
 
-/// Custom painter for the modern, sleek tonearm stick assembly.
-class _CdTonearmPainter extends CustomPainter {
-  final Offset pivot;
-  final double angle;
+/// Paints the jewel case that seats the disc: translucent lid, hinge spine,
+/// recessed tray and the gloss band that sweeps the lid on play/pause.
+///
+/// The case is what makes this deck read as a CD jewel box instead of a second
+/// turntable. Everything here is anchored to the stage box, so it repaints only
+/// when the gloss animation ticks or the case geometry changes.
+class _CdJewelCasePainter extends CustomPainter {
+  final double spineWidth;
+  final Rect trayRect;
+  final Offset discCenter;
+  final double discRadius;
   final Color activeColor;
-  final double armLength;
-  final double liftProgress;
+  final bool isPlaying;
 
-  static const double _gimbalRadius = 20.0;
-  static const double _innerPivotRadius = 13.0;
-
-  _CdTonearmPainter({
-    required this.pivot,
-    required this.angle,
+  _CdJewelCasePainter({
+    required this.spineWidth,
+    required this.trayRect,
+    required this.discCenter,
+    required this.discRadius,
     required this.activeColor,
-    required this.armLength,
-    this.liftProgress = 1.0,
+    required this.isPlaying,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Arm Rest / Cradle at fixed parked position
-    final restBase = pivot + const Offset(-4, 38);
-    _drawArmRest(canvas, restBase);
-
-    // 2. Gimbal Base (Pivot Mount)
-    _drawGimbalBase(canvas);
-
-    // Save canvas to rotate the tonearm stick around the pivot
-    canvas.save();
-    canvas.translate(pivot.dx, pivot.dy);
-    canvas.rotate(angle);
-
-    final l = armLength;
-
-    // 3. Counterweight / Back Stem
-    _drawCounterweight(canvas);
-
-    // 4. Realistic Drop Shadow on the CD beneath the arm
-    _drawTonearmShadow(canvas, l);
-
-    // 5. Tonearm Stick (Cylindrical metallic rod)
-    _drawStickTube(canvas, l);
-
-    // 6. Modern Cartridge & Stylus Head
-    _drawStylusHead(canvas, l);
-
-    // 7. Pivot Cap & Bearing
-    _drawPivotCap(canvas);
-
-    canvas.restore();
-  }
-
-  void _drawArmRest(Canvas canvas, Offset base) {
-    // Cradle pillar
-    final restPaint = Paint()
-      ..color = PlayerMaterialColors.cdClampWell
-      ..style = PaintingStyle.fill;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: base, width: 7, height: 16),
-        const Radius.circular(2),
-      ),
-      restPaint,
+    final caseRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final caseRRect = RRect.fromRectAndRadius(
+      caseRect.deflate(0.5),
+      const Radius.circular(AppRadii.r14),
     );
 
-    // Cradle top fork
-    final forkPaint = Paint()
-      ..color = PlayerMaterialColors.cdClampBorder
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-    final forkPath = Path()
-      ..moveTo(base.dx - 5, base.dy - 6)
-      ..lineTo(base.dx, base.dy - 3)
-      ..lineTo(base.dx + 5, base.dy - 6);
-    canvas.drawPath(forkPath, forkPaint);
-  }
-
-  void _drawGimbalBase(Canvas canvas) {
-    // Outer base plate with shadow
-    final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.5)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-    canvas.drawCircle(pivot + const Offset(0, 3), _gimbalRadius, shadowPaint);
-
-    // Base body gradient
-    final basePaint = Paint()
-      ..shader = RadialGradient(
-        colors: const [
-          PlayerMaterialColors.cdPivotHigh,
-          PlayerMaterialColors.cdPivotMid,
-          PlayerMaterialColors.cdPivotLow,
-        ],
-        stops: const [0.0, 0.65, 1.0],
-      ).createShader(Rect.fromCircle(center: pivot, radius: _gimbalRadius));
-    canvas.drawCircle(pivot, _gimbalRadius, basePaint);
-
-    // Metallic rim ring
-    final rimPaint = Paint()
-      ..shader = SweepGradient(
-        colors: [
-          Colors.grey.shade400,
-          Colors.grey.shade700,
-          Colors.grey.shade300,
-          Colors.grey.shade800,
-          Colors.grey.shade400,
-        ],
-      ).createShader(Rect.fromCircle(center: pivot, radius: _gimbalRadius))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    canvas.drawCircle(pivot, _gimbalRadius, rimPaint);
-
-    // Inner concentric bezel
-    final innerBezelPaint = Paint()
-      ..color = PlayerMaterialColors.cdPivotBase
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(pivot, _innerPivotRadius, innerBezelPaint);
-
-    // Ambient status indicator ring (glows with activeColor)
-    final ledPaint = Paint()
-      ..color = activeColor.withValues(alpha: 0.6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    canvas.drawCircle(pivot, _innerPivotRadius, ledPaint);
-  }
-
-  void _drawCounterweight(Canvas canvas) {
-    // Rear stem extension behind pivot
-    final stemPaint = Paint()..color = PlayerMaterialColors.cdStem;
+    // 1. Case lift-off shadow.
     canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        const Rect.fromLTWH(-3, -26, 6, 26),
-        const Radius.circular(2),
-      ),
-      stemPaint,
+      caseRRect.shift(const Offset(0, 8)),
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.42)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
     );
 
-    // Cylindrical counterweight cylinder
-    final weightRect = const Rect.fromLTWH(-7, -23, 14, 15);
-    final weightPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [
-          PlayerMaterialColors.cdWeightHigh,
-          PlayerMaterialColors.cdWeightMid,
-          PlayerMaterialColors.cdWeightLow,
-          PlayerMaterialColors.cdWeightRim,
-        ],
-        stops: [0.0, 0.35, 0.7, 1.0],
-      ).createShader(weightRect);
+    // 2. Translucent polycarbonate lid. It stays dark enough to keep the white
+    // VFD read-out legible in the light theme.
     canvas.drawRRect(
-      RRect.fromRectAndRadius(weightRect, const Radius.circular(3)),
-      weightPaint,
+      caseRRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            PlayerMaterialColors.cdSurfaceUpper.withValues(alpha: 0.97),
+            PlayerMaterialColors.cdTrayGradStart,
+            PlayerMaterialColors.cdTrayGradEnd,
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(caseRect),
     );
 
-    // Calibration groove
-    final groovePaint = Paint()
-      ..color = Colors.white24
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
-    canvas.drawLine(const Offset(-7, -15), const Offset(7, -15), groovePaint);
-  }
-
-  void _drawTonearmShadow(Canvas canvas, double l) {
-    final p = liftProgress.clamp(0.0, 1.0);
-    final offset =
-        Offset.lerp(const Offset(11, 13), const Offset(3.5, 4.0), p)!;
-    final blurSigma = 7.0 + (2.5 - 7.0) * p;
-
-    final shadowPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.42)
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, blurSigma)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.5
-      ..strokeCap = StrokeCap.round;
-
-    final shadowPath = Path()
-      ..moveTo(0, 6)
-      ..lineTo(0, l - 18)
-      ..lineTo(-5, l);
-
-    canvas.save();
-    canvas.translate(offset.dx, offset.dy);
-    canvas.drawPath(shadowPath, shadowPaint);
-    canvas.restore();
-  }
-
-  void _drawStickTube(Canvas canvas, double l) {
-    final tubeLength = l - 22;
-    final tubeRect = Rect.fromLTWH(-2.2, 0, 4.4, tubeLength);
-
-    // Precision cylindrical aluminum specular highlight
-    final tubePaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.centerLeft,
-        end: Alignment.centerRight,
-        colors: [
-          Colors.grey.shade400,
-          Colors.white,
-          Colors.grey.shade300,
-          Colors.grey.shade600,
-        ],
-        stops: const [0.0, 0.28, 0.65, 1.0],
-      ).createShader(tubeRect);
-
+    // 3. Clear plastic edge bevel: bright where the light hits, dim opposite.
     canvas.drawRRect(
-      RRect.fromRectAndRadius(tubeRect, const Radius.circular(2.2)),
-      tubePaint,
+      caseRRect.deflate(0.8),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.30),
+            Colors.white.withValues(alpha: 0.06),
+            Colors.white.withValues(alpha: 0.16),
+          ],
+        ).createShader(caseRect),
     );
 
-    // Subtle edge specular stroke
-    final tubeEdgePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5;
+    // 4. The tray the disc clips into: a recessed panel, darker than the lid.
+    final trayRRect = RRect.fromRectAndRadius(
+      trayRect,
+      const Radius.circular(AppRadii.r10),
+    );
+    canvas.drawRRect(
+      trayRRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            PlayerMaterialColors.recordBase.withValues(alpha: 0.55),
+            PlayerMaterialColors.cdSurfaceBottom.withValues(alpha: 0.78),
+          ],
+        ).createShader(trayRect),
+    );
+    canvas.drawRRect(
+      trayRRect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..color = Colors.white.withValues(alpha: 0.10),
+    );
+
+    // 5. Hinge spine along the leading edge, with the lid seam and ribs.
+    final spineRect = Rect.fromLTWH(
+      caseRect.left + 1.5,
+      caseRect.top + 1.5,
+      math.max(spineWidth - 1.5, 4.0),
+      caseRect.height - 3.0,
+    );
+    canvas.drawRect(
+      spineRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            PlayerMaterialColors.cdClampWell,
+            PlayerMaterialColors.cdTrayGradStart,
+          ],
+        ).createShader(spineRect),
+    );
     canvas.drawLine(
-        const Offset(-1.5, 2), Offset(-1.5, tubeLength - 2), tubeEdgePaint);
-  }
+      Offset(spineRect.right, spineRect.top),
+      Offset(spineRect.right, spineRect.bottom),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.14)
+        ..strokeWidth = 1.0,
+    );
+    final ribPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.10)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+    for (final double fraction in const [0.22, 0.5, 0.78]) {
+      final y = spineRect.top + spineRect.height * fraction;
+      canvas.drawLine(
+        Offset(spineRect.left + 4, y),
+        Offset(spineRect.right - 4, y),
+        ribPaint,
+      );
+    }
 
-  void _drawStylusHead(Canvas canvas, double l) {
-    // Stylus cartridge connector collar
-    final collarRect = Rect.fromLTWH(-3.5, l - 24, 7, 5);
-    final collarPaint = Paint()..color = PlayerMaterialColors.cdCollar;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(collarRect, const Radius.circular(1.5)),
-      collarPaint,
+    // 6. Disc seat: a shadowed well with a lit rim, plus the accent ring that
+    // brightens while the deck is playing.
+    canvas.drawCircle(
+      discCenter,
+      discRadius + 7,
+      Paint()..color = Colors.black.withValues(alpha: 0.30),
+    );
+    canvas.drawCircle(
+      discCenter,
+      discRadius + 7,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..color = Colors.white.withValues(alpha: 0.08),
+    );
+    canvas.drawCircle(
+      discCenter,
+      discRadius + 4,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = activeColor.withValues(alpha: isPlaying ? 0.20 : 0.08),
     );
 
-    // Angled contemporary headshell (like the sleek stick in the photo)
-    final headshellPath = Path()
-      ..moveTo(-3, l - 19)
-      ..lineTo(3, l - 19)
-      ..lineTo(2, l - 2)
-      ..lineTo(-5, l)
-      ..lineTo(-5, l - 10)
-      ..close();
-
-    final headRect = Rect.fromLTWH(-5, l - 19, 8, 20);
-    final headPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          PlayerMaterialColors.cdHeadHigh,
-          PlayerMaterialColors.cdHeadMid,
-          PlayerMaterialColors.cdHeadLow,
-        ],
-      ).createShader(headRect);
-    canvas.drawPath(headshellPath, headPaint);
-
-    // Stylus edge bevel highlight
-    final headEdgePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8;
-    canvas.drawPath(headshellPath, headEdgePaint);
-
-    // Stylus Cartridge Needle / Accent Light Indicator
-    final needlePaint = Paint()
-      ..color = activeColor
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(-3.5, l - 1), 1.8, needlePaint);
-
-    // Glow dot on stylus
-    final glowPaint = Paint()
-      ..color = activeColor.withValues(alpha: 0.6)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-    canvas.drawCircle(Offset(-3.5, l - 1), 3.0, glowPaint);
-  }
-
-  void _drawPivotCap(Canvas canvas) {
-    // Center pivot bearing cap
-    final capRect = const Rect.fromLTWH(-7, -7, 14, 14);
-    final capPaint = Paint()
-      ..shader = SweepGradient(
-        colors: [
-          Colors.grey.shade300,
-          Colors.grey.shade600,
-          Colors.grey.shade200,
-          Colors.grey.shade700,
-          Colors.grey.shade300,
-        ],
-      ).createShader(capRect);
-    canvas.drawCircle(Offset.zero, 6.5, capPaint);
-
-    // Center screw dot
-    final screwPaint = Paint()..color = PlayerMaterialColors.recordSheenCenter;
-    canvas.drawCircle(Offset.zero, 2.4, screwPaint);
+    // The lid gloss itself is painted above the disc by _CdLidGlossPainter, so
+    // the sweep crosses the disc like light over clear plastic.
   }
 
   @override
-  bool shouldRepaint(covariant _CdTonearmPainter oldDelegate) =>
-      oldDelegate.angle != angle ||
+  bool shouldRepaint(covariant _CdJewelCasePainter oldDelegate) =>
+      oldDelegate.spineWidth != spineWidth ||
+      oldDelegate.trayRect != trayRect ||
+      oldDelegate.discCenter != discCenter ||
+      oldDelegate.discRadius != discRadius ||
       oldDelegate.activeColor != activeColor ||
-      oldDelegate.armLength != armLength ||
-      oldDelegate.pivot != pivot ||
-      oldDelegate.liftProgress != liftProgress;
+      oldDelegate.isPlaying != isPlaying;
+}
+
+/// Paints the optical pickup sled: the rail along the tray lip, the lens head
+/// riding it, and the read beam that lands on the disc surface.
+class _CdPickupSledPainter extends CustomPainter {
+  final double railLeft;
+  final double railRight;
+  final double railY;
+  final double lensX;
+
+  /// 0 while the pickup is parked, 1 when it has engaged the disc.
+  final double engage;
+  final Color activeColor;
+  final Offset discCenter;
+  final double discRadius;
+
+  _CdPickupSledPainter({
+    required this.railLeft,
+    required this.railRight,
+    required this.railY,
+    required this.lensX,
+    required this.engage,
+    required this.activeColor,
+    required this.discCenter,
+    required this.discRadius,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final engaged = engage.clamp(0.0, 1.0);
+
+    // 1. Rail: a machined groove with an end stop at either side.
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTRB(railLeft, railY - 3.5, railRight, railY + 3.5),
+        const Radius.circular(AppRadii.r1_5),
+      ),
+      Paint()..color = PlayerMaterialColors.cdWeightLow,
+    );
+    canvas.drawLine(
+      Offset(railLeft, railY),
+      Offset(railRight, railY),
+      Paint()
+        ..color = PlayerMaterialColors.cdWeightRim.withValues(alpha: 0.8)
+        ..strokeWidth = 1.0,
+    );
+    final stopPaint = Paint()..color = PlayerMaterialColors.cdCollar;
+    canvas.drawRect(
+      Rect.fromLTRB(railLeft - 2, railY - 5, railLeft, railY + 5),
+      stopPaint,
+    );
+    canvas.drawRect(
+      Rect.fromLTRB(railRight, railY - 5, railRight + 2, railY + 5),
+      stopPaint,
+    );
+
+    // 2. Read beam: only the ray that actually leaves the lens and lands on the
+    // disc is drawn, so a parked sled shows no phantom light.
+    if (engaged > 0) {
+      final dx = lensX - discCenter.dx;
+      final inside = discRadius * discRadius - dx * dx;
+      if (inside > 0) {
+        final spotY = discCenter.dy + math.sqrt(inside);
+        canvas.drawLine(
+          Offset(lensX, railY - 12),
+          Offset(lensX, spotY),
+          Paint()
+            ..color = activeColor.withValues(alpha: 0.45 * engaged)
+            ..strokeWidth = 1.1,
+        );
+        canvas.drawCircle(
+          Offset(lensX, spotY),
+          3.2,
+          Paint()
+            ..color = activeColor.withValues(alpha: 0.55 * engaged)
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+        );
+      }
+    }
+
+    // 3. Lens head: sled block, objective lens and its glow while engaged.
+    final headRect = Rect.fromCenter(
+      center: Offset(lensX, railY - 7),
+      width: 16,
+      height: 14,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        headRect,
+        const Radius.circular(AppRadii.r3),
+      ),
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            PlayerMaterialColors.cdHeadHigh,
+            PlayerMaterialColors.cdHeadMid,
+            PlayerMaterialColors.cdHeadLow,
+          ],
+        ).createShader(headRect),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        headRect,
+        const Radius.circular(AppRadii.r3),
+      ),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8
+        ..color = Colors.white.withValues(alpha: 0.18),
+    );
+
+    final objective = Offset(lensX, railY - 10);
+    canvas.drawCircle(
+      objective,
+      2.6,
+      Paint()..color = activeColor.withValues(alpha: 0.30 + (0.70 * engaged)),
+    );
+    if (engaged > 0) {
+      canvas.drawCircle(
+        objective,
+        5.0,
+        Paint()
+          ..color = activeColor.withValues(alpha: 0.45 * engaged)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CdPickupSledPainter oldDelegate) =>
+      oldDelegate.railLeft != railLeft ||
+      oldDelegate.railRight != railRight ||
+      oldDelegate.railY != railY ||
+      oldDelegate.lensX != lensX ||
+      oldDelegate.engage != engage ||
+      oldDelegate.activeColor != activeColor ||
+      oldDelegate.discCenter != discCenter ||
+      oldDelegate.discRadius != discRadius;
+}
+
+/// The lid highlight that sweeps across the closed case when playback starts or
+/// stops. It is painted above the disc — light crossing clear plastic — and is
+/// driven straight from the gloss animation so no widget rebuilds per frame.
+class _CdLidGlossPainter extends CustomPainter {
+  final Animation<double> gloss;
+
+  _CdLidGlossPainter({required this.gloss}) : super(repaint: gloss);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sweep = gloss.value;
+    if (sweep <= 0.0 || sweep >= 1.0) return;
+
+    final caseRRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height).deflate(0.5),
+      const Radius.circular(AppRadii.r14),
+    );
+    final bandWidth = size.width * 0.34;
+    final x = -bandWidth + (size.width + bandWidth * 2) * sweep;
+
+    canvas.save();
+    canvas.clipRRect(caseRRect);
+    canvas.translate(x, 0);
+    canvas.rotate(-0.32);
+    final bandRect = Rect.fromLTWH(0, -size.height, bandWidth, size.height * 3);
+    canvas.drawRect(
+      bandRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.0),
+            Colors.white.withValues(alpha: 0.16),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ).createShader(bandRect)
+        ..blendMode = BlendMode.screen,
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _CdLidGlossPainter oldDelegate) =>
+      oldDelegate.gloss != gloss;
 }

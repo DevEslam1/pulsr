@@ -301,7 +301,11 @@ Future<void> main() async {
           if (onlineAllowed)
             getIt<YtmAccountService>()
                 .init()
-                .timeout(const Duration(seconds: 8))
+                // init() reads the WebView cookie jar over a platform channel
+                // and the secure-storage keystore, both of which can take
+                // several seconds on a cold/emulated device. The 8 s budget
+                // fired there and reported a healthy boot as a crash.
+                .timeout(const Duration(seconds: 20))
                 .catchError((e, st) {
               ErrorLogger.log('YtmAccountService init failed or timed out',
                   error: e, stackTrace: st, category: 'Startup');
@@ -367,7 +371,10 @@ Future<void> main() async {
             unawaited(scrobbler
                 .migrateAllCredentialsToSecureStorage()
                 .then((_) => scrobbler.checkPendingScrobble())
-                .timeout(const Duration(seconds: 10))
+                // Secure-storage keystore access is the slow part on a cold
+                // boot (seconds on an emulator's first decrypt); 10 s cut it
+                // off mid-migration and reported a false crash.
+                .timeout(const Duration(seconds: 30))
                 .catchError((e, st) {
               ErrorLogger.log('Scrobbler startup recovery failed',
                   error: e, stackTrace: st, category: 'Startup');

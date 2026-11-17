@@ -15,6 +15,8 @@ import '../../cubit/player_state.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/player_gesture_scope.dart';
+import 'painters/platter_scrub.dart';
+import 'player_shape.dart';
 import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
@@ -22,16 +24,16 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import '../../../../core/performance/gpu_budget.dart';
-import '../../../../core/utils/pulsr_haptics.dart';
 
 part 'painters/cd_stage.dart';
 part 'painters/cd_painters.dart';
 part 'parts/cd_player_theme_build.dart';
 
-/// CD Turntable Player Theme:
-/// Features a rotating iridescent compact disc with circular song cover,
-/// animated tonearm/stylus stick that moves onto the CD to play, and
-/// responsive mobile/tablet layout in portrait and landscape.
+/// CD Jewel Case Player Theme:
+/// A rotating iridescent compact disc seated in a translucent jewel case, with
+/// a hinge spine, recessed tray, spider hub, VFD read-out and an optical pickup
+/// sled that lights up while playing. Deliberately unlike the vinyl plinth: no
+/// tonearm, no strobe rim, no RPM badge.
 class CdPlayerTheme extends StatefulWidget {
   final PlayerThemeProps props;
 
@@ -45,8 +47,9 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
     with TickerProviderStateMixin {
   late final AnimationController _rotationController;
   late final AnimationController _velocityController;
-  late final AnimationController _tonearmController;
-  late final CurvedAnimation _tonearmAnimation;
+  late final AnimationController _pickupController;
+  late final CurvedAnimation _pickupAnimation;
+  late final AnimationController _glossController;
 
   @override
   void initState() {
@@ -62,23 +65,32 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
       value: widget.props.state.isPlaying ? 1.0 : 0.0,
     );
 
-    _tonearmController = AnimationController(
+    _pickupController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 850),
       value: widget.props.state.isPlaying ? 1.0 : 0.0,
     );
 
-    _tonearmAnimation = CurvedAnimation(
-      parent: _tonearmController,
+    _pickupAnimation = CurvedAnimation(
+      parent: _pickupController,
       curve: Curves.easeInOutBack,
+    );
+
+    // The lid highlight parks past the case (value 1) so nothing sweeps across
+    // the jewel case until playback actually starts or stops.
+    _glossController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+      value: 1.0,
     );
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _tonearmController.duration = context.motionMs(480);
+    _pickupController.duration = context.motionMs(480);
     _velocityController.duration = context.motionMs(650);
+    _glossController.duration = context.motionMs(900);
     _syncRotation();
   }
 
@@ -122,20 +134,34 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
     super.didUpdateWidget(oldWidget);
     if (widget.props.state.isPlaying != oldWidget.props.state.isPlaying) {
       if (widget.props.state.isPlaying) {
-        _tonearmController.forward();
+        _pickupController.forward();
       } else {
-        _tonearmController.reverse();
+        _pickupController.reverse();
       }
+      _sweepCaseGloss();
     }
     _syncRotation();
   }
 
+  /// Replays the jewel-case highlight whenever playback starts or stops.
+  ///
+  /// With motion disabled the band is parked past the case instead of running,
+  /// so a reduced-motion build never animates the lid.
+  void _sweepCaseGloss() {
+    if (!context.motionEnabled) {
+      _glossController.value = 1.0;
+      return;
+    }
+    _glossController.forward(from: 0.0);
+  }
+
   @override
   void dispose() {
-    _tonearmAnimation.dispose();
+    _pickupAnimation.dispose();
+    _glossController.dispose();
     _velocityController.dispose();
     _rotationController.dispose();
-    _tonearmController.dispose();
+    _pickupController.dispose();
     super.dispose();
   }
 

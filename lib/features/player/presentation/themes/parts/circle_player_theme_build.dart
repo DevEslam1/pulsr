@@ -2,7 +2,6 @@ part of '../circle_player_theme.dart';
 
 extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
   Widget _buildBody(BuildContext context) {
-    final cubit = widget.props.cubit;
     final state = widget.props.state;
     final activeColor = widget.props.activeColor;
     final visualizerStyle = context
@@ -17,7 +16,6 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
       trackIcon: Icons.album_rounded,
       dockIconStyle: PlayerDockIconStyle.circle,
       stage: (context, metrics) => PlayerGestureScope(
-        onTap: () => cubit.toggleLyricsVisibility(),
         child: LayoutBuilder(
           builder: (context, stageConstraints) {
             final double visualizerH = showVisualizer

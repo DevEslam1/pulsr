@@ -2,7 +2,7 @@ part of '../cassette_player_theme.dart';
 
 /// Ultra-detailed skeuomorphic cassette shell with dynamic magnetic tape transfer,
 /// 3-digit mechanical rolling counter, stereo VU level meters, and acrylic glass sheen.
-class _CassetteBody extends StatelessWidget {
+class _CassetteBody extends StatefulWidget {
   final PlayerThemeProps props;
   final Color activeColor;
   final AnimationController spoolController;
@@ -18,20 +18,135 @@ class _CassetteBody extends StatelessWidget {
   });
 
   @override
+  State<_CassetteBody> createState() => _CassetteBodyState();
+}
+
+class _CassetteBodyState extends State<_CassetteBody> {
+  /// One full left-to-right pass over the acrylic well is worth this much
+  /// audio. Expressing the ratio per well width (rather than per pixel) keeps
+  /// the feel identical at every viewport: the shell is a fixed 450x296 box
+  /// rendered through a FittedBox, so raw pixel deltas change meaning with the
+  /// scale while a fraction of the surface does not.
+  static const double _scrubRangeSeconds = 60.0;
+
+  /// Coarse tactile detents, spaced like the vinyl platter's selection clicks.
+  static const int _scrubDetentMs = 5000;
+
+  /// Drags shorter than this are finger jitter on a tap, not a seek: the stage
+  /// should keep toggling lyrics rather than nudging the playhead 60 ms.
+  static const int _scrubCommitFloorMs = 400;
+
+  /// Frozen at drag start so the target cannot drift while the player keeps
+  /// running underneath the finger.
+  int _scrubBaseMs = 0;
+  int? _scrubTargetMs;
+  double _scrubTravelPx = 0.0;
+  int _detentIndex = 0;
+
+  bool get _isScrubbing => _scrubTargetMs != null;
+
+  @override
+  void didUpdateWidget(covariant _CassetteBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Switching track mid-drag invalidates both the base position and the
+    // duration the delta was clamped against.
+    if (oldWidget.props.state.currentSong?.id !=
+        widget.props.state.currentSong?.id) {
+      _scrubTargetMs = null;
+      _scrubTravelPx = 0.0;
+    }
+  }
+
+  void _onScrubStart(DragStartDetails _) {
+    final state = widget.props.state;
+    final durationMs = state.duration.inMilliseconds;
+    if (durationMs <= 0) return;
+    final baseMs = state.position.inMilliseconds.clamp(0, durationMs);
+    setState(() {
+      _scrubBaseMs = baseMs;
+      _scrubTargetMs = baseMs;
+      _scrubTravelPx = 0.0;
+      // Detents are counted from the drag origin, so the first click lands
+      // after 5 s of scrub in either direction rather than on an arbitrary
+      // multiple of five seconds in the track's timeline.
+      _detentIndex = 0;
+    });
+  }
+
+  void _onScrubUpdate(double deltaDx, double wellWidth) {
+    final target = _scrubTargetMs;
+    final durationMs = widget.props.state.duration.inMilliseconds;
+    if (target == null || wellWidth <= 0 || durationMs <= 0) return;
+
+    _scrubTravelPx += deltaDx;
+    final deltaMs = (_scrubTravelPx / wellWidth) * _scrubRangeSeconds * 1000.0;
+    final nextMs = (_scrubBaseMs + deltaMs.round()).clamp(0, durationMs);
+    final detentIndex = (nextMs - _scrubBaseMs) ~/ _scrubDetentMs;
+    if (detentIndex != _detentIndex) {
+      _detentIndex = detentIndex;
+      PulsrHaptics.selection();
+    }
+    if (nextMs != target) {
+      setState(() => _scrubTargetMs = nextMs);
+    }
+  }
+
+  void _commitScrub() {
+    final target = _scrubTargetMs;
+    if (target == null) return;
+    if ((target - _scrubBaseMs).abs() >= _scrubCommitFloorMs) {
+      PulsrHaptics.selection();
+      widget.props.cubit.seek(Duration(milliseconds: target));
+    }
+    setState(() {
+      _scrubTargetMs = null;
+      _scrubTravelPx = 0.0;
+    });
+  }
+
+  void _cancelScrub() {
+    if (_scrubTargetMs == null) return;
+    setState(() {
+      _scrubTargetMs = null;
+      _scrubTravelPx = 0.0;
+    });
+  }
+
+  /// Screen-reader seeking: ±10 s from the live position, clamped to the track.
+  void _seekBy(Duration delta) {
+    final state = widget.props.state;
+    final durationMs = state.duration.inMilliseconds;
+    if (durationMs <= 0) return;
+    final nextMs = (state.position + delta).inMilliseconds.clamp(0, durationMs);
+    PulsrHaptics.selection();
+    widget.props.cubit.seek(Duration(milliseconds: nextMs));
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final state = props.state;
+    final state = widget.props.state;
     final song = state.currentSong;
     final durationMs = state.duration.inMilliseconds;
-    final positionMs = state.position.inMilliseconds;
-    final progress =
-        durationMs > 0 ? (positionMs / durationMs).clamp(0.0, 1.0) : 0.0;
+    final progress = durationMs > 0
+        ? (state.position.inMilliseconds / durationMs).clamp(0.0, 1.0)
+        : 0.0;
+    // While the finger is down the tape packs and the mechanical counter must
+    // show where the seek will land, not where playback currently is.
+    final displayProgress = _isScrubbing && durationMs > 0
+        ? (_scrubTargetMs! / durationMs).clamp(0.0, 1.0)
+        : progress;
 
+    // The shell is decorative: it prints no information that is not already
+    // in the chrome (PlayerTrackHeader announces title, artist and transport
+    // state), so the fixed 450x296 artwork box may legitimately ignore text
+    // scaling. The scrub pill is transient feedback mirrored by the slider
+    // node below, not a reading surface.
     return MediaQuery.withNoTextScaling(
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: isLandscape ? 270 : (isTablet ? 380 : 310),
-            maxWidth: isLandscape ? 410 : (isTablet ? 560 : 450),
+            maxHeight: widget.isLandscape ? 270 : (widget.isTablet ? 380 : 310),
+            maxWidth: widget.isLandscape ? 410 : (widget.isTablet ? 560 : 450),
           ),
           child: AspectRatio(
             aspectRatio: 1.52,
@@ -64,7 +179,7 @@ class _CassetteBody extends StatelessWidget {
                         offset: const Offset(0, 14),
                       ),
                       BoxShadow(
-                        color: activeColor.withValues(alpha: 0.08),
+                        color: widget.activeColor.withValues(alpha: 0.08),
                         blurRadius: 36,
                         spreadRadius: -2,
                       ),
@@ -90,24 +205,31 @@ class _CassetteBody extends StatelessWidget {
                         ),
                         child: Column(
                           children: [
-                            // Cassette Label Header with Stereo VU Meters
-                            _buildCassetteHeader(context, state.isPlaying),
+                            // Cassette Label Header with Stereo VU Meters.
+                            // Label print is decorative: the deck's semantics
+                            // node already announces the track and its state.
+                            ExcludeSemantics(
+                              child:
+                                  _buildCassetteHeader(context, state.isPlaying),
+                            ),
 
                             const SizedBox(height: AppSpacing.s8),
 
                             // Center Acrylic Window with Tape Pack and Reels
                             Expanded(
-                              child: _buildCenterTapeWindow(
-                                context,
-                                progress,
-                                state.isPlaying,
+                              child: _buildScrubSurface(
+                                progress: displayProgress,
+                                isPlaying: state.isPlaying,
                               ),
                             ),
 
                             const SizedBox(height: AppSpacing.s8),
 
-                            // Bottom Label & Mechanical Head Notch
-                            _buildBottomSection(context, song),
+                            // Bottom Label & Mechanical Head Notch (decorative
+                            // print - excluded from semantics, see above).
+                            ExcludeSemantics(
+                              child: _buildBottomSection(context, song),
+                            ),
                           ],
                         ),
                       ),
@@ -131,10 +253,10 @@ class _CassetteBody extends StatelessWidget {
         vertical: AppSpacing.s6,
       ),
       decoration: BoxDecoration(
-        color: activeColor.withValues(alpha: 0.16),
+        color: widget.activeColor.withValues(alpha: 0.16),
         borderRadius: AppRadii.r8All,
         border: Border.all(
-          color: activeColor.withValues(alpha: 0.35),
+          color: widget.activeColor.withValues(alpha: 0.35),
           width: 1,
         ),
       ),
@@ -175,7 +297,7 @@ class _CassetteBody extends StatelessWidget {
             // Center: Stereo Dancing VU Meters (Isolated in RepaintBoundary for 120fps)
             RepaintBoundary(
               child: _CassetteStereoVuMeter(
-                activeColor: activeColor,
+                activeColor: widget.activeColor,
                 isPlaying: isPlaying,
               ),
             ),
@@ -191,7 +313,7 @@ class _CassetteBody extends StatelessWidget {
                     style: TextStyle(
                       fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w900,
-                      color: activeColor,
+                      color: widget.activeColor,
                       letterSpacing: AppTracking.wide,
                     ),
                   ),
@@ -208,6 +330,110 @@ class _CassetteBody extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Horizontal scrub surface over the acrylic well.
+  ///
+  /// The shell used to be dead decoration: progress only moved tape-pack radii
+  /// and a three-digit counter, so there was no way to seek from the stage.
+  /// The well is the one wide, flat surface on the cassette, which makes it the
+  /// natural scrub strip. It competes with the stage's next/previous swipe only
+  /// for horizontal pointers, and the inner recognizer wins that arena.
+  Widget _buildScrubSurface({
+    required double progress,
+    required bool isPlaying,
+  }) {
+    final state = widget.props.state;
+    final durationMs = state.duration.inMilliseconds;
+
+    Duration clampSeek(Duration delta) {
+      final nextMs = (state.position + delta).inMilliseconds;
+      return Duration(milliseconds: nextMs.clamp(0, math.max(0, durationMs)));
+    }
+
+    String seekLabel(Duration value) =>
+        '${Formatters.formatDuration(value)} / '
+        '${Formatters.formatDuration(state.duration)}';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wellWidth = constraints.maxWidth;
+        return Semantics(
+          // Keeps the tape well its own node. Without the boundary the shell's
+          // "Now playing …" description merges into the slider, and the reader
+          // announces a seek bar whose label is the whole deck.
+          container: true,
+          slider: true,
+          label: context.l10n.seekLabel,
+          value: seekLabel(state.position),
+          increasedValue: seekLabel(clampSeek(const Duration(seconds: 10))),
+          decreasedValue: seekLabel(clampSeek(const Duration(seconds: -10))),
+          onIncrease: () => _seekBy(const Duration(seconds: 10)),
+          onDecrease: () => _seekBy(const Duration(seconds: -10)),
+          // The well's painted internals (counter digits, ruler ticks) are
+          // decoration; this is the only node assistive tech should reach.
+          excludeSemantics: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragStart: _onScrubStart,
+            onHorizontalDragUpdate: (details) =>
+                _onScrubUpdate(details.delta.dx, wellWidth),
+            onHorizontalDragEnd: (_) => _commitScrub(),
+            onHorizontalDragCancel: _cancelScrub,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                _buildCenterTapeWindow(context, progress, isPlaying),
+                if (_isScrubbing)
+                  Center(child: IgnorePointer(child: _buildScrubDeltaPill())),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Delta read-out while scrubbing, reusing the rounded dark pill with an
+  /// active-colour rim that the vinyl and CD platters show, so all the
+  /// skeuomorphic themes speak the same scrub language.
+  Widget _buildScrubDeltaPill() {
+    // Rounded to tenths first so a backwards drag reads "-12.3s" and never
+    // "-0.0s" when the finger barely moves.
+    final deltaTenths = ((_scrubTargetMs! - _scrubBaseMs) / 100).round();
+    final deltaText = (deltaTenths / 10).toStringAsFixed(1);
+    final label = deltaTenths > 0 ? '+${deltaText}s' : '${deltaText}s';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.s6,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.82),
+        borderRadius: AppRadii.full,
+        border: Border.all(
+          color: widget.activeColor.withValues(alpha: 0.65),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: widget.activeColor.withValues(alpha: 0.40),
+            blurRadius: 18,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: AppFontSize.label,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+          letterSpacing: AppTracking.label,
         ),
       ),
     );
@@ -377,7 +603,7 @@ class _CassetteBody extends StatelessWidget {
           // Rotating White Spool Hub with Teeth (Isolated in outer + inner RepaintBoundary)
           RepaintBoundary(
             child: RotationTransition(
-              turns: spoolController,
+              turns: widget.spoolController,
               child: RepaintBoundary(
                 child: Container(
                   width: 52,
@@ -414,7 +640,14 @@ class _CassetteBody extends StatelessWidget {
     );
   }
 
-  /// Bottom section: Printed track title, artist, and trapezoidal deck housing notch
+  /// Bottom section: printed label and trapezoidal deck housing notch.
+  ///
+  /// The title/artist line is the sticker a listener would have written on the
+  /// shell, so it stays purely cosmetic: the call site wraps this whole section
+  /// in [ExcludeSemantics] and PlayerTrackHeader already announces the same
+  /// track. That is also why the live song text is allowed to sit inside the
+  /// shell's no-text-scaling MediaQuery - nothing here is the only copy of a
+  /// piece of information.
   Widget _buildBottomSection(BuildContext context, SongsTableData? song) {
     return Container(
       width: double.infinity,

@@ -15,6 +15,8 @@ import 'player_theme.dart';
 import 'player_theme_chrome.dart';
 import 'player_theme_scaffold.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
 
 part 'painters/circle_stage.dart';

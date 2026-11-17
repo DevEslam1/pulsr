@@ -4204,17 +4204,25 @@ class LockCachingAudioSource extends StreamAudioSource {
     }
     final byteRangeRequest = _StreamingByteRangeRequest(start, end);
     _requests.add(byteRangeRequest);
-    _response ??=
-        _fetch().catchError((dynamic error, StackTrace? stackTrace) async {
-      // So that we can restart later
-      _response = null;
-      // Cancel any pending request
-      for (final req in _requests) {
-        req.fail(error, stackTrace);
-      }
-      _requests.clear();
-      return Future<HttpClientResponse>.error(error as Object, stackTrace);
-    });
+    final previous = _response;
+    if (previous == null) {
+      final pending = _fetch();
+      _response = pending;
+      // The memoized future has no awaiting caller of its own: callers read the
+      // error through their `_StreamingByteRangeRequest`. Attaching this
+      // listener both restarts the fetch on the next request (by clearing
+      // `_response`) and marks the error handled — without it every dead URL
+      // surfaced as an unhandled async error in addition to the caller's own
+      // error path, which the retry logic above already handles.
+      unawaited(pending.then<void>((_) {}, onError: (Object error, StackTrace stackTrace) {
+        if (identical(_response, pending)) _response = null;
+        // Cancel any pending request
+        for (final req in _requests) {
+          req.fail(error, stackTrace);
+        }
+        _requests.clear();
+      }));
+    }
     return byteRangeRequest.future.then((response) {
       response.stream.listen((event) {}, onError: (Object e, StackTrace st) {
         // So that we can restart later

@@ -52,6 +52,9 @@ void main() {
     when(() => settingsCubit.state).thenReturn(
       const SettingsState(
         playerThemeMode: PlayerThemeMode.milkdrop,
+        // The theme now honours the visualizer setting instead of forcing the
+        // shader, so the fixture has to ask for the shader it asserts on.
+        visualizerStyle: VisualizerStyle.milkdrop,
       ),
     );
     when(() => settingsCubit.stream).thenAnswer((_) => const Stream.empty());
@@ -131,6 +134,28 @@ void main() {
 
       expect(find.byType(MilkdropPlayerTheme), findsOneWidget);
       expect(find.byType(AudioVisualizer), findsOneWidget);
+    });
+
+    testWidgets('respects a disabled visualizer setting', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      when(() => settingsCubit.state).thenReturn(
+        const SettingsState(
+          playerThemeMode: PlayerThemeMode.milkdrop,
+          visualizerStyle: VisualizerStyle.off,
+        ),
+      );
+
+      await tester.pumpWidget(createHost());
+      await tester.pump();
+
+      // A disabled visualizer must stay disabled: the theme keeps its
+      // full-bleed treatment, but it may not spin up a shader the user turned
+      // off (battery, motion sensitivity, or simply preference).
+      expect(find.byType(MilkdropPlayerTheme), findsOneWidget);
+      expect(find.byType(AudioVisualizer), findsNothing);
     });
 
     testWidgets('MilkdropCanvasPainter paints transparent background properly',
