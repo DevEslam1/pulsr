@@ -18,6 +18,10 @@ bool isOnlineFavorite(SongsTableData s) {
         (s.path.startsWith('content:') || s.isDownloaded == true);
     return !hasLocalFile;
   }
+  // A net-library file (SMB / WebDAV / FTP / SFTP) has no copy on this device
+  // and a radio row never will, so both belong in the Online bucket whatever
+  // remoteId says.
+  if (SongSource.isNetwork(s.source)) return true;
   return s.remoteId != null && s.remoteId!.isNotEmpty;
 }
 

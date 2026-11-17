@@ -70,6 +70,10 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
   Future<void> setDspEffectsEnabled(bool enabled) =>
       dspController.setDspEffectsEnabled(enabled);
 
+  /// True when the last master-DSP disable captured stages that a later enable
+  /// can restore. False means the master switch will only re-arm the gate.
+  bool get hasDspEffectsSnapshot => dspController.hasDspEffectsSnapshot;
+
   Future<void> setVolumeBoost(double value) =>
       dspController.setVolumeBoost(value);
 

@@ -300,15 +300,24 @@ class UsbErgonomicsService extends ChangeNotifier {
     }
   }
 
-  /// Stores [profile] and pushes it to the native side.
+  /// Stores [profile] and, when it belongs to the attached DAC, pushes it to
+  /// the native side.
   ///
   /// Returns false when the store rejected the write; the native side is left
-  /// on the previously applied profile in that case.
+  /// on the previously applied profile in that case. Editing a profile for a
+  /// device that is not the one currently attached only persists the entry (so
+  /// the list refreshes); it must not replace [ErgonomicsState.quirk] or reach
+  /// the native side, which would apply another DAC's settings to this one.
   Future<bool> saveQuirk(UsbQuirkProfile profile) async {
     final stored = await _store.put(profile);
     if (!stored) {
       _emit(_state.copyWith(lastError: UsbErgonomicsStrings.saveFailed));
       return false;
+    }
+    if (!_profileAppliesToAttachedDevice(profile)) {
+      // Persisted only: the attached device's resolution stays as it was.
+      _emit(_state.copyWith(lastError: null));
+      return true;
     }
     // Drop the signature so the very same profile is re-applied after an edit
     // that only touched the label or was made while detached.
@@ -316,6 +325,15 @@ class UsbErgonomicsService extends ChangeNotifier {
     _emit(_state.copyWith(quirk: profile, lastError: null));
     if (_state.attached) await _applyActive();
     return true;
+  }
+
+  /// Whether [profile] is the stored entry for the DAC attached right now.
+  bool _profileAppliesToAttachedDevice(UsbQuirkProfile profile) {
+    if (!_state.attached) return false;
+    final vid = _state.deviceVid;
+    final pid = _state.devicePid;
+    if (vid == null || pid == null) return false;
+    return UsbQuirkProfile.deviceKey(vid, pid) == profile.key;
   }
 
   /// Removes the stored entry for the attached device and applies the fallback.

@@ -48,7 +48,17 @@ import 'extras_strings.dart';
 /// (announcements, system behaviour, USB ergonomics, network/DLNA output,
 /// profiles and diagnostics).
 class ExtrasScreen extends StatefulWidget {
-  const ExtrasScreen({super.key});
+  const ExtrasScreen({super.key, this.debugToolErrors, this.debugFailInits});
+
+  /// Seeds per-tool initialization failures. Test-only: production always
+  /// discovers failures in [_load].
+  @visibleForTesting
+  final Map<ExtrasTool, String>? debugToolErrors;
+
+  /// Tools whose real initialization must throw, exercising the per-tool
+  /// try/catch isolation in [_load] instead of seeding the result map.
+  @visibleForTesting
+  final Set<ExtrasTool>? debugFailInits;
 
   @override
   State<ExtrasScreen> createState() => _ExtrasScreenState();
@@ -71,87 +81,40 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
   bool _loading = true;
   String? _loadError;
 
+  /// Tools whose initialization failed, with the inline message their row
+  /// shows. A tool listed here has its row disabled; every other row stays
+  /// usable (one broken service cannot blank the whole hub).
+  late final Map<ExtrasTool, String> _toolErrors =
+      Map<ExtrasTool, String>.from(widget.debugToolErrors ?? const <ExtrasTool, String>{});
+
+  /// Subtitle for [tool]: its inline error when it failed, else [fallback].
+  String _subtitleFor(ExtrasTool tool, String fallback) =>
+      _toolErrors[tool] ?? fallback;
+
+  /// Whether [tool] initialized successfully.
+  bool _ready(ExtrasTool tool) => !_toolErrors.containsKey(tool);
+
   @override
   void initState() {
     super.initState();
+    if (widget.debugToolErrors != null) {
+      // Test-only: the seeded map stands in for the initialization pass, so the
+      // row-rendering contract can be asserted without booting every service.
+      _loading = false;
+      return;
+    }
     _load();
   }
 
   Future<void> _load() async {
+    SharedPreferences prefs;
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final profiles = AudioProfileService(prefs: prefs);
-      final diagnostics = DiagnosticsBundleService(
-        prefs: prefs,
-        outputDevice: _outputDeviceSnapshot,
-      );
-      // The audio handler publishes the app-scoped controller so the failure
-      // streak and the manual Enter/Exit controls share one active-device map.
-      final ownsSafeMode = !getIt.isRegistered<SafeModeController>();
-      final safeMode = ownsSafeMode
-          ? SafeModeController(prefs: prefs)
-          : getIt<SafeModeController>();
-      // Reuse the app-level instances started with the audio handler; only build
-      // private ones when the bootstrap has not published them (tests, early
-      // navigation). Ownership follows creation so nothing is disposed twice.
-      final ownsBehavior = !getIt.isRegistered<SystemBehaviorSettings>();
-      final behavior = ownsBehavior
-          ? SystemBehaviorSettings()
-          : getIt<SystemBehaviorSettings>();
-      if (ownsBehavior) await behavior.load();
-      final ownsUsb = !getIt.isRegistered<UsbErgonomicsService>();
-      final usbErgonomics = ownsUsb
-          ? UsbErgonomicsService(store: UsbQuirkStore(prefs: prefs))
-          : getIt<UsbErgonomicsService>();
-      if (ownsUsb) await usbErgonomics.start();
-      // Same app-level pair the live announcer uses. Creating here first is
-      // fine: the bootstrap picks up whatever is registered, so edits always
-      // reach one shared instance instead of a screen-local copy.
-      final announcements = getIt.isRegistered<AnnouncementSettings>()
-          ? getIt<AnnouncementSettings>()
-          : await AnnouncementSettings.load();
-      final engine = getIt.isRegistered<MethodChannelTtsEngine>()
-          ? getIt<MethodChannelTtsEngine>()
-          : MethodChannelTtsEngine();
-      if (!getIt.isRegistered<AnnouncementSettings>()) {
-        getIt.registerSingleton<AnnouncementSettings>(announcements);
-      }
-      if (!getIt.isRegistered<MethodChannelTtsEngine>()) {
-        getIt.registerSingleton<MethodChannelTtsEngine>(engine);
-        await engine.init();
-      }
-      engine.voiceId = announcements.voiceId;
-      engine.localeId = announcements.localeId;
-      final assistant = getIt.isRegistered<AssistantSettings>()
-          ? getIt<AssistantSettings>()
-          : await AssistantSettings.load();
-      if (!getIt.isRegistered<AssistantSettings>()) {
-        getIt.registerSingleton<AssistantSettings>(assistant);
-      }
-      if (!mounted) {
-        if (ownsBehavior) behavior.dispose();
-        if (ownsUsb) usbErgonomics.dispose();
-        if (ownsSafeMode) await safeMode.dispose();
-        return;
-      }
-      setState(() {
-        _profiles = profiles;
-        _diagnostics = diagnostics;
-        _safeMode = safeMode;
-        _systemBehavior = behavior;
-        _usbErgonomics = usbErgonomics;
-        _announcements = announcements;
-        _ttsEngine = engine;
-        _assistantSettings = assistant;
-        _ownsSystemBehavior = ownsBehavior;
-        _ownsUsbErgonomics = ownsUsb;
-        _ownsSafeMode = ownsSafeMode;
-        _loading = false;
-        _loadError = null;
-      });
+      prefs = await SharedPreferences.getInstance();
     } catch (e, st) {
+      // Without preferences no tool can start, so this stays the one fatal
+      // failure; everything below is isolated per tool.
       ErrorLogger.log(
-        'Extras tools failed to initialize',
+        'Extras tools could not read their preferences',
         error: e,
         stackTrace: st,
         category: 'Extras',
@@ -161,6 +124,189 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         _loading = false;
         _loadError = ExtrasStrings.loadFailed;
       });
+      return;
+    }
+
+    // Each tool initializes on its own: a tool whose service throws disables
+    // only its row and shows its inline error, while every other row stays
+    // usable. Skipping this isolation meant one broken service blanked the hub.
+    await Future.wait<void>(<Future<void>>[
+      _initProfiles(prefs),
+      _initDiagnostics(prefs),
+      _initSafeMode(prefs),
+      _initSystemBehavior(),
+      _initUsb(prefs),
+      _initAnnouncements(),
+      _initAssistant(),
+    ]);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  /// Throws when a test asked this tool's real initialization to fail.
+  void _maybeDebugFail(ExtrasTool tool) {
+    if (widget.debugFailInits?.contains(tool) ?? false) {
+      throw StateError('Injected $tool initialization failure');
+    }
+  }
+
+  /// Records a failed tool and disables its row.
+  void _failTool(    ExtrasTool tool,
+    String label,
+    Object error,
+    StackTrace stackTrace,
+  ) {
+    ErrorLogger.log(
+      'Extras tool failed to initialize: $label',
+      error: error,
+      stackTrace: stackTrace,
+      category: 'Extras',
+    );
+    if (!mounted) return;
+    setState(() => _toolErrors[tool] = ExtrasStrings.toolUnavailable);
+  }
+
+  Future<void> _initProfiles(SharedPreferences prefs) async {
+    try {
+      _maybeDebugFail(ExtrasTool.profiles);
+      final profiles = AudioProfileService(prefs: prefs);
+      if (!mounted) return;
+      setState(() => _profiles = profiles);
+    } catch (e, st) {
+      _failTool(ExtrasTool.profiles, 'profiles', e, st);
+    }
+  }
+
+  Future<void> _initDiagnostics(SharedPreferences prefs) async {
+    try {
+      _maybeDebugFail(ExtrasTool.diagnostics);
+      final diagnostics = DiagnosticsBundleService(
+        prefs: prefs,
+        outputDevice: _outputDeviceSnapshot,
+      );
+      if (!mounted) return;
+      setState(() => _diagnostics = diagnostics);
+    } catch (e, st) {
+      _failTool(ExtrasTool.diagnostics, 'diagnostics', e, st);
+    }
+  }
+
+  Future<void> _initSafeMode(SharedPreferences prefs) async {
+    SafeModeController? owned;
+    try {
+      _maybeDebugFail(ExtrasTool.safeMode);
+      // The audio handler publishes the app-scoped controller so the failure
+      // streak and the manual Enter/Exit controls share one active-device map.
+      final owns = !getIt.isRegistered<SafeModeController>();
+      final safeMode = owns
+          ? (owned = SafeModeController(prefs: prefs))
+          : getIt<SafeModeController>();
+      if (!mounted) {
+        if (owns) await owned?.dispose();
+        return;
+      }
+      setState(() {
+        _safeMode = safeMode;
+        _ownsSafeMode = owns;
+      });
+    } catch (e, st) {
+      _failTool(ExtrasTool.safeMode, 'safe mode', e, st);
+    }
+  }
+
+  Future<void> _initSystemBehavior() async {
+    SystemBehaviorSettings? owned;
+    try {
+      _maybeDebugFail(ExtrasTool.systemBehavior);
+      // Reuse the app-level instance started with the audio handler; only build
+      // a private one when the bootstrap has not published it (tests, early
+      // navigation). Ownership follows creation so nothing is disposed twice.
+      final owns = !getIt.isRegistered<SystemBehaviorSettings>();
+      final behavior = owns
+          ? (owned = SystemBehaviorSettings())
+          : getIt<SystemBehaviorSettings>();
+      if (owns) await behavior.load();
+      if (!mounted) {
+        if (owns) owned?.dispose();
+        return;
+      }
+      setState(() {
+        _systemBehavior = behavior;
+        _ownsSystemBehavior = owns;
+      });
+    } catch (e, st) {
+      _failTool(ExtrasTool.systemBehavior, 'system behavior', e, st);
+    }
+  }
+
+  Future<void> _initUsb(SharedPreferences prefs) async {
+    UsbErgonomicsService? owned;
+    try {
+      _maybeDebugFail(ExtrasTool.usb);
+      final owns = !getIt.isRegistered<UsbErgonomicsService>();
+      final usbErgonomics = owns
+          ? (owned = UsbErgonomicsService(store: UsbQuirkStore(prefs: prefs)))
+          : getIt<UsbErgonomicsService>();
+      if (owns) await usbErgonomics.start();
+      if (!mounted) {
+        if (owns) owned?.dispose();
+        return;
+      }
+      setState(() {
+        _usbErgonomics = usbErgonomics;
+        _ownsUsbErgonomics = owns;
+      });
+    } catch (e, st) {
+      _failTool(ExtrasTool.usb, 'USB ergonomics', e, st);
+    }
+  }
+
+  Future<void> _initAnnouncements() async {
+    try {
+      _maybeDebugFail(ExtrasTool.announcements);
+      // Same app-level pair the live announcer uses. Creating here first is
+      // fine: the bootstrap picks up whatever is registered, so edits always
+      // reach one shared instance instead of a screen-local copy.
+      final announcements = getIt.isRegistered<AnnouncementSettings>()
+          ? getIt<AnnouncementSettings>()
+          : await AnnouncementSettings.load();
+      final engine = getIt.isRegistered<MethodChannelTtsEngine>()
+          ? getIt<MethodChannelTtsEngine>()
+          : MethodChannelTtsEngine();
+      if (!mounted) return;
+      if (!getIt.isRegistered<AnnouncementSettings>()) {
+        getIt.registerSingleton<AnnouncementSettings>(announcements);
+      }
+      if (!getIt.isRegistered<MethodChannelTtsEngine>()) {
+        getIt.registerSingleton<MethodChannelTtsEngine>(engine);
+        await engine.init();
+      }
+      engine.voiceId = announcements.voiceId;
+      engine.localeId = announcements.localeId;
+      if (!mounted) return;
+      setState(() {
+        _announcements = announcements;
+        _ttsEngine = engine;
+      });
+    } catch (e, st) {
+      _failTool(ExtrasTool.announcements, 'announcements', e, st);
+    }
+  }
+
+  Future<void> _initAssistant() async {
+    try {
+      _maybeDebugFail(ExtrasTool.assistant);
+      final assistant = getIt.isRegistered<AssistantSettings>()
+          ? getIt<AssistantSettings>()
+          : await AssistantSettings.load();
+      if (!mounted) return;
+      if (!getIt.isRegistered<AssistantSettings>()) {
+        getIt.registerSingleton<AssistantSettings>(assistant);
+      }
+      setState(() => _assistantSettings = assistant);
+    } catch (e, st) {
+      _failTool(ExtrasTool.assistant, 'assistant', e, st);
     }
   }
 
@@ -267,7 +413,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
-        source: SongSource.radio,
+        // A net-library file is seekable and finite, so it must not be tagged
+        // as live radio: that would route pause/resume through the live-edge
+        // path (position reset) and show the radio recommendation card.
+        source: SongSource.remote,
         isDownloaded: false,
       );
       await getIt<PlayerCubit>().playSong(song);
@@ -345,8 +494,11 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                       SettingsNavTile(
                         Icons.campaign_rounded,
                         ExtrasStrings.announcementsTitle,
-                        ExtrasStrings.announcementsSubtitle,
-                        onTap: _announcements == null || _ttsEngine == null
+                        _subtitleFor(ExtrasTool.announcements,
+                            ExtrasStrings.announcementsSubtitle),
+                        onTap: _announcements == null ||
+                                _ttsEngine == null ||
+                                !_ready(ExtrasTool.announcements)
                             ? null
                             : () => _push(
                                   AnnouncementScreen(
@@ -359,8 +511,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                       SettingsNavTile(
                         Icons.manage_search_rounded,
                         ExtrasStrings.assistantTitle,
-                        ExtrasStrings.assistantSubtitle,
-                        onTap: _assistantSettings == null
+                        _subtitleFor(ExtrasTool.assistant,
+                            ExtrasStrings.assistantSubtitle),
+                        onTap: _assistantSettings == null ||
+                                !_ready(ExtrasTool.assistant)
                             ? null
                             : () => _push(
                                   AssistantSettingsScreen(
@@ -372,8 +526,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                       SettingsNavTile(
                         Icons.tune_rounded,
                         ExtrasStrings.systemBehaviorTitle,
-                        ExtrasStrings.systemBehaviorSubtitle,
-                        onTap: _systemBehavior == null
+                        _subtitleFor(ExtrasTool.systemBehavior,
+                            ExtrasStrings.systemBehaviorSubtitle),
+                        onTap: _systemBehavior == null ||
+                                !_ready(ExtrasTool.systemBehavior)
                             ? null
                             : () => _push(
                                   SystemBehaviorScreen(
@@ -385,8 +541,9 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                       SettingsNavTile(
                         Icons.usb_rounded,
                         ExtrasStrings.usbTitle,
-                        ExtrasStrings.usbSubtitle,
-                        onTap: _usbErgonomics == null
+                        _subtitleFor(
+                            ExtrasTool.usb, ExtrasStrings.usbSubtitle),
+                        onTap: _usbErgonomics == null || !_ready(ExtrasTool.usb)
                             ? null
                             : () => _push(
                                   UsbErgonomicsScreen(
@@ -431,8 +588,9 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                       SettingsNavTile(
                         Icons.badge_rounded,
                         ExtrasStrings.profilesTitle,
-                        ExtrasStrings.profilesSubtitle,
-                        onTap: _profiles == null
+                        _subtitleFor(
+                            ExtrasTool.profiles, ExtrasStrings.profilesSubtitle),
+                        onTap: _profiles == null || !_ready(ExtrasTool.profiles)
                             ? null
                             : () => _push(
                                   AudioProfilesScreen(
@@ -445,8 +603,12 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
                       SettingsNavTile(
                         Icons.monitor_heart_rounded,
                         ExtrasStrings.diagnosticsTitle,
-                        ExtrasStrings.diagnosticsSubtitle,
-                        onTap: _diagnostics == null || _safeMode == null
+                        _subtitleFor(ExtrasTool.diagnostics,
+                            ExtrasStrings.diagnosticsSubtitle),
+                        onTap: _diagnostics == null ||
+                                _safeMode == null ||
+                                !_ready(ExtrasTool.diagnostics) ||
+                                !_ready(ExtrasTool.safeMode)
                             ? null
                             : () => _push(
                                   DiagnosticsScreen(
@@ -498,4 +660,15 @@ class _InlineNotice extends StatelessWidget {
       ),
     );
   }
+}
+
+/// One tool row in the hub; keys its initialization failure.
+enum ExtrasTool {
+  profiles,
+  diagnostics,
+  safeMode,
+  systemBehavior,
+  usb,
+  announcements,
+  assistant,
 }

@@ -45,6 +45,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   int _totalTaps = 0;
   int _scoreAccumulator = 0;
   PlayerCubit? _playerCubit;
+  StreamSubscription<PlayerState>? _practiceLoopSub;
   double? _initialPitch;
 
   @override
@@ -75,6 +76,14 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     super.didChangeDependencies();
     try {
       _playerCubit ??= context.read<PlayerCubit>();
+      final cubit = _playerCubit;
+      if (cubit != null) {
+        // Practice-loop scheduling listens to the position stream instead of
+        // running inside build(), where a seek was a build-time side effect.
+        _practiceLoopSub ??= cubit.stream.listen(
+          (state) => _syncPracticeLoop(cubit, state),
+        );
+      }
       if (_initialPitch == null) {
         final entryPitch = _playerCubit!.state.playbackPitch;
         _initialPitch = entryPitch;
@@ -112,6 +121,8 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _practiceLoopSub?.cancel();
+    _practiceLoopSub = null;
     // Restore the app's system UI cleanly when leaving karaoke mode
     SystemUiController.instance.releaseImmersive('karaoke');
     final initialPitch = _initialPitch;
@@ -128,6 +139,86 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
       }
     }
     super.dispose();
+  }
+
+  /// Practice-loop probe, driven by the position listener and the practice
+  /// toggle (never by [build]).
+  ///
+  /// [_practiceLoopArmed] keeps one seek in flight while the engine catches up
+  /// and is only re-armed once the position is back inside the looped window,
+  /// so one window can never loop twice.
+  void _syncPracticeLoop(PlayerCubit cubit, PlayerState state) {
+    if (!mounted) return;
+    if (!_practiceMode) {
+      _practiceLoopLine = -1;
+      _practiceLoopArmed = true;
+      return;
+    }
+    final lyrics = state.lyrics;
+    if (lyrics.isEmpty) return;
+
+    var pos = state.position;
+    try {
+      pos -= context.read<SettingsCubit>().state.audibleLatencyOffset;
+    } catch (_) {}
+    if (pos.isNegative) pos = Duration.zero;
+
+    int activeIdx = -1;
+    for (int i = 0; i < lyrics.length; i++) {
+      if (pos >= lyrics[i].timestamp) {
+        activeIdx = i;
+      } else {
+        break;
+      }
+    }
+    if (activeIdx < 0) return;
+
+    // Lock onto the line being practised; re-lock when playback moves back
+    // before it (restart, scrub, previous track) or the lyric list changed.
+    var loopIndex = _practiceLoopLine;
+    if (loopIndex < 0 || loopIndex >= lyrics.length || activeIdx < loopIndex) {
+      loopIndex = activeIdx;
+      _practiceLoopLine = loopIndex;
+      _practiceLoopArmed = true;
+    }
+    // The line's end is the next line's timestamp (or a short fallback after
+    // the last line); comparing against the *next* line is what the old
+    // build-time check could never reach.
+    final lineStart = lyrics[loopIndex].timestamp;
+    final nextIndex = loopIndex + 1;
+    final lineEnd = (nextIndex < lyrics.length &&
+            lyrics[nextIndex].timestamp > lineStart)
+        ? lyrics[nextIndex].timestamp
+        : lineStart + const Duration(seconds: 4);
+    if (pos < lineEnd) {
+      _practiceLoopArmed = true;
+      return;
+    }
+    if (!_practiceLoopArmed) return;
+    _practiceLoopArmed = false;
+    try {
+      unawaited(cubit.seek(lineStart));
+    } catch (e, st) {
+      ErrorLogger.log('Practice loop seek failed',
+          error: e, stackTrace: st, category: 'Karaoke');
+    }
+  }
+
+  /// Enables/disables practice mode and probes the loop immediately, so
+  /// toggling it on while parked past a line end loops right away.
+  void _togglePracticeMode() {
+    final enabling = !_practiceMode;
+    setState(() {
+      _practiceMode = enabling;
+      if (!enabling) {
+        _practiceLoopLine = -1;
+        _practiceLoopArmed = true;
+      }
+    });
+    if (enabling) {
+      final cubit = context.read<PlayerCubit>();
+      _syncPracticeLoop(cubit, cubit.state);
+    }
   }
 
   @override
@@ -172,42 +263,6 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                   : (activeIdx == -1 && effectiveLyrics.isNotEmpty
                       ? effectiveLyrics[0]
                       : null);
-
-          // Practice Mode: loop the line being practised back to its start.
-          // The old check compared against `nextLine.timestamp`, which the scan
-          // above has already passed by construction, so the loop could never
-          // fire. The line's end is the next line's timestamp (or a short
-          // fallback after the last line); the armed flag keeps a single seek
-          // in flight while the engine catches up instead of re-seeking on
-          // every position tick.
-          if (!_practiceMode) {
-            _practiceLoopLine = -1;
-            _practiceLoopArmed = true;
-          } else if (activeIdx >= 0) {
-            if (_practiceLoopLine < 0 || activeIdx < _practiceLoopLine) {
-              _practiceLoopLine = activeIdx;
-              _practiceLoopArmed = true;
-            }
-            final loopIndex = _practiceLoopLine;
-            if (loopIndex >= 0 && loopIndex < effectiveLyrics.length) {
-              final lineStart = effectiveLyrics[loopIndex].timestamp;
-              final nextIndex = loopIndex + 1;
-              final lineEnd = (nextIndex < effectiveLyrics.length &&
-                      effectiveLyrics[nextIndex].timestamp > lineStart)
-                  ? effectiveLyrics[nextIndex].timestamp
-                  : lineStart + const Duration(seconds: 4);
-              if (pos < lineEnd) {
-                _practiceLoopArmed = true;
-              } else if (_practiceLoopArmed) {
-                _practiceLoopArmed = false;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    context.read<PlayerCubit>().seek(lineStart);
-                  }
-                });
-              }
-            }
-          }
 
           final durationMs = state.duration.inMilliseconds;
           final progressPct = durationMs > 0
@@ -478,8 +533,7 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
                                 const Icon(Icons.repeat_one_rounded, size: 18),
                             visualDensity:
                                 compact ? VisualDensity.compact : null,
-                            onPressed: () =>
-                                setState(() => _practiceMode = !_practiceMode),
+                            onPressed: _togglePracticeMode,
                           ),
                           // Pitch Down
                           IconButton(

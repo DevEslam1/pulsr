@@ -198,11 +198,20 @@ class SafeModeController {
   }
 
   /// Clears the consecutive-failure counter after a healthy run.
+  ///
+  /// The stored reason goes with the counter: a device that just played cleanly
+  /// must not keep advertising the failure it recovered from. The counter is
+  /// removed last so a rejected reason removal cannot hide a live failure
+  /// streak from [shouldFallback].
   Future<void> recordSuccess(String deviceKey) async {
     final key = normalizeDeviceKey(deviceKey);
     final previous = consecutiveFailures(key);
-    if (previous == 0) return;
-    final removed = await _removeKeys(<String>[failuresKey(key)]);
+    final hadReason = _prefs.containsKey(reasonKey(key));
+    if (previous == 0 && !hadReason) return;
+    final removed = await _removeKeys(<String>[
+      reasonKey(key),
+      failuresKey(key),
+    ]);
     if (!removed) {
       throw const SafeModeError(
         code: 'safe-mode-record-success-failed',
@@ -396,18 +405,75 @@ class SafeModeController {
     }
   }
 
+  /// Persists one failure record, committing the counter last.
+  ///
+  /// The counter is what trips the fallback on the next launch, so it may only
+  /// advance once the reason and stamp that describe it are safely stored. A
+  /// rejected earlier write rolls the keys it already wrote back, so a partial
+  /// failure can never leave a phantom increment behind.
   Future<bool> _writeState(
     String key, {
     required int failures,
     required String reason,
   }) async {
-    final wroteFailures = await _prefs.setInt(failuresKey(key), failures);
-    final wroteReason = await _prefs.setString(reasonKey(key), reason);
-    final wroteStamp = await _prefs.setString(
-      updatedKey(key),
-      _clock().toUtc().toIso8601String(),
-    );
-    return wroteFailures && wroteReason && wroteStamp;
+    final reasonPref = reasonKey(key);
+    final stampPref = updatedKey(key);
+    final previousReason = _prefs.getString(reasonPref);
+    final previousStamp = _prefs.getString(stampPref);
+    final wroteReason =
+        await _commit(() => _prefs.setString(reasonPref, reason));
+    final wroteStamp = wroteReason &&
+        await _commit(
+          () => _prefs.setString(
+            stampPref,
+            _clock().toUtc().toIso8601String(),
+          ),
+        );
+    if (!wroteReason || !wroteStamp) {
+      await _restoreString(reasonPref, previousReason, written: wroteReason);
+      await _restoreString(stampPref, previousStamp, written: wroteStamp);
+      return false;
+    }
+    final wroteFailures =
+        await _commit(() => _prefs.setInt(failuresKey(key), failures));
+    if (!wroteFailures) {
+      await _restoreString(reasonPref, previousReason, written: true);
+      await _restoreString(stampPref, previousStamp, written: true);
+    }
+    return wroteFailures;
+  }
+
+  /// Runs one preference setter, treating a thrown platform error as a rejected
+  /// write so the caller can roll a half-applied record back.
+  Future<bool> _commit(Future<bool> Function() write) async {
+    try {
+      return await write();
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Writing a safe-mode preference failed',
+        error: e,
+        stackTrace: st,
+        category: 'SafeModeController',
+      );
+      return false;
+    }
+  }
+
+  /// Puts [key] back to [previous] after a rejected write.
+  ///
+  /// [written] is false when the key was never reached, so a failed first write
+  /// does not rewrite the value it failed to replace.
+  Future<void> _restoreString(
+    String key,
+    String? previous, {
+    required bool written,
+  }) async {
+    if (!written) return;
+    if (previous == null) {
+      await _removeKeys(<String>[key]);
+    } else {
+      await _commit(() => _prefs.setString(key, previous));
+    }
   }
 
   Future<bool> _removeKeys(List<String> keys) async {

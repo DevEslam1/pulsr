@@ -196,12 +196,15 @@ void main() {
       final info = YtmErrorClassifier.classify(sabrEx);
 
       expect(info.signal, equals(YtmBlockSignal.sabrEnforced));
-      expect(info.recoveryAction, equals(YtmRecoveryAction.rotateIdentity));
+      // SABR is decided per upload, not per route: every client receives the
+      // same formats for the same video, so rotating the identity/route cannot
+      // help. The recoverable move is a different upload, then the next track.
+      expect(info.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
 
       final strErr = Exception('server-based adaptive bitrate enforced');
       final strInfo = YtmErrorClassifier.classify(strErr);
       expect(strInfo.signal, equals(YtmBlockSignal.sabrEnforced));
-      expect(strInfo.recoveryAction, equals(YtmRecoveryAction.rotateIdentity));
+      expect(strInfo.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
     });
   });
 

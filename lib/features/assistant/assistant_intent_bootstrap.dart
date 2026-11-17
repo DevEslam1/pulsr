@@ -116,6 +116,10 @@ abstract final class AssistantIntentBootstrap {
   }
 
   /// Removes the channel handler (tests and process teardown).
+  ///
+  /// Idempotent, and safe when the channel was never installed. App teardown
+  /// calls it from the root state's `dispose()`; a later [ensureInstalled]
+  /// (e.g. the next suggestion sync) simply reinstalls the handler.
   static void dispose() {
     _service?.dispose();
     _service = null;

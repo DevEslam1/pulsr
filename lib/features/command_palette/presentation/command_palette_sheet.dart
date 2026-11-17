@@ -12,6 +12,7 @@ import '../../../core/constants/app_typography.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 import '../../../core/widgets/gestures_sheet.dart';
 import '../../../core/widgets/highlighted_text.dart';
@@ -61,13 +62,21 @@ class CommandPaletteItem {
 }
 
 class CommandPaletteSheet extends StatefulWidget {
-  const CommandPaletteSheet({super.key});
+  /// App-level context captured by [show] before the sheet is pushed.
+  ///
+  /// Item callbacks navigate, read cubits and open other sheets; they must not
+  /// run against the sheet's own context because popping it deactivates that
+  /// context. The sheet prefers the live root-navigator context and falls back
+  /// to this one.
+  final BuildContext? appContext;
+
+  const CommandPaletteSheet({super.key, this.appContext});
 
   static Future<void> show(BuildContext context) {
     PulsrHaptics.selectionClick();
     return PulsrSheetHelper.showPulsrSheet<void>(
       context: context,
-      builder: (_) => const CommandPaletteSheet(),
+      builder: (_) => CommandPaletteSheet(appContext: context),
     );
   }
 
@@ -358,10 +367,43 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
     ];
   }
 
+  /// A context that outlives this sheet.
+  ///
+  /// The root navigator's context is always mounted and still sits under the
+  /// app's providers, theme and Router, so `context.go` / `context.read` /
+  /// `showModalBottomSheet` all resolve. The caller context from [show] is the
+  /// fallback for hosts that build the sheet without a navigator ancestor.
+  BuildContext? _resolveAppContext() {
+    final navigator = Navigator.maybeOf(context, rootNavigator: true);
+    final navContext = navigator?.context;
+    if (navContext != null && navContext.mounted) return navContext;
+    final fallback = widget.appContext;
+    if (fallback != null && fallback.mounted) return fallback;
+    return null;
+  }
+
   void _handleSelect(CommandPaletteItem item) {
     PulsrHaptics.lightImpact();
+    // Capture before the pop: after it the sheet's element is unmounted and
+    // every item callback (go/push/read/EqualizerSheet.show) would throw.
+    final appContext = _resolveAppContext();
     Navigator.of(context).pop();
-    item.onSelect(context);
+    if (appContext == null) return;
+    // Post-frame so the palette route is off-screen before the destination
+    // route or sheet is pushed (avoids a transition race on small devices).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!appContext.mounted) return;
+      try {
+        item.onSelect(appContext);
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Command palette action failed: ${item.id}',
+          error: e,
+          stackTrace: st,
+          category: 'CommandPalette',
+        );
+      }
+    });
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {

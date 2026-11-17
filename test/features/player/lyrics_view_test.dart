@@ -124,4 +124,51 @@ void main() {
     expect(find.text('LRCLIB'), findsOneWidget);
     expect(find.text('LRCLIB Synced'), findsNothing);
   });
+
+  testWidgets('LyricsView caches the synced verdict across equal lyric lists',
+      (tester) async {
+    LyricsView.debugSyncedScans = 0;
+    addTearDown(() => LyricsView.debugSyncedScans = 0);
+
+    Widget host(List<LyricsLine> lyrics) => MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 300,
+              height: 400,
+              child: LyricsView(
+                lyrics: lyrics,
+                currentPosition: Duration.zero,
+              ),
+            ),
+          ),
+        );
+
+    // Freezed player states hand the view an equal but distinct list on every
+    // emission, which used to defeat the identity-keyed synced cache.
+    final firstEmission = [
+      LyricsLine(timestamp: const Duration(seconds: 2), text: 'Line one'),
+    ];
+    final secondEmission = [
+      LyricsLine(timestamp: const Duration(seconds: 2), text: 'Line one'),
+    ];
+
+    await tester.pumpWidget(host(firstEmission));
+    await tester.pumpAndSettle();
+    final scansAfterFirstBuild = LyricsView.debugSyncedScans;
+    expect(scansAfterFirstBuild, greaterThan(0));
+
+    await tester.pumpWidget(host(secondEmission));
+    await tester.pump();
+    expect(LyricsView.debugSyncedScans, scansAfterFirstBuild,
+        reason: 'equal lyric content must hit the cached synced verdict');
+
+    // Changed content still invalidates the cache.
+    await tester.pumpWidget(host([
+      LyricsLine(timestamp: const Duration(seconds: 2), text: 'Line one'),
+      LyricsLine(timestamp: Duration.zero, text: 'Line two'),
+    ]));
+    await tester.pump();
+    expect(LyricsView.debugSyncedScans, greaterThan(scansAfterFirstBuild));
+    await tester.pumpAndSettle();
+  });
 }

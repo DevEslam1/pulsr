@@ -21,6 +21,12 @@ class LyricsEditorSheet extends StatefulWidget {
   final List<LyricsLine> initialLyrics;
   final ValueChanged<List<LyricsLine>> onSave;
 
+  /// Test-only counter of discard-guard snapshot builds. Regression guard for
+  /// the snapshot being recomputed on every build instead of only after a
+  /// mutator touched the line list.
+  @visibleForTesting
+  static int debugSnapshotBuilds = 0;
+
   const LyricsEditorSheet({
     super.key,
     required this.song,
@@ -47,12 +53,24 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   StreamSubscription<Duration>? _positionSub;
   Timer? _fallbackTimer;
   late String _initialSnapshot;
+  // Snapshot of [_lines] behind the discard guard. Rebuilt only by
+  // [_refreshSnapshot] (i.e. after a mutator ran), never from `build`.
+  late String _currentSnapshot;
   bool _allowPop = false;
   bool _dirty = false;
 
-  String _snapshot() => _lines
-      .map((l) => '${l.timestamp.inMilliseconds}|${l.text}')
-      .join(String.fromCharCode(10));
+  String _snapshot() {
+    LyricsEditorSheet.debugSnapshotBuilds++;
+    return _lines
+        .map((l) => '${l.timestamp.inMilliseconds}|${l.text}')
+        .join(String.fromCharCode(10));
+  }
+
+  /// Re-signs [_lines] for the discard guard. Call after every mutation so
+  /// unrelated rebuilds never re-serialise the whole lyric list.
+  void _refreshSnapshot() {
+    _currentSnapshot = _snapshot();
+  }
 
   @override
   void initState() {
@@ -67,6 +85,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     }
     _rowKeys = List.generate(_lines.length, (_) => UniqueKey());
     _initialSnapshot = _snapshot();
+    _currentSnapshot = _initialSnapshot;
     try {
       final cubit = context.read<PlayerCubit>();
       _positionSub = cubit.rawPositionStream.listen((pos) {
@@ -127,6 +146,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     setState(() {
       final old = _lines[index];
       _lines[index] = old.copyWith(timestamp: stamp);
+      _refreshSnapshot();
     });
   }
 
@@ -136,6 +156,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
       final old = _lines[index];
       final newMs = (old.timestamp.inMilliseconds + deltaMs).clamp(0, 3600000);
       _lines[index] = old.copyWith(timestamp: Duration(milliseconds: newMs));
+      _refreshSnapshot();
     });
   }
 
@@ -144,6 +165,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
       _lines
           .add(LyricsLine(timestamp: _livePosition.value, text: 'New line...'));
       _rowKeys.add(UniqueKey());
+      _refreshSnapshot();
     });
   }
 
@@ -152,6 +174,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
       if (_lines.length > 1) {
         _lines.removeAt(index);
         _rowKeys.removeAt(index);
+        _refreshSnapshot();
       }
     });
   }
@@ -163,6 +186,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
       pairs.sort((a, b) => a.$1.timestamp.compareTo(b.$1.timestamp));
       _lines = [for (final p in pairs) p.$1];
       _rowKeys = [for (final p in pairs) p.$2];
+      _refreshSnapshot();
     });
   }
 
@@ -171,7 +195,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     final p = context.palette;
 
     return PopScope(
-      canPop: _allowPop || (!_dirty && _snapshot() == _initialSnapshot),
+      canPop: _allowPop || (!_dirty && _currentSnapshot == _initialSnapshot),
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
         final discard = await PulsrDialogHelper.showConfirmDialog(
@@ -369,6 +393,7 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                             ),
                             onChanged: (val) {
                               _lines[index] = _lines[index].copyWith(text: val);
+                              _refreshSnapshot();
                               // AUDIT-FIX (P0-1): Trigger one rebuild on the
                               // false->true transition so PopScope blocks back
                               // without rebuilding the list on every keystroke.

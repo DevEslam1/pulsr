@@ -15,6 +15,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/utils/error_logger.dart';
+import '../../data/audio/audio_handler.dart';
+import '../../data/audio/system_behavior_hooks.dart';
 import '../../data/services/usb_exclusive_service.dart';
 import 'system_behavior_service.dart';
 import 'system_behavior_settings.dart';
@@ -49,6 +51,7 @@ class SystemBehaviorRuntime {
 
   VoidCallback? _settingsListener;
   bool _disposed = false;
+  PulsrAudioHandler? _attachedHandler;
 
   /// Whether the service subscriptions are installed and the runtime is live.
   bool get isStarted => !_disposed && _service.isStarted;
@@ -75,7 +78,7 @@ class SystemBehaviorRuntime {
     Future<void> Function(double volume)? writeVolume,
     MethodChannel? channel,
     bool subscribeInterruptions = false,
-  }) {
+  }) async {
     final AudioHandlerVolumeControls? volume =
         readVolume == null || writeVolume == null
             ? null
@@ -85,7 +88,7 @@ class SystemBehaviorRuntime {
               );
     final AudioHandlerSystemPlaybackPort port =
         AudioHandlerSystemPlaybackPort(handler, volume: volume);
-    return _start(
+    final SystemBehaviorRuntime runtime = await _start(
       settings: settings,
       port: port,
       volumeReader: volume == null ? null : () => port.currentVolume ?? 0,
@@ -95,6 +98,33 @@ class SystemBehaviorRuntime {
       channel: channel ?? defaultChannel,
       subscribeInterruptions: subscribeInterruptions,
     );
+    // Delivery is live from here on: the handler forwards its focus / duck /
+    // noisy events to this service and stops pausing on its own, so one event
+    // produces exactly one pause (fade or immediate, as the settings decide).
+    runtime._attachToHandler(handler);
+    return runtime;
+  }
+
+  /// Bridges [handler]'s interruption path to this runtime's service.
+  ///
+  /// Only a [PulsrAudioHandler] exposes the attach point; any other
+  /// `AudioHandler` keeps its own delivery and the service stays reachable
+  /// through the manual `handle*` methods. Public so a test can wire a fake
+  /// handler and assert the one-pause contract without booting the app.
+  @visibleForTesting
+  void attachToHandler(AudioHandler handler) => _attachToHandler(handler);
+
+  void _attachToHandler(AudioHandler handler) {
+    if (handler is! PulsrAudioHandler) return;
+    _attachedHandler = handler;
+    handler.attachSystemBehaviorHooks(SystemBehaviorHooks(
+      onAudioFocusLoss: ({required bool permanent}) =>
+          _service.handleAudioFocusLoss(permanent: permanent),
+      onAudioFocusGain: _service.handleAudioFocusGain,
+      onNotificationSound: _service.handleNotificationSound,
+      onNotificationSoundEnd: _service.handleNotificationSoundEnd,
+      onHeadsetUnplug: _service.handleHeadsetUnplug,
+    ));
   }
 
   /// Starts the runtime over an injected port. Used by tests, which cannot
@@ -171,6 +201,8 @@ class SystemBehaviorRuntime {
   void dispose() {
     if (_disposed) return;
     _disposed = true;
+    _attachedHandler?.attachSystemBehaviorHooks(null);
+    _attachedHandler = null;
     final VoidCallback? listener = _settingsListener;
     _settingsListener = null;
     if (listener != null) _settings.removeListener(listener);

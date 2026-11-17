@@ -154,6 +154,14 @@ class AudioProfileService {
   /// How many pre-apply backups are kept; older ones are pruned.
   static const int maxBackups = 10;
 
+  /// Preference key remembering the last automatic default-profile
+  /// application as `<profileId>@<deviceKey>`.
+  ///
+  /// Scheduler metadata like [defaultProfileKey], deliberately not a profile
+  /// setting: it exists so a settings refresh or a repeated device event cannot
+  /// re-apply the same profile forever.
+  static const String lastAppliedProfileKey = 'audio_profile_last_applied';
+
   static final RegExp _safeId = RegExp(r'^[A-Za-z0-9_-]{1,80}$');
   static final Random _random = Random();
 
@@ -196,6 +204,9 @@ class AudioProfileService {
   /// left untouched), and throws [AudioProfileStoreError] for an unsafe id.
   Future<bool> setGlobalDefaults(String? profileId) async {
     if (profileId == null) {
+      // Changing the default frees the scheduler marker so the next matching
+      // event (startup or attach) can act on the new selection immediately.
+      await clearLastAppliedMarker();
       return _prefs.remove(defaultProfileKey);
     }
     if (!_safeId.hasMatch(profileId)) {
@@ -207,7 +218,9 @@ class AudioProfileService {
     final directory = await _directory(create: false);
     final file = File(p.join(directory.path, '$profileId.json'));
     if (!await file.exists()) return false;
-    return _prefs.setString(defaultProfileKey, profileId);
+    final saved = await _prefs.setString(defaultProfileKey, profileId);
+    if (saved) await clearLastAppliedMarker();
+    return saved;
   }
 
   /// Every saved profile, newest first. Unreadable files are logged and
@@ -487,6 +500,100 @@ class AudioProfileService {
       );
     }
   }
+
+  /// Reads a saved profile from its file, or `null` when the file is gone.
+  ///
+  /// Unlike [list] this addresses one id directly, so the startup scheduler
+  /// does not have to enumerate every profile to find its default.
+  Future<AudioProfile?> profileById(String id) async {
+    if (!_safeId.hasMatch(id)) return null;
+    final directory = await _directory(create: false);
+    final file = File(p.join(directory.path, '$id.json'));
+    if (!await file.exists()) return null;
+    try {
+      return await _readProfile(file);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Reading the default audio profile failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioProfileService',
+        meta: <String, dynamic>{'profileId': id},
+      );
+      return null;
+    }
+  }
+
+  /// Whether [profile] targets the device described by [deviceVid]/[devicePid].
+  ///
+  /// A profile without a device pin applies everywhere. A pinned profile needs
+  /// a device to compare against and must match every id it pins.
+  static bool profileMatchesDevice(
+    AudioProfile profile, {
+    int? deviceVid,
+    int? devicePid,
+  }) {
+    final pinnedVid = profile.deviceVid;
+    final pinnedPid = profile.devicePid;
+    if (pinnedVid == null && pinnedPid == null) return true;
+    if (deviceVid == null && devicePid == null) return false;
+    if (pinnedVid != null && pinnedVid != deviceVid) return false;
+    if (pinnedPid != null && pinnedPid != devicePid) return false;
+    return true;
+  }
+
+  /// Applies the profile marked with [setGlobalDefaults] when the device fits.
+  ///
+  /// Called once at startup ([startup] true) and again when a USB DAC is
+  /// attached. The last application is remembered in
+  /// [lastAppliedProfileKey] keyed by profile + device, so a settings reload or
+  /// a duplicate attach event is a no-op instead of an apply loop. Returns the
+  /// report, or `null` when there was nothing to do.
+  Future<AudioProfileApplyReport?> applyDefaultProfile({
+    bool startup = false,
+    int? deviceVid,
+    int? devicePid,
+    String? deviceKey,
+  }) async {
+    final id = defaultProfileId;
+    if (id == null) return null;
+    final resolvedDeviceKey = deviceKey ?? (startup ? 'startup' : 'device');
+    final marker = '$id@$resolvedDeviceKey';
+    if (_prefs.getString(lastAppliedProfileKey) == marker) return null;
+
+    final profile = await profileById(id);
+    if (profile == null) {
+      ErrorLogger.log(
+        'Default audio profile is missing; nothing applied',
+        category: 'AudioProfileService',
+        meta: <String, dynamic>{'profileId': id},
+      );
+      return null;
+    }
+    if (!profileMatchesDevice(
+      profile,
+      deviceVid: deviceVid,
+      devicePid: devicePid,
+    )) {
+      ErrorLogger.addBreadcrumb(
+        'Default audio profile skipped: attached device does not match',
+        category: 'audio_profiles',
+      );
+      return null;
+    }
+
+    final report = await apply(profile);
+    // Only a completed apply marks the marker: a rolled-back apply must be
+    // retried on the next event instead of being treated as done.
+    await _prefs.setString(lastAppliedProfileKey, marker);
+    return report;
+  }
+
+  /// Clears the automatic-apply marker so the next matching event applies the
+  /// default profile again (used when the user changes which profile is the
+  /// default, or detaches the device).
+  Future<void> clearLastAppliedMarker() =>
+      _prefs.remove(lastAppliedProfileKey);
 
   /// Deletes the profile whose id is [id]. Missing files are treated as done.
   ///

@@ -140,6 +140,13 @@ public class FloatDspAudioSinkTest {
         return sink.configuredFormats.get(sink.configuredFormats.size() - 1);
     }
 
+    /** Bytes the delegate has accepted so far, in write order. */
+    private static byte[] acceptedBytes(FakeSink sink) {
+        byte[] bytes = new byte[sink.accepted.size()];
+        for (int i = 0; i < bytes.length; i++) bytes[i] = sink.accepted.get(i);
+        return bytes;
+    }
+
     /** Overrides JNI only: real processor float expansion/raw eligibility run. */
     private static class NativeDecision extends NativeDspAudioProcessor {
         int calls;
@@ -814,8 +821,12 @@ public class FloatDspAudioSinkTest {
         assertEquals(C.ENCODING_PCM_16BIT, lastConfigured(sink).pcmEncoding);
         ByteBuffer first = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
         first.putShort((short) 1000).putShort((short) -1000).flip();
+        byte[] firstBytes = new byte[4];
+        first.duplicate().get(firstBytes);
         assertTrue(wrapper.handleBuffer(first, 0L, 1));
         assertEquals(0, nativeCalls[0]);
+        assertArrayEquals("the 16-bit bypass must hand over the decoded bytes unchanged",
+                firstBytes, acceptedBytes(sink));
 
         bitPerfect[0] = false;
         ByteBuffer second = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
@@ -834,6 +845,68 @@ public class FloatDspAudioSinkTest {
 
         wrapper.reset();
         processor.release();
+    }
+
+    /**
+     * audit/verify_tests.md 3.1B(b1): a packed 24-bit source whose boundary
+     * carries the 24-bit grid keeps that encoding and reaches the delegate
+     * untouched. {@code queueCount == 0} plus byte equality is what proves the
+     * float path, the native call and boundaryOutput() never ran: none of them
+     * exposes a counter of its own.
+     */
+    @Test
+    public void bitPerfectBypassKeeps24BitEncodingWhenTheBoundaryCarries24Bit() throws Exception {
+        FakeSink sink = new FakeSink();
+        FakeProcessor processor = new FakeProcessor();
+        processor.bitPerfect = true;
+        processor.output = new AudioFormat(96000, 2, C.ENCODING_PCM_FLOAT);
+        assertTrue("the real gate must grant the bypass: native available, bit-perfect, "
+                + "no USB-exclusive path, no tap SRC, no pending gain curve",
+                processor.canBypassFloatPath());
+        FloatDspAudioSink wrapper = new FloatDspAudioSink(sink, processor, true, false, true);
+
+        wrapper.configure(source(96000, 2, C.ENCODING_PCM_24BIT), 0, null);
+        assertEquals(C.ENCODING_PCM_24BIT, lastConfigured(sink).pcmEncoding);
+        assertEquals(96000, lastConfigured(sink).sampleRate);
+
+        byte[] packed = {1, 0, 64, 2, 0, -64, 3, 0, 64, 4, 0, -64};
+        ByteBuffer input = ByteBuffer.allocateDirect(packed.length).order(ByteOrder.nativeOrder());
+        input.put(packed).flip();
+        assertTrue(wrapper.handleBuffer(input, 0L, 1));
+        assertEquals("24-bit must not enter the DSP/quantiser path", 0, processor.queueCount);
+        assertArrayEquals("the delegate must receive the decoded 24-bit bytes unchanged",
+                packed, acceptedBytes(sink));
+        assertEquals("the bypass path must not reconfigure mid-stream", 1,
+                sink.configuredFormats.size());
+    }
+
+    /**
+     * audit/verify_tests.md 3.1B(b2): documents the open Mode.DEFAULT gap, it
+     * does not bless it. A 24-bit source held back by a 16-bit boundary has to
+     * take the float path, where Media3's ToInt16PcmAudioProcessor (or this
+     * wrapper's Pcm16Quantizer) reduces it to 16 bits, so the output-path
+     * verdict must degrade instead of claiming bit-perfect. This is the
+     * negative control: if the policy ever starts bypassing 24-bit into a
+     * 16-bit boundary, it turns red on purpose.
+     */
+    @Test
+    public void pcm16BoundaryQuantizes24BitSoTheVerdictMustDegrade() throws Exception {
+        FakeSink sink = new FakeSink();
+        FakeProcessor processor = new FakeProcessor();
+        processor.bitPerfect = true;
+        processor.output = new AudioFormat(96000, 2, C.ENCODING_PCM_FLOAT);
+        FloatDspAudioSink wrapper = new FloatDspAudioSink(sink, processor, true, true, true);
+
+        wrapper.configure(source(96000, 2, C.ENCODING_PCM_24BIT), 0, null);
+        assertEquals("a 16-bit boundary cannot carry the 24-bit grid",
+                C.ENCODING_PCM_16BIT, lastConfigured(sink).pcmEncoding);
+
+        byte[] packed = {1, 0, 64, 2, 0, -64, 3, 0, 64, 4, 0, -64};
+        ByteBuffer input = ByteBuffer.allocateDirect(packed.length).order(ByteOrder.nativeOrder());
+        input.put(packed).flip();
+        assertTrue(wrapper.handleBuffer(input, 0L, 1));
+        assertEquals("24-bit must go through the float path when the boundary is 16-bit",
+                1, processor.queueCount);
     }
 
     @Test

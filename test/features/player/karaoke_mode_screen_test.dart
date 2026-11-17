@@ -198,6 +198,59 @@ void main() {
     verify(() => cubit.seek(Duration.zero)).called(1);
   });
 
+  testWidgets(
+      '3.6: practice loop is scheduled from the position listener, once per window',
+      (tester) async {
+    final states = StreamController<PlayerState>.broadcast();
+    addTearDown(states.close);
+    final cubit = stubTransport(stateWith(
+      lines: lyrics,
+      position: const Duration(seconds: 5),
+    ));
+    when(() => cubit.stream).thenAnswer((_) => states.stream);
+    await pumpKaraoke(tester, cubit);
+
+    void emit(Duration position) {
+      final next = stateWith(lines: lyrics, position: position);
+      when(() => cubit.state).thenReturn(next);
+      states.add(next);
+    }
+
+    final practice = tester.widget<IconButton>(
+        find.widgetWithIcon(IconButton, Icons.repeat_one_rounded));
+    practice.onPressed!();
+    await tester.pump();
+    // Still inside the first line (0s..10s): the toggle itself must not seek.
+    verifyNever(() => cubit.seek(any()));
+
+    // A position tick past the line end schedules exactly one loop-back seek.
+    emit(const Duration(seconds: 12));
+    await tester.pump();
+    await tester.pump();
+    verify(() => cubit.seek(Duration.zero)).called(1);
+
+    // A rebuild (no new position) must not re-run the loop scheduling.
+    tester.element(find.byType(KaraokeModeScreen)).markNeedsBuild();
+    await tester.pump();
+    await tester.pump();
+    verifyNever(() => cubit.seek(any()));
+
+    // A stale tick still past the window, before the seek lands, stays guarded
+    // by the armed flag instead of looping the same window a second time.
+    emit(const Duration(seconds: 12, milliseconds: 200));
+    await tester.pump();
+    await tester.pump();
+    verifyNever(() => cubit.seek(any()));
+
+    // Back inside the window: the next pass is allowed to loop again.
+    emit(const Duration(seconds: 1));
+    await tester.pump();
+    emit(const Duration(seconds: 12));
+    await tester.pump();
+    await tester.pump();
+    verify(() => cubit.seek(Duration.zero)).called(1);
+  });
+
   testWidgets('practice mode loops the last line with the fallback end',
       (tester) async {
     final cubit = stubTransport(stateWith(

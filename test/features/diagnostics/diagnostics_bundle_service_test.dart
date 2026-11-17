@@ -264,7 +264,7 @@ void main() {
     expect(details['dac_voicing'], 'neutral');
     expect(details['dither'], '24-bit');
     expect(details['limiter'], '0.0 dB');
-    expect(details['multiband_compressor'], '3 bands');
+    expect(details['multiband_compressor'], '4 bands');
   });
 
   test('redacts internal data, opt and UNC paths', () {

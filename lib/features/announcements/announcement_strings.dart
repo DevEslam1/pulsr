@@ -45,6 +45,13 @@ abstract final class AnnouncementStrings {
   /// Volume slider explanation.
   static const String volumeSubtitle = 'Separate from the music volume.';
 
+  /// Maximum announcement length slider label.
+  static const String maxLengthLabel = 'Maximum length';
+
+  /// Maximum announcement length slider explanation.
+  static const String maxLengthSubtitle =
+      'Longer details are shortened to this many characters.';
+
   /// Ducking switch label.
   static const String duckAudioTitle = 'Duck the music while speaking';
 
@@ -102,6 +109,13 @@ abstract final class AnnouncementStrings {
   /// Test button label.
   static const String testButton = 'Speak test';
 
+  /// Sample track title read out by the test button when the screen was opened
+  /// without a preview track.
+  static const String previewTrackTitle = 'Pulsr Music';
+
+  /// Sample artist read out by the test button.
+  static const String previewTrackArtist = 'Announcement test';
+
   /// Shown when no element is selected, so there is nothing to say.
   static const String emptySelection = 'Select at least one item to announce.';
 
@@ -139,6 +153,12 @@ abstract final class AnnouncementStrings {
 
   /// Formats the volume slider value as a percentage.
   static String volumeValue(double value) => '${(value * 100).round()}%';
+
+  /// Formats the maximum-length slider value in characters.
+  static String maxLengthValue(int characters) => '$characters characters';
+
+  /// Refresh action for the voice list.
+  static const String voiceRefresh = 'Refresh voices';
 
   /// Formats one voice dropdown entry as `Name (locale)`.
   static String voiceOption(String name, String localeCode) =>

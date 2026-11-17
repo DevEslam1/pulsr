@@ -121,6 +121,17 @@ int main() {
         check(decodeI24(&doubled[3]) == -0x800000, "I24 -max saturates at -max");
         check(decodeI24(&doubled[6]) == 16384, "I24 +8192 * 2");
 
+        // Policy: a bit-perfect stream and a DoP carrier must never be scaled,
+        // while ordinary PCM (including 24-bit) keeps its volume control.
+        check(pulsr::SinkVolumeAllowed(false, false),
+              "shared PCM may be scaled");
+        check(!pulsr::SinkVolumeAllowed(true, false),
+              "bit-perfect stream is unity-only");
+        check(!pulsr::SinkVolumeAllowed(false, true),
+              "DoP carrier is unity-only");
+        check(!pulsr::SinkVolumeAllowed(true, true),
+              "bit-perfect DoP carrier is unity-only");
+
         std::vector<int32_t> s32 = {
             0x40000000, 0x40000001, 0x7FFFFFFF, static_cast<int32_t>(0x80000000u)
         };

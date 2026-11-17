@@ -272,9 +272,18 @@ struct DitherParamSet {
 struct BitPerfectParamSet {
     bool enabled = false;
     bool isDop = false;
+    // Gates directUsbGain: true only while Direct USB PCM output is the live
+    // endpoint. When false the engine ignores directUsbGain and runs that stage
+    // at unity, so an attenuation left over from an unplugged DAC can never
+    // scale (and silently de-bit-perfect) the current stream. Defaults false:
+    // UsbAudioSink publishes true only while its stream is open, so
+    // "no USB open => no USB attenuation" holds from cold start instead of
+    // failing open on whatever gain a previous session left behind.
+    bool directUsbActive = false;
     // Software attenuation fallback [0.0, 1.0] used ONLY when Direct USB PCM
-    // output is active and UAC hardware volume does not own the DAC level.
-    // Unity (1.0) guarantees bit-exact sample pass-through; ignored on DoP.
+    // output is active (`directUsbActive`) and UAC hardware volume does not own
+    // the DAC level. Unity (1.0) guarantees bit-exact sample pass-through;
+    // ignored on DoP.
     double directUsbGain = 1.0;
 };
 

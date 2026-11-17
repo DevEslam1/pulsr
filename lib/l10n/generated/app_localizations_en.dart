@@ -5974,6 +5974,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dspAboutBassBoost => 'About Bass Boost';
 
   @override
+  String get dspMasterNoSnapshotNotice =>
+      'Effects are now off. Enable the stages you want individually; nothing is restored automatically.';
+
+  @override
   String get dspAboutBitPerfect => 'About Bit-Perfect';
 
   @override
@@ -7178,6 +7182,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errYtmExtractFail => 'Stream extraction failed. Switching route.';
+
+  @override
+  String get errYtmSabr =>
+      'YouTube only offers this track in a format Pulsr cannot stream yet.';
 
   @override
   String get errYtmVerify =>
@@ -10579,4 +10587,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String ambientVolumePercent(int percent) {
     return 'Volume: $percent%';
   }
+
+  @override
+  String get badgeExclusive => 'EXCLUSIVE';
 }

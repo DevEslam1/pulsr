@@ -149,8 +149,9 @@ mixin PhoneLayoutSection
           final rate = dev != null
               ? '${(dev.sampleRate / 1000).toStringAsFixed(dev.sampleRate % 1000 == 0 ? 0 : 1)} kHz / ${dev.bitDepth}-bit'
               : '44.1 kHz / 16-bit';
-          final isBitPerfect =
-              dev?.isBitPerfectActive == true || state.bitPerfectOutput;
+          // The preference alone is not an output fact, and the platform
+          // flag is an exclusive route, not a verified chain.
+          final isExclusive = dev?.isBitPerfectActive == true;
 
           topAction = Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xs),
@@ -216,7 +217,7 @@ mixin PhoneLayoutSection
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (isBitPerfect) ...[
+              if (isExclusive) ...[
                 const SizedBox(width: AppSpacing.xs),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -228,7 +229,7 @@ mixin PhoneLayoutSection
                         color: AppColors.dacGold.withValues(alpha: 0.5)),
                   ),
                   child: Text(
-                    context.l10n.bitPerfectLabel,
+                    context.l10n.badgeExclusive,
                     style: TextStyle(
                       color: p.warning,
                       fontSize: AppFontSize.caption,

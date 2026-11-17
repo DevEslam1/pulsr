@@ -1,5 +1,9 @@
 part of 'equalizer_sheet.dart';
 
+/// Boost deltas at or below this are slider rounding noise, not a
+/// GainStagingBudget clamp.
+const double _boostClampEpsilon = 0.01;
+
 extension _EqSheetShell on _EqualizerSheetState {
   void _setStudioMode(BuildContext context, bool studio) {
     _setStateSafe(() => _isStudioModeOverride = studio);
@@ -845,7 +849,7 @@ extension _EqSheetShell on _EqualizerSheetState {
           onTap: dspBlockedGlobal != null && !state.isDspEffectsActive
               ? null
               : () {
-                  cubit.setDspEffectsEnabled(!state.isDspEffectsActive);
+                  _setDspMasterEnabled(cubit, !state.isDspEffectsActive);
                   _tabController.animateTo(2);
                 },
           child: Padding(
@@ -961,7 +965,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     onChanged:
                         dspBlockedGlobal != null && !state.isDspEffectsActive
                             ? null
-                            : (val) => cubit.setDspEffectsEnabled(val),
+                            : (val) => _setDspMasterEnabled(cubit, val),
                   ),
                 ),
               ],
@@ -970,6 +974,22 @@ extension _EqSheetShell on _EqualizerSheetState {
         ),
       ),
     );
+  }
+
+  /// Drives the master DSP switch and explains the "nothing to restore" case.
+  ///
+  /// Re-enabling used to force spatializer/virtualizer/limiter defaults on a
+  /// session that never had them. Now the switch only re-arms the master gate,
+  /// and the user is told to enable the stages they actually want.
+  void _setDspMasterEnabled(PlayerCubit cubit, bool enabled) {
+    if (enabled && !cubit.hasDspEffectsSnapshot) {
+      PulsrToast.show(
+        context,
+        message: context.l10n.dspMasterNoSnapshotNotice,
+        icon: Icons.info_outline_rounded,
+      );
+    }
+    cubit.setDspEffectsEnabled(enabled);
   }
 
   Widget _buildEssentialControlsPane(
@@ -1585,10 +1605,12 @@ extension _EqSheetShell on _EqualizerSheetState {
     final effectiveEnabled = isEnabled && dspBlocked == null;
     final spatializerAvailable = _spatializerToggleAvailable(state);
 
-    // Gain staging calculations for Volume Boost
-    final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
-    final safeMaxBoost = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
-    final isOverSafe = state.volumeBoost > safeMaxBoost;
+    // Gain staging truth: the engine applies `effectiveVolumeBoost`, which
+    // GainStagingBudget may have clamped against every other active gain stage.
+    // Warn only when that clamp actually reduced the requested boost; the
+    // headphone profile preamp says nothing about the other stages.
+    final isBoostClamped = state.volumeBoost - state.effectiveVolumeBoost >
+        _boostClampEpsilon;
 
     return SingleChildScrollView(
       padding: const EdgeInsetsDirectional.fromSTEB(
@@ -2928,13 +2950,13 @@ extension _EqSheetShell on _EqualizerSheetState {
                     Container(
                       padding: const EdgeInsets.all(AppSpacing.xs),
                       decoration: BoxDecoration(
-                        color: (isOverSafe ? p.error : p.accent)
+                        color: (isBoostClamped ? p.error : p.accent)
                             .withValues(alpha: 0.15),
                         borderRadius: AppRadii.r8All,
                       ),
                       child: Icon(
                         Icons.volume_up_rounded,
-                        color: isOverSafe ? p.error : p.accent,
+                        color: isBoostClamped ? p.error : p.accent,
                         size: 20,
                       ),
                     ),
@@ -2985,7 +3007,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                               horizontal: AppSpacing.xs,
                               vertical: AppSpacing.xxs),
                           decoration: BoxDecoration(
-                            color: (isOverSafe
+                            color: (isBoostClamped
                                     ? p.error
                                     : (state.volumeBoost > 0
                                         ? p.accent
@@ -2993,7 +3015,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 .withValues(alpha: 0.15),
                             borderRadius: AppRadii.r8All,
                             border: Border.all(
-                              color: isOverSafe
+                              color: isBoostClamped
                                   ? p.error.withValues(alpha: 0.4)
                                   : (state.volumeBoost > 0
                                       ? p.accent.withValues(alpha: 0.3)
@@ -3005,7 +3027,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB'
                                 : context.l10n.dspOff,
                             style: TextStyle(
-                              color: isOverSafe
+                              color: isBoostClamped
                                   ? p.error
                                   : (state.volumeBoost > 0
                                       ? p.accent
@@ -3053,9 +3075,9 @@ extension _EqSheetShell on _EqualizerSheetState {
                             const RoundSliderThumbShape(enabledThumbRadius: 6),
                         overlayShape:
                             const RoundSliderOverlayShape(overlayRadius: 14),
-                        activeTrackColor: isOverSafe ? p.error : p.accent,
+                        activeTrackColor: isBoostClamped ? p.error : p.accent,
                         inactiveTrackColor: p.surface,
-                        thumbColor: isOverSafe ? p.error : p.accent,
+                        thumbColor: isBoostClamped ? p.error : p.accent,
                       ),
                       child: Semantics(
                         slider: true,
@@ -3098,7 +3120,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     );
                   },
                 ),
-                if (isOverSafe)
+                if (isBoostClamped)
                   Padding(
                     padding: const EdgeInsetsDirectional.only(
                         top: AppSpacing.s2, start: AppSpacing.xxs),
@@ -3109,8 +3131,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                         const SizedBox(width: AppSpacing.s6),
                         Expanded(
                           child: Text(
-                            context.l10n.dspVolumeClipWarning(
-                                preampDb.toStringAsFixed(1)),
+                            context.l10n.dspLimitedForHeadroom,
                             style: TextStyle(
                                 color: p.error,
                                 fontSize: AppFontSize.caption,
@@ -3136,25 +3157,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                                 color: p.error,
                                 fontSize: AppFontSize.caption,
                                 fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (state.volumeBoost - state.effectiveVolumeBoost > 0.01)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                        top: AppSpacing.s2, start: AppSpacing.xxs),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded,
-                            color: p.textTertiary, size: 12),
-                        const SizedBox(width: AppSpacing.s4),
-                        Text(
-                          context.l10n.dspLimitedForHeadroom,
-                          style: TextStyle(
-                            color: p.textTertiary,
-                            fontSize: AppFontSize.caption,
                           ),
                         ),
                       ],

@@ -197,6 +197,41 @@ void main() {
       service.dispose();
     });
 
+    test('saveQuirk for a device that is not attached only persists the entry',
+        () async {
+      final store = await _storeWith(profile);
+      final service = await build(store);
+      controller.add(_status());
+      await pumpEventQueue();
+      expect(service.state.quirk, profile);
+
+      // A profile for a DAC that is not the one currently plugged in.
+      final other = UsbQuirkProfile(
+        vid: 0x1234,
+        pid: 0x5678,
+        label: 'Other DAC',
+        hidEnabled: false,
+      );
+      expect(await service.saveQuirk(other), isTrue);
+      await pumpEventQueue();
+
+      // Persisted so the list refreshes...
+      expect(store.get(other.vid, other.pid), other);
+      // ...but the attached device keeps its own resolution and push count.
+      expect(service.state.quirk, profile,
+          reason: 'the attached DAC must not adopt another device\'s quirks');
+      final applied = fake.named(UsbErgonomicsService.applyMethod);
+      expect(applied, hasLength(1),
+          reason: 'only the attach-time apply may reach the native side');
+      expect(
+        (applied.single.arguments as Map<Object?, Object?>)['hidEnabled'],
+        isTrue,
+        reason: 'the attached profile was still the one applied',
+      );
+      expect(service.state.lastError, isNull);
+      service.dispose();
+    });
+
     test('deleteQuirk removes the entry and applies the fallback', () async {
       final store = await _storeWith(profile);
       final fallback = UsbQuirkProfile(vid: 0, pid: 0, label: 'Fallback');

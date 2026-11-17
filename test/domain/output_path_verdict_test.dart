@@ -1,6 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/data/audio/bit_perfect_chain.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
+import 'package:pulsr/domain/models/bit_perfect_state.dart';
 import 'package:pulsr/domain/services/output_path_verdict.dart';
+
+/// A state that already folded every observation; the verdict must honour it.
+const _verified = BitPerfectState(
+  tier: BitPerfectTier.active,
+  assessment: BitPerfectChainAssessment(
+    verdict: BitPerfectChainVerdict.verified,
+    sourceSampleRate: 96000,
+    sourceBitDepth: 24,
+    outputSampleRate: 96000,
+    outputBitDepth: 24,
+  ),
+);
 
 AudioOutputInfo _info({
   bool usb = false,
@@ -30,15 +44,33 @@ AudioOutputInfo _info({
 
 void main() {
   group('OutputPathVerdict', () {
-    test('USB + bit-perfect + no DSP is bit-perfect', () {
-      final v =
-          OutputPathVerdict.of(_info(usb: true, bitPerfect: true, type: 'usb'));
+    test('USB + verified state + no DSP is bit-perfect', () {
+      final v = OutputPathVerdict.of(
+        _info(usb: true, bitPerfect: true, type: 'usb'),
+        bitPerfectState: _verified,
+      );
       expect(v.quality, OutputPathQuality.bitPerfect);
       expect(v.detail, '96 kHz / 24-bit');
       expect(v.isLossy, isFalse);
     });
 
-    test('USB with active DSP is lossless but processed', () {
+    test('the platform flag alone is exclusive, never bit-perfect', () {
+      final v =
+          OutputPathVerdict.of(_info(usb: true, bitPerfect: true, type: 'usb'));
+      expect(v.quality, OutputPathQuality.losslessProcessed);
+      expect(v.label, 'EXCLUSIVE');
+    });
+
+    test('a verified state outranks an enabled-but-bypassed DSP', () {
+      final v = OutputPathVerdict.of(
+        _info(usb: true, bitPerfect: true, type: 'usb'),
+        dspActive: true,
+        bitPerfectState: _verified,
+      );
+      expect(v.quality, OutputPathQuality.bitPerfect);
+    });
+
+    test('USB with active DSP and no state is lossless but processed', () {
       final v = OutputPathVerdict.of(
           _info(usb: true, bitPerfect: true, type: 'usb'),
           dspActive: true);

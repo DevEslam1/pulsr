@@ -52,6 +52,15 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   double get maxPlaybackSpeed => 3.0;
   @override
   double get volume => _vol;
+
+  /// The follow-track resolver gates its verdict on the player gain; the
+  /// double applies none, so it reports unity instead of throwing through
+  /// `noSuchMethod` and aborting the whole follow path.
+  @override
+  double get effectiveSoftwareGain => 1.0;
+
+  @override
+  bool get transportSamplesModified => false;
   @override
   SongsTableData? get currentSong => null;
   @override

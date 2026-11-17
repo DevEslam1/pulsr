@@ -214,6 +214,36 @@ class AudioOutputInfo {
   final int decodedSampleRate;
   final int decodedPcmEncoding;
 
+  /// The rate the sink actually opened (not the file tag, not the target).
+  /// 0 means the platform did not report it, which can never be a verified
+  /// format match.
+  final int sinkSampleRate;
+
+  /// The sink's true container depth, before any display collapsing.
+  /// [bitDepth] stays the collapsed, user-facing value.
+  final int sinkBitDepth;
+
+  /// `AudioFormat.ENCODING_PCM_*` constant the sink opened, 0 if unprobed.
+  final int sinkPcmEncoding;
+
+  /// The decoder carries the source in float32 although the file is integer
+  /// PCM, so the integer samples were re-quantised upstream of the sink.
+  final bool floatCarrierDecodesSource;
+
+  /// The native engine reported an integer bit-perfect bypass engaged on this
+  /// route: the decoded integer samples reached the sink unmodified. This is an
+  /// observation, never an inference from [sinkPcmEncoding] - an integer sink
+  /// encoding says nothing about a float carrier or a gain stage ahead of it.
+  final bool integerBypassActive;
+
+  /// The user asked for Bit-Perfect. This is a request, not evidence: only the
+  /// observed route can say whether the samples survived.
+  final bool bitPerfectRequested;
+
+  /// Number of active HAL/system (AudioEffect) stages on this route. Non-zero
+  /// means the samples are altered after the app hands them over.
+  final int halStagesActive;
+
   // Phase 4: output-path capability diagnostics
   final List<AudioDirectFormat> directFormats;
   final int usbAudioClass; // 0 = none/unknown, 1 = UAC1, 2 = UAC2, 3 = UAC3
@@ -267,6 +297,13 @@ class AudioOutputInfo {
     this.decodedBitDepth = 0,
     this.decodedSampleRate = 0,
     this.decodedPcmEncoding = 0,
+    this.sinkSampleRate = 0,
+    this.sinkBitDepth = 0,
+    this.sinkPcmEncoding = 0,
+    this.floatCarrierDecodesSource = false,
+    this.integerBypassActive = false,
+    this.bitPerfectRequested = false,
+    this.halStagesActive = 0,
     this.directFormats = const [],
     this.usbAudioClass = 0,
     this.usbDacLabel,
@@ -332,6 +369,14 @@ class AudioOutputInfo {
       decodedBitDepth: (map['decodedBitDepth'] as num?)?.toInt() ?? 0,
       decodedSampleRate: (map['decodedSampleRate'] as num?)?.toInt() ?? 0,
       decodedPcmEncoding: (map['decodedPcmEncoding'] as num?)?.toInt() ?? 0,
+      sinkSampleRate: (map['sinkSampleRate'] as num?)?.toInt() ?? 0,
+      sinkBitDepth: (map['sinkBitDepth'] as num?)?.toInt() ?? 0,
+      sinkPcmEncoding: (map['sinkPcmEncoding'] as num?)?.toInt() ?? 0,
+      floatCarrierDecodesSource:
+          (map['floatCarrierDecodesSource'] as bool?) ?? false,
+      integerBypassActive: (map['integerBypassActive'] as bool?) ?? false,
+      bitPerfectRequested: (map['bitPerfectRequested'] as bool?) ?? false,
+      halStagesActive: (map['halStagesActive'] as num?)?.toInt() ?? 0,
       directFormats: () {
         final raw = map['directFormats'];
         final out = <AudioDirectFormat>[];
@@ -445,6 +490,13 @@ class AudioOutputInfo {
       'decodedBitDepth': decodedBitDepth,
       'decodedSampleRate': decodedSampleRate,
       'decodedPcmEncoding': decodedPcmEncoding,
+      'sinkSampleRate': sinkSampleRate,
+      'sinkBitDepth': sinkBitDepth,
+      'sinkPcmEncoding': sinkPcmEncoding,
+      'floatCarrierDecodesSource': floatCarrierDecodesSource,
+      'integerBypassActive': integerBypassActive,
+      'bitPerfectRequested': bitPerfectRequested,
+      'halStagesActive': halStagesActive,
       'directFormats': directFormats.map((d) => d.toMap()).toList(),
       'usbAudioClass': usbAudioClass,
       'usbDacLabel': usbDacLabel,
@@ -492,6 +544,13 @@ class AudioOutputInfo {
     int? decodedBitDepth,
     int? decodedSampleRate,
     int? decodedPcmEncoding,
+    int? sinkSampleRate,
+    int? sinkBitDepth,
+    int? sinkPcmEncoding,
+    bool? floatCarrierDecodesSource,
+    bool? integerBypassActive,
+    bool? bitPerfectRequested,
+    int? halStagesActive,
     List<AudioDirectFormat>? directFormats,
     int? usbAudioClass,
     String? usbDacLabel,
@@ -541,6 +600,14 @@ class AudioOutputInfo {
       decodedBitDepth: decodedBitDepth ?? this.decodedBitDepth,
       decodedSampleRate: decodedSampleRate ?? this.decodedSampleRate,
       decodedPcmEncoding: decodedPcmEncoding ?? this.decodedPcmEncoding,
+      sinkSampleRate: sinkSampleRate ?? this.sinkSampleRate,
+      sinkBitDepth: sinkBitDepth ?? this.sinkBitDepth,
+      sinkPcmEncoding: sinkPcmEncoding ?? this.sinkPcmEncoding,
+      floatCarrierDecodesSource:
+          floatCarrierDecodesSource ?? this.floatCarrierDecodesSource,
+      integerBypassActive: integerBypassActive ?? this.integerBypassActive,
+      bitPerfectRequested: bitPerfectRequested ?? this.bitPerfectRequested,
+      halStagesActive: halStagesActive ?? this.halStagesActive,
       directFormats: directFormats ?? this.directFormats,
       usbAudioClass: usbAudioClass ?? this.usbAudioClass,
       usbDacLabel: usbDacLabel ?? this.usbDacLabel,
@@ -598,6 +665,13 @@ class AudioOutputInfo {
           decodedBitDepth == other.decodedBitDepth &&
           decodedSampleRate == other.decodedSampleRate &&
           decodedPcmEncoding == other.decodedPcmEncoding &&
+          sinkSampleRate == other.sinkSampleRate &&
+          sinkBitDepth == other.sinkBitDepth &&
+          sinkPcmEncoding == other.sinkPcmEncoding &&
+          floatCarrierDecodesSource == other.floatCarrierDecodesSource &&
+          integerBypassActive == other.integerBypassActive &&
+          bitPerfectRequested == other.bitPerfectRequested &&
+          halStagesActive == other.halStagesActive &&
           _listEquals(directFormats, other.directFormats) &&
           usbAudioClass == other.usbAudioClass &&
           usbDacLabel == other.usbDacLabel &&
@@ -644,6 +718,13 @@ class AudioOutputInfo {
         decodedBitDepth,
         decodedSampleRate,
         decodedPcmEncoding,
+        sinkSampleRate,
+        sinkBitDepth,
+        sinkPcmEncoding,
+        floatCarrierDecodesSource,
+        integerBypassActive,
+        bitPerfectRequested,
+        halStagesActive,
         Object.hashAll(directFormats),
         usbAudioClass,
         usbDacLabel,
@@ -667,6 +748,15 @@ class AudioOutputInfo {
 
   @override
   String toString() {
-    return 'AudioOutputInfo(name: $deviceName, isUsbDac: $isUsbDac, sampleRate: ${sampleRate}Hz, bitDepth: $bitDepth-bit, bitPerfect: $isBitPerfectActive)';
+    return 'AudioOutputInfo(name: $deviceName, isUsbDac: $isUsbDac, '
+        'sampleRate: ${sampleRate}Hz, bitDepth: $bitDepth-bit, '
+        'sink: ${sinkSampleRate}Hz/$sinkBitDepth-bit '
+        '(enc $sinkPcmEncoding), '
+        'decoder: ${decodedSampleRate}Hz/$decodedBitDepth-bit '
+        '(enc $decodedPcmEncoding), '
+        'bitPerfectRequested: $bitPerfectRequested, '
+        'bitPerfectActive: $isBitPerfectActive, '
+        'integerBypass: $integerBypassActive, '
+        'halStagesActive: $halStagesActive)';
   }
 }

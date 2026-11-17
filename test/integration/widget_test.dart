@@ -375,6 +375,18 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
             const MethodChannel('com.pulsr.music/proxy'), (call) async => null);
+    // The startup audio-profile scheduler reads the USB status and the USB
+    // ergonomics service listens to its event channel. widget tests report
+    // TargetPlatform.android, so the event channel is activated for real and
+    // an unhandled 'listen' message flakes the smoke test.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/usb_exclusive'),
+            (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/usb_exclusive_events'),
+            (call) async => null);
     // Hermetic smoke test: connectivity_plus opens an EventChannel stream at
     // startup; without a mock the async listen throws MissingPluginException
     // under full-suite load and flakes the suite (no relation to app logic).

@@ -5988,6 +5988,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dspAboutBassBoost => 'Acerca del refuerzo de graves';
 
   @override
+  String get dspMasterNoSnapshotNotice =>
+      'Los efectos están desactivados. Activa individualmente las etapas que quieras; nada se restaura automáticamente.';
+
+  @override
   String get dspAboutBitPerfect => 'Acerca de Bit-Perfect';
 
   @override
@@ -7219,6 +7223,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get errYtmExtractFail => 'Falló la extracción. Cambiando de ruta.';
+
+  @override
+  String get errYtmSabr =>
+      'YouTube solo ofrece esta pista en un formato que Pulsr todavía no puede reproducir.';
 
   @override
   String get errYtmVerify =>
@@ -10661,4 +10669,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String ambientVolumePercent(int percent) {
     return 'Volumen: $percent%';
   }
+
+  @override
+  String get badgeExclusive => 'EXCLUSIVO';
 }

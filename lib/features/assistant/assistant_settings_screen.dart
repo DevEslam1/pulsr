@@ -11,6 +11,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_typography.dart';
 import '../../core/theme/aura_theme.dart';
+import '../../core/utils/error_logger.dart';
 import 'assistant_search_channel.dart';
 import 'assistant_settings.dart';
 import 'assistant_strings.dart';
@@ -96,9 +97,14 @@ void _clearSuggestionCache(AssistantSuggestionSync? sync) {
       } else {
         await AssistantSearchChannel().clear();
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
       // Both paths are already failure-tolerant; this is a last-resort guard.
-      debugPrint('Assistant suggestion clear failed: $error');
+      ErrorLogger.log(
+        'Assistant suggestion cache could not be cleared',
+        error: error,
+        stackTrace: stackTrace,
+        category: 'Assistant',
+      );
     }
   }());
 }

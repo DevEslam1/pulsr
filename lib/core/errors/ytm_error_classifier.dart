@@ -887,8 +887,14 @@ class YtmErrorClassifier {
         );
       case YtmBlockSignal.sabrEnforced:
         return YtmErrorInfo(
-          message: 'YouTube format restriction encountered. Rotating route…',
-          recoveryAction: YtmRecoveryAction.rotateIdentity,
+          // SABR is a per-upload streaming protocol, so "rotate the route" is
+          // the one remedy that cannot help: every client is answered with the
+          // same formats for the same video. A different upload of the same
+          // recording may still serve progressive streams, so the recovery is
+          // to try a substitute, then move on instead of retrying the route.
+          message:
+              'YouTube only offers this track in a format Pulsr cannot stream yet.',
+          recoveryAction: YtmRecoveryAction.skipToNextTrack,
           signal: signal,
           traceId: traceId,
         );

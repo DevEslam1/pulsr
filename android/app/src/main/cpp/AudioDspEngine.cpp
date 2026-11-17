@@ -585,6 +585,12 @@ AudioDspEngine* DspEngineRegistry::selectActiveEngineLocked() const {
     return &AudioDspEngine::instance();
 }
 
+bool DspEngineRegistry::wasLastBlockBitPerfect() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    AudioDspEngine* engine = selectActiveEngineLocked();
+    return engine != nullptr && engine->wasLastBlockBitPerfect();
+}
+
 void DspEngineRegistry::unregisterEngine(AudioDspEngine* engine) {
     if (!engine) return;
     std::lock_guard<std::mutex> lock(mutex_);
@@ -821,6 +827,17 @@ bool DspEngineRegistry::isSafetyAttenuationActive() {
     return false;
 }
 
+bool DspEngineRegistry::wasSafetySuppressed() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (AudioDspEngine::instance().wasSafetySuppressed()) return true;
+    for (auto* engine : engines_) {
+        if (engine && engine->wasSafetySuppressed()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 double DspEngineRegistry::getAppliedSampleRate() {
     std::lock_guard<std::mutex> lock(mutex_);
     return selectActiveEngineLocked()->getSampleRate();
@@ -979,6 +996,15 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
 
 std::shared_ptr<const DspParamSnapshot> AudioDspEngine::getParams() const {
     return currentParams_.load();
+}
+
+double AudioDspEngine::effectiveDirectUsbGain(const DspParamSnapshot& snapshot) {
+    // Unity unless the caller says Direct USB PCM is the live endpoint. Gating
+    // here (not in the JNI setter) keeps every consumer — bypass, A/B and the
+    // normal DVC stage — from scaling a stream that is no longer on that route.
+    return snapshot.bitPerfect.directUsbActive
+        ? std::clamp(snapshot.bitPerfect.directUsbGain, 0.0, 1.0)
+        : 1.0;
 }
 
 void AudioDspEngine::resetInternal() {
@@ -1366,6 +1392,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     lastBlockBitPerfect_.store(snapshot && snapshot->bitPerfect.enabled, std::memory_order_relaxed);
     lastBlockDop_.store(snapshot && snapshot->bitPerfect.enabled && snapshot->bitPerfect.isDop,
                         std::memory_order_relaxed);
+    // Per-block observation: only the bit-perfect branch below may set this true
+    // again for the block it is about to produce.
+    safetySuppressed_.store(false, std::memory_order_relaxed);
     if (!snapshot) {
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterActive_.store(false, std::memory_order_relaxed);
@@ -1382,6 +1411,37 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     if (resetGeneration != lastResetGeneration_) {
         resetInternal();
         lastResetGeneration_ = resetGeneration;
+    }
+    // Bit-perfect edge: entering or leaving the bypass changes which stages ran
+    // on the previous block and with what history, so stale filter/reverb/limiter
+    // state must not bleed across it. Reset once per edge (never per block) and
+    // keep gain staging continuous, exactly as the non-finite recovery path does.
+    const bool bitPerfectRequested = snapshot->bitPerfect.enabled;
+    if (bitPerfectRequested != lastBitPerfectRequested_) {
+        // resetInternal() also clears the ReplayGain targets and the tag cache.
+        // Capture them first: an active attenuation must not jump back to 0 dB,
+        // and a cleared tag cache would be read as "new track" and snap the
+        // smoother instead of easing it.
+        const double replayGainTarget = targetReplayGain_;
+        const double rgTrackDb = lastRgTrackDb_;
+        const double rgAlbumDb = lastRgAlbumDb_;
+        const bool rgHasTrack = lastRgHasTrack_;
+        const bool rgHasAlbum = lastRgHasAlbum_;
+        resetInternal();
+        targetReplayGain_ = replayGainTarget;
+        lastRgTrackDb_ = rgTrackDb;
+        lastRgAlbumDb_ = rgAlbumDb;
+        lastRgHasTrack_ = rgHasTrack;
+        lastRgHasAlbum_ = rgHasAlbum;
+        // The bypass applied neither gain stage. Leaving it resumes the smoother
+        // from the gain the chain last applied (not from a forced unity origin),
+        // so the ReplayGain stage picks up where it left off.
+        smoothedReplayGain_ = bitPerfectRequested ? 1.0 : lastAppliedReplayGain_;
+        smoothedDirectVolume_ = bitPerfectRequested ? 1.0 : lastAppliedDirectVolume_;
+        // The full-chain DVC stage re-unities this every block, so it carries
+        // no history to restore.
+        smoothedDirectUsbVolume_ = 1.0;
+        lastBitPerfectRequested_ = bitPerfectRequested;
     }
     // Measured custody: capture the exact bytes this block enters with, and (via
     // the guard's destructor) leaves with. Placed after the pending reset so a
@@ -1480,6 +1540,20 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         lastAppliedGeneration_.store(snapshot->generation);
     }
 
+    // Non-finite scrub for the bypass paths below. The output-integrity guard at
+    // the end of this function (finite check + clamp) never runs on the DoP /
+    // bit-perfect returns, so a corrupt decoder would otherwise hand NaN/Inf
+    // straight to the sink (the float sink writes it verbatim). Zeroing a NaN
+    // cannot break bit-exactness for any legal signal; the +/-1 clamp is
+    // deliberately not applied here, so the bypass stays sample-identical.
+    // One pass, no allocation, no logging.
+    {
+        const int totalBypassSamples = frames * channels;
+        for (int i = 0; i < totalBypassSamples; ++i) {
+            if (!std::isfinite(buffer[i])) buffer[i] = 0.0f;
+        }
+    }
+
     // Bit-Perfect / DoP bypass path: sample-identical to raw input, zero DSP roundtrips, volume locked to unity.
     // Gated on `enabled` only: a stale `isDop` must never keep the chain
     // bypassed after the user disables bit-perfect. Callers must clear
@@ -1489,12 +1563,18 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         limiterGrDb_.store(0.0f, std::memory_order_relaxed);
         safetyAttenuationActive_.store(false, std::memory_order_relaxed);
         limiter_.setProcessingActive(false);
+        // The safety limiter is suppressed on this path by design (it would
+        // alter the samples). Publish that so callers can distinguish "safety
+        // inactive" from "safety bypassed by bit-perfect"; dose stays metered.
+        safetySuppressed_.store(snapshot->headphoneSafety.enabled,
+                                std::memory_order_relaxed);
         // Bit-perfect output must remain sample-identical, but the listener's
         // weekly sound dose still has to be metered. Read-only: no gain is
         // applied and the safety limiter never runs on this path.
         const double bpSr = sampleRate_.load(std::memory_order_acquire);
-        // The gain stages are skipped here, so restart their smoothing at
-        // unity; leaving bit-perfect must not ramp from a stale gain.
+        // The gain stages are skipped here, so their smoothers are held at unity
+        // while the bypass is engaged; the bit-perfect edge above restores the
+        // pre-bypass gain when it ends.
         smoothedReplayGain_ = 1.0;
         smoothedDirectVolume_ = 1.0;
         // DoP words are DSD payload, not PCM: metering them yields a bogus
@@ -1509,9 +1589,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         }
         // When Direct USB lacks DAC hardware volume control and user lowers
         // device/app volume, attenuate PCM smoothly before leaving bit-perfect
-        // bypass; at unity (1.0) this is a zero-touch pass-through.
-        const double usbTarget =
-            std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
+        // bypass; at unity (1.0) this is a zero-touch pass-through. Gated on
+        // directUsbActive: with no live Direct USB endpoint the stage is unity,
+        // so a stale gain cannot scale (and de-bit-perfect) this stream.
+        const double usbTarget = snapshot->bitPerfect.directUsbActive
+            ? std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0)
+            : 1.0;
         if (applySmoothedBlockGain(buffer, frames, channels, bpSr, usbTarget,
                                    smoothedDirectUsbVolume_)) {
             lastBlockBitPerfect_.store(false, std::memory_order_relaxed);
@@ -1549,6 +1632,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             // Compensation applied to the dry path is the inverse of the
             // chain's measured change, bounded to [-18, +12] dB.
             bypassGainDb = std::clamp(-measuredDb, -18.0, 12.0);
+        }
+        // The DVC and Direct USB gain stages never run on this path either, so
+        // fold the Direct USB attenuation (when that endpoint is live) into the
+        // compare gain. Without it A/B would be louder than the bit-perfect
+        // output it is being compared against.
+        const double usbCompareGain = effectiveDirectUsbGain(*snapshot);
+        if (usbCompareGain < 0.9999) {
+            bypassGainDb += std::log10(std::max(0.001, usbCompareGain)) * 20.0;
         }
         if (std::abs(bypassGainDb) > 1e-3) {
             const int totalSamples = frames * channels;
@@ -1615,6 +1706,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             lastRgHasTrack_ = rgt.hasTrackGain; lastRgHasAlbum_ = rgt.hasAlbumGain;
         }
     }
+    // The gain this block applies ends at smoothedReplayGain_ (the per-block ramp
+    // below travels start->smoothed). Remember it so leaving the bit-perfect
+    // bypass can resume the smoother from the gain the chain last applied.
+    lastAppliedReplayGain_ = smoothedReplayGain_;
 
     // Net gain check for conditional limiter insertion
     const uint32_t rawStages = snapshot->activeStages;
@@ -1706,8 +1801,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     const double dvcRequestedTarget = snapshot->directVolume.enabled
         ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
         : 1.0;
-    const double usbRequestedTarget =
-        std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
+    const double usbRequestedTarget = effectiveDirectUsbGain(*snapshot);
     const double composedDirectTarget = dvcRequestedTarget * usbRequestedTarget;
     const bool dvcActive =
         (snapshot->directVolume.enabled || usbRequestedTarget < 0.9999) &&
@@ -1879,10 +1973,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                 (snapshot->directVolume.enabled
                      ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
                      : 1.0) *
-                std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
+                effectiveDirectUsbGain(*snapshot);
             smoothedDirectUsbVolume_ = 1.0;
             applySmoothedBlockGain(buffer, frames, channels, currentSr,
                                    dvcTarget, smoothedDirectVolume_);
+            // The ramp ends the block at smoothedDirectVolume_; remember it so
+            // leaving the bit-perfect bypass resumes from the gain the chain
+            // last applied instead of re-ramping from unity.
+            lastAppliedDirectVolume_ = smoothedDirectVolume_;
         }
 
         // 9c. Multichannel trim/delay (2-8 channels). Runs before the limiter
@@ -2232,7 +2330,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
                 (snapshot->directVolume.enabled
                      ? std::clamp(snapshot->directVolume.gainLinear, 0.0, 8.0)
                      : 1.0) *
-                std::clamp(snapshot->bitPerfect.directUsbGain, 0.0, 1.0);
+                effectiveDirectUsbGain(*snapshot);
             resetInternal();
             targetReplayGain_ = replayGainTarget;
             smoothedReplayGain_ = replayGainTarget;

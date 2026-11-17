@@ -72,6 +72,15 @@ public final class AaudioNativeBridge {
     public static native boolean nativeIsExclusive(long handle);
 
     public static native void nativeSetVolume(long handle, float volume);
+
+    /**
+     * Mirrors the app-level bit-perfect/DoP request onto an open stream. Cheap;
+     * callers may push it per buffer. {@code dop} marks a DSD-over-PCM carrier.
+     */
+    public static native void nativeSetBitPerfect(long handle, boolean bitPerfect, boolean dop);
+
+    /** True when the open stream asserted bit-exact output. */
+    public static native boolean nativeIsBitPerfectSink(long handle);
  
     public static native double nativeGetOutputLatencyMs(long handle);
 

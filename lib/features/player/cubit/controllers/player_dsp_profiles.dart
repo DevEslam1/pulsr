@@ -299,45 +299,172 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     bool bitPerfectOutput,
   ) async {
     final dsp = snapshot.dsp;
-    Future<void> step(Future<void> Function() op) async {
+    Future<void> step(String label, Future<void> Function() op) async {
       try {
         await op();
       } catch (e, st) {
-        ErrorLogger.log('Profile rollback step failed',
+        ErrorLogger.log('Profile rollback step failed: $label',
             error: e, stackTrace: st, category: 'PlayerDspController');
       }
     }
 
     final settings = _settingsCubit;
-    if (settings != null) {
-      await step(() => settings.setBitPerfectOutput(bitPerfectOutput));
-      await step(() => settings.setCrossfade(crossfadeSeconds));
+    // Table-driven: every DspSlice field that owns an engine setter is pushed
+    // back, so a profile failure cannot leave one stage at the failed profile's
+    // value while the UI claims the pre-apply snapshot is live. Each entry is
+    // isolated by [step]; one dead stage never aborts the rest.
+    final steps = <(String, Future<void> Function())>[
+      if (settings != null) ...[
+        ('bitPerfectOutput', () => settings.setBitPerfectOutput(bitPerfectOutput)),
+        ('crossfade', () => settings.setCrossfade(crossfadeSeconds)),
+      ],
+      ('equalizerEnabled', () => _audioHandler.setEqualizerEnabled(dsp.isEqEnabled)),
+      ('eqPreset', () => _audioHandler.applyPreset(dsp.eqPreset)),
+      ('preamp', () => _audioHandler.setPreamp(dsp.preampDb)),
+      ('volumeBoost', () => _audioHandler.setVolumeBoost(dsp.volumeBoost)),
+      ('bassBoost', () => _audioHandler.setBassBoost(dsp.effectiveBassBoost)),
+      (
+        'saturation',
+        () => _audioHandler.setSaturation(
+              dsp.isSaturationEnabled,
+              drive: dsp.saturationDrive,
+              mix: dsp.saturationMix,
+              tilt: dsp.saturationTilt,
+              multiband: dsp.saturationMultiband,
+            )
+      ),
+      (
+        'stereoWidth',
+        () => _audioHandler.setStereoWidth(
+              dsp.isStereoWidthEnabled,
+              width: dsp.stereoWidth,
+              multiband: dsp.stereoWidthMultiband,
+              lowWidth: dsp.stereoWidthLow,
+              midWidth: dsp.stereoWidthMid,
+              highWidth: dsp.stereoWidthHigh,
+              lowCrossoverHz: dsp.stereoWidthLowCrossoverHz,
+              highCrossoverHz: dsp.stereoWidthHighCrossoverHz,
+            )
+      ),
+      (
+        'loudnessContour',
+        () => _audioHandler.setLoudnessContour(
+              dsp.isLoudnessContourEnabled,
+              intensity: dsp.loudnessContourIntensity,
+            )
+      ),
+      (
+        'subCrossover',
+        () => _audioHandler.setSubCrossover(
+              dsp.isSubCrossoverEnabled,
+              cornerHz: dsp.subCrossoverCornerHz,
+              slopeDbPerOct: dsp.subCrossoverSlopeDbPerOct,
+              gain: dsp.subCrossoverGain,
+              bassMono: dsp.subCrossoverBassMono,
+              antiPop: dsp.subCrossoverAntiPop,
+            )
+      ),
+      ('dynamicEq', () => _audioHandler.setDynamicEq(dsp.isDynamicEqEnabled)),
+      for (var i = 0; i < dsp.dynamicEqBands.length; i++)
+        (
+          'dynamicEqBand$i',
+          () => _audioHandler.setDynamicEqBand(i, dsp.dynamicEqBands[i])
+        ),
+      ('spatializer',
+          () => _audioHandler.setSpatializerEnabled(dsp.isSpatializerEnabled)),
+      ('virtualizer', () async {
+        await _audioHandler.setVirtualizerEnabled(dsp.isVirtualizerEnabled);
+        if (dsp.isVirtualizerEnabled) {
+          await _audioHandler.setVirtualizerStrength(dsp.virtualizerStrength);
+        }
+      }),
+      (
+        'dynamics',
+        () => _audioHandler.setDynamicsPreset(
+              dsp.dynamicsPreset,
+              enabled: dsp.isDynamicsEnabled,
+            )
+      ),
+      (
+        'limiter',
+        () => _audioHandler.setLookaheadLimiter(
+              dsp.isLimiterEnabled,
+              thresholdDb: dsp.limiterThresholdDb,
+              releaseMs: dsp.limiterReleaseMs,
+            )
+      ),
+      (
+        'reverb',
+        () => _audioHandler.setReverb(
+              dsp.isReverbEnabled,
+              preset: dsp.reverbPreset,
+              wetDry: dsp.reverbWetDry,
+            )
+      ),
+      ('crossfeed', () => _audioHandler.setCrossfeed(dsp.isCrossfeedEnabled,
+          delayUs: dsp.crossfeedDelayUs,
+          feedDb: dsp.crossfeedFeedDb,
+          mode: dsp.crossfeedMode)),
+      ('stereoBalance', () => _audioHandler.setStereoBalance(dsp.stereoBalance)),
+      ('monoMix', () => _audioHandler.setMonoMix(dsp.monoMix)),
+      ('sincResampler',
+          () => _audioHandler.setSincResampler(dsp.isSincResamplerEnabled)),
+      (
+        'dither',
+        () => _audioHandler.setDither(
+              dsp.isDitherEnabled,
+              targetBitDepth: dsp.ditherTargetBitDepth,
+            )
+      ),
+      (
+        'dynamicBass',
+        () => _audioHandler.setDynamicBass(
+              enabled: dsp.isDynamicBassEnabled,
+              strength: dsp.dynamicBassStrength,
+              preset: dsp.dynamicBassPreset,
+            )
+      ),
+      (
+        'viperDdc',
+        () => _audioHandler.setViperDdc(
+              dsp.isViperDdcEnabled,
+              profileName: dsp.viperDdcProfileName,
+            )
+      ),
+      (
+        'arbitraryEq',
+        () => _audioHandler.setArbitraryEq(
+              dsp.isArbitraryEqEnabled,
+              eqString: dsp.arbitraryEqString,
+              linearPhase: dsp.arbitraryEqLinearPhase,
+            )
+      ),
+      (
+        'liveProg',
+        () => _audioHandler.setLiveProg(
+              dsp.isLiveProgEnabled,
+              code: dsp.liveProgCode,
+            )
+      ),
+      // The multiband compressor lives on the manager (not the DspSlice-only
+      // handler surface), so it is restored through it, bands and crossovers
+      // included.
+      ('multibandCompressor', () async {
+        await _audioHandler.equalizerManager.setMultibandCompressor(
+          dsp.isMultibandCompressorEnabled,
+          bands: dsp.multibandCompressorBands,
+          f0: dsp.multibandCompressorF0,
+          f1: dsp.multibandCompressorF1,
+          f2: dsp.multibandCompressorF2,
+        );
+      }),
+      ('headphoneProfile',
+          () => _audioHandler.applyHeadphoneProfile(dsp.selectedHeadphoneProfile)),
+    ];
+
+    for (final (label, op) in steps) {
+      await step(label, op);
     }
-    await step(() => _audioHandler.setEqualizerEnabled(dsp.isEqEnabled));
-    await step(() => _audioHandler.applyPreset(dsp.eqPreset));
-    await step(() => _audioHandler.setPreamp(dsp.preampDb));
-    await step(() => _audioHandler.setVolumeBoost(dsp.volumeBoost));
-    await step(() => _audioHandler.setSaturation(dsp.isSaturationEnabled,
-        drive: dsp.saturationDrive,
-        mix: dsp.saturationMix,
-        tilt: dsp.saturationTilt,
-        multiband: dsp.saturationMultiband));
-    await step(() => _audioHandler.setStereoWidth(dsp.isStereoWidthEnabled,
-        width: dsp.stereoWidth));
-    await step(() => _audioHandler.setLoudnessContour(
-        dsp.isLoudnessContourEnabled,
-        intensity: dsp.loudnessContourIntensity));
-    await step(() => _audioHandler.setSubCrossover(dsp.isSubCrossoverEnabled,
-        cornerHz: dsp.subCrossoverCornerHz,
-        slopeDbPerOct: dsp.subCrossoverSlopeDbPerOct,
-        gain: dsp.subCrossoverGain));
-    await step(() => _audioHandler.setDynamicEq(dsp.isDynamicEqEnabled));
-    await step(() => _audioHandler.setCrossfeed(dsp.isCrossfeedEnabled,
-        delayUs: dsp.crossfeedDelayUs,
-        feedDb: dsp.crossfeedFeedDb,
-        mode: dsp.crossfeedMode));
-    await step(() =>
-        _audioHandler.applyHeadphoneProfile(dsp.selectedHeadphoneProfile));
 
     if (_isClosed()) return;
     final s = _getState();

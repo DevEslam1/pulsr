@@ -337,6 +337,12 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     // registered later inherit it.
     DspEngineRegistry::instance().setSinkBitDepth(validBitDepth_);
     sinkDepthPublished_ = true;
+    // Direct USB PCM is now the live endpoint, so the engine may apply the
+    // software attenuation (bitPerfect.directUsbGain). Published before the
+    // worker starts so the first block already sees the gate open.
+    AudioDspEngine::instance().updateParams([](DspParamSnapshot& snap) {
+        snap.bitPerfect.directUsbActive = true;
+    });
     producerOwner_.store(0, std::memory_order_release);
     running_.store(true, std::memory_order_release);
     active_.store(true, std::memory_order_release);
@@ -569,6 +575,12 @@ void UsbAudioSink::releaseResources() {
         DspEngineRegistry::instance().setSinkBitDepth(0);
         sinkDepthPublished_ = false; // clear even after the worker self-exited
     }
+    // No live Direct USB endpoint any more: gate directUsbGain back to unity so
+    // an attenuation left over from this DAC cannot scale a speaker/Bluetooth
+    // stream that is still claiming bit-perfect.
+    AudioDspEngine::instance().updateParams([](DspParamSnapshot& snap) {
+        snap.bitPerfect.directUsbActive = false;
+    });
 
     if (!drainUrbCompletions()) return; // preserve kernel-owned buffers on failure
 

@@ -122,6 +122,11 @@ public:
     uint64_t getLastAppliedGeneration() const { return lastAppliedGeneration_.load(); }
     uint64_t getPublishedGeneration() const { return snapshotGeneration_.load(); }
     bool wasLastBlockBitPerfect() const { return lastBlockBitPerfect_.load(std::memory_order_relaxed); }
+    // True when the last block ran the bit-perfect bypass while headphone safety
+    // was enabled, i.e. the safety limiter was suppressed by design (it would
+    // alter the samples). Dose is still metered read-only on that path. Lets a
+    // caller tell "safety inactive" from "safety bypassed".
+    bool wasSafetySuppressed() const { return safetySuppressed_.load(std::memory_order_relaxed); }
     // Item 3: render-thread-safe flag telling the USB tap whether the block it
     // just pushed through was a DoP carrier (marker in the MSB of every word), so
     // the sink can synthesize valid DoP silence on an underrun. Reads the same
@@ -314,6 +319,11 @@ private:
     // (control) thread and stores it as the snapshot's preparedFilter.
     void ensureArbitraryEqPrepared(DspParamSnapshot& snap);
     void resetInternal();
+    // Direct USB software attenuation actually in force for this snapshot: the
+    // clamped directUsbGain only while Direct USB PCM output is the live
+    // endpoint (bitPerfect.directUsbActive), otherwise unity. Pure arithmetic,
+    // no state, so it is safe on the render thread.
+    static double effectiveDirectUsbGain(const DspParamSnapshot& snapshot);
 
     // Publishes `snap` as the live snapshot and retires the previous owner.
     // MUST be called with publishMutex_ held.
@@ -391,6 +401,9 @@ private:
     std::atomic<const DspParamSnapshot*> currentParamsPtr_{nullptr};
     std::atomic<bool> lastBlockBitPerfect_{false};
     std::atomic<bool> lastBlockDop_{false};
+    // Set per block by the bit-perfect branch (see processInterleaved); reset on
+    // every other path so it always describes the block just processed.
+    std::atomic<bool> safetySuppressed_{false};
 
     // Per-renderer hazard slots plus a monotonic publishEpoch_ counter to prevent
     // pointer-address ABA across snapshot reallocations and concurrent
@@ -435,8 +448,20 @@ private:
     float ditherErrorHistory_[ChannelManager::MAX_CHANNELS][2] = {};
     double smoothedReplayGain_ = 1.0;
     double targetReplayGain_ = 1.0;
+    // Gain actually applied to the last block that ran the ReplayGain stage.
+    // The bit-perfect bypass forces smoothedReplayGain_ to unity, so leaving it
+    // must resume the smoother from this value instead of from 1.0.
+    double lastAppliedReplayGain_ = 1.0;
+    // Last requested bit-perfect value, used to detect the bypass edges. Render
+    // thread only: written and read exclusively inside processInterleaved(),
+    // which runs on one thread per engine, so no atomic is needed.
+    bool lastBitPerfectRequested_ = false;
     // Direct Volume Control output gain, smoothed across a 20ms window.
     double smoothedDirectVolume_ = 1.0;
+    // Gain the DVC stage actually applied to the last block that ran it. The
+    // bit-perfect bypass holds smoothedDirectVolume_ at unity, so leaving the
+    // bypass must resume the smoother from this value instead of from 1.0.
+    double lastAppliedDirectVolume_ = 1.0;
     // Direct USB software fallback gain (bit-perfect PCM only), smoothed across 20ms.
     double smoothedDirectUsbVolume_ = 1.0;
     bool gainBoostLatched_ = false;
@@ -578,6 +603,14 @@ public:
     void resetWeeklyDose();
     void setWeeklyDose(double dose);
     bool isSafetyAttenuationActive();
+    // Observed render state. wasLastBlockBitPerfect() reports the engine that
+    // actually renders (the control-only singleton never runs processInterleaved
+    // so it would always answer false, and a retired engine must not answer for
+    // the live one); wasSafetySuppressed() is true when any registered engine had
+    // its headphone-safety limiter suppressed by the bit-perfect bypass.
+    // Control thread only: takes the registry lock.
+    bool wasLastBlockBitPerfect();
+    bool wasSafetySuppressed();
     double getAppliedSampleRate();
     uint64_t getLastAppliedGeneration();
     void setPerformanceProfile(DspPerformanceProfile profile);

@@ -195,8 +195,9 @@ void main() {
           bitExactMeasured: true,
         ),
       );
-      expect(partial.verificationBadge, contains('partial window'));
-      expect(partial.verificationBadge, contains('Bit-Exact on a short 100-frame'));
+      expect(partial.verificationBadge, startsWith('Not Verified'));
+      expect(partial.verificationBadge, contains('partial 100-frame window'));
+      expect(partial.verificationBadge, contains('ended early'));
     });
 
     test('two empty digests are not evidence of bit-exactness', () {
@@ -314,7 +315,11 @@ void main() {
         verifiedAt: original.verifiedAt,
       );
       expect(tampered.certificateSha256, isNot(original.certificateSha256));
-      expect(tampered.verdict, CustodyVerdict.bitExactMeasured);
+      // Identical digests certify the bytes, but this report never observed a
+      // bit-perfect path, so the honest verdict is unverified — not a claim.
+      expect(tampered.measurement!.bitExactMeasured, isTrue);
+      expect(tampered.bitExactObserved, isFalse);
+      expect(tampered.verdict, CustodyVerdict.unverified);
       expect(tamperedJson['bitExactMeasured'], isTrue);
     });
   });

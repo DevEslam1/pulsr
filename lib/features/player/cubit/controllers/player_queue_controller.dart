@@ -84,6 +84,9 @@ class PlayerQueueController {
   final MediaScannerService? _mediaScannerService;
   final YtmService? _ytmService;
 
+  /// Ceiling for one autoplay fetch; injectable so a test can use milliseconds.
+  final Duration _autoplayFetchTimeout;
+
   /// A-01: Invoked when a track is resumed (initialPosition provided) so the
   /// per-song speed/pitch/volume/EQ memory can be re-applied.
   final void Function(SongsTableData song)? _onResumePerSongMemory;
@@ -128,6 +131,15 @@ class PlayerQueueController {
   /// same recommendations twice.
   bool _autoplayFetchInFlight = false;
 
+  /// Whether an autoplay recommendation fetch is running right now.
+  ///
+  /// Exposed so a test (and the settings surface, later) can see that a wedged
+  /// request timed out instead of blocking every later trigger forever.
+  bool get isAutoplayFetchInFlight => _autoplayFetchInFlight;
+
+  /// Default ceiling for one autoplay recommendation fetch.
+  static const Duration defaultAutoplayFetchTimeout = Duration(seconds: 20);
+
   PlayerQueueController({
     required PulsrAudioHandler audioHandler,
     required IMusicRepository repository,
@@ -145,6 +157,7 @@ class PlayerQueueController {
     PlaybackLatencyTracker? latencyTracker,
     MediaScannerService? mediaScannerService,
     YtmService? ytmService,
+    Duration autoplayFetchTimeout = defaultAutoplayFetchTimeout,
     void Function(SongsTableData song)? onResumePerSongMemory,
     void Function()? invalidateQueueSyncResolution,
     void Function()? cancelPendingSeek,
@@ -167,6 +180,7 @@ class PlayerQueueController {
         _latencyTracker = latencyTracker,
         _mediaScannerService = mediaScannerService,
         _ytmService = ytmService,
+        _autoplayFetchTimeout = autoplayFetchTimeout,
         _onResumePerSongMemory = onResumePerSongMemory,
         _invalidateQueueSyncResolution =
             invalidateQueueSyncResolution ?? (() {}),

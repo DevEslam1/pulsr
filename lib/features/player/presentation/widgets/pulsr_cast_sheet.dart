@@ -15,6 +15,73 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
+/// Whether [song] can be handed to a cast renderer: a real local file or a
+/// downloaded YouTube track that already has a local path. Streaming rows
+/// (YouTube, radio) and net-library files ([SongSource.remote]) have no file
+/// the renderer can read, so they are filtered out.
+bool isCastableLocalSong(SongsTableData song) {
+  if (song.source != SongSource.local && song.isDownloaded != true) {
+    return false;
+  }
+  final path = song.path;
+  if (path.isEmpty) return false;
+  final lower = path.toLowerCase();
+  if (lower.startsWith('http') || lower.startsWith('ytmusic://')) {
+    return false;
+  }
+  return true;
+}
+
+/// The castable slice of a player queue plus the offset the renderer starts at.
+@immutable
+class CastQueueSelection {
+  const CastQueueSelection({
+    required this.items,
+    required this.startIndex,
+    required this.startPositionMs,
+  });
+
+  /// Castable tracks in player-queue order.
+  final List<SongsTableData> items;
+
+  /// Index inside [items] the renderer must start on.
+  final int startIndex;
+
+  /// Playback offset for [startIndex].
+  final int startPositionMs;
+
+  bool get isEmpty => items.isEmpty;
+}
+
+/// Filters [queue] down to castable files and remaps the anchor.
+///
+/// [position] belongs to [currentSong] only. When that track is not castable
+/// (a YouTube/radio row, a net-library file) the renderer would otherwise start
+/// the first castable track at an offset from a different file, so the offset is
+/// reset to zero and the anchor falls back to index 0.
+CastQueueSelection selectCastableQueue({
+  required List<SongsTableData> queue,
+  SongsTableData? currentSong,
+  Duration position = Duration.zero,
+}) {
+  final items = <SongsTableData>[];
+  var startIndex = 0;
+  var anchorFound = false;
+  for (final song in queue) {
+    if (!isCastableLocalSong(song)) continue;
+    if (currentSong != null && song.id == currentSong.id) {
+      startIndex = items.length;
+      anchorFound = true;
+    }
+    items.add(song);
+  }
+  return CastQueueSelection(
+    items: items,
+    startIndex: items.isEmpty ? 0 : startIndex.clamp(0, items.length - 1),
+    startPositionMs: anchorFound ? position.inMilliseconds : 0,
+  );
+}
 class PulsrCastSheet extends StatefulWidget {
   const PulsrCastSheet({super.key});
 
@@ -158,18 +225,7 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
 
   /// B12: only real local files can be handed to a cast receiver. YT Music
   /// sentinels (`ytmusic://`) and HTTP streams are not castable.
-  bool _isCastableLocal(SongsTableData song) {
-    if (song.source != SongSource.local && song.isDownloaded != true) {
-      return false;
-    }
-    final path = song.path;
-    if (path.isEmpty) return false;
-    final lower = path.toLowerCase();
-    if (lower.startsWith('http') || lower.startsWith('ytmusic://')) {
-      return false;
-    }
-    return true;
-  }
+  bool _isCastableLocal(SongsTableData song) => isCastableLocalSong(song);
 
   String _mimeFor(String path) {
     final lower = path.toLowerCase();
@@ -215,19 +271,15 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
       }
       return;
     }
-    // B12: filter to castable local files, remapping the start index to the
-    // filtered list so mixed queues cast correctly.
-    final castable = <SongsTableData>[];
-    var startIndex = 0;
-    for (final s in queue) {
-      if (!_isCastableLocal(s)) continue;
-      if (playerState.currentSong != null &&
-          s.id == playerState.currentSong!.id) {
-        startIndex = castable.length;
-      }
-      castable.add(s);
-    }
-    if (castable.isEmpty) {
+    // B12: filter to castable local files and remap the start index. The
+    // start offset is only meaningful when the current track itself is cast.
+    final selection = selectCastableQueue(
+      queue: queue,
+      currentSong: playerState.currentSong,
+      position: playerState.position,
+    );
+    final castable = selection.items;
+    if (selection.isEmpty) {
       _showToast(context.l10n.castNoLocalItems);
       return;
     }
@@ -245,8 +297,8 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
           .toList();
       final result = await _service.castQueue(
         queueItems: items,
-        startIndex: startIndex.clamp(0, castable.length - 1),
-        startPositionMs: playerState.position.inMilliseconds,
+        startIndex: selection.startIndex,
+        startPositionMs: selection.startPositionMs,
       );
       _showToast(result.success
           ? l10n.settingsCastingQueueTo(_session.deviceName ?? 'device')

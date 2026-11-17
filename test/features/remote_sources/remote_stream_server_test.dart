@@ -19,6 +19,7 @@ class _FakeProvider implements RemoteFsProvider {
   String? etag;
   DateTime? modifiedAt;
   int openReadCount = 0;
+  int statCount = 0;
   int closeCount = 0;
   final List<({int start, int? end})> requests = <({int start, int? end})>[];
 
@@ -27,6 +28,7 @@ class _FakeProvider implements RemoteFsProvider {
 
   @override
   Future<RemoteEntry?> stat(String path) async {
+    statCount++;
     final data = files[path];
     if (data == null) return null;
     return RemoteEntry(
@@ -60,6 +62,28 @@ class _FakeProvider implements RemoteFsProvider {
   @override
   Future<void> close() async {
     closeCount++;
+  }
+}
+
+/// Cache store that counts [lookup] calls, so a test can prove one request
+/// performs at most one lookup.
+class _CountingCacheStore extends RemoteCacheStore {
+  _CountingCacheStore({
+    required super.directoryProvider,
+    super.maxBytes,
+  });
+
+  int lookups = 0;
+
+  @override
+  Future<File?> lookup(
+    String sourceId,
+    String path, {
+    String? etag,
+    DateTime? modifiedAt,
+  }) {
+    lookups++;
+    return super.lookup(sourceId, path, etag: etag, modifiedAt: modifiedAt);
   }
 }
 
@@ -425,6 +449,114 @@ void main() {
       } finally {
         await revalidating.stop();
       }
+    });
+  });
+
+  group('stat cache', () {
+    final payload = List<int>.generate(64, (index) => index);
+    late Directory tempDir;
+    late _CountingCacheStore cache;
+    late _FakeProvider provider;
+    late RemoteStreamServer server;
+    late HttpClient client;
+    late DateTime now;
+
+    setUp(() async {
+      now = DateTime(2026, 1, 1, 12);
+      tempDir = await Directory.systemTemp.createTemp('pulsr_stat_cache_test');
+      provider = _FakeProvider(_source(), <String, List<int>>{
+        'Music/a.mp3': payload,
+      });
+      cache = _CountingCacheStore(
+        directoryProvider: () async => tempDir,
+        maxBytes: 1024 * 1024,
+      );
+      server = RemoteStreamServer(cache: cache, clock: () => now);
+      await server.registerProvider(provider);
+      await server.start();
+      client = HttpClient();
+    });
+
+    tearDown(() async {
+      client.close(force: true);
+      await server.stop();
+      if (await tempDir.exists()) await tempDir.delete(recursive: true);
+    });
+
+    /// Opens [path] as HEAD: the cheapest request that still needs a stat.
+    Future<HttpClientResponse> head(String path) async {
+      final uri = server.uriFor(_source(), path);
+      final request = await client.openUrl('HEAD', uri);
+      final response = await request.close();
+      await response.drain<void>();
+      return response;
+    }
+
+    void advance(int seconds) => now = now.add(Duration(seconds: seconds));
+
+    /// Commits an entry through the store, exactly as a finished download does.
+    Future<void> warmCache() async {
+      final sink = await cache.beginWrite(_source().id, 'Music/a.mp3');
+      sink.add(payload);
+      await sink.commit();
+    }
+
+    test('a second request within the TTL does not stat again', () async {
+      await head('Music/a.mp3');
+      expect(provider.statCount, 1);
+
+      advance(4);
+      await head('Music/a.mp3');
+      expect(
+        provider.statCount,
+        1,
+        reason: 'the memo is younger than the five-second TTL',
+      );
+
+      advance(2);
+      await head('Music/a.mp3');
+      expect(provider.statCount, 2, reason: 'the memo expired');
+    });
+
+    test('one request performs one lookup and one stat', () async {
+      await warmCache();
+      cache.lookups = 0;
+
+      final response = await head('Music/a.mp3');
+
+      expect(cache.lookups, 1, reason: 'a cache hit is looked up once');
+      expect(provider.statCount, 1);
+      expect(response.headers.value(HttpHeaders.contentLengthHeader), '64');
+    });
+
+    test('a cache commit and delete each invalidate the memo', () async {
+      await head('Music/a.mp3');
+      expect(provider.statCount, 1);
+
+      await warmCache();
+      await head('Music/a.mp3');
+      expect(provider.statCount, 2, reason: 'a commit changes the entry');
+
+      await head('Music/a.mp3');
+      expect(provider.statCount, 2, reason: 'the refreshed memo is reused');
+
+      await cache.remove(_source().id, 'Music/a.mp3');
+      await head('Music/a.mp3');
+      expect(provider.statCount, 3, reason: 'a delete changes the entry');
+    });
+
+    test('a replaced provider is statted instead of the old one', () async {
+      await head('Music/a.mp3');
+      expect(provider.statCount, 1);
+
+      final replacement = _FakeProvider(_source(), <String, List<int>>{
+        'Music/a.mp3': payload,
+      });
+      await server.registerProvider(replacement);
+
+      await head('Music/a.mp3');
+      expect(replacement.statCount, 1);
+      expect(provider.statCount, 1, reason: 'the old provider is not consulted');
     });
   });
 }

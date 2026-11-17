@@ -48,22 +48,25 @@ class AudioEffectsPluginDispatchTest {
     }
 
     @Test
-    fun bitPerfectBypassIsNotVetoedByExternalSystemEffects() {
+    fun bitPerfectBypassFailsClosedWithoutNativeEngine() {
         val plugin = AudioEffectsPlugin()
 
-        // No native engine and no vendor effect controller in this process: the
-        // only thing that could refuse is an app-owned HAL stage, and there is
-        // none. An external/unknown system-effect verdict must never turn a
-        // request the app itself applied into a failure (that was the bug: OEM
-        // phones and the "leave on" policy could never enable Bit-Perfect).
+        // With no native engine in this process there is nothing that can stop
+        // the DSP chain, so the request must be refused instead of flipping the
+        // flag and reporting a bypass that does not exist.
         val enable = mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(
             MethodCall("setBypassDspForBitPerfect", mapOf("bypass" to true)),
             enable,
         )
-        verify(enable).success(true)
+        val captor = ArgumentCaptor.forClass(Any::class.java)
+        verify(enable).success(captor.capture())
+        val refusal = captor.value as Map<*, *>
+        assertEquals(false, refusal["applied"])
+        assertEquals("dsp_unavailable", refusal["reason"])
         verifyNoMoreInteractions(enable)
 
+        // Disabling is still allowed: it can only make the chain more honest.
         val disable = mock(MethodChannel.Result::class.java)
         plugin.onMethodCall(
             MethodCall("setBypassDspForBitPerfect", mapOf("bypass" to false)),

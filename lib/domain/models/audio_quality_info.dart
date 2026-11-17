@@ -58,10 +58,10 @@ class AudioQualityInfo {
   /// The audio rendering pipeline configuration based on source format and bit-depth.
   String get renderEngineDescription {
     if (dsdNativeActive) {
-      return 'Direct Native DSD (Raw Bitstream) • Bit-Perfect USB DAC';
+      return 'Direct Native DSD (Raw Bitstream) • USB DAC';
     }
     if (dsdDopActive) {
-      return 'DSD over PCM (DoP v1.1) • Bit-Perfect USB DAC';
+      return 'DSD over PCM (DoP v1.1) • USB DAC';
     }
     if (AudioFormats.requiresNativeDecoder(format)) {
       return 'Unavailable • native decoder not bundled in this build';
@@ -97,10 +97,15 @@ class AudioQualityInfo {
     final path = song.path.toLowerCase();
 
     // Internet Radio live stream
-    final bool isRadio = song.source == SongSource.radio ||
+    // A net-library file is finite and seekable: its loopback URL must not be
+    // misread as a live radio stream because a folder happens to be called
+    // "radio".
+    final bool isNetLibraryFile = song.source == SongSource.remote;
+    final bool isRadio = !isNetLibraryFile &&
+        (song.source == SongSource.radio ||
         path.startsWith('radio://') ||
         ((path.startsWith('http://') || path.startsWith('https://')) &&
-            (path.contains('/radio') || path.contains('radio.')));
+            (path.contains('/radio') || path.contains('radio.'))));
     if (isRadio) {
       final kbps = explicitBitrateKbps ?? song.bitrateKbps;
       return AudioQualityInfo(

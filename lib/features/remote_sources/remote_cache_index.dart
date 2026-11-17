@@ -180,8 +180,24 @@ class RemoteCacheIndex {
     return found;
   }
 
+  /// Writes are chained so the shared `index.json.partial` staging file can
+  /// never be deleted by a concurrent write (which used to lose an entry).
+  Future<void> _writeChain = Future<void>.value();
+
   /// Writes the index atomically through a `.partial` file.
-  Future<void> write(Map<String, RemoteCacheEntry> entries) async {
+  ///
+  /// Calls are serialized: the encode + replace sequence is not reentrant and
+  /// two callers using the same temp name would interleave.
+  Future<void> write(Map<String, RemoteCacheEntry> entries) {
+    // Snapshot now: the store keeps mutating its live map while this write is
+    // queued behind another one.
+    final snapshot = Map<String, RemoteCacheEntry>.from(entries);
+    final next = _writeChain.then((_) => _writeNow(snapshot));
+    _writeChain = next;
+    return next;
+  }
+
+  Future<void> _writeNow(Map<String, RemoteCacheEntry> entries) async {
     final target = File(p.join(directory.path, indexFileName));
     final temp = File('${target.path}$partialSuffix');
     try {
@@ -201,6 +217,8 @@ class RemoteCacheIndex {
         stackTrace: st,
         category: 'RemoteSources',
       );
+      // A leftover .partial from a failed write is removed by
+      // removeStalePartials on the next start.
     }
   }
 }

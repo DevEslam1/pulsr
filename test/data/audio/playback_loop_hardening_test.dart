@@ -260,7 +260,11 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
   @override
-  Future<void> setReverb(bool enabled, {int? preset, double? wetDry, double? predelayMs, double? damping}) async {}
+  Future<void> setReverb(bool enabled,
+      {int? preset,
+      double? wetDry,
+      double? predelayMs,
+      double? damping}) async {}
   @override
   Future<bool> loadCustomImpulseResponse(List<double> irSamples) async => true;
   @override
@@ -345,9 +349,9 @@ void main() {
       expect((capturedError as YtmException).isFatal, isTrue);
     });
 
-    test('invokes onError callback with withRefresh constructor', () async {
+    test('invokes onError callback when the resolver throws', () async {
       Object? capturedError;
-      final source = YtmResolvingSource.withRefresh(
+      final source = YtmResolvingSource(
         videoId: 'video_404',
         resolve: ({bool forceRefresh = false}) async {
           throw const YtmException('YTM_UNAVAILABLE', 'Track not found');

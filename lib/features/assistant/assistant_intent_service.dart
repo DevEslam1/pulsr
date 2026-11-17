@@ -22,20 +22,26 @@ import 'assistant_resolver.dart';
 /// Identical requests inside [AssistantIntentService.dedupeWindow] are
 /// dropped, because Android delivers the same intent twice on cold start
 /// (pending intent plus channel call) and users double-tap shortcut bubbles.
+///
+/// The window is measured on a monotonic [Stopwatch], never on the wall clock:
+/// a device time change must neither suppress a fresh request (backwards jump)
+/// nor let a duplicate through (forward jump).
 class AssistantIntentService {
   /// Creates the service and starts listening on the platform channel.
   ///
   /// [playPlan] is the player port the main agent wires to PlayerCubit.
-  /// [clock] is injectable so the dedupe window is testable without waiting.
+  /// [monotonicClock] is an injectable elapsed-time source (time since an
+  /// arbitrary fixed origin, never wall-clock) so the dedupe window is
+  /// testable without waiting and immune to system clock changes.
   AssistantIntentService({
     required AssistantResolver resolver,
     required Future<void> Function(AssistantPlayPlan plan) playPlan,
     this.dedupeWindow = const Duration(seconds: 1),
-    DateTime Function()? clock,
+    Duration Function()? monotonicClock,
     MethodChannel? channel,
   })  : _resolver = resolver,
         _playPlan = playPlan,
-        _clock = clock ?? DateTime.now,
+        _monotonicClock = monotonicClock ?? _startMonotonicClock(),
         _channel = channel ?? const MethodChannel(channelName) {
     _channel.setMethodCallHandler((call) async {
       await handleMethodCall(call);
@@ -51,12 +57,23 @@ class AssistantIntentService {
 
   final AssistantResolver _resolver;
   final Future<void> Function(AssistantPlayPlan plan) _playPlan;
-  final DateTime Function() _clock;
+  final Duration Function() _monotonicClock;
   final MethodChannel _channel;
 
   String? _lastSignature;
-  DateTime? _lastRequestAt;
+  Duration? _lastRequestElapsed;
   bool _disposed = false;
+
+  /// Default time source for [dedupeWindow]: one [Stopwatch] per service.
+  ///
+  /// A stopwatch only advances with real elapsed time, so an NTP correction or
+  /// manual clock change cannot make the delta negative (which used to latch
+  /// dedupe on until the clock caught up) or larger than the window (which
+  /// used to defeat dedupe for a genuine double delivery).
+  static Duration Function() _startMonotonicClock() {
+    final stopwatch = Stopwatch()..start();
+    return () => stopwatch.elapsed;
+  }
 
   /// Handles search-intent extras. Invalid requests are logged and dropped;
   /// this method never throws.
@@ -158,15 +175,17 @@ class AssistantIntentService {
     String signature,
     Future<AssistantResolution> Function() resolve,
   ) async {
-    final now = _clock();
-    final previousAt = _lastRequestAt;
+    final now = _monotonicClock();
+    final previousAt = _lastRequestElapsed;
+    final elapsedSincePrevious = previousAt == null ? null : now - previousAt;
     if (_lastSignature == signature &&
-        previousAt != null &&
-        now.difference(previousAt) < dedupeWindow) {
+        elapsedSincePrevious != null &&
+        !elapsedSincePrevious.isNegative &&
+        elapsedSincePrevious < dedupeWindow) {
       return;
     }
     _lastSignature = signature;
-    _lastRequestAt = now;
+    _lastRequestElapsed = now;
 
     final AssistantResolution resolution;
     try {

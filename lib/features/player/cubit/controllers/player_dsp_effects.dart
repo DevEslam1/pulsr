@@ -404,28 +404,11 @@ extension PlayerDspEffectsExtension on PlayerDspController {
               await _audioHandler.setVolumeBoost(safeValue);
             }
           } else {
-            final enableSpatial = state.isSpatializerSupported;
-            final enableVirt = !enableSpatial && state.isVirtualizerSupported;
-            _emit(state.copyWith(
-              dsp: state.dsp.copyWith(
-                isSpatializerEnabled: enableSpatial,
-                isVirtualizerEnabled: enableVirt,
-                virtualizerStrength:
-                    enableVirt ? 0.35 : state.virtualizerStrength,
-                isLimiterEnabled: true,
-                limiterThresholdDb: -0.2,
-                limiterReleaseMs: 50.0,
-              ),
-            ));
-            if (enableSpatial) {
-              await _audioHandler.setSpatializerEnabled(true);
-            }
-            if (enableVirt) {
-              await _audioHandler.setVirtualizerEnabled(true);
-              await _audioHandler.setVirtualizerStrength(0.35);
-            }
-            await _audioHandler.setLookaheadLimiter(true,
-                thresholdDb: -0.2, releaseMs: 50.0);
+            // No snapshot exists because no stage was on when the master switch
+            // was turned off (EQ-only session). Re-enabling must NOT invent
+            // spatializer/virtualizer/limiter defaults the user never chose:
+            // the switch only re-arms the master gate and every stage keeps its
+            // own toggle. The sheet surfaces this to the user.
           }
           if (_multibandCompressorRestore) {
             await _audioHandler.equalizerManager.setMultibandCompressor(true);

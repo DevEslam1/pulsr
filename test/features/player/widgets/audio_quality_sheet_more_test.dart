@@ -649,6 +649,9 @@ void main() {
           sampleRate: 48000,
           bitDepth: 24,
           isBitPerfectActive: true,
+          // The engine observed an integer bypass on this route, so the chain
+          // reaches the rate comparison instead of stopping at the carrier.
+          integerBypassActive: true,
         ),
         bitPerfectOutput: true,
       ),
@@ -834,6 +837,9 @@ void main() {
       sampleRate: 96000,
       bitDepth: 24,
       isBitPerfectActive: true,
+      // An observed integer bypass is what lets this route ever verify; the
+      // sink encoding alone is no longer read as one.
+      integerBypassActive: true,
     );
     // A DoP carrier is never a verified PCM chain; this file's DSD case leaves
     // the flag set, so pin it for the comparison below.
@@ -868,10 +874,9 @@ void main() {
     await _openDiagnosticsTab(tester);
 
     expect(find.textContaining(_l10n(tester).bpChainVerified), findsNothing);
-    expect(
-      find.textContaining('Platform conversion • not measured by this app'),
-      findsWidgets,
-    );
+    // The chain names the observed cause instead of the old catch-all
+    // "Platform conversion": the user's own DSP stage edited the samples.
+    expect(find.textContaining('Samples modified by DSP'), findsWidgets);
 
     // Same route with nothing touching the samples: the agreement is real.
     currentDsp = const DspSlice();

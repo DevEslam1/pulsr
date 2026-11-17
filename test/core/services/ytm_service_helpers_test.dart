@@ -822,12 +822,27 @@ void main() {
           final args = call.arguments as Map<Object?, Object?>;
           final query = (args['query'] as String?) ?? '';
           final idx = query.replaceFirst('Artist Song ', '');
-          return [_resultRow(videoId: 'alt_$idx')];
+          // Echo the requested title/artist: the substitute gate rejects a hit
+          // that is not the same recording, and this test is about cache
+          // eviction, not identity matching.
+          return [
+            {
+              'videoId': 'alt_$idx',
+              'title': 'Song $idx',
+              'artist': 'Artist',
+              'durationMs': 213000,
+            }
+          ];
         }
         if (call.method == 'resolveStream') {
           final args = call.arguments as Map<Object?, Object?>;
           final vid = (args['videoId'] as String?) ?? 'alt';
-          return _streamRow(videoId: vid);
+          final idx = vid.replaceFirst('alt_', '');
+          return {
+            ..._streamRow(videoId: vid),
+            'title': 'Song $idx',
+            'artist': 'Artist',
+          };
         }
         return null;
       };

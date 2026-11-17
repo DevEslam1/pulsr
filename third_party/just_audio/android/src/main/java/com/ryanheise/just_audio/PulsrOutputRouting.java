@@ -7,6 +7,7 @@ import android.media.AudioTrack;
 import android.os.Build;
 import android.util.Log;
 import androidx.annotation.Nullable;
+import androidx.media3.common.C;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.audio.AudioOutput;
 import androidx.media3.exoplayer.audio.AudioOutputProvider;
@@ -111,6 +112,11 @@ public final class PulsrOutputRouting {
     private static boolean reflectionWarningLogged = false;
     private static boolean trackMissLogged = false;
     private static volatile boolean debugBuild = false;
+    // App-level bit-perfect / DSD-over-PCM request. Deliberately outside
+    // snapshot(): this is what the app asks for, not what the sink achieved,
+    // and the native sink may still refuse to assert it.
+    private static volatile boolean bitPerfectRequested = false;
+    private static volatile boolean dopRequested = false;
 
     private static synchronized void ensureReflectionInitialized() {
         if (reflectionLookupDone) return;
@@ -252,9 +258,27 @@ public final class PulsrOutputRouting {
         return preferred == null ? 0 : preferred.getId();
     }
 
-    /** [device ID, app AudioTrack rate, PCM encoding]. Zero means unverified.
-     * This describes the app stream, not a claim about the downstream DAC/mixer.
-     */
+    /** Records the app-level bit-perfect request mirrored onto AAudio sinks. */
+    public static void setBitPerfectRequested(boolean requested) {
+        bitPerfectRequested = requested;
+    }
+
+    /** True while the app has asked for bit-perfect AAudio output. */
+    public static boolean isBitPerfectRequested() {
+        return bitPerfectRequested;
+    }
+
+    /** Records the app-level DoP request mirrored onto AAudio sinks. */
+    public static void setDopRequested(boolean requested) {
+        dopRequested = requested;
+    }
+
+    /** True while the app has asked for a DSD-over-PCM carrier. */
+    public static boolean isDopRequested() {
+        return dopRequested;
+    }
+
+    /** True while a registered AAudio or AudioTrack stream is playing. */
     public static synchronized boolean isPlaying() {
         for (AAudioAudioSink sink : nativeSinks) {
             if (sink.isPlaying() && sink.measuredStream()[1] > 0) return true;
@@ -315,37 +339,87 @@ public final class PulsrOutputRouting {
         return !nativeSinks.isEmpty();
     }
 
+    /**
+     * Observed app stream: [device ID, app stream rate, PCM encoding, decoded
+     * input encoding, 1 when the integer bit-perfect bypass is active for this
+     * stream else 0]. Zero means unverified.
+     *
+     * <p>Elements 3 and 4 are read from the {@link PulsrAudioSink} that produced
+     * elements 0..2, so they belong to this stream; when that attribution is
+     * ambiguous (for example during a crossfade) they stay 0 rather than mix one
+     * player's decoder with another's output. Element 3 holds Media3
+     * {@code C.ENCODING_PCM_*} values, which are numerically identical to
+     * {@code AudioFormat.ENCODING_*} for PCM. This describes the app stream, not
+     * a claim about the downstream DAC/mixer.
+     */
     public static synchronized int[] snapshot() {
         int[] nativeFallback = null;
+        PulsrAudioSink nativeFallbackOwner = null;
         for (AAudioAudioSink sink : nativeSinks) {
             int[] measured = sink.measuredStream();
             if (measured[1] == 0) continue;
             nativeFallback = measured;
-            if (sink.isPlaying()) return measured;
+            nativeFallbackOwner = ownerOf(sink);
+            if (sink.isPlaying()) return withDecodedPath(measured, nativeFallbackOwner);
         }
         AudioTrack fallback = null;
+        PulsrAudioSink fallbackOwner = null;
         for (DefaultAudioSink sink : sinks) {
             AudioTrack track = getAudioTrackFromSink(sink);
             try {
                 if (track == null || track.getState() != AudioTrack.STATE_INITIALIZED) continue;
-                if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING) return snapshot(track);
+                if (track.getPlayState() == AudioTrack.PLAYSTATE_PLAYING)
+                    return snapshot(track, ownerOf(sink));
                 fallback = track;
+                fallbackOwner = ownerOf(sink);
             } catch (IllegalStateException released) {
                 // Track released concurrently by the playback thread; skip it.
             }
         }
         if (fallback != null) {
             try {
-                return snapshot(fallback);
+                return snapshot(fallback, fallbackOwner);
             } catch (IllegalStateException released) {
                 // fall through to native/zero result
             }
         }
-        return nativeFallback != null ? nativeFallback : new int[] {0, 0, 0};
+        return nativeFallback != null ? withDecodedPath(nativeFallback, nativeFallbackOwner)
+                : new int[] {0, 0, 0, C.ENCODING_INVALID, 0};
     }
 
-    private static int[] snapshot(AudioTrack track) {
+    private static int[] snapshot(AudioTrack track, @Nullable PulsrAudioSink owner) {
         AudioDeviceInfo routed = Build.VERSION.SDK_INT >= 24 ? track.getRoutedDevice() : null;
-        return new int[] {routed == null ? 0 : routed.getId(), track.getSampleRate(), track.getAudioFormat()};
+        return withDecodedPath(new int[] {routed == null ? 0 : routed.getId(),
+                track.getSampleRate(), track.getAudioFormat()}, owner);
+    }
+
+    /**
+     * Keeps elements 0..2 of {@code base} exactly and appends the owning sink's
+     * decoded input encoding plus the integer-bypass flag. A null owner (no
+     * measured stream or an ambiguous one) leaves both new elements at 0.
+     */
+    private static int[] withDecodedPath(int[] base, @Nullable PulsrAudioSink owner) {
+        return new int[] {
+                base.length > 0 ? base[0] : 0,
+                base.length > 1 ? base[1] : 0,
+                base.length > 2 ? base[2] : 0,
+                owner == null ? C.ENCODING_INVALID : owner.inputPcmEncodingForTelemetry(),
+                owner != null && owner.integerBypassActiveForTelemetry() ? 1 : 0,
+        };
+    }
+
+    /** The player whose live inner backend is {@code innerSink}, or null if none. */
+    @Nullable
+    private static PulsrAudioSink ownerOf(@Nullable Object innerSink) {
+        if (innerSink == null) return null;
+        PulsrAudioSink owner = null;
+        for (PulsrAudioSink candidate : decodedOwners.keySet()) {
+            if (!candidate.ownsInnerSink(innerSink)) continue;
+            // Two players claiming one backend would mean a half-finished swap;
+            // report unknown instead of guessing.
+            if (owner != null) return null;
+            owner = candidate;
+        }
+        return owner;
     }
 }

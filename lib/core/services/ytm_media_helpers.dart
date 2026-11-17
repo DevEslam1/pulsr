@@ -76,6 +76,11 @@ class YtmMediaHelpers {
 
   /// Whether [error] means the track itself cannot play (auth/geo/gone), as
   /// opposed to a transient transport or extraction failure.
+  ///
+  /// SABR is deliberately absent: it means YouTube is already restricting this
+  /// client/route, and firing a three-query, multi-resolve substitute search at
+  /// a route with the highest challenge risk is how one unplayable track turns
+  /// into a queue-wide bot cooldown.
   static bool isPlayabilityOrRestrictedError(Object error) {
     if (error is YtmException) {
       if (error.isAuth || error.isUnavailable) return true;

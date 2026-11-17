@@ -60,6 +60,12 @@ class MediaHttpServer {
   /// Largest number of requests handled at once. Further requests get 503.
   final int maxConcurrentRequests;
 
+  /// A token read within this window is never evicted while the server runs.
+  ///
+  /// A renderer streaming a long track re-reads the same token for every range
+  /// request; evicting it mid-playback used to end the cast with a 403.
+  static const Duration activeAccessWindow = Duration(minutes: 2);
+
   /// Longest request path accepted, in characters.
   static const int maxRequestPathLength = 512;
 
@@ -206,9 +212,11 @@ class MediaHttpServer {
         'Token must be 1-$maxRequestPathLength URL-safe characters',
       );
     }
+    final now = DateTime.now();
     _entries[token] = _MediaEntry(
       source: source,
-      expiresAt: DateTime.now().add(tokenTtl),
+      expiresAt: now.add(tokenTtl),
+      registeredAt: now,
     );
     _prune();
   }
@@ -430,14 +438,52 @@ class MediaHttpServer {
 
   _MediaEntry? _lookup(String token) {
     _prune();
-    return _entries[token];
+    final entry = _entries[token];
+    if (entry == null) return null;
+    // Touch on access: LRU order and the token TTL both follow reads, not
+    // registration, so an actively streamed item stays valid and is the last
+    // candidate for eviction.
+    final now = DateTime.now();
+    entry.lastAccess = now;
+    entry.expiresAt = now.add(tokenTtl);
+    return entry;
   }
 
   void _prune() {
     final now = DateTime.now();
     _entries.removeWhere((_, entry) => !entry.expiresAt.isAfter(now));
-    while (_entries.length > maxEntries) {
-      _entries.remove(_entries.keys.first);
+    if (_entries.length <= maxEntries) return;
+
+    final cutoff = now.subtract(activeAccessWindow);
+    final running = _server != null;
+
+    bool isActive(_MediaEntry entry) {
+      final access = entry.lastAccess;
+      return running && access != null && access.isAfter(cutoff);
+    }
+
+    // Least-recently ACCESSED first (never-read entries fall back to their
+    // registration time), skipping anything a renderer read in the last two
+    // minutes.
+    final candidates = _entries.entries
+        .where((entry) => !isActive(entry.value))
+        .toList()
+      ..sort((a, b) => a.value.freshness.compareTo(b.value.freshness));
+    for (final candidate in candidates) {
+      if (_entries.length <= maxEntries) break;
+      _entries.remove(candidate.key);
+    }
+
+    // Everything left was read within the protection window. The cap still
+    // wins: dropping the least recently read entry keeps a renderer that
+    // cycles through more live tracks than the registry can hold bounded.
+    if (_entries.length > maxEntries) {
+      final overflow = _entries.entries.toList()
+        ..sort((a, b) => a.value.freshness.compareTo(b.value.freshness));
+      for (final entry in overflow) {
+        if (_entries.length <= maxEntries) break;
+        _entries.remove(entry.key);
+      }
     }
   }
 
@@ -517,10 +563,24 @@ class MediaHttpServer {
 }
 
 class _MediaEntry {
-  final MediaSource source;
-  final DateTime expiresAt;
+  _MediaEntry({
+    required this.source,
+    required this.expiresAt,
+    required this.registeredAt,
+  });
 
-  const _MediaEntry({required this.source, required this.expiresAt});
+  final MediaSource source;
+  DateTime expiresAt;
+
+  /// When the token entered the registry; the LRU fallback for a never-read
+  /// entry.
+  final DateTime registeredAt;
+
+  /// Last read, or `null` when the token was never requested.
+  DateTime? lastAccess;
+
+  /// Sort key for eviction: last read, else registration.
+  DateTime get freshness => lastAccess ?? registeredAt;
 }
 
 enum _RangeStatus { none, satisfiable, unsatisfiable }

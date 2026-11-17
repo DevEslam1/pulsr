@@ -27,6 +27,17 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   double get maxPlaybackSpeed => 3.0;
   @override
   double get volume => _vol;
+
+  /// Player gain actually applied to the samples. Production gates a
+  /// bit-perfect verdict on unity gain here, so the double reports unity
+  /// instead of leaving the getter to `noSuchMethod`, which throws.
+  @override
+  double get effectiveSoftwareGain => 1.0;
+
+  /// Speed/pitch/silence-skip style transport edits. The double never applies
+  /// them, so the observed answer is that the samples are untouched.
+  @override
+  bool get transportSamplesModified => false;
   @override
   SongsTableData? get currentSong => _currentTrack;
   SongsTableData? _currentTrack;

@@ -7,28 +7,16 @@ import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 
-/// BUG-06: an in-flight resolve together with a completion marker, so a
-/// superseded future whose identity no longer matches the map cannot be left
-/// dangling (and can be pruned once complete).
-class _InFlightResolve {
-  _InFlightResolve(this.future);
-  final Future<
-          ({String url, String? userAgent, String? cookies, String quality})>
-      future;
-  bool done = false;
-}
-
-/// Pipeline resolving YouTube Music stream URLs, gating playback-time checks,
-/// deduplicating in-flight resolves, and classifying errors. Resolved URLs are
-/// cached by [YtmUrlCache] under [YtmService]; this class keeps no second copy.
+/// Pipeline resolving YouTube Music stream URLs, gating playback-time checks
+/// and classifying errors. Resolved URLs are cached by [YtmUrlCache] under
+/// [YtmService]; single-flight for identical resolves lives there too, so this
+/// class keeps no state of its own.
 class StreamResolutionPipeline {
   final YtmService ytmService;
   final PlaybackLatencyTracker? Function()? getLatencyTracker;
   final String Function()? qualityProvider;
-  final void Function(SongsTableData song, int bitrateKbps, String? codec)?
+  final void Function(SongsTableData song, int? bitrateKbps, String? codec)?
       onStreamResolved;
-
-  final Map<String, _InFlightResolve> _inFlightResolves = {};
 
   StreamResolutionPipeline({
     required this.ytmService,
@@ -37,15 +25,13 @@ class StreamResolutionPipeline {
     this.onStreamResolved,
   });
 
+  /// Drops any in-flight resolve for [videoId].
+  ///
+  /// The URL cache is left alone: the new quality has its own slot, and the
+  /// resolver invalidates a burned URL itself. Clearing the cache here made an
+  /// adaptive-quality step re-resolve a URL that was still valid.
   void invalidateCache(String videoId) {
-    // Keys are `videoId:quality`; anchor the prefix to the separator so a
-    // shorter id can never match a sibling key.
-    _inFlightResolves.removeWhere((k, _) => k.startsWith('$videoId:'));
-  }
-
-  /// Drops in-flight resolves bound to the old network path.
-  void clearNetworkCaches() {
-    _inFlightResolves.clear();
+    ytmService.forgetInFlightResolve(videoId);
   }
 
   Future<({String url, String? userAgent, String? cookies, String quality})>
@@ -86,115 +72,61 @@ class StreamResolutionPipeline {
         qualityProvider?.call() ??
         effectivePrefs.getString(PrefsKeys.streamingQuality) ??
         'high';
-    final cacheKey = '$videoId:${effectiveQuality.toLowerCase()}';
-
-    if (!forceRefresh) {
-      final inFlight = _inFlightResolves[cacheKey];
-      if (inFlight != null && !inFlight.done) {
-        return await inFlight.future;
-      }
-      _inFlightResolves.remove(cacheKey);
-      _pruneInFlight();
-    }
-
-    final future = () async {
-      try {
-        getLatencyTracker?.call()?.markStage(PlaybackStage.pluginEntered);
-        getLatencyTracker?.call()?.markStage(PlaybackStage.clientRequestSent);
-      } catch (_) {}
-
-      Future<YtmStream> doResolve() => ytmService.resolveStream(videoId,
-          quality: effectiveQuality,
-          forceRefresh: forceRefresh,
-          title: song.title,
-          artist: song.artist);
-      // The native extractor already hedges its top two clients and bounds each
-      // call, so racing a second independent chain here only doubled native
-      // load for no tail-latency gain. One chain; the extractor owns the hedge.
-      final YtmStream stream = await doResolve();
-      if (stream.url.trim().isEmpty) {
-        throw const YtmException(
-            'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
-      }
-
-      final realBitrate = stream.bitrateKbps > 0
-          ? stream.bitrateKbps
-          : (effectiveQuality == 'low'
-              ? 64
-              : effectiveQuality == 'medium'
-                  ? 128
-                  : 160);
-      final containerUpper = stream.container.toUpperCase();
-      final mimeLower = stream.mimeType.toLowerCase();
-      final String? realCodec = containerUpper == 'WEBM' ||
-              mimeLower.contains('webm') ||
-              mimeLower.contains('opus')
-          ? 'OPUS'
-          : (containerUpper == 'M4A' ||
-                  mimeLower.contains('mp4') ||
-                  mimeLower.contains('m4a') ||
-                  mimeLower.contains('aac')
-              ? 'AAC'
-              : null);
-
-      onStreamResolved?.call(song, realBitrate, realCodec);
-
-      try {
-        getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
-      } catch (_) {}
-
-      return (
-        url: stream.url,
-        userAgent: stream.userAgent,
-        cookies: stream.cookies,
-        quality: effectiveQuality,
-      );
-    }();
-
-    // Only register non-force resolves for dedup, and remove by identity. A
-    // force-refresh must not overwrite an in-flight normal resolve's entry,
-    // and a completing resolve must not evict a *different* future that
-    // replaced it in the map (which left later callers un-deduped).
-    _InFlightResolve? entry;
-    if (!forceRefresh) {
-      // Race close (BUG-06): another resolve may have registered while we were
-      // awaiting the offline/wifi probes. Prefer theirs rather than overwriting
-      // it, so neither future is orphaned in the map.
-      final existing = _inFlightResolves[cacheKey];
-      if (existing != null && !existing.done) {
-        return await existing.future;
-      }
-      entry = _InFlightResolve(future);
-      _inFlightResolves[cacheKey] = entry;
-      final captured = entry;
-      // Mark completion and drop the entry as soon as the future settles,
-      // regardless of whether its identity still matches the map. `then` with
-      // an onError handler keeps a failed resolve from surfacing as an
-      // unhandled async error on this side channel.
-      void settle() {
-        captured.done = true;
-        if (identical(_inFlightResolves[cacheKey], captured)) {
-          _inFlightResolves.remove(cacheKey);
-        }
-      }
-
-      unawaited(
-          future.then<void>((_) => settle(), onError: (_, __) => settle()));
-    }
+    // Single-flight for identical (videoId, quality) resolves belongs to
+    // YtmService, where the in-flight map and the URL cache share one owner.
+    // A second map here only made invalidation ambiguous: clearing one copy
+    // left the other serving the URL that had just been declared dead (BUG-06).
     try {
-      return await future;
-    } finally {
-      if (entry != null && identical(_inFlightResolves[cacheKey], entry)) {
-        _inFlightResolves.remove(cacheKey);
-      }
-    }
-  }
+      getLatencyTracker?.call()?.markStage(PlaybackStage.pluginEntered);
+      getLatencyTracker?.call()?.markStage(PlaybackStage.clientRequestSent);
+    } catch (_) {}
 
-  /// BUG-06: drop completed in-flight entries whose identity was superseded
-  /// before their own cleanup could run.
-  void _pruneInFlight() {
-    if (_inFlightResolves.isEmpty) return;
-    _inFlightResolves.removeWhere((_, v) => v.done);
+    // The native extractor already hedges its top two clients and bounds each
+    // call, so racing a second independent chain here only doubled native
+    // load for no tail-latency gain. One chain; the extractor owns the hedge.
+    final YtmStream stream = await ytmService.resolveStream(
+      videoId,
+      quality: effectiveQuality,
+      forceRefresh: forceRefresh,
+      title: song.title,
+      artist: song.artist,
+      duration:
+          song.durationMs > 0 ? Duration(milliseconds: song.durationMs) : null,
+    );
+    if (stream.url.trim().isEmpty) {
+      throw const YtmException(
+          'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
+    }
+
+    // Unknown stays unknown. The old fallback stamped 64/128/160 kbps onto
+    // the song row whenever the resolver reported no bitrate, so the library
+    // asserted a technical property the stream had never claimed.
+    final int? realBitrate = stream.bitrateKbps > 0 ? stream.bitrateKbps : null;
+    final containerUpper = stream.container.toUpperCase();
+    final mimeLower = stream.mimeType.toLowerCase();
+    final String? realCodec = containerUpper == 'WEBM' ||
+            mimeLower.contains('webm') ||
+            mimeLower.contains('opus')
+        ? 'OPUS'
+        : (containerUpper == 'M4A' ||
+                mimeLower.contains('mp4') ||
+                mimeLower.contains('m4a') ||
+                mimeLower.contains('aac')
+            ? 'AAC'
+            : null);
+
+    onStreamResolved?.call(song, realBitrate, realCodec);
+
+    try {
+      getLatencyTracker?.call()?.markStage(PlaybackStage.urlObtained);
+    } catch (_) {}
+
+    return (
+      url: stream.url,
+      userAgent: stream.userAgent,
+      cookies: stream.cookies,
+      quality: effectiveQuality,
+    );
   }
 
   Future<void> warmStreamCache(

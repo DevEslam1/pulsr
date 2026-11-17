@@ -26,6 +26,7 @@ import '../../../../data/audio/output_format_negotiation.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/audio_output_info.dart';
+import '../../../../domain/models/bit_perfect_state.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/audio_signal_path.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
@@ -75,6 +76,12 @@ class PlayerDspController {
   StreamSubscription<AudioOutputInfo>? _deviceSub;
   DspSlice? _dspSnapshot;
   bool _multibandCompressorRestore = false;
+
+  /// Whether a disable/enable cycle has something real to restore.
+  ///
+  /// The sheet uses this to tell the user that re-arming the master switch does
+  /// not bring any stage back (nothing was captured because nothing was on).
+  bool get hasDspEffectsSnapshot => _dspSnapshot?.isDspEffectsActive ?? false;
 
   /// Pure, route-based DSP compensation (crossfeed gating + codec-aware music
   /// EQ/reverb) runs through [EarbudOptimizationService.detect], whose methods

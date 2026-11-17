@@ -157,6 +157,9 @@ String resolveUiErrorMessage(BuildContext context, String message) {
   if (message.startsWith('Stream extraction failed. Switching route')) {
     return l10n.errYtmExtractFail;
   }
+  if (message.startsWith('YouTube only offers this track in a format')) {
+    return l10n.errYtmSabr;
+  }
   if (message
       .startsWith('YouTube needs verification. Trying alternate route')) {
     return l10n.errYtmVerify;

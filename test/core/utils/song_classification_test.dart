@@ -67,6 +67,26 @@ void main() {
       expect(isOnlineFavorite(_song(remoteId: 'vid123')), isTrue);
     });
 
+    test('net-library file with no remoteId is Online, never Local', () {
+      // A remote (SMB/WebDAV/FTP/SFTP) file has no copy on this device; the
+      // favorites bucket must not offer it as a Local track.
+      expect(
+        isOnlineFavorite(_song(
+          source: SongSource.remote,
+          path: 'http://127.0.0.1:52110/stream/lib-1/a.flac',
+        )),
+        isTrue,
+      );
+    });
+
+    test('radio rows are Online', () {
+      expect(
+        isOnlineFavorite(
+            _song(source: SongSource.radio, path: 'https://s/radio')),
+        isTrue,
+      );
+    });
+
     test('empty remoteId string does not count as online', () {
       expect(isOnlineFavorite(_song(remoteId: '')), isFalse);
     });

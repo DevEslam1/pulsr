@@ -49,6 +49,12 @@ class RadioNowPlayingRecommendations extends StatefulWidget {
     this.metrics,
   });
 
+  /// Only a live radio stream gets this recommendation surface. A net-library
+  /// file ([SongSource.remote]) is finite and seekable, so it must not show the
+  /// radio card (the Quran/ambient offers assume an endless live broadcast).
+  static bool shouldShowFor(SongsTableData? song) =>
+      SongSource.isLive(song?.source);
+
   @override
   State<RadioNowPlayingRecommendations> createState() =>
       _RadioNowPlayingRecommendationsState();
@@ -71,7 +77,7 @@ class _RadioNowPlayingRecommendationsState
   @override
   Widget build(BuildContext context) {
     final song = widget.props.state.currentSong;
-    if (song?.source != SongSource.radio) {
+    if (!RadioNowPlayingRecommendations.shouldShowFor(song)) {
       return const SizedBox.shrink();
     }
     if (widget.props.state.isLyricsVisible || widget.props.state.isQueueVisible) {

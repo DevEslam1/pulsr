@@ -832,7 +832,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                 ),
               _buildStatChip(
                 p,
-                'BIT-PERFECT',
+                'DSP BYPASS',
                 isBypassed ? 'BYPASSED' : 'OFF',
                 isHighlight: isBypassed,
               ),

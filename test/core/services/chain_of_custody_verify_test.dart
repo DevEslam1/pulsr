@@ -21,6 +21,20 @@ void main() {
   const channel = MethodChannel(PulsrChannels.audioEffects);
   final calls = <MethodCall>[];
 
+  /// Engine config report. [bitPerfectActive] is the observed bypass state the
+  /// custody verdict requires alongside the window's own arming fact.
+  Map<String, dynamic> baseEngineReport({bool bitPerfectActive = false}) => {
+        'nativeEngineLoaded': true,
+        'sampleRate': 48000.0,
+        'bufferSize': 512,
+        'activeStages': ['EQUALIZER', 'LIMITER'],
+        'isBitPerfectActive': bitPerfectActive,
+        'isBypassCompareActive': false,
+        'rollingRtf': 0.08,
+        'estimatedLatencyMs': 14.0,
+        'thermalStatus': 1,
+      };
+
   /// Installs a handler whose custody behaviour is chosen by the case.
   void stubChannel({
     bool armed = true,
@@ -33,18 +47,7 @@ void main() {
       calls.add(call);
       switch (call.method) {
         case 'getChainOfCustodyReport':
-          return engineReport ??
-              {
-                'nativeEngineLoaded': true,
-                'sampleRate': 48000.0,
-                'bufferSize': 512,
-                'activeStages': ['EQUALIZER', 'LIMITER'],
-                'isBitPerfectActive': false,
-                'isBypassCompareActive': false,
-                'rollingRtf': 0.08,
-                'estimatedLatencyMs': 14.0,
-                'thermalStatus': 1,
-              };
+          return engineReport ?? baseEngineReport();
         case 'armCustodyWindow':
           return {'armed': armed, 'reason': armed ? 'ok' : armReason};
         case 'collectCustodyWindow':
@@ -100,7 +103,12 @@ void main() {
 
   group('verifyChain', () {
     test('records a measured bit-exact verdict from the window digests', () async {
-      stubChannel(window: bitExactWindow());
+      // A bit-exact claim needs the engine to have observed the bypass: the
+      // window's arming fact alone would let a preferred-but-unused mode pass.
+      stubChannel(
+        window: bitExactWindow(),
+        engineReport: baseEngineReport(bitPerfectActive: true),
+      );
       final service = ChainOfCustodyService(
           contentHasher: (path, size) async => 'a' * 64);
 
@@ -121,6 +129,61 @@ void main() {
       expect(report.activeDspStages, ['EQUALIZER', 'LIMITER']);
       expect(report.outputSampleRate, 48000);
       expect(report.bufferSize, 512);
+    });
+
+    test('identical digests on a chain not observed bit-perfect stay unverified',
+        () async {
+      stubChannel(
+        window: {
+          ...bitExactWindow(),
+          'bitPerfectAtArm': false,
+        },
+        engineReport: baseEngineReport(bitPerfectActive: true),
+      );
+      final service = ChainOfCustodyService();
+
+      final report = await service.verifyChain(
+        trackId: 't1b',
+        trackTitle: 'Armed Too Early',
+        hashFile: false,
+      );
+
+      // The bytes matched, but the path was not bit-perfect while the window
+      // ran, so no bit-exactness claim was ever established.
+      expect(report.measurement!.bitExactMeasured, isTrue);
+      expect(report.measurement!.bitPerfectAtArm, isFalse);
+      expect(report.verdict, CustodyVerdict.unverified);
+      expect(report.verificationBadge, contains('Not Verified'));
+      expect(report.verificationBadge, contains('not reported bit-perfect'));
+      expect(report.verificationBadge, isNot(contains('Bit-Exact')));
+    });
+
+    test('a truncated window is not promoted to a bit-exact verdict', () async {
+      stubChannel(
+        window: {
+          ...bitExactWindow(),
+          'frames': 512,
+          'truncated': true,
+        },
+        engineReport: baseEngineReport(bitPerfectActive: true),
+      );
+      final service = ChainOfCustodyService();
+
+      final report = await service.verifyChain(
+        trackId: 't1c',
+        trackTitle: 'Short Window',
+        hashFile: false,
+      );
+
+      // The digests still describe exactly what was captured, so the verdict is
+      // not "chain modified" - but a partial window certifies fewer frames than
+      // requested and cannot carry the bit-exact wording.
+      expect(report.measurement!.bitExactMeasured, isTrue);
+      expect(report.measurement!.truncated, isTrue);
+      expect(report.verdict, CustodyVerdict.unverified);
+      expect(report.verificationBadge, contains('Not Verified'));
+      expect(report.verificationBadge, contains('partial 512-frame window'));
+      expect(report.verificationBadge, isNot(contains('Bit-Exact')));
     });
 
     test('a window whose halves differ cannot be reported as bit-exact', () async {

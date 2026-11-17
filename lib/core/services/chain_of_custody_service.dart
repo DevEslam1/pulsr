@@ -122,6 +122,11 @@ class ChainOfCustodyReport {
   final int outputSampleRate;
   final int bufferSize;
   final List<String> activeDspStages;
+
+  /// The engine OBSERVED Bit-Perfect on the live path: the bypass was requested,
+  /// the native engine reported the last block bit-perfect, and the library was
+  /// loaded. A saved preference never sets this, and no "bit-exact" wording is
+  /// emitted unless it is true.
   final bool isBitPerfectActive;
   final bool isBypassCompareActive;
   final double rollingRtf;
@@ -162,9 +167,30 @@ class ChainOfCustodyReport {
           ? CustodyVerdict.notSupported
           : CustodyVerdict.unverified;
     }
-    return measured.bitExactMeasured
-        ? CustodyVerdict.bitExactMeasured
-        : CustodyVerdict.chainModifiedMeasured;
+    if (bitExactObserved) return CustodyVerdict.bitExactMeasured;
+    // Identical digests only certify the bytes. When the engine did not observe
+    // a bit-perfect path while that window ran, the window describes a chain
+    // nobody claimed was bit-perfect, and "chain modified" would be equally
+    // false: the honest verdict is that no claim was established.
+    if (measured.bitExactMeasured) return CustodyVerdict.unverified;
+    return CustodyVerdict.chainModifiedMeasured;
+  }
+
+  /// True only when the capture proved identical bytes over the full window AND
+  /// the live path was observed as bit-perfect both when the window was
+  /// requested and when it was armed. This is the only gate behind the
+  /// "bit-exact" wording.
+  ///
+  /// A truncated window certifies fewer frames than requested, so its digests
+  /// describe a partial capture: the badge qualifies it, and the verdict must
+  /// not promote it to a measured bit-exact claim.
+  bool get bitExactObserved {
+    final measured = measurement;
+    return measured != null &&
+        measured.bitExactMeasured &&
+        !measured.truncated &&
+        isBitPerfectActive &&
+        measured.bitPerfectAtArm;
   }
 
   /// Non-Android builds have no native capture path at all, which is a different
@@ -190,6 +216,19 @@ class ChainOfCustodyReport {
       case CustodyVerdict.notSupported:
         return 'Not Verified — no native capture on this platform';
       case CustodyVerdict.unverified:
+        final measured = measurement;
+        if (measured != null && measured.bitExactMeasured) {
+          // A window that ended early can measure identical bytes without
+          // covering the frames it was asked for. Saying the chain was never
+          // reported bit-perfect would be false there, so name the short
+          // window instead.
+          if (measured.truncated) {
+            return 'Not Verified — samples measured identical over a partial '
+                '${measured.frames}-frame window that ended early';
+          }
+          return 'Not Verified — samples measured identical, but the chain was '
+              'not reported bit-perfect while it ran';
+        }
         return 'Not Verified — no capture window completed';
     }
   }
@@ -350,10 +389,12 @@ class ChainOfCustodyService {
     final limitations = <String>[];
     final nativeReport = await _effectsChannel.getChainOfCustodyReport();
 
-    // Read from the engine rather than the caller: what the user has switched on
-    // is a fact the native report already owns, and a caller-supplied flag could
-    // only ever disagree with it.
-    final bitPerfectActive = nativeReport['isBitPerfectActive'] as bool? ?? false;
+    // Arm on the request, not on the observation: the engine may not have
+    // rendered a block since the bypass was armed, and a window that opens on
+    // "no block yet" would never certify. The observed flag still gates the
+    // verdict (bitExactObserved), so this cannot promote an unverified chain.
+    final bitPerfectRequested =
+        nativeReport['isBitPerfectRequested'] as bool? ?? false;
     final bypassCompareActive =
         nativeReport['isBypassCompareActive'] as bool? ?? false;
 
@@ -389,7 +430,7 @@ class ChainOfCustodyService {
     final armResult = await _effectsChannel.armCustodyWindow(
       frames: frames,
       sampleRate: sourceSampleRate.toDouble(),
-      bitPerfect: bitPerfectActive,
+      bitPerfect: bitPerfectRequested,
       bypassCompare: bypassCompareActive,
     );
     final armed = armResult['armed'] == true;
@@ -486,6 +527,8 @@ class ChainOfCustodyService {
       bufferSize: (nativeReport['bufferSize'] as num?)?.toInt() ?? 0,
       activeDspStages:
           activeStagesRaw?.map((e) => e.toString()).toList() ?? const [],
+      // Observed, not requested: the native report only says true when the
+      // engine saw the last block stay bit-perfect.
       isBitPerfectActive: nativeReport['isBitPerfectActive'] as bool? ?? false,
       isBypassCompareActive:
           nativeReport['isBypassCompareActive'] as bool? ?? false,

@@ -41,17 +41,6 @@ class YtmResolvingSource extends StreamAudioSource {
     super.tag,
   });
 
-  YtmResolvingSource.withRefresh({
-    required this.videoId,
-    required this.resolve,
-    this.userAgent,
-    this.cookies,
-    this.quality = 'high',
-    this.onError,
-    this.urlCache,
-    super.tag,
-  });
-
   /// The YouTube video id this source streams; also the disk-cache key.
   final String videoId;
 
@@ -179,17 +168,19 @@ class YtmResolvingSource extends StreamAudioSource {
     }
 
     try {
-      // Serialize initial byte-cache population per cache path when the file has
-      // not yet been written, so two concurrent sources for the same videoId
-      // never write the same `.part` file simultaneously.
+      // Serialize initial byte-cache population per cache path when no download
+      // has started yet, so two concurrent sources for the same videoId never
+      // write the same `.part` file simultaneously.
+      //
+      // The lock covers ONLY the byte request. The retry below takes the same
+      // per-path lock, and holding it across that retry made the caller wait on
+      // itself for the lock's full 60 s timeout: on a first play whose URL
+      // answered 403 immediately, the "single fast re-resolve" this class
+      // exists for became a minute of silence.
       final inner = await _ensureInner();
-      return await _withPathLockIfUncached(() async {
-        try {
-        final res = await inner.request(start, end);
-        try {
-          _latency?.markStage(PlaybackStage.firstBytesReady);
-        } catch (_) {}
-        return _wrapWithThroughputSampler(res);
+      try {
+        return await _withPathLockIfUncached(
+            () => _requestOnce(inner, start, end));
       } catch (byteErr) {
         final burned = isUrlBurned(byteErr);
 
@@ -212,11 +203,10 @@ class YtmResolvingSource extends StreamAudioSource {
 
         try {
           final freshInner = await _createInner(forceRefresh: burned);
-          final res = await freshInner.request(start, end);
-          try {
-            _latency?.markStage(PlaybackStage.firstBytesReady);
-          } catch (_) {}
-          return _wrapWithThroughputSampler(res);
+          // Outside the lock held above, so this acquisition is fresh rather
+          // than a re-entry against ourselves.
+          return await _withPathLockIfUncached(
+              () => _requestOnce(freshInner, start, end));
         } catch (retryErr) {
           // Classify failure to ensure structured diagnostics
           final classified = YtmErrorClassifier.classify(retryErr);
@@ -236,7 +226,6 @@ class YtmResolvingSource extends StreamAudioSource {
           rethrow;
         }
       }
-    });
     } catch (err) {
       if (err == _permanentFailure) rethrow; // already recorded above
       _discardInner();
@@ -453,11 +442,13 @@ class YtmResolvingSource extends StreamAudioSource {
       final existing = _inner;
       if (existing != null && !skipCache) return existing;
       try {
-        final inner = LockCachingAudioSource(
-          Uri.parse(resolvedUrl),
-          headers: headers,
-          cacheFile: cacheFile,
-        );
+        final uri = Uri.parse(resolvedUrl);
+        final inner = debugInnerFactory?.call(uri, headers, cacheFile) ??
+            LockCachingAudioSource(
+              uri,
+              headers: headers,
+              cacheFile: cacheFile,
+            );
         _inner = inner;
         _innerCacheFile = cacheFile;
         try {
@@ -479,14 +470,35 @@ class YtmResolvingSource extends StreamAudioSource {
 
   /// Runs [action] under the per-path mutex when the byte-cache file does not
   /// yet exist on disk, preventing two concurrent [YtmResolvingSource] instances
-  /// for the same track from racing on the initial `.part` file download. Once
-  /// the cache file exists, reads proceed without locking.
+  /// for the same track from racing on the initial `.part` file download.
+  ///
+  /// The predicate is deliberately `.part`-aware. `LockCachingAudioSource`
+  /// streams into `<name>.part` and renames it only once the whole track has
+  /// arrived, so testing the final file alone kept this lock handed out for the
+  /// entire first download — minutes of mutual exclusion for a creation race
+  /// that the first byte has already decided.
   Future<T> _withPathLockIfUncached<T>(Future<T> Function() action) async {
     final file = _innerCacheFile;
-    if (file == null || file.existsSync()) {
+    if (file == null ||
+        file.existsSync() ||
+        File('${file.path}.part').existsSync()) {
       return action();
     }
     return _withPathLock(file.path, action);
+  }
+
+  /// Issues one byte request against [inner] and wraps the response for
+  /// throughput sampling.
+  ///
+  /// Extracted so the byte-error retry runs after the per-path creation lock
+  /// has been released instead of re-entering it (a 60 s self-deadlock).
+  Future<StreamAudioResponse> _requestOnce(
+      LockCachingAudioSource inner, int? start, int? end) async {
+    final res = await inner.request(start, end);
+    try {
+      _latency?.markStage(PlaybackStage.firstBytesReady);
+    } catch (_) {}
+    return _wrapWithThroughputSampler(res);
   }
 
   /// Acquires the per-path lock for [pathKey] and releases it in `finally` only
@@ -575,6 +587,17 @@ class YtmResolvingSource extends StreamAudioSource {
 
   static final LinkedHashMap<String, _PathLockEntry> _pathCreationLocks =
       LinkedHashMap<String, _PathLockEntry>();
+
+  /// Test seam replacing the byte-caching inner source.
+  ///
+  /// Production always builds a [LockCachingAudioSource]; a host test cannot,
+  /// because `TestWidgetsFlutterBinding` answers every real HTTP request with
+  /// 400 and reports the failure on the zone as well as the future. Supplying a
+  /// source whose `request()` fails deterministically lets the byte-error retry
+  /// path — and its lock behaviour — be exercised without a network.
+  @visibleForTesting
+  static LockCachingAudioSource Function(
+      Uri uri, Map<String, String> headers, File cacheFile)? debugInnerFactory;
 
   static void _cleanStalePathCreationLocks() {
     final now = DateTime.now();

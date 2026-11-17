@@ -1,5 +1,6 @@
 // lib/domain/models/audio_signal_path.dart
 import 'audio_output_info.dart';
+import 'bit_perfect_state.dart';
 
 /// Real-time 4-stage "Audio Signal Path" diagnostic snapshot:
 /// Source File Format -> Decoder Output -> Active Output Route -> Hardware Output Rate.
@@ -87,6 +88,19 @@ class AudioSignalPath {
         _ => encoding > 0 ? 'PCM (enc $encoding)' : 'PCM Unprobed',
       };
 
+  /// Builds the four-stage trace from the live output facts.
+  ///
+  /// [bitPerfectState] is the only source of a Bit-Perfect claim. The
+  /// [AudioOutputInfo.isBitPerfectActive] flag reports what the app asked the
+  /// platform to do, not what the platform then did to the samples: it stays
+  /// true when a HAL AudioEffect, a float re-quantisation or an OS resample
+  /// sits in the chain, and the sink only ever reports the format it opened.
+  /// A preference flag floating alone is therefore not evidence.
+  ///
+  /// Without a state this method fails closed: only a directly-exclusive UAC2
+  /// route to a non-Bluetooth sink is counted as bit-perfect, and the flag is
+  /// never trusted by itself. Callers that have a [BitPerfectState] hand it in
+  /// and its [BitPerfectState.isVerified] decides.
   factory AudioSignalPath.fromOutputInfo({
     required String sourceCodec,
     required int sourceSampleRate,
@@ -96,6 +110,7 @@ class AudioSignalPath {
     bool uac2DirectActive = false,
     bool aaudioEnabled = false,
     bool floatOutputEnabled = false,
+    BitPerfectState? bitPerfectState,
   }) {
     final normCodec = sourceCodec.trim().isEmpty ? 'Audio' : sourceCodec.trim();
     final srcRateLabel =
@@ -161,13 +176,16 @@ class AudioSignalPath {
 
     final hwRate = (isBt ? (output?.btSampleRateHz ?? output?.sampleRate) : output?.sampleRate) ?? 0;
     final hwDepth = (isBt ? (output?.btBitDepth ?? output?.bitDepth) : output?.bitDepth) ?? 0;
-    final bitPerfect = output?.isBitPerfectActive == true || uac2DirectActive;
+    // Only a verified state is evidence. An exclusive attribute, a direct
+    // route or [AudioOutputInfo.isBitPerfectActive] all describe intent or
+    // routing, never the samples, so without a state the claim is false.
+    final bitPerfect = bitPerfectState?.isVerified ?? false;
     final direct = output?.isDirectSupported == true || aaudioEnabled || uac2DirectActive;
 
     final String driver;
     if (uac2DirectActive) {
       driver = 'Pulsr UAC2 Isochronous';
-    } else if (output?.isBitPerfectActive == true && isUsb) {
+    } else if (bitPerfectState?.isVerified == true && isUsb) {
       driver = 'USB Exclusive Mixer';
     } else if (aaudioEnabled) {
       driver = 'AAudio Direct';
@@ -179,9 +197,16 @@ class AudioSignalPath {
 
     final hwRateText = hwRate > 0 ? formatRate(hwRate) : 'Unverified rate';
     final hwDepthText = hwDepth > 0 ? '$hwDepth-bit' : 'Unknown depth';
+    // Only a verified state may say Bit-Perfect. When a state exists and is
+    // not verified, the honest tag is that the route is exclusive at best.
     final statusTag = bitPerfect
         ? 'Bit-Perfect'
-        : (isBt ? 'Lossy A2DP/LE' : (direct ? 'Direct PCM' : 'OS Mixer'));
+        : (isBt
+            ? 'Lossy A2DP/LE'
+            : ((bitPerfectState != null &&
+                    bitPerfectState.tier != BitPerfectTier.off)
+                ? 'Exclusive / Unverified'
+                : (direct ? 'Direct PCM' : 'OS Mixer')));
     final hwText = '$driver • $hwDepthText / $hwRateText ($statusTag)';
 
     return AudioSignalPath(

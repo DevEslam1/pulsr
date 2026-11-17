@@ -4378,6 +4378,7 @@
   "settingsAaudioDirect": "AAudio Direct Output (Bit-Perfect)",
   "settingsAaudioDirectDesc": "Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players",
   "dspAboutBassBoost": "About Bass Boost",
+  "dspMasterNoSnapshotNotice": "Effects are now off. Enable the stages you want individually; nothing is restored automatically.",
   "dspAboutBitPerfect": "About Bit-Perfect",
   "dspAboutCrossfeed": "About Crossfeed",
   "dspAboutDspEngine": "About DSP Engine",
@@ -4813,6 +4814,7 @@
   "errYtmBusy": "YouTube is busy. Cooling down.",
   "errYtmTrouble": "YouTube is having trouble. Retrying.",
   "errYtmExtractFail": "Stream extraction failed. Switching route.",
+  "errYtmSabr": "YouTube only offers this track in a format Pulsr cannot stream yet.",
   "errYtmVerify": "YouTube needs verification. Trying alternate route.",
   "errSignInFailed": "Sign in failed. Please try again.",
   "errSignUpFailed": "Sign up failed. Please try again.",
@@ -8389,5 +8391,9 @@
         "type": "int"
       }
     }
+  },
+  "badgeExclusive": "EXCLUSIVE",
+  "@badgeExclusive": {
+    "description": "Compact badge shown on the direct USB output row when the exclusive streaming path is active"
   }
 }

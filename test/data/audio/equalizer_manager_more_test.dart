@@ -345,7 +345,9 @@ void main() {
 
     calls.clear();
     await manager.setBandGain(0, 5.0);
-    await Future<void>.delayed(const Duration(milliseconds: 90));
+    // The manager flushes band gains on a 60 ms debounce; allow generous
+    // headroom so a loaded test shard cannot lose the race.
+    await Future<void>.delayed(const Duration(milliseconds: 250));
     expect(hasCall('setNativeEqBand'), isTrue);
     expect(hasCall('setEqBandGains'), isTrue);
 
@@ -353,7 +355,7 @@ void main() {
     await manager.setBandMode(10);
     calls.clear();
     await manager.setBandGain(1, 4.0);
-    await Future<void>.delayed(const Duration(milliseconds: 90));
+    await Future<void>.delayed(const Duration(milliseconds: 250));
     expect(hasCall('setEqBandGain'), isTrue);
   });
 

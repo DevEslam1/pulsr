@@ -121,6 +121,21 @@ inline void ApplyI16Volume(int16_t* data, int32_t sampleCount, float gain,
  * Native 32-bit int carries true 32-bit data (unlike float32), so 1-LSB TPDF
  * dither keeps requantization noise decorrelated when scaling off-grid.
  */
+/**
+ * Whether the sink may scale this stream at all.
+ *
+ * A bit-perfect stream and a DoP carrier must stay byte-identical: scaling
+ * requantizes the payload and rewrites the 0x05/0xFA marker, which makes a DAC
+ * lose DoP framing. The decision is a policy input (the caller's declaration),
+ * never inferred from the 24-bit container, because that container also
+ * carries ordinary PCM that must keep its volume control.
+ *
+ * Pure so the rule is host-testable without an AAudio device.
+ */
+inline bool SinkVolumeAllowed(bool bitPerfect, bool dopCarrier) {
+    return !bitPerfect && !dopCarrier;
+}
+
 inline void ApplyI32Volume(int32_t* data, int32_t sampleCount, float gain,
                            SinkDitherState& st) {
     for (int32_t i = 0; i < sampleCount; ++i) {

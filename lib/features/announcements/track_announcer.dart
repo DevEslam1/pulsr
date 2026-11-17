@@ -104,6 +104,14 @@ class TrackAnnouncer {
   /// cleared by stop, pause, a track change or dispose.
   bool _speechLive = false;
 
+  /// The stop currently being delivered to the engine, if any.
+  ///
+  /// A track change schedules the new announcement immediately at `delayMs ==
+  /// 0`, while the previous track's `stop()` is still in flight. Without this
+  /// handle the two calls raced and the late stop could silence the new
+  /// sentence; [_announce] awaits it before speaking.
+  Future<void>? _pendingStop;
+
   /// Whether [start] has been called and [dispose] has not.
   bool get isStarted => _started && !_disposed;
 
@@ -225,6 +233,15 @@ class TrackAnnouncer {
   Future<void> _announce(MediaItem item) async {
     if (_disposed || !_isPlaying || !_canAnnounce) return;
     if (item.id == _announcedId) return;
+    // Serialize against the stop the previous track change requested: a delay of
+    // 0 ms used to let speak() and stop() overlap, so the new title could be cut
+    // off by the old stop (or never heard at all).
+    final Future<void>? pendingStop = _pendingStop;
+    if (pendingStop != null) {
+      await pendingStop;
+      if (_disposed || !_isPlaying || !_canAnnounce) return;
+      if (item.id == _announcedId) return;
+    }
     final text = composeAnnouncement(
       settings.elements,
       announcementTrackForMediaItem(item),
@@ -275,10 +292,26 @@ class TrackAnnouncer {
     _pendingId = null;
   }
 
-  Future<void> _stopSpeech() async {
+  Future<void> _stopSpeech() {
     _speechLive = false;
+    // Remember the in-flight stop so the next [_announce] can await it. The
+    // future never completes with an error (engine failures are logged below)
+    // and is bounded inside [_stopEngine]: a wedged platform channel must not
+    // block every later announcement forever. Clearing the handle on
+    // completion keeps a future track change from waiting on a stale stop.
+    final Future<void> stop = _stopEngine();
+    _pendingStop = stop;
+    unawaited(stop.whenComplete(() {
+      if (identical(_pendingStop, stop)) _pendingStop = null;
+    }));
+    return stop;
+  }
+
+  Future<void> _stopEngine() async {
     try {
-      await engine.stop();
+      // The engine contract has no completion callback for stop(); bound it so
+      // a hung channel degrades to a logged failure instead of a deadlock.
+      await engine.stop().timeout(const Duration(seconds: 2));
     } on Exception catch (error, stackTrace) {
       ErrorLogger.log(
         'Stopping announcement speech failed',

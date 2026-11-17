@@ -95,7 +95,11 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
         AAudioStream_close(stream);
         return false;
     }
-    if (bitPerfect_ && AAudioStream_getSharingMode(stream) != AAUDIO_SHARING_MODE_EXCLUSIVE) {
+    // Exclusive is mandatory whenever the caller asked for it (preferExclusive)
+    // or asserts bit-exact output (bitPerfect): a SHARED stream is resampled by
+    // AudioFlinger and voids both claims.
+    const bool requireExclusive = config_.preferExclusive || config_.bitPerfect;
+    if (requireExclusive && AAudioStream_getSharingMode(stream) != AAUDIO_SHARING_MODE_EXCLUSIVE) {
         lastError_ = "bit-perfect output requires exclusive sharing";
         AAudioStream_close(stream);
         return false;
@@ -166,6 +170,11 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     CommitOpenState(/*startSucceeded=*/true, staged, live);
     bytesPerFrame_ = frameBytes;
     exclusive_.store(exclusive, std::memory_order_release);
+    // Publish the unity-only verdicts for THIS stream. Only an exclusive open
+    // can honour them, so a bit-perfect request that ended up on a SHARED rung
+    // keeps bitPerfect_ false and the sink stays honest about it.
+    bitPerfect_.store(exclusive && config_.bitPerfect, std::memory_order_release);
+    dop_.store(exclusive && config_.dop, std::memory_order_release);
     framesWritten_.store(live.framesWritten, std::memory_order_relaxed);
     framesWrittenBase_.store(live.framesWrittenBase, std::memory_order_relaxed);
     readBase_.store(live.readBase, std::memory_order_relaxed);
@@ -184,7 +193,9 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     // The container that actually opened is the grid the engine must shape onto.
     // Float output reports 32: the next conversion belongs to the platform and
     // the app cannot observe its depth, so nothing is gained by shaping for it.
-    AudioDspEngine::instance().setSinkBitDepth(
+    // Registry, not the control singleton: the depth must reach the engines that
+    // actually render (the singleton never runs processInterleaved).
+    DspEngineRegistry::instance().setSinkBitDepth(
         config_.encoding == Encoding::Int16
             ? 16
             : (config_.encoding == Encoding::I24Packed ? 24 : 32));
@@ -205,7 +216,15 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
     config_ = config;
     bytesPerFrame_ =
         ContainerBytesPerFrame(config_.encoding, config_.channelCount);
-    bitPerfect_ = config_.preferExclusive;
+    // Only an explicit bit-perfect request implies unity gain; preferExclusive
+    // keeps its historical EXCLUSIVE-only ladder without forcing unity. The
+    // unity verdict itself is published by TryOpen() once the stream's sharing
+    // mode is known: a SHARED stream is resampled by AudioFlinger, so it may
+    // never carry the gate. Both flags start clean and VolumeWasRejected()
+    // describes the stream about to open.
+    bitPerfect_.store(false, std::memory_order_release);
+    dop_.store(false, std::memory_order_release);
+    volumeRejected_.store(false, std::memory_order_release);
     if (config_.encoding == Encoding::Int32 && android_get_device_api_level() < 31) {
         lastError_ = "AAUDIO_FORMAT_PCM_I32 requires Android 12 (API 31)+";
         if (error != nullptr) *error = lastError_;
@@ -217,7 +236,7 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
         if (error != nullptr) *error = lastError_;
         return false;
     }
-    if (bitPerfect_) {
+    if (config_.preferExclusive || config_.bitPerfect) {
         // Prefer LOW_LATENCY for wired/short bursts unless a deep buffer is
         // requested (>= 180 ms); fall back to PERFORMANCE_MODE_NONE in
         // EXCLUSIVE so DACs/HALs that only grant exclusive mode on NONE still
@@ -261,6 +280,15 @@ void AAudioSink::ErrorCallback(AAudioStream* stream, void* userData, aaudio_resu
 
 bool AAudioSink::RecoverDisconnected() {
     LOGW("Attempting to recover disconnected AAudio stream...");
+    // A live SetBitPerfect() is the caller's current intent and is not part of
+    // config_ (which only carries the open-time request). CloseLocked clears
+    // both verdicts, so capture them before the reopen and re-assert them on
+    // the replacement stream; otherwise a reconnect would silently drop the
+    // unity-only guarantee while Java still believes bit-perfect is engaged.
+    const bool liveBitPerfect = bitPerfect_.load(std::memory_order_acquire);
+    const bool liveDop = dop_.load(std::memory_order_acquire);
+    const bool requireExclusive =
+        config_.preferExclusive || config_.bitPerfect || liveBitPerfect;
     // Current writer thread is active, so do not wait for writers here
     CloseLocked(/* waitForWriters = */ false);
     // The disconnected flag is deliberately not cleared here. TryOpen clears
@@ -269,14 +297,16 @@ bool AAudioSink::RecoverDisconnected() {
     int64_t prevFramesWritten = framesWritten_;
     int64_t prevWrittenBase = framesWrittenBase_;
 
-    return recovery_.attempt([&]() {
-        if (bitPerfect_ &&
+    const bool recovered = recovery_.attempt([&]() {
+        if (requireExclusive &&
             TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
                     &prevFramesWritten, &prevWrittenBase)) {
             LOGI("Recovered AAudio stream in EXCLUSIVE mode");
             return true;
         }
-        if (bitPerfect_) return false;
+        // Neither an exclusive request nor a bit-perfect assertion may fall back
+        // to SHARED: a resampled stream would silently void the contract.
+        if (requireExclusive) return false;
         if (config_.lowLatency &&
             TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
                     &prevFramesWritten, &prevWrittenBase)) {
@@ -291,14 +321,21 @@ bool AAudioSink::RecoverDisconnected() {
         LOGE("Failed to recover disconnected AAudio stream");
         return false;
     });
+    if (recovered && (liveBitPerfect || liveDop)) {
+        if (!SetBitPerfect(liveBitPerfect, liveDop) && liveBitPerfect) {
+            LOGE("Recovered stream refused the live bit-perfect assertion");
+        }
+    }
+    return recovered;
 }
 
 void AAudioSink::CloseLocked(bool waitForWriters) {
     AAudioStream* st = stream_.exchange(nullptr, std::memory_order_acq_rel);
     if (st != nullptr) {
-        // This stream was the sink the engine was shaping for; the next one
-        // (usually the Java fallback) decides its own depth.
-        AudioDspEngine::instance().setSinkBitDepth(0);
+        // This stream was the sink the engines were shaping for; the next one
+        // (usually the Java fallback) decides its own depth. Registry, not the
+        // control singleton, so every render engine clears.
+        DspEngineRegistry::instance().setSinkBitDepth(0);
         // Request stop immediately so any in-flight write unblocks without blocking Close
         AAudioStream_requestStop(st);
         // Wait for any in-flight lock-free queries to finish before closing
@@ -312,6 +349,12 @@ void AAudioSink::CloseLocked(bool waitForWriters) {
         }
         AAudioStream_close(st);
     }
+    // No live stream: the sharing mode is unknown again until the next open, so
+    // IsExclusiveStream() must not keep reporting the closed stream's mode, and
+    // the unity-only verdicts die with the stream that carried them.
+    exclusive_.store(false, std::memory_order_release);
+    bitPerfect_.store(false, std::memory_order_release);
+    dop_.store(false, std::memory_order_release);
 }
 
 void AAudioSink::Close() {
@@ -371,9 +414,17 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     }
 
     const float curVol = volume_.load(std::memory_order_relaxed);
-    // At unity (1.0f, including all DoP and hardware-volume playback) samples
-    // are passed untouched; < 1.0f allows volume control on exclusive PCM.
-    const bool applyVol = (curVol != 1.0f);
+    // Bit-perfect output and an explicitly declared DoP carrier are unity-only:
+    // scaling them would void the sample-identical claim (and destroy the DoP
+    // markers), so no volume is applied there even if a stale value reached
+    // volume_. The gate is keyed on the flags, not on the packed 24-bit
+    // container, so ordinary 24-bit PCM keeps its volume. Every other
+    // configuration passes samples untouched at unity and is scaled on a
+    // scratch copy below it.
+    const bool unityOnly = !SinkVolumeAllowed(
+        bitPerfect_.load(std::memory_order_relaxed),
+        dop_.load(std::memory_order_relaxed));
+    const bool applyVol = !unityOnly && (curVol != 1.0f);
 
     alignas(16) uint8_t stackScratch[2048];
     uint8_t* scratchPtr = nullptr;
@@ -500,11 +551,48 @@ void AAudioSink::Flush() {
 }
 
 void AAudioSink::SetVolume(float volume) {
-    // DoP carrier safety is enforced by PlaybackVolumeController locking volume
-    // to 1.0f while DoP is active. Keep storing the requested volume so
-    // non-DoP exclusive PCM streams still respond to device/app volume control.
-    volume_.store(volume < 0.0f ? 0.0f : (volume > 1.0f ? 1.0f : volume),
-                  std::memory_order_relaxed);
+    const float clamped =
+        volume < 0.0f ? 0.0f : (volume > 1.0f ? 1.0f : volume);
+    // Bit-perfect output and an explicitly declared DoP carrier are unity-only.
+    // Storing a requested attenuation would break the sample-identical contract,
+    // so the request is refused, 1.0f is kept, and VolumeWasRejected() reports
+    // it; the first refusal is logged once per stream so a dead volume slider is
+    // never silent. Other configurations store the requested value (and Write()
+    // applies it). Keyed on the flags, so 24-bit PCM is unaffected.
+    if (!SinkVolumeAllowed(bitPerfect_.load(std::memory_order_acquire),
+                           dop_.load(std::memory_order_acquire))) {
+        volume_.store(1.0f, std::memory_order_relaxed);
+        if (clamped != 1.0f) {
+            // Exchange, not store: the warning belongs to the transition into
+            // "rejected", and the caller keeps pushing slider values.
+            if (!volumeRejected_.exchange(true, std::memory_order_acq_rel)) {
+                LOGW("AAudio volume %.3f rejected: unity-only stream "
+                     "(bit-perfect=%d dop=%d)",
+                     static_cast<double>(clamped),
+                     bitPerfect_.load(std::memory_order_relaxed) ? 1 : 0,
+                     dop_.load(std::memory_order_relaxed) ? 1 : 0);
+            }
+        }
+        return;
+    }
+    volume_.store(clamped, std::memory_order_relaxed);
+    // An accepted value clears the diagnostic latch: the next refusal belongs
+    // to the next unity-only transition, not to a stale earlier stream state.
+    volumeRejected_.store(false, std::memory_order_release);
+}
+
+bool AAudioSink::SetBitPerfect(bool bitPerfect, bool dop) {
+    // Only an EXCLUSIVE stream can honour either claim: a SHARED stream is
+    // resampled by AudioFlinger, so bit-exactness and the DoP carrier both die
+    // there. Refuse the request instead of pretending, and leave the gate off.
+    if ((bitPerfect || dop) && !IsExclusive()) {
+        bitPerfect_.store(false, std::memory_order_release);
+        dop_.store(false, std::memory_order_release);
+        return false;
+    }
+    bitPerfect_.store(bitPerfect, std::memory_order_release);
+    dop_.store(dop, std::memory_order_release);
+    return true;
 }
 
 int64_t AAudioSink::FramesRead() const {

@@ -1140,9 +1140,16 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDitherBluetoothAllowed(
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBitPerfectParams(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jboolean isDop) {
+    // Normalise at the native boundary instead of trusting every caller: the
+    // engine gates the bypass on `enabled` alone, so a stale isDop must never
+    // outlive it. Disabling bit-perfect also drops any Direct USB attenuation,
+    // because no bit-perfect request means no USB software gain.
+    const bool bpEnabled = enabled == JNI_TRUE;
+    const bool dopActive = bpEnabled && isDop == JNI_TRUE;
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
-        snap.bitPerfect.enabled = enabled;
-        snap.bitPerfect.isDop = isDop;
+        snap.bitPerfect.enabled = bpEnabled;
+        snap.bitPerfect.isDop = dopActive;
+        if (!bpEnabled) snap.bitPerfect.directUsbGain = 1.0;
     });
 }
 
@@ -1155,6 +1162,26 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDirectUsbVolume(
     if (std::abs(g - 1.0) < 1e-6) g = 1.0;
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.bitPerfect.directUsbGain = g;
+    });
+}
+
+// Observed (not requested) state for the effects-plugin debug surface.
+// AudioEffectsPlugin talks to the singleton control engine, which never renders
+// a block, so these aggregate over the engines that do (see
+// DspEngineRegistry::wasLastBlockBitPerfect / wasSafetySuppressed). The
+// nativeWasLastBlockBitPerfect binding itself lives lower in this file.
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeWasSafetySuppressed(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return DspEngineRegistry::instance().wasSafetySuppressed() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDirectUsbActive(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean active) {
+    const bool on = (active == JNI_TRUE);
+    AudioDspEngine::instance().updateParams([on](DspParamSnapshot& snap) {
+        snap.bitPerfect.directUsbActive = on;
     });
 }
 
@@ -1594,9 +1621,10 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResampleTap(
     }
 }
 
-// Configure-time query: bit-perfect playback must never be routed through the
-// tap SRC (the engine bypass would echo resampled bytes and silently void the
-// sample-identical contract).
+// Configure-time query: REQUESTED, not observed. Reports the bit-perfect
+// preference on the live snapshot (callers use it to keep the tap SRC out of the
+// path); it says nothing about what the last block actually rendered — use
+// nativeWasLastBlockBitPerfect() for that.
 JNIEXPORT jboolean JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsBitPerfect(
         JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
@@ -1607,6 +1635,68 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsBitPerfect(
     try {
         auto params = engine->getParams();
         return (params && params->bitPerfect.enabled) ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+// OBSERVED: whether the block this engine produced last was really rendered
+// through the bit-perfect bypass (and not revoked mid-block by a USB gain or a
+// transport fade). Lock-free atomic read on the render engine.
+JNIEXPORT jboolean JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeWasLastBlockBitPerfect(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    if (engineHandle == 0) return JNI_FALSE;
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    auto* engine = lease.get();
+    if (!engine) return JNI_FALSE;
+    try {
+        return engine->wasLastBlockBitPerfect() ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+// OBSERVED: true when the last block ran the bit-perfect bypass while headphone
+// safety was enabled, i.e. the safety limiter was suppressed by that path. Dose
+// is still metered read-only, so this is not "safety off".
+JNIEXPORT jboolean JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeWasSafetySuppressed(
+        JNIEnv* /* env */, jclass /* clazz */, jlong engineHandle) {
+    if (engineHandle == 0) return JNI_FALSE;
+    EngineLease lease(static_cast<int64_t>(engineHandle));
+    auto* engine = lease.get();
+    if (!engine) return JNI_FALSE;
+    try {
+        return engine->wasSafetySuppressed() ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+// Direct USB PCM is (or is not) the live endpoint. Gates bitPerfect.directUsbGain
+// inside the engine: when no Direct USB output is active the software
+// attenuation is ignored and that stage runs at unity. Runs on the singleton
+// control engine like nativeSetDirectUsbVolume — updateParams broadcasts the
+// snapshot to every registered render engine.
+JNIEXPORT void JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeSetDirectUsbActive(
+        JNIEnv* /* env */, jclass /* clazz */, jboolean active) {
+    const bool on = (active == JNI_TRUE);
+    AudioDspEngine::instance().updateParams([on](DspParamSnapshot& snap) {
+        snap.bitPerfect.directUsbActive = on;
+    });
+}
+
+// OBSERVED bit-perfect state for the effects plugin (no engine handle: the
+// plugin talks to the registry, which reads the engine that actually renders).
+// Fail-closed: a missing/teardown engine answers false, never true.
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeWasLastBlockBitPerfect(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    try {
+        return DspEngineRegistry::instance().wasLastBlockBitPerfect()
+                ? JNI_TRUE : JNI_FALSE;
     } catch (...) {
         return JNI_FALSE;
     }

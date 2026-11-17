@@ -3,7 +3,9 @@ part of 'player_queue_controller.dart';
 extension PlayerQueueRadio on PlayerQueueController {
   /// Whether the active track is a live radio stream. Derived from the current
   /// song's source so it self-clears when a regular track starts.
-  bool get isLiveRadio => _getState().currentSong?.source == SongSource.radio;
+  /// A net-library file ([SongSource.remote]) is a finite, seekable stream and
+  /// must NOT count as live: it would lose its position on pause.
+  bool get isLiveRadio => SongSource.isLive(_getState().currentSong?.source);
 
   /// Pause for a live stream acts as stop: the buffered stream is retained but
   /// playback is halted and the stale position is dropped so a later resume
@@ -181,8 +183,13 @@ extension PlayerQueueRadio on PlayerQueueController {
 
     _autoplayFetchInFlight = true;
     try {
-      final radioTracks =
-          await ytmService.getRadioTracks(seedVideoId, limit: 15);
+      // Bounded so a wedged InnerTube request (no response, no error) cannot
+      // leave the in-flight flag set forever and starve every later autoplay
+      // trigger. The timeout throws into the catch below, which logs and lets
+      // the finally clear the flag.
+      final radioTracks = await ytmService
+          .getRadioTracks(seedVideoId, limit: 15)
+          .timeout(_autoplayFetchTimeout);
       if (radioTracks.isEmpty || _isClosed()) return;
 
       await _queueMutex.protect(() async {

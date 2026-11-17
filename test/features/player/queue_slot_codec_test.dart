@@ -68,6 +68,28 @@ void main() {
       expect((online.first as Map<String, dynamic>)['title'], 'Y -5');
     });
 
+    test('net-library rows persist even with a positive synthetic id', () {
+      // Queue restore resolves positive ids through the database, but a
+      // net-library row never lives there: it must be materialized explicitly.
+      final doc = QueueSlotCodec.encodeDocument(
+        {
+          0: (
+            songs: [song(77, source: SongSource.remote, title: 'NAS')],
+            currentIndex: 0,
+            position: Duration.zero,
+            speed: 1.0,
+            trackTiers: const <int, QueueTier>{},
+          ),
+        },
+        0,
+      );
+      final s0 = doc['0'] as Map<String, dynamic>;
+      final online = s0['onlineSongs'] as List;
+      expect(online.length, 1);
+      expect((online.first as Map<String, dynamic>)['source'],
+          SongSource.remote);
+    });
+
     test('decodeDocument rejects non-maps and oversized documents', () {
       expect(QueueSlotCodec.decodeDocument(null), isNull);
       expect(QueueSlotCodec.decodeDocument([]), isNull);

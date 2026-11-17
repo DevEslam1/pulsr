@@ -51,6 +51,8 @@ public final class AAudioAudioSink implements AudioSink {
         long getFramesWritten(long handle);
         boolean isExclusive(long handle);
         void setVolume(long handle, float volume);
+        void setBitPerfect(long handle, boolean bitPerfect, boolean dop);
+        boolean isBitPerfectSink(long handle);
     }
 
     private static final Bridge NATIVE_BRIDGE = new Bridge() {
@@ -80,6 +82,12 @@ public final class AAudioAudioSink implements AudioSink {
         }
         @Override public void setVolume(long handle, float volume) {
             AaudioNativeBridge.nativeSetVolume(handle, volume);
+        }
+        @Override public void setBitPerfect(long handle, boolean bitPerfect, boolean dop) {
+            AaudioNativeBridge.nativeSetBitPerfect(handle, bitPerfect, dop);
+        }
+        @Override public boolean isBitPerfectSink(long handle) {
+            return AaudioNativeBridge.nativeIsBitPerfectSink(handle);
         }
     };
 
@@ -149,6 +157,12 @@ public final class AAudioAudioSink implements AudioSink {
     void adoptFrameEditor(FloatDspAudioSink.PcmFrameEditor editor) { frameEditor = editor; }
 
     private float volume = 1.0f;
+    // App-level bit-perfect / DoP request mirrored from PulsrAudioSink. Cached
+    // so the per-buffer push is free and only a change reaches JNI.
+    private boolean bitPerfectRequested = false;
+    private boolean dopRequested = false;
+    private boolean bitPerfectUnconfirmedLogged = false;
+    private boolean bitPerfectJniUnavailable = false;
     private PlaybackParameters playbackParameters = PlaybackParameters.DEFAULT;
     private AudioAttributes audioAttributes = AudioAttributes.DEFAULT;
     private boolean skipSilenceEnabled = false;
@@ -376,6 +390,9 @@ public final class AAudioAudioSink implements AudioSink {
         pendingBasePosition = true;
         baseFramesWritten = 0L;
         bridge.setVolume(handle, volume);
+        // The native flag is per stream: re-assert the cached request on open.
+        bitPerfectUnconfirmedLogged = false;
+        pushBitPerfectToNative();
         if (playing) bridge.play(handle);
         else bridge.pause(handle);
         Log.i(TAG, "AAudio sink configured: " + sampleRate + "Hz/" + channelCount
@@ -693,6 +710,42 @@ public final class AAudioAudioSink implements AudioSink {
         this.volume = volume;
         if (handle != 0L) {
             bridge.setVolume(handle, volume);
+        }
+    }
+
+    /**
+     * Mirrors the app-level bit-perfect/DoP request onto the native stream.
+     * Cached here because the caller pushes it per buffer: JNI is only reached
+     * when the pair changes or a new stream is opened.
+     */
+    void setBitPerfect(boolean bitPerfect, boolean dop) {
+        if (bitPerfectRequested == bitPerfect && dopRequested == dop) return;
+        bitPerfectRequested = bitPerfect;
+        dopRequested = dop;
+        bitPerfectUnconfirmedLogged = false;
+        pushBitPerfectToNative();
+    }
+
+    /**
+     * Sends the cached request to the open stream. An unconfirmed sink or a
+     * missing JNI export degrades the verdict; it must never fail playback.
+     */
+    private void pushBitPerfectToNative() {
+        final long current = handle;
+        if (current == 0L || bitPerfectJniUnavailable) return;
+        try {
+            bridge.setBitPerfect(current, bitPerfectRequested, dopRequested);
+            if (bitPerfectRequested && !bridge.isBitPerfectSink(current)
+                    && !bitPerfectUnconfirmedLogged) {
+                bitPerfectUnconfirmedLogged = true;
+                Log.w(TAG, "AAudio stream did not assert bit-perfect output (dop="
+                        + dopRequested + "); Bit-Perfect output cannot be certified");
+            }
+        } catch (UnsatisfiedLinkError e) {
+            // Older libpulsr_dsp builds lack this export: stop calling it
+            // instead of throwing UnsatisfiedLinkError out of configure().
+            bitPerfectJniUnavailable = true;
+            Log.w(TAG, "AAudio bit-perfect JNI unavailable: " + e.getMessage());
         }
     }
 

@@ -28,7 +28,7 @@ mixin SettingsCategoryMetadata on State<SettingsScreen> {
   }) {
     final dev = state?.currentOutputDevice;
     final soundSubtitle = dev != null
-        ? '${dev.deviceName} • ${(dev.sampleRate / 1000).toStringAsFixed(dev.sampleRate % 1000 == 0 ? 0 : 1)} kHz / ${dev.bitDepth}-bit${dev.isBitPerfectActive ? " • Bit-Perfect" : ""}'
+        ? '${dev.deviceName} • ${(dev.sampleRate / 1000).toStringAsFixed(dev.sampleRate % 1000 == 0 ? 0 : 1)} kHz / ${dev.bitDepth}-bit${dev.isBitPerfectActive ? " • Exclusive" : ""}'
         : context.l10n.settingsCategoryAudioSubtitle;
 
     return <_SettingsCategoryItem>[

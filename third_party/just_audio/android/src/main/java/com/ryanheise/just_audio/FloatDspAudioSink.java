@@ -27,6 +27,20 @@ import java.nio.ShortBuffer;
  * by the processor, unless {@code forceFloatForPcm16} is false, in which case a
  * 16-bit source bypasses the wrapper entirely and stays a native 16-bit
  * AudioTrack.
+ *
+ * <p>A 16-bit source, and a packed 24-bit source carried by a non-16-bit
+ * boundary (float output), also bypass the float path when
+ * {@code allowBitPerfectIntegerBypass} is set and the native engine reports no
+ * work to do ({@link NativeDspAudioProcessor#canBypassFloatPath()}): the decoded
+ * integer frames then reach the delegate sink without float staging, DSP,
+ * requantisation, dither or channel remap.
+ *
+ * <p>24-bit is deliberately not bypassed into a 16-bit boundary: Media3's
+ * {@code DefaultAudioSink} always inserts {@code ToInt16PcmAudioProcessor} when
+ * {@code enableFloatOutput(false)} and that processor truncates 24-bit to
+ * 16-bit, so a "passthrough" there would be neither bit-exact nor dithered.
+ * With float output enabled the same delegate converts 24-bit to float32
+ * exactly (24 significant bits) instead of quantising it.
  */
 @androidx.media3.common.util.UnstableApi
 final class FloatDspAudioSink extends ForwardingAudioSink {
@@ -39,7 +53,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private final boolean forceFloatForPcm16;
     private final boolean pcm16Boundary;
     private final boolean allowBitPerfectIntegerBypass;
-    private boolean bypassedForBitPerfect;
+    // Read by PulsrAudioSink/PulsrOutputRouting telemetry off the playback
+    // thread, written by configure() on it.
+    private volatile boolean bypassedForBitPerfect;
     private ByteBuffer quantizedOutput;
     private boolean processFloat;
     private int inputEncoding;
@@ -272,14 +288,18 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 || encoding == C.ENCODING_PCM_16BIT
                 || encoding == C.ENCODING_PCM_24BIT
                 || encoding == C.ENCODING_PCM_32BIT;
-        final boolean bitPerfectBypass16 = allowBitPerfectIntegerBypass
-                && encoding == C.ENCODING_PCM_16BIT
-                && processor != null
-                && processor.canBypassFloatPath();
-        final boolean bypass16 = (!forceFloatForPcm16 || bitPerfectBypass16)
-                && encoding == C.ENCODING_PCM_16BIT;
-        if (processor == null || !supported || bypass16) {
-            bypassedForBitPerfect = bitPerfectBypass16;
+        // Integer bit-perfect bypass: 16-bit always, packed 24-bit only into a
+        // boundary that carries the 24-bit grid (see integerBypassWanted()).
+        // 32-bit int and float stay on the float path because the app's
+        // bit-perfect policy refuses 32-bit sources.
+        final boolean integerBypassEligible = integerBypassWanted(encoding);
+        // DSP-off mode (forceFloatForPcm16 == false) keeps its original
+        // 16-bit-only direct path; 24-bit is granted solely by the bit-perfect
+        // bypass, so a false flag changes nothing.
+        final boolean integerDirectPath = integerBypassEligible
+                || (!forceFloatForPcm16 && encoding == C.ENCODING_PCM_16BIT);
+        if (processor == null || !supported || integerDirectPath) {
+            bypassedForBitPerfect = integerBypassEligible;
             frameEditor = null;
             if (processor != null && !supported) {
                 Log.w(TAG, "Unsupported PCM encoding " + encoding
@@ -289,6 +309,14 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             pendingInput = null;
             processFloat = false;
             processorOutputFormat = AudioProcessor.AudioFormat.NOT_SET;
+            // The delegate is configured with the decoded integer Format, so on
+            // the 16-bit bypass the sink writes the source bytes unchanged: the
+            // same contract it already relied on. handleBuffer() hands the input
+            // buffer straight to the delegate and boundaryOutput() is never
+            // reached, so no dither or requantisation can run here. A 24-bit
+            // stream only takes this branch when the boundary is not 16-bit
+            // (see integerBypassWanted()), where Media3 converts 24-bit to
+            // float32 without losing a bit.
             configuredOutputFormat = format;
             super.configure(format, bufferSize, outputChannels);
             return;
@@ -346,15 +374,40 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         }
     }
 
+    /**
+     * Whether this stream may skip the float path and hand decoded integers to
+     * the delegate.
+     *
+     * <p>16-bit is byte-exact because {@code ToInt16PcmAudioProcessor} stays
+     * inactive for it. 24-bit is only safe when the boundary is not 16-bit: with
+     * {@code enableFloatOutput(false)} Media3's {@code DefaultAudioSink} inserts
+     * {@code ToInt16PcmAudioProcessor}, which truncates 24-bit to 16-bit inside
+     * the delegate (verified against media3 1.9.2). With float output enabled
+     * the delegate converts 24-bit to float32, which holds all 24 bits exactly,
+     * so the samples stay lossless.
+     */
+    private boolean integerBypassWanted(int encoding) {
+        return allowBitPerfectIntegerBypass
+                && processor != null
+                && processor.canBypassFloatPath()
+                && (encoding == C.ENCODING_PCM_16BIT
+                        || (encoding == C.ENCODING_PCM_24BIT && !pcm16Boundary));
+    }
+
     @Override
     public boolean handleBuffer(ByteBuffer input, long presentationTimeUs, int accessUnits)
             throws InitializationException, WriteException {
         if (!input.hasRemaining()) return true;
+        // A live policy change (DSP switched on/off, USB exclusive engaged) must
+        // be honoured mid-stream for both integer encodings the bypass covers;
+        // integerBypassWanted() keeps this switch from flapping when 24-bit is
+        // held back by a 16-bit boundary.
         if (pendingInput == null && deferredFormat == null
                 && allowBitPerfectIntegerBypass && forceFloatForPcm16
                 && processor != null && lastInputFormat != null
-                && lastInputFormat.pcmEncoding == C.ENCODING_PCM_16BIT) {
-            final boolean wantBypass = processor.canBypassFloatPath();
+                && (lastInputFormat.pcmEncoding == C.ENCODING_PCM_16BIT
+                        || lastInputFormat.pcmEncoding == C.ENCODING_PCM_24BIT)) {
+            final boolean wantBypass = integerBypassWanted(lastInputFormat.pcmEncoding);
             if (wantBypass != bypassedForBitPerfect) {
                 try {
                     configure(lastInputFormat.buildUpon().setEncoderDelay(0).build(),
@@ -431,8 +484,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
                 && java.util.Arrays.equals(previous.channels, channels)) frameEditor = previous;
     }
 
-    /** Quantize once, after DSP, never by dropping packed integer low bytes. */
+    /**
+     * Quantize once, after DSP, never by dropping packed integer low bytes.
+     *
+     * <p>Never quantises on the integer bypass path: those frames are already in
+     * the sink encoding and dithering them would break bit-exactness. The guard
+     * also covers bytes adopted through {@link #acceptPreparedPcm}.
+     */
     private ByteBuffer boundaryOutput(ByteBuffer output, int encoding) {
+        if (bypassedForBitPerfect) return output;
         if (!pcm16Boundary || encoding == C.ENCODING_PCM_16BIT) return output;
         int bytes = encoding == C.ENCODING_PCM_24BIT ? 3 : 4;
         int samples = output.remaining() / bytes;
@@ -482,6 +542,9 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
             }
             pendingOutput = boundaryOutput(processor.getOutput(), processorOutputFormat.encoding);
         } else {
+            // Integer passthrough (bit-perfect bypass or DSP off): boundaryOutput()
+            // hands back the integer bytes unchanged, so the transferred buffer is
+            // written as-is (24-bit stays sampleBytes == 3, no float round-trip).
             pendingOutput = boundaryOutput(view, encoding);
         }
         pendingInput = input;
@@ -492,6 +555,14 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     boolean hasStagedInput() { return pendingInput != null; }
     PcmFrameEditor frameEditor() { return frameEditor; }
+
+    /**
+     * True while this sink writes decoded integer PCM straight to the delegate,
+     * i.e. {@code allowBitPerfectIntegerBypass} was granted for the stream that
+     * is configured now. Consumed by {@code PulsrAudioSink} telemetry (element
+     * [4] of {@code PulsrOutputRouting.snapshot()}).
+     */
+    boolean isBitPerfectIntegerBypassActive() { return bypassedForBitPerfect; }
 
     /** Configure the track for already-processed bytes, not the queued source. */
     void configurePendingReplacement(FloatDspAudioSink target) throws ConfigurationException {

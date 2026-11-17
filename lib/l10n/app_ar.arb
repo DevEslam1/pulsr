@@ -3840,6 +3840,7 @@
   "settingsAaudioDirect": "إخراج AAudio مباشر (بت مثالي)",
   "settingsAaudioDirectDesc": "يتجاوز مازج النظام بتدفّق AAudio أصلي يُفتح عند معدّل كل مسار (محاولة EXCLUSIVE، وتراجع SHARED). تتعطّل سلسلة DSP وأدوات السرعة/النغمة في هذا الوضع؛ يُطبَّق على المشغّلات المُنشأة حديثاً",
   "dspAboutBassBoost": "حول تعزيز الجهير",
+  "dspMasterNoSnapshotNotice": "المؤثرات متوقفة الآن. شغّل المراحل التي تريدها بشكل فردي؛ لا شيء يُستعاد تلقائيًا.",
   "dspAboutBitPerfect": "حول Bit-Perfect",
   "dspAboutCrossfeed": "حول التغذية المتبادلة",
   "dspAboutDspEngine": "حول محرك DSP",
@@ -4220,6 +4221,7 @@
   "errYtmBusy": "YouTube مشغول. جارٍ التهدئة.",
   "errYtmTrouble": "يواجه YouTube مشكلة. جارٍ إعادة المحاولة.",
   "errYtmExtractFail": "فشل استخراج البث. جارٍ تبديل المسار.",
+  "errYtmSabr": "لا يوفّر YouTube هذا المقطع إلا بصيغة لا يستطيع Pulsr بثّها حتى الآن.",
   "errYtmVerify": "يحتاج YouTube إلى التحقق. جارٍ تجربة مسار بديل.",
   "errSignInFailed": "فشل تسجيل الدخول. حاول مجددًا.",
   "errSignUpFailed": "فشل إنشاء الحساب. حاول مجددًا.",
@@ -5945,5 +5947,6 @@
   "alwaysOnRadio": "تشغيل دائم مع الراديو",
   "alwaysOnRadioDesc": "تشغيل تلقائي مع الراديو؛ وإيقاف عند تشغيل المقاطع المحلية أو عبر الإنترنت",
   "styleDefaultNotice": "الافتراضي: تجويد • حفظ اختيارك كافتراضي",
-  "ambientVolumePercent": "مستوى الصوت: {percent}٪"
+  "ambientVolumePercent": "مستوى الصوت: {percent}٪",
+  "badgeExclusive": "حصري"
 }

@@ -392,7 +392,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 val success = applyBitPerfectMode(enabled)
                 if (success) bitPerfectRequested = enabled && !directRouteFallbackActive
                 notifyDeviceChange()
-                result.success(mapOf("success" to success, "reason" to lastBitPerfectReason))
+                // Rebuild instead of reading the cached map: the route and sink
+                // state just changed, so a cached copy would describe the mode
+                // the app was in before this call.
+                val details = getAudioOutputDetails(forceRefresh = true)
+                result.success(mapOf(
+                    "success" to success,
+                    "reason" to lastBitPerfectReason,
+                    "sinkBitDepth" to details["sinkBitDepth"],
+                    "sinkSampleRate" to details["sinkSampleRate"],
+                ))
             }
             // ── Bluetooth codec control ──────────────────────────────────────
             "getBluetoothCodecInfo" -> {
@@ -1551,19 +1560,26 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     /**
      * Pick the exclusive mixer configuration to hand the platform. Honours the
      * rate/depth the user asked for when the DAC offers it, so the sample-rate
-     * picker is not decoration on the one path where it can be obeyed.
+     * picker is not decoration on the one path where it can be obeyed. Callers
+     * may pass `targetRate`/`targetDepth` to negotiate against a format other
+     * than the persisted user target (the live decoder format, for example).
      */
-    private fun selectMixerAttributes(supported: List<*>, strictTargetFormat: Boolean = false): Any? {
+    private fun selectMixerAttributes(
+        supported: List<*>,
+        strictTargetFormat: Boolean = false,
+        targetRate: Int = targetSampleRate,
+        targetDepth: Int = targetBitDepth,
+    ): Any? {
         val exclusive = supported.filterNotNull().filter { getMixerBehaviorCached(it) == 1 }
         val pool = exclusive
         if (pool.isEmpty()) return null
-        if (targetSampleRate > 0 || targetBitDepth > 0) {
+        if (targetRate > 0 || targetDepth > 0) {
             val match = pool.firstOrNull { attr ->
                 val fmt = mixerAttrFormat(attr) ?: return@firstOrNull false
-                (targetSampleRate <= 0 || fmt.sampleRate == targetSampleRate) &&
-                    (targetBitDepth <= 0 ||
-                        (encodingBitDepth(fmt.encoding) >= targetBitDepth &&
-                            (fmt.encoding != AudioFormat.ENCODING_PCM_FLOAT || targetBitDepth <= 24)))
+                (targetRate <= 0 || fmt.sampleRate == targetRate) &&
+                    (targetDepth <= 0 ||
+                        (encodingBitDepth(fmt.encoding) >= targetDepth &&
+                            (fmt.encoding != AudioFormat.ENCODING_PCM_FLOAT || targetDepth <= 24)))
             }
             if (match != null) {
                 lastBitPerfectReason = null
@@ -1621,6 +1637,23 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             return false
         }
 
+        // With no explicit user target, aim the mixer at the format the decoder
+        // is actually producing instead of whichever rate the DAC advertises as
+        // its highest. A zero snapshot means no track format is known yet, in
+        // which case both targets stay 0 and the selection is unchanged. The
+        // persisted targetSampleRate/targetBitDepth fields are not mutated: only
+        // this negotiation uses the live values.
+        val effectiveTargetRate: Int
+        val effectiveTargetDepth: Int
+        if (targetSampleRate == 0 && targetBitDepth == 0) {
+            val liveFormat = com.ryanheise.just_audio.PulsrOutputRouting.decodedPcmSnapshot()
+            effectiveTargetRate = liveFormat[1].coerceAtLeast(0)
+            effectiveTargetDepth = encodingBitDepth(liveFormat[0])
+        } else {
+            effectiveTargetRate = targetSampleRate
+            effectiveTargetDepth = targetBitDepth
+        }
+
         if (Build.VERSION.SDK_INT >= 34) {
             try {
                 var getSupported = cachedGetSupportedMixerMethod
@@ -1632,7 +1665,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 if (supportedAttributes.isNotEmpty()) {
                     val selectedAttr = selectMixerAttributes(
                         supportedAttributes,
-                        strictTargetFormat = (targetSampleRate > 0 || targetBitDepth > 0)
+                        strictTargetFormat = (targetSampleRate > 0 || targetBitDepth > 0),
+                        targetRate = effectiveTargetRate,
+                        targetDepth = effectiveTargetDepth,
                     )
                     if (selectedAttr != null) {
                         val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
@@ -1880,6 +1915,15 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             result["isUsbDac"] = false
             result["sampleRate"] = 0
             result["bitDepth"] = 0
+            result["sinkSampleRate"] = 0
+            result["sinkPcmEncoding"] = 0
+            result["sinkBitDepth"] = 0
+            result["decodedPcmEncoding"] = 0
+            result["integerBypassActive"] = false
+            result["halStagesActive"] = 0
+            result["floatCarrierDecodesSource"] = false
+            result["bitPerfectRequested"] =
+                bitPerfectRequested || UsbExclusivePlugin.directStreamingActive
             result["isBitPerfectActive"] = false
             result["isBitPerfectSupported"] = false
             result["supportedSampleRates"] = emptyList<Int>()
@@ -2020,8 +2064,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             stream[2] == AudioFormat.ENCODING_PCM_FLOAT &&
             decodedDepth in 16..24
         val reportedDepth = if (floatCarriesDecoded) decodedDepth else sinkDepth
+        // A sink narrower than the decoder grid means the platform is truncating
+        // samples, so the mixer cannot be bit-perfect no matter what the accepted
+        // attributes claim. decodedDepth is 0 when no decoder format is known,
+        // which leaves this comparison inert.
         val mixerActive = isUsb && !isBluetooth && isBitPerfectActive &&
-            stream[1] > 0 && sinkDepth > 0 &&
+            stream[1] > 0 && sinkDepth > 0 && sinkDepth >= decodedDepth &&
             (activeMixerRate == 0 || stream[1] == activeMixerRate) &&
             (activeMixerEncoding == 0 ||
                 (stream[2] == activeMixerEncoding && sinkDepth >= reportedDepth) ||
@@ -2058,11 +2106,31 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["nativeSampleRateMeasured"] = false
         result["nativeFramesPerBuffer"] = nativeFrames
         result["bitDepth"] = directStream?.bitDepth ?: reportedDepth
+        // Truth fields. "bitDepth" above stays the display value (a float sink
+        // carrying a 16/24-bit decoder grid is collapsed to the source depth), so
+        // consumers that verify the chain use these instead. sinkBitDepth is the
+        // container depth the sink really opened, never collapsed, 0 if unknown.
+        result["sinkSampleRate"] = stream[1]
+        result["sinkPcmEncoding"] = stream[2]
+        result["sinkBitDepth"] = sinkDepth
+        // Decoded-input and bypass truth, attributed by the routing snapshot to
+        // the same sink as elements 0..2 above: [3] is the decoded PCM encoding,
+        // [4] the integer bit-perfect bypass that stream actually took. 0/false
+        // here means unverified, not bit-perfect.
+        result["decodedPcmEncoding"] = stream[3]
+        result["integerBypassActive"] = stream[4] != 0
+        // Published by AudioEffectsPlugin from the live effect objects; this is
+        // the only channel AudioOutputInfo reads, so it must be here.
+        result["halStagesActive"] = AudioEffectsPlugin.liveHalStagesActive
+        result["floatCarrierDecodesSource"] = floatCarriesDecoded
+        result["bitPerfectRequested"] =
+            bitPerfectRequested || UsbExclusivePlugin.directStreamingActive
         result["outputChannels"] = directStream?.channels ?: 0
         result["pcmEncoding"] = stream[2]
         result["decodedBitDepth"] = decodedDepth
         result["decodedSampleRate"] = decoded[1]
-        result["decodedPcmEncoding"] = decoded[0]
+        // decodedPcmEncoding is published with the sink truth fields above, read
+        // from the same routing snapshot that attributes it to this stream.
         result["isBitPerfectActive"] = finalIsBitPerfectActive
         result["isBitPerfectSupported"] = finalIsBitPerfectSupported
         result["isDirectSupported"] = isDirectSupported

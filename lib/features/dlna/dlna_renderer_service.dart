@@ -14,6 +14,7 @@ import 'package:path/path.dart' as p;
 import '../../core/errors/app_error.dart';
 import '../../core/utils/error_logger.dart';
 import 'av_transport.dart';
+import 'dlna_strings.dart';
 import 'media_http_server.dart';
 import 'ssdp_client.dart';
 import 'upnp_device.dart';
@@ -60,6 +61,10 @@ class DlnaRendererService extends ChangeNotifier {
   final MediaHttpServer _mediaServer;
   final http.Client _httpClient;
   final bool _ownsHttpClient;
+  /// Consecutive poll failures after which the loop stops and the UI shows the
+  /// stale banner instead of pretending playback is still live.
+  static const int maxConsecutivePollFailures = 3;
+
   final Duration _pollInterval;
   final Duration _discoveryTimeout;
   final Duration _descriptionTimeout;
@@ -76,6 +81,7 @@ class DlnaRendererService extends ChangeNotifier {
   Timer? _pollTimer;
   bool _polling = false;
   int _pollFailures = 0;
+  bool _pollStale = false;
   String? _token;
   String? _lastCastPath;
   String? _lastCastTitle;
@@ -124,6 +130,14 @@ class DlnaRendererService extends ChangeNotifier {
 
   /// Last failure, cleared when a new operation starts.
   AppError? get lastError => _lastError;
+
+  /// True when polling gave up after repeated failures.
+  ///
+  /// The transport state on screen is the last one the renderer reported, so it
+  /// may no longer be true (a renderer that stopped answering used to keep the
+  /// UI on "Playing" with a position that never advanced). [retryPolling]
+  /// clears it and resumes the loop.
+  bool get isPollStale => _pollStale;
 
   /// Exposed so the host can report the serving URL / port.
   MediaHttpServer get mediaServer => _mediaServer;
@@ -433,6 +447,10 @@ class DlnaRendererService extends ChangeNotifier {
       final transport = await client.getTransportInfo();
       if (_disposed) return;
       _pollFailures = 0;
+      if (_pollStale) {
+        _pollStale = false;
+        _lastError = null;
+      }
       final reported = position.position;
       if (reported != null) _position = reported;
       final reportedDuration = position.trackDuration;
@@ -450,10 +468,39 @@ class DlnaRendererService extends ChangeNotifier {
         stackTrace: stackTrace,
         category: 'DLNA',
       );
-      if (_pollFailures >= 3) _stopPolling();
+      if (_pollFailures >= maxConsecutivePollFailures && !_pollStale) {
+        // Stop hammering a renderer that stopped answering and surface the
+        // stale state instead of freezing "Playing" silently.
+        _stopPolling();
+        _pollStale = true;
+        _lastError = NetworkError(
+          code: 'dlna-poll-stale',
+          userMessage: DlnaStrings.pollLost,
+          cause: error,
+          stackTrace: stackTrace,
+        );
+        notifyListeners();
+      }
     } finally {
       _polling = false;
     }
+  }
+
+  /// Clears a stale poll and resumes position polling.
+  ///
+  /// Called by the screen's Retry action on the stale banner. Returns whether a
+  /// poll loop was restarted (false when no renderer is selected).
+  Future<bool> retryPolling() async {
+    if (_disposed) return false;
+    final client = _avTransport;
+    if (client == null) return false;
+    _pollFailures = 0;
+    _pollStale = false;
+    _lastError = null;
+    notifyListeners();
+    _startPolling();
+    await _pollOnce();
+    return true;
   }
 
   Uri? _resolveLocation(SsdpResponse response) {

@@ -59,6 +59,18 @@ class AudioEffectsPluginIntegrationTest {
         return result.await()
     }
 
+    // Live count of enabled app-owned HAL effects, read from the public debug
+    // map only. -1 when the key is missing, so a renamed key fails both the
+    // `>= 1` and the `== 0` assertion instead of silently satisfying one.
+    private fun halStagesActive(report: Map<*, *>): Int =
+        (report["halStagesActive"] as? Number)?.toInt() ?: -1
+
+    private fun dspDebugStatus(): Map<*, *> {
+        val report = invoke("getDspDebugStatus") as? Map<*, *>
+        assertNotNull("DSP debug report should be available", report)
+        return report!!
+    }
+
     @Test
     fun testAudioSessionRecreationAndDetachment() {
         // Step 1: Attach to initial session S1 (101)
@@ -87,29 +99,85 @@ class AudioEffectsPluginIntegrationTest {
         assertEquals("Session attached flag should be false", false, detachedReport?.get("isSessionAttached"))
     }
 
+    /**
+     * Phase 5 item 16 (audit/verify_tests.md BF-4 / 3.1A): the bypass must leave
+     * no app-owned HAL effect enabled on the live session, including when the
+     * session is swapped while the bypass is active - the swap recreates every
+     * effect instance from the user's flags, which is the regression this test
+     * exists for.
+     *
+     * `halStagesActive` counts *live, enabled* effect objects
+     * (AudioEffectsPlugin.countEnabledAppOwnedHalStages), so the first
+     * assertion is a positive control: on its own, `== 0` would also pass on a
+     * build where the cleanup was deleted and nothing was ever constructed.
+     * `isBitExactChain` is deliberately NOT asserted: it needs
+     * nativeLastBlockWasBitPerfect(), i.e. a block rendered by the native
+     * engine, which a plugin-only instrumentation test never produces.
+     *
+     * If the positive control fails, the device refused to construct or enable
+     * the HAL effects for a session with no live AudioTrack; the fallback in
+     * audit/verify_tests.md 3.1A is a real session id plus a muted AudioTrack.
+     */
     @Test
-    fun testBitPerfectEnableAndDisableRestoration() {
-        // Set up active session
-        invoke("setAudioSessionId", mapOf("audioSessionId" to 105))
+    fun testBitPerfectBypassClearsAndRestoresAppOwnedHalStages() {
+        // Session 1: three app-owned HAL stages, all user-enabled.
+        invoke("setAudioSessionId", mapOf("audioSessionId" to 1))
+        val virtualizerResult = invoke("setVirtualizerEnabled", mapOf("enabled" to true))
+        val volumeBoostResult = invoke("setVolumeBoost", mapOf("milliBels" to 400))
+        val bassBoostResult = invoke("setBassBoost", mapOf("strength" to 400))
 
-        // Enable stages
-        invoke("setLimiterEnabled", mapOf("enabled" to true))
-        invoke("setReverbEnabled", mapOf("enabled" to true))
-        invoke("setCrossfeedEnabled", mapOf("enabled" to true))
+        // Positive control: the effects must really exist and be enabled,
+        // otherwise every `halStagesActive == 0` below is vacuous.
+        val stagesBeforeBypass = halStagesActive(dspDebugStatus())
+        assertTrue(
+            "No app-owned HAL stage was enabled on session 1 " +
+                "(virtualizer=$virtualizerResult, volumeBoost=$volumeBoostResult, " +
+                "bassBoost=$bassBoostResult), so the bypass assertions below would be vacuous",
+            stagesBeforeBypass >= 1
+        )
 
-        // Step 1: Enable Bit-Perfect bypass
+        // Bypass on: a stream called bit-perfect may not pass an app-owned
+        // effect, so the live count must drop to zero.
         val bypassResult = invoke("setBypassDspForBitPerfect", mapOf("bypass" to true))
-        assertEquals(true, bypassResult)
+        assertTrue(
+            "Bit-perfect bypass must be accepted with the native engine loaded: $bypassResult",
+            bypassResult == true
+        )
+        val bypassedReport = dspDebugStatus()
+        assertEquals(
+            "Bit-perfect bypass must suppress every app-owned HAL stage",
+            0,
+            halStagesActive(bypassedReport)
+        )
+        assertTrue(
+            "Bit-perfect bypass must still be requested",
+            bypassedReport["isBitPerfectRequested"] == true
+        )
 
-        val bypassedReport = invoke("getDspDebugStatus") as? Map<*, *>
-        assertEquals("Bit-perfect bypass must be active", true, bypassedReport?.get("isBitPerfectBypassActive"))
+        // Session swap while bypassed: recreateEffects() must not rebuild the
+        // stages the user's flags still describe.
+        invoke("setAudioSessionId", mapOf("audioSessionId" to 202))
+        assertEquals(
+            "A session swap during bypass must not re-enable a single HAL stage",
+            0,
+            halStagesActive(dspDebugStatus())
+        )
 
-        // Step 2: Disable Bit-Perfect bypass - all DSP stages must restore
+        // Bypass off: the restore path must honour the untouched user flags.
         val restoreResult = invoke("setBypassDspForBitPerfect", mapOf("bypass" to false))
-        assertEquals(true, restoreResult)
-
-        val restoredReport = invoke("getDspDebugStatus") as? Map<*, *>
-        assertEquals("Bit-perfect bypass must be inactive", false, restoredReport?.get("isBitPerfectBypassActive"))
+        assertTrue(
+            "Leaving bit-perfect must be accepted: $restoreResult",
+            restoreResult == true
+        )
+        val restoredReport = dspDebugStatus()
+        assertTrue(
+            "Leaving the bypass must clear the request",
+            restoredReport["isBitPerfectRequested"] == false
+        )
+        assertTrue(
+            "Leaving the bypass must restore the app-owned HAL stages the user enabled",
+            halStagesActive(restoredReport) >= 1
+        )
 
         // Tear down
         invoke("setAudioSessionId", mapOf("audioSessionId" to 0))

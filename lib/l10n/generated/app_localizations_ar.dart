@@ -5925,6 +5925,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dspAboutBassBoost => 'حول تعزيز الجهير';
 
   @override
+  String get dspMasterNoSnapshotNotice =>
+      'المؤثرات متوقفة الآن. شغّل المراحل التي تريدها بشكل فردي؛ لا شيء يُستعاد تلقائيًا.';
+
+  @override
   String get dspAboutBitPerfect => 'حول Bit-Perfect';
 
   @override
@@ -7124,6 +7128,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get errYtmExtractFail => 'فشل استخراج البث. جارٍ تبديل المسار.';
+
+  @override
+  String get errYtmSabr =>
+      'لا يوفّر YouTube هذا المقطع إلا بصيغة لا يستطيع Pulsr بثّها حتى الآن.';
 
   @override
   String get errYtmVerify => 'يحتاج YouTube إلى التحقق. جارٍ تجربة مسار بديل.';
@@ -10501,4 +10509,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String ambientVolumePercent(int percent) {
     return 'مستوى الصوت: $percent٪';
   }
+
+  @override
+  String get badgeExclusive => 'حصري';
 }

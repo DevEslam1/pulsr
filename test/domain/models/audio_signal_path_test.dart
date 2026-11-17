@@ -3,6 +3,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/telemetry/audio_session_log.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/domain/models/audio_signal_path.dart';
+import 'package:pulsr/domain/models/bit_perfect_state.dart';
+
+/// A USB route capable of a verified chain; each test supplies the state that
+/// decides whether it is one.
+const _usbDacOutput = AudioOutputInfo(
+  deviceName: 'FiiO KA17',
+  isUsbDac: true,
+  sampleRate: 96000,
+  bitDepth: 24,
+  decodedSampleRate: 96000,
+  decodedBitDepth: 24,
+  isBitPerfectActive: true,
+  activeDeviceType: 'usb',
+  usbAudioClass: 2,
+);
 
 void main() {
   group('AudioOutputInfo device capability serialization', () {
@@ -44,6 +59,32 @@ void main() {
     });
   });
 
+  group('AudioOutputInfo integer-bypass observation', () {
+    test('round-trips the flag, keeps it through copyWith and defaults it off',
+        () {
+      const info = AudioOutputInfo(
+        deviceName: 'USB DAC',
+        isUsbDac: true,
+        sampleRate: 96000,
+        bitDepth: 24,
+        isBitPerfectActive: true,
+        integerBypassActive: true,
+      );
+
+      expect(info.toMap()['integerBypassActive'], isTrue);
+      expect(AudioOutputInfo.fromMap(info.toMap()).integerBypassActive, isTrue);
+      expect(info.copyWith(bitDepth: 16).integerBypassActive, isTrue);
+      expect(info.copyWith(integerBypassActive: false).integerBypassActive,
+          isFalse);
+
+      // A payload from a platform build that never observed the bypass must not
+      // read as one: absence of evidence is not an integer path.
+      final legacy = Map<String, dynamic>.from(info.toMap())
+        ..remove('integerBypassActive');
+      expect(AudioOutputInfo.fromMap(legacy).integerBypassActive, isFalse);
+    });
+  });
+
   group('AudioSignalPath across all 4 hardware output paths', () {
     test('1. 3.5mm Wired Headphone Jack path shows AAudio Direct PCM', () {
       final path = AudioSignalPath.fromOutputInfo(
@@ -75,7 +116,7 @@ void main() {
       expect(path.toChainString(), contains('-> PCM 24-bit Packed'));
     });
 
-    test('2. External USB-C DAC shows UAC2 Isochronous 384kHz Bit-Perfect', () {
+    test('2. External USB-C DAC is UAC2 Isochronous but unverified without a state', () {
       final path = AudioSignalPath.fromOutputInfo(
         sourceCodec: 'WAV',
         sourceSampleRate: 384000,
@@ -97,9 +138,12 @@ void main() {
 
       expect(path.routeCategory, 'usb');
       expect(path.driverPath, 'Pulsr UAC2 Isochronous');
-      expect(path.isBitPerfect, isTrue);
+      // A direct route is not evidence that the bytes reached the DAC
+      // unaltered: only a supplied BitPerfectState may say Bit-Perfect.
+      expect(path.isBitPerfect, isFalse);
       expect(path.hardwareSummary, contains('384 kHz'));
-      expect(path.hardwareSummary, contains('Bit-Perfect'));
+      expect(path.hardwareSummary, contains('Direct PCM'));
+      expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
 
     test('3. USB-C Digital Audio adapter preserves encodings & channel caps', () {
@@ -161,6 +205,93 @@ void main() {
       expect(path.hardwareSampleRate, 96000);
       expect(path.hardwareBitDepth, 24);
       expect(path.hardwareSummary, contains('Lossy A2DP/LE'));
+    });
+  });
+
+  group('AudioSignalPath status tag follows the supplied BitPerfectState', () {
+    test('a verified state tags the endpoint Bit-Perfect', () {
+      final state = resolveBitPerfectState(
+        requested: true,
+        strict: false,
+        sinkActive: true,
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        sinkSampleRate: 96000,
+        sinkBitDepth: 24,
+        exclusive: true,
+        integerBypass: true,
+        halClean: true,
+        unityGain: true,
+      );
+      expect(state.tier, BitPerfectTier.active);
+
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: state,
+      );
+
+      expect(path.isBitPerfect, isTrue);
+      expect(path.hardwareSummary, contains('Bit-Perfect'));
+      expect(path.driverPath, 'USB Exclusive Mixer');
+    });
+
+    test('a degraded state tags the endpoint Exclusive / Unverified', () {
+      final state = resolveBitPerfectState(
+        requested: true,
+        strict: false,
+        sinkActive: true,
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        sinkSampleRate: 96000,
+        sinkBitDepth: 24,
+        // Exclusive, but no observed integer bypass: the samples were
+        // re-quantised somewhere ahead of the sink.
+        integerBypass: false,
+        halClean: true,
+        unityGain: true,
+      );
+      expect(state.tier, BitPerfectTier.degraded);
+
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: state,
+      );
+
+      expect(path.isBitPerfect, isFalse);
+      expect(path.hardwareSummary, contains('Exclusive / Unverified'));
+      expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
+    });
+
+    test('without a state no route claims Bit-Perfect', () {
+      // AudioOutputInfo.isBitPerfectActive echoes the request, so it cannot
+      // stand in for evidence when no state was supplied.
+      final flagOnly = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+      );
+      expect(flagOnly.isBitPerfect, isFalse);
+      expect(flagOnly.hardwareSummary, isNot(contains('Bit-Perfect')));
+
+      final directRoute = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        uac2DirectActive: true,
+        output: _usbDacOutput,
+      );
+      // A direct route is a routing fact, not a measurement. Without a
+      // supplied state the honest tag is Direct PCM, never Bit-Perfect.
+      expect(directRoute.isBitPerfect, isFalse);
+      expect(directRoute.hardwareSummary, contains('Direct PCM'));
+      expect(directRoute.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
   });
 

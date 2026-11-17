@@ -269,7 +269,11 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                                       AppColors.dacGold.withValues(alpha: 0.6)),
                             ),
                             child: Text(
-                              context.l10n.bitPerfectLabel,
+                              // The flag proves an exclusive route, not
+                              // unaltered samples. The verified label lives in
+                              // the player's live-chain sheet, which has the
+                              // BitPerfectState.
+                              'EXCLUSIVE',
                               style: TextStyle(
                                 color: p.warning,
                                 fontWeight: FontWeight.w900,

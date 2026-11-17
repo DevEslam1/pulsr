@@ -240,5 +240,52 @@ void main() {
       await tester.pump();
       expect(longPressedIndex, 0);
     });
+
+    testWidgets('prunes cached line keys when the lyric set shrinks',
+        (tester) async {
+      final reports = <Map<int, GlobalKey>>[];
+      AdvancedLyricsView.debugOnLineKeysChanged =
+          (keys) => reports.add(Map<int, GlobalKey>.from(keys));
+      addTearDown(() => AdvancedLyricsView.debugOnLineKeysChanged = null);
+
+      List<LyricsLine> lines(int count) => [
+            for (var i = 0; i < count; i++)
+              LyricsLine(timestamp: Duration(seconds: i), text: 'Line $i'),
+          ];
+
+      Widget host(List<LyricsLine> lyrics) => MaterialApp(
+            theme: AuraTheme.darkTheme,
+            home: Scaffold(
+              body: SizedBox(
+                width: 400,
+                height: 600,
+                child: AdvancedLyricsView(
+                  lyrics: lyrics,
+                  currentPosition: const Duration(seconds: 1),
+                  activeColor: Colors.amber,
+                ),
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(host(lines(30)));
+      await tester.pumpAndSettle();
+      expect(reports, isNotEmpty);
+      final wideKeys = reports.last;
+      expect(wideKeys.length, greaterThan(2));
+
+      reports.clear();
+      await tester.pumpWidget(host(lines(2)));
+      await tester.pumpAndSettle();
+
+      expect(reports, isNotEmpty);
+      final prunedKeys = reports.last;
+      expect(prunedKeys.length, lessThanOrEqualTo(2));
+      expect(prunedKeys.keys.every((index) => index < 2), isTrue,
+          reason: 'keys for lines that no longer exist must be dropped');
+      // Surviving indices keep their GlobalKey so ensureVisible stays stable.
+      expect(prunedKeys[0], same(wideKeys[0]));
+      expect(prunedKeys[1], same(wideKeys[1]));
+    });
   });
 }

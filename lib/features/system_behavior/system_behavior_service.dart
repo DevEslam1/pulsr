@@ -354,11 +354,15 @@ class SystemBehaviorService with WidgetsBindingObserver {
   /// The interruption manager decides whether playback should pause at all;
   /// only then does the policy choose the delivery (fade, USB release, pause).
   ///
+  /// Returns true when a pause delivery was started (immediately or through a
+  /// fade ramp). The audio handler uses that answer to skip its own pause, so
+  /// one focus loss produces exactly one pause.
+  ///
   /// Both variants are recorded as [InterruptionKind.pause] because this path
   /// always delivers a pause. Recording a duck and ending a pause used to leave
   /// the manager stuck in the duck state, so no later gain could ever resume.
-  Future<void> handleAudioFocusLoss({required bool permanent}) async {
-    if (_disposed) return;
+  Future<bool> handleAudioFocusLoss({required bool permanent}) async {
+    if (_disposed) return false;
     final bool playing = _playing;
     final InterruptionDecision decision =
         _interruption.onPauseInterruptionBegin(isPlaying: playing);
@@ -367,13 +371,14 @@ class SystemBehaviorService with WidgetsBindingObserver {
         'Focus loss ignored: playback was not running',
         category: 'system_behavior',
       );
-      return;
+      return false;
     }
-    await _run(
+    final SystemAction action = await _run(
       permanent
           ? SystemEvent.audioFocusLossPermanent
           : SystemEvent.audioFocusLossTransient,
     );
+    return action != SystemAction.ignore;
   }
 
   /// Handles the end of a focus loss: restores the pre-fade volume and lets
@@ -381,8 +386,11 @@ class SystemBehaviorService with WidgetsBindingObserver {
   ///
   /// Ends whichever kind is actually active. A duck-only event ends as a duck;
   /// everything else ends as a pause, so the state can never stay half-open.
-  Future<void> handleAudioFocusGain() async {
-    if (_disposed) return;
+  ///
+  /// Returns true when playback was resumed here, so the audio handler does not
+  /// resume a second time.
+  Future<bool> handleAudioFocusGain() async {
+    if (_disposed) return false;
     final SystemBehaviorSettingsSnapshot snapshot = _settings.snapshot;
     final InterruptionDecision decision =
         _interruption.activeKind == InterruptionKind.duck
@@ -395,54 +403,69 @@ class SystemBehaviorService with WidgetsBindingObserver {
               );
     _fade.cancelTimer();
     await _fade.restore();
-    if (decision == InterruptionDecision.resume) await _resume();
+    if (decision != InterruptionDecision.resume) return false;
+    await _resume();
+    return true;
   }
 
   /// Handles a short system notification sound (duck begin), pausing when the
   /// user asked for that instead of a duck.
-  Future<void> handleNotificationSound() async {
-    if (_disposed) return;
+  ///
+  /// Returns true when this call delivered a pause, so a caller that also pauses
+  /// (the audio handler's duck path) can stand down.
+  Future<bool> handleNotificationSound() async {
+    if (_disposed) return false;
     final SystemBehaviorSettingsSnapshot snapshot = _settings.snapshot;
     final InterruptionDecision decision = _interruption.onDuckBegin(
       isPlaying: _playing,
       shouldPauseInstead: snapshot.pauseOnNotificationSound,
     );
-    if (decision == InterruptionDecision.ignore) return;
-    await _run(SystemEvent.notificationSound);
+    if (decision == InterruptionDecision.ignore) return false;
+    if (decision == InterruptionDecision.duck) return false;
+    final SystemAction action = await _run(SystemEvent.notificationSound);
+    return action != SystemAction.ignore;
   }
 
-  /// Handles the end of a notification-sound duck.
-  Future<void> handleNotificationSoundEnd() async {
-    if (_disposed) return;
+  /// Handles the end of a notification-sound duck. Returns true when playback
+  /// was resumed here.
+  Future<bool> handleNotificationSoundEnd() async {
+    if (_disposed) return false;
     final SystemBehaviorSettingsSnapshot snapshot = _settings.snapshot;
     final InterruptionDecision decision = _interruption.onDuckEnd(
       shouldPauseInstead: snapshot.pauseOnNotificationSound,
       resumeAllowed: snapshot.resumeAfterCall,
     );
-    if (decision != InterruptionDecision.resume) return;
+    if (decision != InterruptionDecision.resume) return false;
     _fade.cancelTimer();
     await _fade.restore();
     await _resume();
+    return true;
   }
 
   /// Handles a headset unplug (`becoming noisy`): the manager debounces and
   /// decides, then the policy pauses without fading into a dead sink.
-  Future<void> handleHeadsetUnplug() async {
-    if (_disposed) return;
+  ///
+  /// Returns true when this call delivered the pause.
+  Future<bool> handleHeadsetUnplug() async {
+    if (_disposed) return false;
     final InterruptionDecision decision = _interruption.onBecomingNoisy(
       isPlaying: _playing,
       now: _clock(),
     );
-    if (decision != InterruptionDecision.pause) return;
-    await _run(SystemEvent.headsetUnplug);
+    if (decision != InterruptionDecision.pause) return false;
+    final SystemAction action = await _run(SystemEvent.headsetUnplug);
+    return action != SystemAction.ignore;
   }
 
   /// Handles the app being removed from the recents list.
-  Future<void> handleTaskRemoved() => _run(SystemEvent.taskRemoved);
+  Future<void> handleTaskRemoved() async {
+    await _run(SystemEvent.taskRemoved);
+  }
 
   /// Handles a volume-rocker double press.
-  Future<void> handleVolumeKeyDoublePress() =>
-      _run(SystemEvent.volumeKeyDoublePress);
+  Future<void> handleVolumeKeyDoublePress() async {
+    await _run(SystemEvent.volumeKeyDoublePress);
+  }
 
   /// Releases the exclusive USB claim when the user asked for that, but only
   /// while nothing is playing.
@@ -550,8 +573,8 @@ class SystemBehaviorService with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _run(SystemEvent event) async {
-    if (_disposed) return;
+  Future<SystemAction> _run(SystemEvent event) async {
+    if (_disposed) return SystemAction.ignore;
     final SystemBehaviorSettingsSnapshot snapshot = _settings.snapshot;
     final SystemAction action = decide(event, snapshot);
     ErrorLogger.addBreadcrumb(
@@ -559,6 +582,7 @@ class SystemBehaviorService with WidgetsBindingObserver {
       category: 'system_behavior',
     );
     await _execute(action, snapshot);
+    return action;
   }
 
   Future<void> _execute(

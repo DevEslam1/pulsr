@@ -52,6 +52,8 @@ import 'core/utils/error_logger.dart';
 import 'core/utils/ytm_rate_limiter.dart';
 import 'data/audio/audio_handler.dart';
 import 'data/audio/eq_legacy_migration.dart';
+import 'features/audio_profiles/audio_profile_bootstrap.dart';
+import 'features/audio_profiles/audio_profile_service.dart';
 import 'data/db/app_database.dart';
 import 'data/scanner/media_scanner_service.dart';
 import 'domain/repositories/music_repository_interface.dart';
@@ -485,6 +487,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   SystemBehaviorSettings? _systemBehaviorSettings;
   VoidCallback? _systemBehaviorSettingsListener;
   SystemBehaviorRuntime? _systemBehaviorRuntime;
+  AudioProfileBootstrap? _audioProfileBootstrap;
   UsbErgonomicsService? _usbErgonomics;
   RemotePlaybackRuntime? _remotePlaybackRuntime;
   DlnaRendererService? _dlnaRendererService;
@@ -513,6 +516,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _startTrackAnnouncements();
     _startAssistantSuggestions();
     _startSystemAndUsbServices();
+    _startAudioProfileScheduler();
     _registerRemotePlaybackRuntime();
     _watchPlatformBridgeHealth();
     _verifyPureMode();
@@ -643,6 +647,35 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       ErrorLogger.log('Failed to start automation trigger service',
           error: e, stackTrace: st, category: 'Startup');
     }
+  }
+
+  /// Applies the profile the user marked as the audio-profile default.
+  ///
+  /// Runs once after the startup settings are readable, then again whenever a
+  /// USB DAC is attached and the profile pins a matching vid/pid. The service
+  /// keeps a last-applied marker, so settings refreshes and duplicate device
+  /// events cannot loop. Nothing here may abort startup: failures are logged.
+  void _startAudioProfileScheduler() {
+    unawaited(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final service = AudioProfileService(prefs: prefs);
+        final bootstrap = AudioProfileBootstrap(service: service);
+        if (!mounted) {
+          bootstrap.dispose();
+          return;
+        }
+        _audioProfileBootstrap = bootstrap;
+        await bootstrap.start();
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Audio-profile scheduler failed to start',
+          error: e,
+          stackTrace: st,
+          category: 'AudioProfiles',
+        );
+      }
+    }());
   }
 
   /// System-behaviour policies (P1-7), USB DAC quirks (P0-3) and the live
@@ -1003,11 +1036,13 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     unawaited(_trackAnnouncer?.dispose() ?? Future<void>.value());
     unawaited(_ttsEngine?.dispose() ?? Future<void>.value());
     _announcementSettings?.dispose();
+    AssistantIntentBootstrap.dispose();
     _assistantSettings?.dispose();
     if (_systemBehaviorSettingsListener != null) {
       _systemBehaviorSettings?.removeListener(_systemBehaviorSettingsListener!);
     }
     _systemBehaviorRuntime?.dispose();
+    _audioProfileBootstrap?.dispose();
     _systemBehaviorSettings?.dispose();
     _usbErgonomics?.dispose();
     unawaited(

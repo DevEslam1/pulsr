@@ -56,7 +56,7 @@ void main() {
         find.textContaining('USB-C DAC (UAC2) • Chord Mojo 2'), findsOneWidget);
     expect(find.textContaining('Encodings: 16, 24, 32'), findsOneWidget);
     expect(
-      find.text('Pulsr UAC2 Isochronous • 24-bit / 192 kHz (Bit-Perfect)'),
+      find.text('Pulsr UAC2 Isochronous • 24-bit / 192 kHz (Direct PCM)'),
       findsOneWidget,
     );
   });

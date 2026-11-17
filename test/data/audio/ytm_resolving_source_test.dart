@@ -10,6 +10,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
 import 'package:pulsr/core/services/ytm_cache_manager.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
@@ -77,6 +78,35 @@ void main() {
 
       expect(calls, 2, reason: 'each request should re-run the resolver');
     });
+
+    test('a first-byte failure retries without waiting out the path lock',
+        () async {
+      // Regression: the retry path re-entered the per-path creation lock that
+      // the first attempt still held, so a cold track whose URL refused the
+      // first byte stalled for the lock's full 60 s timeout — on exactly the
+      // failure this class exists to repair in one fast re-resolve.
+      YtmResolvingSource.debugInnerFactory = (uri, headers, cacheFile) =>
+          _RefusingCacheSource(uri, cacheFile: cacheFile);
+      addTearDown(() => YtmResolvingSource.debugInnerFactory = null);
+
+      var resolveCalls = 0;
+      final source = YtmResolvingSource(
+        videoId: 'lockretryvid',
+        resolve: ({bool forceRefresh = false}) async {
+          resolveCalls++;
+          return _streamUrl();
+        },
+      );
+
+      final stopwatch = Stopwatch()..start();
+      await expectLater(source.request(), throwsA(isA<Exception>()));
+      stopwatch.stop();
+
+      expect(stopwatch.elapsed, lessThan(const Duration(seconds: 5)),
+          reason: 'the retry must not queue behind a lock it already holds');
+      expect(resolveCalls, equals(2),
+          reason: 'a burned URL is re-resolved exactly once before failing');
+    }, timeout: const Timeout(Duration(seconds: 15)));
 
     test('the resolver runs lazily, not at construction', () {
       var calls = 0;
@@ -303,8 +333,7 @@ void main() {
               const HttpException('Closed after 5 bytes for vid500xyz')),
           isFalse);
       expect(
-          YtmResolvingSource.isRetryable5xx(
-              Exception('clen=5001234 itag=251')),
+          YtmResolvingSource.isRetryable5xx(Exception('clen=5001234 itag=251')),
           isFalse);
       expect(
           YtmResolvingSource.isRetryable5xx(
@@ -367,4 +396,16 @@ String _streamUrl({int? expireEpochSeconds}) {
       DateTime.now().add(const Duration(hours: 5)).millisecondsSinceEpoch ~/
           1000;
   return 'https://rr1---sn-x.googlevideo.com/videoplayback?itag=140&expire=$expire';
+}
+
+/// A byte-cache source whose first read is refused the way googlevideo refuses
+/// an expired signature — synchronously on the returned future, so the retry
+/// path can be exercised without a network or a 60 s lock wait.
+class _RefusingCacheSource extends LockCachingAudioSource {
+  _RefusingCacheSource(super.uri, {required super.cacheFile});
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    throw Exception('HTTP Status Error: 403');
+  }
 }

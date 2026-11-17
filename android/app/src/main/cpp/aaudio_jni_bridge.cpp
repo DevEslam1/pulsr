@@ -194,3 +194,25 @@ Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeGetDeviceId(
     if (auto* sink = AsSink(handle)) return sink->DeviceId();
     return 0;
 }
+
+// Bit-perfect / DoP verdict for the live stream. AsSink + the shared lifecycle
+// read lock, exactly like nativeSetVolume/nativeIsExclusive, so a concurrent
+// nativeClose() cannot free the sink mid-call. SetBitPerfect() returns false
+// (leaving the sink's bit-perfect flag off) when the request cannot be honoured
+// on a non-exclusive stream.
+extern "C" JNIEXPORT void JNICALL
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeSetBitPerfect(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle, jboolean bitPerfect, jboolean dop) {
+    SinkReadLock lifeLock;
+    if (auto* sink = AsSink(handle)) {
+        sink->SetBitPerfect(bitPerfect == JNI_TRUE, dop == JNI_TRUE);
+    }
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_ryanheise_just_1audio_AaudioNativeBridge_nativeIsBitPerfectSink(
+    JNIEnv* /*env*/, jclass /*clazz*/, jlong handle) {
+    SinkReadLock lifeLock;
+    if (auto* sink = AsSink(handle)) return sink->IsBitPerfectSink() ? JNI_TRUE : JNI_FALSE;
+    return JNI_FALSE;
+}

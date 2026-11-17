@@ -315,6 +315,16 @@ class YtmUrlCache {
   String _buildKey(String videoId, String quality) =>
       '$videoId:${quality.toLowerCase()}';
 
+  /// The quality slot a resolved stream belongs in.
+  ///
+  /// `preferM4a` selects a different container for the same video, and the two
+  /// must never share a slot: a webm/Opus body served from an m4a slot (or the
+  /// reverse) writes the wrong bytes into the wrong file. The rule used to be
+  /// spelled out at each call site as `'$quality:m4a'`; keeping it here stops
+  /// the next caller from inventing a fourth spelling.
+  static String qualitySlot(String quality, {bool preferM4a = false}) =>
+      preferM4a ? '${quality.toLowerCase()}:m4a' : quality.toLowerCase();
+
   /// Retrieves cached entry if present and not expired. Moves entry to MRU position.
   YtmUrlCacheEntry? get(String videoId, {String quality = 'high'}) {
     final key = _buildKey(videoId, quality);
@@ -534,7 +544,15 @@ class YtmUrlCache {
 
   @disposeMethod
   void dispose() {
+    final hadPendingWrite = _persistTimer != null;
     _persistTimer?.cancel();
     _persistTimer = null;
+    final file = _diskFile;
+    // A debounced write is the only record of URLs resolved in the last three
+    // seconds; cancelling it on shutdown meant the next launch re-resolved
+    // tracks this launch had already paid for.
+    if (hadPendingWrite && file != null) {
+      unawaited(_persistNow(file));
+    }
   }
 }

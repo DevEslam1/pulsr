@@ -83,6 +83,12 @@ class _DlnaScreenState extends State<DlnaScreen> {
 
   Future<void> _retry() async {
     setState(() => _seekPreviewMs = null);
+    // A stale poll is retried by restarting the loop; anything else goes
+    // through the normal reconnect/re-cast path.
+    if (_service.isPollStale) {
+      await _service.retryPolling();
+      return;
+    }
     await _service.retry();
   }
 
@@ -334,6 +340,7 @@ class _DlnaScreenState extends State<DlnaScreen> {
         _NowPlayingCard(
           title: title,
           state: state,
+          stale: _service.isPollStale,
           position: _service.position,
           duration: _service.duration,
           previewMs: _seekPreviewMs,
@@ -513,6 +520,7 @@ class _NowPlayingCard extends StatelessWidget {
   const _NowPlayingCard({
     required this.title,
     required this.state,
+    required this.stale,
     required this.position,
     required this.duration,
     required this.previewMs,
@@ -525,6 +533,9 @@ class _NowPlayingCard extends StatelessWidget {
 
   final String title;
   final DlnaState state;
+
+  /// The poll is lost: show that instead of freezing the last transport label.
+  final bool stale;
   final Duration position;
   final Duration duration;
   final double? previewMs;
@@ -575,7 +586,7 @@ class _NowPlayingCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xxs),
           Text(
-            DlnaStrings.stateLabel(state),
+            stale ? DlnaStrings.stateStale : DlnaStrings.stateLabel(state),
             style: Theme.of(context)
                 .textTheme
                 .bodySmall

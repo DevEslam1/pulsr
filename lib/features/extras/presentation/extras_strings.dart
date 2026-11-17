@@ -10,6 +10,10 @@ abstract final class ExtrasStrings {
       'to retry.';
   static const String unknownDevice = 'Unknown output device';
 
+  /// Inline error shown on a row whose tool failed to initialize.
+  static const String toolUnavailable =
+      'Could not start this tool. Reopen Tools & extras to retry.';
+
   static const String settingsCategoryTitle = 'Tools & extras';
   static const String settingsCategorySubtitle =
       'Announcements, system behaviour, USB DAC ergonomics, network output, '

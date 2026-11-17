@@ -237,10 +237,10 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
         // chain (native -> DoP -> PCM) is testable without a device. Both
         // wrapped transports need a bypassed pipeline: DSP/volume math would
         // corrupt the 0x05/0xFA DoP markers, and would also break raw DSD.
-        final caps = (bitPerfectActive &&
-                (dsdMode == 'dop' || dsdMode == 'native'))
-            ? await DsdDecoderHelper.probeDopCapabilities()
-            : DsdDacCapabilities.none;
+        final caps =
+            (bitPerfectActive && (dsdMode == 'dop' || dsdMode == 'native'))
+                ? await DsdDecoderHelper.probeDopCapabilities()
+                : DsdDacCapabilities.none;
         final rateMultiple = await DsdHeaderProbe.probeMultiple(song.path);
         // Native capability is the *measured* raw-DSD flag only. A USB sink
         // that merely advertises a 768 kHz PCM carrier (dsd512) used to turn
@@ -360,12 +360,16 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   YtmResolvingSource _buildResolvingYoutubeSource({
     required SongsTableData song,
     required MediaItem tag,
-    ({String url, String? userAgent, String? cookies, String quality})?
-        initialResolved,
+    ({
+      String url,
+      String? userAgent,
+      String? cookies,
+      String quality
+    })? initialResolved,
   }) {
     var seedResolved = initialResolved;
     late final YtmResolvingSource source;
-    source = YtmResolvingSource.withRefresh(
+    source = YtmResolvingSource(
       videoId: song.remoteId ?? '',
       userAgent: initialResolved?.userAgent,
       cookies: initialResolved?.cookies,
@@ -402,7 +406,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   /// Call on VPN/network-path change: googlevideo URLs carry an IP-bound
   /// `expire`/`ip` signature and return 403 when the egress IP changes.
   void clearNetworkCaches() {
-    _streamResolutionPipeline.clearNetworkCaches();
+    // Stream URL state (the URL cache and any in-flight resolve) is dropped by
+    // YtmService.handleNetworkChange on the same event; this method owns only
+    // the playback-side caches.
     // DNS answers (and any warm edges) are pinned to the old route.
     PreconnectedSocketPool().clear();
     cancelPrefetches(); // also clears _prefetching
@@ -523,8 +529,8 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   Future<void> _restoreSkipSilence() async {
     try {
       await silenceSkipController.load();
-      final enabled = silenceSkipController.enabled &&
-          !await playbackRateMustRemainUnity();
+      final enabled =
+          silenceSkipController.enabled && !await playbackRateMustRemainUnity();
       if (enabled) {
         await _playerA.setSkipSilenceEnabled(true);
         await _playerB.setSkipSilenceEnabled(true);
@@ -692,8 +698,6 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
   StreamController<String> get _errorSubject;
 
   FormatAwareDecoder get _formatDecoder;
-
-  StreamResolutionPipeline get _streamResolutionPipeline;
 
   AudioPlayer get _inactivePlayer;
 

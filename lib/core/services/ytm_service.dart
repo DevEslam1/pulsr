@@ -30,6 +30,7 @@ export '../errors/ytm_error_classifier.dart' show YtmException;
 import 'ytm_circuit_breaker.dart';
 import 'ytm_media_helpers.dart';
 part 'ytm_service_internals.dart';
+part 'ytm_service_alternates.dart';
 
 @lazySingleton
 class YtmService {
@@ -561,6 +562,16 @@ class YtmService {
     }
   }
 
+  /// Drops any in-flight resolve for [videoId].
+  ///
+  /// Deliberately does **not** touch [YtmUrlCache]: each quality has its own
+  /// slot, the resolver evicts a burned URL itself, and evicting here turned
+  /// every adaptive-quality step into a fresh network resolve of a URL that was
+  /// still perfectly good.
+  void forgetInFlightResolve(String videoId) {
+    _inFlightStreamResolves.removeWhere((k, _) => k.startsWith('$videoId:'));
+  }
+
   /// Returns true if native stack is running in limited mode (no poToken).
   Future<bool> getLimitedMode() async {
     try {
@@ -581,6 +592,9 @@ class YtmService {
   /// the next resolve re-resolves the edge for the new route.
   Future<void> handleNetworkChange() async {
     debugClearBotCooldown();
+    // Futures already running cannot be cancelled, but no new caller should
+    // attach to a resolve bound to the old egress.
+    _inFlightStreamResolves.clear();
     YtmRateLimiter.shared.resetAfterNetworkChange();
     try {
       if (getIt.isRegistered<YtmUrlCache>()) {
@@ -987,96 +1001,6 @@ class YtmService {
 
   /// Resolves an alternative playable stream for a track when the primary
   /// [originalVideoId] is age-restricted, region-blocked, or unplayable.
-  Future<YtmStream?> resolveAlternateStream(
-    String title,
-    String? artist, {
-    String? originalVideoId,
-    String quality = 'high',
-    bool preferM4a = false,
-  }) async {
-    final cleanTitle = title
-        .replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    if (cleanTitle.isEmpty) return null;
-
-    final cleanArtist = (artist ?? '')
-        .replaceAll(RegExp(r'- Topic$', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-
-    // 1. Check if we already found and cached a working alternate ID for this video
-    if (originalVideoId != null && originalVideoId.isNotEmpty) {
-      final cachedAltId = _alternateVideoIds[originalVideoId];
-      if (cachedAltId != null && cachedAltId != originalVideoId) {
-        try {
-          final stream = await resolveStream(
-            cachedAltId,
-            quality: quality,
-            preferM4a: preferM4a,
-          );
-          if (stream.url.trim().isNotEmpty) {
-            return stream;
-          }
-        } catch (_) {
-          _alternateVideoIds.remove(originalVideoId);
-        }
-      }
-    }
-
-    // 2. Build search queries
-    final queryList = <String>[
-      if (cleanArtist.isNotEmpty) '$cleanArtist $cleanTitle' else cleanTitle,
-      if (cleanArtist.isNotEmpty)
-        '$cleanArtist $cleanTitle audio'
-      else
-        '$cleanTitle audio',
-      if (cleanArtist.isNotEmpty) '$cleanArtist $title' else title,
-    ];
-
-    final testedIds = <String>{
-      if (originalVideoId != null && originalVideoId.isNotEmpty)
-        originalVideoId,
-    };
-
-    for (final q in queryList) {
-      try {
-        final tracks = await searchWithFallback(q, limit: 6);
-        for (final cand in tracks) {
-          final candId = cand.videoId;
-          if (candId.isEmpty || testedIds.contains(candId)) continue;
-          testedIds.add(candId);
-
-          try {
-            final stream = await resolveStream(
-              candId,
-              quality: quality,
-              preferM4a: preferM4a,
-            );
-            if (stream.url.trim().isNotEmpty) {
-              if (originalVideoId != null && originalVideoId.isNotEmpty) {
-                _capMap(_alternateVideoIds, originalVideoId, candId);
-                final urlCache = getIt.isRegistered<YtmUrlCache>()
-                    ? getIt<YtmUrlCache>()
-                    : null;
-                final cacheQuality = preferM4a ? '$quality:m4a' : quality;
-                urlCache?.putStream(stream, quality: cacheQuality);
-              }
-              debugPrint(
-                  '[YTM_SERVICE] Alternate track resolved: "$originalVideoId" -> "$candId" (${cand.title})');
-              return stream;
-            }
-          } catch (_) {
-            continue;
-          }
-        }
-      } catch (e) {
-        debugPrint('[YTM_SERVICE] Alternate track search failed for "$q": $e');
-      }
-    }
-    return null;
-  }
-
   /// Resolves audio: account stream, then the native multi-client extractor.
   /// Coalesces identical non-force resolves; a hedged caller can disable
   /// [coalesce] so its second attempt is genuinely independent, and
@@ -1087,14 +1011,16 @@ class YtmService {
       bool coalesce = true,
       bool preferM4a = false,
       String? title,
-      String? artist}) {
+      String? artist,
+      Duration? duration}) {
     if (forceRefresh) {
       return _resolveStreamInner(videoId,
           quality: quality,
           forceRefresh: true,
           preferM4a: preferM4a,
           title: title,
-          artist: artist);
+          artist: artist,
+          duration: duration);
     }
     if (!coalesce) {
       return _resolveStreamInner(videoId,
@@ -1102,28 +1028,18 @@ class YtmService {
           forceRefresh: false,
           preferM4a: preferM4a,
           title: title,
-          artist: artist);
+          artist: artist,
+          duration: duration);
     }
-    final key = '$videoId:${quality.toLowerCase()}${preferM4a ? ":m4a" : ""}';
+    final key =
+        '$videoId:${YtmUrlCache.qualitySlot(quality, preferM4a: preferM4a)}';
     final existing = _inFlightStreamResolves[key];
     if (existing != null) {
-      if (title != null && title.trim().isNotEmpty) {
-        return existing
-            .timeout(_defaultResolveTimeout + const Duration(seconds: 5))
-            .catchError((Object e) async {
-          if (YtmMediaHelpers.isPlayabilityOrRestrictedError(e)) {
-            final alt = await resolveAlternateStream(
-              title,
-              artist,
-              originalVideoId: videoId,
-              quality: quality,
-              preferM4a: preferM4a,
-            );
-            if (alt != null) return alt;
-          }
-          throw e;
-        });
-      }
+      // Join the in-flight resolve; do not wrap it in a substitute search per
+      // caller. The registered future already runs that search on its way out
+      // (`_resolveStreamInner`), so a per-caller catchError fired the whole
+      // three-query search once per waiter — twice for a prefetch + playback
+      // pair — adding exactly the request volume a challenged route punishes.
       return existing
           .timeout(_defaultResolveTimeout + const Duration(seconds: 5));
     }
@@ -1132,7 +1048,8 @@ class YtmService {
         forceRefresh: false,
         preferM4a: preferM4a,
         title: title,
-        artist: artist);
+        artist: artist,
+        duration: duration);
     _inFlightStreamResolves[key] = fut;
     return fut.whenComplete(() {
       if (identical(_inFlightStreamResolves[key], fut)) {
@@ -1175,7 +1092,8 @@ class YtmService {
       bool forceRefresh = false,
       bool preferM4a = false,
       String? title,
-      String? artist}) async {
+      String? artist,
+      Duration? duration}) async {
     if (!forceRefresh && _alternateVideoIds.containsKey(videoId)) {
       final altId = _alternateVideoIds[videoId];
       if (altId != null && altId != videoId) {
@@ -1187,6 +1105,7 @@ class YtmService {
             preferM4a: preferM4a,
             title: title,
             artist: artist,
+            duration: duration,
           );
         } catch (_) {
           _alternateVideoIds.remove(videoId);
@@ -1197,7 +1116,7 @@ class YtmService {
     // Check Task 2 in-memory URL cache first
     final urlCache =
         getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
-    final cacheQuality = preferM4a ? '$quality:m4a' : quality;
+    final cacheQuality = YtmUrlCache.qualitySlot(quality, preferM4a: preferM4a);
     if (forceRefresh) {
       urlCache?.invalidate(videoId, quality: cacheQuality);
     } else {
@@ -1631,6 +1550,7 @@ class YtmService {
         originalVideoId: videoId,
         quality: quality,
         preferM4a: preferM4a,
+        expectedDuration: duration,
       );
       if (altStream != null) {
         return altStream;

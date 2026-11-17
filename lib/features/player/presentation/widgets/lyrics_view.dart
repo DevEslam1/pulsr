@@ -41,6 +41,12 @@ class LyricsView extends StatefulWidget {
   final ValueChanged<Duration>? onLineTapped;
   final bool transparentBackground;
 
+  /// Test-only counter of lyric-list scans performed to decide whether lyrics
+  /// are time-stamped. Equal-content lyric lists must hit the cache and leave
+  /// this unchanged.
+  @visibleForTesting
+  static int debugSyncedScans = 0;
+
   const LyricsView({
     super.key,
     this.currentPosition,
@@ -84,19 +90,26 @@ class _LyricsViewState extends State<LyricsView> {
           ? _translatedLyrics!
           : widget.lyrics;
 
-  // Cached synced check
+  // Cached synced check. Freezed player states hand this widget an equal but
+  // distinct `lyrics` list on every emission, so an identity (`identical`)
+  // cache never hit and the whole list was re-scanned on each build; keying on
+  // content makes the cache hit, and storing a snapshot copy means an in-place
+  // mutation of `widget.lyrics` cannot return a stale verdict either.
   List<LyricsLine>? _syncedCheckSource;
   bool _syncedCache = false;
 
   bool get _isSynced {
-    if (!identical(_syncedCheckSource, widget.lyrics)) {
-      _syncedCheckSource = widget.lyrics;
+    final lyrics = widget.lyrics;
+    final cachedSource = _syncedCheckSource;
+    if (cachedSource == null || !listEquals(cachedSource, lyrics)) {
+      _syncedCheckSource = List<LyricsLine>.unmodifiable(lyrics);
       // Synced when any line carries a positive timestamp, OR any line has
       // word-level (enhanced LRC) timing — the latter rescues a synced set
       // whose only/first line sits exactly at 0:00 (which a bare
       // `timestamp > 0` check would misclassify as plain text).
-      _syncedCache = widget.lyrics.any(
+      _syncedCache = lyrics.any(
           (line) => line.timestamp > Duration.zero || line.words.isNotEmpty);
+      LyricsView.debugSyncedScans++;
     }
     return _syncedCache;
   }

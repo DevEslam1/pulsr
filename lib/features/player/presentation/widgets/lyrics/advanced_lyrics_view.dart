@@ -31,6 +31,12 @@ class AdvancedLyricsView extends StatefulWidget {
   final bool showTranslation;
   final bool replaceOriginalWithTranslation;
 
+  /// Test-only probe reporting the per-index [GlobalKey] cache whenever it is
+  /// pruned or grown. Used by the regression test that the cache tracks the
+  /// current lyric set instead of the largest one ever rendered.
+  @visibleForTesting
+  static void Function(Map<int, GlobalKey> lineKeys)? debugOnLineKeysChanged;
+
   const AdvancedLyricsView({
     super.key,
     required this.lyrics,
@@ -53,8 +59,30 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
   bool _userIsScrolling = false;
   DateTime _lastUserScrollTime = DateTime.fromMillisecondsSinceEpoch(0);
 
-  GlobalKey _keyForIndex(int index) =>
-      _lineKeys.putIfAbsent(index, () => GlobalKey());
+  GlobalKey _keyForIndex(int index) {
+    final existing = _lineKeys[index];
+    if (existing != null) return existing;
+    final key = GlobalKey();
+    _lineKeys[index] = key;
+    _reportLineKeys();
+    return key;
+  }
+
+  /// Drops cached keys for indices that no longer exist so the map tracks the
+  /// current lyric set instead of growing to the largest set ever rendered.
+  /// Surviving indices keep their key, preserving `ensureVisible` targeting.
+  void _pruneLineKeys(int lineCount) {
+    if (_lineKeys.length > lineCount) {
+      _lineKeys.removeWhere((index, _) => index >= lineCount);
+    }
+    _reportLineKeys();
+  }
+
+  void _reportLineKeys() {
+    final probe = AdvancedLyricsView.debugOnLineKeysChanged;
+    if (probe == null) return;
+    probe(Map<int, GlobalKey>.unmodifiable(_lineKeys));
+  }
 
   @override
   void initState() {
@@ -72,6 +100,9 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
   @override
   void didUpdateWidget(covariant AdvancedLyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.lyrics.length != widget.lyrics.length) {
+      _pruneLineKeys(widget.lyrics.length);
+    }
     final activeIdx = _findActiveIndex(widget.currentPosition);
     if (activeIdx != _lastActiveIndex) {
       _lastActiveIndex = activeIdx;

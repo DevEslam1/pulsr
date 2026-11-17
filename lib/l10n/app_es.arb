@@ -3840,6 +3840,7 @@
   "settingsAaudioDirect": "Salida directa AAudio (bit-perfect)",
   "settingsAaudioDirectDesc": "Omite el mezclador del sistema con un flujo AAudio nativo abierto a la frecuencia de cada pista (intento EXCLUSIVE, reserva SHARED). La cadena DSP y los controles de velocidad/tono se desactivan en este modo; se aplica a reproductores recién creados",
   "dspAboutBassBoost": "Acerca del refuerzo de graves",
+  "dspMasterNoSnapshotNotice": "Los efectos están desactivados. Activa individualmente las etapas que quieras; nada se restaura automáticamente.",
   "dspAboutBitPerfect": "Acerca de Bit-Perfect",
   "dspAboutCrossfeed": "Acerca del crossfeed",
   "dspAboutDspEngine": "Acerca del motor DSP",
@@ -4220,6 +4221,7 @@
   "errYtmBusy": "YouTube está ocupado. Enfriando.",
   "errYtmTrouble": "YouTube tiene problemas. Reintentando.",
   "errYtmExtractFail": "Falló la extracción. Cambiando de ruta.",
+  "errYtmSabr": "YouTube solo ofrece esta pista en un formato que Pulsr todavía no puede reproducir.",
   "errYtmVerify": "YouTube necesita verificación. Probando ruta alternativa.",
   "errSignInFailed": "Error al iniciar sesión. Inténtalo de nuevo.",
   "errSignUpFailed": "Error al registrarse. Inténtalo de nuevo.",
@@ -5945,5 +5947,6 @@
   "alwaysOnRadio": "Siempre en la radio",
   "alwaysOnRadioDesc": "Activar automáticamente con la radio; desactivar para pistas locales y en línea",
   "styleDefaultNotice": "Predeterminado: Tayweed • Se guarda tu elección como predeterminada",
-  "ambientVolumePercent": "Volumen: {percent}%"
+  "ambientVolumePercent": "Volumen: {percent}%",
+  "badgeExclusive": "EXCLUSIVO"
 }

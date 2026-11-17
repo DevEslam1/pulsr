@@ -10649,6 +10649,12 @@ abstract class AppLocalizations {
   /// **'About Bass Boost'**
   String get dspAboutBassBoost;
 
+  /// No description provided for @dspMasterNoSnapshotNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Effects are now off. Enable the stages you want individually; nothing is restored automatically.'**
+  String get dspMasterNoSnapshotNotice;
+
   /// No description provided for @dspAboutBitPerfect.
   ///
   /// In en, this message translates to:
@@ -12928,6 +12934,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stream extraction failed. Switching route.'**
   String get errYtmExtractFail;
+
+  /// No description provided for @errYtmSabr.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube only offers this track in a format Pulsr cannot stream yet.'**
+  String get errYtmSabr;
 
   /// No description provided for @errYtmVerify.
   ///
@@ -18595,6 +18607,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Volume: {percent}%'**
   String ambientVolumePercent(int percent);
+
+  /// Compact badge shown on the direct USB output row when the exclusive streaming path is active
+  ///
+  /// In en, this message translates to:
+  /// **'EXCLUSIVE'**
+  String get badgeExclusive;
 }
 
 class _AppLocalizationsDelegate

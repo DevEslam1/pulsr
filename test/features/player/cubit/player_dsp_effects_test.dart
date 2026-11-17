@@ -588,14 +588,17 @@ void main() {
       expect(state.virtualizerStrength, 0.75);
     });
 
-    test('enable with no snapshot applies conservative defaults', () async {
+    test('enable with no snapshot invents no stage settings', () async {
       state = PlayerState(
         dsp: const DspSlice().copyWith(isVirtualizerSupported: true),
       );
+      handler.calls.clear();
       await controller.setDspEffectsEnabled(true);
-      expect(state.isVirtualizerEnabled, isTrue);
-      expect(state.isLimiterEnabled, isTrue);
-      expect(handler.calls, contains('setVirtualizerStrength'));
+      expect(state.isVirtualizerEnabled, isFalse);
+      expect(state.isLimiterEnabled, isFalse);
+      expect(state.isDspEffectsActive, isFalse);
+      expect(handler.calls.where((c) => c == 'setVirtualizerStrength'), isEmpty,
+          reason: 'enabling must not push invented stage defaults');
     });
 
     test('enable is refused under bit-perfect bypass', () async {

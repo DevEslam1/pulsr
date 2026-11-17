@@ -257,6 +257,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var dspPreference: String = "native" // "native", "oem", "auto"
     @Volatile private var isBitPerfectBypassActive = false
     private var bitPerfectSpatializerOwned = false
+    /** Set when the platform Spatializer stayed on (or threw) while a bypass
+     * asked it to switch off: the chain is then unverified, never clean. */
+    @Volatile private var bitPerfectSpatializerBlocked = false
     private var systemEffectsPolicy = "auto"
 
     /** Last external (vendor/OEM) effect verdict, recorded so diagnostics and
@@ -273,6 +276,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         fun update(effect: AudioEffect?, enabled: Boolean) {
             if (effect == null) return
             try {
+                // Only a stage this app actually controls can be verified. An
+                // enabled effect we do not control still colours the stream, so
+                // it makes the bypass unverified instead of clean.
+                if (!effect.hasControl()) {
+                    // No control is no evidence, whether the cached flag reads
+                    // on or off: the stage can keep processing either way.
+                    complete = false
+                    return
+                }
                 effect.enabled = enabled
                 if (effect.enabled != enabled) complete = false
             } catch (_: Throwable) { complete = false }
@@ -291,9 +303,26 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
      * flags rather than the bypass snapshot. Shared by the normal disable path
      * and by a refused enable, which must leave the chain exactly as it was. */
     private fun restoreAppOwnedStagesAfterBypass() {
-        try { virtualizer?.enabled = isVirtualizerEnabled } catch (_: Exception) {}
-        try { loudnessEnhancer?.enabled = volumeBoostMilliBels > 0 } catch (_: Exception) {}
-        try { bassBoost?.enabled = bassBoostStrength > 0 } catch (_: Exception) {}
+        // A bypass that outlived a session change released these objects; a
+        // null-safe write cannot bring a user's stage back. Rebuild what the
+        // live flags say should exist, then apply the flags as before.
+        if (virtualizer == null && (isVirtualizerEnabled || virtualizerStrength > 0)) {
+            setVirtualizerState(isVirtualizerEnabled)
+            setVirtualizerStrengthValue(virtualizerStrength.toInt())
+        } else {
+            try { virtualizer?.enabled = isVirtualizerEnabled } catch (_: Exception) {}
+        }
+        if (loudnessEnhancer == null && volumeBoostMilliBels > 0) {
+            setVolumeBoost(volumeBoostMilliBels)
+        } else {
+            try { loudnessEnhancer?.enabled = volumeBoostMilliBels > 0 } catch (_: Exception) {}
+        }
+        if (bassBoost == null && bassBoostStrength > 0) {
+            setBassBoostStrengthValue(bassBoostStrength.toInt())
+        } else {
+            try { bassBoost?.enabled = bassBoostStrength > 0 } catch (_: Exception) {}
+        }
+        if (dynamicsProcessing == null) buildDynamicsProcessing()
         // Same suppression-aware DP enable rule as everywhere else.
         updateDpEnabled()
         updateLegacyEqualizer()
@@ -305,23 +334,40 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
      * state is recorded, never used to reject a bypass the app itself applied.
      * Blocking on them made Bit-Perfect impossible on OEM devices (and under the
      * "leave on" system-effects policy) even though the app-owned DSP had
-     * already been bypassed. */
+     * already been bypassed. A Spatializer switch that throws or stays on is
+     * recorded in [bitPerfectSpatializerBlocked] so the chain reads unverified.
+     */
     private fun applyExternalSystemEffects(bypass: Boolean): SystemAudioEffectsController.Status? {
+        // Leaving bypass always clears the failure record: the user's system
+        // effect is allowed to be on again.
+        if (!bypass) bitPerfectSpatializerBlocked = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
             try {
                 val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 val spatializer = am?.spatializer
                 if (spatializer != null && spatializer.isAvailable) {
                     if (bypass && spatializer.isEnabled && systemEffectsPolicy != "leaveOn") {
-                        spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
-                            .invoke(spatializer, false)
-                        bitPerfectSpatializerOwned = !spatializer.isEnabled
+                        try {
+                            spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
+                                .invoke(spatializer, false)
+                            bitPerfectSpatializerOwned = !spatializer.isEnabled
+                            bitPerfectSpatializerBlocked = spatializer.isEnabled
+                        } catch (_: Throwable) {
+                            // Disable attempt threw: the effect keeps colouring
+                            // the output, so record the failure explicitly.
+                            bitPerfectSpatializerBlocked = true
+                        }
+                    } else if (bypass && spatializer.isEnabled) {
+                        // The "leave on" policy (or any path that skipped the
+                        // disable) leaves a live spatializer colouring output.
+                        bitPerfectSpatializerBlocked = true
                     } else if (!bypass && bitPerfectSpatializerOwned) {
                         if (!spatializer.isEnabled) {
                             spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
                                 .invoke(spatializer, true)
                         }
                         if (spatializer.isEnabled) bitPerfectSpatializerOwned = false
+                        bitPerfectSpatializerBlocked = false
                     }
                 }
             } catch (_: Throwable) {}
@@ -331,9 +377,43 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun recordSystemEffects(status: SystemAudioEffectsController.Status?, bypass: Boolean) {
         lastSystemEffectsStatus = status?.value ?: "unknown"
-        bitPerfectSystemEffectsActive = bypass && status != null && status !in listOf(
-            SystemAudioEffectsController.Status.BYPASSED,
-            SystemAudioEffectsController.Status.UNSUPPORTED_DEVICE)
+        // Only an explicit BYPASSED verdict is clean. UNSUPPORTED_DEVICE means
+        // the controller could not even reach the effect chain, so the chain is
+        // unverified and must be scored compromised, not clean.
+        // Unknown is not clean: a missing controller cannot prove the vendor
+        // chain is bypassed, so it scores compromised like UNSUPPORTED_DEVICE.
+        bitPerfectSystemEffectsActive = bypass &&
+            status != SystemAudioEffectsController.Status.BYPASSED
+    }
+
+    /** Number of app-owned HAL effects actually enabled right now, read from
+     * the live effect objects rather than from the user's preference flags. */
+    private fun countEnabledAppOwnedHalStages(): Int {
+        val count = listOfNotNull(
+            legacyEqualizer, virtualizer, loudnessEnhancer, bassBoost, dynamicsProcessing
+        ).count { effect ->
+            try { effect.enabled } catch (_: Throwable) { false }
+        }
+        // Mirrored for HiResDacPlugin's output-info map: that is the only
+        // channel Dart's AudioOutputInfo reads, so without this the verdict's
+        // halClean term can never see an enabled effect.
+        liveHalStagesActive = count
+        return count
+    }
+
+    /** Native engine's own verdict for the last processed block. Guarded by the
+     * load flag so a missing library can never lift a report to bit-perfect. */
+    private fun nativeLastBlockWasBitPerfect(): Boolean {
+        if (!isNativeDspLoaded) return false
+        return try { nativeWasLastBlockBitPerfect() } catch (_: Throwable) { false }
+    }
+
+    /** Native engine report that hearing-safety was bypassed to keep the block
+     * sample-identical. Guarded by the load flag so a missing library cannot
+     * claim it. */
+    private fun nativeSafetySuppressed(): Boolean {
+        if (!isNativeDspLoaded) return false
+        return try { nativeWasSafetySuppressed() } catch (_: Throwable) { false }
     }
 
     // Dither / bit-perfect snapshot state (mirrors DspParams.h defaults).
@@ -588,6 +668,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetDitherBluetooth(isBluetooth: Boolean)
     private external fun nativeSetDitherBluetoothAllowed(allowed: Boolean)
     private external fun nativeSetBitPerfectParams(enabled: Boolean, isDop: Boolean)
+    /** True when the native engine's last processed block was bit-perfect. */
+    private external fun nativeWasLastBlockBitPerfect(): Boolean
+    /** True when the native engine bypassed hearing-safety to keep a block
+     * bit-perfect, never that safety was off. */
+    private external fun nativeWasSafetySuppressed(): Boolean
     private external fun nativeSetDirectUsbVolume(gainLinear: Double)
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int, resetState: Boolean, streamId: Long): FloatArray?
     private external fun nativeResetDsdDecoder()
@@ -966,18 +1051,32 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         val sessionAttached = currentAudioSessionId != 0
-        val halColoring = computeHalColoring(
-            sessionAttached = sessionAttached,
-            virtualizerEnabled = isVirtualizerEnabled,
-            bassBoostStrength = bassBoostStrength.toInt(),
-            volumeBoostMilliBels = volumeBoostMilliBels,
-            eqEnabled = isEqEnabled,
-            eqOwner = currentEqOwner,
-            dynamicsEnabled = isDynamicsEnabled,
-            dynamicsPresetNativeActive = isDynamicsPresetNativeActive,
-            dynamicsPreset = currentDynamicsPreset,
-            spatializerFallbackActive = isSpatializerFallbackActive,
-        )
+        // During a bypass the preference flags still read "on" while the live
+        // objects are muted, so the flags are not evidence about the output.
+        // Count what is actually enabled (and keep a blocked system layer),
+        // otherwise every user with a saved HAL stage reads unverified forever.
+        val halColoring = if (isBitPerfectBypassActive) {
+            countEnabledAppOwnedHalStages() > 0 ||
+                isSpatializerFallbackActive ||
+                bitPerfectSpatializerBlocked
+        } else {
+            computeHalColoring(
+                sessionAttached = sessionAttached,
+                virtualizerEnabled = isVirtualizerEnabled,
+                bassBoostStrength = bassBoostStrength.toInt(),
+                volumeBoostMilliBels = volumeBoostMilliBels,
+                eqEnabled = isEqEnabled,
+                eqOwner = currentEqOwner,
+                dynamicsEnabled = isDynamicsEnabled,
+                dynamicsPresetNativeActive = isDynamicsPresetNativeActive,
+                dynamicsPreset = currentDynamicsPreset,
+                spatializerFallbackActive = isSpatializerFallbackActive || bitPerfectSpatializerBlocked,
+            )
+        }
+        // Observed, not requested: the flag only says the app ASKED for the
+        // bypass, while the native engine reports whether the last block really
+        // went through untouched. Both are required, plus a loaded engine.
+        val observedBitPerfect = isBitPerfectBypassActive && nativeLastBlockWasBitPerfect()
         val isBitExact = computeChainBitExact(
             isBitPerfectBypassActive = isBitPerfectBypassActive,
             activeDspStages = activeDspStages,
@@ -987,6 +1086,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             isBypassCompareActive = isBypassCompareActive,
             halColoring = halColoring,
             bitPerfectSystemEffectsActive = bitPerfectSystemEffectsActive,
+            nativeObservedBitPerfect = observedBitPerfect,
         )
 
         return mapOf(
@@ -995,8 +1095,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "bufferSize" to (if (latencyFrames > 0) latencyFrames else 0),
             "activeStagesBitmask" to activeDspStages,
             "activeStages" to activeStagesList,
-            "halStagesActive" to halColoring,
-            "isBitPerfectActive" to isBitPerfectBypassActive,
+            "halStagesActive" to countEnabledAppOwnedHalStages(),
+            "isBitPerfectRequested" to isBitPerfectBypassActive,
+            "isBitPerfectActive" to observedBitPerfect,
+            "safetySuppressed" to nativeSafetySuppressed(),
+            "spatializerBlocked" to bitPerfectSpatializerBlocked,
             "isBypassCompareActive" to isBypassCompareActive,
             "isDitherEnabled" to isDitherEnabled,
             "ditherBitDepth" to ditherTargetBitDepth,
@@ -1054,6 +1157,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     fun recalculateActiveStages() {
         synchronized(stateLock) {
             cachedDebugReport = null
+            // Mirror the live count before any early return: HiResDacPlugin's
+            // output-info map is the only channel the Dart verdict reads, and
+            // a stale 0 would make halClean fail open.
+            liveHalStagesActive = countEnabledAppOwnedHalStages()
             // Bit-perfect bypass: force zero stages regardless of toggles
             if (isBitPerfectBypassActive) {
                 currentEqOwner = EqOwner.NONE
@@ -1135,6 +1242,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 }
 
     companion object {
+        /** Live count of enabled app-owned HAL stages, mirrored for
+         * HiResDacPlugin so the Dart verdict can observe it. */
+        @Volatile internal var liveHalStagesActive: Int = 0
+            private set
+
         // Must match kCustodyHeaderBytes in eq_jni_bridge.cpp.
         const val CUSTODY_HEADER_BYTES = 40
         // Must match CustodyVerifier::kMaxFrames.
@@ -1250,10 +1362,19 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             isBypassCompareActive: Boolean,
             halColoring: Boolean,
             bitPerfectSystemEffectsActive: Boolean,
-        ): Boolean = !halColoring && !bitPerfectSystemEffectsActive && (
-            isBitPerfectBypassActive ||
-                (activeDspStages == 0 && !isDitherEnabled && !isReplayGainEnabled && !dvcActive && !isBypassCompareActive)
-        )
+            nativeObservedBitPerfect: Boolean = true,
+        ): Boolean {
+            if (halColoring || bitPerfectSystemEffectsActive) return false
+            if (isBitPerfectBypassActive) {
+                // The stage mask is zeroed during a bypass, so the count can
+                // never certify the bypass: only the engine's own observation
+                // can. Keeping the two cases separate stops the stage branch
+                // from returning true while isBitPerfectActive is false.
+                return nativeObservedBitPerfect
+            }
+            return activeDspStages == 0 && !isDitherEnabled &&
+                !isReplayGainEnabled && !dvcActive && !isBypassCompareActive
+        }
 
         internal fun clampCacheBudgetBytes(bytes: Long): Long =
             bytes.coerceIn(1L * 1024 * 1024, 256L * 1024 * 1024)
@@ -1915,6 +2036,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         releaseNativeDsp()
         isBitPerfectBypassActive = false
         isDopActive = false
+        // A torn-down plugin must not leave a stale `true` request in the
+        // Java sink layer: the AAudio sink would keep refusing volume.
+        publishBitPerfectRequestToSinkLayer()
         dvcActive = false
         isBypassCompareActive = false
         bitPerfectSpatializerOwned = false
@@ -2484,6 +2608,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
      * after rolling back to the prior state.
      */
     private fun applyBitPerfectBypass(bypass: Boolean, isDop: Boolean): String? {
+        // Without the native engine the PCM path cannot be guaranteed, so an
+        // ENABLE request is rejected instead of flipping a flag we cannot
+        // honour. The previous bypass value is deliberately left untouched.
+        if (bypass && !isNativeDspLoaded) {
+            // Nothing changed, so this republishes the unchanged truth: a
+            // refused enable must not leave a stale request in the sink layer.
+            publishBitPerfectRequestToSinkLayer()
+            return "dsp_unavailable"
+        }
         val targetDop = bypass && isDop
         // Snapshot the truthful state first: a refused request must not
         // leave the plugin (or the native chain) on the value the Dart
@@ -2551,6 +2684,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 failure = "Bit-perfect HAL effect cleanup incomplete"
             }
         }
+        // Refresh after reconcile: the count taken by
+        // recalculateActiveStages() precedes the HAL disable above, so without
+        // this the mirrored value can lag one stage and read unverified.
+        liveHalStagesActive = countEnabledAppOwnedHalStages()
+        // Mirror the flag the plugin actually holds now: a rolled-back request
+        // publishes the restored value, never the refused one, and a no-op
+        // request re-asserts the same truth.
+        publishBitPerfectRequestToSinkLayer()
         // Vendor/OEM effects and the platform Spatializer are recorded,
         // never a veto: they belong to the system policy and the output
         // route, and rejecting the request made Bit-Perfect unreachable
@@ -2559,6 +2700,18 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val externalTarget = if (failure == null) bypass else previousBypass
         recordSystemEffects(applyExternalSystemEffects(externalTarget), externalTarget)
         return failure
+    }
+
+    /**
+     * Publishes the bypass request to the Java sink layer so the output sink can
+     * honour the same decision the plugin just took: the integer bit-perfect
+     * path, and DoP packing only while the bypass is the DoP one. Reads the live
+     * flags, so it must run after the state is final.
+     */
+    private fun publishBitPerfectRequestToSinkLayer() {
+        val requested = isBitPerfectBypassActive
+        com.ryanheise.just_audio.PulsrOutputRouting.setBitPerfectRequested(requested)
+        com.ryanheise.just_audio.PulsrOutputRouting.setDopRequested(requested && isDopActive)
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -2650,6 +2803,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         if (changed) {
                             recreateEffects()
                             if (isBitPerfectBypassActive) {
+                                // Fresh session, fresh effect instances: re-assert
+                                // that nothing app-owned stayed enabled on a
+                                // stream we are calling bit-perfect.
+                                reconcileAppOwnedHal(true)
                                 recalculateActiveStages()
                                 if (isNativeDspLoaded) {
                                     safeCall(TAG, "restoreBitPerfectSessionAttach") {
@@ -4534,9 +4691,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val isDop = enabled && (call.argument<Boolean>("isDop") ?: false)
                     val reason = applyBitPerfectBypass(enabled, isDop)
                     if (reason != null) {
-                        Log.w(TAG, "setBitPerfectParams bypass reconciliation warning: $reason")
+                        // Report the rollback instead of a success the plugin
+                        // could not apply: Dart must not claim a bypass here.
+                        Log.w(TAG, "setBitPerfectParams rejected: $reason")
+                        result.error("DSP_BITPERFECT_REJECTED", reason, null)
+                    } else {
+                        result.success(true)
                     }
-                    result.success(true)
                 }
 
                 "releaseEffects" -> {
@@ -5033,6 +5194,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             try { nativeGetPublishedGeneration() } catch (_: Exception) { 0 }
         } else 0
 
+        // Requested vs observed: only the native engine can confirm that the
+        // last block really ran untouched, the flag alone is a request.
+        val observedBitPerfectActive = isBitPerfectBypassActive && nativeLastBlockWasBitPerfect()
         val report = mapOf(
             "audioSessionId" to currentAudioSessionId,
             // Truthful: only attached when the HAL chain for the
@@ -5040,6 +5204,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "isSessionAttached" to isEffectPipelineAttached(),
             "dspPreference" to dspPreference,
             "isBitPerfectBypassActive" to isBitPerfectBypassActive,
+            "isBitPerfectRequested" to isBitPerfectBypassActive,
+            "isBitPerfectActive" to observedBitPerfectActive,
+            "halStagesActive" to countEnabledAppOwnedHalStages(),
+            "spatializerBlocked" to bitPerfectSpatializerBlocked,
             "systemEffectsStatus" to lastSystemEffectsStatus,
             "systemEffectsCompromised" to bitPerfectSystemEffectsActive,
             "isNativeDspLoaded" to isNativeDspLoaded,
@@ -5823,6 +5991,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // Give the new session a fresh chance at a stereo DynamicsProcessing
         // config instead of inheriting a prior session's mono fallback.
         effectiveChannelCount = CHANNEL_COUNT
+        // A session can be replaced while a bypass is active. The user's flags
+        // are intentionally left untouched, but the stages they describe must
+        // NOT be rebuilt now: that would colour a stream we call bit-perfect.
+        val suppressed = isBitPerfectBypassActive
         // Release old instances BEFORE creating new ones to prevent audio session conflicts
         try { virtualizer?.release() } catch (_: Exception) {}
         try { loudnessEnhancer?.release() } catch (_: Exception) {}
@@ -5837,22 +6009,32 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         legacyEqualizer = null
         refreshEffectsCache()
 
-        if (isVirtualizerEnabled || virtualizerStrength > 0) {
-            setVirtualizerState(isVirtualizerEnabled)
-            setVirtualizerStrengthValue(virtualizerStrength.toInt())
+        if (!suppressed) {
+            if (isVirtualizerEnabled || virtualizerStrength > 0) {
+                setVirtualizerState(isVirtualizerEnabled)
+                setVirtualizerStrengthValue(virtualizerStrength.toInt())
+            }
+
+            if (volumeBoostMilliBels > 0) {
+                setVolumeBoost(volumeBoostMilliBels)
+            }
+
+            if (bassBoostStrength > 0) {
+                setBassBoostStrengthValue(bassBoostStrength.toInt())
+            }
+
+            buildDynamicsProcessing()
+            // Reattach HAL-side effects after session recreate
+            applyHalLimiter()
         }
 
-        if (volumeBoostMilliBels > 0) {
-            setVolumeBoost(volumeBoostMilliBels)
+        if (suppressed) {
+            // New session, same bypass: nothing app-owned may stay enabled.
+            reconcileAppOwnedHal(true)
+            updateDpEnabled()
+            updateLegacyEqualizer()
         }
-
-        if (bassBoostStrength > 0) {
-            setBassBoostStrengthValue(bassBoostStrength.toInt())
-        }
-
-        buildDynamicsProcessing()
-        // Reattach HAL-side effects after session recreate
-        applyHalLimiter()
+        liveHalStagesActive = countEnabledAppOwnedHalStages()
     }
 
     /**
@@ -6053,6 +6235,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     fun hasActiveEffects(): Boolean {
+        // A bypass owns the chain: route changes must not rebuild effects from
+        // the user's flags while it is active.
+        if (isBitPerfectBypassActive) return false
         synchronized(stateLock) {
             val halActive = (isEqEnabled && !isHalEqSuppressed()) ||
                     (isDynamicsEnabled && currentDynamicsPreset != "off" && !isDynamicsPresetNativeActive) ||

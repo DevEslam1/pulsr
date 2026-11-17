@@ -1,5 +1,6 @@
 // lib/features/announcements/tts_engine.dart
 
+import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter/services.dart';
 
 import '../../core/utils/error_logger.dart';
@@ -101,6 +102,13 @@ class MethodChannelTtsEngine implements TtsEngine {
   /// Locale tag applied to the next [speak] call; empty keeps the system one.
   String localeId = '';
 
+  /// Fires whenever [isAvailable] changes.
+  ///
+  /// A method-channel engine learns it can speak only after a successful
+  /// `init` (or loses the ability when a call fails), so the settings screen
+  /// needs a signal to re-list voices instead of showing a stale empty list.
+  final ValueNotifier<bool> availability = ValueNotifier<bool>(false);
+
   @override
   bool get isAvailable => _available;
 
@@ -108,7 +116,7 @@ class MethodChannelTtsEngine implements TtsEngine {
   Future<bool> init() async {
     try {
       final ready = await _channel.invokeMethod<bool>('init') ?? false;
-      _available = ready;
+      _setAvailable(ready);
       return ready;
     } on Exception catch (error, stackTrace) {
       _handleFailure(error, stackTrace, 'init');
@@ -198,8 +206,15 @@ class MethodChannelTtsEngine implements TtsEngine {
     _available = false;
   }
 
+  /// Updates [isAvailable] and notifies listeners on a real change only.
+  void _setAvailable(bool value) {
+    if (_available == value) return;
+    _available = value;
+    availability.value = value;
+  }
+
   void _handleFailure(Object error, StackTrace stackTrace, String action) {
-    _available = false;
+    _setAvailable(false);
     final isMissingPlugin = error is MissingPluginException;
     ErrorLogger.log(
       isMissingPlugin

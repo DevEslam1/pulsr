@@ -292,5 +292,49 @@ void main() {
       expect(find.text(l10n.discard), findsOneWidget);
       expect(find.byType(LyricsEditorSheet), findsOneWidget);
     });
+
+    testWidgets('re-signs the discard snapshot only when a mutator runs',
+        (tester) async {
+      final cubit = stubPlayerCubit();
+      LyricsEditorSheet.debugSnapshotBuilds = 0;
+      addTearDown(() {
+        LyricsEditorSheet.debugSnapshotBuilds = 0;
+        tester.view.reset();
+      });
+
+      Widget host() => lyricsHost(
+            cubit: cubit,
+            sheetBuilder: (_) => LyricsEditorSheet(
+              song: testSong,
+              currentPosition: Duration.zero,
+              initialLyrics: initial,
+              onSave: (_) {},
+            ),
+          );
+
+      await tester.pumpWidget(host());
+      await tester.pump();
+      final mounts = LyricsEditorSheet.debugSnapshotBuilds;
+      expect(mounts, 1,
+          reason: 'mount signs the initial lyric list exactly once');
+
+      // A pure layout rebuild (the sheet reads MediaQuery height) must not
+      // re-serialise every lyric line.
+      tester.view.physicalSize = const Size(2400, 2400);
+      await tester.pump();
+      expect(LyricsEditorSheet.debugSnapshotBuilds, mounts);
+
+      // A real mutation (+250 ms on the first row) re-signs exactly once.
+      tester
+          .widget<IconButton>(
+              find.widgetWithIcon(IconButton, Icons.add_rounded).at(1))
+          .onPressed!();
+      await tester.pump();
+      expect(LyricsEditorSheet.debugSnapshotBuilds, mounts + 1);
+
+      tester.view.physicalSize = const Size(2400, 2100);
+      await tester.pump();
+      expect(LyricsEditorSheet.debugSnapshotBuilds, mounts + 1);
+    });
   });
 }

@@ -262,6 +262,65 @@ void main() {
     });
 
     testWidgets(
+        '3.5: volume-boost warning follows the headroom clamp, not the profile preamp',
+        (tester) async {
+      EqualizerSheet.debugForceAndroidSurface = true;
+      addTearDown(() => EqualizerSheet.debugForceAndroidSurface = null);
+
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = StreamController<PlayerState>.broadcast();
+      addTearDown(controller.close);
+      // 90% requested and 90% applied: GainStagingBudget clamped nothing, so
+      // the old preamp-derived rule ("boost > 60%") must stay quiet.
+      var currentState = PlayerState(
+        dsp: DspSlice(
+          isEqEnabled: true,
+          eqPreset: EqPreset(
+            name: 'Flat',
+            gains: List<double>.filled(10, 0.0),
+          ),
+          volumeBoost: 0.9,
+          effectiveVolumeBoost: 0.9,
+          isVolumeBoostSupported: true,
+        ),
+      );
+      final cubit = stubPlayerCubit(state: currentState);
+      when(() => cubit.state).thenAnswer((_) => currentState);
+      when(() => cubit.stream).thenAnswer((_) => controller.stream);
+
+      await tester.pumpWidget(sheetHost(
+        playerCubit: cubit,
+        settingsCubit: stubSettingsCubit(
+            state: const SettingsState(
+                experienceMode: ExperienceMode.professional)),
+        child: const EqualizerSheet(),
+      ));
+      await tester.pump();
+
+      expect(find.text('Volume Boost'), findsOneWidget);
+      expect(find.text('Limited for headroom'), findsNothing);
+      expect(find.textContaining('Combined with EQ preamp'), findsNothing);
+
+      // Same request, but the budget only granted 40%: the clamp is real now.
+      currentState = currentState.copyWith(
+        dsp: currentState.dsp.copyWith(effectiveVolumeBoost: 0.4),
+      );
+      controller.add(currentState);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.text('Limited for headroom'), findsOneWidget);
+      expect(find.textContaining('Combined with EQ preamp'), findsNothing);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets(
         'hardware device profile bar matches segmented bar height and equal flex distribution',
         (tester) async {
       EqualizerSheet.debugForceAndroidSurface = true;

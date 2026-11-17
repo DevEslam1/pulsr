@@ -32,6 +32,7 @@ public class AAudioAudioSinkTest {
         int closeCount;
         int flushCount;
         byte[] writtenBytes;
+        boolean bitPerfect;
 
         @Override public long openForDevice(int sampleRate, int channelCount, int encoding,
                 boolean preferExclusive, int targetBufferMs, int deviceId) {
@@ -67,6 +68,12 @@ public class AAudioAudioSinkTest {
         @Override public boolean isExclusive(long handle) { return true; }
 
         @Override public void setVolume(long handle, float volume) {}
+
+        @Override public void setBitPerfect(long handle, boolean bitPerfect, boolean dop) {
+            this.bitPerfect = bitPerfect;
+        }
+
+        @Override public boolean isBitPerfectSink(long handle) { return bitPerfect; }
     }
 
     private static AAudioAudioSink newSink(FakeBridge bridge) {

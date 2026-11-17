@@ -67,6 +67,11 @@ abstract final class DlnaStrings {
   /// Title of the error banner.
   static const String errorTitle = 'Could not reach the device';
 
+  /// Banner message after repeated position-poll failures.
+  static const String pollLost =
+      'Lost contact with the renderer. The state shown may be out of date; '
+      'retry to reconnect the poll.';
+
   /// Semantics label for the scan button.
   static const String scanSemantics = 'Scan the network for DLNA renderers';
 
@@ -77,9 +82,12 @@ abstract final class DlnaStrings {
   static String deviceRow(String name, String? model) =>
       model == null || model.isEmpty ? name : '$name, $model';
 
+  /// Transport label while the position poll is lost: the last state is
+  /// displayed but must not read as live.
+  static const String stateStale = 'Connection lost';
+
   /// Short label for the current transport state.
-  static String stateLabel(DlnaState state) {
-    switch (state) {
+  static String stateLabel(DlnaState state) {    switch (state) {
       case DlnaState.idle:
         return 'Ready';
       case DlnaState.discovering:

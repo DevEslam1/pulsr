@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/errors/ytm_error_classifier.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
@@ -344,6 +345,103 @@ void main() {
       expect(cachedStream.videoId, equals('alternate456'));
     });
 
+    test('rejects an alternate whose duration does not match the request',
+        () async {
+      // A ten-hour loop shares the title and artist of the track that was
+      // blocked, so only length distinguishes it. The substitute path used to
+      // accept the first hit that produced a URL and silently play it.
+      _mockChannel((call) async {
+        if (call.method == 'resolveStream') {
+          final vid = call.arguments['videoId'];
+          if (vid == 'restricted999') {
+            throw PlatformException(
+              code: 'SIGN_IN_REQUIRED',
+              message: 'Sign in to confirm your age.',
+            );
+          } else if (vid == 'loopVersion1') {
+            return {
+              'videoId': 'loopVersion1',
+              'url': 'https://example.com/loop.m4a',
+              'mimeType': 'audio/mp4',
+              'container': 'm4a',
+              'bitrateKbps': 128,
+              'durationMs': 3600000,
+            };
+          }
+        } else if (call.method == 'search') {
+          return [
+            {
+              'videoId': 'loopVersion1',
+              'title': 'Explicit Hit Song',
+              'artist': 'Artist Name',
+              'duration': 3600,
+            }
+          ];
+        }
+        return null;
+      });
+
+      final service = YtmService();
+      service.debugClearBotCooldown();
+
+      await expectLater(
+        service.resolveStream(
+          'restricted999',
+          title: 'Explicit Hit Song',
+          artist: 'Artist Name',
+          duration: const Duration(seconds: 180),
+        ),
+        throwsA(isA<YtmException>()),
+      );
+    });
+
+    test('accepts an alternate within the duration tolerance', () async {
+      _mockChannel((call) async {
+        if (call.method == 'resolveStream') {
+          final vid = call.arguments['videoId'];
+          if (vid == 'restricted888') {
+            throw PlatformException(
+              code: 'SIGN_IN_REQUIRED',
+              message: 'Sign in to confirm your age.',
+            );
+          } else if (vid == 'closeVersion1') {
+            return {
+              'videoId': 'closeVersion1',
+              'url': 'https://example.com/close.m4a',
+              'mimeType': 'audio/mp4',
+              'container': 'm4a',
+              'bitrateKbps': 128,
+              'durationMs': 180000,
+            };
+          }
+        } else if (call.method == 'search') {
+          return [
+            {
+              'videoId': 'closeVersion1',
+              'title': 'Explicit Hit Song',
+              'artist': 'Artist Name',
+              // Two seconds longer than the requested track: the same upload
+              // after a lossless re-encode, not a different recording.
+              'duration': 182,
+            }
+          ];
+        }
+        return null;
+      });
+
+      final service = YtmService();
+      service.debugClearBotCooldown();
+
+      final stream = await service.resolveStream(
+        'restricted888',
+        title: 'Explicit Hit Song',
+        artist: 'Artist Name',
+        duration: const Duration(seconds: 180),
+      );
+
+      expect(stream.videoId, equals('closeVersion1'));
+    });
+
     test('resolveStream treats a native AGE_RESTRICTED as restricted, not auth',
         () async {
       _mockChannel((call) async {
@@ -407,8 +505,7 @@ void main() {
         return null;
       });
 
-      final stream =
-          await YtmService().resolveAgeGatedStream('DuQGokwsWF8');
+      final stream = await YtmService().resolveAgeGatedStream('DuQGokwsWF8');
 
       expect(stream, isNotNull);
       expect(stream!.url, equals('https://rr1.googlevideo.com/age.m4a'));
@@ -452,6 +549,23 @@ void main() {
       expect(await service.isAvailable(), isFalse);
       expect(await service.isAvailable(), isFalse);
       expect(calls, equals(1), reason: 'the answer is fixed at compile time');
+    });
+
+    test('a bot challenge opens the service gate and the shared breaker', () {
+      // Two ledgers exist for two purposes — an escalating egress gate for the
+      // resolve chain, and per-signal policy/metrics — but they must agree on
+      // the one verdict they both represent, or one of them will happily retry
+      // a route the other has just declared blocked.
+      final service = YtmService();
+      service.debugClearBotCooldown();
+      service.recordFailure('dQw4w9WgXcQ', const YtmException('BOT_CHALLENGE'));
+
+      expect(service.isBotCoolingDown, isTrue);
+      expect(service.breaker.shouldAllow(YtmBlockSignal.botChallenge), isFalse);
+
+      service.debugClearBotCooldown();
+      expect(service.breaker.shouldAllow(YtmBlockSignal.botChallenge), isTrue);
+      service.dispose();
     });
 
     test('dispose cancels the bot-cooldown timer and disposes the notifier',

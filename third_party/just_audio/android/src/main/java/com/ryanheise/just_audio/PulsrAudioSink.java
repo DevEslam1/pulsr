@@ -140,14 +140,50 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     int[] decodedPcmSnapshot() { return decodedPcm.clone(); }
     boolean isPlayingForTelemetry() { return playWhenReady && format != null && !released; }
 
+    /**
+     * Decoded input PCM encoding of the configured stream (Media3
+     * {@code C.ENCODING_PCM_*}), or {@code C.ENCODING_INVALID} before the first
+     * configure. Reported as element [3] of {@code PulsrOutputRouting.snapshot()}.
+     */
+    int inputPcmEncodingForTelemetry() {
+        final Format current = format;
+        return current == null ? C.ENCODING_INVALID : current.pcmEncoding;
+    }
+
+    /**
+     * True while the active inner sink passes decoded integer PCM through
+     * untouched instead of staging it as float. Reported as element [4] of
+     * {@code PulsrOutputRouting.snapshot()}. The AAudio backend never runs the
+     * Media3 float/DSP wrapper, so it always reports false here.
+     */
+    boolean integerBypassActiveForTelemetry() {
+        final Inner current = currentInner;
+        return current != null && current.sink instanceof FloatDspAudioSink
+                && ((FloatDspAudioSink) current.sink).isBitPerfectIntegerBypassActive();
+    }
+
+    /**
+     * True when {@code sink} is this wrapper's live inner backend (AudioTrack -
+     * DEFAULT/FLOAT - or AAudio). Used by routing telemetry to attribute the
+     * measured stream back to its player. Best effort: {@code currentInner} is
+     * written on the playback thread, so the reader may observably lag a swap.
+     */
+    boolean ownsInnerSink(@Nullable Object sink) {
+        final Inner current = currentInner;
+        return current != null && sink != null
+                && (current.defaultSink == sink || current.nativeSink == sink);
+    }
+
     // Current configuration and inner sink.
     @Nullable private volatile Format format;
     private int bufferSize;
     @Nullable private int[] outputChannels;
     private boolean endOfStreamQueued;
-    @Nullable private Inner currentInner;
+    // Written on the playback thread, read from telemetry/polling threads:
+    // volatile so a cross-thread read cannot pair a stale sink with a new mode.
+    @Nullable private volatile Inner currentInner;
     @Nullable private Mode mode;
-    @Nullable private AudioSink inner;
+    @Nullable private volatile AudioSink inner;
 
     PulsrAudioSink(Context context, BooleanFlag aaudioEnabled, BooleanFlag preferExclusive,
             IntFlag targetBufferMs, BooleanFlag floatEnabled, PlayerSupplier playerSupplier,
@@ -364,6 +400,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             throw new InitializationException(
                     "configure() has not been called", 0, fmt, false, null);
         }
+        pushBitPerfectStateToAaudio();
         try {
             boolean consumed = inner.handleBuffer(buffer, presentationTimeUs, encodedAccessUnitCount);
             processPendingModeIfReady();
@@ -594,6 +631,19 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     // ---- swap mechanics ----
 
+    /**
+     * Mirrors the app-level bit-perfect/DoP request onto the live AAudio sink.
+     * The sink caches the pair, so pushing it per buffer is cheap and only an
+     * actual change reaches JNI. No-op for the AudioTrack-backed inners.
+     */
+    private void pushBitPerfectStateToAaudio() {
+        final Inner current = currentInner;
+        if (current == null || current.nativeSink == null) return;
+        current.nativeSink.setBitPerfect(
+                PulsrOutputRouting.isBitPerfectRequested(),
+                PulsrOutputRouting.isDopRequested());
+    }
+
     private void swapTo(Mode desired, boolean internal, boolean sameStream) throws ConfigurationException {
         final Inner previous = currentInner;
         // Error policy (internal) is independent of stream identity: SRC/write
@@ -689,6 +739,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         if (tapSrcFailed && candidate.processor != null) candidate.processor.setTapSrcTargetRate(0);
         if (old != null) releaseInner(old);
         updateAaudioSuspensionNotification(appliedMode);
+        pushBitPerfectStateToAaudio();
 
         if (playWhenReady) inner.play();
         if (endOfStreamQueued) {

@@ -57,12 +57,12 @@ class QueueSlotCodec {
       final tiers = entry.value.trackTiers ?? const <int, QueueTier>{};
       data['${entry.key}'] = {
         'songIds': songs.map((s) => s.id).toList(),
-        // Serialize rows not resolvable via getSongsByIds on restore: YouTube
-        // rows and any synthetic negative-id row (radio stations carry a
-        // negative id + a stream URL in `path`, so they are covered here).
-        // Without materializing them mergeInPersistedOrder would drop them.
+        // Serialize rows not resolvable via getSongsByIds on restore: network
+        // sources (YouTube, radio and net-library files streamed through the
+        // loopback proxy) and any synthetic negative-id row. Without
+        // materializing them mergeInPersistedOrder would drop them.
         'onlineSongs': songs
-            .where((s) => s.source == SongSource.youtube || s.id < 0)
+            .where((s) => SongSource.isNetwork(s.source) || s.id < 0)
             .map((s) => {
                   'id': s.id,
                   'title': s.title,

@@ -2,13 +2,77 @@
 //
 // State-machine contract: the third consecutive failure trips the fallback, the
 // fallback switches the risky output path off, and a success or reset clears it.
+// A recovery also drops the stored reason, the persisted DSD token stays a
+// String every reader parses, and a partly applied record never leaves a
+// failure counter behind.
 
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
+import 'package:pulsr/data/audio/dsd_transport_resolver.dart';
 import 'package:pulsr/features/diagnostics/safe_mode_controller.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// In-memory [SharedPreferences] stand-in that rejects (or throws on) writes to
+/// one key, so a partly applied safe-mode record can be reproduced.
+///
+/// Only the members [SafeModeController] touches are forwarded; anything else is
+/// unreachable from these tests.
+class _RejectingPrefs implements SharedPreferences {
+  _RejectingPrefs(
+    this._inner, {
+    required this.rejectKey,
+    this.throwOnReject = false,
+  });
+
+  final SharedPreferences _inner;
+  final String rejectKey;
+  final bool throwOnReject;
+  int rejections = 0;
+
+  bool _reject(String key) {
+    if (key != rejectKey) return false;
+    rejections++;
+    if (throwOnReject) throw StateError('preferences write rejected: $key');
+    return true;
+  }
+
+  @override
+  Future<bool> setString(String key, String value) async =>
+      _reject(key) ? false : await _inner.setString(key, value);
+
+  @override
+  Future<bool> setInt(String key, int value) async =>
+      _reject(key) ? false : await _inner.setInt(key, value);
+
+  @override
+  Future<bool> setBool(String key, bool value) async =>
+      _reject(key) ? false : await _inner.setBool(key, value);
+
+  @override
+  Future<bool> remove(String key) async =>
+      _reject(key) ? false : await _inner.remove(key);
+
+  @override
+  bool containsKey(String key) => _inner.containsKey(key);
+
+  @override
+  Object? get(String key) => _inner.get(key);
+
+  @override
+  bool? getBool(String key) => _inner.getBool(key);
+
+  @override
+  int? getInt(String key) => _inner.getInt(key);
+
+  @override
+  String? getString(String key) => _inner.getString(key);
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
 
 void main() {
   late SharedPreferences prefs;
@@ -80,6 +144,34 @@ void main() {
 
     expect(controller.consecutiveFailures('Pixel 8'), 0);
     expect(controller.shouldFallback('Pixel 8'), isFalse);
+  });
+
+  test('a recovery also clears the stored failure reason', () async {
+    await controller.recordFailure('Pixel 8', 'sink underrun -5');
+    expect(controller.lastFailureReason('Pixel 8'), 'sink underrun -5');
+
+    await controller.recordSuccess('Pixel 8');
+
+    expect(controller.consecutiveFailures('Pixel 8'), 0);
+    expect(controller.lastFailureReason('Pixel 8'), isNull);
+    expect(
+      prefs.containsKey(SafeModeController.reasonKey('Pixel 8')),
+      isFalse,
+    );
+  });
+
+  test('a recovery with no counter still drops a stale reason', () async {
+    await prefs.setString(
+      SafeModeController.reasonKey('Pixel 8'),
+      'stale reason',
+    );
+
+    await controller.recordSuccess('Pixel 8');
+
+    expect(
+      prefs.containsKey(SafeModeController.reasonKey('Pixel 8')),
+      isFalse,
+    );
   });
 
   test('applyFallback turns off the risky output path', () async {
@@ -204,5 +296,170 @@ void main() {
 
     await local.reset('Pixel 8');
     expect(reloads, 2);
+  });
+
+  test('the DSD fallback persists a String every reader parses', () async {
+    await controller.applyFallback('Pixel 8');
+
+    // Type contract: the typed getters cast blindly, so the persisted value has
+    // to stay a String. An enum or bool written here would throw in both the
+    // settings loader and the playback resolver.
+    final stored = prefs.get(PrefsKeys.dsdOutputMode);
+    expect(stored, isA<String>());
+    final restored = stored! as String;
+    expect(restored, DsdOutputMode.pcm.name);
+
+    // SettingsCubit.load() resolves the token by enum name.
+    expect(
+      DsdOutputMode.values.firstWhere(
+        (mode) => mode.name == restored,
+        orElse: () => DsdOutputMode.dop,
+      ),
+      DsdOutputMode.pcm,
+    );
+
+    // The playback path hands the same token to the transport resolver.
+    final plan = resolveDsdTransport(
+      mode: restored,
+      bitPerfectActive: true,
+      dopCapable: true,
+      nativeCapable: true,
+      dsdRateMultiple: 64,
+    );
+    expect(plan.requested, DsdTransport.pcm);
+    expect(plan.transport, DsdTransport.pcm);
+    expect(plan.reason, DsdTransportReason.userPcm);
+  });
+
+  test('every DsdOutputMode name is a token both readers understand', () async {
+    for (final mode in DsdOutputMode.values) {
+      await prefs.setString(PrefsKeys.dsdOutputMode, mode.name);
+
+      final stored = prefs.getString(PrefsKeys.dsdOutputMode);
+      expect(stored, mode.name);
+      expect(
+        DsdOutputMode.values.firstWhere(
+          (candidate) => candidate.name == stored,
+          orElse: () => DsdOutputMode.dop,
+        ),
+        mode,
+      );
+
+      final plan = resolveDsdTransport(
+        mode: stored!,
+        bitPerfectActive: true,
+        dopCapable: true,
+        nativeCapable: true,
+        dsdRateMultiple: 64,
+      );
+      expect(plan.requested.name, mode.name);
+    }
+  });
+
+  group('a partly applied failure record', () {
+    SafeModeController buildController(SharedPreferences failing) {
+      final local = SafeModeController(
+        prefs: failing,
+        clock: () => DateTime.utc(2026, 1, 2, 3, 4, 5),
+      );
+      addTearDown(local.dispose);
+      return local;
+    }
+
+    test('leaves no counter when the reason write is rejected', () async {
+      final failing = _RejectingPrefs(
+        prefs,
+        rejectKey: SafeModeController.reasonKey('Pixel 8'),
+      );
+      final local = buildController(failing);
+
+      await expectLater(
+        local.recordFailure('Pixel 8', 'sink underrun'),
+        throwsA(isA<SafeModeError>()),
+      );
+
+      expect(failing.rejections, 1);
+      expect(
+        prefs.containsKey(SafeModeController.failuresKey('Pixel 8')),
+        isFalse,
+      );
+      expect(
+        prefs.containsKey(SafeModeController.reasonKey('Pixel 8')),
+        isFalse,
+      );
+    });
+
+    test('keeps the earlier counter and reason when the stamp fails', () async {
+      await prefs.setInt(SafeModeController.failuresKey('Pixel 8'), 2);
+      await prefs.setString(
+        SafeModeController.reasonKey('Pixel 8'),
+        'earlier failure',
+      );
+      final failing = _RejectingPrefs(
+        prefs,
+        rejectKey: SafeModeController.updatedKey('Pixel 8'),
+      );
+      final local = buildController(failing);
+
+      await expectLater(
+        local.recordFailure('Pixel 8', 'sink underrun'),
+        throwsA(isA<SafeModeError>()),
+      );
+
+      expect(prefs.getInt(SafeModeController.failuresKey('Pixel 8')), 2);
+      expect(
+        prefs.getString(SafeModeController.reasonKey('Pixel 8')),
+        'earlier failure',
+      );
+      expect(
+        prefs.containsKey(SafeModeController.updatedKey('Pixel 8')),
+        isFalse,
+      );
+    });
+
+    test('rolls the reason and stamp back when the counter fails', () async {
+      final failing = _RejectingPrefs(
+        prefs,
+        rejectKey: SafeModeController.failuresKey('Pixel 8'),
+      );
+      final local = buildController(failing);
+
+      await expectLater(
+        local.recordFailure('Pixel 8', 'sink underrun'),
+        throwsA(isA<SafeModeError>()),
+      );
+
+      expect(
+        prefs.containsKey(SafeModeController.failuresKey('Pixel 8')),
+        isFalse,
+      );
+      expect(
+        prefs.containsKey(SafeModeController.reasonKey('Pixel 8')),
+        isFalse,
+      );
+      expect(
+        prefs.containsKey(SafeModeController.updatedKey('Pixel 8')),
+        isFalse,
+      );
+    });
+
+    test('treats a throwing preferences write as a rejection', () async {
+      final failing = _RejectingPrefs(
+        prefs,
+        rejectKey: SafeModeController.reasonKey('Pixel 8'),
+        throwOnReject: true,
+      );
+      final local = buildController(failing);
+
+      await expectLater(
+        local.recordFailure('Pixel 8', 'sink underrun'),
+        throwsA(isA<SafeModeError>()),
+      );
+
+      expect(
+        prefs.containsKey(SafeModeController.failuresKey('Pixel 8')),
+        isFalse,
+      );
+    });
   });
 }

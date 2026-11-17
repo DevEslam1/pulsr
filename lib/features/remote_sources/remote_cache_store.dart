@@ -12,6 +12,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
@@ -49,6 +50,19 @@ class RemoteCacheStore {
   /// Suffix of an in-flight file; leftovers are deleted on the next start.
   static const String partialSuffix = RemoteCacheIndex.partialSuffix;
 
+  /// Name used for the disambiguating part of a partial file. Two concurrent
+  /// writes for the same key must never open the same path: before this, the
+  /// second `beginWrite` deleted and reopened the first writer's partial, so
+  /// their bytes interleaved and one commit renamed a mixed file into place.
+  static String _partialToken() {
+    _partialCounter += 1;
+    final salt = _partialRandom.nextInt(0xFFFFFF).toRadixString(16);
+    return '$_partialCounter$salt';
+  }
+
+  static final Random _partialRandom = Random();
+  static int _partialCounter = 0;
+
   /// Key prefix used for files found on disk without an index row. They can
   /// never be served (the logical path is unknown) and are evicted first.
   static const String untrackedPrefix = 'untracked:';
@@ -64,10 +78,25 @@ class RemoteCacheStore {
 
   final Map<String, RemoteCacheEntry> _entries = <String, RemoteCacheEntry>{};
   final Map<String, Future<File?>> _inFlight = <String, Future<File?>>{};
+
+  /// Tail of the per-key commit queue. Commits for one key run one at a time in
+  /// arrival order, so the last finished download wins the index entry instead
+  /// of two renames racing over the same target file.
+  final Map<String, Future<void>> _commitQueues = <String, Future<void>>{};
   Future<void>? _initFuture;
   Directory? _root;
   RemoteCacheIndex? _index;
   DateTime _lastIndexWrite = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Monotonic counter that advances whenever an entry is committed, removed or
+  /// the whole cache is cleared.
+  ///
+  /// [RemoteStreamServer] stores the stamp beside each provider stat it memoizes:
+  /// a different stamp means the entry changed underneath the memo, so the next
+  /// request re-stats instead of trusting a size/validators snapshot that a
+  /// finished download, an eviction or a delete just made obsolete.
+  int get changeStamp => _changeStamp;
+  int _changeStamp = 0;
 
   /// Cache key for a source id and provider path.
   static String keyFor(String sourceId, String path) {
@@ -142,9 +171,11 @@ class RemoteCacheStore {
     }
     final key = keyFor(sourceId, path);
     final digest = sha256.convert(utf8.encode(key)).toString();
-    final partial = File(p.join(root.path, '$digest.bin$partialSuffix'));
+    // Unique per sink, still `*.partial` so removeStalePartials cleans up a
+    // crash. Never delete an existing partial here: it belongs to another sink.
+    final partial = File(
+        p.join(root.path, '$digest.bin.${_partialToken()}$partialSuffix'));
     await partial.parent.create(recursive: true);
-    if (await partial.exists()) await partial.delete();
     final sink = partial.openWrite();
     return RemoteCacheSink(
       key: key,
@@ -335,12 +366,61 @@ class RemoteCacheStore {
       );
     }
     _entries.clear();
+    _changeStamp++;
     _lastIndexWrite = DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   /// Finishes a write started by [RemoteCacheSink]: renames the partial file
   /// into place, indexes it and evicts if the cache is over its cap.
   Future<File?> commitPartial({
+    required String key,
+    required File partial,
+    required int bytes,
+    required bool pinned,
+    String? etag,
+    DateTime? modifiedAt,
+  }) {
+    // Serialize per key: the rename, the index write and eviction are not
+    // reentrant, and two concurrent downloads of one key must finish with a
+    // single entry whose bytes are the last writer's ("last commit wins").
+    return _serializedPerKey(
+      key,
+      () => _commitPartialNow(
+        key: key,
+        partial: partial,
+        bytes: bytes,
+        pinned: pinned,
+        etag: etag,
+        modifiedAt: modifiedAt,
+      ),
+    );
+  }
+
+  /// Runs [action] once every earlier action queued for [key] has finished.
+  ///
+  /// The queue tail is a completer future, never a failure: an aborted commit
+  /// must not poison later commits for the same key.
+  Future<T> _serializedPerKey<T>(String key, Future<T> Function() action) {
+    final previous = _commitQueues[key];
+    final completer = Completer<void>();
+    _commitQueues[key] = completer.future;
+
+    Future<T> run() async {
+      try {
+        if (previous != null) await previous;
+        return await action();
+      } finally {
+        completer.complete();
+        if (identical(_commitQueues[key], completer.future)) {
+          _commitQueues.remove(key);
+        }
+      }
+    }
+
+    return run();
+  }
+
+  Future<File?> _commitPartialNow({
     required String key,
     required File partial,
     required int bytes,
@@ -369,6 +449,7 @@ class RemoteCacheStore {
       modifiedAt: modifiedAt,
     );
     await _persistIndex();
+    _changeStamp++;
     await evictIfNeeded(protectKey: key);
     return target;
   }
@@ -376,6 +457,7 @@ class RemoteCacheStore {
   Future<void> _deleteEntry(String key) async {
     final entry = _entries.remove(key);
     if (entry == null) return;
+    _changeStamp++;
     final root = _root;
     if (root == null) return;
     final file = File(p.join(root.path, entry.fileName));

@@ -1,4 +1,6 @@
 // test/features/assistant/assistant_intent_service_test.dart
+import 'dart:io';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/features/assistant/assistant_intent_service.dart';
@@ -27,12 +29,14 @@ void main() {
   AssistantIntentService build({
     AssistantResolver? resolver,
     Future<void> Function(AssistantPlayPlan plan)? playPlan,
-    DateTime Function()? clock,
+    Duration Function()? monotonicClock,
+    Duration dedupeWindow = const Duration(seconds: 1),
   }) {
     final service = AssistantIntentService(
       resolver: resolver ?? _resolver(),
       playPlan: playPlan ?? (plan) async => played.add(plan),
-      clock: clock,
+      monotonicClock: monotonicClock,
+      dedupeWindow: dedupeWindow,
     );
     addTearDown(service.dispose);
     return service;
@@ -49,8 +53,8 @@ void main() {
     });
 
     test('drops an identical request inside the dedupe window', () async {
-      final now = DateTime.utc(2026, 1, 1, 12);
-      final service = build(clock: () => now);
+      const elapsed = Duration.zero;
+      final service = build(monotonicClock: () => elapsed);
       await service.handle({'QUERY': 'Miles Davis'});
       await service.handle({'QUERY': 'Miles Davis'});
 
@@ -58,18 +62,18 @@ void main() {
     });
 
     test('plays again once the dedupe window has passed', () async {
-      var now = DateTime.utc(2026, 1, 1, 12);
-      final service = build(clock: () => now);
+      var elapsed = Duration.zero;
+      final service = build(monotonicClock: () => elapsed);
       await service.handle({'QUERY': 'Miles Davis'});
-      now = now.add(const Duration(milliseconds: 1500));
+      elapsed += const Duration(milliseconds: 1500);
       await service.handle({'QUERY': 'Miles Davis'});
 
       expect(played, hasLength(2));
     });
 
     test('does not dedupe a different term', () async {
-      final now = DateTime.utc(2026, 1, 1, 12);
-      final service = build(clock: () => now);
+      const elapsed = Duration.zero;
+      final service = build(monotonicClock: () => elapsed);
       await service.handle({'QUERY': 'Miles Davis'});
       await service.handle({'QUERY': 'John Coltrane'});
 
@@ -77,8 +81,8 @@ void main() {
     });
 
     test('dedupes an identical shortcut request too', () async {
-      final now = DateTime.utc(2026, 1, 1, 12);
-      final service = build(clock: () => now);
+      const elapsed = Duration.zero;
+      final service = build(monotonicClock: () => elapsed);
       await service.handleShortcut('shortcut_shuffle');
       await service.handleShortcut('shortcut_shuffle');
 
@@ -108,6 +112,69 @@ void main() {
       await expectLater(
         service.handle({'QUERY': 'Miles Davis'}),
         completes,
+      );
+    });
+  });
+
+  group('monotonic dedupe clock', () {
+    test('a forward wall-clock jump does not defeat dedupe', () async {
+      const jump = Duration(hours: 6);
+      var wallClock = DateTime.utc(2026, 1, 1, 12);
+      var elapsed = Duration.zero;
+      final service = build(monotonicClock: () => elapsed);
+      // Premise: the jump dwarfs the window, so the old DateTime-based delta
+      // would have looked expired and replayed the duplicate.
+      expect(jump > service.dedupeWindow, isTrue);
+
+      await service.handle({'QUERY': 'Miles Davis'});
+      wallClock = wallClock.add(jump);
+      elapsed += const Duration(milliseconds: 250);
+      expect(wallClock, DateTime.utc(2026, 1, 1, 18));
+      await service.handle({'QUERY': 'Miles Davis'});
+
+      expect(played, hasLength(1));
+    });
+
+    test('a backwards wall-clock jump does not trigger dedupe', () async {
+      const jump = Duration(hours: 6);
+      var wallClock = DateTime.utc(2026, 1, 1, 12);
+      var elapsed = Duration.zero;
+      final service = build(monotonicClock: () => elapsed);
+
+      await service.handle({'QUERY': 'Miles Davis'});
+      wallClock = wallClock.subtract(jump);
+      // Monotonic time moved past the window even though the device clock went
+      // back: a negative wall-clock delta used to latch dedupe on until the
+      // clock caught up, swallowing every legitimate repeat.
+      elapsed += const Duration(milliseconds: 1500);
+      expect(wallClock, DateTime.utc(2026, 1, 1, 6));
+      await service.handle({'QUERY': 'Miles Davis'});
+
+      expect(played, hasLength(2));
+    });
+
+    test('defaults to a real monotonic source', () async {
+      final service = build(dedupeWindow: const Duration(milliseconds: 200));
+
+      await service.handle({'QUERY': 'Miles Davis'});
+      await service.handle({'QUERY': 'Miles Davis'});
+      expect(played, hasLength(1));
+
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await service.handle({'QUERY': 'Miles Davis'});
+      expect(played, hasLength(2));
+    });
+
+    test('the dedupe path never reads the wall clock', () {
+      final source = File(
+        'lib/features/assistant/assistant_intent_service.dart',
+      ).readAsStringSync();
+
+      expect(
+        source.contains('DateTime.now'),
+        isFalse,
+        reason: 'Dedupe must stay on the injected Stopwatch source; a '
+            'DateTime.now read reintroduces the clock-jump bug pinned above.',
       );
     });
   });

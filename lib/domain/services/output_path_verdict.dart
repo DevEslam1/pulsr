@@ -1,8 +1,10 @@
 import '../models/audio_output_info.dart';
+import '../models/bit_perfect_state.dart';
 
 /// How faithfully the current output route delivers the decoded signal.
 enum OutputPathQuality {
-  /// Unaltered stream to a USB DAC (Bit-Perfect active, DSP bypassed).
+  /// Verified unaltered stream to an exclusive/USB sink. Only a verified
+  /// [BitPerfectState] reaches this quality.
   bitPerfect,
 
   /// Digital path to a wired/USB sink with no lossy stage, but DSP and/or the
@@ -40,7 +42,21 @@ class OutputPathVerdict {
   /// [dspActive] is whether any DSP stage currently alters the signal; it only
   /// matters for distinguishing [OutputPathQuality.bitPerfect] from
   /// [OutputPathQuality.losslessProcessed] on a wired route.
-  static OutputPathVerdict of(AudioOutputInfo info, {bool dspActive = false}) {
+  ///
+  /// [bitPerfectState] is the only evidence that can produce BIT-PERFECT: it
+  /// is resolved from observed facts, while
+  /// [AudioOutputInfo.isBitPerfectActive] only records what the app asked the
+  /// platform to do. A verified state is authoritative and [dspActive] cannot
+  /// override it, because the state already folded every DSP/HAL/gain fact —
+  /// an enabled-but-bypassed EQ is not a modified sample. Without a state the
+  /// old flag is still honoured as an exclusive hint, but it is labelled
+  /// EXCLUSIVE rather than BIT-PERFECT because nothing verified that the
+  /// samples survived the route.
+  static OutputPathVerdict of(
+    AudioOutputInfo info, {
+    bool dspActive = false,
+    BitPerfectState? bitPerfectState,
+  }) {
     if (info.isLeAudio) {
       return const OutputPathVerdict(
         OutputPathQuality.lossyLeAudio,
@@ -74,11 +90,31 @@ class OutputPathVerdict {
         ? '${_khz(info.sampleRate)} / ${info.bitDepth}-bit'
         : 'Format unknown';
 
-    if (info.isUsbDac && info.isBitPerfectActive && !dspActive) {
+    if (bitPerfectState?.isVerified == true) {
       return OutputPathVerdict(
         OutputPathQuality.bitPerfect,
         'BIT-PERFECT',
         format,
+      );
+    }
+
+    // Exclusive USB output whose samples nothing has verified. The state knows
+    // why it is not verified; the bare flag is only a request, so the strongest
+    // honest label is EXCLUSIVE, never BIT-PERFECT.
+    final exclusiveButUnverified = bitPerfectState != null
+        ? bitPerfectState.tier != BitPerfectTier.off &&
+            info.isUsbDac &&
+            !info.isBluetooth &&
+            !dspActive
+        : info.isUsbDac &&
+            info.isBitPerfectActive &&
+            !info.isBluetooth &&
+            !dspActive;
+    if (exclusiveButUnverified) {
+      return OutputPathVerdict(
+        OutputPathQuality.losslessProcessed,
+        'EXCLUSIVE',
+        _withReason(format, bitPerfectState?.reasonCode),
       );
     }
 
@@ -96,6 +132,11 @@ class OutputPathVerdict {
       format,
     );
   }
+
+  static String _withReason(String detail, String? reasonCode) =>
+      reasonCode == null || reasonCode.isEmpty
+          ? detail
+          : '$detail · $reasonCode';
 
   static String _khz(int hz) {
     final k = hz / 1000.0;

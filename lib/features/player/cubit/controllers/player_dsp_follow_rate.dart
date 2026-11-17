@@ -23,23 +23,93 @@ extension PlayerDspFollowRate on PlayerDspController {
         if (_isClosed()) return;
         final settings = _settingsCubit!.state;
         // Log real-time 4-stage signal path telemetry per track start (no-op if disabled).
+        final outputDevice = settings.currentOutputDevice;
+        final usbSnapshot = _usbExclusiveService.lastStatus;
+        final sourceRate = effectiveSourceSampleRate(
+          tagged: song.sampleRate ?? 0,
+          decoded: outputDevice?.decodedSampleRate ?? 0,
+        );
+        final sourceDepth = effectiveSourceBitDepth(
+          tagged: song.bitDepth ?? 0,
+          decoded: outputDevice?.decodedBitDepth ?? 0,
+        );
+        // Same observed facts as the audio-quality sheet: the session log must
+        // record the verified tier, never the preference flag. A collapsed
+        // float carrier contributes no sink depth instead of inventing one.
+        final floatCarrier = outputDevice?.floatCarrierDecodesSource == true;
+        final directUsb = usbSnapshot.streamingActive &&
+            outputDevice?.isUsbDac == true &&
+            outputDevice?.isBluetooth != true;
+        final reportedSinkRate = outputDevice?.sinkSampleRate ?? 0;
+        final reportedSinkDepth = outputDevice?.sinkBitDepth ?? 0;
+        final sinkRate = reportedSinkRate > 0
+            ? reportedSinkRate
+            : (floatCarrier
+                ? 0
+                : (directUsb
+                    ? usbSnapshot.streamingSampleRate
+                    : outputDevice?.sampleRate ?? 0));
+        final sinkDepth = reportedSinkDepth > 0
+            ? reportedSinkDepth
+            : (floatCarrier
+                ? 0
+                : (directUsb
+                    ? usbSnapshot.streamingBitDepth
+                    : outputDevice?.bitDepth ?? 0));
+        final representation = AudioConflicts.classifySourceSampleFormat(
+            codec: song.codec);
+        final sourceCodecState =
+            AudioConflicts.classifySourceCodec(path: song.path, codec: song.codec);
+        final gain = _audioHandler.effectiveSoftwareGain;
+        final dspBypassed = settings.strictBitPerfect ||
+            AudioConflicts.dspBypassActive(
+              bitPerfectOutput: settings.bitPerfectOutput,
+              bypassDspOnBitPerfect: settings.bypassDspOnBitPerfect,
+              device: outputDevice,
+            );
+        final bitPerfectState = resolveBitPerfectState(
+          requested: settings.bitPerfectOutput ||
+              (outputDevice?.bitPerfectRequested ?? false),
+          strict: settings.strictBitPerfect,
+          sinkActive: directUsb || outputDevice?.isBitPerfectActive == true,
+          sourceSampleRate: sourceRate,
+          sourceBitDepth: sourceDepth,
+          sinkSampleRate: sinkRate,
+          sinkBitDepth: sinkDepth,
+          exclusive: directUsb ||
+              (outputDevice?.isBitPerfectActive == true &&
+                  outputDevice?.isBluetooth != true),
+          integerBypass: !floatCarrier &&
+              (representation == AudioSourceSampleFormat.integer ||
+                  (representation == AudioSourceSampleFormat.unknown &&
+                      sourceDepth <= 24)) &&
+              outputDevice?.integerBypassActive == true &&
+              sinkDepth > 0 &&
+              sinkDepth >= sourceDepth,
+          halClean: (outputDevice?.halStagesActive ?? 0) == 0,
+          unityGain: gain.isFinite && (gain - 1.0).abs() <= 1e-9,
+          samplesModified: _audioHandler.transportSamplesModified ||
+              (!dspBypassed && _getState().dsp.isDspActive),
+          isDsdDop: AudioQualityInfo.dsdDopActive,
+          sourceLossy: song.source == SongSource.radio ||
+              sourceCodecState == AudioSourceCodecState.lossy,
+          sourceCodecUnconfirmed:
+              sourceCodecState == AudioSourceCodecState.unknown,
+          rateVerified: !directUsb || usbSnapshot.rateVerified,
+          failureReason: outputDevice?.bitPerfectFailureReason,
+        );
         final signalPath = AudioSignalPath.fromOutputInfo(
           sourceCodec: song.codec ?? '',
-          sourceSampleRate: effectiveSourceSampleRate(
-            tagged: song.sampleRate ?? 0,
-            decoded: settings.currentOutputDevice?.decodedSampleRate ?? 0,
-          ),
-          sourceBitDepth: effectiveSourceBitDepth(
-            tagged: song.bitDepth ?? 0,
-            decoded: settings.currentOutputDevice?.decodedBitDepth ?? 0,
-          ),
+          sourceSampleRate: sourceRate,
+          sourceBitDepth: sourceDepth,
           isDsdSource: (song.codec ?? '').toUpperCase().contains('DSD') ||
               song.path.toLowerCase().endsWith('.dsf') ||
               song.path.toLowerCase().endsWith('.dff'),
-          output: settings.currentOutputDevice,
-          uac2DirectActive: _usbExclusiveService.lastStatus.streamingActive,
+          output: outputDevice,
+          uac2DirectActive: usbSnapshot.streamingActive,
           aaudioEnabled: settings.aaudioOutputEnabled,
           floatOutputEnabled: settings.floatOutputEnabled,
+          bitPerfectState: bitPerfectState,
         );
         unawaited(AudioSessionLog.instance.updateOutputInfo(
           routeType:

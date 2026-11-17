@@ -1,6 +1,7 @@
 // lib/features/announcements/announcement_screen.dart
 
 import 'package:material_ui/material_ui.dart';
+import 'dart:async';
 
 import '../../core/constants/app_radii.dart';
 import '../../core/constants/app_spacing.dart';
@@ -48,6 +49,8 @@ class AnnouncementScreen extends StatefulWidget {
 
 class _AnnouncementScreenState extends State<AnnouncementScreen> {
   late Future<List<TtsVoice>> _voicesFuture;
+  ValueNotifier<bool>? _availability;
+  VoidCallback? _availabilityListener;
 
   @override
   void initState() {
@@ -59,7 +62,42 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     if (engine is MethodChannelTtsEngine) {
       engine.voiceId = widget.settings.voiceId;
       engine.localeId = widget.settings.localeId;
+      // A channel engine starts unavailable until `init` succeeds; listening to
+      // its availability lets the list appear as soon as it flips, instead of
+      // requiring the user to reopen the screen.
+      _availability = engine.availability;
+      _availabilityListener = () {
+        if (!mounted) return;
+        unawaited(_prepareVoices());
+      };
+      _availability!.addListener(_availabilityListener!);
     }
+    unawaited(_prepareVoices());
+  }
+
+  @override
+  void dispose() {
+    final notifier = _availability;
+    final listener = _availabilityListener;
+    if (notifier != null && listener != null) {
+      notifier.removeListener(listener);
+    }
+    super.dispose();
+  }
+
+  /// Initializes a channel engine when needed, then (re)lists its voices.
+  ///
+  /// `init` is idempotent, so this is safe both on the first frame and after a
+  /// refresh tap or an availability flip.
+  Future<void> _prepareVoices() async {
+    final engine = widget.engine;
+    if (engine is MethodChannelTtsEngine && !engine.isAvailable) {
+      await engine.init();
+    }
+    if (!mounted) return;
+    setState(() {
+      _voicesFuture = widget.engine.voices();
+    });
   }
 
   @override
@@ -173,6 +211,19 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           formatValue: AnnouncementStrings.volumeValue,
           onChanged: settings.setVolume,
         ),
+        SettingSliderRow(
+          label: AnnouncementStrings.maxLengthLabel,
+          subtitle: AnnouncementStrings.maxLengthSubtitle,
+          value: settings.maxLength.toDouble(),
+          min: AnnouncementSettings.minMaxLength.toDouble(),
+          max: AnnouncementSettings.maxMaxLength.toDouble(),
+          // 56 steps over the 40–600 range land on exact 10-character values.
+          divisions: 56,
+          defaultValue: AnnouncementSettings.defaultMaxLength.toDouble(),
+          formatValue: (value) =>
+              AnnouncementStrings.maxLengthValue(value.round()),
+          onChanged: (value) => settings.setMaxLength(value.round()),
+        ),
         settingsCardDivider(palette),
         SettingsSwitchTile(
           Icons.volume_down_rounded,
@@ -229,6 +280,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 subtitle: const Text(
                   AnnouncementStrings.unavailableTitle,
                 ),
+                trailing: _refreshVoicesButton(),
               );
             }
             if (snapshot.connectionState != ConnectionState.done) {
@@ -267,6 +319,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     List<TtsVoice> voices,
   ) {
     final palette = context.palette;
+    if (voices.isEmpty) {
+      return ListTile(
+        contentPadding: _rowPadding,
+        leading: const SettingsIconBox(Icons.record_voice_over_rounded),
+        title: const Text(AnnouncementStrings.voiceLabel),
+        subtitle: const Text(AnnouncementStrings.voiceNoneInstalled),
+        trailing: _refreshVoicesButton(),
+      );
+    }
     final ids = voices.map((voice) => voice.id).toSet();
     // A stored id can disappear after a system voice update; falling back to
     // the default keeps DropdownButton's value/items assertion satisfied.
@@ -275,6 +336,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       contentPadding: _rowPadding,
       leading: const SettingsIconBox(Icons.record_voice_over_rounded),
       title: const Text(AnnouncementStrings.voiceLabel),
+      trailing: _refreshVoicesButton(),
       subtitle: Padding(
         padding: const EdgeInsetsDirectional.only(top: AppSpacing.xs),
         child: DropdownButtonHideUnderline(
@@ -313,6 +375,15 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     );
   }
 
+  /// Re-lists the installed voices (and retries `init` for a channel engine).
+  Widget _refreshVoicesButton() {
+    return IconButton(
+      tooltip: AnnouncementStrings.voiceRefresh,
+      icon: const Icon(Icons.refresh_rounded),
+      onPressed: () => unawaited(_prepareVoices()),
+    );
+  }
+
   void _selectVoice(String? value, List<TtsVoice> voices) {
     final settings = widget.settings;
     if (value == null || value.isEmpty) {
@@ -339,8 +410,8 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     final messenger = ScaffoldMessenger.maybeOf(context);
     final track = widget.previewTrack ??
         const AnnouncementTrack(
-          title: 'Pulsr Music',
-          artist: 'Announcement test',
+          title: AnnouncementStrings.previewTrackTitle,
+          artist: AnnouncementStrings.previewTrackArtist,
         );
     final text = composeAnnouncement(
       settings.elements,

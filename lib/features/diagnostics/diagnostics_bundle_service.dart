@@ -423,7 +423,7 @@ class DiagnosticsBundleService {
   ///
   /// The equalizer stores the band list as a JSON array string, so reading it
   /// as an int would silently fall back forever. A malformed payload falls back
-  /// to the three-band default.
+  /// to the four-band default.
   int _multibandBandCount() {
     final raw = _stringValue(PrefsKeys.multibandCompressorBands);
     if (raw != null) {
@@ -434,7 +434,9 @@ class DiagnosticsBundleService {
         // Corrupt payload: report the default without failing the bundle.
       }
     }
-    return 3;
+    // Native MultibandCompressor::NUM_BANDS is 4 (see MultibandCompressor.h);
+    // a missing pref means the engine's own four-band default is in effect.
+    return 4;
   }
 
   Map<String, Object?> _buildCounters() {
