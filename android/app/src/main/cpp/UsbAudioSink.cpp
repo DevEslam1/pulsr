@@ -558,6 +558,11 @@ void UsbAudioSink::releaseResources() {
     }
     producerOwner_.store(0, std::memory_order_release);
     producerRawDepth_.store(0, std::memory_order_release);
+    // Item 3: a new stream starts as plain PCM; the JNI tap re-declares DoP on the
+    // next direct-USB block. Reset the marker phase so a fresh stream starts on
+    // 0x05 like every DoP framer in this codebase.
+    producerIsDop_.store(false, std::memory_order_relaxed);
+    dopMarkerPhase_ = kDopMarkerA;
     deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
     rawPcmStatus_.store(0, std::memory_order_release);
     if (sinkDepthPublished_) {
@@ -653,11 +658,21 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
     }
 
     const size_t realBytes = copyFrames * frameBytes;
+    // Item 3: DoP words carry a 0x05/0xFA marker in their MSB. A raw underrun on a
+    // DoP stream must therefore be filled with valid DoP silence that continues
+    // the producer's phase, not with plain zeros.
+    const bool dopGap = producerIsDop_.load(std::memory_order_relaxed) &&
+                        IsDopSilenceContainer(bytesPerSample_);
     if (copyFrames == static_cast<size_t>(framesInPacket)) {
         if (packetRaw) {
             // Raw/DoP packets must stay bit-identical across underrun recovery:
             // never run gapFader_ or RequantizePcmValidBits on raw samples.
             gapFader_.reset();
+            if (dopGap) {
+                // Carry the marker phase forward so a later gap stays in lockstep.
+                dopMarkerPhase_ = DopMarkerAfterLastFrame(
+                    dst, copyFrames, channels_, bytesPerSample_, dopMarkerPhase_);
+            }
         } else {
             if (gapFader_.recovering()) {
                 rawDepth = 0;
@@ -676,7 +691,18 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
         const int missingFrames = framesInPacket - static_cast<int>(copyFrames);
         if (copyFrames > 0) {
             if (packetRaw || producerRawDepth_.load(std::memory_order_acquire) != 0) {
-                std::memset(dst + realBytes, 0, pktLen - realBytes);
+                if (dopGap) {
+                    // Continue the marker alternation from the last real frame and
+                    // emit zero payload; no fader and no requantisation (both would
+                    // corrupt the DoP words).
+                    dopMarkerPhase_ = DopMarkerAfterLastFrame(
+                        dst, copyFrames, channels_, bytesPerSample_, dopMarkerPhase_);
+                    dopMarkerPhase_ = FillDopSilence(dst + realBytes, missingFrames,
+                                                     channels_, bytesPerSample_,
+                                                     dopMarkerPhase_);
+                } else {
+                    std::memset(dst + realBytes, 0, pktLen - realBytes);
+                }
                 gapFader_.reset();
             } else {
                 gapFader_.applyReal(dst, static_cast<int>(copyFrames), workerDither_);
@@ -691,7 +717,12 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
         } else {
             // Raw/DoP gaps must be silence, not synthesized marker/audio bytes.
             if (producerRawDepth_.load(std::memory_order_acquire) != 0) {
-                std::memset(dst, 0, pktLen);
+                if (dopGap) {
+                    dopMarkerPhase_ = FillDopSilence(dst, framesInPacket, channels_,
+                                                     bytesPerSample_, dopMarkerPhase_);
+                } else {
+                    std::memset(dst, 0, pktLen);
+                }
                 gapFader_.reset();
             } else {
                 gapFader_.fillGap(dst, framesInPacket, workerDither_);

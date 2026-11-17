@@ -31,6 +31,7 @@
 #include <vector>
 
 #include "SinkQuantizer.h"
+#include "DopGapSilence.h"
 #include "UsbGapFader.h"
 
 namespace pulsr {
@@ -117,6 +118,18 @@ public:
                           int sampleRate, int64_t producerId);
     bool WritePcm(const uint8_t* buffer, int frames, int channels,
                   int sourceBitDepth, int sampleRate, int64_t producerId);
+    // Item 3: per-producer DoP marker flag. The JNI direct-USB tap sets this from
+    // `engine->getParams()->bitPerfect.isDop` before WritePcm(); the USB worker
+    // reads it so an underrun gap is filled with valid DoP silence (zero payload
+    // + alternating 0x05/0xFA markers) instead of raw zeros, which would destroy
+    // the marker stream and make a DoP-capable DAC lose lock. Single writer (the
+    // JNI tap), atomic so the worker never observes a torn value.
+    void SetProducerDop(bool isDop) {
+        producerIsDop_.store(isDop, std::memory_order_relaxed);
+    }
+    bool IsProducerDop() const {
+        return producerIsDop_.load(std::memory_order_relaxed);
+    }
     void ReleaseProducer(int64_t id);
     void ReportWriteError(int error);
     int GetRawPcmBitDepth() const {
@@ -187,6 +200,13 @@ private:
     std::atomic<uint32_t> writerGate_{kWriterClosed};
     std::atomic<int64_t> producerOwner_{0};
     std::atomic<int> producerRawDepth_{0};
+    // Item 3: true while the producer is handing us DoP words (raw, marker in
+    // the MSB). Read only by the USB worker; written by the JNI tap.
+    std::atomic<bool> producerIsDop_{false};
+    // Marker the next synthesized DoP gap frame must use. Worker-thread-only:
+    // it is re-derived from the last real frame of every packet, so a mid-stream
+    // restart or a producer phase change cannot desynchronise the alternation.
+    uint8_t dopMarkerPhase_ = kDopMarkerA;
     std::atomic<uint64_t> rawPcmStatus_{0}; // delivery epoch in high bits, depth in low byte
     std::atomic<uint64_t> deliveryEpoch_{0};
     std::mutex controlMutex_; // Open/Close only; never render/worker

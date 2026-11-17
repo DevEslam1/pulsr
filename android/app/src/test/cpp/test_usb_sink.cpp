@@ -809,6 +809,60 @@ int main() {
         sink.Close();
     }
 
+    // ---- Item 3: DoP underrun gaps carry valid marker silence -------------
+    {
+        using Access = pulsr::UsbAudioSinkTestAccess;
+        auto& sink = UsbAudioSink::instance();
+        Access::prepare(sink, 4, 32, 4096, 0);
+        sink.SetProducerDop(true);
+        check(sink.IsProducerDop(), "the DoP producer flag must be observable by the worker");
+        // Two real 24-in-32 DoP frames: markers 0x05 then 0xFA.
+        const std::vector<uint8_t> dop = {
+            0x11,0x22,0x33,0x05, 0x44,0x55,0x66,0x05,
+            0x77,0x88,0x99,0xFA, 0xAA,0xBB,0xCC,0xFA,
+        };
+        check(sink.WritePcm(dop.data(), 2, 2, 32, 48000, 101),
+              "raw DoP frames must be accepted");
+        int rawDepth = -1;
+        uint64_t epoch = Access::epoch(sink);
+        std::vector<uint8_t> pkt(4 * 8, 0xAA);
+        Access::fillPacket(sink, pkt.data(), 4, rawDepth, epoch);
+        const std::vector<uint8_t> expectedDop = {
+            0x11,0x22,0x33,0x05, 0x44,0x55,0x66,0x05,
+            0x77,0x88,0x99,0xFA, 0xAA,0xBB,0xCC,0xFA,
+            0x00,0x00,0x00,0x05, 0x00,0x00,0x00,0x05,  // frame 2 -> 0x05
+            0x00,0x00,0x00,0xFA, 0x00,0x00,0x00,0xFA,  // frame 3 -> 0xFA
+        };
+        check(pkt == expectedDop && rawDepth == 0,
+              "a DoP underrun must synthesize marker silence in phase with the producer");
+        // A fully-empty packet must continue the alternation: frame 4 is 0x05.
+        Access::fillPacket(sink, pkt.data(), 4, rawDepth, epoch);
+        const std::vector<uint8_t> expectedDop2 = {
+            0x00,0x00,0x00,0x05, 0x00,0x00,0x00,0x05,
+            0x00,0x00,0x00,0xFA, 0x00,0x00,0x00,0xFA,
+            0x00,0x00,0x00,0x05, 0x00,0x00,0x00,0x05,
+            0x00,0x00,0x00,0xFA, 0x00,0x00,0x00,0xFA,
+        };
+        check(pkt == expectedDop2,
+              "DoP marker alternation must continue across empty packets");
+        // Plain PCM gaps keep the historical zero fill.
+        sink.SetProducerDop(false);
+        const std::vector<uint8_t> pcm = {0x01,0x00,0x00,0x00, 0x02,0x00,0x00,0x00};
+        check(sink.WritePcm(pcm.data(), 1, 2, 32, 48000, 101),
+              "raw PCM frames must still be accepted after DoP");
+        pkt.assign(4 * 8, 0xAA);
+        Access::fillPacket(sink, pkt.data(), 4, rawDepth, epoch);
+        const std::vector<uint8_t> expectedPcm = {
+            0x01,0x00,0x00,0x00, 0x02,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,
+            0x00,0x00,0x00,0x00, 0x00,0x00,0x00,0x00,
+        };
+        check(pkt == expectedPcm,
+              "raw PCM gaps must keep the plain zero fill (no synthetic markers)");
+        sink.Close();
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " USB sink check(s) failed." << std::endl;
         return 1;
