@@ -103,8 +103,22 @@ class AppConfig {
   static const bool voiceSearchEnabled =
       bool.fromEnvironment('ENABLE_VOICE_SEARCH', defaultValue: false);
 
+  /// Flavor the installed binary was actually built with.
+  ///
+  /// `String.fromEnvironment('FLAVOR')` defaults to `dev` when CI forgets the
+  /// define, which made a `--flavor prod` Pure build run network code with the
+  /// INTERNET permission stripped. Flutter populates `appFlavor` from the
+  /// Gradle product flavor, so prefer it when available.
+  static String get effectiveFlavor {
+    final platformFlavor = appFlavor;
+    if (platformFlavor != null && platformFlavor.isNotEmpty) {
+      return platformFlavor.toLowerCase();
+    }
+    return flavor.toLowerCase();
+  }
+
   static AppEnvironment get environment {
-    final lowerFlavor = flavor.toLowerCase();
+    final lowerFlavor = effectiveFlavor;
     if (lowerFlavor == 'prod') {
       return AppEnvironment.prod;
     }

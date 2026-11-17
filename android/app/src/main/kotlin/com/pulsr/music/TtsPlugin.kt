@@ -299,45 +299,68 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         runCatching {
-            val requestedVoice = if (!voiceId.isNullOrEmpty()) {
-                engine.voices?.firstOrNull { voice -> voice.name == voiceId }
+            val hasVoiceChoice = !voiceId.isNullOrEmpty()
+            val hasLocaleChoice = !localeId.isNullOrEmpty()
+            if (!hasVoiceChoice && !hasLocaleChoice) {
+                // configureEngine() already selected the device locale. Some
+                // OEM engines throw from setVoice(null), so touching the voice
+                // here silenced every announcement on those devices.
+                cachedVoice = null
+                voiceCacheKey = key
+                return
+            }
+            val requestedVoice = if (hasVoiceChoice) {
+                // Some engines expose a null entry in the voice set; use an
+                // explicit null-safe access so the platform type cannot
+                // reintroduce the NPE.
+                engine.voices?.firstOrNull { voice -> voice?.name == voiceId }
             } else {
                 null
             }
             if (requestedVoice != null) {
-                engine.voice = requestedVoice
-                cachedVoice = requestedVoice
+                val applied = runCatching { engine.voice = requestedVoice }.isSuccess
+                cachedVoice = if (applied) requestedVoice else null
                 voiceCacheKey = key
+                if (!applied) {
+                    Log.w(
+                        TAG,
+                        "Voice '$voiceId' was rejected by the engine; using the default voice"
+                    )
+                }
                 return
             }
-            if (!voiceId.isNullOrEmpty()) {
-                Log.w(TAG, "Voice $voiceId is not installed; keeping the current voice")
+            if (hasVoiceChoice) {
+                Log.w(TAG, "Voice $voiceId is not installed; using the default voice")
             }
-            val requestedLocale = if (!localeId.isNullOrEmpty()) {
-                Locale.forLanguageTag(localeId)
+            val requestedLocale = if (hasLocaleChoice) {
+                Locale.forLanguageTag(localeId!!)
             } else {
                 null
             }
             if (requestedLocale != null &&
                 engine.isLanguageAvailable(requestedLocale) >= TextToSpeech.LANG_AVAILABLE
             ) {
-                engine.voice = null
-                engine.language = requestedLocale
+                val applied = runCatching { engine.language = requestedLocale }.isSuccess
                 cachedVoice = null
                 voiceCacheKey = key
+                if (!applied) {
+                    Log.w(
+                        TAG,
+                        "Locale '$localeId' was rejected by the engine; using the default locale"
+                    )
+                }
                 return
             }
-            // No explicit choice (or an unavailable one): return to the cached
-            // device locale without another availability probe.
+            // Explicit choice unavailable: fall back to the init-time locale
+            // without calling setVoice(null).
             cachedVoice = null
             voiceCacheKey = key
             val defaultLocale = cachedDefaultLocale
             if (defaultLocale != null) {
-                engine.voice = null
-                engine.language = defaultLocale
+                runCatching { engine.language = defaultLocale }
             }
         }.onFailure { error ->
-            Log.w(TAG, "Voice selection failed: ${error.message}")
+            Log.w(TAG, "Voice selection failed for '$voiceId'", error)
         }
     }
 
@@ -382,7 +405,7 @@ class TtsPlugin : FlutterPlugin, MethodCallHandler {
         if (disposed || state != InitState.READY) return emptyList()
         val engine = tts ?: return emptyList()
         val installed = runCatching { engine.voices }.getOrNull() ?: return emptyList()
-        return installed.mapNotNull { voice -> voice.toMap() }
+        return installed.mapNotNull { voice -> voice?.toMap() }
     }
 
     private fun Voice.toMap(): Map<String, Any>? {

@@ -80,6 +80,7 @@ import 'features/downloads/cubit/downloads_cubit.dart';
 import 'features/announcements/announcement_settings.dart';
 import 'features/announcements/track_announcer.dart';
 import 'features/announcements/tts_engine.dart';
+import 'features/assistant/assistant_intent_bootstrap.dart';
 import 'features/assistant/assistant_settings.dart';
 import 'features/assistant/assistant_suggestion_sync.dart';
 import 'features/dlna/dlna_renderer_service.dart';
@@ -744,9 +745,14 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   /// Keeps the Android search-suggestion cache warm (P1-9). Local-only and
   /// failure-tolerant: without the platform channel this is a no-op.
   void _startAssistantSuggestions() {
+    // Install the assistant channel as early as the container allows: a
+    // MEDIA_PLAY_FROM_SEARCH intent that launches the app must not wait for the
+    // full async warm-up before it can be resolved.
+    AssistantIntentBootstrap.ensureInstalled();
     unawaited(() async {
       try {
         await getIt.allReady().timeout(const Duration(seconds: 30));
+        AssistantIntentBootstrap.ensureInstalled();
         if (!getIt.isRegistered<IMusicRepository>()) return;
         // One settings instance for the process: the Extras toggle writes it
         // and this sync reads it, so flipping the opt-in takes effect without

@@ -100,6 +100,9 @@ abstract final class AssistantIntentBootstrap {
       // extras channel after this handshake, so an uninstalled handler falls
       // back to the legacy query path instead of silently swallowing them.
       unawaited(_announceReady());
+    } on StateError {
+      // Registered but still warming up. The post-warm-up call retries; this
+      // is expected at cold start and is not a crash.
     } catch (e, st) {
       ErrorLogger.log(
         'Assistant intent channel could not be installed',
