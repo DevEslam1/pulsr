@@ -9,6 +9,7 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import android.hardware.usb.UsbRequest
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -20,6 +21,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.IOException
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 private const val TAG = "UsbErgonomicsPlugin"
 
@@ -33,7 +36,10 @@ private const val MEDIA_BUTTON_RECEIVER = "androidx.media.session.MediaButtonRec
 private const val AUDIO_SUBCLASS_STREAMING = 2
 
 private const val MIN_REPORT_BYTES = 8
-private const val TRANSFER_TIMEOUT_MS = 250
+// Item 5: UsbRequest.requestWait() has no timeout parameter (it returns when the
+// request completes, is cancelled, or the device goes away), so the old 250 ms
+// bulkTransfer timeout is gone. The wait is now event-driven instead of a 4 Hz
+// poll, and the failure backoff below still applies to every failed queue/wait.
 private const val FAILURE_BACKOFF_MS = 50L
 private const val REPEAT_GUARD_MS = 120L
 
@@ -89,6 +95,9 @@ class UsbErgonomicsPlugin private constructor(
 
     @Volatile private var hidThread: HandlerThread? = null
     @Volatile private var hidConnection: UsbDeviceConnection? = null
+    // Item 5: the pending interrupt IN request. Closed from the teardown path so a
+    // blocked requestWait() returns instead of pinning the reader thread.
+    @Volatile private var hidRequest: UsbRequest? = null
     @Volatile private var hidDevice: UsbDevice? = null
     @Volatile private var hidClaimed = false
     @Volatile private var consumerSeen = false
@@ -203,10 +212,26 @@ class UsbErgonomicsPlugin private constructor(
         hidSession += 1
         val connection = hidConnection
         val thread = hidThread
+        val request = hidRequest
         hidConnection = null
         hidDevice = null
         hidClaimed = false
         hidThread = null
+        hidRequest = null
+        // Item 5: cancel and close the pending request BEFORE the connection, so a
+        // reader blocked in requestWait() wakes up and observes the dead session.
+        if (request != null) {
+            try {
+                request.cancel()
+            } catch (e: Exception) {
+                Log.w(TAG, "Cancelling the HID request failed: ${e.message}")
+            }
+            try {
+                request.close()
+            } catch (e: Exception) {
+                Log.w(TAG, "Closing the HID request failed: ${e.message}")
+            }
+        }
         closeQuietly(connection)
         try {
             thread?.quitSafely()
@@ -310,6 +335,7 @@ class UsbErgonomicsPlugin private constructor(
                     hidConnection = null
                     hidDevice = null
                     hidThread = null
+                    hidRequest = null
                 }
             }
             releaseAndClose(connection, hidInterface)
@@ -322,34 +348,110 @@ class UsbErgonomicsPlugin private constructor(
         device: UsbDevice,
         session: Long,
     ) {
-        val buffer = ByteArray(maxOf(endpoint.maxPacketSize, MIN_REPORT_BYTES))
-        var previous = ByteArray(0)
-        while (isCurrentSession(session)) {
-            if (usbManager?.deviceList?.containsValue(device) != true) {
-                markHidStopped(session, "device_detached")
-                return
-            }
-            val read = try {
-                connection.bulkTransfer(endpoint, buffer, buffer.size, TRANSFER_TIMEOUT_MS)
+        // Item 5: kernels >= 4.9 reject BULK URBs submitted to an INTERRUPT
+        // endpoint (usb_urb_ep_type_check), so the old bulkTransfer() call could
+        // never have worked on a real DAC. UsbRequest submits an URB with the
+        // endpoint's own transfer type, which is what the HID class requires.
+        val request = UsbRequest()
+        if (!request.initialize(connection, endpoint)) {
+            try {
+                request.close()
             } catch (e: Exception) {
-                Log.w(TAG, "HID transfer failed: ${e.message}")
-                -1
+                Log.w(TAG, "Closing an unusable HID request failed: ${e.message}")
             }
-            if (!isCurrentSession(session)) return
-            if (read <= 0) {
-                try {
-                    Thread.sleep(FAILURE_BACKOFF_MS)
-                } catch (e: InterruptedException) {
-                    Log.w(TAG, "HID backoff was interrupted: ${e.message}")
-                    Thread.currentThread().interrupt()
+            markHidStopped(session, "hid_request_unsupported")
+            return
+        }
+        val capacity = maxOf(endpoint.maxPacketSize, MIN_REPORT_BYTES)
+        val buffer = ByteBuffer.allocateDirect(capacity).order(ByteOrder.nativeOrder())
+        val registered = synchronized(hidLock) {
+            if (hidSession != session || disposed) {
+                false
+            } else {
+                hidRequest = request
+                true
+            }
+        }
+        if (!registered) {
+            // A newer session (or dispose) won the race: drop only our request.
+            try {
+                request.close()
+            } catch (e: Exception) {
+                Log.w(TAG, "Closing a stale HID request failed: ${e.message}")
+            }
+            return
+        }
+        var previous = ByteArray(0)
+        try {
+            while (isCurrentSession(session)) {
+                if (usbManager?.deviceList?.containsValue(device) != true) {
+                    markHidStopped(session, "device_detached")
                     return
                 }
-                continue
+                // The framework writes at position 0 and advances the position by
+                // the number of bytes received, so clear() before every queue and
+                // read position() after the wait.
+                buffer.clear()
+                val queued = try {
+                    request.queue(buffer, capacity)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Queueing the HID request failed: ${e.message}")
+                    false
+                }
+                if (!isCurrentSession(session)) return
+                if (!queued) {
+                    if (!backoffHid(session)) return
+                    continue
+                }
+                val completed = try {
+                    // Blocks until the report arrives, the request is closed by the
+                    // teardown path, or the device is detached. Cancelling/closing
+                    // the request from stopHidLocked() is what unblocks it.
+                    connection.requestWait()
+                } catch (e: Exception) {
+                    Log.w(TAG, "HID transfer failed: ${e.message}")
+                    null
+                }
+                if (!isCurrentSession(session)) return
+                if (completed !== request) {
+                    // Cancelled/no data: preserve the old failure backoff instead
+                    // of spinning on a device that keeps refusing the transfer.
+                    if (!backoffHid(session)) return
+                    continue
+                }
+                val read = buffer.position()
+                if (read <= 0) {
+                    if (!backoffHid(session)) return
+                    continue
+                }
+                val report = ByteArray(read)
+                buffer.flip()
+                buffer.get(report, 0, read)
+                dispatchReport(report, previous, session)
+                previous = report
             }
-            val report = buffer.copyOf(read)
-            dispatchReport(report, previous, session)
-            previous = report
+        } finally {
+            synchronized(hidLock) {
+                if (hidRequest === request) hidRequest = null
+            }
+            try {
+                request.close()
+            } catch (e: Exception) {
+                Log.w(TAG, "Closing the HID request failed: ${e.message}")
+            }
         }
+    }
+
+    /** Sleeps the failure backoff; false when the session ended meanwhile. */
+    private fun backoffHid(session: Long): Boolean {
+        try {
+            Thread.sleep(FAILURE_BACKOFF_MS)
+        } catch (e: InterruptedException) {
+            Log.w(TAG, "HID backoff was interrupted: ${e.message}")
+            Thread.currentThread().interrupt()
+            return false
+        }
+        return isCurrentSession(session)
     }
 
     /**

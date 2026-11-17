@@ -135,6 +135,36 @@ class SystemAudioEffectsController(private val context: Context) {
     fun getPartiallyBypassedEffects(): List<String> = partiallyBypassedEffects.toList()
 
     /**
+     * Applies the verdict implied by a detection result.
+     *
+     * `bundles` are the descriptors detection matched; the managed set is what
+     * this controller actually silenced. A non-empty detection with no held
+     * effect is ACTIVE (the OEM effect is running), a fully silenced set is
+     * BYPASSED, and a partially silenced set is PARTIALLY_BYPASSED. BYPASSED is
+     * therefore never inferred from detection alone.
+     */
+    private fun applyDetectionResult(bundles: List<String>): Status {
+        currentStatus = when {
+            bundles.isEmpty() -> Status.UNSUPPORTED_DEVICE
+            managedEffects.isEmpty() -> Status.ACTIVE
+            partiallyBypassedEffects.isEmpty() -> Status.BYPASSED
+            else -> Status.PARTIALLY_BYPASSED
+        }
+        return currentStatus
+    }
+
+    /**
+     * Test seam: runs the post-detection verdict as if [bundles] had been found.
+     * Uses the production [applyDetectionResult] so the regression covers the real
+     * decision, not a copy of it.
+     */
+    internal fun applyDetectionResultForTesting(bundles: List<String>): Status {
+        detectedBundles.clear()
+        detectedBundles.addAll(bundles)
+        return applyDetectionResult(bundles)
+    }
+
+    /**
      * Query audio effects installed in the Android HAL / AudioFlinger.
      */
     fun detect(): Map<String, Any?> {
@@ -160,7 +190,13 @@ class SystemAudioEffectsController(private val context: Context) {
             // descriptor could actually be controlled; counting held effects
             // against the deduped display list reported PARTIALLY_BYPASSED for a
             // device we had silenced completely (and vice versa).
-            if (detectedBundles.isEmpty()) currentStatus = Status.UNSUPPORTED_DEVICE
+            //
+            // Item 6: the verdict must be refreshed for a NON-empty result too. It
+            // used to be written only when no bundle was found, so a stale BYPASSED
+            // survived a reboot, a system update or an OEM turn-off forever. Never
+            // report BYPASSED from detection alone: nothing is bypassed unless we
+            // still hold a silenced effect.
+            applyDetectionResult(detectedBundles);
         } catch (e: Exception) {
             Log.w(TAG, "AudioEffect.queryEffects failed gracefully: ${e.message}")
             currentStatus = Status.UNSUPPORTED_DEVICE
