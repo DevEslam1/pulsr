@@ -64,8 +64,21 @@ class DspIntRange {
   int clamp(int value) => value.clamp(min, max);
 }
 
-/// The DSP parameter range contract. Grouped by stage; the comments cite the
-/// matching struct/field in `android/app/src/main/cpp/DspParams.h`.
+/// The DSP parameter range contract — the AUTHORITATIVE table.
+///
+/// Every stage that clamps a DSP parameter must use these numbers, and the same
+/// numbers are mirrored in `android/app/src/main/cpp/DspParamRanges.h` (native
+/// sanitizer + per-stage clamps) and in `AudioEffectsPlugin.kt` (`DspParamRanges`
+/// object). Two tests keep the three in lockstep:
+///  * `android/app/src/test/kotlin/.../DspParamRangesContractTest.kt` parses this
+///    file and asserts the Kotlin object equals it.
+///  * `android/app/src/test/cpp/test_param_ranges.cpp` feeds every bound through
+///    `SanitizeSnapshot` and the owning stage clamp and asserts nothing is
+///    modified.
+///
+/// Where a stage can do more than the UI offers, the UI's narrower range wins and
+/// the reason is documented on the entry. A value listed here is a promise: no
+/// layer may silently narrow it further.
 abstract final class DspParamRanges {
   // --- Parametric EQ ---------------------------------------------------------
   /// Per-band graphic-EQ gain. App/UI range (DspParams.h EqBandParam.gainDb has
@@ -91,6 +104,9 @@ abstract final class DspParamRanges {
   static const DspRange virtualizerStrength = DspRange(0.0, 1.0);
 
   // --- Crossfeed (DspParams.h CrossfeedParamSet) -----------------------------
+  /// bs2b "custom" delay. The native stage can do 50..2000 µs; the custom panel
+  /// never offers more than 700 µs, and that narrower product range is the
+  /// contract (the stage clamp was widened to it).
   static const DspRange crossfeedDelayUs =
       DspRange(200.0, 700.0, defaultValue: 350.0);
   static const DspRange crossfeedFeedDb =
@@ -102,6 +118,7 @@ abstract final class DspParamRanges {
   static const DspIntRange crossfeedMode = DspIntRange(0, 3);
 
   // --- Lookahead limiter (DspParams.h LimiterParamSet) -----------------------
+  /// Also used by the headphone-safety limiter, whose ceiling can be -40 dB.
   static const DspRange limiterThresholdDb =
       DspRange(-60.0, 0.0, defaultValue: -0.2);
   static const DspRange limiterReleaseMs =
@@ -152,6 +169,9 @@ abstract final class DspParamRanges {
   static const DspRange volumeLinear = DspRange(0.0, 1.0, defaultValue: 1.0);
 
   // --- Sub crossover (DspParams.h SubCrossoverParamSet) ----------------------
+  /// Bass-management corner. The stage accepts 20..500 Hz; the UI only offers
+  /// 60..150 Hz, which is the contract (a 500 Hz "sub" corner is not a
+  /// subwoofer split).
   static const DspRange subCrossoverCornerHz =
       DspRange(60.0, 150.0, defaultValue: 80.0);
   static const DspRange subCrossoverGain =
@@ -183,4 +203,74 @@ abstract final class DspParamRanges {
   static const DspIntRange dynamicBassYHigh = DspIntRange(30, 300);
   static const DspRange dynamicBassSideGainLow = DspRange(0.0, 1.0);
   static const DspRange dynamicBassSideGainHigh = DspRange(0.0, 1.0);
+
+  // --- Dynamic EQ (DspParams.h DynamicEqBandParam) ---------------------------
+  /// Band centre frequency. The native stage additionally clamps to 0.45*fs
+  /// (physical Nyquist guard, not a contract narrowing).
+  static const DspRange dynamicEqFrequencyHz =
+      DspRange(20.0, 20000.0, defaultValue: 1000.0);
+
+  /// Agreed maximum Q is 20 (UI + Kotlin). The native stage used to stop at 12
+  /// and the sanitizer accepted 100; neither extreme was reachable from the UI.
+  static const DspRange dynamicEqQ = DspRange(0.1, 20.0, defaultValue: 2.0);
+
+  static const DspRange dynamicEqThresholdDb =
+      DspRange(-80.0, 0.0, defaultValue: -30.0);
+
+  /// 1..20: a ratio below 1 would invert the expander/compressor direction, so
+  /// the old sanitizer floor of 0.1 was never honoured by the stage.
+  static const DspRange dynamicEqRatio = DspRange(1.0, 20.0, defaultValue: 3.0);
+
+  static const DspRange dynamicEqAttackMs =
+      DspRange(0.1, 200.0, defaultValue: 5.0);
+  static const DspRange dynamicEqReleaseMs =
+      DspRange(5.0, 2000.0, defaultValue: 120.0);
+
+  /// ±48 dB is the widest documented cut/boost contract; the old stage clamp of
+  /// ±24 dB silently halved a legal UI value.
+  static const DspRange dynamicEqMaxCutDb =
+      DspRange(-48.0, 0.0, defaultValue: -12.0);
+  static const DspRange dynamicEqMaxBoostDb =
+      DspRange(0.0, 48.0, defaultValue: 12.0);
+
+  // --- Multiband compressor (DspParams.h MultibandBandParam) -----------------
+  // These are the same numbers as the `compressor*` knobs above; both names are
+  // kept because the visual compressor UI and the multiband engine section each
+  // read their own alias. They must never drift apart.
+  static const DspRange multibandThresholdDb =
+      DspRange(-60.0, 0.0, defaultValue: -18.0);
+  static const DspRange multibandRatio = DspRange(1.0, 20.0, defaultValue: 2.0);
+  static const DspRange multibandAttackMs =
+      DspRange(0.1, 200.0, defaultValue: 15.0);
+
+  /// Native release is capped at 1000 ms (a 2 s release reads as a level drift,
+  /// not compression) — a genuine stage limit, so the contract follows it.
+  static const DspRange multibandReleaseMs =
+      DspRange(5.0, 1000.0, defaultValue: 100.0);
+  static const DspRange multibandKneeDb = DspRange(0.0, 12.0, defaultValue: 3.0);
+
+  /// Deliberately non-negative: applying a *negative* makeup is the EQ preamp's
+  /// job, and the old Kotlin -24..24 range was silently clamped to >= 0 here.
+  static const DspRange multibandMakeupGainDb = DspRange(0.0, 24.0);
+
+  // --- Headphone safety (DspParams.h HeadphoneSafetyParamSet) ----------------
+  /// Weekly-dose multiplier. JNI used to cap at 10, Kotlin allowed 100 and the
+  /// sanitizer 0.1..100; 0.1..100 is the widest range the UI can express, so all
+  /// three now share it.
+  static const DspRange safetyDoseThreshold =
+      DspRange(0.1, 100.0, defaultValue: 1.0);
+  static const DspRange safetyCeilingDb =
+      DspRange(-40.0, 0.0, defaultValue: -6.0);
+
+  // --- Bit-perfect / dither (DspParams.h BitPerfectParamSet / DitherParamSet) -
+  /// Direct-USB software attenuation. 1.0 is the only bit-exact value.
+  static const DspRange directUsbGain = DspRange(0.0, 1.0, defaultValue: 1.0);
+
+  /// Dither only exists for integer PCM depths; anything else falls back to 16
+  /// (a zero/other depth would silently disable the quantiser).
+  static const List<int> ditherBitDepths = <int>[16, 24, 32];
+
+  /// Returns [value] when it is a supported dither depth, else 16.
+  static int normalizeDitherBitDepth(int value) =>
+      ditherBitDepths.contains(value) ? value : 16;
 }

@@ -18,6 +18,9 @@ void SubCrossover::setSampleRate(double sampleRate) {
 }
 
 void SubCrossover::configure(double cornerHz, double slopeDbPerOct, double subGain, bool bassMono, bool antiPop) {
+    // Item 4: the stage keeps its physical 20..500 Hz capability; the user-facing
+    // contract (60..150 Hz bass management) is enforced in SanitizeSnapshot + the
+    // Kotlin plugin, so a contract bound is never re-narrowed here.
     const double newCorner = std::clamp(cornerHz, 20.0, 500.0);
     const bool newCascade = !(slopeDbPerOct < 18.0); // 12 dB/oct below 18, else 24
     const bool cornerChanged = std::abs(newCorner - cornerHz_) > 0.01;

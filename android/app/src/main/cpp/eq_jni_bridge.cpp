@@ -11,8 +11,12 @@
 #include <thread>
 #include <vector>
 #include "AudioDspEngine.h"
+#include "DspParamRanges.h"
 #include "IrBounds.h"
 #include "UsbAudioSink.h"
+
+// Item 4: short alias for the shared parameter contract (DspParamRanges.h).
+namespace dsp = pulsr::dsp;
 
 #define LOG_TAG "PulsrDSP"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -797,11 +801,18 @@ JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetHeadphoneSafetyParams(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled, jdouble threshold, jdouble ceilingDb) {
     const double safeThreshold = (std::isfinite(threshold) && threshold > 0.0)
-        ? std::clamp(static_cast<double>(threshold), 0.01, 10.0)
-        : 1.0;
+        // Item 4: one contract for the dose threshold (DspParamRanges.h). This
+        // bridge used to cap at 10 while Kotlin allowed 100 and the sanitizer
+        // 0.1..100, silently halving a value the UI could legitimately produce.
+        ? std::clamp(static_cast<double>(threshold),
+                     dsp::ranges::kSafetyDoseThreshold.min,
+                     dsp::ranges::kSafetyDoseThreshold.max)
+        : dsp::ranges::kSafetyDoseThreshold.fallback;
     const double safeCeilingDb = std::isfinite(ceilingDb)
-        ? std::clamp(static_cast<double>(ceilingDb), -24.0, 0.0)
-        : -6.0;
+        ? std::clamp(static_cast<double>(ceilingDb),
+                     dsp::ranges::kSafetyCeilingDb.min,
+                     dsp::ranges::kSafetyCeilingDb.max)
+        : dsp::ranges::kSafetyCeilingDb.fallback;
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.headphoneSafety.enabled = enabled;
         snap.headphoneSafety.doseThreshold = safeThreshold;
@@ -1492,9 +1503,14 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
             bool written = false;
             if (raw) {
                 if (!sourceBytes) return reject(EINVAL); // float cannot preserve S32 LSBs
+                // Item 3: the tap knows whether these raw words are DoP-framed, so
+                // the sink can synthesize marker-carrying silence on an underrun
+                // instead of zero-filling and destroying the marker stream.
+                usb.SetProducerDop(engine->wasLastBlockDop());
                 written = usb.WritePcm(sourceBytes, frameCount, channels, sourceBitDepth,
                                       sourceSampleRate, static_cast<int64_t>(engineHandle));
             } else {
+                usb.SetProducerDop(false);
                 written = usb.WriteInterleaved(floatBuffer, frameCount, channels,
                     static_cast<int>(engine->getSampleRate()), static_cast<int64_t>(engineHandle));
             }

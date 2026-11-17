@@ -2761,7 +2761,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setEqPreamp" -> {
-                    val preampDb = clamp((call.argument<Number>("preampDb"))?.toDouble() ?: 0.0, -36.0, 36.0)
+                    val preampDb = DspParamRanges.preampDb.clamp(
+                        (call.argument<Number>("preampDb"))?.toDouble() ?: 0.0
+                    )
                     setEqPreampValue(preampDb)
                     if (isNativeDspLoaded) {
                         try {
@@ -2782,9 +2784,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "EQ band index out of range [0 until $MAX_NATIVE_EQ_BANDS]: $index", null)
                         return
                     }
-                    val freq = clamp((call.argument<Number>("frequency"))?.toDouble() ?: 1000.0, 20.0, 22000.0)
-                    val gainDb = clamp((call.argument<Number>("gainDb"))?.toDouble() ?: 0.0, -36.0, 36.0)
-                    val q = clamp((call.argument<Number>("q"))?.toDouble() ?: 1.0, 0.1, 25.0)
+                    val freq = DspParamRanges.eqFilterFrequencyHz.clamp(
+                        (call.argument<Number>("frequency"))?.toDouble() ?: 1000.0
+                    )
+                    val gainDb = DspParamRanges.eqBandGainDb.clamp(
+                        (call.argument<Number>("gainDb"))?.toDouble() ?: 0.0
+                    )
+                    val q = DspParamRanges.eqFilterQ.clamp(
+                        (call.argument<Number>("q"))?.toDouble() ?: 1.0
+                    )
                     val type = (call.argument<Int>("type") ?: 0).coerceIn(0, 7)
                     val enabled = call.argument<Boolean>("enabled") ?: true
                     nativeEqBandSnapshots[index] = EqBandSnapshot(freq, gainDb, q, type, enabled)
@@ -2815,9 +2823,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "EQ bulk band count ${freqs.size} exceeds MAX ($MAX_NATIVE_EQ_BANDS)", null)
                         return
                     }
-                    val freqArr = DoubleArray(freqs.size) { clamp(freqs[it], 20.0, 22000.0) }
-                    val gainArr = DoubleArray(gains.size) { clamp(gains[it], -36.0, 36.0) }
-                    val qArr = qs?.let { DoubleArray(it.size) { idx -> clamp(it[idx], 0.1, 25.0) } }
+                    val freqArr = DoubleArray(freqs.size) {
+                        DspParamRanges.eqFilterFrequencyHz.clamp(freqs[it])
+                    }
+                    val gainArr = DoubleArray(gains.size) {
+                        DspParamRanges.eqBandGainDb.clamp(gains[it])
+                    }
+                    val qArr = qs?.let { values ->
+                        DoubleArray(values.size) { idx -> DspParamRanges.eqFilterQ.clamp(values[idx]) }
+                    }
                     val typeArr = types?.let { IntArray(it.size) { idx -> it[idx].coerceIn(0, 7) } }
                     nativeEqBandCountSnapshot = freqs.size
                     nativeEqBandSnapshots.clear()
@@ -2967,9 +2981,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setCrossfeedParams" -> {
-                    val delayUs = clamp((call.argument<Number>("delayUs"))?.toDouble() ?: 350.0, 100.0, 1000.0)
-                    val feedDb = clamp((call.argument<Number>("feedDb"))?.toDouble() ?: -9.0, -30.0, 0.0)
-                    val fcut = clamp((call.argument<Number>("fcut"))?.toDouble() ?: 650.0, 200.0, 2000.0)
+                    val delayUs = DspParamRanges.crossfeedDelayUs.clamp(
+                        (call.argument<Number>("delayUs"))?.toDouble() ?: 350.0
+                    )
+                    val feedDb = DspParamRanges.crossfeedFeedDb.clamp(
+                        (call.argument<Number>("feedDb"))?.toDouble() ?: -9.0
+                    )
+                    val fcut = DspParamRanges.crossfeedFcut.clamp(
+                        (call.argument<Number>("fcut"))?.toDouble() ?: 650.0
+                    )
                     crossfeedDelayUs = delayUs
                     crossfeedFeedDb = feedDb
                     crossfeedFcut = fcut
@@ -3027,9 +3047,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setLimiterParams" -> {
-                    val lookaheadMs = clamp((call.argument<Number>("lookaheadMs"))?.toDouble() ?: 3.0, 0.1, 20.0)
-                    val thresholdDb = clamp((call.argument<Number>("thresholdDb"))?.toDouble() ?: -0.2, -30.0, 0.0)
-                    val releaseMs = clamp((call.argument<Number>("releaseMs"))?.toDouble() ?: 50.0, 5.0, 1000.0)
+                    val lookaheadMs = DspParamRanges.limiterLookaheadMs.clamp(
+                        (call.argument<Number>("lookaheadMs"))?.toDouble() ?: 3.0
+                    )
+                    val thresholdDb = DspParamRanges.limiterThresholdDb.clamp(
+                        (call.argument<Number>("thresholdDb"))?.toDouble() ?: -0.2
+                    )
+                    val releaseMs = DspParamRanges.limiterReleaseMs.clamp(
+                        (call.argument<Number>("releaseMs"))?.toDouble() ?: 50.0
+                    )
                     val truePeak = call.argument<Boolean>("truePeakMode") ?: true
                     limiterLookaheadMs = lookaheadMs
                     limiterThresholdDb = thresholdDb
@@ -3502,8 +3528,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "Invalid headphone safety params: threshold=$rawThreshold, ceilingDb=$rawCeilingDb", null)
                         return
                     }
-                    val threshold = clamp(rawThreshold, 0.01, 100.0)
-                    val ceilingDb = clamp(rawCeilingDb, -60.0, 0.0)
+                    val threshold = DspParamRanges.safetyDoseThreshold.clamp(rawThreshold)
+                    val ceilingDb = DspParamRanges.safetyCeilingDb.clamp(rawCeilingDb)
                     isHeadphoneSafetyEnabled = enabled
                     headphoneSafetyDoseThreshold = threshold
                     headphoneSafetyCeilingDb = ceilingDb
@@ -3812,9 +3838,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "Sub crossover parameters must be finite", null)
                         return
                     }
-                    val cornerHz = clamp(rawCornerHz, 20.0, 1000.0)
+                    val cornerHz = DspParamRanges.subCrossoverCornerHz.clamp(rawCornerHz)
                     val slopeDbPerOct = if (rawSlope <= 18.0) 12.0 else 24.0
-                    val subGain = clamp(rawSubGain, 0.0, 2.0)
+                    val subGain = DspParamRanges.subCrossoverGain.clamp(rawSubGain)
                     subCrossoverCornerHz = cornerHz
                     subCrossoverSlopeDbPerOct = slopeDbPerOct
                     subCrossoverGain = subGain
@@ -3876,14 +3902,30 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "Dynamic EQ band index out of range [0 until $MAX_DYNAMIC_EQ_BANDS]: $index", null)
                         return
                     }
-                    val freq = clamp((call.argument<Number>("frequency"))?.toDouble() ?: 1000.0, 20.0, 22000.0)
-                    val q = clamp((call.argument<Number>("q"))?.toDouble() ?: 2.0, 0.1, 20.0)
-                    val thresholdDb = clamp((call.argument<Number>("thresholdDb"))?.toDouble() ?: -30.0, -80.0, 0.0)
-                    val ratio = clamp((call.argument<Number>("ratio"))?.toDouble() ?: 3.0, 1.0, 30.0)
-                    val attackMs = clamp((call.argument<Number>("attackMs"))?.toDouble() ?: 5.0, 0.1, 500.0)
-                    val releaseMs = clamp((call.argument<Number>("releaseMs"))?.toDouble() ?: 120.0, 5.0, 2000.0)
-                    val maxCutDb = clamp((call.argument<Number>("maxCutDb"))?.toDouble() ?: -12.0, -48.0, 0.0)
-                    val maxBoostDb = clamp((call.argument<Number>("maxBoostDb"))?.toDouble() ?: 12.0, 0.0, 48.0)
+                    val freq = DspParamRanges.dynamicEqFrequencyHz.clamp(
+                        (call.argument<Number>("frequency"))?.toDouble() ?: 1000.0
+                    )
+                    val q = DspParamRanges.dynamicEqQ.clamp(
+                        (call.argument<Number>("q"))?.toDouble() ?: 2.0
+                    )
+                    val thresholdDb = DspParamRanges.dynamicEqThresholdDb.clamp(
+                        (call.argument<Number>("thresholdDb"))?.toDouble() ?: -30.0
+                    )
+                    val ratio = DspParamRanges.dynamicEqRatio.clamp(
+                        (call.argument<Number>("ratio"))?.toDouble() ?: 3.0
+                    )
+                    val attackMs = DspParamRanges.dynamicEqAttackMs.clamp(
+                        (call.argument<Number>("attackMs"))?.toDouble() ?: 5.0
+                    )
+                    val releaseMs = DspParamRanges.dynamicEqReleaseMs.clamp(
+                        (call.argument<Number>("releaseMs"))?.toDouble() ?: 120.0
+                    )
+                    val maxCutDb = DspParamRanges.dynamicEqMaxCutDb.clamp(
+                        (call.argument<Number>("maxCutDb"))?.toDouble() ?: -12.0
+                    )
+                    val maxBoostDb = DspParamRanges.dynamicEqMaxBoostDb.clamp(
+                        (call.argument<Number>("maxBoostDb"))?.toDouble() ?: 12.0
+                    )
                     val mode = call.argument<Int>("mode") ?: 0
                     val filterType = call.argument<Int>("filterType") ?: 0
                     val enabled = call.argument<Boolean>("enabled") ?: true
@@ -3927,12 +3969,24 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "Band index out of range [0..3]: $bandIndex", null)
                         return
                     }
-                    val thresholdDb = clamp((call.argument<Number>("thresholdDb"))?.toDouble() ?: -20.0, -60.0, 0.0)
-                    val ratio = clamp((call.argument<Number>("ratio"))?.toDouble() ?: 2.0, 1.0, 20.0)
-                    val attackMs = clamp((call.argument<Number>("attackMs"))?.toDouble() ?: 20.0, 0.1, 500.0)
-                    val releaseMs = clamp((call.argument<Number>("releaseMs"))?.toDouble() ?: 100.0, 5.0, 2000.0)
-                    val kneeDb = clamp((call.argument<Number>("kneeDb"))?.toDouble() ?: 6.0, 0.0, 24.0)
-                    val makeupGainDb = clamp((call.argument<Number>("makeupGainDb"))?.toDouble() ?: 0.0, -24.0, 24.0)
+                    val thresholdDb = DspParamRanges.multibandThresholdDb.clamp(
+                        (call.argument<Number>("thresholdDb"))?.toDouble() ?: -20.0
+                    )
+                    val ratio = DspParamRanges.multibandRatio.clamp(
+                        (call.argument<Number>("ratio"))?.toDouble() ?: 2.0
+                    )
+                    val attackMs = DspParamRanges.multibandAttackMs.clamp(
+                        (call.argument<Number>("attackMs"))?.toDouble() ?: 20.0
+                    )
+                    val releaseMs = DspParamRanges.multibandReleaseMs.clamp(
+                        (call.argument<Number>("releaseMs"))?.toDouble() ?: 100.0
+                    )
+                    val kneeDb = DspParamRanges.multibandKneeDb.clamp(
+                        (call.argument<Number>("kneeDb"))?.toDouble() ?: 6.0
+                    )
+                    val makeupGainDb = DspParamRanges.multibandMakeupGainDb.clamp(
+                        (call.argument<Number>("makeupGainDb"))?.toDouble() ?: 0.0
+                    )
                     val enabled = call.argument<Boolean>("enabled") ?: true
                     multibandCompressorBandSnapshots[bandIndex] = MultibandCompressorBandSnapshot(
                         thresholdDb, ratio, attackMs, releaseMs, kneeDb, makeupGainDb, enabled,
@@ -4450,7 +4504,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setDitherParams" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
-                    val targetBitDepth = (call.argument<Int>("targetBitDepth") ?: 16).coerceIn(16, 32)
+                    val targetBitDepth = DspParamRanges.normalizeDitherBitDepth(
+                        call.argument<Int>("targetBitDepth") ?: 16
+                    )
                     val isBt = call.argument<Boolean>("isBluetooth") ?: isBluetoothRoute
                     val allowBt = call.argument<Boolean>("allowBluetoothDither") ?: isBluetoothDitherAllowed
                     isDitherEnabled = enabled

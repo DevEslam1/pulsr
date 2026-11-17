@@ -1,8 +1,12 @@
 // android/app/src/main/cpp/AudioDspEngine.cpp
 #include "AudioDspEngine.h"
+#include "DspParamRanges.h"
 #include <algorithm>
 #include <cmath>
 #include <thread>
+
+// Item 4: short alias for the shared parameter contract (DspParamRanges.h).
+namespace dsp = pulsr::dsp;
 
 namespace {
 
@@ -34,17 +38,35 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
         if (t < 0 || t > 7) b.type = FilterType::Peaking;
     }
 
-    s.crossfeed.delayUs = clampFinite(s.crossfeed.delayUs, 0.0, 2000.0, 0.0);
-    s.crossfeed.feedDb = clampFinite(s.crossfeed.feedDb, -30.0, 0.0, 0.0);
-    s.crossfeed.fcut = clampFinite(s.crossfeed.fcut, 100.0, 5000.0, 650.0);
+    s.crossfeed.delayUs = clampFinite(s.crossfeed.delayUs,
+                                     dsp::ranges::kCrossfeedDelayUs.min,
+                                     dsp::ranges::kCrossfeedDelayUs.max,
+                                     dsp::ranges::kCrossfeedDelayUs.fallback);
+    s.crossfeed.feedDb = clampFinite(s.crossfeed.feedDb,
+                                     dsp::ranges::kCrossfeedFeedDb.min,
+                                     dsp::ranges::kCrossfeedFeedDb.max,
+                                     dsp::ranges::kCrossfeedFeedDb.fallback);
+    s.crossfeed.fcut = clampFinite(s.crossfeed.fcut,
+                                   dsp::ranges::kCrossfeedFcutHz.min,
+                                   dsp::ranges::kCrossfeedFcutHz.max,
+                                   dsp::ranges::kCrossfeedFcutHz.fallback);
     {
         const int m = static_cast<int>(s.crossfeed.mode);
         if (m < 0 || m > 3) s.crossfeed.mode = CrossfeedMode::Bs2bDefault;
     }
 
-    s.limiter.lookaheadMs = clampFinite(s.limiter.lookaheadMs, 0.0, 20.0, 5.0);
-    s.limiter.thresholdDb = clampFinite(s.limiter.thresholdDb, -60.0, 0.0, -0.2);
-    s.limiter.releaseMs = clampFinite(s.limiter.releaseMs, 1.0, 1000.0, 50.0);
+    s.limiter.lookaheadMs = clampFinite(s.limiter.lookaheadMs,
+                                       dsp::ranges::kLimiterLookaheadMs.min,
+                                       dsp::ranges::kLimiterLookaheadMs.max,
+                                       dsp::ranges::kLimiterLookaheadMs.fallback);
+    s.limiter.thresholdDb = clampFinite(s.limiter.thresholdDb,
+                                       dsp::ranges::kLimiterThresholdDb.min,
+                                       dsp::ranges::kLimiterThresholdDb.max,
+                                       dsp::ranges::kLimiterThresholdDb.fallback);
+    s.limiter.releaseMs = clampFinite(s.limiter.releaseMs,
+                                      dsp::ranges::kLimiterReleaseMs.min,
+                                      dsp::ranges::kLimiterReleaseMs.max,
+                                      dsp::ranges::kLimiterReleaseMs.fallback);
 
     s.reverb.wetDry = clampFinite(s.reverb.wetDry, 0.0, 1.0, 0.2);
     s.reverb.predelayMs = clampFinite(s.reverb.predelayMs, 0.0, 150.0, 0.0);
@@ -79,9 +101,16 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.loudness.intensity = clampFinite(s.loudness.intensity, 0.0, 1.0, 0.0);
     s.loudness.volumeLinear = clampFinite(s.loudness.volumeLinear, 0.0, 1.0, 1.0);
 
-    s.subCrossover.cornerHz = clampFinite(s.subCrossover.cornerHz, 20.0, 500.0, 80.0);
+    // Item 4: the table is the contract; the stage clamps use the same header.
+    s.subCrossover.cornerHz = clampFinite(s.subCrossover.cornerHz,
+                                         dsp::ranges::kSubCrossoverCornerHz.min,
+                                         dsp::ranges::kSubCrossoverCornerHz.max,
+                                         dsp::ranges::kSubCrossoverCornerHz.fallback);
     s.subCrossover.slopeDbPerOct = clampFinite(s.subCrossover.slopeDbPerOct, 6.0, 48.0, 24.0);
-    s.subCrossover.subGain = clampFinite(s.subCrossover.subGain, 0.0, 2.0, 0.8);
+    s.subCrossover.subGain = clampFinite(s.subCrossover.subGain,
+                                        dsp::ranges::kSubCrossoverGain.min,
+                                        dsp::ranges::kSubCrossoverGain.max,
+                                        dsp::ranges::kSubCrossoverGain.fallback);
 
     s.channelManager.channelCount = clampInt(s.channelManager.channelCount, 2, ChannelManager::MAX_CHANNELS);
     for (int ch = 0; ch < ChannelManager::MAX_CHANNELS; ++ch) {
@@ -99,26 +128,53 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.dynamicEq.bandCount = clampInt(s.dynamicEq.bandCount, 0, DynamicEqParamSet::MAX_BANDS);
     for (int i = 0; i < DynamicEqParamSet::MAX_BANDS; ++i) {
         auto& b = s.dynamicEq.bands[i];
-        b.frequency = clampFinite(b.frequency, 10.0, 40000.0, 1000.0);
-        b.q = clampFinite(b.q, 0.05, 100.0, 2.0);
-        b.thresholdDb = clampFinite(b.thresholdDb, -80.0, 0.0, -30.0);
-        b.ratio = clampFinite(b.ratio, 0.1, 20.0, 3.0);
-        b.attackMs = clampFinite(b.attackMs, 0.1, 200.0, 5.0);
-        b.releaseMs = clampFinite(b.releaseMs, 5.0, 2000.0, 120.0);
-        b.maxCutDb = clampFinite(b.maxCutDb, -48.0, 0.0, -12.0);
-        b.maxBoostDb = clampFinite(b.maxBoostDb, 0.0, 48.0, 12.0);
+        b.frequency = clampFinite(b.frequency, dsp::ranges::kDynamicEqFrequencyHz.min,
+                                  dsp::ranges::kDynamicEqFrequencyHz.max,
+                                  dsp::ranges::kDynamicEqFrequencyHz.fallback);
+        b.q = clampFinite(b.q, dsp::ranges::kDynamicEqQ.min, dsp::ranges::kDynamicEqQ.max,
+                          dsp::ranges::kDynamicEqQ.fallback);
+        b.thresholdDb = clampFinite(b.thresholdDb, dsp::ranges::kDynamicEqThresholdDb.min,
+                                    dsp::ranges::kDynamicEqThresholdDb.max,
+                                    dsp::ranges::kDynamicEqThresholdDb.fallback);
+        b.ratio = clampFinite(b.ratio, dsp::ranges::kDynamicEqRatio.min,
+                              dsp::ranges::kDynamicEqRatio.max,
+                              dsp::ranges::kDynamicEqRatio.fallback);
+        b.attackMs = clampFinite(b.attackMs, dsp::ranges::kDynamicEqAttackMs.min,
+                                 dsp::ranges::kDynamicEqAttackMs.max,
+                                 dsp::ranges::kDynamicEqAttackMs.fallback);
+        b.releaseMs = clampFinite(b.releaseMs, dsp::ranges::kDynamicEqReleaseMs.min,
+                                  dsp::ranges::kDynamicEqReleaseMs.max,
+                                  dsp::ranges::kDynamicEqReleaseMs.fallback);
+        b.maxCutDb = clampFinite(b.maxCutDb, dsp::ranges::kDynamicEqMaxCutDb.min,
+                                 dsp::ranges::kDynamicEqMaxCutDb.max,
+                                 dsp::ranges::kDynamicEqMaxCutDb.fallback);
+        b.maxBoostDb = clampFinite(b.maxBoostDb, dsp::ranges::kDynamicEqMaxBoostDb.min,
+                                   dsp::ranges::kDynamicEqMaxBoostDb.max,
+                                   dsp::ranges::kDynamicEqMaxBoostDb.fallback);
         b.mode = clampInt(b.mode, 0, 1);
         b.filterType = clampInt(b.filterType, 0, 2);
     }
 
     for (int i = 0; i < MultibandCompressorParamSet::NUM_BANDS; ++i) {
         auto& b = s.multibandCompressor.bands[i];
-        b.thresholdDb = clampFinite(b.thresholdDb, -60.0, 0.0, -18.0);
-        b.ratio = clampFinite(b.ratio, 1.0, 20.0, 2.0);
-        b.attackMs = clampFinite(b.attackMs, 0.1, 200.0, 15.0);
-        b.releaseMs = clampFinite(b.releaseMs, 5.0, 1000.0, 100.0);
-        b.kneeDb = clampFinite(b.kneeDb, 0.0, 12.0, 3.0);
-        b.makeupGainDb = clampFinite(b.makeupGainDb, 0.0, 24.0, 0.0);
+        b.thresholdDb = clampFinite(b.thresholdDb, dsp::ranges::kMultibandThresholdDb.min,
+                                    dsp::ranges::kMultibandThresholdDb.max,
+                                    dsp::ranges::kMultibandThresholdDb.fallback);
+        b.ratio = clampFinite(b.ratio, dsp::ranges::kMultibandRatio.min,
+                              dsp::ranges::kMultibandRatio.max,
+                              dsp::ranges::kMultibandRatio.fallback);
+        b.attackMs = clampFinite(b.attackMs, dsp::ranges::kMultibandAttackMs.min,
+                                 dsp::ranges::kMultibandAttackMs.max,
+                                 dsp::ranges::kMultibandAttackMs.fallback);
+        b.releaseMs = clampFinite(b.releaseMs, dsp::ranges::kMultibandReleaseMs.min,
+                                  dsp::ranges::kMultibandReleaseMs.max,
+                                  dsp::ranges::kMultibandReleaseMs.fallback);
+        b.kneeDb = clampFinite(b.kneeDb, dsp::ranges::kMultibandKneeDb.min,
+                               dsp::ranges::kMultibandKneeDb.max,
+                               dsp::ranges::kMultibandKneeDb.fallback);
+        b.makeupGainDb = clampFinite(b.makeupGainDb, dsp::ranges::kMultibandMakeupGainDb.min,
+                                     dsp::ranges::kMultibandMakeupGainDb.max,
+                                     dsp::ranges::kMultibandMakeupGainDb.fallback);
     }
     for (int i = 0; i < MultibandCompressorParamSet::NUM_BANDS - 1; ++i) {
         s.multibandCompressor.crossoverFreqs[i] =
@@ -167,8 +223,24 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.liveProg.slider7 = clampFinite(s.liveProg.slider7, -1e6, 1e6, 0.0);
     s.liveProg.slider8 = clampFinite(s.liveProg.slider8, -1e6, 1e6, 0.0);
 
-    s.headphoneSafety.doseThreshold = clampFinite(s.headphoneSafety.doseThreshold, 0.1, 100.0, 1.0);
-    s.headphoneSafety.safetyCeilingDb = clampFinite(s.headphoneSafety.safetyCeilingDb, -40.0, 0.0, -6.0);
+    s.headphoneSafety.doseThreshold = clampFinite(s.headphoneSafety.doseThreshold,
+                                                 dsp::ranges::kSafetyDoseThreshold.min,
+                                                 dsp::ranges::kSafetyDoseThreshold.max,
+                                                 dsp::ranges::kSafetyDoseThreshold.fallback);
+    s.headphoneSafety.safetyCeilingDb = clampFinite(s.headphoneSafety.safetyCeilingDb,
+                                                   dsp::ranges::kSafetyCeilingDb.min,
+                                                   dsp::ranges::kSafetyCeilingDb.max,
+                                                   dsp::ranges::kSafetyCeilingDb.fallback);
+
+    // Item 11: defense-in-depth for the two bit-perfect/dither fields that had
+    // no sanitizer bound at all. A zero/other dither depth would silently skip
+    // quantisation, and an unbounded direct-USB gain could exceed unity and
+    // break the bit-exact pass-through promise.
+    s.dither.targetBitDepth = dsp::ranges::ClampDitherBitDepth(s.dither.targetBitDepth);
+    s.bitPerfect.directUsbGain = clampFinite(s.bitPerfect.directUsbGain,
+                                            dsp::ranges::kDirectUsbGain.min,
+                                            dsp::ranges::kDirectUsbGain.max,
+                                            dsp::ranges::kDirectUsbGain.fallback);
 
     s.bypassCompare.gainCompensationLinear =
         clampFinite(s.bypassCompare.gainCompensationLinear, 0.001, 16.0, 1.0);
@@ -1041,8 +1113,31 @@ void AudioDspEngine::processSafetyStage(float* buffer, int frames, int channels,
                                         int& blockLatency) {
     if (!snapshot.headphoneSafety.enabled || frames <= 0 || channels <= 0 ||
         currentSr <= 0.0) {
-        smoothedSafetyGain_ = 1.0;
+        // Item 9: disabling safety mid-attenuation must not snap the gain back to
+        // unity (an audible +6 dB step). Ramp it over the same 20 ms tau the
+        // attenuation uses, while skipping dose metering and the ceiling limiter
+        // immediately (the user asked for the safety stage to stop working).
         safetyAttenuationActive_.store(false, std::memory_order_relaxed);
+        if (smoothedSafetyGain_ < 1.0 && frames > 0 && channels > 0 && currentSr > 0.0) {
+            const double startGain = smoothedSafetyGain_;
+            const double safetyTau = 0.020;
+            const double safetySmooth =
+                1.0 - std::exp(-static_cast<double>(frames) / (currentSr * safetyTau));
+            smoothedSafetyGain_ += safetySmooth * (1.0 - smoothedSafetyGain_);
+            if (1.0 - smoothedSafetyGain_ < 1e-4) smoothedSafetyGain_ = 1.0;
+            double currentGain = startGain;
+            const double gainIncrement =
+                (smoothedSafetyGain_ - startGain) / static_cast<double>(frames);
+            for (int f = 0; f < frames; ++f) {
+                const float g = static_cast<float>(currentGain);
+                for (int ch = 0; ch < channels; ++ch) {
+                    buffer[f * channels + ch] *= g;
+                }
+                currentGain += gainIncrement;
+            }
+        } else {
+            smoothedSafetyGain_ = 1.0;
+        }
         return;
     }
 
@@ -1269,6 +1364,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         }
     }
     lastBlockBitPerfect_.store(snapshot && snapshot->bitPerfect.enabled, std::memory_order_relaxed);
+    lastBlockDop_.store(snapshot && snapshot->bitPerfect.enabled && snapshot->bitPerfect.isDop,
+                        std::memory_order_relaxed);
     if (!snapshot) {
         effectiveLatencyFrames_.store(0, std::memory_order_release);
         limiterActive_.store(false, std::memory_order_relaxed);
@@ -1436,6 +1533,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         limiter_.setProcessingActive(false);
         smoothedReplayGain_ = 1.0;
         smoothedDirectVolume_ = 1.0;
+        // Item 9: match the bit-perfect path. The Direct USB software gain stage
+        // is skipped on this path too, so its smoother must restart at unity;
+        // otherwise leaving A/B compares loudness against a stale attenuation.
+        smoothedDirectUsbVolume_ = 1.0;
         // Auto-Level: cancel the DSP chain's measured loudness change on the dry
         // signal. If the chain measured +3 dB, the dry path is trimmed -3 dB so
         // the comparison is level-matched. Clamp the correction so a momentary

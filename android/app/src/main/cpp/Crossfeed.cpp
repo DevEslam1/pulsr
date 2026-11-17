@@ -133,6 +133,12 @@ void Crossfeed::clearCustomState() {
 }
 
 void Crossfeed::configure(double delayUs, double feedDb, double fcut) {
+    // Item 4: the stage keeps its full PHYSICAL range (50..2000 us, -30..0 dB,
+    // 100..5000 Hz) because bespoke callers (bs2b presets, headphone profiles,
+    // tests) legitimately use it. The user-facing contract is deliberately
+    // narrower (200..700 us, -15..-6 dB, 200..2000 Hz) and is enforced once, in
+    // SanitizeSnapshot + the Kotlin plugin, so this clamp never re-narrows a
+    // sanitized value: every contract bound lies inside the physical range.
     delayUs_ = std::clamp(delayUs, 50.0, 2000.0);
     feedDb_ = std::clamp(feedDb, -30.0, 0.0);
     fcut_ = std::clamp(fcut, 100.0, 5000.0);

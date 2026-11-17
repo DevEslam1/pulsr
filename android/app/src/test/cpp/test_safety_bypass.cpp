@@ -137,6 +137,49 @@ int main() {
               "disabled headphone safety must not accumulate dose");
     }
 
+    {
+        // Item 9: disabling headphone safety mid-attenuation must release over the
+        // same 20 ms tau the attenuation uses, not snap +6 dB inside one block.
+        auto engine = makeEngine(sr);
+        auto snap = baseSnapshot(sr);
+        snap->headphoneSafety.enabled = true;
+        snap->headphoneSafety.doseThreshold = 1e-12;  // any signal crosses it
+        engine->publishParams(snap);
+
+        const auto loud = makeSignal(frames, channels, 0.2f);
+        std::vector<float> work = loud;
+        for (int b = 0; b < 60; ++b) {
+            work = loud;
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        check(engine->isSafetyAttenuationActive(),
+              "safety must be engaged before the release test");
+        const float attenuated = peak(work);
+        check(attenuated < 0.2f * 0.75f,
+              "safety must hold the signal near -6 dB before it is disabled");
+
+        snap = baseSnapshot(sr);
+        snap->headphoneSafety.enabled = false;
+        engine->publishParams(snap);
+
+        work = loud;
+        engine->processInterleaved(work.data(), frames, channels);
+        const float firstBlock = peak(work);
+        check(firstBlock > attenuated * 1.01f,
+              "the release ramp must start on the first disabled block");
+        check(firstBlock < 0.2f * 0.95f,
+              "disabling safety must not snap to unity in one block");
+
+        for (int b = 0; b < 40; ++b) {
+            work = loud;
+            engine->processInterleaved(work.data(), frames, channels);
+        }
+        check(std::fabs(peak(work) - 0.2f) < 0.002f,
+              "the release ramp must reach unity within ~200 ms");
+        check(!engine->isSafetyAttenuationActive(),
+              "a disabled safety stage must not report attenuation");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " safety bypass check(s) failed." << std::endl;
         return 1;

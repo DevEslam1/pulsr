@@ -122,6 +122,11 @@ public:
     uint64_t getLastAppliedGeneration() const { return lastAppliedGeneration_.load(); }
     uint64_t getPublishedGeneration() const { return snapshotGeneration_.load(); }
     bool wasLastBlockBitPerfect() const { return lastBlockBitPerfect_.load(std::memory_order_relaxed); }
+    // Item 3: render-thread-safe flag telling the USB tap whether the block it
+    // just pushed through was a DoP carrier (marker in the MSB of every word), so
+    // the sink can synthesize valid DoP silence on an underrun. Reads the same
+    // lock-free mirror as wasLastBlockBitPerfect(); no shared_ptr traffic.
+    bool wasLastBlockDop() const { return lastBlockDop_.load(std::memory_order_relaxed); }
     bool isLimiterActive() const { return limiterActive_.load(std::memory_order_relaxed); }
 
     void resyncForTrack(double sampleRate, int channels = 2);
@@ -385,6 +390,7 @@ private:
     // audioHazardPtr_ (see processInterleaved / retireAndDrain).
     std::atomic<const DspParamSnapshot*> currentParamsPtr_{nullptr};
     std::atomic<bool> lastBlockBitPerfect_{false};
+    std::atomic<bool> lastBlockDop_{false};
 
     // Per-renderer hazard slots plus a monotonic publishEpoch_ counter to prevent
     // pointer-address ABA across snapshot reallocations and concurrent

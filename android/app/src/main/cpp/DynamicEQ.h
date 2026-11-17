@@ -23,6 +23,25 @@ public:
     void setBandCount(int count);
     int getBandCount() const { return bandCount_; }
     void setBand(int idx, const DynamicEqBandParam& params);
+    // Item 4 contract test: the clamped band in force (copy, so the caller cannot
+    // mutate render state).
+    DynamicEqBandParam getBandParams(int idx) const {
+        DynamicEqBandParam out{};
+        if (idx < 0 || idx >= MAX_BANDS) return out;
+        const BandState& b = bands_[idx];
+        out.frequency = b.frequency;
+        out.q = b.q;
+        out.thresholdDb = b.thresholdDb;
+        out.ratio = b.ratio;
+        out.attackMs = b.attackMs;
+        out.releaseMs = b.releaseMs;
+        out.maxCutDb = b.maxCutDb;
+        out.maxBoostDb = b.maxBoostDb;
+        out.mode = b.mode;
+        out.filterType = b.filterType;
+        out.enabled = b.enabled;
+        return out;
+    }
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
     bool isRamping() const {

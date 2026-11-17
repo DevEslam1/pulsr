@@ -1,7 +1,11 @@
 // android/app/src/main/cpp/DynamicEQ.cpp
 #include "DynamicEQ.h"
+#include "DspParamRanges.h"
 #include <cstring>
 #include <cmath>
+
+// Item 4: short alias for the shared parameter contract (DspParamRanges.h).
+namespace dsp = pulsr::dsp;
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
@@ -55,8 +59,14 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
     // band's retained filter state can be cleared below. computeBandCoeffs
     // never touches the detector state, so a retune at non-zero gain otherwise
     // leaves stale registers and clicks. Capture old values before overwriting.
-    const double newFreq = std::clamp(params.frequency, 20.0, sampleRate_ * 0.45);
-    const double newQ = std::clamp(params.q, 0.1, 12.0);
+    // Item 4: bounds come from the shared contract. The former local literals
+    // (Q <= 12, cut/boost <= 24 dB) silently halved values that the Dart UI and
+    // the snapshot sanitizer already accepted. The Nyquist guard is physical, not
+    // a contract narrowing: a biquad above 0.45*fs is numerically unstable.
+    const double nyquistLimit = sampleRate_ * 0.45;
+    const double newFreq = std::min(
+        dsp::ranges::kDynamicEqFrequencyHz.clamp(params.frequency), nyquistLimit);
+    const double newQ = dsp::ranges::kDynamicEqQ.clamp(params.q);
     const int newFilterType = std::clamp(params.filterType, 0, 2);
     const bool filterTypeChanged = (newFilterType != band.filterType);
     // The detector cache depends only on frequency/Q/type. Snapshot churn from
@@ -69,12 +79,12 @@ void DynamicEQ::setBand(int idx, const DynamicEqBandParam& params) {
 
     band.frequency = newFreq;
     band.q = newQ;
-    band.thresholdDb = std::clamp(params.thresholdDb, -80.0, 0.0);
-    band.ratio = std::clamp(params.ratio, 1.0, 20.0);
-    band.attackMs = std::clamp(params.attackMs, 0.1, 200.0);
-    band.releaseMs = std::clamp(params.releaseMs, 5.0, 2000.0);
-    band.maxCutDb = std::clamp(params.maxCutDb, -24.0, 0.0);
-    band.maxBoostDb = std::clamp(params.maxBoostDb, 0.0, 24.0);
+    band.thresholdDb = dsp::ranges::kDynamicEqThresholdDb.clamp(params.thresholdDb);
+    band.ratio = dsp::ranges::kDynamicEqRatio.clamp(params.ratio);
+    band.attackMs = dsp::ranges::kDynamicEqAttackMs.clamp(params.attackMs);
+    band.releaseMs = dsp::ranges::kDynamicEqReleaseMs.clamp(params.releaseMs);
+    band.maxCutDb = dsp::ranges::kDynamicEqMaxCutDb.clamp(params.maxCutDb);
+    band.maxBoostDb = dsp::ranges::kDynamicEqMaxBoostDb.clamp(params.maxBoostDb);
     band.mode = std::clamp(params.mode, 0, 1);
     band.filterType = newFilterType;
     band.enabled = params.enabled;

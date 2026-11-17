@@ -104,6 +104,8 @@ set(REVERB_SRCS
 )
 
 pulsr_add_test(test_reverb_regression ${REVERB_SRCS})
+# Item 2: direct-IR (<= 1024 tap) crossfade completion.
+pulsr_add_test(test_reverb_direct_crossfade ${REVERB_SRCS})
 pulsr_add_test(test_reverb_equivalence ${REVERB_SRCS})
 pulsr_add_test(test_reverb_fft ${REVERB_SRCS})
 
@@ -113,6 +115,12 @@ pulsr_add_test(test_dsd_dynamic_cic ${MAIN_CPP}/DsdDecoder.cpp)
 pulsr_add_test(test_engine_registry ${DSP_SRCS})
 
 pulsr_add_test(test_limiter_true_peak ${MAIN_CPP}/LookaheadLimiter.cpp)
+# Item 1: a sample-rate change on an active limiter must re-prime, not go silent.
+pulsr_add_test(test_limiter_rate_change ${MAIN_CPP}/LookaheadLimiter.cpp)
+# Item 4: the range table must survive SanitizeSnapshot and every stage clamp.
+pulsr_add_test(test_param_ranges ${DSP_SRCS})
+# Item 3: DoP underrun silence is a pure helper (header only).
+pulsr_add_test(test_dop_silence)
 
 pulsr_add_test(test_sinc_resampler ${MAIN_CPP}/SincResampler.cpp)
 pulsr_add_test(test_dop_framer ${MAIN_CPP}/DopFramer.cpp)

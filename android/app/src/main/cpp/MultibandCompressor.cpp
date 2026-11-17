@@ -1,5 +1,9 @@
 // android/app/src/main/cpp/MultibandCompressor.cpp
 #include "MultibandCompressor.h"
+#include "DspParamRanges.h"
+
+// Item 4: short alias for the shared parameter contract (DspParamRanges.h).
+namespace dsp = pulsr::dsp;
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
@@ -69,8 +73,8 @@ void MultibandCompressor::updateCoefficients() {
     }
 
     for (int b = 0; b < NUM_BANDS; ++b) {
-        const double attSec = std::clamp(params_.bands[b].attackMs, 0.1, 500.0) * 0.001;
-        const double relSec = std::clamp(params_.bands[b].releaseMs, 5.0, 2000.0) * 0.001;
+        const double attSec = dsp::ranges::kMultibandAttackMs.clamp(params_.bands[b].attackMs) * 0.001;
+        const double relSec = dsp::ranges::kMultibandReleaseMs.clamp(params_.bands[b].releaseMs) * 0.001;
         attackCoeff_[b] = std::exp(-1.0 / (attSec * sampleRate_));
         releaseCoeff_[b] = std::exp(-1.0 / (relSec * sampleRate_));
     }
