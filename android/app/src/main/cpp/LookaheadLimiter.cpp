@@ -1,7 +1,11 @@
 // android/app/src/main/cpp/LookaheadLimiter.cpp
 #include "LookaheadLimiter.h"
+#include "DspParamRanges.h"
 #include <cstring>
 #include <cmath>
+
+// Item 4: short alias for the shared parameter contract (DspParamRanges.h).
+namespace dsp = pulsr::dsp;
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
@@ -49,19 +53,36 @@ LookaheadLimiter::LookaheadLimiter() {
 
 void LookaheadLimiter::setSampleRate(double sampleRate) {
     if (sampleRate <= 0.0 || std::abs(sampleRate_ - sampleRate) < 1.0) return;
+    // Item 1: a live limiter must re-prime, not go silent. configure() may
+    // already start an enable transition when the lookahead length changed, but
+    // the unconditional reset() below wipes it: reset() zeroes the delay line
+    // while bypassMix_ returns to 1.0 (fully wet) and clears processingActive_,
+    // so the stage emits one lookahead window of digital silence in the middle
+    // of an otherwise continuous stream. Capture the live state first, then
+    // restore the insertion transition after the reset.
+    const bool wasActive = (processingActive_ && enabled_);
     sampleRate_ = sampleRate;
     configure(lookaheadMs_, thresholdDb_, releaseMs_, truePeakMode_);
     reset();
+    if (wasActive) {
+        // Same dry hold + fade as setEnabled(true)/setProcessingActive(true):
+        // the next lookaheadSamples_ + FILTER_DELAY frames pass the current
+        // input through (gain-limited) and then crossfade to the fresh delayed
+        // stream. A dormant/reset limiter keeps the plain reset above.
+        processingActive_ = true;
+        beginEnableTransition();
+    }
 }
 
 void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double releaseMs, bool truePeakMode) {
-    lookaheadMs_ = std::clamp(lookaheadMs, 0.1, 20.0);
-    // Match the Dart contract (DspParamRanges.limiterThresholdDb) and the
-    // snapshot sanitizer (-60..0) so a valid UI value is not silently clamped.
+    // Item 4: every bound here comes from DspParamRanges.h so the UI, the
+    // snapshot sanitizer and this stage cannot disagree. A value the sanitizer
+    // accepts must never be narrowed again by the stage's own literals.
+    lookaheadMs_ = dsp::ranges::kLimiterLookaheadMs.clamp(lookaheadMs);
     // The shared class also serves the headphone-safety limiter, whose ceiling
-    // may be as low as -40 dB.
-    thresholdDb_ = std::clamp(thresholdDb, -60.0, 0.0);
-    releaseMs_ = std::clamp(releaseMs, 5.0, 1000.0);
+    // may be as low as -40 dB, so the range is -60..0 dB.
+    thresholdDb_ = dsp::ranges::kLimiterThresholdDb.clamp(thresholdDb);
+    releaseMs_ = dsp::ranges::kLimiterReleaseMs.clamp(releaseMs);
     truePeakMode_ = truePeakMode;
 
     const int newLookahead = std::clamp(

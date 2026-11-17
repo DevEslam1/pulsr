@@ -63,6 +63,12 @@ public:
     }
     float getCurrentGainReductionDb() const { return gainReductionDb_.load(std::memory_order_relaxed); }
 
+    // Item 4 contract test: the values actually in force after clamping, so the
+    // test can prove no stage narrows a table bound.
+    double getThresholdDb() const { return thresholdDb_; }
+    double getReleaseMs() const { return releaseMs_; }
+    double getLookaheadMs() const { return lookaheadMs_; }
+
     /** Sample index of the min-gain entry at the deque head. */
     int64_t getMinGainSampleIndex() const {
         constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
