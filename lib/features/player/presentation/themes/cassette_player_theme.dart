@@ -73,8 +73,9 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
   void _syncSpool({bool restartIfAnimating = false}) {
     final duration = _spoolController.duration;
     final hasValidDuration = duration != null && duration > Duration.zero;
-    final shouldAnimate =
-        widget.props.state.isPlaying && context.motionEnabled && hasValidDuration;
+    final shouldAnimate = widget.props.state.isPlaying &&
+        context.motionEnabled &&
+        hasValidDuration;
     if (shouldAnimate) {
       if (!_spoolController.isAnimating || restartIfAnimating) {
         _spoolController.repeat();
@@ -94,17 +95,17 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
       } else if (_spoolController.isAnimating) {
         _spoolVelocityController
             .animateTo(
-              0.0,
-              duration: context.motionMs(650),
-              curve: Curves.decelerate,
-            )
+          0.0,
+          duration: context.motionMs(650),
+          curve: Curves.decelerate,
+        )
             .whenComplete(() {
-              if (mounted &&
-                  !widget.props.state.isPlaying &&
-                  _spoolVelocityController.value == 0.0) {
-                _spoolController.stop();
-              }
-            });
+          if (mounted &&
+              !widget.props.state.isPlaying &&
+              _spoolVelocityController.value == 0.0) {
+            _spoolController.stop();
+          }
+        });
       }
     }
   }
@@ -112,8 +113,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
   @override
   void didUpdateWidget(covariant CassettePlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final speedChanged = widget.props.state.playbackSpeed !=
-        oldWidget.props.state.playbackSpeed;
+    final speedChanged =
+        widget.props.state.playbackSpeed != oldWidget.props.state.playbackSpeed;
     if (speedChanged) {
       _updateSpoolSpeed();
     }

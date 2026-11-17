@@ -107,4 +107,52 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(PlayerControls), findsOneWidget);
   });
+
+  testWidgets('A/B transport strip keeps all controls on one row at 390px',
+      (tester) async {
+    await tester.pumpWidget(
+      createSubject(
+        width: 390,
+        child: PlayerControls(
+          isPlaying: false,
+          isShuffle: false,
+          repeatMode: PlayerRepeatMode.off,
+          showAbControls: true,
+          onPlayPause: () {},
+          onNext: () {},
+          onPrevious: () {},
+          onToggleShuffle: () {},
+          onToggleRepeat: () {},
+          onSetAbPointA: () {},
+          onSetAbPointB: () {},
+          onToggleAbLoop: () {},
+          onClearAbLoop: () {},
+          primaryColor: Colors.blue,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final finders = <Finder>[
+      find.byIcon(Icons.shuffle_rounded),
+      find.text('A'),
+      find.byIcon(Icons.skip_previous_rounded),
+      find.byIcon(Icons.play_arrow_rounded),
+      find.byIcon(Icons.skip_next_rounded),
+      find.text('B'),
+      find.byIcon(Icons.repeat_rounded),
+    ];
+    final centers = finders
+        .map((f) => tester.getRect(f).center.dy)
+        .toList(growable: false);
+    // Icons and A/B labels have slightly different intrinsic heights, so
+    // compare row placement (a wrapped row would differ by a full control).
+    expect(
+      centers.reduce((a, b) => a > b ? a : b) -
+          centers.reduce((a, b) => a < b ? a : b),
+      lessThan(16.0),
+      reason: 'controls split across rows: $centers',
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

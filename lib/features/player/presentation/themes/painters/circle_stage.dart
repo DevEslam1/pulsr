@@ -209,20 +209,26 @@ class _CircleArtworkState extends State<_CircleArtwork> {
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: currentSong != null
-                                  ? CachedArtwork(
-                                      id: currentSong.id,
-                                      albumId: currentSong.albumId,
-                                      remoteUrl: currentSong.remoteArtworkUrl ??
-                                          currentSong.artworkUri,
-                                      type: ArtworkType.AUDIO,
-                                      size: dialSize * 0.50,
-                                      borderRadius: 999,
-                                      highQuality: true,
+                                  ? PlayerArtworkSemantics(
+                                      song: currentSong,
+                                      child: CachedArtwork(
+                                        id: currentSong.id,
+                                        albumId: currentSong.albumId,
+                                        remoteUrl:
+                                            currentSong.remoteArtworkUrl ??
+                                                currentSong.artworkUri,
+                                        type: ArtworkType.AUDIO,
+                                        size: dialSize * 0.50,
+                                        borderRadius: 999,
+                                        highQuality: true,
+                                      ),
                                     )
-                                  : Icon(
-                                      Icons.album_rounded,
-                                      size: dialSize * 0.22,
-                                      color: Colors.white54,
+                                  : ExcludeSemantics(
+                                      child: Icon(
+                                        Icons.album_rounded,
+                                        size: dialSize * 0.22,
+                                        color: Colors.white54,
+                                      ),
                                     ),
                             ),
 

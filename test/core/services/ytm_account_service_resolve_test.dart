@@ -363,6 +363,48 @@ void main() {
     });
   });
 
+  group('guest-restricted chain', () {
+    test('only the session-bearing client is asked when guests are disabled',
+        () async {
+      final service = await loggedIn(dataSyncId: 'dsid||');
+      requests.clear();
+      handler = (request) async => _playability('UNPLAYABLE');
+
+      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ',
+          guestClientsEnabled: false);
+
+      expect(stream, isNull);
+      expect(
+        requests.where((r) => r.url.path.contains('/player')).map(_clientName),
+        ['WEB_REMIX'],
+        reason: 'the guest sweep is the native extractor\'s job',
+      );
+    });
+
+    test('a guest pass with guests disabled issues no request at all',
+        () async {
+      handler = (request) async => _json(200, {
+            'contents': {
+              'singleColumnBrowseResultsRenderer': {},
+            },
+          });
+      final service = _service();
+      await service.init();
+      await _settle();
+      expect(service.isLoggedIn, isTrue);
+      expect(service.dataSyncId, isNull);
+      requests.clear();
+      handler = (request) async => _playability('UNPLAYABLE');
+
+      final stream = await service.resolvePlayerStream('dQw4w9WgXcQ',
+          guestClientsEnabled: false);
+
+      expect(stream, isNull);
+      expect(requests, isEmpty,
+          reason: 'without a session there is no client this pass may use');
+    });
+  });
+
   group('chain fallback and short-circuit', () {
     test('a non-blocking UNPLAYABLE walks the whole authenticated chain',
         () async {

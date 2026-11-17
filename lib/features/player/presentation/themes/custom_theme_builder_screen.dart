@@ -353,8 +353,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                       builder: (ctx) {
                         try {
                           final playerCubit = ctx.read<PlayerCubit>();
-                          ctx.select<PlayerCubit, int?>((c) => c.state.currentSong?.id);
-                          ctx.select<PlayerCubit, bool>((c) => c.state.isPlaying);
+                          ctx.select<PlayerCubit, int?>(
+                              (c) => c.state.currentSong?.id);
+                          ctx.select<PlayerCubit, bool>(
+                              (c) => c.state.isPlaying);
                           final props = PlayerThemeProps(
                             state: playerCubit.state,
                             cubit: playerCubit,

@@ -3,8 +3,8 @@ part of '../cd_player_theme.dart';
 extension _CdPlayerThemeBuild on _CdPlayerThemeState {
   Widget _buildBody(BuildContext context) {
     final state = widget.props.state;
-    final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
-        (c) => c.state.visualizerStyle);
+    final visualizerStyle = context
+        .select<SettingsCubit, VisualizerStyle>((c) => c.state.visualizerStyle);
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&

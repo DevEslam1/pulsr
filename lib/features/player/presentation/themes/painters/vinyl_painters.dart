@@ -301,7 +301,10 @@ class _TonearmPainter extends CustomPainter {
   void _drawCounterweight(Canvas canvas) {
     final stemPaint = Paint()
       ..shader = const LinearGradient(
-        colors: [PlayerMaterialColors.counterweightStemLight, PlayerMaterialColors.counterweightStemDark],
+        colors: [
+          PlayerMaterialColors.counterweightStemLight,
+          PlayerMaterialColors.counterweightStemDark
+        ],
       ).createShader(const Rect.fromLTWH(-2.5, -34, 5, 34))
       ..style = PaintingStyle.fill;
     canvas.drawRRect(
@@ -408,7 +411,10 @@ class _TonearmPainter extends CustomPainter {
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [PlayerMaterialColors.headshellHighlight, PlayerMaterialColors.headshellShadow],
+        colors: [
+          PlayerMaterialColors.headshellHighlight,
+          PlayerMaterialColors.headshellShadow
+        ],
       ).createShader(
           Rect.fromLTWH(headshellEnd.dx - 6, headshellStart.dy, 12, 22));
     canvas.drawPath(headshellPath, headshellPaint);
@@ -458,7 +464,8 @@ class _TonearmPainter extends CustomPainter {
       ).createShader(const Rect.fromLTWH(-7, -7, 14, 14));
     canvas.drawCircle(Offset.zero, _pivotBearingRadius, bearingPaint);
 
-    final centerScrewPaint = Paint()..color = PlayerMaterialColors.pivotCenterScrew;
+    final centerScrewPaint = Paint()
+      ..color = PlayerMaterialColors.pivotCenterScrew;
     canvas.drawCircle(Offset.zero, _pivotCenterScrewRadius, centerScrewPaint);
   }
 

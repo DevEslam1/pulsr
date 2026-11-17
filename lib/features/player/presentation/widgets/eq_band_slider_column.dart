@@ -70,15 +70,27 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
       if (!state.isEqEnabled) {
         cubit.setEqualizerEnabled(true);
       }
-      final clamped =
-          (gain + delta).clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
-      cubit.setBandGain(index, double.parse(clamped.toStringAsFixed(1)));
+      cubit.setBandGain(
+        index,
+        EqSheetMath.adjustedGain(
+          gain,
+          delta,
+          min: _VerticalEqSlider.min,
+          max: _VerticalEqSlider.max,
+        ),
+      );
     }
 
-    final nextGain =
-        (gain + 1.0).clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
-    final prevGain =
-        (gain - 1.0).clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
+    final nextGain = EqSheetMath.clampGain(
+      gain + 1.0,
+      min: _VerticalEqSlider.min,
+      max: _VerticalEqSlider.max,
+    );
+    final prevGain = EqSheetMath.clampGain(
+      gain - 1.0,
+      min: _VerticalEqSlider.min,
+      max: _VerticalEqSlider.max,
+    );
 
     return RepaintBoundary(
       child: Column(
@@ -284,15 +296,13 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
   void _handlePointer(double localY, double totalHeight,
       {bool notifyParent = false}) {
     widget.onInteraction?.call();
-    const topMargin = 12.0;
-    const bottomMargin = 12.0;
-    final trackHeight = totalHeight - topMargin - bottomMargin;
-    if (trackHeight <= 0) return;
-    final clampedY = (localY - topMargin).clamp(0.0, trackHeight);
-    final fraction = 1.0 - (clampedY / trackHeight);
-    final newGain = _VerticalEqSlider.min +
-        fraction * (_VerticalEqSlider.max - _VerticalEqSlider.min);
-    final roundedGain = double.parse(newGain.toStringAsFixed(1));
+    final roundedGain = EqSheetMath.gainFromPointerY(
+      localY,
+      totalHeight,
+      min: _VerticalEqSlider.min,
+      max: _VerticalEqSlider.max,
+    );
+    if (roundedGain == null) return;
     final oldGain = _dragGain ?? widget.value;
     if ((oldGain < -0.1 && roundedGain >= 0.0) ||
         (oldGain > 0.1 && roundedGain <= 0.0) ||

@@ -12,6 +12,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
+import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/services/stream_url_verifier.dart';
 import 'package:pulsr/core/services/ytm_cache_manager.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
@@ -255,6 +257,248 @@ void main() {
     });
   });
 
+  group('YtmResolvingSource — cached URL verification', () {
+    late YtmUrlCache cache;
+
+    setUp(() {
+      cache = YtmUrlCache.withClock(
+          FakeClock(DateTime.fromMillisecondsSinceEpoch(1000000)));
+      // Production resolves the cache through DI; probing is only active on
+      // that path, so these tests register a real cache rather than passing the
+      // (probe-disabling) constructor seam.
+      getIt.registerSingleton<YtmUrlCache>(cache);
+      // These tests seed a byte-cache file so the byte request stays local;
+      // production skips probing in that situation, so pin the guard off.
+      YtmResolvingSource.debugCompleteByteCacheOverride = (_) async => false;
+    });
+
+    tearDown(() {
+      StreamUrlVerifier.debugProbeOverride = null;
+      YtmResolvingSource.debugCompleteByteCacheOverride = null;
+      if (getIt.isRegistered<YtmUrlCache>()) {
+        getIt.unregister<YtmUrlCache>();
+      }
+    });
+
+    test('a rejected cached URL costs one probe and one re-resolve', () async {
+      const videoId = 'rejectvid';
+      await _seedCacheFile(videoId);
+      const deadUrl =
+          'https://rr1---sn-dead.googlevideo.com/videoplayback?itag=140&sig=dead';
+      cache.put(videoId, deadUrl, userAgent: 'UA');
+
+      var probes = 0;
+      String? probedUrl;
+      String? probedUa;
+      StreamUrlVerifier.debugProbeOverride =
+          (url, {userAgent, referer, cookie}) async {
+        probes++;
+        probedUrl = url;
+        probedUa = userAgent;
+        return const StreamUrlProbe.rejected(403);
+      };
+
+      var resolveCalls = 0;
+      var sawForceRefresh = false;
+      final source = YtmResolvingSource(
+        videoId: videoId,
+        resolve: ({bool forceRefresh = false}) async {
+          resolveCalls++;
+          sawForceRefresh = forceRefresh;
+          return _streamUrl();
+        },
+      );
+
+      await source.request();
+
+      expect(probes, equals(1),
+          reason: 'one two-byte GET replaces the whole re-resolve latency');
+      expect(probedUrl, deadUrl);
+      expect(probedUa, 'UA',
+          reason: 'the probe must ask as the same client that minted the URL');
+      expect(resolveCalls, equals(1),
+          reason: 'the rejection falls through to a fresh resolve in this call');
+      expect(sawForceRefresh, isTrue,
+          reason: 'a dead signature must not be read back from any memo');
+      expect(cache.getUrl(videoId), isNot(deadUrl));
+      expect(cache.isVerified(videoId), isTrue,
+          reason: 'the first byte of the fresh URL vouches for it');
+    });
+
+    test('an unknown verdict keeps the cached URL and resolves nothing',
+        () async {
+      const videoId = 'unknownvid';
+      await _seedCacheFile(videoId);
+      final cachedUrl = _streamUrl();
+      cache.put(videoId, cachedUrl);
+
+      StreamUrlVerifier.debugProbeOverride =
+          (url, {userAgent, referer, cookie}) async =>
+              const StreamUrlProbe.unknown('timeout');
+
+      var resolveCalls = 0;
+      final source = YtmResolvingSource(
+        videoId: videoId,
+        resolve: ({bool forceRefresh = false}) async {
+          resolveCalls++;
+          return _streamUrl();
+        },
+      );
+
+      await source.request();
+
+      expect(resolveCalls, isZero,
+          reason: 'a flaky probe must never cost a paid re-resolve');
+      expect(cache.getUrl(videoId), cachedUrl);
+    });
+
+    test('an ok verdict is remembered so the next playback skips the probe',
+        () async {
+      const videoId = 'okvid';
+      await _seedCacheFile(videoId);
+      cache.put(videoId, _streamUrl());
+
+      var probes = 0;
+      StreamUrlVerifier.debugProbeOverride =
+          (url, {userAgent, referer, cookie}) async {
+        probes++;
+        return const StreamUrlProbe.ok();
+      };
+
+      var resolveCalls = 0;
+      Future<String> resolve({bool forceRefresh = false}) async {
+        resolveCalls++;
+        return _streamUrl();
+      }
+
+      await YtmResolvingSource(videoId: videoId, resolve: resolve).request();
+      expect(probes, equals(1));
+      expect(cache.isVerified(videoId), isTrue);
+
+      await YtmResolvingSource(videoId: videoId, resolve: resolve).request();
+      expect(probes, equals(1),
+          reason: 'a verified URL inside the window is trusted uncounted');
+      expect(resolveCalls, isZero);
+    });
+
+    test('a fresh resolve is never probed', () async {
+      const videoId = 'freshvid';
+      // Seed only the byte slot: the URL cache starts empty, so this is the
+      // cold-tap path the probe must not slow down.
+      await _seedCacheFile(videoId);
+
+      var probes = 0;
+      StreamUrlVerifier.debugProbeOverride =
+          (url, {userAgent, referer, cookie}) async {
+        probes++;
+        return const StreamUrlProbe.rejected(403);
+      };
+
+      var resolveCalls = 0;
+      final source = YtmResolvingSource(
+        videoId: videoId,
+        resolve: ({bool forceRefresh = false}) async {
+          resolveCalls++;
+          return _streamUrl();
+        },
+      );
+
+      await source.request();
+
+      expect(resolveCalls, equals(1));
+      expect(probes, isZero,
+          reason: 'a URL minted a moment ago has nothing to verify yet');
+      expect(cache.isVerified(videoId), isTrue,
+          reason: 'the first byte still vouches for it');
+    });
+
+    test('a fully cached track is served from disk without a probe', () async {
+      const videoId = 'diskvid';
+      await _seedCacheFile(videoId);
+      cache.put(videoId, _streamUrl());
+      YtmResolvingSource.debugCompleteByteCacheOverride = (_) async => true;
+
+      var probes = 0;
+      StreamUrlVerifier.debugProbeOverride =
+          (url, {userAgent, referer, cookie}) async {
+        probes++;
+        return const StreamUrlProbe.ok();
+      };
+
+      var resolveCalls = 0;
+      await YtmResolvingSource(
+        videoId: videoId,
+        resolve: ({bool forceRefresh = false}) async {
+          resolveCalls++;
+          return _streamUrl();
+        },
+      ).request();
+
+      expect(probes, isZero,
+          reason: 'a completed byte-cache file never reads the URL, so probing '
+              'it would spend a round trip (two seconds offline) for nothing');
+      expect(resolveCalls, isZero);
+    });
+
+    test('an explicit urlCache disables probing entirely', () async {
+      const videoId = 'seamvid';
+      await _seedCacheFile(videoId);
+      cache.put(videoId, _streamUrl());
+
+      var probes = 0;
+      StreamUrlVerifier.debugProbeOverride =
+          (url, {userAgent, referer, cookie}) async {
+        probes++;
+        return const StreamUrlProbe.rejected(403);
+      };
+
+      var resolveCalls = 0;
+      final source = YtmResolvingSource(
+        videoId: videoId,
+        urlCache: cache,
+        resolve: ({bool forceRefresh = false}) async {
+          resolveCalls++;
+          return _streamUrl();
+        },
+      );
+
+      await source.request();
+
+      expect(probes, isZero,
+          reason: 'host tests construct the source this way and must see the '
+              'pre-probe behaviour');
+      expect(resolveCalls, isZero);
+    });
+
+    test('debugInnerFactory also disables probing', () async {
+      const videoId = 'factoryvid';
+      cache.put(videoId, _streamUrl());
+      YtmResolvingSource.debugInnerFactory =
+          (uri, headers, cacheFile) =>
+              _ServingCacheSource(uri, cacheFile: cacheFile);
+      addTearDown(() => YtmResolvingSource.debugInnerFactory = null);
+
+      var probes = 0;
+      StreamUrlVerifier.debugProbeOverride =
+          (url, {userAgent, referer, cookie}) async {
+        probes++;
+        return const StreamUrlProbe.rejected(403);
+      };
+
+      var resolveCalls = 0;
+      await YtmResolvingSource(
+        videoId: videoId,
+        resolve: ({bool forceRefresh = false}) async {
+          resolveCalls++;
+          return _streamUrl();
+        },
+      ).request();
+
+      expect(probes, isZero);
+      expect(resolveCalls, isZero);
+    });
+  });
+
   group('YtmResolvingSource.isUrlBurned', () {
     test('a refusal from googlevideo burns the URL', () {
       for (final status in const [401, 403, 404, 407, 410, 416, 429]) {
@@ -407,5 +651,22 @@ class _RefusingCacheSource extends LockCachingAudioSource {
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     throw Exception('HTTP Status Error: 403');
+  }
+}
+
+/// A byte-cache source that always answers from a two-byte body, for tests that
+/// need a successful first byte without a network or a seeded cache file.
+class _ServingCacheSource extends LockCachingAudioSource {
+  _ServingCacheSource(super.uri, {required super.cacheFile});
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    return StreamAudioResponse(
+      sourceLength: 2,
+      contentLength: 2,
+      offset: 0,
+      stream: Stream<List<int>>.value(const [1, 2]),
+      contentType: 'audio/mp4',
+    );
   }
 }

@@ -281,7 +281,7 @@ class AudioFeatureRegistry {
     title: 'Bit-Perfect USB Pass-Through',
     subtitle: 'Direct hardware streaming to a USB DAC',
     description:
-        'Bypasses Android AudioFlinger and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr\'s own UAC2 isochronous sink when the platform exposes no exclusive mixer. No software volume or DSP is applied. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).',
+        'Bypasses Android AudioFlinger and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr\'s own UAC2 isochronous sink when the platform exposes no exclusive mixer. Bit-Perfect is reported as verified only while no software volume, DSP stage or HAL effect sits in the path. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead and is not verified. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).',
     conflictsWith: 'All DSP when “Bypass DSP” is ON',
     conflictKey: 'allDspWithBypass',
   );
@@ -291,7 +291,7 @@ class AudioFeatureRegistry {
     title: 'Bypass DSP in Bit-Perfect Mode',
     subtitle: 'Uncolored, pure bitstream to DAC',
     description:
-        'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).',
+        'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Software volume stays in the player unless the hardware volume of the DAC owns attenuation, so any digital attenuation left in the path downgrades the output to exclusive but unverified. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).',
   );
 
   static const followTrackSampleRate = AudioFeatureInfo(

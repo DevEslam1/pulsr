@@ -26,7 +26,7 @@ import '../../../../data/audio/output_format_negotiation.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/audio_output_info.dart';
-import '../../../../domain/models/bit_perfect_state.dart';
+import '../../../../domain/models/bit_perfect_output_facts.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/audio_signal_path.dart';
 import '../../../../core/telemetry/audio_session_log.dart';

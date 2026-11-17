@@ -615,8 +615,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                     _isPlayingTone
                                         ? context.l10n.viperStopSweep
                                         : context.l10n.viperTestTone,
-                                    style:
-                                        TextStyle(fontSize: AppFontSize.caption),
+                                    style: TextStyle(
+                                        fontSize: AppFontSize.caption),
                                   ),
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(
@@ -675,7 +675,8 @@ class _ViperDdcSheetState extends State<ViperDdcSheet> {
                                   _abBypassed
                                       ? context.l10n.viperAbBypassedShort
                                       : context.l10n.viperAbCompare,
-                                  style: TextStyle(fontSize: AppFontSize.caption),
+                                  style:
+                                      TextStyle(fontSize: AppFontSize.caption),
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   side: BorderSide(

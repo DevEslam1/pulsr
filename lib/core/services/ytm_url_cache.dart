@@ -24,6 +24,14 @@ class YtmUrlCacheEntry {
   final String? cookies;
   final YtmStream? stream;
 
+  /// When a probe — or a first byte that actually arrived — confirmed this URL
+  /// serves audio, or null when nothing has confirmed it yet.
+  ///
+  /// Never leaves the process: [YtmUrlCache.restore] deliberately drops it,
+  /// because a URL that survived a launch may have been minted for a previous
+  /// egress or attested by a previous run.
+  final DateTime? verifiedAt;
+
   const YtmUrlCacheEntry({
     required this.videoId,
     required this.url,
@@ -32,7 +40,23 @@ class YtmUrlCacheEntry {
     this.userAgent,
     this.cookies,
     this.stream,
+    this.verifiedAt,
   });
+
+  /// Whether this entry carries a verification stamp. Age is not considered
+  /// here; [YtmUrlCache.isVerified] owns the staleness rule.
+  bool get isVerified => verifiedAt != null;
+
+  YtmUrlCacheEntry _withVerifiedAt(DateTime at) => YtmUrlCacheEntry(
+        videoId: videoId,
+        url: url,
+        fetchedAt: fetchedAt,
+        expiresAt: expiresAt,
+        userAgent: userAgent,
+        cookies: cookies,
+        stream: stream,
+        verifiedAt: at,
+      );
 
   /// Checks if entry is expired relative to [now].
   bool isExpired([DateTime? now]) {
@@ -141,6 +165,13 @@ class YtmUrlCache {
   /// are far more likely to be invalidated (IP/account binding) between runs.
   /// Guest URLs for public tracks are the overwhelmingly common case and the
   /// one worth caching across launches.
+  ///
+  /// Restored entries always come back **unverified**. Verification is a
+  /// statement about the path a URL was fetched over, and a URL that survived a
+  /// launch may have been minted for a previous egress or attested by a
+  /// previous run: replaying its old stamp would skip the one probe that can
+  /// tell whether the signature still works from here. Any `verifiedAt` an
+  /// on-disk file happens to carry is therefore ignored, not restored.
   Future<void> restore() async {
     if (_restored) return;
     _restored = true;
@@ -241,12 +272,15 @@ class YtmUrlCache {
             expiresAt: expiresAt.millisecondsSinceEpoch,
           );
         }
-        // Reuse put() so URL stamp parsing / safety margins stay authoritative.
-        put(videoId, url,
+        // Reuse the store so URL stamp parsing / safety margins stay
+        // authoritative. `carryVerified: false` makes the drop unconditional
+        // even if this exact URL is already in memory — see [restore].
+        _store(videoId, url,
             quality: quality,
             explicitExpiry: expiresAt,
             userAgent: userAgent,
-            stream: rebuilt);
+            stream: rebuilt,
+            carryVerified: false);
       }
       debugPrint(
           '[YtmUrlCache] Restored ${_cache.length} cached stream URL(s)');
@@ -386,6 +420,11 @@ class YtmUrlCache {
   }
 
   /// Stores a resolved stream URL into the LRU cache.
+  ///
+  /// [verifiedAt] records that a probe, or a first byte that actually arrived,
+  /// already confirmed this exact URL. Leave it null for a freshly resolved
+  /// URL: an unverified entry costs one probe on first use, while a wrongly
+  /// verified one serves a dead URL straight to the player.
   void put(
     String videoId,
     String url, {
@@ -394,6 +433,35 @@ class YtmUrlCache {
     String? userAgent,
     String? cookies,
     YtmStream? stream,
+    DateTime? verifiedAt,
+  }) {
+    _store(
+      videoId,
+      url,
+      quality: quality,
+      explicitExpiry: explicitExpiry,
+      userAgent: userAgent,
+      cookies: cookies,
+      stream: stream,
+      verifiedAt: verifiedAt,
+    );
+  }
+
+  /// Store shared by [put] and [putStream].
+  ///
+  /// [carryVerified] is false for [putStream]: a URL handed over by the
+  /// resolver is a fresh mint and must not inherit an earlier verification
+  /// merely because YouTube returned the same URL again.
+  void _store(
+    String videoId,
+    String url, {
+    required String quality,
+    DateTime? explicitExpiry,
+    String? userAgent,
+    String? cookies,
+    YtmStream? stream,
+    DateTime? verifiedAt,
+    bool carryVerified = true,
   }) {
     if (videoId.trim().isEmpty || url.trim().isEmpty) return;
     if (Uri.tryParse(url.trim()) == null) return;
@@ -444,6 +512,13 @@ class YtmUrlCache {
     final effectiveUserAgent = userAgent ?? previous?.userAgent;
     final effectiveCookies = cookies ?? previous?.cookies;
 
+    // A verification describes one URL, so it survives only a re-store of that
+    // same URL. A different URL carries a different signature and starts
+    // unproven, or the probe would be skipped for a URL nobody has fetched.
+    final inheritedVerifiedAt = sameUrl ? previous.verifiedAt : null;
+    final effectiveVerifiedAt =
+        carryVerified ? (verifiedAt ?? inheritedVerifiedAt) : null;
+
     final entry = YtmUrlCacheEntry(
       videoId: videoId,
       url: url,
@@ -452,6 +527,7 @@ class YtmUrlCache {
       userAgent: effectiveUserAgent,
       cookies: effectiveCookies,
       stream: effectiveStream,
+      verifiedAt: effectiveVerifiedAt,
     );
 
     // Evict oldest if full
@@ -466,11 +542,14 @@ class YtmUrlCache {
   }
 
   /// Stores a resolved [YtmStream] into the LRU cache.
+  ///
+  /// The entry is never stored as verified: `resolveStream` returned a URL
+  /// nobody has fetched yet, so the next playback owes it a probe.
   void putStream(
     YtmStream stream, {
     String quality = 'high',
   }) {
-    put(
+    _store(
       stream.videoId,
       stream.url,
       quality: quality,
@@ -478,7 +557,58 @@ class YtmUrlCache {
       userAgent: stream.userAgent,
       cookies: stream.cookies,
       stream: stream,
+      carryVerified: false,
     );
+  }
+
+  /// Records that [videoId]'s URL at [quality] answered a probe, or served its
+  /// first byte, at [at] (default: now).
+  ///
+  /// A no-op for a missing or expired entry: there is no URL to vouch for, and
+  /// re-inserting one would resurrect an entry the cache had already dropped.
+  /// The stamp stays in memory — [restore] never brings it back — because a URL
+  /// that survived a launch may be bound to a previous egress or a previous
+  /// attestation.
+  ///
+  /// Deliberately does not reorder the LRU: verification says the URL works,
+  /// not that the user played it, and eviction aging should follow playback.
+  void markVerified(String videoId, {String quality = 'high', DateTime? at}) {
+    final key = _buildKey(videoId, quality);
+    final entry = _cache[key];
+    if (entry == null) return;
+    final now = _clock.now();
+    if (entry.isExpired(now)) {
+      _cache.remove(key);
+      return;
+    }
+    // Updating an existing LinkedHashMap key keeps its position.
+    _cache[key] = entry._withVerifiedAt(at ?? now);
+  }
+
+  /// Whether [videoId]'s entry at [quality] exists, is unexpired, and was
+  /// verified within [maxAge].
+  ///
+  /// Missing, expired, never-verified and stale all answer false: the caller's
+  /// only remaining option is a probe, so one boolean is the whole question. A
+  /// stamp in the future (a clock stepped backwards) counts as fresh rather
+  /// than as stale. Like [contains], this is a read and does not promote the
+  /// entry to MRU.
+  bool isVerified(
+    String videoId, {
+    String quality = 'high',
+    Duration maxAge = const Duration(seconds: 90),
+  }) {
+    final key = _buildKey(videoId, quality);
+    final entry = _cache[key];
+    if (entry == null) return false;
+    final now = _clock.now();
+    if (entry.isExpired(now)) {
+      _cache.remove(key);
+      return false;
+    }
+    final verifiedAt = entry.verifiedAt;
+    if (verifiedAt == null) return false;
+    return now.difference(verifiedAt) <= maxAge;
   }
 
   /// Invalidates entry for [videoId]. If [quality] is specified, removes exact entry.

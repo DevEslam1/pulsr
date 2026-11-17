@@ -1,8 +1,9 @@
 // test/features/player/widgets/compressor_limiter_sheet_coverage_test.dart
 //
 // Extra branch coverage for [CompressorLimiterSheet] beyond the base suite:
-// the lifecycle re-sync paths (didUpdateWidget and the PlayerCubit listener)
-// and the native (non-advanced) limiter branches.
+// the lifecycle re-sync paths (didUpdateWidget and the PlayerCubit listener),
+// the native (non-advanced) limiter branches, and the drift guards that keep
+// the sheet on the manager's values after a rejected write.
 //
 // The advanced multiband branch remains unreachable: its ExpansionTiles render
 // ListTiles inside a decorated (colored) Container, so Flutter's debug-only
@@ -166,5 +167,88 @@ void main() {
     await tester.tap(icon);
     await tester.pumpAndSettle();
     expect(manager.limiterThresholdDb, -0.2);
+  });
+
+  group('drift guards (EqualizerManager is the source of truth)', () {
+    testWidgets(
+        'a refused write leaves the manager value on screen, not the dragged one',
+        (tester) async {
+      final manager = buildManager();
+      manager.isLimiterEnabled = true;
+      manager.limiterThresholdDb = -3.0;
+
+      // The cubit state claims the write landed at -30 dB while the manager
+      // still holds -3 dB, because the write below is a no-op (guard block or
+      // rollback). Trusting either a local shadow or the cubit state is the
+      // drift this sheet must not reproduce.
+      final cubit = stubPlayerCubit(
+        state: const PlayerState(
+          dsp: DspSlice(isLimiterEnabled: true, limiterThresholdDb: -30.0),
+        ),
+      );
+      await pumpSheet(tester, manager, cubit: cubit);
+      expect(find.text('-3.0 dB'), findsOneWidget);
+
+      final threshold = tester
+          .widgetList<Slider>(find.byType(Slider))
+          .firstWhere((s) => s.onChangeEnd != null);
+      threshold.onChangeEnd!(threshold.min);
+      await tester.pumpAndSettle();
+
+      // The rejected value must not survive anywhere in the UI.
+      expect(manager.limiterThresholdDb, -3.0);
+      expect(find.text('-3.0 dB'), findsOneWidget);
+      expect(find.text('-30.0 dB'), findsNothing);
+      final after = tester
+          .widgetList<Slider>(find.byType(Slider))
+          .firstWhere((s) => s.onChangeEnd != null);
+      expect(after.value, closeTo(-3.0, 0.001));
+    });
+
+    testWidgets('a throwing cubit write also reconciles to the manager value',
+        (tester) async {
+      final manager = buildManager();
+      manager.isLimiterEnabled = true;
+      manager.limiterReleaseMs = 50.0;
+
+      final cubit = stubPlayerCubit();
+      when(() => cubit.setLookaheadLimiter(
+            any(),
+            thresholdDb: any(named: 'thresholdDb'),
+            releaseMs: any(named: 'releaseMs'),
+          )).thenThrow(Exception('native write rejected'));
+      await pumpSheet(tester, manager, cubit: cubit);
+
+      final release = tester
+          .widgetList<Slider>(find.byType(Slider))
+          .firstWhere((s) => s.onChangeEnd != null && s.min == 10.0);
+      release.onChangeEnd!(release.min);
+      await tester.pumpAndSettle();
+
+      expect(manager.limiterReleaseMs, 50.0);
+      expect(find.text('50 ms'), findsOneWidget);
+      expect(find.text('10 ms'), findsNothing);
+    });
+
+    testWidgets('reopening after an external manager change shows new values',
+        (tester) async {
+      final manager = buildManager();
+      manager.isLimiterEnabled = true;
+      manager.limiterThresholdDb = -6.0;
+      final cubit = stubPlayerCubit();
+      await pumpSheet(tester, manager, cubit: cubit);
+      expect(find.text('-6.0 dB'), findsOneWidget);
+
+      // Another screen (or a profile restore) moves the manager while the
+      // sheet is closed; a fresh sheet must not reuse the previous snapshot.
+      manager.limiterThresholdDb = -18.5;
+      manager.isLimiterEnabled = false;
+      await tester.pumpWidget(const SizedBox());
+
+      await pumpSheet(tester, manager, cubit: cubit);
+      expect(find.text('-18.5 dB'), findsOneWidget);
+      expect(find.text('-6.0 dB'), findsNothing);
+      expect(tester.widget<Switch>(find.byType(Switch).first).value, isFalse);
+    });
   });
 }

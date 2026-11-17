@@ -124,7 +124,6 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
 
     final capturedGen = _mediaItemResolutionGuard.next();
     final capturedSwapGen = _localMatchSwapGuard.next();
-    _mediaItemGuard.next();
 
     final rawQueue =
         queue != null ? List<SongsTableData>.from(queue) : [effectiveSong];
@@ -296,7 +295,6 @@ extension PlayerQueuePlaybackExtension on PlayerQueueController {
       // C3 FIX: Rollback and invalidate parallel guards so late resolution/match futures cannot re-apply failed queue
       _mediaItemResolutionGuard.invalidate();
       _localMatchSwapGuard.invalidate();
-      _lyricsGuard.invalidate();
 
       assert(!_mediaItemResolutionGuard.isValid(capturedGen),
           'Resolution guard must be invalid after rollback');

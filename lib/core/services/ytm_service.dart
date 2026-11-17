@@ -31,6 +31,7 @@ import 'ytm_circuit_breaker.dart';
 import 'ytm_media_helpers.dart';
 part 'ytm_service_internals.dart';
 part 'ytm_service_alternates.dart';
+part 'ytm_service_dart_resolve.dart';
 
 @lazySingleton
 class YtmService {
@@ -45,12 +46,13 @@ class YtmService {
   /// redundant native chain in the common case; a slow account hop now delays
   /// the (usually faster) native tier by at most this window instead of the
   /// old 1500ms — halving worst-case dead-time on a signed-in cold tap.
-  /// Only signed-in cold taps are affected: a logged-out resolve returns null
-  /// from Tier-1 immediately and promotes the native tier without waiting out
-  /// the hedge (see `runAccountTier` and the null branch that calls
-  /// `startNativeTier()` below). Lowering trades a slightly higher chance of
-  /// spending one extra (uncancellable) native chain for a faster start when
-  /// the account hop lags.
+  /// The window only applies to an account-bound pass. Without a dataSyncId
+  /// Tier-1 can only run as a guest, and a guest cannot decipher the formats it
+  /// is handed, so it gets no head start at all: the native tier starts at once
+  /// and the account tier is restricted to the session-bearing client, which
+  /// with no session yet issues nothing. Lowering trades a slightly higher
+  /// chance of spending one extra (uncancellable) native chain for a faster
+  /// start when the account hop lags.
   static const Duration _tier1HedgeDelay = Duration(milliseconds: 700);
 
   final MethodChannel _channel = const MethodChannel(channelName);
@@ -1200,35 +1202,53 @@ class YtmService {
     // Tier-1 (authenticated account InnerTube) and Tier-2 (native multi-client
     // extractor) used to run strictly one after the other, so a slow Tier-1
     // charged its whole 50 s budget before the native chain — normally the
-    // faster of the two — was even started. They now race: Tier-1 gets
-    // [_tier1HedgeDelay] alone, so the signed-in path still wins outright and
-    // never pays for a redundant native chain, and past that the native tier
-    // starts alongside it. First stream back wins; the loser's result is
+    // faster of the two — was even started. They now race: an account-bound
+    // Tier-1 gets [_tier1HedgeDelay] alone, so the signed-in path still wins
+    // outright and never pays for a redundant native chain, and past that the
+    // native tier starts alongside it. A guest pass gets no head start: it
+    // cannot decipher a ciphered format, so it could only repeat the native
+    // sweep request for request. First stream back wins; the loser's result is
     // dropped. Because a MethodChannel call cannot be cancelled once invoked,
     // the only cost of losing the race is the single extra chain the hedge
     // already decided to spend.
     Timer? tierHedge;
     Object? nativeError;
 
+    final accountService = getIt.isRegistered<YtmAccountService>()
+        ? getIt<YtmAccountService>()
+        : null;
+    final accountLoggedIn = accountService != null && accountService.isLoggedIn;
+    // An account-bound pass is the only one worth racing the native chain for:
+    // it carries the session (cookies + account-bound poToken), which is the
+    // only way past an age gate or a signed-in-only restriction. Everything
+    // else is a guest, and a guest chain duplicates the native extractor.
+    final accountBound = accountService != null &&
+        accountService.isLoggedIn &&
+        (accountService.dataSyncId?.trim().isNotEmpty ?? false);
+
     // 1. Direct authenticated YouTube Music InnerTube Player API if logged in
     Future<YtmStream?> runAccountTier() async {
       try {
-        if (!inBotCooldown && getIt.isRegistered<YtmAccountService>()) {
-          final account = getIt<YtmAccountService>();
+        if (!inBotCooldown && accountService != null) {
+          final account = accountService;
           if (account.isLoggedIn) {
-            // Do NOT gate Tier-1 on dataSyncId. YtmAccountService.resolvePlayerStream
-            // already detects a missing/empty dataSyncId and runs its chain as a
-            // clean guest pass (no session cookies), which is strictly better than
-            // skipping Tier-1 entirely: that handed every signed-in resolution to
-            // Tier-2, whose WEB_REMIX request pairs session cookies with a guest
-            // poToken — the mismatch YouTube answers with UNPLAYABLE "Video
-            // unavailable" / LOGIN_REQUIRED. It was also the reason dataSyncId was
-            // never harvested, so the account-bound token could never be minted.
+            // Do NOT skip Tier-1 on a missing dataSyncId, and do not hand the
+            // session to Tier-2 instead: resolvePlayerStream detects the
+            // unbound account itself and runs a clean guest pass (no session
+            // cookies). That is strictly better than Tier-2's WEB_REMIX
+            // pairing session cookies with a guest poToken — the mismatch
+            // YouTube answers with UNPLAYABLE "Video unavailable" /
+            // LOGIN_REQUIRED. What the guest pass must not do is sweep the
+            // guest clients: those requests are exactly the native chain's, and
+            // only the native side can decipher what they return. So the pass
+            // is restricted to the session-bearing client
+            // (guestClientsEnabled: false).
             //
-            // Kick a (throttled) dataSyncId bootstrap in parallel so later tracks
-            // resolve with the account-bound token; the current resolve proceeds
-            // on the guest/native chain meanwhile.
-            if (account.dataSyncId == null || account.dataSyncId!.isEmpty) {
+            // Kick a (throttled) dataSyncId bootstrap in parallel so later
+            // tracks resolve with the account-bound token; the current resolve
+            // is restricted to the session-bearing client, so with no session
+            // yet it issues nothing and leaves the work to the native tier.
+            if (!accountBound) {
               debugPrint(
                   '[YTM_SERVICE] Tier-1 running as guest pass for $videoId: '
                   'dataSyncId not yet ready; bootstrapping in background.');
@@ -1241,8 +1261,12 @@ class YtmService {
               ErrorLogger.log('Non-critical YTM operation failed',
                   error: e, stackTrace: st, category: 'YTM');
             }
-            final directStream =
-                await account.resolvePlayerStream(videoId, quality: quality);
+            // Guest passes are the only case that restricts the chain; an
+            // account-bound pass keeps the default, full chain.
+            final directStream = accountBound
+                ? await account.resolvePlayerStream(videoId, quality: quality)
+                : await account.resolvePlayerStream(videoId,
+                    quality: quality, guestClientsEnabled: false);
             if (directStream != null) {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
@@ -1387,9 +1411,30 @@ class YtmService {
       });
     }
 
-    tierHedge = Timer(_tier1HedgeDelay, startNativeTier);
+    // Logged out: Tier-1 has no session to carry and the Dart chain is a guest
+    // sweep of the same clients the native extractor is about to ask — and only
+    // the native side can decipher what they return. Skip it entirely and mark
+    // it done so the race can still settle on the native answer.
+    if (!accountLoggedIn) {
+      debugPrint('[YTM_SERVICE] No account session for $videoId — going '
+          'straight to the native tier');
+      accountDone = true;
+    }
 
-    runAccountTier().then((stream) {
+    // A guest pass gets no head start (see the comment above): a zero delay
+    // starts the native chain on the next event-loop turn, and the account tier
+    // is restricted to the session-bearing client instead of the native chain
+    // waiting out [_tier1HedgeDelay] for a resolve that cannot decipher a
+    // ciphered format. Only an account-bound pass is hedged.
+    tierHedge = Timer(
+        accountBound ? _tier1HedgeDelay : Duration.zero, startNativeTier);
+
+    // The conditional expression is lazy, so a logged-out resolve never starts
+    // the account tier; the null future just keeps the wiring below unchanged.
+    final accountRun =
+        accountLoggedIn ? runAccountTier() : Future<YtmStream?>.value();
+
+    accountRun.then((stream) {
       accountResult = stream;
       accountDone = true;
       tierHedge?.cancel();
@@ -1561,244 +1606,6 @@ class YtmService {
     if (err != null) throw err;
     throw const YtmException(
         'YTM_FAILED', 'No stream returned from any engine');
-  }
-
-  /// Pure-Dart fallback that directly queries InnerTube player API using
-  /// lightweight clients (e.g. ANDROID_VR, TVHTML5) that provide direct audio
-  /// stream URLs without requiring native deciphers or MethodChannels.
-  Future<YtmStream?> _resolveStreamDart(String videoId,
-      {String quality = 'high', bool preferM4a = false}) async {
-    String apiKey = YtmClientVersionResolver.fallbackApiKey;
-    String androidVersion = '19.44.38';
-    String androidVrVersion = '1.63.27';
-    if (getIt.isRegistered<YtmClientVersionResolver>()) {
-      final resolver = getIt<YtmClientVersionResolver>();
-      apiKey = resolver.apiKey;
-      androidVersion = resolver.androidVersion;
-      androidVrVersion = resolver.androidVrVersion;
-    }
-
-    String? guestPoToken;
-    String? guestVisitorData;
-    try {
-      final poState =
-          await getPoTokenState().timeout(const Duration(seconds: 2));
-      guestPoToken = poState?['streamingPoToken'] as String?;
-      guestVisitorData = poState?['visitorData'] as String?;
-    } catch (e, st) {
-      ErrorLogger.log('Non-critical YTM operation failed',
-          error: e, stackTrace: st, category: 'YTM');
-    }
-
-    final effectiveAndroidVersion =
-        androidVersion == '19.44.38' ? '21.26.364' : androidVersion;
-    final List<_DartPlayerClient> clients = [
-      (
-        name: 'ANDROID',
-        version: effectiveAndroidVersion,
-        clientNameId: '3',
-        ua: 'com.google.android.youtube/$effectiveAndroidVersion (Linux; U; Android 11; en_US) gzip',
-        host: 'https://www.youtube.com',
-      ),
-      (
-        name: 'ANDROID_VR',
-        version: androidVrVersion,
-        clientNameId: '28',
-        ua: 'com.google.android.apps.youtube.vr/$androidVrVersion (Linux; U; Android 14; en_US) gzip',
-        host: 'https://www.youtube.com',
-      ),
-      (
-        name: 'WEB_EMBEDDED_PLAYER',
-        version: '1.20241009.01.00',
-        clientNameId: '56',
-        ua: 'Mozilla/5.0 (PlayStation; PlayStation 5/2.26) AppleWebKit/605.1.15 (KHTML, like Gecko)',
-        host: 'https://www.youtube.com',
-      ),
-      (
-        name: 'TVHTML5_SIMPLY',
-        version: '1.0',
-        clientNameId: '75',
-        ua: 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko)',
-        host: 'https://www.youtube.com',
-      ),
-    ];
-
-    Future<YtmStream> attempt(_DartPlayerClient client) async {
-      final isEmbed = client.name.contains('EMBED');
-      final clientContext = <String, dynamic>{
-        'client': {
-          'clientName': client.name,
-          'clientVersion': client.version,
-          'hl': YtmLocale.hl(),
-          'gl': YtmLocale.gl(),
-          if (guestVisitorData != null && guestVisitorData.isNotEmpty)
-            'visitorData': guestVisitorData,
-        },
-        if (isEmbed)
-          'thirdParty': {
-            'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
-          },
-      };
-
-      final body = jsonEncode({
-        'context': clientContext,
-        'videoId': videoId,
-        'racyCheckOk': true,
-        'contentCheckOk': true,
-        if (isEmbed)
-          'thirdParty': {
-            'embedUrl': 'https://www.youtube.com/watch?v=$videoId',
-          },
-        'playbackContext': {
-          'contentPlaybackContext': {
-            'html5Preference': 'HTML5_PREF_WANTS',
-            if (guestPoToken != null && guestPoToken.isNotEmpty)
-              'poToken': guestPoToken,
-          },
-        },
-      });
-
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'User-Agent': client.ua,
-        'X-Goog-Api-Key': apiKey,
-        'x-youtube-client-name': client.clientNameId,
-        'x-youtube-client-version': client.version,
-        if (guestVisitorData != null && guestVisitorData.isNotEmpty)
-          'X-Goog-Visitor-Id': guestVisitorData,
-      };
-
-      final response = await _httpClient
-          .post(
-            Uri.parse(
-                '${client.host}/youtubei/v1/player?prettyPrint=false&key=$apiKey'),
-            headers: headers,
-            body: body,
-          )
-          // FIX-C06: 12s timeout per client in _resolveStreamDart
-          .timeout(const Duration(seconds: 12));
-
-      if (response.statusCode != 200) {
-        throw YtmException('YTM_HTTP_${response.statusCode}',
-            'Dart client ${client.name} answered HTTP ${response.statusCode}');
-      }
-
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final playability = data['playabilityStatus'] as Map<String, dynamic>?;
-      final status = playability?['status'] as String? ?? '';
-      if (status == 'LOGIN_REQUIRED' ||
-          status == 'UNPLAYABLE' ||
-          status.contains('BOT')) {
-        throw YtmException('YTM_UNAVAILABLE',
-            'Dart client ${client.name} answered playability $status');
-      }
-
-      final streamingData = data['streamingData'] as Map<String, dynamic>?;
-      if (streamingData == null) {
-        throw YtmException('YTM_UNAVAILABLE',
-            'Dart client ${client.name} returned no streamingData');
-      }
-
-      final adaptive =
-          (streamingData['adaptiveFormats'] as List<dynamic>? ?? [])
-              .whereType<Map<String, dynamic>>()
-              .toList();
-
-      final audioFormats = <({Map<String, dynamic> format, String url})>[];
-      for (final f in adaptive) {
-        final mime = f['mimeType'] as String? ?? '';
-        final streamUrl = f['url'] as String?;
-        if (mime.startsWith('audio/') &&
-            streamUrl != null &&
-            streamUrl.isNotEmpty) {
-          audioFormats.add((format: f, url: streamUrl));
-        }
-      }
-
-      if (audioFormats.isEmpty) {
-        final formats = (streamingData['formats'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .toList();
-        for (final f in formats) {
-          final streamUrl = f['url'] as String?;
-          if (streamUrl != null && streamUrl.isNotEmpty) {
-            audioFormats.add((format: f, url: streamUrl));
-          }
-        }
-      }
-
-      if (audioFormats.isEmpty) {
-        throw YtmException('YTM_UNAVAILABLE',
-            'Dart client ${client.name} returned no audio formats');
-      }
-
-      final m4a = audioFormats
-          .where(
-              (f) => ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
-          .toList();
-      final pool = (preferM4a && m4a.isNotEmpty)
-          ? m4a
-          : (m4a.isNotEmpty ? m4a : audioFormats);
-
-      final selected = switch (quality.toLowerCase()) {
-        'low' => pool.reduce((a, b) => ((a.format['bitrate'] as num?) ?? 0) <
-                ((b.format['bitrate'] as num?) ?? 0)
-            ? a
-            : b),
-        'medium' => pool.reduce((a, b) =>
-            (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
-                    (((b.format['bitrate'] as num?) ?? 128000) - 128000).abs()
-                ? a
-                : b),
-        _ => pool.reduce((a, b) => ((a.format['bitrate'] as num?) ?? 0) >
-                ((b.format['bitrate'] as num?) ?? 0)
-            ? a
-            : b),
-      };
-
-      final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';
-      final bitrate = (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
-      final durationMs = int.tryParse(
-              selected.format['approxDurationMs']?.toString() ?? '0') ??
-          0;
-      final details = data['videoDetails'] as Map<String, dynamic>?;
-      final audioConfig =
-          data['playerConfig']?['audioConfig'] as Map<String, dynamic>?;
-      final loudnessDb = (audioConfig?['loudnessDb'] as num?)?.toDouble() ??
-          (audioConfig?['perVideoLoudnessDb'] as num?)?.toDouble();
-
-      return YtmStream(
-        videoId: videoId,
-        url: selected.url,
-        mimeType: mime.split(';').first.trim(),
-        container: mime.contains('mp4') ? 'm4a' : 'webm',
-        bitrateKbps: (bitrate / 1000).round(),
-        duration: Duration(milliseconds: durationMs),
-        title: details?['title'] as String? ?? '',
-        artist: details?['author'] as String? ?? '',
-        artworkUrl: null,
-        userAgent: client.ua,
-        loudnessDb: loudnessDb,
-      ).withResolvedExpiry();
-    }
-
-    // The three clients are each a full round trip that can hang for its whole
-    // 12s budget. Run them as a staggered race instead of back-to-back so one
-    // unresponsive client no longer holds the chain hostage: the first client
-    // to return usable formats wins and the rest are abandoned. A block or an
-    // An empty payload throws (ignored by the race), so only a real success
-    // wins; when every client fails this tier answers null, as before.
-    try {
-      return await HedgedStreamResolver.race<YtmStream>(
-        [for (final client in clients) () => attempt(client)],
-        hedgeDelay: const Duration(milliseconds: 300),
-        timeout: const Duration(seconds: 15),
-      );
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Dart InnerTube client race exhausted: $e');
-    }
-
-    return null;
   }
 
   Future<T?> _guard<T>(

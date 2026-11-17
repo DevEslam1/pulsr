@@ -48,6 +48,25 @@ int effectiveSourceSampleRate({required int tagged, required int decoded}) =>
 /// Fold observed processing facts, not slider positions or output preferences.
 /// Unknown gain is deliberately not unity. A direct raw USB tee skips the
 /// player-volume stage but not source rate/pitch/frame edits.
+/// Highest software gain this app can legitimately report.
+///
+/// `_volume` and the ReplayGain multiplier are clamped to 0..1 and the native
+/// DVC stage tops out at 4.0, so a larger reading is a corrupt value rather
+/// than a real level.
+const double kMaxTrustedSoftwareGain = 4.0;
+
+/// The gain a bit-perfect verdict may trust, or `null` when the reading cannot
+/// be a real software volume multiplier.
+///
+/// Missing, NaN, ±Infinity, negative and absurd readings are all unusable.
+/// `double.nan` is the worst of them: it compares false against every bound,
+/// which is how it once slipped through as "not attenuated".
+double? trustedSoftwareGain(double? gain) {
+  if (gain == null || !gain.isFinite) return null;
+  if (gain < 0.0 || gain > kMaxTrustedSoftwareGain) return null;
+  return gain;
+}
+
 bool chainSamplesModified({
   required bool dspProcessing,
   required double effectiveGain,
@@ -108,10 +127,11 @@ class BitPerfectChainAssessment {
 /// (an active DSP stage, or int32 source audio entering a float32 pipeline).
 /// No format agreement can make that chain bit-perfect. It is a single bool on
 /// purpose - the verdict does not enumerate stages - so the caller must fold
-/// *every* processing and gain stage it knows about into it (EQ, limiter,
-/// crossfeed, reverb, saturation, dynamics, width, contour, crossover, volume
-/// boost, ReplayGain...); passing a partial list silently upgrades the verdict
-/// to "verified".
+/// *every* processing stage it knows about into it (EQ, limiter, crossfeed,
+/// reverb, saturation, dynamics, width, contour, crossover, volume boost,
+/// ReplayGain...) and must NOT fold software gain here: attenuation has its own
+/// [digitalVolumeAttenuated] fact and its own reason code. Passing gain here
+/// would report a lowered volume as "samples modified by DSP".
 ///
 /// [channelsAltered] means the sink remapped the channel layout (duplicated,
 /// silenced or dropped channels) on at least one frame. Like [samplesModified]
@@ -127,6 +147,12 @@ BitPerfectChainAssessment assessBitPerfectChain({
   bool isDsdDop = false,
   bool isDsdNative = false,
   bool samplesModified = false,
+  /// The live chain took an observed integer path (the Media3 sink's integer
+  /// bypass, or the direct USB sink's delivered raw-integer depth). Format
+  /// agreement alone cannot rule out a float carrier or a gain stage, so a
+  /// chain without this fact is reported `float_conversion`, after any more
+  /// specific rate/depth offence has had its say.
+  bool integerBypass = true,
   bool channelsAltered = false,
   /// The active sink scales the samples with software/system volume below
   /// unity. A bit-exact claim needs unity gain; below it the samples are
@@ -294,6 +320,20 @@ BitPerfectChainAssessment assessBitPerfectChain({
       outputSampleRate: outputSampleRate,
       outputBitDepth: outputBitDepth,
       reasonCode: 'depth_truncated',
+    );
+  }
+  // Same rate, wide enough container, yet nothing proved the samples stayed
+  // integer: they passed through a float carrier or an unobserved gain stage.
+  // Checked after the format offences so a real resample or truncation keeps
+  // its specific name; checked before volume so a float path is never excused.
+  if (!integerBypass) {
+    return BitPerfectChainAssessment(
+      verdict: BitPerfectChainVerdict.unverified,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      outputSampleRate: outputSampleRate,
+      outputBitDepth: outputBitDepth,
+      reasonCode: 'float_conversion',
     );
   }
 

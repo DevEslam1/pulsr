@@ -82,18 +82,19 @@ class BitPerfectState {
 /// platform confirming the exclusive/direct output is configured. Everything
 /// else is an observation about the live chain.
 ///
-/// [strict] carries the "block rather than downgrade" preference. It never
-/// loosens the verdict — the resolver is fail-closed for both values — and it
-/// does not change the tier; callers use it to decide whether a
-/// non-[BitPerfectTier.active] state should block playback or only warn.
+/// This resolver has no "strict" switch on purpose: a policy preference must
+/// never change what the observations mean. Strict Bit-Perfect is enforced
+/// where it belongs (source/format validation and transport teardown in
+/// SettingsCubit), not by relabelling a degraded chain.
 ///
 /// The capability booleans are deliberately defaulted to `false`: a caller
 /// that has not proven exclusivity, an integer path, a clean HAL and unity
 /// gain gets `degraded`, never `active`. [softwareGainUnknown] says the gain
 /// reading itself was unusable, which is distinct from a measured attenuation.
+/// [systemEffectsCompromised] covers OEM post-processing the app cannot bypass
+/// or prove bypassed; unknown is not clean, so it blocks `active`.
 BitPerfectState resolveBitPerfectState({
   required bool requested,
-  required bool strict,
   required bool sinkActive,
   required int sourceSampleRate,
   required int sourceBitDepth,
@@ -102,6 +103,7 @@ BitPerfectState resolveBitPerfectState({
   bool exclusive = false,
   bool integerBypass = false,
   bool halClean = false,
+  bool systemEffectsCompromised = false,
   bool unityGain = false,
   bool softwareGainUnknown = false,
   bool samplesModified = false,
@@ -114,7 +116,7 @@ BitPerfectState resolveBitPerfectState({
 }) {
   // Fold every observation into the one assessment that already knows how to
   // compare source and sink formats:
-  //  - a non-integer path re-quantises the samples, so it *is* a modification;
+  //  - a non-integer path is reported `float_conversion`, not a modification;
   //  - any gain below unity attenuates them;
   //  - exclusive is the direct-USB fact the precision rules depend on;
   //  - the sink depth is the raw depth, never the collapsed display value.
@@ -126,7 +128,8 @@ BitPerfectState resolveBitPerfectState({
     outputSampleRate: sinkSampleRate,
     outputBitDepth: sinkBitDepth,
     isDsdDop: isDsdDop,
-    samplesModified: samplesModified || !integerBypass,
+    samplesModified: samplesModified,
+    integerBypass: integerBypass,
     channelsAltered: channelsAltered,
     // An unreadable gain is unknown, not attenuated: attenuation was never
     // measured, and claiming it would invent a fact.
@@ -154,11 +157,17 @@ BitPerfectState resolveBitPerfectState({
     );
   }
 
-  // `halClean` has no counterpart in the assessment (HAL effects live outside
-  // the PCM buffer), so the active tier requires it here as well. Every fact
-  // must hold *and* the chain must be verified; anything else is degraded.
+  // `halClean` covers app-owned HAL effects; `systemEffectsCompromised`
+  // covers OEM post-processing the app cannot reach. Both live outside the PCM
+  // buffer, so the active tier requires both here as well. Every fact must
+  // hold *and* the chain must be verified; anything else is degraded.
   final allFactsHold =
-      exclusive && integerBypass && halClean && unityGain && !softwareGainUnknown;
+      exclusive &&
+      integerBypass &&
+      halClean &&
+      !systemEffectsCompromised &&
+      unityGain &&
+      !softwareGainUnknown;
 
   final BitPerfectTier tier;
   if (!requested) {
@@ -173,10 +182,11 @@ BitPerfectState resolveBitPerfectState({
   }
 
   // Reason precedence: the fact that most directly destroys bit-exactness
-  // wins. A HAL effect alters the stream after the app hands it over; without
-  // an exclusive route the sink format is not ours to control; a float carrier
-  // re-quantises integer samples. Otherwise the assessment's own reason stands
-  // (rate/depth mismatch, modified samples, lossy source, DoP carrier...).
+  // wins. A HAL effect alters the stream after the app hands it over; an OEM
+  // effect the app cannot prove bypassed is the same problem one layer down;
+  // without an exclusive route the sink format is not ours to control.
+  // Otherwise the assessment's own reason stands (rate/depth mismatch, float
+  // carrier, modified samples, lossy source, DoP carrier...).
   final String? reasonCode;
   if (!requested) {
     reasonCode = null;
@@ -187,11 +197,14 @@ BitPerfectState resolveBitPerfectState({
     reasonCode = assessment.reasonCode ?? 'sink_not_active';
   } else if (!halClean) {
     reasonCode = 'hal_effect_active';
+  } else if (systemEffectsCompromised) {
+    reasonCode = 'system_effect_active';
   } else if (!exclusive) {
     reasonCode = 'not_exclusive';
-  } else if (!integerBypass) {
-    reasonCode = 'float_conversion';
   } else {
+    // The assessment already names a non-integer path as `float_conversion`,
+    // after any more specific rate/depth/codec offence. Nothing is gained by
+    // re-deriving that here, and a second copy could disagree.
     reasonCode = assessment.reasonCode;
   }
 

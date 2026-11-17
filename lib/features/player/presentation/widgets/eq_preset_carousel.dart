@@ -159,10 +159,7 @@ extension _EqPresetCarousel on _EqualizerSheetState {
     final initial = List<double>.from(_activeFrequencies(state));
     final controllers = [
       for (final f in initial)
-        TextEditingController(
-            text: f == f.roundToDouble()
-                ? f.toStringAsFixed(0)
-                : f.toStringAsFixed(1)),
+        TextEditingController(text: EqSheetMath.formatFrequencyText(f)),
     ];
     try {
       String? error;
@@ -228,27 +225,20 @@ extension _EqPresetCarousel on _EqualizerSheetState {
               ),
               FilledButton(
                 onPressed: () {
-                  final parsed = <double>[];
-                  for (final c in controllers) {
-                    final v = double.tryParse(c.text.trim());
-                    if (v == null || !v.isFinite) {
-                      setDialogState(
-                          () => error = context.l10n.dspEveryBandValidNumber);
-                      return;
-                    }
-                    parsed.add(v);
-                  }
-                  for (var i = 0; i < parsed.length; i++) {
-                    if (parsed[i] < 10 || parsed[i] > 30000) {
-                      setDialogState(
-                          () => error = context.l10n.dspFreqRange10To30k);
-                      return;
-                    }
-                    if (i > 0 && parsed[i] <= parsed[i - 1]) {
-                      setDialogState(
-                          () => error = context.l10n.dspFreqStrictlyAscending);
-                      return;
-                    }
+                  final result = EqSheetMath.parseCenterFrequencies(
+                    [for (final c in controllers) c.text.trim()],
+                  );
+                  if (!result.isValid) {
+                    final message = switch (result.issue!) {
+                      CenterFrequencyIssue.notANumber =>
+                        context.l10n.dspEveryBandValidNumber,
+                      CenterFrequencyIssue.outOfRange =>
+                        context.l10n.dspFreqRange10To30k,
+                      CenterFrequencyIssue.notAscending =>
+                        context.l10n.dspFreqStrictlyAscending,
+                    };
+                    setDialogState(() => error = message);
+                    return;
                   }
                   Navigator.pop(ctx, true);
                 },

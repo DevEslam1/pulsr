@@ -24,6 +24,7 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pulsr/l10n/app_localizations_delegates.dart';
+
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class MockPlayerCubit extends Mock implements PlayerCubit {}
@@ -89,6 +90,7 @@ Future<SettingsSectionHarness> pumpSettingsCategory(
   SettingsState? seedState,
   Map<String, Object> extraPrefs = const {},
   Size size = const Size(420, 3200),
+  PlayerState playerState = const PlayerState(),
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
@@ -108,8 +110,9 @@ Future<SettingsSectionHarness> pumpSettingsCategory(
       .thenAnswer((_) => const Stream<double>.empty());
 
   final player = MockPlayerCubit();
-  when(() => player.state).thenReturn(const PlayerState());
+  when(() => player.state).thenReturn(playerState);
   when(() => player.stream).thenAnswer((_) => const Stream.empty());
+  when(() => player.isQuranAlwaysOnRadio()).thenAnswer((_) async => false);
 
   final auth = MockAuthCubit();
   when(() => auth.state).thenReturn(const AuthState());

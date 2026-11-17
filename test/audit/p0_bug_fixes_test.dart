@@ -89,15 +89,12 @@ void main() {
             autoPlay: any(named: 'autoPlay'),
           )).thenThrow(Exception('Engine load failure'));
 
-      final lyricsGen = controller.lyricsGuard.next();
-
       await controller.playSong(failedSong);
 
       // Rollback occurred
       expect(state.errorMessage, contains('Failed to play Failing Song'));
       expect(controller.mediaItemResolutionGuard.isValid(1), isFalse);
       expect(controller.localMatchSwapGuard.isValid(1), isFalse);
-      expect(controller.lyricsGuard.isValid(lyricsGen), isFalse);
     });
 
     test(

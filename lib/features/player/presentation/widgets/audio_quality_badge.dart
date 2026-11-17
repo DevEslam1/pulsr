@@ -65,9 +65,7 @@ class AudioQualityBadge extends StatelessWidget {
             ? 'USB DAC'
             : (output.isBt
                 ? 'Bluetooth'
-                : (output.isSpeaker
-                    ? 'Speaker'
-                    : 'DAC')));
+                : (output.isSpeaker ? 'Speaker' : 'DAC')));
 
     return Material(
       color: Colors.transparent,

@@ -49,20 +49,14 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
         child: LayoutBuilder(
           builder: (context, artConstraints) {
             final visualizerSpace = showVisualizer
-                ? math.min(
-                    artConstraints.maxHeight,
-                    visualizerStyle == VisualizerStyle.circular
-                        ? 70.0
-                        : 46.0)
+                ? math.min(artConstraints.maxHeight,
+                    visualizerStyle == VisualizerStyle.circular ? 70.0 : 46.0)
                 : 0.0;
             final telemetrySpace = (song != null) ? 50.0 : 0.0;
             final artworkSize = PlayerThemeMetrics.safeArtworkSize(
               availableWidth: artConstraints.maxWidth,
-              availableHeight: math.max(
-                  0.0,
-                  artConstraints.maxHeight -
-                      visualizerSpace -
-                      telemetrySpace),
+              availableHeight: math.max(0.0,
+                  artConstraints.maxHeight - visualizerSpace - telemetrySpace),
               isTablet: metrics.isTablet,
               maxAllowedOverride: metrics.isLandscape ? 280.0 : null,
             );
@@ -89,27 +83,29 @@ extension _MinimalPlayerThemeBuild on MinimalPlayerTheme {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color:
-                                    activeColor.withValues(alpha: 0.25),
+                                color: activeColor.withValues(alpha: 0.25),
                                 blurRadius: 28,
                                 spreadRadius: 1,
                                 offset: const Offset(0, 10),
                               ),
                             ],
                           ),
-                          child: song != null
-                              ? CachedArtwork(
-                                  id: song.id,
-                                  albumId: song.albumId,
-                                  remoteUrl: song.remoteArtworkUrl ??
-                                      song.artworkUri,
-                                  type: ArtworkType.AUDIO,
-                                  size: double.infinity,
-                                  borderRadius:
-                                      resolveCustomRadius(context, 20),
-                                  highQuality: true,
-                                )
-                              : const SizedBox.shrink(),
+                          child: PlayerArtworkSemantics(
+                            song: song,
+                            child: song != null
+                                ? CachedArtwork(
+                                    id: song.id,
+                                    albumId: song.albumId,
+                                    remoteUrl: song.remoteArtworkUrl ??
+                                        song.artworkUri,
+                                    type: ArtworkType.AUDIO,
+                                    size: double.infinity,
+                                    borderRadius:
+                                        resolveCustomRadius(context, 20),
+                                    highQuality: true,
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                         ),
                       ),
                     ),

@@ -9,6 +9,7 @@ import '../../../../core/widgets/pulsr_slider.dart';
 import '../../cubit/player_cubit.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 class PlayerVolumeBar extends StatefulWidget {
   final PlayerCubit cubit;
   final Color activeColor;
@@ -32,7 +33,9 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
     final p = context.palette;
     final currentVolume = () {
       try {
-        return context.select<PlayerCubit, double>((c) => c.state.volume).clamp(0.0, 1.0);
+        return context
+            .select<PlayerCubit, double>((c) => c.state.volume)
+            .clamp(0.0, 1.0);
       } catch (_) {
         return widget.cubit.state.volume.clamp(0.0, 1.0);
       }
@@ -86,7 +89,8 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
                 },
                 onChanged: (v) {
                   final prev = _dragVolume ?? currentVolume;
-                  if ((prev > 0.02 && v <= 0.02) || (prev < 0.98 && v >= 0.98)) {
+                  if ((prev > 0.02 && v <= 0.02) ||
+                      (prev < 0.98 && v >= 0.98)) {
                     PulsrHaptics.selectionClick();
                   }
                   setState(() => _dragVolume = v);

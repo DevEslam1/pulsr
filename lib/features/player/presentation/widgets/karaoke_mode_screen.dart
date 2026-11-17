@@ -186,10 +186,10 @@ class _KaraokeModeScreenState extends State<KaraokeModeScreen>
     // build-time check could never reach.
     final lineStart = lyrics[loopIndex].timestamp;
     final nextIndex = loopIndex + 1;
-    final lineEnd = (nextIndex < lyrics.length &&
-            lyrics[nextIndex].timestamp > lineStart)
-        ? lyrics[nextIndex].timestamp
-        : lineStart + const Duration(seconds: 4);
+    final lineEnd =
+        (nextIndex < lyrics.length && lyrics[nextIndex].timestamp > lineStart)
+            ? lyrics[nextIndex].timestamp
+            : lineStart + const Duration(seconds: 4);
     if (pos < lineEnd) {
       _practiceLoopArmed = true;
       return;

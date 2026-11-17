@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../db/app_database.dart';
 import '../../core/services/ytm_url_cache.dart';
+import '../../core/telemetry/clock.dart';
 import '../../domain/models/ytm_track.dart';
 
 typedef StreamUrlResolver = Future<YtmStream> Function(String videoId,
@@ -83,6 +84,8 @@ class PreconnectedSocketPool {
 /// - Debounced re-plan (300ms) on queue mutations (add/remove/reorder/shuffle)
 /// - Idempotent cache writes into [YtmUrlCache]
 /// - Non-blocking, cancellable, and dispose-safe
+/// - One global concurrency budget for every trigger, with a bounded queue and
+///   foreground priority for the track the user actually tapped
 class StreamPreResolver {
   static const int defaultPreResolveCount = 4;
 
@@ -93,6 +96,28 @@ class StreamPreResolver {
   final bool Function(String videoId)? isAlreadyPrefetching;
   final int preResolveWindowSize;
 
+  /// Global cap on resolution chains running at once, shared by every trigger.
+  ///
+  /// Each chain costs a Dart account pass plus a native Kotlin pass with a
+  /// Rhino signature transform, so a handful started together competes with
+  /// the track the user is waiting for. They cannot be cancelled once started,
+  /// so the only cure is to start fewer of them.
+  final int maxConcurrentResolutions;
+
+  /// Bound on requests parked behind [maxConcurrentResolutions]. A request
+  /// arriving with the queue full is dropped rather than parked: a stale
+  /// lookahead is worth less than a bounded footprint.
+  final int maxQueuedResolutions;
+
+  /// How long a failed video id is skipped everywhere. A bot-challenged or
+  /// age-gated egress answers every retry the same way, so a retry inside the
+  /// window only burns CPU and data for the same answer.
+  final Duration failureCooldown;
+
+  /// Clock used for [failureCooldown] bookkeeping; the system clock in
+  /// production, a fake clock in tests.
+  final Clock clock;
+
   /// Optional live override for [preResolveWindowSize], evaluated on every
   /// plan so the host can bind the warm depth to the current buffer bucket and
   /// metered-connection policy instead of a value fixed at construction.
@@ -101,6 +126,9 @@ class StreamPreResolver {
   Timer? _debounceTimer;
   final Map<String, Object> _activeResolutionTokens = {};
   final Set<String> _inFlightVideoIds = {};
+  final List<_PendingResolution> _pending = [];
+  final Map<String, DateTime> _cooldownUntil = {};
+  String? _foregroundVideoId;
   bool _disposed = false;
 
   StreamPreResolver({
@@ -112,6 +140,10 @@ class StreamPreResolver {
     this.repeatQueueProvider,
     this.preResolveWindowSize = 1,
     this.windowSizeProvider,
+    this.maxConcurrentResolutions = 2,
+    this.maxQueuedResolutions = 8,
+    this.failureCooldown = const Duration(seconds: 60),
+    this.clock = const SystemClock(),
   });
 
   /// Test entry point mirroring the production constructor so unit tests can
@@ -126,6 +158,10 @@ class StreamPreResolver {
     bool Function()? repeatQueueProvider,
     int preResolveWindowSize = 1,
     int Function()? windowSizeProvider,
+    int maxConcurrentResolutions = 2,
+    int maxQueuedResolutions = 8,
+    Duration failureCooldown = const Duration(seconds: 60),
+    Clock clock = const SystemClock(),
   }) =>
       StreamPreResolver(
         resolveUrl: resolveUrl,
@@ -136,6 +172,10 @@ class StreamPreResolver {
         repeatQueueProvider: repeatQueueProvider,
         preResolveWindowSize: preResolveWindowSize,
         windowSizeProvider: windowSizeProvider,
+        maxConcurrentResolutions: maxConcurrentResolutions,
+        maxQueuedResolutions: maxQueuedResolutions,
+        failureCooldown: failureCooldown,
+        clock: clock,
       );
 
   final bool Function()? repeatQueueProvider;
@@ -146,6 +186,54 @@ class StreamPreResolver {
   String? get inFlightVideoId =>
       _inFlightVideoIds.isEmpty ? null : _inFlightVideoIds.first;
   Set<String> get inFlightVideoIds => Set.unmodifiable(_inFlightVideoIds);
+
+  /// Whether the foreground (user-tapped) resolution is still running.
+  ///
+  /// Background warming is held back while it is: the tap is the only stream
+  /// anyone is waiting on, and a second chain started now would only compete
+  /// with it for CPU and bandwidth. Already-running chains are left alone —
+  /// they cannot be cancelled.
+  bool get _foregroundInFlight =>
+      _foregroundVideoId != null &&
+      _inFlightVideoIds.contains(_foregroundVideoId);
+
+  bool get _hasFreeSlot =>
+      _inFlightVideoIds.length < maxConcurrentResolutions &&
+      !_foregroundInFlight;
+
+  /// Marks [videoId] as the track the user is waiting on.
+  ///
+  /// Queued background work for every other track is dropped rather than
+  /// parked: a resolution chain cannot be cancelled once started, so the only
+  /// way to stop the lookahead competing with the tap is to never start it.
+  void prioritize(String videoId) {
+    if (_disposed || videoId.isEmpty) return;
+    _foregroundVideoId = videoId;
+
+    var dropped = 0;
+    for (var i = _pending.length - 1; i >= 0; i--) {
+      if (_pending[i].videoId != videoId) {
+        _pending.removeAt(i);
+        dropped++;
+      }
+    }
+    if (dropped > 0) {
+      debugPrint('[StreamPreResolver] Dropped $dropped queued background '
+          'pre-resolve(s) behind foreground $videoId');
+    }
+
+    _promotePending(videoId);
+  }
+
+  /// Moves a queued request for [videoId] to the head of the queue and marks it
+  /// as user-priority. Returns false when the id is not queued.
+  bool _promotePending(String videoId) {
+    final index = _pending.indexWhere((r) => r.videoId == videoId);
+    if (index < 0) return false;
+    final promoted = _pending.removeAt(index);
+    _pending.insert(0, promoted.asPriority());
+    return true;
+  }
 
   /// Called immediately when a track starts playing.
   ///
@@ -214,6 +302,10 @@ class StreamPreResolver {
   }
 
   /// Fire the moment a track is tapped or enqueued — not only on track start.
+  ///
+  /// A tap is what the user is waiting on, so it bypasses the queue whenever a
+  /// slot is free and otherwise takes the next freed slot ahead of every
+  /// background request.
   void onTrackEnqueuedOrTapped(SongsTableData song) {
     if (_disposed) return;
     if (song.source != SongSource.youtube || song.isDownloaded == true) return;
@@ -229,8 +321,19 @@ class StreamPreResolver {
         isAlreadyPrefetching?.call(videoId) == true) {
       return;
     }
+    if (_isCoolingDown(videoId)) return;
 
-    _resolveNow(song, quality);
+    if (_promotePending(videoId)) {
+      _pump();
+      return;
+    }
+
+    if (_hasFreeSlot && _pending.isEmpty) {
+      _startResolution(song, quality);
+      return;
+    }
+    _enqueue(_PendingResolution(song: song, quality: quality, priority: true));
+    _pump();
   }
 
   void _planPreResolution({
@@ -293,13 +396,13 @@ class StreamPreResolver {
         continue;
       }
 
-      _resolveNow(song, quality);
-      // Bound background concurrency to 2 in-flight requests
-      if (_inFlightVideoIds.length >= 2) break;
+      if (_isCoolingDown(videoId)) continue;
+
+      _submitBackground(song, quality);
     }
   }
 
-  void _resolveNow(SongsTableData song, String quality) {
+  void _startResolution(SongsTableData song, String quality) {
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) return;
 
@@ -307,12 +410,16 @@ class StreamPreResolver {
     final token = Object();
     _activeResolutionTokens[videoId] = token;
 
-    resolveUrl(videoId,
-            quality: quality, title: song.title, artist: song.artist)
+    // `Future.sync` so a resolver that throws synchronously still lands in the
+    // error path below and clears its in-flight entry.
+    Future<YtmStream>.sync(() => resolveUrl(videoId,
+            quality: quality, title: song.title, artist: song.artist))
         .then((stream) {
       if (_disposed || !identical(_activeResolutionTokens[videoId], token)) {
         return;
       }
+      // A successful resolve clears any cooldown left by an earlier failure.
+      _cooldownUntil.remove(videoId);
       urlCache.putStream(stream, quality: quality);
       unawaited(PreconnectedSocketPool().preconnect(Uri.parse(stream.url)));
       debugPrint(
@@ -321,14 +428,75 @@ class StreamPreResolver {
       if (_disposed || !identical(_activeResolutionTokens[videoId], token)) {
         return;
       }
+      _cooldownUntil[videoId] = clock.now().add(failureCooldown);
       debugPrint(
           '[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
+      debugPrint('[StreamPreResolver] Cooling down $videoId for '
+          '${failureCooldown.inSeconds}s after failed pre-resolution');
     }).whenComplete(() {
       if (identical(_activeResolutionTokens[videoId], token)) {
         _inFlightVideoIds.remove(videoId);
         _activeResolutionTokens.remove(videoId);
+        _pump();
       }
     });
+  }
+
+  /// Starts queued requests, priority first, while the shared budget allows.
+  void _pump() {
+    if (_disposed) return;
+    while (_pending.isNotEmpty && _hasFreeSlot) {
+      final request = _pending.removeAt(0);
+      if (_inFlightVideoIds.contains(request.videoId)) continue;
+      if (_isCoolingDown(request.videoId)) continue;
+      _startResolution(request.song, request.quality);
+    }
+  }
+
+  void _submitBackground(SongsTableData song, String quality) {
+    if (_hasFreeSlot && _pending.isEmpty) {
+      _startResolution(song, quality);
+      return;
+    }
+    _enqueue(
+        _PendingResolution(song: song, quality: quality, priority: false));
+  }
+
+  /// Queues [request] in priority-then-FIFO order, dropping it when the queue
+  /// is full instead of parking it indefinitely.
+  void _enqueue(_PendingResolution request) {
+    if (_pending.length >= maxQueuedResolutions) {
+      if (!request.priority) {
+        debugPrint('[StreamPreResolver] Dropped background pre-resolve for '
+            '${request.videoId}: queue full');
+        return;
+      }
+      // A tapped track must never be parked behind background work: evict the
+      // newest background request to make room. If every slot already holds a
+      // priority request, this one is dropped instead.
+      final evictIndex = _pending.lastIndexWhere((r) => !r.priority);
+      if (evictIndex < 0) {
+        debugPrint('[StreamPreResolver] Dropped priority pre-resolve for '
+            '${request.videoId}: queue full');
+        return;
+      }
+      _pending.removeAt(evictIndex);
+    }
+    if (!request.priority) {
+      _pending.add(request);
+      return;
+    }
+    final firstBackground = _pending.indexWhere((r) => !r.priority);
+    _pending.insert(
+        firstBackground < 0 ? _pending.length : firstBackground, request);
+  }
+
+  bool _isCoolingDown(String videoId) {
+    final until = _cooldownUntil[videoId];
+    if (until == null) return false;
+    if (clock.now().isBefore(until)) return true;
+    _cooldownUntil.remove(videoId);
+    return false;
   }
 
   List<SongsTableData> _determineNextSongs({
@@ -393,11 +561,33 @@ class StreamPreResolver {
 
   void cancel() {
     _debounceTimer?.cancel();
+    _pending.clear();
+    _foregroundVideoId = null;
     _cancelInFlight();
   }
 
   void dispose() {
     _disposed = true;
     cancel();
+    _cooldownUntil.clear();
   }
+}
+
+/// One queued pre-resolution request. [priority] marks a track the user
+/// explicitly tapped or enqueued: it is served before any lookahead request.
+class _PendingResolution {
+  const _PendingResolution({
+    required this.song,
+    required this.quality,
+    required this.priority,
+  });
+
+  final SongsTableData song;
+  final String quality;
+  final bool priority;
+
+  String get videoId => song.remoteId ?? '';
+
+  _PendingResolution asPriority() =>
+      _PendingResolution(song: song, quality: quality, priority: true);
 }

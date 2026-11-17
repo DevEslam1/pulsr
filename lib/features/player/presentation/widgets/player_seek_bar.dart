@@ -474,6 +474,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     children: [
                       Semantics(
                         slider: true,
+                        label: semanticLabel,
                         // The child PulsrSlider publishes its own slider node
                         // with a percentage value; without this exclusion the
                         // same control appeared twice (time and percent) and
@@ -537,8 +538,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                         _tapSeekPending = false;
                                       }
                                       if (_lastHapticCheckMs != null) {
-                                        if ((clampedVal == 0.0 && _lastHapticCheckMs! > 0.0) ||
-                                            (clampedVal == maxDuration && _lastHapticCheckMs! < maxDuration)) {
+                                        if ((clampedVal == 0.0 &&
+                                                _lastHapticCheckMs! > 0.0) ||
+                                            (clampedVal == maxDuration &&
+                                                _lastHapticCheckMs! <
+                                                    maxDuration)) {
                                           PulsrHaptics.selectionClick();
                                         }
                                         _checkHapticBoundaries(
@@ -585,7 +589,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         ),
                       ),
                       // Floating dual-tone timestamp pill above thumb while dragging
-                      if (isDragging && trackWidth > 70 && sliderStyle != PlayerSliderStyle.capsule)
+                      if (isDragging &&
+                          trackWidth > 70 &&
+                          sliderStyle != PlayerSliderStyle.capsule)
                         PositionedDirectional(
                           top: -36,
                           start: (ratio * trackWidth - 54).clamp(
@@ -599,42 +605,43 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                 duration: context.motionMs(150),
                                 curve: Curves.easeOutBack,
                                 child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s8,
-                                vertical: AppSpacing.s4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: p.surfaceContainerHighest,
-                                borderRadius: AppRadii.r12All,
-                                border: Border.all(
-                                  color: widget.activeColor
-                                      .withValues(alpha: 0.45),
-                                  width: 1.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.24),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.s8,
+                                    vertical: AppSpacing.s4,
                                   ),
-                                ],
-                              ),
-                              child: Text(
-                                '${Formatters.formatDuration(currentDuration)} ($deltaStr)',
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontSize: AppFontSize.caption,
-                                  fontWeight: FontWeight.w700,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures()
-                                  ],
+                                  decoration: BoxDecoration(
+                                    color: p.surfaceContainerHighest,
+                                    borderRadius: AppRadii.r12All,
+                                    border: Border.all(
+                                      color: widget.activeColor
+                                          .withValues(alpha: 0.45),
+                                      width: 1.0,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.24),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    '${Formatters.formatDuration(currentDuration)} ($deltaStr)',
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontSize: AppFontSize.caption,
+                                      fontWeight: FontWeight.w700,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures()
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
                     ],
                   );
                 },
@@ -648,7 +655,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     AnimatedDefaultTextStyle(
                       duration: context.motionMs(150),
                       style: TextStyle(
-                        color: isDragging ? widget.activeColor : p.textSecondary,
+                        color:
+                            isDragging ? widget.activeColor : p.textSecondary,
                         fontSize: AppFontSize.label,
                         fontWeight:
                             isDragging ? FontWeight.w700 : FontWeight.w600,
@@ -697,7 +705,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                       ),
                     GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() => _showRemaining = !_showRemaining),
+                      onTap: () =>
+                          setState(() => _showRemaining = !_showRemaining),
                       child: Text(
                         _showRemaining
                             ? (widget.duration > currentDuration

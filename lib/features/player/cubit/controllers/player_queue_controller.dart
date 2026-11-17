@@ -116,13 +116,9 @@ class PlayerQueueController {
   // Async guards for coordination
   final AsyncGuard _mediaItemResolutionGuard = AsyncGuard();
   final AsyncGuard _localMatchSwapGuard = AsyncGuard();
-  final AsyncGuard _mediaItemGuard = AsyncGuard();
-  final AsyncGuard _lyricsGuard = AsyncGuard();
 
   AsyncGuard get mediaItemResolutionGuard => _mediaItemResolutionGuard;
   AsyncGuard get localMatchSwapGuard => _localMatchSwapGuard;
-  AsyncGuard get mediaItemGuard => _mediaItemGuard;
-  AsyncGuard get lyricsGuard => _lyricsGuard;
 
   bool _isSwitchingSlot = false;
 
@@ -196,7 +192,5 @@ class PlayerQueueController {
     }
     _mediaItemResolutionGuard.invalidate();
     _localMatchSwapGuard.invalidate();
-    _mediaItemGuard.invalidate();
-    _lyricsGuard.invalidate();
   }
 }

@@ -100,6 +100,43 @@ void main() {
       expect(find.text('Ambient Sounds'), findsWidgets);
     });
 
+    testWidgets(
+        'header fits a phone-width banner without overflowing the tab row',
+        (tester) async {
+      final state = const PlayerState(
+        playback: PlaybackSlice(isPlaying: true, currentSong: radioSong),
+      );
+      final cubit = stubPlayerCubit(state: state);
+
+      final props = PlayerThemeProps(
+        state: state,
+        cubit: cubit,
+        activeColor: Colors.teal,
+        bgColor: Colors.black,
+      );
+
+      await tester.pumpWidget(
+        sheetHost(
+          playerCubit: cubit,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: 420,
+              child: RadioNowPlayingRecommendations(
+                props: props,
+                cubit: cubit,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('Quran Mode'), findsWidgets);
+      expect(find.text('Ambient Sounds'), findsWidgets);
+    });
+
     testWidgets('hides recommendations when local or online track is playing',
         (tester) async {
       final state = const PlayerState(

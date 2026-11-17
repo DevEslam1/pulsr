@@ -9,6 +9,7 @@ import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 class _ListDoubleTween extends Tween<List<double>> {
   _ListDoubleTween({super.begin, super.end});
 

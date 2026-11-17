@@ -28,6 +28,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 class LyricsView extends StatefulWidget {
   /// Playback position used to highlight the active line.
   ///
@@ -900,9 +901,8 @@ class _LyricsViewState extends State<LyricsView> {
     final p = context.palette;
     final isInSplit = PlayerSplitViewScope.of(context);
     final isSeamless = isInSplit || widget.transparentBackground;
-    final topSafe = widget.transparentBackground
-        ? MediaQuery.paddingOf(context).top
-        : 0.0;
+    final topSafe =
+        widget.transparentBackground ? MediaQuery.paddingOf(context).top : 0.0;
 
     return Container(
       decoration: BoxDecoration(
@@ -1068,7 +1068,8 @@ class _LyricsViewState extends State<LyricsView> {
                         foregroundColor: widget.activeColor,
                         side: BorderSide(
                             color: widget.activeColor.withValues(alpha: 0.4)),
-                        shape: RoundedRectangleBorder(borderRadius: AppRadii.r10All),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: AppRadii.r10All),
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.md, vertical: AppSpacing.xs),
                       ),

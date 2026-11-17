@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/services/sound_feedback_service.dart';
 import 'package:pulsr/core/widgets/pulsr_bottom_sheet.dart';
+import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:pulsr/features/shell/presentation/widgets/dock_style_controller.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
@@ -148,6 +150,42 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     expect(h.cubit.state.playerThemeMode, PlayerThemeMode.lyricsFocus);
+  });
+
+  testWidgets('theme picker live previews stay clean while radio plays',
+      (tester) async {
+    const radioSong = SongsTableData(
+      id: 99,
+      title: 'Holy Quran Cairo',
+      artist: 'Radio',
+      album: '',
+      durationMs: 0,
+      path: 'https://stream.radiojar.com/8s5u8xamm',
+      source: 'radio',
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
+    );
+
+    final h = await pumpSettingsCategory(
+      tester,
+      category: 'look',
+      playerState: const PlayerState(
+        playback: PlaybackSlice(isPlaying: true, currentSong: radioSong),
+      ),
+    );
+    addTearDown(h.cubit.close);
+
+    await tester.tap(find.text(l10n.nowPlayingTheme));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(find.text(l10n.selectPlayerTheme), findsOneWidget);
+    // Live theme previews lay themselves out on a real window canvas; a short
+    // fixed canvas used to overflow and painted debug stripes in the picker.
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('visualizer + color source pickers update their state',

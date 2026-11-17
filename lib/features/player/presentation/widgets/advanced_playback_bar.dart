@@ -16,6 +16,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// AB-loop / bookmark labels need a placeholder for an unset point; the
 /// duration itself is formatted with the shared [Formatters.formatDuration] so
 /// it can never disagree with the seek bar (A-12).

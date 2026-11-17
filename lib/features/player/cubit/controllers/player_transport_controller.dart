@@ -10,6 +10,7 @@ import 'player_seek_throttle.dart';
 import 'queue_slot_data.dart';
 
 import '../../../../core/errors/app_error.dart';
+
 /// Owns audio transport controls: play, pause, seek, track skipping, shuffle, repeat, and favorite toggle.
 class PlayerTransportController {
   final PulsrAudioHandler _audioHandler;
@@ -22,7 +23,9 @@ class PlayerTransportController {
   final void Function()? _debouncedPersistQueueSlots;
   final void Function({bool force})? _updateWidgetThrottled;
   final Future<void> Function(SongsTableData song,
-      {List<SongsTableData>? queue, Duration? initialPosition, int? queueIndex})? _onPlaySong;
+      {List<SongsTableData>? queue,
+      Duration? initialPosition,
+      int? queueIndex})? _onPlaySong;
 
   // Monotonic stopwatch for seek throttling. H-05: instance-scoped so separate
   // controller instances (e.g. test + prod) never share throttle state.
@@ -44,7 +47,9 @@ class PlayerTransportController {
     void Function()? debouncedPersistQueueSlots,
     void Function({bool force})? updateWidgetThrottled,
     Future<void> Function(SongsTableData song,
-            {List<SongsTableData>? queue, Duration? initialPosition, int? queueIndex})?
+            {List<SongsTableData>? queue,
+            Duration? initialPosition,
+            int? queueIndex})?
         onPlaySong,
   })  : _audioHandler = audioHandler,
         _getState = getState,
@@ -65,8 +70,7 @@ class PlayerTransportController {
         final s = _getState();
         final isPlaying = _audioHandler.playbackState.value.playing;
         _emit(s.copyWith(
-            playback:
-                s.playback.copyWith(isPlaying: isPlaying, error: null)));
+            playback: s.playback.copyWith(isPlaying: isPlaying, error: null)));
       }
     } catch (e, st) {
       ErrorLogger.log('Play failed',
@@ -74,8 +78,8 @@ class PlayerTransportController {
       if (!_isClosed()) {
         final s = _getState();
         _emit(s.copyWith(
-            playback:
-                s.playback.copyWith(error: uiError('Failed to start playback'))));
+            playback: s.playback
+                .copyWith(error: uiError('Failed to start playback'))));
       }
     }
   }
@@ -237,8 +241,7 @@ class PlayerTransportController {
     final prev = state.isShuffle;
     final next = !prev;
     _emit(state.copyWith(
-        playback:
-            state.playback.copyWith(isShuffle: next, error: null)));
+        playback: state.playback.copyWith(isShuffle: next, error: null)));
     try {
       await _audioHandler.setShuffleMode(
           next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
@@ -272,8 +275,7 @@ class PlayerTransportController {
       PlayerRepeatMode.one => AudioServiceRepeatMode.one,
     };
     _emit(state.copyWith(
-        playback:
-            state.playback.copyWith(repeatMode: next, error: null)));
+        playback: state.playback.copyWith(repeatMode: next, error: null)));
     try {
       await _audioHandler.setRepeatMode(nextMode);
       // See toggleShuffle: force a full widget push so the repeat icon reflects
@@ -294,8 +296,7 @@ class PlayerTransportController {
   Future<void> toggleFavoriteSong(SongsTableData song) =>
       toggleFavoriteById(song.id);
 
-  Future<void> toggleFavoriteById(int songId) =>
-      _executeToggleFavorite(songId);
+  Future<void> toggleFavoriteById(int songId) => _executeToggleFavorite(songId);
 
   Future<void> toggleFavorite([Object? target]) async {
     if (target is SongsTableData) {
@@ -316,8 +317,7 @@ class PlayerTransportController {
       result.fold(
         (failure) {
           final s = _getState();
-          _emit(s.copyWith(
-              playback: s.playback.copyWith(error: failure)));
+          _emit(s.copyWith(playback: s.playback.copyWith(error: failure)));
         },
         (isFav) {
           // Mirror the favorite change to the media session / OS notification.

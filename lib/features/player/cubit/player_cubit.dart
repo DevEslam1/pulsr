@@ -969,8 +969,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         // message without counting the track as unplayable or auto-skipping.
         safeEmit(state.copyWith(
             playback: state.playback.copyWith(
-                error: uiError(err
-                    .substring(PulsrAudioHandler.outputModeNoticePrefix.length)),
+                error: uiError(err.substring(
+                    PulsrAudioHandler.outputModeNoticePrefix.length)),
                 isBuffering: false)));
         return;
       }
@@ -1034,8 +1034,8 @@ class PlayerCubit extends PulsrCubit<PlayerState>
         return;
       }
       safeEmit(state.copyWith(
-          playback:
-              state.playback.copyWith(error: uiError(err), isBuffering: false)));
+          playback: state.playback
+              .copyWith(error: uiError(err), isBuffering: false)));
     });
 
     autoSub(_audioHandler.sleepTimerRemainingStream, (rem) {
@@ -1109,8 +1109,7 @@ class PlayerCubit extends PulsrCubit<PlayerState>
   }
 
   void clearError() {
-    safeEmit(
-        state.copyWith(playback: state.playback.copyWith(error: null)));
+    safeEmit(state.copyWith(playback: state.playback.copyWith(error: null)));
   }
 
   Future<void> persistQueueSlotsNow() => queueController.persistQueueSlotsNow();

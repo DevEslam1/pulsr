@@ -75,14 +75,18 @@ extension PlayerPlaybackOptionsTrackState on PlayerPlaybackOptionsController {
       rating = _songRatingStore.getRating(key);
     } catch (e, st) {
       ErrorLogger.log('Failed to read song rating for $key',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
     }
     double gainDb = 0.0;
     try {
       gainDb = _perSongVolumeStore.getGainDbForTrack(key);
     } catch (e, st) {
       ErrorLogger.log('Failed to read per-song volume gain for $key',
-          error: e, stackTrace: st, category: 'PlayerPlaybackOptionsController');
+          error: e,
+          stackTrace: st,
+          category: 'PlayerPlaybackOptionsController');
     }
     final bookmark = storedBookmarkFor(song);
     final bookmarkPos = (bookmark != null && bookmark.positionMs > 0)

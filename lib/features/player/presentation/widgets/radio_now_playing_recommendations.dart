@@ -80,7 +80,8 @@ class _RadioNowPlayingRecommendationsState
     if (!RadioNowPlayingRecommendations.shouldShowFor(song)) {
       return const SizedBox.shrink();
     }
-    if (widget.props.state.isLyricsVisible || widget.props.state.isQueueVisible) {
+    if (widget.props.state.isLyricsVisible ||
+        widget.props.state.isQueueVisible) {
       return const SizedBox.shrink();
     }
 
@@ -94,6 +95,10 @@ class _RadioNowPlayingRecommendationsState
       return _buildCompactBar(context, p);
     }
 
+    final accent = _selectedTab == _RecommendationTab.quran
+        ? AppColors.quranEmerald
+        : widget.props.activeColor;
+
     return AnimatedContainer(
       duration: context.motion(PulsrMotion.layout),
       curve: context.motionCurve(Curves.easeOutCubic),
@@ -102,26 +107,37 @@ class _RadioNowPlayingRecommendationsState
         vertical: AppSpacing.xxs,
       ),
       decoration: BoxDecoration(
-        color: p.isDark
-            ? AppColors.specularAt(0.06)
-            : p.surfaceContainer.withValues(alpha: 0.85),
-        borderRadius: AppRadii.r16All,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.alphaBlend(
+              accent.withValues(alpha: p.isDark ? 0.10 : 0.05),
+              p.surfaceContainer.withValues(alpha: p.isDark ? 0.92 : 0.98),
+            ),
+            p.surfaceContainer.withValues(alpha: p.isDark ? 0.70 : 0.90),
+          ],
+        ),
+        borderRadius: AppRadii.r20All,
         border: Border.all(
-          color: _selectedTab == _RecommendationTab.quran
-              ? AppColors.quranEmerald.withValues(alpha: 0.28)
-              : widget.props.activeColor.withValues(alpha: 0.28),
+          color: accent.withValues(alpha: p.isDark ? 0.30 : 0.24),
           width: 1.0,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: p.isDark ? 0.22 : 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: accent.withValues(alpha: 0.10),
+            blurRadius: 18,
+            spreadRadius: -6,
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: AppRadii.r16All,
+        borderRadius: AppRadii.r20All,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -269,93 +285,154 @@ class _RadioNowPlayingRecommendationsState
     );
   }
 
+  Color _readableOn(Color color) =>
+      color.computeLuminance() > 0.5 ? AppColors.controlInk : Colors.white;
+
   Widget _buildHeader(
     BuildContext context,
     PulsrPalette p,
     dynamic l10n,
   ) {
-    return Container(
-      padding: const EdgeInsetsDirectional.fromSTEB(
-        AppSpacing.s12,
-        AppSpacing.s6,
-        AppSpacing.s6,
-        AppSpacing.s6,
-      ),
+    final accent = _selectedTab == _RecommendationTab.quran
+        ? AppColors.quranEmerald
+        : widget.props.activeColor;
+
+    final brand = Container(
+      width: 30,
+      height: 30,
       decoration: BoxDecoration(
-        color: p.isDark
-            ? Colors.black.withValues(alpha: 0.20)
-            : Colors.white.withValues(alpha: 0.35),
-        border: Border(bottom: BorderSide(color: p.hairline, width: 0.7)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: p.isDark ? 0.30 : 0.20),
+            accent.withValues(alpha: p.isDark ? 0.10 : 0.06),
+          ],
+        ),
+        borderRadius: AppRadii.r10All,
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      child: Icon(Icons.auto_awesome_rounded, size: 15, color: accent),
+    );
+
+    final title = Text(
+      l10n.radioRecommendations,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: p.textPrimary,
+        fontSize: AppFontSize.label,
+        fontWeight: FontWeight.w800,
+        letterSpacing: AppTracking.label,
+      ),
+    );
+
+    final collapseButton = IconButton(
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      tooltip:
+          _isCollapsed ? 'Expand recommendations' : 'Collapse recommendations',
+      icon: Icon(
+        _isCollapsed
+            ? Icons.keyboard_arrow_down_rounded
+            : Icons.keyboard_arrow_up_rounded,
+        size: 20,
+        color: p.textSecondary,
+      ),
+      onPressed: () {
+        PulsrHaptics.selectionClick();
+        setState(() => _isCollapsed = !_isCollapsed);
+      },
+    );
+
+    final tabSelector = Container(
+      padding: const EdgeInsets.all(3.0),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          Colors.black.withValues(alpha: p.isDark ? 0.28 : 0.03),
+          p.surfaceContainer,
+        ),
+        borderRadius: AppRadii.r14All,
+        border: Border.all(color: p.hairline, width: 0.8),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.auto_awesome_rounded,
-            size: 15,
-            color: widget.props.activeColor,
+          _buildTabButton(
+            tab: _RecommendationTab.quran,
+            icon: Icons.auto_stories_rounded,
+            label: l10n.quranMode,
+            activeColor: AppColors.quranEmerald,
+            p: p,
           ),
-          const SizedBox(width: AppSpacing.xs),
-          Text(
-            l10n.radioRecommendations,
-            style: TextStyle(
-              color: p.textSecondary,
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w800,
-              letterSpacing: AppTracking.overline,
-            ),
-          ),
-          const Spacer(),
-
-          // Segmented Tab: Quran Mode vs Ambient
-          Container(
-            padding: const EdgeInsets.all(2.0),
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: AppRadii.r20All,
-              border: Border.all(color: p.hairline, width: 0.6),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildTabButton(
-                  tab: _RecommendationTab.quran,
-                  icon: Icons.auto_stories_rounded,
-                  label: l10n.quranMode,
-                  activeColor: AppColors.quranEmerald,
-                  p: p,
-                ),
-                _buildTabButton(
-                  tab: _RecommendationTab.ambient,
-                  icon: Icons.water_drop_rounded,
-                  label: l10n.ambientSounds,
-                  activeColor: widget.props.activeColor,
-                  p: p,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-
-          // Collapse / Expand toggle button
-          IconButton(
-            constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-            padding: EdgeInsets.zero,
-            tooltip: _isCollapsed
-                ? 'Expand recommendations'
-                : 'Collapse recommendations',
-            icon: Icon(
-              _isCollapsed
-                  ? Icons.keyboard_arrow_down_rounded
-                  : Icons.keyboard_arrow_up_rounded,
-              size: 20,
-              color: p.textSecondary,
-            ),
-            onPressed: () {
-              PulsrHaptics.selectionClick();
-              setState(() => _isCollapsed = !_isCollapsed);
-            },
+          const SizedBox(width: 3),
+          _buildTabButton(
+            tab: _RecommendationTab.ambient,
+            icon: Icons.water_drop_rounded,
+            label: l10n.ambientSounds,
+            activeColor: widget.props.activeColor,
+            p: p,
           ),
         ],
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppSpacing.s10,
+        AppSpacing.s8,
+        AppSpacing.s6,
+        AppSpacing.s8,
+      ),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: p.hairline, width: 0.7)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // The label, both tab labels and the collapse button cannot share a
+          // single line on phones (~460dp of natural width), so the selector
+          // drops to its own line instead of overflowing the banner.
+          if (constraints.maxWidth < 480) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    brand,
+                    const SizedBox(width: AppSpacing.s10),
+                    Expanded(child: title),
+                    collapseButton,
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: AppSpacing.xs,
+                    top: AppSpacing.xxs,
+                    bottom: AppSpacing.xxs,
+                  ),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: AlignmentDirectional.centerStart,
+                    child: tabSelector,
+                  ),
+                ),
+              ],
+            );
+          }
+          return Row(
+            children: [
+              brand,
+              const SizedBox(width: AppSpacing.s10),
+              Expanded(child: title),
+              const SizedBox(width: AppSpacing.sm),
+              tabSelector,
+              const SizedBox(width: AppSpacing.xxs),
+              collapseButton,
+            ],
+          );
+        },
       ),
     );
   }
@@ -368,6 +445,7 @@ class _RadioNowPlayingRecommendationsState
     required PulsrPalette p,
   }) {
     final isSelected = _selectedTab == tab;
+    final foreground = isSelected ? _readableOn(activeColor) : p.textSecondary;
     return InkWell(
       onTap: () {
         if (!isSelected) {
@@ -378,36 +456,47 @@ class _RadioNowPlayingRecommendationsState
           });
         }
       },
-      borderRadius: AppRadii.r16All,
+      borderRadius: AppRadii.r10All,
       child: AnimatedContainer(
         duration: context.motionMs(200),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        curve: context.motionCurve(Curves.easeOutCubic),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? activeColor.withValues(alpha: 0.22)
-              : Colors.transparent,
-          borderRadius: AppRadii.r16All,
-          border: Border.all(
-            color: isSelected
-                ? activeColor.withValues(alpha: 0.40)
-                : Colors.transparent,
-          ),
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    activeColor,
+                    Color.alphaBlend(
+                      Colors.black.withValues(alpha: 0.16),
+                      activeColor,
+                    ),
+                  ],
+                )
+              : null,
+          borderRadius: AppRadii.r10All,
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.32),
+                    blurRadius: 10,
+                    spreadRadius: -2,
+                  ),
+                ]
+              : null,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 13,
-              color: isSelected ? activeColor : p.textSecondary,
-            ),
-            const SizedBox(width: AppSpacing.xxs),
+            Icon(icon, size: 13, color: foreground),
+            const SizedBox(width: 5),
             Text(
               label,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                color: isSelected ? p.textPrimary : p.textSecondary,
+                color: foreground,
               ),
             ),
           ],
@@ -416,33 +505,184 @@ class _RadioNowPlayingRecommendationsState
     );
   }
 
+  Widget _sectionIcon({
+    required IconData icon,
+    required Color accent,
+    required PulsrPalette p,
+  }) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            accent.withValues(alpha: p.isDark ? 0.24 : 0.16),
+            accent.withValues(alpha: p.isDark ? 0.08 : 0.05),
+          ],
+        ),
+        borderRadius: AppRadii.r14All,
+        border: Border.all(color: accent.withValues(alpha: 0.32)),
+      ),
+      child: Icon(icon, size: 20, color: accent),
+    );
+  }
+
+  Widget _buildChoicePill({
+    required String label,
+    required bool isSelected,
+    required Color accent,
+    required PulsrPalette p,
+    required VoidCallback onTap,
+  }) {
+    final foreground = isSelected ? _readableOn(accent) : p.textPrimary;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: AppRadii.r12All,
+      child: AnimatedContainer(
+        duration: context.motionMs(200),
+        curve: context.motionCurve(Curves.easeOutCubic),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    accent,
+                    Color.alphaBlend(
+                      Colors.black.withValues(alpha: 0.16),
+                      accent,
+                    ),
+                  ],
+                )
+              : null,
+          color: isSelected
+              ? null
+              : p.surfaceContainerHigh.withValues(alpha: p.isDark ? 0.55 : 0.8),
+          borderRadius: AppRadii.r12All,
+          border: Border.all(
+            color: isSelected ? Colors.transparent : p.hairline,
+            width: 1.0,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.28),
+                    blurRadius: 10,
+                    spreadRadius: -2,
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSelected) ...[
+              Icon(Icons.check_rounded, size: 13, color: foreground),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                color: foreground,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlwaysOnRow({
+    required PulsrPalette p,
+    required Color accent,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    required VoidCallback onOpen,
+    required String openTooltip,
+    required String label,
+  }) {
+    return Container(
+      padding: const EdgeInsetsDirectional.fromSTEB(
+        AppSpacing.s10,
+        AppSpacing.s2,
+        AppSpacing.s2,
+        AppSpacing.s2,
+      ),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(
+          Colors.black.withValues(alpha: p.isDark ? 0.18 : 0.02),
+          p.surfaceContainer.withValues(alpha: p.isDark ? 0.55 : 0.8),
+        ),
+        borderRadius: AppRadii.r14All,
+        border: Border.all(color: p.hairline, width: 0.7),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.radio_rounded,
+            size: 16,
+            color: value ? accent : p.textSecondary,
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: AppFontSize.caption,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          PulsrSwitch(
+            value: value,
+            activeColor: accent,
+            onChanged: onChanged,
+          ),
+          IconButton(
+            constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              Icons.open_in_new_rounded,
+              size: 15,
+              color: p.textSecondary,
+            ),
+            tooltip: openTooltip,
+            onPressed: onOpen,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuranSection(BuildContext context, PulsrPalette p) {
     final state = widget.props.state;
     final isQuranOn = state.isQuranModeEnabled;
     final currentStyle = state.quranReciterStyle;
+    const accent = AppColors.quranEmerald;
 
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.s10),
+      padding: const EdgeInsets.all(AppSpacing.s12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Power switch row
+          // Reciter hero row
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.xs),
-                decoration: BoxDecoration(
-                  color: AppColors.quranEmerald.withValues(alpha: 0.16),
-                  borderRadius: AppRadii.r8All,
-                ),
-                child: const Icon(
-                  Icons.auto_stories_rounded,
-                  size: 18,
-                  color: AppColors.quranEmerald,
-                ),
+              _sectionIcon(
+                icon: Icons.auto_stories_rounded,
+                accent: accent,
+                p: p,
               ),
-              const SizedBox(width: AppSpacing.xs),
+              const SizedBox(width: AppSpacing.s12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,18 +695,24 @@ class _RadioNowPlayingRecommendationsState
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       '${currentStyle.label} • ${currentStyle.tagline}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
               PulsrSwitch(
                 value: isQuranOn,
+                activeColor: accent,
                 onChanged: (v) {
                   PulsrHaptics.lightImpact();
                   unawaited(widget.cubit.setQuranModeEnabled(v));
@@ -474,40 +720,26 @@ class _RadioNowPlayingRecommendationsState
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.s8),
+          const SizedBox(height: AppSpacing.s12),
 
-          // Style chips (Tajweed / Mujawwad is default; user choice saved as default)
+          // Reciter style pills (user choice saved as the new default)
           SizedBox(
-            height: 32,
+            height: 38,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: QuranReciterStyle.values.length,
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xxs),
+              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.s6),
               itemBuilder: (context, i) {
                 final style = QuranReciterStyle.values[i];
                 final isSelected = style == currentStyle;
-                return ChoiceChip(
-                  selected: isSelected,
-                  visualDensity: VisualDensity.compact,
-                  showCheckmark: false,
-                  label: Text(
-                    style == QuranReciterStyle.mujawwad
-                        ? '${style.label} (Tajweed)'
-                        : style.label,
-                  ),
-                  labelStyle: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? Colors.white : p.textPrimary,
-                  ),
-                  selectedColor: AppColors.quranEmerald,
-                  backgroundColor: p.surfaceContainer,
-                  side: BorderSide(
-                    color: isSelected
-                        ? AppColors.quranEmerald
-                        : p.hairline,
-                  ),
-                  onSelected: (_) {
+                return _buildChoicePill(
+                  label: style == QuranReciterStyle.mujawwad
+                      ? '${style.label} (Tajweed)'
+                      : style.label,
+                  isSelected: isSelected,
+                  accent: accent,
+                  p: p,
+                  onTap: () {
                     PulsrHaptics.selectionClick();
                     unawaited(widget.cubit.setQuranReciterStyle(style));
                   },
@@ -515,55 +747,42 @@ class _RadioNowPlayingRecommendationsState
               },
             ),
           ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            context.l10n.styleDefaultNotice,
-            style: TextStyle(
-              color: p.textTertiary,
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
           const SizedBox(height: AppSpacing.s6),
-          Divider(height: 1, color: p.hairline),
-          const SizedBox(height: AppSpacing.s6),
-
-          // Always on Radio row
           Row(
             children: [
               Icon(
-                Icons.radio_rounded,
-                size: 16,
-                color: _quranAlwaysOnRadio ? AppColors.quranEmerald : p.textSecondary,
+                Icons.info_outline_rounded,
+                size: 13,
+                color: p.textTertiary,
               ),
-              const SizedBox(width: AppSpacing.xs),
+              const SizedBox(width: AppSpacing.s6),
               Expanded(
                 child: Text(
-                  context.l10n.alwaysOnRadio,
+                  context.l10n.styleDefaultNotice,
                   style: TextStyle(
-                    color: p.textPrimary,
+                    color: p.textTertiary,
                     fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              PulsrSwitch(
-                value: _quranAlwaysOnRadio,
-                onChanged: (v) {
-                  PulsrHaptics.selectionClick();
-                  setState(() => _quranAlwaysOnRadio = v);
-                  unawaited(widget.cubit.setQuranAlwaysOnRadio(v));
-                },
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              IconButton(
-                constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                padding: EdgeInsets.zero,
-                icon: Icon(Icons.open_in_new_rounded, size: 16, color: p.textSecondary),
-                tooltip: context.l10n.quranMode,
-                onPressed: () => QuranModeSheet.show(context),
-              ),
             ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+
+          // Always on Radio footer
+          _buildAlwaysOnRow(
+            p: p,
+            accent: accent,
+            value: _quranAlwaysOnRadio,
+            label: context.l10n.alwaysOnRadio,
+            openTooltip: context.l10n.quranMode,
+            onOpen: () => QuranModeSheet.show(context),
+            onChanged: (v) {
+              PulsrHaptics.selectionClick();
+              setState(() => _quranAlwaysOnRadio = v);
+              unawaited(widget.cubit.setQuranAlwaysOnRadio(v));
+            },
           ),
         ],
       ),
@@ -572,6 +791,7 @@ class _RadioNowPlayingRecommendationsState
 
   Widget _buildAmbientSection(BuildContext context, PulsrPalette p) {
     final ambientService = AmbientSoundService();
+    final accent = widget.props.activeColor;
 
     return ListenableBuilder(
       listenable: ambientService,
@@ -582,27 +802,20 @@ class _RadioNowPlayingRecommendationsState
         final alwaysOnRadio = ambientService.alwaysOnRadio;
 
         return Padding(
-          padding: const EdgeInsets.all(AppSpacing.s10),
+          padding: const EdgeInsets.all(AppSpacing.s12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Power switch row
+              // Ambient hero row
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
-                    decoration: BoxDecoration(
-                      color: widget.props.activeColor.withValues(alpha: 0.16),
-                      borderRadius: AppRadii.r8All,
-                    ),
-                    child: Icon(
-                      Icons.water_drop_rounded,
-                      size: 18,
-                      color: widget.props.activeColor,
-                    ),
+                  _sectionIcon(
+                    icon: Icons.water_drop_rounded,
+                    accent: accent,
+                    p: p,
                   ),
-                  const SizedBox(width: AppSpacing.xs),
+                  const SizedBox(width: AppSpacing.s12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,6 +828,7 @@ class _RadioNowPlayingRecommendationsState
                             fontWeight: FontWeight.w800,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           isAmbientOn && ambientService.activeEffects.isNotEmpty
                               ? ambientService.activeEffects
@@ -622,16 +836,21 @@ class _RadioNowPlayingRecommendationsState
                                       '${e.emoji} ${(ambientService.volumeFor(e) * 100).round()}%')
                                   .join('  ')
                               : context.l10n.ambientSoundsDesc,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: p.textSecondary,
                             fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: AppSpacing.xs),
                   PulsrSwitch(
                     value: isAmbientOn,
+                    activeColor: accent,
                     onChanged: (v) {
                       PulsrHaptics.lightImpact();
                       unawaited(ambientService.setEnabled(v));
@@ -639,48 +858,31 @@ class _RadioNowPlayingRecommendationsState
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.s8),
+              const SizedBox(height: AppSpacing.s12),
 
-              // Effects chips
+              // Effect pills
               SizedBox(
-                height: 32,
+                height: 38,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: AmbientSoundEffect.values.length,
                   separatorBuilder: (_, __) =>
-                      const SizedBox(width: AppSpacing.xxs),
+                      const SizedBox(width: AppSpacing.s6),
                   itemBuilder: (context, i) {
                     final effect = AmbientSoundEffect.values[i];
                     final isSelected = ambientService.isEffectActive(effect);
                     final effectVolPercent =
                         (ambientService.volumeFor(effect) * 100).round();
+                    final effectLabel = isSelected
+                        ? '${effect.localizedLabel(context.l10n)} $effectVolPercent%'
+                        : effect.localizedLabel(context.l10n);
 
-                    return ChoiceChip(
-                      selected: isSelected,
-                      visualDensity: VisualDensity.compact,
-                      showCheckmark: false,
-                      avatar: Text(
-                        effect.emoji,
-                        style: const TextStyle(fontSize: AppFontSize.bodySmall),
-                      ),
-                      label: Text(
-                        isSelected
-                            ? '${effect.localizedLabel(context.l10n)} $effectVolPercent%'
-                            : effect.localizedLabel(context.l10n),
-                      ),
-                      labelStyle: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                        color: isSelected ? Colors.white : p.textPrimary,
-                      ),
-                      selectedColor: widget.props.activeColor,
-                      backgroundColor: p.surfaceContainer,
-                      side: BorderSide(
-                        color: isSelected
-                            ? widget.props.activeColor
-                            : p.hairline,
-                      ),
-                      onSelected: (_) {
+                    return _buildChoicePill(
+                      label: '${effect.emoji} $effectLabel',
+                      isSelected: isSelected,
+                      accent: accent,
+                      p: p,
+                      onTap: () {
                         PulsrHaptics.selectionClick();
                         unawaited(ambientService.toggleEffect(effect));
                       },
@@ -691,77 +893,65 @@ class _RadioNowPlayingRecommendationsState
               const SizedBox(height: AppSpacing.s8),
 
               // Volume percentage slider
-              Row(
-                children: [
-                  Icon(
-                    Icons.volume_up_rounded,
-                    size: 16,
-                    color: p.textSecondary,
+              Container(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.s10,
+                  AppSpacing.s2,
+                  AppSpacing.s10,
+                  AppSpacing.s2,
+                ),
+                decoration: BoxDecoration(
+                  color: Color.alphaBlend(
+                    Colors.black.withValues(alpha: p.isDark ? 0.18 : 0.02),
+                    p.surfaceContainer.withValues(alpha: p.isDark ? 0.55 : 0.8),
                   ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Text(
-                    context.l10n.ambientVolumePercent(percent),
-                    style: TextStyle(
+                  borderRadius: AppRadii.r14All,
+                  border: Border.all(color: p.hairline, width: 0.7),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.volume_up_rounded,
+                      size: 16,
                       color: p.textSecondary,
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w700,
                     ),
-                  ),
-                  Expanded(
-                    child: PulsrSlider(
-                      value: masterVol,
-                      min: 0.0,
-                      max: 1.0,
-                      activeColor: widget.props.activeColor,
-                      onChanged: (v) {
-                        unawaited(ambientService.setMasterVolume(v));
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.s4),
-              Divider(height: 1, color: p.hairline),
-              const SizedBox(height: AppSpacing.s6),
-
-              // Always on Radio row
-              Row(
-                children: [
-                  Icon(
-                    Icons.radio_rounded,
-                    size: 16,
-                    color: alwaysOnRadio
-                        ? widget.props.activeColor
-                        : p.textSecondary,
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: Text(
-                      context.l10n.alwaysOnRadio,
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      context.l10n.ambientVolumePercent(percent),
                       style: TextStyle(
-                        color: p.textPrimary,
+                        color: p.textSecondary,
                         fontSize: AppFontSize.caption,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ),
-                  PulsrSwitch(
-                    value: alwaysOnRadio,
-                    onChanged: (v) {
-                      PulsrHaptics.selectionClick();
-                      unawaited(ambientService.setAlwaysOnRadio(v));
-                    },
-                  ),
-                  const SizedBox(width: AppSpacing.xs),
-                  IconButton(
-                    constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.open_in_new_rounded,
-                        size: 16, color: p.textSecondary),
-                    tooltip: context.l10n.ambientSounds,
-                    onPressed: () => AmbientSoundSheet.show(context),
-                  ),
-                ],
+                    Expanded(
+                      child: PulsrSlider(
+                        value: masterVol,
+                        min: 0.0,
+                        max: 1.0,
+                        activeColor: accent,
+                        onChanged: (v) {
+                          unawaited(ambientService.setMasterVolume(v));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // Always on Radio footer
+              _buildAlwaysOnRow(
+                p: p,
+                accent: accent,
+                value: alwaysOnRadio,
+                label: context.l10n.alwaysOnRadio,
+                openTooltip: context.l10n.ambientSounds,
+                onOpen: () => AmbientSoundSheet.show(context),
+                onChanged: (v) {
+                  PulsrHaptics.selectionClick();
+                  unawaited(ambientService.setAlwaysOnRadio(v));
+                },
               ),
             ],
           ),

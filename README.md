@@ -10,8 +10,8 @@
   </p>
 
   <p align="center">
-    <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.41%2B-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"></a>
-    <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.6%2B-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart"></a>
+    <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.47%2B-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"></a>
+    <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.13%2B-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart"></a>
     <a href="#"><img src="https://img.shields.io/badge/Android-9%2B%20%2F%20API%2028-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 9+"></a>
     <a href="https://github.com/DevEslam1/pulsr/releases"><img src="https://img.shields.io/github/downloads/DevEslam1/pulsr/total?style=for-the-badge&color=blueviolet&logo=github" alt="GitHub Total Downloads"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License GPLv3"></a>
@@ -244,7 +244,7 @@ Data
 
 | Layer | Technology |
 |---|---|
-| UI | Flutter 3.41+, Dart 3.6+ effective (vendored `just_audio` requires `^3.6.0`), Material 3 |
+| UI | Flutter 3.47+, Dart 3.13+ (`material_ui`/`cupertino_ui` require `^3.13.0`), Material 3 |
 | State | `flutter_bloc` Cubits, `freezed` immutable states, `fpdart` results |
 | DI | `get_it` + `injectable` |
 | Persistence | `drift` SQLite, `shared_preferences`, `flutter_secure_storage` |
@@ -343,8 +343,8 @@ The repository contains **833 Dart test files** across unit, cubit, fuzz, proper
 
 ### Prerequisites
 
-- Flutter `>= 3.41.0`.
-- Dart `>= 3.6.0 < 4.0.0` effective floor. The root `pubspec.yaml` declares `>=3.0.0`, but `third_party/just_audio` requires `^3.6.0`.
+- Flutter `>= 3.47.0` — this is the binding constraint (`material_ui` 1.11.x and `cupertino_ui` 1.1.x both require it, and Flutter 3.47 ships Dart 3.13).
+- Dart: the runtime floor is 3.13 via the Flutter constraint above. `environment.sdk` deliberately keeps the `>=3.0.0` lower bound, because that value selects the package *language version*; raising it to `^3.13.0` would move the whole repo to the Dart 3.7+ tall formatter and surface ~344 currently-gated lint diagnostics (separate migration). Vendored `third_party/just_audio` only needs `^3.6.0`, so it is not the binding constraint.
 - Android Studio with Android SDK and NDK.
 - JDK 17.
 - Go 1.22+ only if you want to run the party server.

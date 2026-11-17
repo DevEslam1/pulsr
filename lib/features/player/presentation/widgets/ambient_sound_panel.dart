@@ -633,7 +633,8 @@ class _VolumeRow extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Row(
         children: [
-          Text(effect.emoji, style: const TextStyle(fontSize: AppFontSize.body)),
+          Text(effect.emoji,
+              style: const TextStyle(fontSize: AppFontSize.body)),
           const SizedBox(width: 6),
           SizedBox(
             width: 72,

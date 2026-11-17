@@ -14,7 +14,6 @@ import '../../cubit/player_cubit.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/song_options_sheet.dart';
-import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
 import '../widgets/player_controls.dart';
@@ -289,9 +288,6 @@ class PlayerHeaderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final song = props.state.currentSong;
-    final hasDownload = song != null &&
-        (song.source == SongSource.youtube ||
-            (song.remoteId != null && song.remoteId!.isNotEmpty));
 
     return Row(
       children: [
@@ -314,27 +310,11 @@ class PlayerHeaderBar extends StatelessWidget {
                 ),
           ),
         ),
+        // Download and favourite live in the track header beside the title;
+        // repeating them here duplicated the actions and crowded the bar.
         if (customActions != null)
           ...customActions!
-        else ...[
-          if (hasDownload)
-            YtmDownloadButton(
-              song: song,
-              activeColor: props.activeColor,
-              iconColor: p.textSecondary,
-              iconSize: 20,
-            ),
-          PlayerAnimatedFavoriteButton(
-            isFavorite: song?.isFavorite == true,
-            semanticLabel: song?.isFavorite == true
-                ? context.l10n.unlike
-                : context.l10n.like,
-            favoriteColor: p.favorite,
-            inactiveColor: p.textSecondary,
-            onTap: () {
-              if (song != null) props.cubit.toggleFavorite(song.id);
-            },
-          ),
+        else
           IconButton(
             constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
@@ -348,7 +328,6 @@ class PlayerHeaderBar extends StatelessWidget {
               }
             },
           ),
-        ],
       ],
     );
   }

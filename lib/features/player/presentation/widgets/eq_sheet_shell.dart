@@ -1,9 +1,5 @@
 part of 'equalizer_sheet.dart';
 
-/// Boost deltas at or below this are slider rounding noise, not a
-/// GainStagingBudget clamp.
-const double _boostClampEpsilon = 0.01;
-
 extension _EqSheetShell on _EqualizerSheetState {
   void _setStudioMode(BuildContext context, bool studio) {
     _setStateSafe(() => _isStudioModeOverride = studio);
@@ -14,43 +10,23 @@ extension _EqSheetShell on _EqualizerSheetState {
     } catch (_) {}
   }
 
-  int _findClosestBand(List<double> freqs, double targetHz) {
-    if (freqs.isEmpty) return 0;
-    int best = 0;
-    double bestDiff = (freqs[0] - targetHz).abs();
-    for (int i = 1; i < freqs.length; i++) {
-      final diff = (freqs[i] - targetHz).abs();
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        best = i;
-      }
-    }
-    return best;
-  }
+  double _getBassGain(PlayerState state) => EqSheetMath.macroGain(
+        state.eqPreset.gains,
+        _activeFrequencies(state),
+        62.0,
+      );
 
-  double _getBassGain(PlayerState state) {
-    final gains = state.eqPreset.gains;
-    if (gains.isEmpty) return 0.0;
-    final freqs = _activeFrequencies(state);
-    final idx = _findClosestBand(freqs, 62.0);
-    return gains[idx.clamp(0, gains.length - 1)].clamp(-12.0, 12.0);
-  }
+  double _getMidGain(PlayerState state) => EqSheetMath.macroGain(
+        state.eqPreset.gains,
+        _activeFrequencies(state),
+        1000.0,
+      );
 
-  double _getMidGain(PlayerState state) {
-    final gains = state.eqPreset.gains;
-    if (gains.isEmpty) return 0.0;
-    final freqs = _activeFrequencies(state);
-    final idx = _findClosestBand(freqs, 1000.0);
-    return gains[idx.clamp(0, gains.length - 1)].clamp(-12.0, 12.0);
-  }
-
-  double _getTrebleGain(PlayerState state) {
-    final gains = state.eqPreset.gains;
-    if (gains.isEmpty) return 0.0;
-    final freqs = _activeFrequencies(state);
-    final idx = _findClosestBand(freqs, 8000.0);
-    return gains[idx.clamp(0, gains.length - 1)].clamp(-12.0, 12.0);
-  }
+  double _getTrebleGain(PlayerState state) => EqSheetMath.macroGain(
+        state.eqPreset.gains,
+        _activeFrequencies(state),
+        8000.0,
+      );
 
   /// Preamp slider coalescing: keep the thumb responsive with a local preview
   /// while pushing at most one native write per 60ms (previously every pixel
@@ -88,7 +64,7 @@ extension _EqSheetShell on _EqualizerSheetState {
       for (int i = 0; i < freqs.length && i < count; i++) {
         final f = freqs[i];
         if (f <= 250.0) {
-          final weight = (1.0 - (f / 280.0)).clamp(0.2, 1.0);
+          final weight = EqSheetMath.bassMacroWeight(f);
           cubit.setBandGain(i, (val * weight).clamp(-12.0, 12.0));
         }
       }
@@ -109,8 +85,7 @@ extension _EqSheetShell on _EqualizerSheetState {
       for (int i = 0; i < freqs.length && i < count; i++) {
         final f = freqs[i];
         if (f >= 250.0 && f <= 3500.0) {
-          final octDist = (math.log(f / 1000.0) / math.ln2).abs();
-          final weight = (1.0 - (octDist / 2.0)).clamp(0.3, 1.0);
+          final weight = EqSheetMath.midMacroWeight(f);
           cubit.setBandGain(i, (val * weight).clamp(-12.0, 12.0));
         }
       }
@@ -129,7 +104,7 @@ extension _EqSheetShell on _EqualizerSheetState {
       for (int i = 0; i < freqs.length && i < count; i++) {
         final f = freqs[i];
         if (f >= 3500.0) {
-          final weight = ((f - 3000.0) / 10000.0).clamp(0.4, 1.0);
+          final weight = EqSheetMath.trebleMacroWeight(f);
           cubit.setBandGain(i, (val * weight).clamp(-12.0, 12.0));
         }
       }
@@ -198,8 +173,7 @@ extension _EqSheetShell on _EqualizerSheetState {
   int _activeBandCount(PlayerState state) {
     final manager = _equalizerManagerOrNull();
     if (manager != null) return manager.activeFrequencies.length;
-    final n = state.eqPreset.gains.length;
-    return (n == 32 || n == 64) ? n : 10;
+    return EqSheetMath.normalizedBandCount(state.eqPreset.gains.length);
   }
 
   /// F-32: center frequencies matching [_activeBandCount].
@@ -212,17 +186,7 @@ extension _EqSheetShell on _EqualizerSheetState {
     return EqPreset.centerFrequencies;
   }
 
-  String _formatHz(double hz) {
-    if (hz >= 1000) {
-      final k = hz / 1000.0;
-      final s =
-          k == k.roundToDouble() ? k.toStringAsFixed(0) : k.toStringAsFixed(1);
-      return '${s}K';
-    }
-    return hz == hz.roundToDouble()
-        ? hz.toStringAsFixed(0)
-        : hz.toStringAsFixed(1);
-  }
+  String _formatHz(double hz) => EqSheetMath.formatHz(hz);
 
   /// Truthful native status: shown under an effect control when the engine
   /// reported it could not be applied (unsupported / build failure / no
@@ -1477,8 +1441,7 @@ extension _EqSheetShell on _EqualizerSheetState {
     required PulsrPalette p,
     required ValueChanged<double> onChanged,
   }) {
-    final sign = value > 0 ? '+' : '';
-    final gainText = '$sign${value.toStringAsFixed(1)} dB';
+    final gainText = EqSheetMath.formatGainDb(value);
 
     return Container(
       padding: const EdgeInsetsDirectional.fromSTEB(
@@ -1561,10 +1524,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                   excludeSemantics: true,
                   label: title,
                   value: gainText,
-                  increasedValue:
-                      '${nextVal > 0 ? '+' : ''}${nextVal.toStringAsFixed(1)} dB',
-                  decreasedValue:
-                      '${prevVal > 0 ? '+' : ''}${prevVal.toStringAsFixed(1)} dB',
+                  increasedValue: EqSheetMath.formatGainDb(nextVal),
+                  decreasedValue: EqSheetMath.formatGainDb(prevVal),
                   onIncrease: () => onChanged(nextVal),
                   onDecrease: () => onChanged(prevVal),
                   child: Slider(
@@ -1575,7 +1536,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                     onChanged: (v) {
                       // One tick per 0.5 dB step instead of every pixel; the slider
                       // previously fired a haptic on every frame of a drag.
-                      final step = ((v + 12.0) * 2).round();
+                      final step = EqSheetMath.hapticStepFor(v);
                       if (step != _lastMacroHapticStep) {
                         _lastMacroHapticStep = step;
                         PulsrHaptics.selectionClick();
@@ -1609,8 +1570,10 @@ extension _EqSheetShell on _EqualizerSheetState {
     // GainStagingBudget may have clamped against every other active gain stage.
     // Warn only when that clamp actually reduced the requested boost; the
     // headphone profile preamp says nothing about the other stages.
-    final isBoostClamped = state.volumeBoost - state.effectiveVolumeBoost >
-        _boostClampEpsilon;
+    final isBoostClamped = EqSheetMath.isBoostClamped(
+      requestedBoost: state.volumeBoost,
+      effectiveBoost: state.effectiveVolumeBoost,
+    );
 
     return SingleChildScrollView(
       padding: const EdgeInsetsDirectional.fromSTEB(
@@ -2103,13 +2066,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                             if (idx >= 0 && idx < updatedGains.length) {
                               updatedGains[idx] = gain;
                             }
-                            double maxBoost = 0.0;
-                            for (final g in updatedGains) {
-                              if (g > maxBoost) maxBoost = g;
-                            }
                             context.read<PlayerCubit>().setPreamp(
-                                  maxBoost > 0.0 ? -maxBoost : 0.0,
-                                );
+                                EqSheetMath.autoPreampFor(updatedGains));
                           }
                         }
                       : null,
@@ -2231,14 +2189,8 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   _setStateSafe(() {
                                     _autoPreampEnabled = !_autoPreampEnabled;
                                     if (_autoPreampEnabled) {
-                                      double maxBoost = 0.0;
-                                      for (final g
-                                          in cubit.state.eqPreset.gains) {
-                                        if (g > maxBoost) maxBoost = g;
-                                      }
-                                      cubit.setPreamp(
-                                        maxBoost > 0.0 ? -maxBoost : 0.0,
-                                      );
+                                      cubit.setPreamp(EqSheetMath.autoPreampFor(
+                                          cubit.state.eqPreset.gains));
                                     }
                                   });
                                 },
@@ -2455,27 +2407,16 @@ extension _EqSheetShell on _EqualizerSheetState {
             builder: (context, liveGains) => StatefulBuilder(
               builder: (context, setCardState) {
                 final currentPreamp = _preampPreview ?? state.dsp.preampDb;
-                final maxBoost = liveGains.isEmpty
-                    ? 0.0
-                    : liveGains.reduce((a, b) => a > b ? a : b);
-                double autoHeadroomDb = 0.0;
-                if (state.dsp.isEqEnabled && maxBoost > 1.5) {
-                  double sumPosSq = 0.0;
-                  int posCount = 0;
-                  for (final g in liveGains) {
-                    if (g > 0.0) {
-                      sumPosSq += g * g;
-                      posCount++;
-                    }
-                  }
-                  final rmsBoost =
-                      posCount > 0 ? math.sqrt(sumPosSq / posCount) : maxBoost;
-                  final effectiveBoost = 0.65 * maxBoost + 0.35 * rmsBoost;
-                  autoHeadroomDb =
-                      -((effectiveBoost - 1.5) * 0.55).clamp(0.0, 6.0);
-                }
-                final clipRisk =
-                    currentPreamp + maxBoost + autoHeadroomDb > 0.0;
+                final maxBoost = EqSheetMath.peakGain(liveGains);
+                final autoHeadroomDb = EqSheetMath.autoHeadroomDb(
+                  liveGains,
+                  isEqEnabled: state.dsp.isEqEnabled,
+                );
+                final clipRisk = EqSheetMath.hasClipRisk(
+                  preampDb: currentPreamp,
+                  gains: liveGains,
+                  isEqEnabled: state.dsp.isEqEnabled,
+                );
                 return Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.md, vertical: AppSpacing.sm),
@@ -2989,8 +2930,7 @@ extension _EqSheetShell on _EqualizerSheetState {
                           Text(
                             state.volumeBoost > 0
                                 ? context.l10n.hardwareGainPlusDb(
-                                    (state.volumeBoost * 10)
-                                        .toStringAsFixed(1))
+                                    (state.volumeBoost * 10).toStringAsFixed(1))
                                 : context.l10n.hardwareGainBypassed,
                             style: TextStyle(
                                 fontSize: AppFontSize.caption,
@@ -3668,8 +3608,7 @@ extension _EqSheetShell on _EqualizerSheetState {
               p: p,
               onTap: () {
                 if (state.currentSong != null) {
-                  AudioQualitySheet.show(
-                      context, state.currentSong!, p.accent);
+                  AudioQualitySheet.show(context, state.currentSong!, p.accent);
                 }
               },
             ),
@@ -3683,8 +3622,7 @@ extension _EqSheetShell on _EqualizerSheetState {
               p: p,
               onTap: () {
                 if (state.currentSong != null) {
-                  AudioQualitySheet.show(
-                      context, state.currentSong!, p.accent);
+                  AudioQualitySheet.show(context, state.currentSong!, p.accent);
                 }
               },
             ),
@@ -3698,8 +3636,7 @@ extension _EqSheetShell on _EqualizerSheetState {
               p: p,
               onTap: () {
                 if (state.currentSong != null) {
-                  AudioQualitySheet.show(
-                      context, state.currentSong!, p.accent);
+                  AudioQualitySheet.show(context, state.currentSong!, p.accent);
                 }
               },
             ),
@@ -3713,8 +3650,7 @@ extension _EqSheetShell on _EqualizerSheetState {
               p: p,
               onTap: () {
                 if (state.currentSong != null) {
-                  AudioQualitySheet.show(
-                      context, state.currentSong!, p.accent);
+                  AudioQualitySheet.show(context, state.currentSong!, p.accent);
                 }
               },
             ),

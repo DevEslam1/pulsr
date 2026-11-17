@@ -13,6 +13,7 @@ import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 class SpeedPickerSheet extends StatefulWidget {
   const SpeedPickerSheet({super.key});
 
@@ -122,8 +123,8 @@ class _SpeedPickerSheetState extends State<SpeedPickerSheet> {
         final cubit = context.read<PlayerCubit>();
         final currentSpeed = playback.speed;
         final currentPitch = _previewPitch ?? playback.pitch;
-        final options =
-            SpeedPickerSheet.speedOptionsFor(cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
+        final options = SpeedPickerSheet.speedOptionsFor(
+            cubit.minPlaybackSpeed, cubit.maxPlaybackSpeed);
         final semitones = currentPitch == 1.0
             ? 0
             : (12.0 *
@@ -169,7 +170,8 @@ class _SpeedPickerSheetState extends State<SpeedPickerSheet> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    context.l10n.currentSpeed(SpeedPickerSheet.formatSpeed(currentSpeed)),
+                    context.l10n.currentSpeed(
+                        SpeedPickerSheet.formatSpeed(currentSpeed)),
                     style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.bodySmall),

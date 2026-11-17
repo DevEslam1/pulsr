@@ -153,6 +153,10 @@ void main() {
       expect(cubit.state.crossfadeSeconds, 0.0);
       // The stubbed native layer refuses exclusive mode, so it must be off.
       expect(cubit.state.bitPerfectOutput, isFalse);
+      // The saved choice survives a boot with no DAC attached: only the runtime
+      // transport stays off, so a later USB attach can re-arm it.
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool(PrefsKeys.bitPerfectOutput), isTrue);
     });
 
     test('unknown quality names fall back to high', () async {

@@ -49,20 +49,27 @@ class ThemeRegistry {
   }
 
   /// Renders a theme at scaled proportion for use in theme picker grids and previews.
+  ///
+  /// [canvasSize] is the logical viewport the theme is laid out against before
+  /// the whole canvas is scaled into the slot. Pass the real window size from
+  /// preview surfaces: a short fixed canvas makes stacked chrome (e.g. the
+  /// radio recommendation card) overflow and paints debug stripes inside the
+  /// preview.
   static Widget preview(
     PlayerThemeMode mode,
     PlayerThemeProps props, {
     double scale = 0.4,
+    Size canvasSize = const Size(360, 640),
   }) {
     return IgnorePointer(
       child: SizedBox(
-        width: 360 * scale,
-        height: 640 * scale,
+        width: canvasSize.width * scale,
+        height: canvasSize.height * scale,
         child: FittedBox(
           fit: BoxFit.contain,
           child: SizedBox(
-            width: 360,
-            height: 640,
+            width: canvasSize.width,
+            height: canvasSize.height,
             child: build(mode, props),
           ),
         ),

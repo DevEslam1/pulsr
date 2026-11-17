@@ -50,65 +50,67 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
     return PlayerThemeScaffold(
       props: props,
       trackIcon: Icons.layers_rounded,
-      background: RepaintBoundary(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            song != null
-                ? CanvasBackdrop(
-                    song: song,
-                    isPlaying: state.isPlaying,
-                    isBackdropMode: true,
-                    fallbackArtwork: CachedArtwork(
-                      id: song.id,
-                      albumId: song.albumId,
-                      remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                      type: ArtworkType.AUDIO,
-                      size: double.infinity,
-                      highQuality: true,
-                    ),
-                  )
-                : Container(color: p.bg),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [
-                          AppColors.scrimLight,
-                          AppColors.scrimAt(0.72),
-                          AppColors.scrimAt(0.94),
-                        ]
-                      : [
-                          AppColors.specularAt(0.35),
-                          AppColors.specularAt(0.65),
-                          AppColors.specularAt(0.92),
-                        ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+      background: ExcludeSemantics(
+        child: RepaintBoundary(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              song != null
+                  ? CanvasBackdrop(
+                      song: song,
+                      isPlaying: state.isPlaying,
+                      isBackdropMode: true,
+                      fallbackArtwork: CachedArtwork(
+                        id: song.id,
+                        albumId: song.albumId,
+                        remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                        type: ArtworkType.AUDIO,
+                        size: double.infinity,
+                        highQuality: true,
+                      ),
+                    )
+                  : Container(color: p.bg),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [
+                            AppColors.scrimLight,
+                            AppColors.scrimAt(0.72),
+                            AppColors.scrimAt(0.94),
+                          ]
+                        : [
+                            AppColors.specularAt(0.35),
+                            AppColors.specularAt(0.65),
+                            AppColors.specularAt(0.92),
+                          ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
                 ),
               ),
-            ),
-            PositionedDirectional(
-              bottom: -40,
-              start: -20,
-              end: -20,
-              height: context.isTablet ? 440 : 340,
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment.center,
-                      radius: 0.85,
-                      colors: [
-                        activeColor.withValues(alpha: isDark ? 0.24 : 0.14),
-                        Colors.transparent,
-                      ],
+              PositionedDirectional(
+                bottom: -40,
+                start: -20,
+                end: -20,
+                height: context.isTablet ? 440 : 340,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment.center,
+                        radius: 0.85,
+                        colors: [
+                          activeColor.withValues(alpha: isDark ? 0.24 : 0.14),
+                          Colors.transparent,
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       stage: (context, metrics) => PlayerGestureScope(
@@ -169,29 +171,32 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                                 ),
                               ],
                             ),
-                            child: song != null
-                                ? CachedArtwork(
-                                    id: song.id,
-                                    albumId: song.albumId,
-                                    remoteUrl: song.remoteArtworkUrl ??
-                                        song.artworkUri,
-                                    type: ArtworkType.AUDIO,
-                                    size: double.infinity,
-                                    borderRadius: 28,
-                                    highQuality: true,
-                                  )
-                                : Container(
-                                    decoration: BoxDecoration(
-                                      color: p.surfaceContainer,
-                                      borderRadius: AppRadii.r28All,
+                            child: PlayerArtworkSemantics(
+                              song: song,
+                              child: song != null
+                                  ? CachedArtwork(
+                                      id: song.id,
+                                      albumId: song.albumId,
+                                      remoteUrl: song.remoteArtworkUrl ??
+                                          song.artworkUri,
+                                      type: ArtworkType.AUDIO,
+                                      size: double.infinity,
+                                      borderRadius: 28,
+                                      highQuality: true,
+                                    )
+                                  : Container(
+                                      decoration: BoxDecoration(
+                                        color: p.surfaceContainer,
+                                        borderRadius: AppRadii.r28All,
+                                      ),
+                                      child: Icon(
+                                        Icons.music_note_rounded,
+                                        size: 96,
+                                        color: textSubtitleColor.withValues(
+                                            alpha: 0.4),
+                                      ),
                                     ),
-                                    child: Icon(
-                                      Icons.music_note_rounded,
-                                      size: 96,
-                                      color: textSubtitleColor.withValues(
-                                          alpha: 0.4),
-                                    ),
-                                  ),
+                            ),
                           ),
                         ),
                       ),
@@ -206,8 +211,8 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
       ),
       chrome: (context, metrics) => Container(
         decoration: BoxDecoration(
-          borderRadius: AppRadii.circular(
-              resolveCustomRadius(context, AppRadii.r28)),
+          borderRadius:
+              AppRadii.circular(resolveCustomRadius(context, AppRadii.r28)),
           color: p.playerCard,
           border: Border.all(
             color: p.hairline,

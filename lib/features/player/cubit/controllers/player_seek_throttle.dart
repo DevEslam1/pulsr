@@ -7,6 +7,7 @@ import '../player_constants.dart';
 import '../player_state.dart';
 
 import '../../../../core/errors/app_error.dart';
+
 /// Owns the monotonic seek throttle: coalesces rapid seek-bar drags onto one
 /// trailing engine seek and restores the previous position when a seek fails.
 class PlayerSeekThrottle {
@@ -68,7 +69,9 @@ class PlayerSeekThrottle {
           _pendingCompleter = null;
           if (pending != null && !_isClosed()) {
             _lastSeekMs = _stopwatch.elapsedMilliseconds;
-            _audioHandler.seekDirect(pending).catchError((Object e, StackTrace st) {
+            _audioHandler
+                .seekDirect(pending)
+                .catchError((Object e, StackTrace st) {
               ErrorLogger.log('Coalesced seek failed',
                   error: e,
                   stackTrace: st,

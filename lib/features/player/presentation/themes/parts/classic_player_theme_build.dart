@@ -121,15 +121,29 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                             ),
                             child: ClipRRect(
                               borderRadius: AppRadii.circular(artRadius),
-                              child: song != null
-                                  ? (!canvasAsBackdrop
-                                      ? CanvasBackdrop(
-                                          song: song,
-                                          isPlaying: state.isPlaying,
-                                          isBackdropMode: false,
-                                          borderRadius:
-                                              AppRadii.circular(artRadius),
-                                          fallbackArtwork: CachedArtwork(
+                              child: PlayerArtworkSemantics(
+                                song: song,
+                                child: song != null
+                                    ? (!canvasAsBackdrop
+                                        ? CanvasBackdrop(
+                                            song: song,
+                                            isPlaying: state.isPlaying,
+                                            isBackdropMode: false,
+                                            borderRadius:
+                                                AppRadii.circular(artRadius),
+                                            fallbackArtwork: CachedArtwork(
+                                              id: song.id,
+                                              albumId: song.albumId,
+                                              remoteUrl:
+                                                  song.remoteArtworkUrl ??
+                                                      song.artworkUri,
+                                              type: ArtworkType.AUDIO,
+                                              size: double.infinity,
+                                              borderRadius: 26.8,
+                                              highQuality: true,
+                                            ),
+                                          )
+                                        : CachedArtwork(
                                             id: song.id,
                                             albumId: song.albumId,
                                             remoteUrl: song.remoteArtworkUrl ??
@@ -138,19 +152,9 @@ extension _ClassicPlayerThemeBuild on ClassicPlayerTheme {
                                             size: double.infinity,
                                             borderRadius: 26.8,
                                             highQuality: true,
-                                          ),
-                                        )
-                                      : CachedArtwork(
-                                          id: song.id,
-                                          albumId: song.albumId,
-                                          remoteUrl: song.remoteArtworkUrl ??
-                                              song.artworkUri,
-                                          type: ArtworkType.AUDIO,
-                                          size: double.infinity,
-                                          borderRadius: 26.8,
-                                          highQuality: true,
-                                        ))
-                                  : const SizedBox.shrink(),
+                                          ))
+                                    : const SizedBox.shrink(),
+                              ),
                             ),
                           ),
                         ),

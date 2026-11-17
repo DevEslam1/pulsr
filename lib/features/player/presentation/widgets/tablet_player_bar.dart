@@ -26,6 +26,7 @@ import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 class TabletPlayerBar extends StatefulWidget {
   final VoidCallback onOpenNowPlaying;
   final VoidCallback? onToggleSideInspector;
@@ -118,8 +119,13 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final (playerSliderStyle, currentOutputDevice, playerThemeMode) =
-        context.select<SettingsCubit, (PlayerSliderStyle, AudioOutputInfo?, PlayerThemeMode)>(
-      (c) => (c.state.playerSliderStyle, c.state.currentOutputDevice, c.state.playerThemeMode),
+        context.select<SettingsCubit,
+            (PlayerSliderStyle, AudioOutputInfo?, PlayerThemeMode)>(
+      (c) => (
+        c.state.playerSliderStyle,
+        c.state.currentOutputDevice,
+        c.state.playerThemeMode
+      ),
     );
     final mq = MediaQuery.of(context);
     final bottomInset = mq.padding.bottom;
@@ -275,14 +281,16 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   : AppRadii
                                                                       .r12),
                                                       child: Hero(
-                                                        tag: nowPlayingArtHeroTag(playerThemeMode),
+                                                        tag: nowPlayingArtHeroTag(
+                                                            playerThemeMode),
                                                         child: CachedArtwork(
                                                           id: song.id,
                                                           albumId: song.albumId,
-                                                          remoteUrl:
-                                                              song.remoteArtworkUrl ??
-                                                                  song.artworkUri,
-                                                          type: ArtworkType.AUDIO,
+                                                          remoteUrl: song
+                                                                  .remoteArtworkUrl ??
+                                                              song.artworkUri,
+                                                          type:
+                                                              ArtworkType.AUDIO,
                                                           size: isShortHeight
                                                               ? 40
                                                               : (isCompactBar
@@ -936,13 +944,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                               ),
                                                                               semanticLabel: context.l10n.seekLabel,
                                                                               activeColor: activeColor,
-                                                                              inactiveColor: Theme.of(context).brightness == Brightness.dark
-                                                                                  ? (playerSliderStyle == PlayerSliderStyle.capsule
-                                                                                      ? Colors.white.withValues(alpha: 0.22)
-                                                                                      : AppColors.specularStrong)
-                                                                                  : (playerSliderStyle == PlayerSliderStyle.capsule
-                                                                                      ? Colors.black.withValues(alpha: 0.15)
-                                                                                      : p.hairline.withValues(alpha: 0.8)),
+                                                                              inactiveColor: Theme.of(context).brightness == Brightness.dark ? (playerSliderStyle == PlayerSliderStyle.capsule ? Colors.white.withValues(alpha: 0.22) : AppColors.specularStrong) : (playerSliderStyle == PlayerSliderStyle.capsule ? Colors.black.withValues(alpha: 0.15) : p.hairline.withValues(alpha: 0.8)),
                                                                               sliderStyle: playerSliderStyle,
                                                                               isWavy: playerSliderStyle == PlayerSliderStyle.wavy,
                                                                               animateWave: state.isPlaying,
@@ -1032,95 +1034,95 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                   (dragVolume ??
                                                                           cubitVolume)
                                                                       .clamp(
-                                                                          0.0, 1.0);
-                                                          final isMuted = cubit
-                                                                  .isMuted ||
-                                                              effectiveVolume <=
-                                                                  0.0;
-                                                          return Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
-                                                            children: [
-                                                              IconButton(
-                                                                visualDensity:
-                                                                    VisualDensity
-                                                                        .compact,
-                                                                padding:
-                                                                    EdgeInsets
-                                                                        .zero,
-                                                                constraints:
-                                                                    const BoxConstraints(
+                                                                          0.0,
+                                                                          1.0);
+                                                              final isMuted = cubit
+                                                                      .isMuted ||
+                                                                  effectiveVolume <=
+                                                                      0.0;
+                                                              return Row(
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  IconButton(
+                                                                    visualDensity:
+                                                                        VisualDensity
+                                                                            .compact,
+                                                                    padding:
+                                                                        EdgeInsets
+                                                                            .zero,
+                                                                    constraints: const BoxConstraints(
                                                                         minWidth:
                                                                             48,
                                                                         minHeight:
                                                                             48),
-                                                                icon: Icon(
-                                                                  isMuted
-                                                                      ? Icons
-                                                                          .volume_off_rounded
-                                                                      : (effectiveVolume <
-                                                                              0.5
+                                                                    icon: Icon(
+                                                                      isMuted
                                                                           ? Icons
-                                                                              .volume_down_rounded
-                                                                          : Icons
-                                                                              .volume_up_rounded),
-                                                                  color: p
-                                                                      .textSecondary,
-                                                                  size: 19,
-                                                                ),
-                                                                tooltip: isMuted
-                                                                    ? l10n
-                                                                        .unmute
-                                                                    : l10n.mute,
-                                                                onPressed: () {
-                                                                  _dragVolumeNotifier
-                                                                          .value =
-                                                                      null;
-                                                                  cubit
-                                                                      .toggleMute();
-                                                                },
-                                                              ),
-                                                              SizedBox(
-                                                                width: 80,
-                                                                child:
-                                                                    Semantics(
-                                                                  label: l10n
-                                                                      .volume,
-                                                                  value:
-                                                                      '${(effectiveVolume * 100).round()}%',
-                                                                  child:
-                                                                      PulsrSlider(
-                                                                    min: 0.0,
-                                                                    max: 1.0,
-                                                                    value:
-                                                                        effectiveVolume,
-                                                                    activeColor:
-                                                                        p.textPrimary,
-                                                                    onChangeStart: (v) =>
-                                                                        _dragVolumeNotifier
-                                                                            .value = v,
-                                                                    onChanged:
-                                                                        (v) {
-                                                                      _dragVolumeNotifier
-                                                                          .value = v;
-                                                                      cubit.setVolume(
-                                                                          v);
-                                                                    },
-                                                                    onChangeEnd:
-                                                                        (v) {
+                                                                              .volume_off_rounded
+                                                                          : (effectiveVolume < 0.5
+                                                                              ? Icons.volume_down_rounded
+                                                                              : Icons.volume_up_rounded),
+                                                                      color: p
+                                                                          .textSecondary,
+                                                                      size: 19,
+                                                                    ),
+                                                                    tooltip: isMuted
+                                                                        ? l10n
+                                                                            .unmute
+                                                                        : l10n
+                                                                            .mute,
+                                                                    onPressed:
+                                                                        () {
                                                                       _dragVolumeNotifier
                                                                               .value =
                                                                           null;
-                                                                      cubit.setVolume(
-                                                                          v);
+                                                                      cubit
+                                                                          .toggleMute();
                                                                     },
                                                                   ),
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          );
-                                                        },
+                                                                  SizedBox(
+                                                                    width: 80,
+                                                                    child:
+                                                                        Semantics(
+                                                                      label: l10n
+                                                                          .volume,
+                                                                      value:
+                                                                          '${(effectiveVolume * 100).round()}%',
+                                                                      child:
+                                                                          PulsrSlider(
+                                                                        min:
+                                                                            0.0,
+                                                                        max:
+                                                                            1.0,
+                                                                        value:
+                                                                            effectiveVolume,
+                                                                        activeColor:
+                                                                            p.textPrimary,
+                                                                        onChangeStart:
+                                                                            (v) =>
+                                                                                _dragVolumeNotifier.value = v,
+                                                                        onChanged:
+                                                                            (v) {
+                                                                          _dragVolumeNotifier.value =
+                                                                              v;
+                                                                          cubit.setVolume(
+                                                                              v);
+                                                                        },
+                                                                        onChangeEnd:
+                                                                            (v) {
+                                                                          _dragVolumeNotifier.value =
+                                                                              null;
+                                                                          cubit.setVolume(
+                                                                              v);
+                                                                        },
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              );
+                                                            },
                                                           );
                                                         },
                                                       ),

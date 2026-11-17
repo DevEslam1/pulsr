@@ -315,10 +315,16 @@ extension PlayerDspProfilesExtension on PlayerDspController {
     // isolated by [step]; one dead stage never aborts the rest.
     final steps = <(String, Future<void> Function())>[
       if (settings != null) ...[
-        ('bitPerfectOutput', () => settings.setBitPerfectOutput(bitPerfectOutput)),
+        (
+          'bitPerfectOutput',
+          () => settings.setBitPerfectOutput(bitPerfectOutput)
+        ),
         ('crossfade', () => settings.setCrossfade(crossfadeSeconds)),
       ],
-      ('equalizerEnabled', () => _audioHandler.setEqualizerEnabled(dsp.isEqEnabled)),
+      (
+        'equalizerEnabled',
+        () => _audioHandler.setEqualizerEnabled(dsp.isEqEnabled)
+      ),
       ('eqPreset', () => _audioHandler.applyPreset(dsp.eqPreset)),
       ('preamp', () => _audioHandler.setPreamp(dsp.preampDb)),
       ('volumeBoost', () => _audioHandler.setVolumeBoost(dsp.volumeBoost)),
@@ -370,14 +376,19 @@ extension PlayerDspProfilesExtension on PlayerDspController {
           'dynamicEqBand$i',
           () => _audioHandler.setDynamicEqBand(i, dsp.dynamicEqBands[i])
         ),
-      ('spatializer',
-          () => _audioHandler.setSpatializerEnabled(dsp.isSpatializerEnabled)),
-      ('virtualizer', () async {
-        await _audioHandler.setVirtualizerEnabled(dsp.isVirtualizerEnabled);
-        if (dsp.isVirtualizerEnabled) {
-          await _audioHandler.setVirtualizerStrength(dsp.virtualizerStrength);
+      (
+        'spatializer',
+        () => _audioHandler.setSpatializerEnabled(dsp.isSpatializerEnabled)
+      ),
+      (
+        'virtualizer',
+        () async {
+          await _audioHandler.setVirtualizerEnabled(dsp.isVirtualizerEnabled);
+          if (dsp.isVirtualizerEnabled) {
+            await _audioHandler.setVirtualizerStrength(dsp.virtualizerStrength);
+          }
         }
-      }),
+      ),
       (
         'dynamics',
         () => _audioHandler.setDynamicsPreset(
@@ -401,14 +412,22 @@ extension PlayerDspProfilesExtension on PlayerDspController {
               wetDry: dsp.reverbWetDry,
             )
       ),
-      ('crossfeed', () => _audioHandler.setCrossfeed(dsp.isCrossfeedEnabled,
-          delayUs: dsp.crossfeedDelayUs,
-          feedDb: dsp.crossfeedFeedDb,
-          mode: dsp.crossfeedMode)),
-      ('stereoBalance', () => _audioHandler.setStereoBalance(dsp.stereoBalance)),
+      (
+        'crossfeed',
+        () => _audioHandler.setCrossfeed(dsp.isCrossfeedEnabled,
+            delayUs: dsp.crossfeedDelayUs,
+            feedDb: dsp.crossfeedFeedDb,
+            mode: dsp.crossfeedMode)
+      ),
+      (
+        'stereoBalance',
+        () => _audioHandler.setStereoBalance(dsp.stereoBalance)
+      ),
       ('monoMix', () => _audioHandler.setMonoMix(dsp.monoMix)),
-      ('sincResampler',
-          () => _audioHandler.setSincResampler(dsp.isSincResamplerEnabled)),
+      (
+        'sincResampler',
+        () => _audioHandler.setSincResampler(dsp.isSincResamplerEnabled)
+      ),
       (
         'dither',
         () => _audioHandler.setDither(
@@ -449,17 +468,22 @@ extension PlayerDspProfilesExtension on PlayerDspController {
       // The multiband compressor lives on the manager (not the DspSlice-only
       // handler surface), so it is restored through it, bands and crossovers
       // included.
-      ('multibandCompressor', () async {
-        await _audioHandler.equalizerManager.setMultibandCompressor(
-          dsp.isMultibandCompressorEnabled,
-          bands: dsp.multibandCompressorBands,
-          f0: dsp.multibandCompressorF0,
-          f1: dsp.multibandCompressorF1,
-          f2: dsp.multibandCompressorF2,
-        );
-      }),
-      ('headphoneProfile',
-          () => _audioHandler.applyHeadphoneProfile(dsp.selectedHeadphoneProfile)),
+      (
+        'multibandCompressor',
+        () async {
+          await _audioHandler.equalizerManager.setMultibandCompressor(
+            dsp.isMultibandCompressorEnabled,
+            bands: dsp.multibandCompressorBands,
+            f0: dsp.multibandCompressorF0,
+            f1: dsp.multibandCompressorF1,
+            f2: dsp.multibandCompressorF2,
+          );
+        }
+      ),
+      (
+        'headphoneProfile',
+        () => _audioHandler.applyHeadphoneProfile(dsp.selectedHeadphoneProfile)
+      ),
     ];
 
     for (final (label, op) in steps) {

@@ -72,6 +72,7 @@ class MiniPlayerState extends State<MiniPlayer> {
   static void resetSessionTrackingForTest() {
     _chevronSessionCounted = false;
   }
+
   bool _swipeInFlight = false;
 
   /// Bounded post-frame retries while the PageView catches up with a queue
@@ -439,18 +440,7 @@ class MiniPlayerState extends State<MiniPlayer> {
             state.currentIndex.clamp(0, math.max(0, queue.length - 1)).toInt();
         _syncPageController(currentIndex, queue.length);
       },
-      buildWhen: (a, b) =>
-          a.currentSong?.id != b.currentSong?.id ||
-          a.currentSong?.title != b.currentSong?.title ||
-          a.currentSong?.artist != b.currentSong?.artist ||
-          a.currentSong?.remoteArtworkUrl != b.currentSong?.remoteArtworkUrl ||
-          a.isPlaying != b.isPlaying ||
-          a.isBuffering != b.isBuffering ||
-          a.errorMessage != b.errorMessage ||
-          a.duration != b.duration ||
-          a.currentIndex != b.currentIndex ||
-          a.activeQueueSlot != b.activeQueueSlot ||
-          listContentDiffers(a.queue, b.queue),
+      buildWhen: (a, b) => a.differsForMiniPlayer(b),
       builder: (context, state) {
         final song = state.currentSong;
         if (song == null) return const SizedBox.shrink();
@@ -657,9 +647,8 @@ class MiniPlayerState extends State<MiniPlayer> {
                                                   ? Colors.white
                                                   : Colors.black)
                                               .withValues(
-                                                  alpha: p.isDark
-                                                      ? 0.12
-                                                      : 0.04),
+                                                  alpha:
+                                                      p.isDark ? 0.12 : 0.04),
                                           Colors.white.withValues(alpha: 0.0),
                                         ],
                                       ),
@@ -691,408 +680,407 @@ class MiniPlayerState extends State<MiniPlayer> {
                                             children: [
                                               NotificationListener<
                                                   ScrollNotification>(
-                                            onNotification: (notification) {
-                                              if (notification
-                                                      is ScrollStartNotification &&
-                                                  notification.dragDetails !=
-                                                      null) {
-                                                _isInteracting.value = true;
-                                              } else if (notification
-                                                      is ScrollUpdateNotification &&
-                                                  carouselEnabled &&
-                                                  _pageController != null &&
-                                                  _pageController!.hasClients) {
-                                                final page =
-                                                    _pageController!.page;
-                                                if (page != null) {
-                                                  _carouselDragDelta.value =
-                                                      (page - currentIndex)
-                                                          .clamp(-1.0, 1.0);
-                                                }
-                                              } else if (notification
-                                                  is UserScrollNotification) {
-                                                if (notification.direction !=
-                                                    ScrollDirection.idle) {
-                                                  _isInteracting.value = true;
-                                                } else if (!_swipeInFlight) {
-                                                  _isInteracting.value = false;
-                                                  if (_carouselDragDelta
-                                                          .value !=
-                                                      0.0) {
-                                                    _carouselDragDelta.value =
-                                                        0.0;
+                                                onNotification: (notification) {
+                                                  if (notification
+                                                          is ScrollStartNotification &&
+                                                      notification
+                                                              .dragDetails !=
+                                                          null) {
+                                                    _isInteracting.value = true;
+                                                  } else if (notification
+                                                          is ScrollUpdateNotification &&
+                                                      carouselEnabled &&
+                                                      _pageController != null &&
+                                                      _pageController!
+                                                          .hasClients) {
+                                                    final page =
+                                                        _pageController!.page;
+                                                    if (page != null) {
+                                                      _carouselDragDelta.value =
+                                                          (page - currentIndex)
+                                                              .clamp(-1.0, 1.0);
+                                                    }
+                                                  } else if (notification
+                                                      is UserScrollNotification) {
+                                                    if (notification
+                                                            .direction !=
+                                                        ScrollDirection.idle) {
+                                                      _isInteracting.value =
+                                                          true;
+                                                    } else if (!_swipeInFlight) {
+                                                      _isInteracting.value =
+                                                          false;
+                                                      if (_carouselDragDelta
+                                                              .value !=
+                                                          0.0) {
+                                                        _carouselDragDelta
+                                                            .value = 0.0;
+                                                      }
+                                                    }
+                                                  } else if (notification
+                                                      is ScrollEndNotification) {
+                                                    _isInteracting.value =
+                                                        false;
+                                                    if (_carouselDragDelta
+                                                            .value !=
+                                                        0.0) {
+                                                      _carouselDragDelta.value =
+                                                          0.0;
+                                                    }
+                                                    if (!_swipeInFlight) {
+                                                      _drainPendingSync();
+                                                    }
                                                   }
-                                                }
-                                              } else if (notification
-                                                  is ScrollEndNotification) {
-                                                _isInteracting.value = false;
-                                                if (_carouselDragDelta.value !=
-                                                    0.0) {
-                                                  _carouselDragDelta.value =
-                                                      0.0;
-                                                }
-                                                if (!_swipeInFlight) {
-                                                  _drainPendingSync();
-                                                }
-                                              }
-                                              return false;
-                                            },
-                                            child: PageView.builder(
-                                              controller: _pageController,
-                                              physics: carouselEnabled
-                                                  ? const BouncingScrollPhysics()
-                                                  : const NeverScrollableScrollPhysics(),
-                                              itemCount: queue.length,
-                                              onPageChanged: (page) {
-                                                if (!_swipeInFlight &&
-                                                    _isInteracting.value &&
-                                                    page != currentIndex) {
-                                                  if (mounted) {
-                                                    setState(() {
-                                                      _swipeInFlight = true;
-                                                    });
-                                                  } else {
-                                                    _swipeInFlight = true;
-                                                  }
-                                                  unawaited(_completeSwipe(
-                                                      page, cubit));
-                                                }
-                                              },
-                                              itemBuilder: (context, index) {
-                                                final item = queue[index];
-                                                final isCurrent =
-                                                    index == currentIndex;
+                                                  return false;
+                                                },
+                                                child: PageView.builder(
+                                                  controller: _pageController,
+                                                  physics: carouselEnabled
+                                                      ? const BouncingScrollPhysics()
+                                                      : const NeverScrollableScrollPhysics(),
+                                                  itemCount: queue.length,
+                                                  onPageChanged: (page) {
+                                                    if (!_swipeInFlight &&
+                                                        _isInteracting.value &&
+                                                        page != currentIndex) {
+                                                      if (mounted) {
+                                                        setState(() {
+                                                          _swipeInFlight = true;
+                                                        });
+                                                      } else {
+                                                        _swipeInFlight = true;
+                                                      }
+                                                      unawaited(_completeSwipe(
+                                                          page, cubit));
+                                                    }
+                                                  },
+                                                  itemBuilder:
+                                                      (context, index) {
+                                                    final item = queue[index];
+                                                    final isCurrent =
+                                                        index == currentIndex;
 
-                                                return RepaintBoundary(
-                                                  child: GestureDetector(
-                                                    behavior:
-                                                        HitTestBehavior.opaque,
-                                                    onTap: widget.onTap,
-                                                    child: Row(
-                                                      children: [
-                                                        // Artwork or Vinyl Disc
-                                                        Stack(
-                                                          alignment:
-                                                              Alignment.center,
+                                                    return RepaintBoundary(
+                                                      child: GestureDetector(
+                                                        behavior:
+                                                            HitTestBehavior
+                                                                .opaque,
+                                                        onTap: widget.onTap,
+                                                        child: Row(
                                                           children: [
-                                                            if (playerThemeMode ==
-                                                                PlayerThemeMode
-                                                                    .vinyl)
-                                                              SpinningVinylDisc(
-                                                                id: item.id,
-                                                                remoteArtworkUrl:
-                                                                    item.remoteArtworkUrl,
-                                                                size: 46,
-                                                                isPlaying: state
-                                                                        .isPlaying &&
-                                                                    isCurrent,
-                                                              )
-                                                            else
-                                                              Container(
-                                                                decoration:
-                                                                    BoxDecoration(
-                                                                  borderRadius:
-                                                                      AppRadii
-                                                                          .r12All,
-                                                                  border: Border
-                                                                      .all(
-                                                                    color: p
-                                                                        .hairline,
-                                                                    width: 0.75,
-                                                                  ),
-                                                                  boxShadow: [
-                                                                    BoxShadow(
-                                                                      color: Colors
-                                                                          .black
-                                                                          .withValues(
-                                                                              alpha: p.isDark ? 0.30 : 0.10),
-                                                                      blurRadius:
-                                                                          8,
-                                                                      offset:
-                                                                          const Offset(
-                                                                              0,
-                                                                              2),
-                                                                    ),
-                                                                  ],
-                                                                ),
-                                                                child: Hero(
-                                                                  tag: isCurrent
-                                                                      ? _fullArtworkHeroTag(
-                                                                          playerThemeMode)
-                                                                      : 'queue_art_${item.id}_$index',
-                                                                  child:
-                                                                      CachedArtwork(
-                                                                    id: item.id,
-                                                                    remoteUrl: item
-                                                                        .remoteArtworkUrl,
-                                                                    type: ArtworkType
-                                                                        .AUDIO,
-                                                                    size: 46,
-                                                                    borderRadius:
-                                                                        12,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                            if (isCurrent &&
-                                                                state
-                                                                    .isPlaying &&
-                                                                playerThemeMode !=
+                                                            // Artwork or Vinyl Disc
+                                                            Stack(
+                                                              alignment:
+                                                                  Alignment
+                                                                      .center,
+                                                              children: [
+                                                                if (playerThemeMode ==
                                                                     PlayerThemeMode
                                                                         .vinyl)
-                                                              PositionedDirectional(
-                                                                bottom: 2,
-                                                                end: 2,
-                                                                child:
-                                                                    Container(
-                                                                  padding:
-                                                                      const EdgeInsets
-                                                                          .symmetric(
-                                                                    horizontal:
-                                                                        3.5,
-                                                                    vertical:
-                                                                        2.0,
-                                                                  ),
-                                                                  decoration:
-                                                                      BoxDecoration(
-                                                                    color: AppColors
-                                                                        .scrim,
-                                                                    borderRadius:
-                                                                        AppRadii
-                                                                            .r4All,
-                                                                    border:
-                                                                        Border
-                                                                            .all(
-                                                                      color: Colors
-                                                                          .white
-                                                                          .withValues(
-                                                                              alpha: 0.14),
-                                                                      width:
-                                                                          0.5,
+                                                                  SpinningVinylDisc(
+                                                                    id: item.id,
+                                                                    remoteArtworkUrl:
+                                                                        item.remoteArtworkUrl,
+                                                                    size: 46,
+                                                                    isPlaying: state
+                                                                            .isPlaying &&
+                                                                        isCurrent,
+                                                                  )
+                                                                else
+                                                                  Container(
+                                                                    decoration:
+                                                                        BoxDecoration(
+                                                                      borderRadius:
+                                                                          AppRadii
+                                                                              .r12All,
+                                                                      border:
+                                                                          Border
+                                                                              .all(
+                                                                        color: p
+                                                                            .hairline,
+                                                                        width:
+                                                                            0.75,
+                                                                      ),
+                                                                      boxShadow: [
+                                                                        BoxShadow(
+                                                                          color: Colors
+                                                                              .black
+                                                                              .withValues(alpha: p.isDark ? 0.30 : 0.10),
+                                                                          blurRadius:
+                                                                              8,
+                                                                          offset: const Offset(
+                                                                              0,
+                                                                              2),
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                    child: Hero(
+                                                                      tag: isCurrent
+                                                                          ? _fullArtworkHeroTag(
+                                                                              playerThemeMode)
+                                                                          : 'queue_art_${item.id}_$index',
+                                                                      child:
+                                                                          CachedArtwork(
+                                                                        id: item
+                                                                            .id,
+                                                                        remoteUrl:
+                                                                            item.remoteArtworkUrl,
+                                                                        type: ArtworkType
+                                                                            .AUDIO,
+                                                                        size:
+                                                                            46,
+                                                                        borderRadius:
+                                                                            12,
+                                                                      ),
                                                                     ),
                                                                   ),
-                                                                  child:
-                                                                      WaveformLogo(
-                                                                    size: 11,
-                                                                    color: p
-                                                                        .accent,
-                                                                    animate:
-                                                                        true,
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                          ],
-                                                        ),
-                                                        const SizedBox(
-                                                            width:
-                                                                AppSpacing.sm),
-                                                        // Track title & artist.
-                                                        Expanded(
-                                                          child: Stack(
-                                                            alignment:
-                                                                AlignmentDirectional
-                                                                    .centerStart,
-                                                            children: [
-                                                              Transform
-                                                                  .translate(
-                                                                offset: Offset(
-                                                                  _horizontalDragDx !=
-                                                                          0.0
-                                                                      ? math.pow(
-                                                                              _horizontalDragDx.abs(),
-                                                                              0.78) *
-                                                                          _horizontalDragDx.sign
-                                                                      : 0.0,
-                                                                  0,
-                                                                ),
-                                                                child: MediaQuery
-                                                                    .withClampedTextScaling(
-                                                                  minScaleFactor:
-                                                                      0.8,
-                                                                  maxScaleFactor:
-                                                                      2.0,
-                                                                  child: Column(
-                                                                    mainAxisSize:
-                                                                        MainAxisSize
-                                                                            .min,
-                                                                    crossAxisAlignment:
-                                                                        CrossAxisAlignment
-                                                                            .start,
-                                                                    mainAxisAlignment:
-                                                                        MainAxisAlignment
-                                                                            .center,
-                                                                    children: [
-                                                                      Text(
-                                                                        item.title,
-                                                                        maxLines:
-                                                                            1,
-                                                                        overflow:
-                                                                            TextOverflow.ellipsis,
-                                                                        style:
-                                                                            TextStyle(
-                                                                          color: isCurrent
-                                                                              ? p.textPrimary
-                                                                              : p.textSecondary,
-                                                                          fontWeight:
-                                                                              FontWeight.w700,
-                                                                          fontSize:
-                                                                              AppFontSize.body,
-                                                                          letterSpacing:
-                                                                              -0.2,
+                                                                if (isCurrent &&
+                                                                    state
+                                                                        .isPlaying &&
+                                                                    playerThemeMode !=
+                                                                        PlayerThemeMode
+                                                                            .vinyl)
+                                                                  PositionedDirectional(
+                                                                    bottom: 2,
+                                                                    end: 2,
+                                                                    child:
+                                                                        Container(
+                                                                      padding:
+                                                                          const EdgeInsets
+                                                                              .symmetric(
+                                                                        horizontal:
+                                                                            3.5,
+                                                                        vertical:
+                                                                            2.0,
+                                                                      ),
+                                                                      decoration:
+                                                                          BoxDecoration(
+                                                                        color: AppColors
+                                                                            .scrim,
+                                                                        borderRadius:
+                                                                            AppRadii.r4All,
+                                                                        border:
+                                                                            Border.all(
+                                                                          color: Colors
+                                                                              .white
+                                                                              .withValues(alpha: 0.14),
+                                                                          width:
+                                                                              0.5,
                                                                         ),
                                                                       ),
-                                                                      const SizedBox(
-                                                                          height:
-                                                                              AppSpacing.s2),
-                                                                      Row(
+                                                                      child:
+                                                                          WaveformLogo(
+                                                                        size:
+                                                                            11,
+                                                                        color: p
+                                                                            .accent,
+                                                                        animate:
+                                                                            true,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                              ],
+                                                            ),
+                                                            const SizedBox(
+                                                                width:
+                                                                    AppSpacing
+                                                                        .sm),
+                                                            // Track title & artist.
+                                                            Expanded(
+                                                              child: Stack(
+                                                                alignment:
+                                                                    AlignmentDirectional
+                                                                        .centerStart,
+                                                                children: [
+                                                                  Transform
+                                                                      .translate(
+                                                                    offset:
+                                                                        Offset(
+                                                                      _horizontalDragDx !=
+                                                                              0.0
+                                                                          ? math.pow(_horizontalDragDx.abs(), 0.78) *
+                                                                              _horizontalDragDx.sign
+                                                                          : 0.0,
+                                                                      0,
+                                                                    ),
+                                                                    child: MediaQuery
+                                                                        .withClampedTextScaling(
+                                                                      minScaleFactor:
+                                                                          0.8,
+                                                                      maxScaleFactor:
+                                                                          2.0,
+                                                                      child:
+                                                                          Column(
+                                                                        mainAxisSize:
+                                                                            MainAxisSize.min,
+                                                                        crossAxisAlignment:
+                                                                            CrossAxisAlignment.start,
+                                                                        mainAxisAlignment:
+                                                                            MainAxisAlignment.center,
                                                                         children: [
-                                                                          QueueSlotBadge(
-                                                                            activeSlot:
-                                                                                state.activeQueueSlot,
+                                                                          Text(
+                                                                            item.title,
+                                                                            maxLines:
+                                                                                1,
+                                                                            overflow:
+                                                                                TextOverflow.ellipsis,
+                                                                            style:
+                                                                                TextStyle(
+                                                                              color: isCurrent ? p.textPrimary : p.textSecondary,
+                                                                              fontWeight: FontWeight.w700,
+                                                                              fontSize: AppFontSize.body,
+                                                                              letterSpacing: -0.2,
+                                                                            ),
                                                                           ),
                                                                           const SizedBox(
-                                                                            width:
-                                                                                AppSpacing.xxs,
-                                                                          ),
-                                                                          Expanded(
-                                                                            child:
-                                                                                Text(
-                                                                              item.artist,
-                                                                              maxLines: 1,
-                                                                              overflow: TextOverflow.ellipsis,
-                                                                              style: TextStyle(
-                                                                                color: p.textSecondary,
-                                                                                fontSize: AppFontSize.label,
-                                                                                fontWeight: FontWeight.w500,
+                                                                              height: AppSpacing.s2),
+                                                                          Row(
+                                                                            children: [
+                                                                              QueueSlotBadge(
+                                                                                activeSlot: state.activeQueueSlot,
                                                                               ),
-                                                                            ),
+                                                                              const SizedBox(
+                                                                                width: AppSpacing.xxs,
+                                                                              ),
+                                                                              Expanded(
+                                                                                child: Text(
+                                                                                  item.artist,
+                                                                                  maxLines: 1,
+                                                                                  overflow: TextOverflow.ellipsis,
+                                                                                  style: TextStyle(
+                                                                                    color: p.textSecondary,
+                                                                                    fontSize: AppFontSize.label,
+                                                                                    fontWeight: FontWeight.w500,
+                                                                                  ),
+                                                                                ),
+                                                                              ),
+                                                                            ],
                                                                           ),
                                                                         ],
                                                                       ),
-                                                                    ],
+                                                                    ),
                                                                   ),
-                                                                ),
+                                                                  if (!carouselEnabled &&
+                                                                      _horizontalDragDx <
+                                                                          -8 &&
+                                                                      swipeLeftIcon !=
+                                                                          null)
+                                                                    PositionedDirectional(
+                                                                      end: 0,
+                                                                      child:
+                                                                          _SwipeActionBadge(
+                                                                        icon:
+                                                                            swipeLeftIcon,
+                                                                        progress: (_horizontalDragDx.abs() / 40.0).clamp(
+                                                                            0.0,
+                                                                            1.0),
+                                                                        thresholdCrossed:
+                                                                            _swipeThresholdCrossed,
+                                                                        accentColor:
+                                                                            activeAccent,
+                                                                      ),
+                                                                    )
+                                                                  else if (_horizontalDragDx >
+                                                                          8 &&
+                                                                      swipeRightIcon !=
+                                                                          null)
+                                                                    PositionedDirectional(
+                                                                      start: 0,
+                                                                      child:
+                                                                          _SwipeActionBadge(
+                                                                        icon:
+                                                                            swipeRightIcon,
+                                                                        progress: (_horizontalDragDx.abs() / 40.0).clamp(
+                                                                            0.0,
+                                                                            1.0),
+                                                                        thresholdCrossed:
+                                                                            _swipeThresholdCrossed,
+                                                                        accentColor:
+                                                                            activeAccent,
+                                                                      ),
+                                                                    ),
+                                                                ],
                                                               ),
-                                                              if (!carouselEnabled &&
-                                                                  _horizontalDragDx <
-                                                                      -8 &&
-                                                                  swipeLeftIcon !=
-                                                                      null)
-                                                                PositionedDirectional(
-                                                                  end: 0,
-                                                                  child:
-                                                                      _SwipeActionBadge(
-                                                                    icon:
-                                                                        swipeLeftIcon,
-                                                                    progress: (_horizontalDragDx.abs() /
-                                                                            40.0)
-                                                                        .clamp(
-                                                                            0.0,
-                                                                            1.0),
-                                                                    thresholdCrossed:
-                                                                        _swipeThresholdCrossed,
-                                                                    accentColor:
-                                                                        activeAccent,
-                                                                  ),
-                                                                )
-                                                              else if (_horizontalDragDx >
-                                                                      8 &&
-                                                                  swipeRightIcon !=
-                                                                      null)
-                                                                PositionedDirectional(
-                                                                  start: 0,
-                                                                  child:
-                                                                      _SwipeActionBadge(
-                                                                    icon:
-                                                                        swipeRightIcon,
-                                                                    progress: (_horizontalDragDx.abs() /
-                                                                            40.0)
-                                                                        .clamp(
-                                                                            0.0,
-                                                                            1.0),
-                                                                    thresholdCrossed:
-                                                                        _swipeThresholdCrossed,
-                                                                    accentColor:
-                                                                        activeAccent,
-                                                                  ),
-                                                                ),
-                                                            ],
-                                                          ),
+                                                            ),
+                                                          ],
                                                         ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                          if (carouselEnabled)
-                                            Positioned.fill(
-                                              child: IgnorePointer(
-                                                child: ValueListenableBuilder<
-                                                    double>(
-                                                  valueListenable:
-                                                      _carouselDragDelta,
-                                                  builder:
-                                                      (context, delta, _) {
-                                                    if (delta.abs() <= 0.05) {
-                                                      return const SizedBox
-                                                          .shrink();
-                                                    }
-                                                    final isNext = delta > 0;
-                                                    final progress =
-                                                        (delta.abs() / 0.35)
-                                                            .clamp(0.0, 1.0);
-                                                    final crossed =
-                                                        delta.abs() >= 0.35;
-                                                    return Stack(
-                                                      alignment:
-                                                          Alignment.center,
-                                                      children: [
-                                                        if (isNext)
-                                                          PositionedDirectional(
-                                                            end: 2,
-                                                            child:
-                                                                _SwipeActionBadge(
-                                                              key: const ValueKey(
-                                                                  'mini_player_carousel_badge_next'),
-                                                              icon: Icons
-                                                                  .skip_next_rounded,
-                                                              progress:
-                                                                  progress,
-                                                              thresholdCrossed:
-                                                                  crossed,
-                                                              accentColor:
-                                                                  activeAccent,
-                                                            ),
-                                                          )
-                                                        else
-                                                          PositionedDirectional(
-                                                            start: 2,
-                                                            child:
-                                                                _SwipeActionBadge(
-                                                              key: const ValueKey(
-                                                                  'mini_player_carousel_badge_prev'),
-                                                              icon: Icons
-                                                                  .skip_previous_rounded,
-                                                              progress:
-                                                                  progress,
-                                                              thresholdCrossed:
-                                                                  crossed,
-                                                              accentColor:
-                                                                  activeAccent,
-                                                            ),
-                                                          ),
-                                                      ],
+                                                      ),
                                                     );
                                                   },
                                                 ),
                                               ),
-                                            ),
-                                          ],
+                                              if (carouselEnabled)
+                                                Positioned.fill(
+                                                  child: IgnorePointer(
+                                                    child:
+                                                        ValueListenableBuilder<
+                                                            double>(
+                                                      valueListenable:
+                                                          _carouselDragDelta,
+                                                      builder:
+                                                          (context, delta, _) {
+                                                        if (delta.abs() <=
+                                                            0.05) {
+                                                          return const SizedBox
+                                                              .shrink();
+                                                        }
+                                                        final isNext =
+                                                            delta > 0;
+                                                        final progress =
+                                                            (delta.abs() / 0.35)
+                                                                .clamp(
+                                                                    0.0, 1.0);
+                                                        final crossed =
+                                                            delta.abs() >= 0.35;
+                                                        return Stack(
+                                                          alignment:
+                                                              Alignment.center,
+                                                          children: [
+                                                            if (isNext)
+                                                              PositionedDirectional(
+                                                                end: 2,
+                                                                child:
+                                                                    _SwipeActionBadge(
+                                                                  key: const ValueKey(
+                                                                      'mini_player_carousel_badge_next'),
+                                                                  icon: Icons
+                                                                      .skip_next_rounded,
+                                                                  progress:
+                                                                      progress,
+                                                                  thresholdCrossed:
+                                                                      crossed,
+                                                                  accentColor:
+                                                                      activeAccent,
+                                                                ),
+                                                              )
+                                                            else
+                                                              PositionedDirectional(
+                                                                start: 2,
+                                                                child:
+                                                                    _SwipeActionBadge(
+                                                                  key: const ValueKey(
+                                                                      'mini_player_carousel_badge_prev'),
+                                                                  icon: Icons
+                                                                      .skip_previous_rounded,
+                                                                  progress:
+                                                                      progress,
+                                                                  thresholdCrossed:
+                                                                      crossed,
+                                                                  accentColor:
+                                                                      activeAccent,
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        );
+                                                      },
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: AppSpacing.xs),
+                                      const SizedBox(width: AppSpacing.xs),
                                       // Primary Play/Pause Button with tonal capsule
                                       Container(
                                         width: 40,
@@ -1944,11 +1932,7 @@ class MiniPlayerHorizontal extends StatelessWidget {
     final activeAccent = p.accent;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
-      buildWhen: (prev, curr) =>
-          prev.currentSong != curr.currentSong ||
-          prev.isPlaying != curr.isPlaying ||
-          prev.isBuffering != curr.isBuffering ||
-          prev.duration != curr.duration,
+      buildWhen: (prev, curr) => prev.differsForMiniPlayerHorizontal(curr),
       builder: (context, state) {
         final song = state.currentSong;
         if (song == null) return const SizedBox.shrink();

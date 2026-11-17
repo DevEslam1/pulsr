@@ -82,4 +82,41 @@ void main() {
       expect(restored.directFormats.first.supported, isTrue);
     });
   });
+
+  group('AudioOutputInfo system-effect compromise observation', () {
+    test('defaults off when the key is absent and round-trips true', () {
+      // A platform build that never published the key has not observed the
+      // vendor chain, so the model must not invent a compromise.
+      final legacy = AudioOutputInfo.fromMap({
+        'deviceName': 'Speaker',
+        'isUsbDac': false,
+        'sampleRate': 44100,
+        'bitDepth': 16,
+        'isBitPerfectActive': false,
+      });
+      expect(legacy.systemEffectsCompromised, isFalse);
+
+      const info = AudioOutputInfo(
+        deviceName: 'USB DAC',
+        isUsbDac: true,
+        sampleRate: 96000,
+        bitDepth: 24,
+        isBitPerfectActive: false,
+        systemEffectsCompromised: true,
+      );
+
+      expect(info.toMap()['systemEffectsCompromised'], isTrue);
+      expect(AudioOutputInfo.fromMap(info.toMap()).systemEffectsCompromised,
+          isTrue);
+      expect(info.copyWith(bitDepth: 16).systemEffectsCompromised, isTrue);
+      expect(info.copyWith(systemEffectsCompromised: false)
+          .systemEffectsCompromised, isFalse);
+
+      // Two routes that differ only in whether the OEM chain is compromised
+      // are not the same route.
+      final clean = info.copyWith(systemEffectsCompromised: false);
+      expect(info, isNot(equals(clean)));
+      expect(info.hashCode, isNot(equals(clean.hashCode)));
+    });
+  });
 }

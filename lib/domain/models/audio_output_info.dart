@@ -244,6 +244,12 @@ class AudioOutputInfo {
   /// means the samples are altered after the app hands them over.
   final int halStagesActive;
 
+  /// The vendor/OEM effect chain could not prove itself bypassed while a
+  /// bypass was requested. [halStagesActive] only counts stages the app owns
+  /// and can switch off; this flag covers the system chain it cannot, so an
+  /// app-side toggle must never clear it.
+  final bool systemEffectsCompromised;
+
   // Phase 4: output-path capability diagnostics
   final List<AudioDirectFormat> directFormats;
   final int usbAudioClass; // 0 = none/unknown, 1 = UAC1, 2 = UAC2, 3 = UAC3
@@ -304,6 +310,7 @@ class AudioOutputInfo {
     this.integerBypassActive = false,
     this.bitPerfectRequested = false,
     this.halStagesActive = 0,
+    this.systemEffectsCompromised = false,
     this.directFormats = const [],
     this.usbAudioClass = 0,
     this.usbDacLabel,
@@ -377,6 +384,8 @@ class AudioOutputInfo {
       integerBypassActive: (map['integerBypassActive'] as bool?) ?? false,
       bitPerfectRequested: (map['bitPerfectRequested'] as bool?) ?? false,
       halStagesActive: (map['halStagesActive'] as num?)?.toInt() ?? 0,
+      systemEffectsCompromised:
+          (map['systemEffectsCompromised'] as bool?) ?? false,
       directFormats: () {
         final raw = map['directFormats'];
         final out = <AudioDirectFormat>[];
@@ -497,6 +506,7 @@ class AudioOutputInfo {
       'integerBypassActive': integerBypassActive,
       'bitPerfectRequested': bitPerfectRequested,
       'halStagesActive': halStagesActive,
+      'systemEffectsCompromised': systemEffectsCompromised,
       'directFormats': directFormats.map((d) => d.toMap()).toList(),
       'usbAudioClass': usbAudioClass,
       'usbDacLabel': usbDacLabel,
@@ -551,6 +561,7 @@ class AudioOutputInfo {
     bool? integerBypassActive,
     bool? bitPerfectRequested,
     int? halStagesActive,
+    bool? systemEffectsCompromised,
     List<AudioDirectFormat>? directFormats,
     int? usbAudioClass,
     String? usbDacLabel,
@@ -608,6 +619,8 @@ class AudioOutputInfo {
       integerBypassActive: integerBypassActive ?? this.integerBypassActive,
       bitPerfectRequested: bitPerfectRequested ?? this.bitPerfectRequested,
       halStagesActive: halStagesActive ?? this.halStagesActive,
+      systemEffectsCompromised:
+          systemEffectsCompromised ?? this.systemEffectsCompromised,
       directFormats: directFormats ?? this.directFormats,
       usbAudioClass: usbAudioClass ?? this.usbAudioClass,
       usbDacLabel: usbDacLabel ?? this.usbDacLabel,
@@ -672,6 +685,7 @@ class AudioOutputInfo {
           integerBypassActive == other.integerBypassActive &&
           bitPerfectRequested == other.bitPerfectRequested &&
           halStagesActive == other.halStagesActive &&
+          systemEffectsCompromised == other.systemEffectsCompromised &&
           _listEquals(directFormats, other.directFormats) &&
           usbAudioClass == other.usbAudioClass &&
           usbDacLabel == other.usbDacLabel &&
@@ -725,6 +739,7 @@ class AudioOutputInfo {
         integerBypassActive,
         bitPerfectRequested,
         halStagesActive,
+        systemEffectsCompromised,
         Object.hashAll(directFormats),
         usbAudioClass,
         usbDacLabel,
@@ -757,6 +772,7 @@ class AudioOutputInfo {
         'bitPerfectRequested: $bitPerfectRequested, '
         'bitPerfectActive: $isBitPerfectActive, '
         'integerBypass: $integerBypassActive, '
-        'halStagesActive: $halStagesActive)';
+        'halStagesActive: $halStagesActive, '
+        'systemEffectsCompromised: $systemEffectsCompromised)';
   }
 }

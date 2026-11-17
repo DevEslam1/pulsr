@@ -212,7 +212,6 @@ void main() {
     test('a verified state tags the endpoint Bit-Perfect', () {
       final state = resolveBitPerfectState(
         requested: true,
-        strict: false,
         sinkActive: true,
         sourceSampleRate: 96000,
         sourceBitDepth: 24,
@@ -241,7 +240,6 @@ void main() {
     test('a degraded state tags the endpoint Exclusive / Unverified', () {
       final state = resolveBitPerfectState(
         requested: true,
-        strict: false,
         sinkActive: true,
         sourceSampleRate: 96000,
         sourceBitDepth: 24,

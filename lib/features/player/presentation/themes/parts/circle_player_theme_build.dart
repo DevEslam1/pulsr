@@ -5,8 +5,8 @@ extension _CirclePlayerThemeBuild on _CirclePlayerThemeState {
     final cubit = widget.props.cubit;
     final state = widget.props.state;
     final activeColor = widget.props.activeColor;
-    final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
-        (c) => c.state.visualizerStyle);
+    final visualizerStyle = context
+        .select<SettingsCubit, VisualizerStyle>((c) => c.state.visualizerStyle);
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&

@@ -8,6 +8,12 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// boot restore re-establishes it from the saved preference.
   bool _bitPerfectViaDirectStream = false;
 
+  /// The user's Bit-Perfect choice as intent, kept apart from the live
+  /// transport state. Booting without a USB DAC, or unplugging one, leaves the
+  /// transport off while this stays true so the route handler can re-arm the
+  /// moment a DAC appears.
+  bool _bitPerfectPreferred = false;
+
   /// Set while the system media-output panel owns a route change. The saved
   /// Bit-Perfect preference stays untouched; the route read back after the
   /// panel decides whether the transport is re-armed.
@@ -261,6 +267,22 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
 
   bool get bitPerfectViaDirectStream => _bitPerfectViaDirectStream;
 
+  /// Whether a Bit-Perfect choice is saved and may be re-armed on a USB DAC.
+  bool get bitPerfectPreferred => _bitPerfectPreferred;
+
+  /// Re-arms the saved choice on a route that can carry it.
+  ///
+  /// Strict is restored as an upgrade after ordinary Bit-Perfect is live: a
+  /// refused Strict rolls back to the working exclusive setup, not to "off".
+  Future<void> _rearmBitPerfectPreference() async {
+    await setBitPerfectOutput(true);
+    if (!state.bitPerfectOutput) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool(PrefsKeys.strictBitPerfect) ?? false) {
+      await setStrictBitPerfect(true);
+    }
+  }
+
   /// Non-persistent suspend for a track the direct sink cannot carry: the
   /// endpoint is released (the native tee unmutes the HAL, so audio continues
   /// on the normal output path instead of going silent), the saved Bit-Perfect
@@ -318,6 +340,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         restoreBypass ?? savedPreBypass ?? state.bypassDspOnBitPerfect;
     final targetFollowRate =
         restoreFollowRate ?? savedPreFollow ?? state.followTrackSampleRate;
+    // The enable failed: the app drops the preference with it, so a later DAC
+    // attach must not resurrect a mode the chain just refused.
+    _bitPerfectPreferred = false;
     if (stopped) {
       _preStrictBypass = null;
       _preStrictFollowRate = null;
@@ -717,6 +742,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           error: uiError('$base$directHint'),
         ));
       }
+      // The device refused the transport, so the re-arm intent goes with the
+      // saved keys: neither may outlive a mode the hardware cannot honour.
+      _bitPerfectPreferred = false;
       await refreshOutputDevice();
       return;
     }
@@ -739,6 +767,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         // DSP restore. Keep the UI truthful and allow a subsequent retry.
         await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
         await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+        _bitPerfectPreferred = false;
         safeEmit(state.copyWith(
           bitPerfectOutput: false,
           strictBitPerfect: false,
@@ -752,6 +781,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     // transition, including strict and bypass changes; saved choices survive.
     if (enabled || !keepPreferenceWhenDisabling) {
       await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
+      // Mirror the saved choice in the intent flag. A route loss passes
+      // [keepPreferenceWhenDisabling] and never reaches here, so an unplug
+      // suspends the transport without forgetting why it was on.
+      _bitPerfectPreferred = enabled;
     }
     bool? restoredBypass;
     bool? restoredFollowRate;
@@ -1004,6 +1037,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
           error: null,
         ));
       }
+      // Strict OFF leaves the transport itself as saved, so the re-arm intent
+      // follows that saved Bit-Perfect choice rather than the strict flag.
+      _bitPerfectPreferred = state.bitPerfectOutput;
       await refreshOutputDevice();
       return;
     }
@@ -1043,6 +1079,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         ErrorLogger.log('Failed to persist strict bit-perfect revert',
             error: e, stackTrace: st, category: 'Settings');
       }
+      // The revert restores the previous Bit-Perfect choice, so the intent
+      // follows it instead of claiming a mode the device refused.
+      _bitPerfectPreferred = prevBitPerfect;
       if (!isClosed) {
         final reason = _hiResAudioService.lastBitPerfectFailureReason;
         final base = AudioConflicts.bitPerfectReasonMessage(reason) ??
@@ -1096,6 +1135,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
     await prefs.setBool(PrefsKeys.bitPerfectOutput, true);
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, true);
     await prefs.setBool(PrefsKeys.followTrackSampleRate, true);
+    // Strict implies Bit-Perfect, so the saved intent is ON from here and may
+    // be re-armed after a route change.
+    _bitPerfectPreferred = true;
     if (!isClosed) {
       safeEmit(state.copyWith(
         strictBitPerfect: true,

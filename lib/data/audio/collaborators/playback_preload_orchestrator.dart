@@ -51,6 +51,12 @@ class PlaybackPreloadOrchestrator {
     );
   }
 
+  /// Marks [videoId] as the track the user is waiting on, so queued background
+  /// warming for other tracks is dropped rather than competing with it.
+  void prioritize(String videoId) {
+    preResolver.prioritize(videoId);
+  }
+
   void onTrackEnqueuedOrTapped(SongsTableData song) {
     preResolver.onTrackEnqueuedOrTapped(song);
   }

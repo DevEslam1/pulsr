@@ -39,6 +39,19 @@ object PoTokenManager {
     private const val TOKEN_TTL_SECONDS = 1800L // 30 minutes
     private const val WEBVIEW_BROKEN_COOLDOWN_SECONDS = 1800L // 30 minutes
     private const val BACKGROUND_REFRESH_INTERVAL_MS = 60_000L
+
+    /**
+     * Delay before the startup pre-warm creates the BotGuard WebView.
+     *
+     * WebView construction and the first BotGuard run are main-thread work and
+     * block it for several seconds on a cold start. Starting that race during
+     * app launch starved the platform-channel replies the startup audio path
+     * waits on (audio-device probe, DAC voicing, DSP preference restore), so
+     * those timed out and the UI skipped hundreds of frames. Resolution keeps
+     * using the persisted token meanwhile, and an on-demand [ensureReady] still
+     * builds the generator immediately when a request cannot wait.
+     */
+    private const val PREWARM_SETTLE_DELAY_MS = 5_000L
     const val EXPIRING_SOON_MARGIN_SECONDS = PoTokenStore.REFRESH_MARGIN_SECONDS // 30 minutes
 
     @Volatile
@@ -290,7 +303,14 @@ object PoTokenManager {
         managerScope.launch {
             try {
                 if (isExpired() || isExpiringSoon() || !hasWarmGenerator) {
-                    ensureReady()
+                    // Let the first frame and the startup platform-channel
+                    // traffic land before the main-thread WebView work starts.
+                    kotlinx.coroutines.delay(PREWARM_SETTLE_DELAY_MS)
+                    // Re-check: an on-demand ensureReady() (or another pre-warm)
+                    // may have produced a generator while this waited.
+                    if (isExpired() || isExpiringSoon() || !hasWarmGenerator) {
+                        ensureReady()
+                    }
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Pre-warm failed non-fatally: ${t.message}")

@@ -63,8 +63,9 @@ class _WaveformHeroStage extends StatelessWidget {
               child: RepaintBoundary(
                 child: Builder(
                   builder: (context) {
-                    final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
-                        (c) => c.state.visualizerStyle);
+                    final visualizerStyle =
+                        context.select<SettingsCubit, VisualizerStyle>(
+                            (c) => c.state.visualizerStyle);
                     if (visualizerStyle == VisualizerStyle.off) {
                       return const SizedBox.shrink();
                     }
@@ -163,25 +164,31 @@ class _WaveformHeroStage extends StatelessWidget {
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: song != null
-                        ? CachedArtwork(
-                            id: song.id,
-                            albumId: song.albumId,
-                            remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                            type: ArtworkType.AUDIO,
-                            size: artSize,
-                            borderRadius: 28,
-                            highQuality: true,
-                            fallbackIcon: Icons.music_note_rounded,
-                          )
-                        : Container(
-                            color: Colors.black26,
-                            child: Icon(
-                              Icons.music_note_rounded,
-                              size: artSize * 0.4,
-                              color: Colors.white54,
+                    child: PlayerArtworkSemantics(
+                      song: song,
+                      child: song != null
+                          ? CachedArtwork(
+                              id: song.id,
+                              albumId: song.albumId,
+                              remoteUrl:
+                                  song.remoteArtworkUrl ?? song.artworkUri,
+                              type: ArtworkType.AUDIO,
+                              size: artSize,
+                              borderRadius: 28,
+                              highQuality: true,
+                              fallbackIcon: Icons.music_note_rounded,
+                            )
+                          : ExcludeSemantics(
+                              child: Container(
+                                color: Colors.black26,
+                                child: Icon(
+                                  Icons.music_note_rounded,
+                                  size: artSize * 0.4,
+                                  color: Colors.white54,
+                                ),
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),

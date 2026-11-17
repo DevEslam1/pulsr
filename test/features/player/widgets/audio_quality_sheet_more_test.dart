@@ -648,6 +648,10 @@ void main() {
           // The source is 96 kHz; the output reports 48 kHz.
           sampleRate: 48000,
           bitDepth: 24,
+          // The sink's own report, not the display format: this is the format
+          // the AudioTrack really opened, and the one the verdict compares.
+          sinkSampleRate: 48000,
+          sinkBitDepth: 24,
           isBitPerfectActive: true,
           // The engine observed an integer bypass on this route, so the chain
           // reaches the rate comparison instead of stopping at the carrier.
@@ -836,6 +840,9 @@ void main() {
       isUsbDac: true,
       sampleRate: 96000,
       bitDepth: 24,
+      // The sink reports the same 96 kHz / 24-bit container it verified on.
+      sinkSampleRate: 96000,
+      sinkBitDepth: 24,
       isBitPerfectActive: true,
       // An observed integer bypass is what lets this route ever verify; the
       // sink encoding alone is no longer read as one.

@@ -4375,8 +4375,8 @@
   "settingsAdaptiveQualitySubtitle": "Step bitrate down/up mid-track on stalls",
   "settingsAaudioBufferSize": "AAudio Buffer Size",
   "settingsAaudioBufferSizeDesc": "Stream buffer capacity hint in milliseconds. Lower = lower latency (wired), higher = more stall resistance",
-  "settingsAaudioDirect": "AAudio Direct Output (Bit-Perfect)",
-  "settingsAaudioDirectDesc": "Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players",
+  "settingsAaudioDirect": "AAudio Direct Output (Low-Latency)",
+  "settingsAaudioDirectDesc": "Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players. This path is not reported as verified Bit-Perfect: it cannot prove the DAC received the source bytes unchanged",
   "dspAboutBassBoost": "About Bass Boost",
   "dspMasterNoSnapshotNotice": "Effects are now off. Enable the stages you want individually; nothing is restored automatically.",
   "dspAboutBitPerfect": "About Bit-Perfect",
@@ -5365,7 +5365,7 @@
   "@featureInfoBitPerfectSubtitle": {
     "description": "Audio feature info string"
   },
-  "featureInfoBitPerfectDescription": "Bypasses Android AudioFlinger and sends the file's exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr's own UAC2 isochronous sink when the platform exposes no exclusive mixer. No software volume or DSP is applied. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).",
+  "featureInfoBitPerfectDescription": "Bypasses Android AudioFlinger and sends the file's exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr's own UAC2 isochronous sink when the platform exposes no exclusive mixer. Bit-Perfect is reported as verified only while no software volume, DSP stage or HAL effect sits in the path; any software attenuation downgrades the output to exclusive but unverified. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead and is not verified. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).",
   "@featureInfoBitPerfectDescription": {
     "description": "Audio feature info string"
   },
@@ -5377,7 +5377,7 @@
   "@featureInfoBypassDspSubtitle": {
     "description": "Audio feature info string"
   },
-  "featureInfoBypassDspDescription": "When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).",
+  "featureInfoBypassDspDescription": "When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Software volume stays in the player unless the hardware volume of the DAC owns attenuation; any digital attenuation left in the path downgrades the output to exclusive but unverified. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).",
   "@featureInfoBypassDspDescription": {
     "description": "Audio feature info string"
   },

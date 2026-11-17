@@ -40,7 +40,8 @@ class PlayerGestureScope extends StatelessWidget {
 
     return GestureDetector(
       behavior: behavior,
-      onTap: onTap ?? () => context.read<PlayerCubit>().toggleLyricsVisibility(),
+      onTap:
+          onTap ?? () => context.read<PlayerCubit>().toggleLyricsVisibility(),
       onDoubleTap: () {
         final cubit = context.read<PlayerCubit>();
         final song = cubit.state.currentSong;
@@ -60,7 +61,9 @@ class PlayerGestureScope extends StatelessWidget {
         }
       },
       onHorizontalDragEnd: (details) {
-        if (nowPlayingArtworkSwipe != NowPlayingArtworkSwipeAction.nextPrev) return;
+        if (nowPlayingArtworkSwipe != NowPlayingArtworkSwipeAction.nextPrev) {
+          return;
+        }
         final velocity = details.primaryVelocity;
         if (velocity == null) return;
 

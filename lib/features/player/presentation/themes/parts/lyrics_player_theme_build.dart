@@ -6,8 +6,8 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
     final cubit = props.cubit;
     final activeColor = props.activeColor;
     final song = state.currentSong;
-    final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
-        (c) => c.state.visualizerStyle);
+    final visualizerStyle = context
+        .select<SettingsCubit, VisualizerStyle>((c) => c.state.visualizerStyle);
     final showVisualizer = visualizerStyle != VisualizerStyle.off &&
         !state.isLyricsVisible &&
         !state.isQueueVisible &&
@@ -94,19 +94,22 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                               ),
                             ],
                           ),
-                          child: song != null
-                              ? CachedArtwork(
-                                  id: song.id,
-                                  albumId: song.albumId,
-                                  remoteUrl: song.remoteArtworkUrl ??
-                                      song.artworkUri,
-                                  type: ArtworkType.AUDIO,
-                                  size: double.infinity,
-                                  borderRadius:
-                                      resolveCustomRadius(context, 20),
-                                  highQuality: true,
-                                )
-                              : const SizedBox.shrink(),
+                          child: PlayerArtworkSemantics(
+                            song: song,
+                            child: song != null
+                                ? CachedArtwork(
+                                    id: song.id,
+                                    albumId: song.albumId,
+                                    remoteUrl: song.remoteArtworkUrl ??
+                                        song.artworkUri,
+                                    type: ArtworkType.AUDIO,
+                                    size: double.infinity,
+                                    borderRadius:
+                                        resolveCustomRadius(context, 20),
+                                    highQuality: true,
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                         ),
                       ),
                     ),
@@ -116,7 +119,8 @@ extension _LyricsPlayerThemeBuild on LyricsPlayerTheme {
                       constraints: const BoxConstraints(maxWidth: 360),
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.lg, vertical: AppSpacing.xxs),
+                            horizontal: AppSpacing.lg,
+                            vertical: AppSpacing.xxs),
                         child: AudioVisualizer(
                           style: visualizerStyle,
                           color: activeColor,

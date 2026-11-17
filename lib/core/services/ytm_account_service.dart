@@ -34,6 +34,8 @@ import 'package:flutter_inappwebview/flutter_inappwebview.dart'
 import 'ytm_cookie_codec.dart';
 import 'ytm_media_helpers.dart';
 
+part 'ytm_account_service_parsing.dart';
+
 enum SessionValidationResult {
   valid,
   invalid,
@@ -2037,10 +2039,18 @@ class YtmAccountService {
     }
   }
 
+  /// [guestClientsEnabled] false restricts the chain to the clients that accept
+  /// the signed-in session (WEB_REMIX), skipping the guest client sweep. The
+  /// guest sweep duplicates the native extractor request for request and cannot
+  /// decipher a ciphered format, so the player passes `false` when it already
+  /// knows the pass is a guest one and the native chain is running alongside.
+  /// Defaults to true: the age-gate rescue and the alternate-stream search must
+  /// keep walking the full chain.
   Future<YtmStream?> resolvePlayerStream(String videoId,
-      {String quality = 'high'}) async {
+      {String quality = 'high', bool guestClientsEnabled = true}) async {
     try {
-      return await _resolvePlayerStreamInternal(videoId, quality: quality)
+      return await _resolvePlayerStreamInternal(videoId,
+              quality: quality, guestClientsEnabled: guestClientsEnabled)
           .timeout(const Duration(seconds: 50));
     } on TimeoutException {
       debugPrint(
@@ -2050,12 +2060,24 @@ class YtmAccountService {
   }
 
   Future<YtmStream?> _resolvePlayerStreamInternal(String videoId,
-      {String quality = 'high'}) async {
+      {String quality = 'high', bool guestClientsEnabled = true}) async {
     // BotGuard requires a poToken on WEB_REMIX player requests regardless of login.
     // Authenticated → the token must be content-bound to the account's datasyncId, sent WITH
     // the session cookies + SAPISIDHASH. Unauthenticated → a guest token bound to guest visitorData.
     final isAuthenticated =
         isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
+
+    // Without a session and without the guest clients there is no request this
+    // chain can make that the native extractor is not already making better (it
+    // can decipher). Bail before the warm-ups rather than spend them on a dead
+    // chain — this is the guest pass's whole point.
+    final boundDsid = _dataSyncId;
+    if (!guestClientsEnabled &&
+        (!isAuthenticated || boundDsid == null || boundDsid.isEmpty)) {
+      debugPrint('[YTM_ACCOUNT] Guest clients disabled and no account-bound '
+          'session for $videoId — handing off to the native tier.');
+      return null;
+    }
 
     // The session warm-up (a browse round-trip) and the BotGuard warm-up (a
     // local generator spin-up) touch different subsystems, so they are started
@@ -2101,17 +2123,22 @@ class YtmAccountService {
     // behind them.
     String? guestPoToken;
     String? guestVisitorData;
-    final guestState = () async {
-      try {
-        final poState = await getIt<YtmService>()
-            .getPoTokenState()
-            .timeout(const Duration(seconds: 2));
-        guestPoToken = poState?['streamingPoToken'] as String?;
-        guestVisitorData = poState?['visitorData'] as String?;
-      } catch (_) {
-        // Best-effort: failure intentionally ignored on this non-critical path.
-      }
-    }();
+    // Only the guest clients read this pair; with them disabled the whole read
+    // (a 2 s-bounded platform round-trip) is dead weight in front of a request
+    // that will not be made.
+    final guestState = !guestClientsEnabled
+        ? Future<void>.value()
+        : () async {
+            try {
+              final poState = await getIt<YtmService>()
+                  .getPoTokenState()
+                  .timeout(const Duration(seconds: 2));
+              guestPoToken = poState?['streamingPoToken'] as String?;
+              guestVisitorData = poState?['visitorData'] as String?;
+            } catch (_) {
+              // Best-effort: failure intentionally ignored on this non-critical path.
+            }
+          }();
 
     Future<Map<String, dynamic>?>? accountMint;
     // Web-shaped clients send the token as `serviceIntegrityDimensions`, which
@@ -2165,6 +2192,14 @@ class YtmAccountService {
       // cookies. Both the token and the visitorData must be the guest ones,
       // so drop what the account attempt left behind.
       if (!hadAccountPoToken) {
+        // With the guest clients disabled there is nothing to demote *to*: the
+        // session-bearing client needs the token that just failed to mint.
+        if (!guestClientsEnabled) {
+          debugPrint(
+              '[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId and '
+              'guest clients are disabled — handing off to the native tier.');
+          return null;
+        }
         debugPrint(
             '[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
             'running Tier-1 as a guest pass (no session cookies).');
@@ -2175,7 +2210,7 @@ class YtmAccountService {
     }
 
     String? playerPoToken;
-    if (!useSessionAuth) {
+    if (!useSessionAuth && guestClientsEnabled) {
       // The account mint may be what demoted this pass to a guest one, so the
       // content-bound token is only awaited here when it could not be started
       // up front. [_mintPlayerPoToken] never throws.
@@ -2208,9 +2243,16 @@ class YtmAccountService {
             'ANDROID_TESTSUITE',
           ];
 
+    // A guest-restricted pass keeps only the session-bearing client: every
+    // other entry is a request the native extractor is already making, and a
+    // ciphered answer from them cannot be used here anyway.
+    final allowedChain = guestClientsEnabled
+        ? rawChain
+        : rawChain.where((c) => c == 'WEB_REMIX').toList();
+
     final clientChain = [
-      ...rawChain.where((c) => !_isSabrDemoted(c)),
-      ...rawChain.where(_isSabrDemoted),
+      ...allowedChain.where((c) => !_isSabrDemoted(c)),
+      ...allowedChain.where(_isSabrDemoted),
     ];
 
     // Track consecutive IP-level blocks to short-circuit early (like the
@@ -2523,93 +2565,6 @@ class YtmAccountService {
     return null;
   }
 
-  String? _extractUrlFromFormat(Map<String, dynamic> format) {
-    final directUrl = format['url'] as String?;
-    if (directUrl != null && directUrl.isNotEmpty) return directUrl;
-
-    // Ciphered formats require JS deciphering (signatureCipher `s` + `n` param).
-    // Dart has no Rhino engine; returning the raw `url` without `sig=` produces
-    // a 403. Let the native `InnertubeClient` / NewPipe tier (which does
-    // `JsDecipherCache.decipherSignature`) handle it. Returning null forces the
-    // Dart tier to be skipped and the native hedged race to run.
-    final cipher = (format['signatureCipher'] ?? format['cipher']) as String?;
-    if (cipher != null && cipher.isNotEmpty) {
-      debugPrint(
-          '[YTM_ACCOUNT] Skipping ciphered format (itag ${format['itag']}) — needs native decipher');
-      return null;
-    }
-    return null;
-  }
-
-  bool _isUnauthenticatedResponse(Map<String, dynamic> json) {
-    final rc = json['responseContext'];
-    if (rc is Map<String, dynamic>) {
-      final mainApp = rc['mainAppWebResponseContext'];
-      if (mainApp is Map<String, dynamic>) {
-        if (mainApp['loggedOut'] == true) return true;
-        if (mainApp['datasyncId'] != null &&
-            (mainApp['datasyncId'] as String).isNotEmpty) {
-          return false;
-        }
-      }
-    }
-    if (json.containsKey('contents') ||
-        json.containsKey('header') ||
-        json.containsKey('continuationContents') ||
-        json.containsKey('onResponseReceivedActions') ||
-        json.containsKey('frameworkUpdates')) {
-      return false;
-    }
-    final alerts = json['alerts'];
-    if (alerts is List) {
-      for (final a in alerts) {
-        final alertText = a.toString().toLowerCase();
-        if (alertText.contains('sign in') || alertText.contains('login')) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  String? _extractContinuationToken(dynamic node, [int depth = 0]) {
-    // Iterative guard via depth cap: InnerTube payloads are shallow (<30);
-    // anything deeper is malformed — bail instead of stack-overflowing.
-    if (depth > 40) return null;
-    if (node is Map<String, dynamic>) {
-      // Canonical format: nextContinuationData.continuation
-      if (node.containsKey('nextContinuationData')) {
-        return node['nextContinuationData']?['continuation'] as String?;
-      }
-      if (node.containsKey('reloadContinuationData')) {
-        return node['reloadContinuationData']?['continuation'] as String?;
-      }
-      // Newer InnerTube format: continuationEndpoint.continuationCommand.token
-      if (node.containsKey('continuationEndpoint')) {
-        final token = node['continuationEndpoint']?['continuationCommand']
-            ?['token'] as String?;
-        if (token != null && token.isNotEmpty) return token;
-      }
-      if (node.containsKey('continuationCommand')) {
-        return node['continuationCommand']?['token'] as String?;
-      }
-      if (node.containsKey('nextRadioContinuationData')) {
-        return node['nextRadioContinuationData']?['continuation'] as String?;
-      }
-      for (final val in node.values) {
-        final token = _extractContinuationToken(val, depth + 1);
-        if (token != null) return token;
-      }
-    } else if (node is List) {
-      // Cap fan-out to avoid pathological payloads pinning the UI thread.
-      final limit = node.length > 500 ? 500 : node.length;
-      for (var i = 0; i < limit; i++) {
-        final token = _extractContinuationToken(node[i], depth + 1);
-        if (token != null) return token;
-      }
-    }
-    return null;
-  }
 
   /// Searches for a map containing [key] in the InnerTube JSON tree.
   Map<String, dynamic>? _findShelfNode(dynamic node, String key,

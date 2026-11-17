@@ -24,7 +24,7 @@ BitPerfectState _resolve({
   bool sourceLossy = false,
   bool sourceCodecUnconfirmed = false,
   bool rateVerified = true,
-  bool strict = false,
+  bool systemEffectsCompromised = false,
   int sourceSampleRate = 96000,
   int sourceBitDepth = 24,
   int sinkSampleRate = 96000,
@@ -33,7 +33,6 @@ BitPerfectState _resolve({
 }) =>
     resolveBitPerfectState(
       requested: requested,
-      strict: strict,
       sinkActive: sinkActive,
       sourceSampleRate: sourceSampleRate,
       sourceBitDepth: sourceBitDepth,
@@ -42,6 +41,7 @@ BitPerfectState _resolve({
       exclusive: exclusive,
       integerBypass: integerBypass,
       halClean: halClean,
+      systemEffectsCompromised: systemEffectsCompromised,
       unityGain: unityGain,
       softwareGainUnknown: softwareGainUnknown,
       samplesModified: samplesModified,
@@ -103,10 +103,21 @@ void main() {
       expect(state.assessment.verdict, BitPerfectChainVerdict.verified);
     });
 
-    test('strict changes no tier in either direction', () {
-      expect(_resolve(strict: true).tier, BitPerfectTier.active);
-      expect(_resolve(strict: true, unityGain: false).tier,
-          BitPerfectTier.degraded);
+    test('an unprovable OEM effect blocks active and names it', () {
+      final state = _resolve(systemEffectsCompromised: true);
+      expect(state.tier, BitPerfectTier.degraded);
+      expect(state.reasonCode, 'system_effect_active');
+    });
+
+    test('an unprovable OEM effect never changes off or armed', () {
+      expect(
+        _resolve(requested: false, systemEffectsCompromised: true).tier,
+        BitPerfectTier.off,
+      );
+      expect(
+        _resolve(sinkActive: false, systemEffectsCompromised: true).tier,
+        BitPerfectTier.armed,
+      );
     });
   });
 
@@ -114,7 +125,6 @@ void main() {
     test('default capability booleans cannot reach active', () {
       final state = resolveBitPerfectState(
         requested: true,
-        strict: false,
         sinkActive: true,
         sourceSampleRate: 96000,
         sourceBitDepth: 24,

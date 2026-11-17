@@ -22,6 +22,7 @@ import 'themes/theme_registry.dart';
 import 'widgets/canvas_backdrop.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
 class NowPlayingScreen extends StatefulWidget {
   const NowPlayingScreen({super.key});
 
@@ -218,26 +219,26 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                             settingsConfig.playerThemeMode !=
                                 PlayerThemeMode.clean))
                       PositionedDirectional(
-                      top: 0,
-                      start: 0,
-                      end: 0,
-                      height: 88,
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black
-                                    .withValues(alpha: isDark ? 0.28 : 0.08),
-                                Colors.transparent,
-                              ],
+                        top: 0,
+                        start: 0,
+                        end: 0,
+                        height: 88,
+                        child: IgnorePointer(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black
+                                      .withValues(alpha: isDark ? 0.28 : 0.08),
+                                  Colors.transparent,
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
 
                     ResponsivePlayerLayout(
                       state: state,

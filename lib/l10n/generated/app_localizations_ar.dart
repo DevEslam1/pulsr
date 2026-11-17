@@ -5915,11 +5915,11 @@ class AppLocalizationsAr extends AppLocalizations {
       'تلميح سعة مخزن البث بالمللي ثانية. أقل = زمن استجابة أقل (سلكي)، أعلى = مقاومة أكبر للتوقّف';
 
   @override
-  String get settingsAaudioDirect => 'إخراج AAudio مباشر (بت مثالي)';
+  String get settingsAaudioDirect => 'إخراج AAudio مباشر (زمن وصول منخفض)';
 
   @override
   String get settingsAaudioDirectDesc =>
-      'يتجاوز مازج النظام بتدفّق AAudio أصلي يُفتح عند معدّل كل مسار (محاولة EXCLUSIVE، وتراجع SHARED). تتعطّل سلسلة DSP وأدوات السرعة/النغمة في هذا الوضع؛ يُطبَّق على المشغّلات المُنشأة حديثاً';
+      'يتجاوز مازج النظام بتدفّق AAudio أصلي يُفتح عند معدّل كل مسار (محاولة EXCLUSIVE، وتراجع SHARED). تتعطّل سلسلة DSP وأدوات السرعة/النغمة في هذا الوضع؛ يُطبَّق على المشغّلات المُنشأة حديثاً. لا يُبلَّغ عن هذا المسار كـ Bit-Perfect مُتحقَّق منه، لأنه لا يستطيع إثبات وصول بايتات المصدر إلى DAC دون تغيير';
 
   @override
   String get dspAboutBassBoost => 'حول تعزيز الجهير';
@@ -7812,7 +7812,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get featureInfoBitPerfectDescription =>
-      'يتجاوز AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC USB عبر AudioMixerAttributes (API 34)، أو عبر مستقبل UAC2 المتزامن الخاص بـ Pulsr عندما لا توفر المنصة مازجًا حصريًا. لا يُطبَّق أي مستوى صوت أو DSP برمجي. لا يوفر أندرويد إخراج Bit-Perfect حصريًا لمقبس 3.5 مم / وحدة الترميز الداخلية — إذ يستخدم هذا المسار AAudio Direct ومسار DSP العائم 24/32 بت بدلًا من ذلك. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).';
+      'يتجاوز AudioFlinger في أندرويد ويرسل عينات الملف الدقيقة (مثل 96 kHz / 24 بت) مباشرة إلى DAC USB عبر AudioMixerAttributes (API 34)، أو عبر مستقبل UAC2 المتزامن الخاص بـ Pulsr عندما لا توفر المنصة مازجًا حصريًا. لا يُبلَّغ عن Bit-Perfect كمُتحقَّق منه إلا حين لا يوجد في المسار أي مستوى صوت برمجي أو مرحلة DSP أو مؤثر HAL؛ وأي تخفيت برمجي يهبط بالخرج إلى حصري غير مُتحقَّق منه. لا يوفر أندرويد إخراج Bit-Perfect حصريًا لمقبس 3.5 مم / وحدة الترميز الداخلية — إذ يستخدم هذا المسار AAudio Direct ومسار DSP العائم 24/32 بت بدلًا من ذلك، ولا يُعدّ مُتحقَّقًا منه. البلوتوث ليس Bit-Perfect أبدًا (تحويل SBC/AAC/LDAC).';
 
   @override
   String get featureInfoBypassDspTitle => 'تجاوز DSP في وضع Bit-Perfect';
@@ -7822,7 +7822,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get featureInfoBypassDspDescription =>
-      'عند التفعيل، يؤدي الدخول إلى Bit-Perfect إلى تعطيل EQ وVirtualizer وDynamics وCrossfeed وLimiter وReverb وموازن الستيريو ومُعيد أخذ العينات Sinc فورًا (القناع الأصلي = 0). يُقفل مستوى الصوت على DAC العتادي. أوقفه إذا أردت EQ + Bit-Perfect (ليس Bit-Perfect حقيقيًا، لكن بعض أجهزة DAC تتحمله).';
+      'عند التفعيل، يؤدي الدخول إلى Bit-Perfect إلى تعطيل EQ وVirtualizer وDynamics وCrossfeed وLimiter وReverb وموازن الستيريو ومُعيد أخذ العينات Sinc فورًا (القناع الأصلي = 0). يبقى التحكم بالصوت البرمجي في المشغّل ما لم يملك التحكم الصوتي العتادي في DAC مسؤولية التوهين؛ وأي توهين رقمي يجعل الخرج حصريًا لكن غير مُتحقَّق منه. أوقفه إذا أردت EQ + Bit-Perfect (ليس Bit-Perfect حقيقيًا، لكن بعض أجهزة DAC تتحمله).';
 
   @override
   String get featureInfoFollowTrackSampleRateTitle =>

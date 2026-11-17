@@ -52,6 +52,8 @@ import '../widgets/speed_picker_sheet.dart';
 import 'player_theme.dart';
 import 'player_theme_scaffold.dart' show PlayerThemeMetrics;
 
+export 'player_artwork_semantics.dart';
+
 /// Readable foreground for a badge painted with an arbitrary (possibly
 /// artwork-derived) accent, instead of assuming every accent is dark.
 Color _readableOn(Color background) =>
@@ -242,9 +244,8 @@ class PlayerSwitcherItem extends StatelessWidget {
                     curve: context.motionCurve(Curves.easeOutCubic),
                     style: TextStyle(
                       fontFamily: 'Manrope',
-                      fontSize: isTablet
-                          ? AppFontSize.bodySmall
-                          : AppFontSize.label,
+                      fontSize:
+                          isTablet ? AppFontSize.bodySmall : AppFontSize.label,
                       fontWeight:
                           isSelected ? FontWeight.w800 : FontWeight.w600,
                       color: isSelected ? p.textPrimary : p.textSecondary,
@@ -1387,8 +1388,12 @@ class PlayerTrackHeader extends StatelessWidget {
     final state = props.state;
     final song = state.currentSong;
     final isFav = song?.isFavorite == true;
-    final resolvedTitle = titleColor ?? p.textPrimary;
-    final resolvedSubtitle = subtitleColor ?? p.textSecondary;
+    // Every theme shares one readable hierarchy: a white title and a neutral
+    // grey artist on dark backdrops, palette text colours on light ones.
+    final resolvedTitle =
+        titleColor ?? (p.isDark ? Colors.white : p.textPrimary);
+    final resolvedSubtitle =
+        subtitleColor ?? (p.isDark ? Colors.white70 : p.textSecondary);
     final hasDownload = song != null &&
         (song.source == SongSource.youtube ||
             (song.remoteId != null && song.remoteId!.isNotEmpty));

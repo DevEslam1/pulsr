@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
+import 'package:pulsr/domain/models/ytm_track.dart';
 
 const _pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
 
@@ -161,6 +162,99 @@ void main() {
       file.writeAsStringSync('{not valid json');
       await corruptCache.restore();
       expect(corruptCache.length, 0);
+    });
+  });
+
+  group('YtmUrlCache — verification stamps', () {
+    late FakeClock clock;
+    late YtmUrlCache cache;
+
+    setUp(() {
+      clock = FakeClock(DateTime.fromMillisecondsSinceEpoch(1000000000));
+      cache = YtmUrlCache.withClock(clock,
+          capacity: 8, ttl: const Duration(hours: 4));
+    });
+
+    test('a fresh put() is unverified until markVerified', () {
+      cache.put('vid1', 'https://x/a');
+      expect(cache.get('vid1')!.isVerified, isFalse);
+      expect(cache.isVerified('vid1'), isFalse);
+
+      cache.markVerified('vid1');
+      expect(cache.get('vid1')!.isVerified, isTrue);
+      expect(cache.isVerified('vid1'), isTrue);
+    });
+
+    test('put(verifiedAt:) records the stamp directly', () {
+      final at = clock.now().subtract(const Duration(seconds: 20));
+      cache.put('vid1', 'https://x/a', verifiedAt: at);
+
+      expect(cache.get('vid1')!.verifiedAt, at);
+      expect(cache.isVerified('vid1'), isTrue);
+    });
+
+    test('a stamp staler than maxAge no longer counts as verified', () {
+      cache.put('vid1', 'https://x/a');
+      cache.markVerified('vid1');
+
+      clock.advance(const Duration(seconds: 91));
+      expect(cache.isVerified('vid1'), isFalse);
+      expect(cache.isVerified('vid1', maxAge: const Duration(minutes: 5)),
+          isTrue,
+          reason: "the stamp is still there; only the caller's window moved");
+    });
+
+    test('isVerified is false for missing, expired and other-quality slots',
+        () {
+      expect(cache.isVerified('missing'), isFalse);
+
+      cache.put('vid1', 'https://x/a', quality: 'low');
+      cache.markVerified('vid1', quality: 'low');
+      expect(cache.isVerified('vid1'), isFalse,
+          reason: 'the high slot was never written');
+      expect(cache.isVerified('vid1', quality: 'low'), isTrue);
+
+      clock.advance(const Duration(hours: 5));
+      expect(cache.isVerified('vid1', quality: 'low'), isFalse);
+    });
+
+    test('markVerified is a no-op for a key the cache does not hold', () {
+      cache.markVerified('ghost');
+
+      expect(cache.contains('ghost'), isFalse);
+      expect(cache.length, 0);
+    });
+
+    test('verification survives a re-store of the same URL only', () {
+      cache.put('vid1', 'https://x/a');
+      cache.markVerified('vid1');
+
+      cache.put('vid1', 'https://x/a', userAgent: 'UA');
+      expect(cache.isVerified('vid1'), isTrue,
+          reason: 'same URL and signature, so the probe result still holds');
+
+      cache.put('vid1', 'https://x/b');
+      expect(cache.isVerified('vid1'), isFalse,
+          reason: 'a different URL carries a different signature');
+    });
+
+    test('putStream never stores a verified entry', () {
+      cache.put('vid1', 'https://x/a', verifiedAt: clock.now());
+      expect(cache.isVerified('vid1'), isTrue);
+
+      cache.putStream(YtmStream(
+        videoId: 'vid1',
+        url: 'https://x/a',
+        mimeType: 'audio/mp4',
+        container: 'm4a',
+        bitrateKbps: 128,
+        duration: const Duration(minutes: 3),
+        title: 'T',
+        artist: 'A',
+      ));
+
+      expect(cache.isVerified('vid1'), isFalse,
+          reason: 'the resolver only ever hands over a freshly minted URL');
     });
   });
 }

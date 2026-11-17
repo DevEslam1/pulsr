@@ -280,7 +280,9 @@ class _CassetteBody extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(8),
                 ),
-                border: Border.all(color: PlayerMaterialColors.cassetteBridgeBorder, width: 1.5),
+                border: Border.all(
+                    color: PlayerMaterialColors.cassetteBridgeBorder,
+                    width: 1.5),
               ),
               child: Center(
                 child: Container(
@@ -383,8 +385,8 @@ class _CassetteBody extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: PlayerMaterialColors.cassetteReelHub,
-                    border:
-                        Border.all(color: PlayerMaterialColors.cassetteReelRim, width: 3),
+                    border: Border.all(
+                        color: PlayerMaterialColors.cassetteReelRim, width: 3),
                     boxShadow: const [
                       BoxShadow(
                         color: Colors.black45,
@@ -423,7 +425,8 @@ class _CassetteBody extends StatelessWidget {
       decoration: BoxDecoration(
         color: PlayerMaterialColors.cassetteBodyTop,
         borderRadius: AppRadii.r8All,
-        border: Border.all(color: PlayerMaterialColors.cassetteCapstanBorder, width: 1),
+        border: Border.all(
+            color: PlayerMaterialColors.cassetteCapstanBorder, width: 1),
       ),
       child: Row(
         children: [
@@ -501,7 +504,8 @@ class _CassetteTapeCounter extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.black,
         borderRadius: AppRadii.r4All,
-        border: Border.all(color: PlayerMaterialColors.cassetteHeadBorder, width: 1.2),
+        border: Border.all(
+            color: PlayerMaterialColors.cassetteHeadBorder, width: 1.2),
         boxShadow: const [
           BoxShadow(
             color: Colors.black87,

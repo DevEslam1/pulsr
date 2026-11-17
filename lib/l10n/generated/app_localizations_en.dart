@@ -5964,11 +5964,11 @@ class AppLocalizationsEn extends AppLocalizations {
       'Stream buffer capacity hint in milliseconds. Lower = lower latency (wired), higher = more stall resistance';
 
   @override
-  String get settingsAaudioDirect => 'AAudio Direct Output (Bit-Perfect)';
+  String get settingsAaudioDirect => 'AAudio Direct Output (Low-Latency)';
 
   @override
   String get settingsAaudioDirectDesc =>
-      'Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players';
+      'Bypasses the system mixer with a native AAudio stream opened at each track rate (EXCLUSIVE attempt, SHARED fallback). The DSP chain and speed/pitch controls are inactive in this mode; applies to newly built players. This path is not reported as verified Bit-Perfect: it cannot prove the DAC received the source bytes unchanged';
 
   @override
   String get dspAboutBassBoost => 'About Bass Boost';
@@ -7863,7 +7863,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureInfoBitPerfectDescription =>
-      'Bypasses Android AudioFlinger and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr\'s own UAC2 isochronous sink when the platform exposes no exclusive mixer. No software volume or DSP is applied. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).';
+      'Bypasses Android AudioFlinger and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the USB DAC via AudioMixerAttributes (API 34), or through Pulsr\'s own UAC2 isochronous sink when the platform exposes no exclusive mixer. Bit-Perfect is reported as verified only while no software volume, DSP stage or HAL effect sits in the path; any software attenuation downgrades the output to exclusive but unverified. Android exposes no exclusive bit-perfect output for the 3.5 mm / internal codec — that route uses the AAudio Direct and 24/32-bit float DSP paths instead and is not verified. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).';
 
   @override
   String get featureInfoBypassDspTitle => 'Bypass DSP in Bit-Perfect Mode';
@@ -7873,7 +7873,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get featureInfoBypassDspDescription =>
-      'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).';
+      'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Software volume stays in the player unless the hardware volume of the DAC owns attenuation; any digital attenuation left in the path downgrades the output to exclusive but unverified. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).';
 
   @override
   String get featureInfoFollowTrackSampleRateTitle =>

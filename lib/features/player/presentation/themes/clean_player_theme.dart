@@ -202,16 +202,18 @@ class CleanPlayerTheme extends StatelessWidget {
                     alignment: artAlignment,
                   );
 
-                  final Widget artworkChild =
-                      (canvasEnabled && !canvasAsBackdrop && song != null)
-                          ? CanvasBackdrop(
-                              song: song,
-                              isPlaying: state.isPlaying,
-                              isBackdropMode: false,
-                              borderRadius: BorderRadius.zero,
-                              fallbackArtwork: fallbackArt,
-                            )
-                          : fallbackArt;
+                  final Widget artworkChild = PlayerArtworkSemantics(
+                    song: song,
+                    child: (canvasEnabled && !canvasAsBackdrop && song != null)
+                        ? CanvasBackdrop(
+                            song: song,
+                            isPlaying: state.isPlaying,
+                            isBackdropMode: false,
+                            borderRadius: BorderRadius.zero,
+                            fallbackArtwork: fallbackArt,
+                          )
+                        : fallbackArt,
+                  );
 
                   final Widget heroArt = RepaintBoundary(
                     child: Hero(
@@ -827,12 +829,39 @@ class _CleanSeekBarState extends State<_CleanSeekBar> {
       );
     }
 
+    Duration clampSeek(Duration delta) {
+      final target = currentDuration + delta;
+      if (target < Duration.zero) return Duration.zero;
+      if (target > widget.duration) return widget.duration;
+      return target;
+    }
+
+    String seekLabelFor(Duration value) =>
+        '${Formatters.formatDuration(value)} / '
+        '${Formatters.formatDuration(widget.duration)}';
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: widget.horizontalPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          sliderWidget,
+          // PulsrSlider publishes a percentage node of its own; replace it with
+          // an elapsed/total time node so TalkBack and VoiceOver read progress.
+          Semantics(
+            slider: true,
+            label: context.l10n.seekLabel,
+            value: seekLabelFor(currentDuration),
+            increasedValue:
+                seekLabelFor(clampSeek(const Duration(seconds: 10))),
+            decreasedValue:
+                seekLabelFor(clampSeek(const Duration(seconds: -10))),
+            onIncrease: () =>
+                widget.props.cubit.seek(clampSeek(const Duration(seconds: 10))),
+            onDecrease: () => widget.props.cubit
+                .seek(clampSeek(const Duration(seconds: -10))),
+            excludeSemantics: true,
+            child: sliderWidget,
+          ),
           const SizedBox(height: 3),
           // Row with: 0:46 (left), Lossless badge pill (center), -1:30 (right)
           Row(

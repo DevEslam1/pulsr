@@ -1674,6 +1674,17 @@ mixin PulsrAudioQueueEngine on BaseAudioHandler, PulsrAudioStreaming {
     // failure can bail without touching current playback at all.
     final generation = ++_playGeneration;
     final song = _songs[index];
+    // The tapped track is what the user is waiting on. Mark it foreground and
+    // drop queued background warming for other tracks before submitting: a
+    // resolution chain cannot be cancelled once started, so the lookahead must
+    // never be allowed to start chains that compete with this load.
+    final tappedVideoId = song.remoteId;
+    if (song.source == SongSource.youtube &&
+        song.isDownloaded != true &&
+        tappedVideoId != null &&
+        tappedVideoId.isNotEmpty) {
+      _streamPreResolver.prioritize(tappedVideoId);
+    }
     _streamPreResolver.onTrackEnqueuedOrTapped(song);
 
     // Soft-landing fade so pause/stop doesn't click, then ensure the previous

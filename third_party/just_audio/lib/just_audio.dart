@@ -1444,7 +1444,12 @@ class AudioPlayer {
       if (accepted) _tapSrcTargetRate = clamped;
       return accepted;
     } catch (e) {
-      // Not the Pulsr Android fork (web/iOS/macOS/windows).
+      // Not the Pulsr Android fork (web/iOS/macOS/windows), or the native
+      // player was disposed while this call was in flight (its method handler
+      // is gone but the channel id still resolves). Remember the target either
+      // way so the next platform activation replays it instead of silently
+      // leaving AudioFlinger to resample the finished DSP chain.
+      _tapSrcTargetRate = clamped;
       if (kDebugMode) {
         debugPrint('dspSetTapSrcRate failed: $e');
       }

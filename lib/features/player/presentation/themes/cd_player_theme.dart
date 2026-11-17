@@ -102,15 +102,17 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
       } else if (_rotationController.isAnimating) {
         _velocityController
             .animateTo(
-              0.0,
-              duration: context.motionMs(650),
-              curve: Curves.decelerate,
-            )
+          0.0,
+          duration: context.motionMs(650),
+          curve: Curves.decelerate,
+        )
             .whenComplete(() {
-              if (mounted && !widget.props.state.isPlaying && _velocityController.value == 0.0) {
-                _rotationController.stop();
-              }
-            });
+          if (mounted &&
+              !widget.props.state.isPlaying &&
+              _velocityController.value == 0.0) {
+            _rotationController.stop();
+          }
+        });
       }
     }
   }

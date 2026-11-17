@@ -15,6 +15,7 @@ import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import 'adaptive_buffer_engine.dart';
+import '../../core/services/stream_url_verifier.dart';
 import '../../core/services/ytm_cache_manager.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
@@ -25,6 +26,9 @@ import '../../domain/models/ytm_track.dart';
 ///
 /// Hardened with:
 /// - In-memory LRU stream URL cache ([YtmUrlCache]) for instantaneous cache hits (<300ms)
+/// - One reachability probe ([StreamUrlVerifier]) before a cached URL is trusted,
+///   so a dead signature costs a single round trip instead of the multi-second
+///   re-resolve it would otherwise trigger on the first byte
 /// - Parsing of the `expire` stamp (proactive re-resolve when < 300s remaining)
 /// - A single retry on a byte error, whose remedy depends on *why* the read
 ///   failed: a burned URL is re-resolved, a dropped connection is retried
@@ -51,6 +55,11 @@ class YtmResolvingSource extends StreamAudioSource {
   final void Function(Object error)? onError;
 
   /// Optional explicit URL cache instance (used in tests).
+  ///
+  /// Supplying one disables cached-URL probing entirely: every host test builds
+  /// the source this way, a probe would reach the network, and the pre-probe
+  /// behaviour is what those tests pin. Production leaves this null and resolves
+  /// the registered singleton.
   final YtmUrlCache? urlCache;
 
   /// Retries on HTTP 5xx errors with exponential backoff (1s, 2s) up to
@@ -128,6 +137,13 @@ class YtmResolvingSource extends StreamAudioSource {
   YtmUrlCache? get _effectiveUrlCache =>
       urlCache ??
       (getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null);
+
+  /// Whether a cached URL may be probed before it is handed to the byte cache.
+  ///
+  /// Off on both test seams — an explicitly supplied [urlCache], and
+  /// [debugInnerFactory] — so host tests keep the pre-probe behaviour and never
+  /// reach the network.
+  bool get _probingEnabled => urlCache == null && debugInnerFactory == null;
 
   PlaybackLatencyTracker? get _latency =>
       getIt.isRegistered<PlaybackLatencyTracker>()
@@ -354,7 +370,7 @@ class YtmResolvingSource extends StreamAudioSource {
 
     // A refresh armed by a burned URL or a near-expiry check must survive the
     // hop through `_ensureInner`, which calls this with no argument.
-    final skipCache = forceRefresh || _forceNextRefresh;
+    var skipCache = forceRefresh || _forceNextRefresh;
     _forceNextRefresh = false;
 
     // Check Task 2 in-memory URL cache first when not force refreshing.
@@ -362,16 +378,70 @@ class YtmResolvingSource extends StreamAudioSource {
     // re-checking here with `DateTime.now()` only added a second, disagreeing
     // opinion about what "now" is.
     if (!skipCache) {
-      final cachedEntry = _effectiveUrlCache?.get(videoId, quality: quality);
-      if (cachedEntry != null) {
-        url = cachedEntry.url;
-        effectiveUa = cachedEntry.userAgent ?? effectiveUa;
-        effectiveCookies = cachedEntry.cookies ?? effectiveCookies;
-        _resolvedExpiresAt = cachedEntry.expiresAt;
-        try {
-          // Cache hit skips pluginEntered and marks urlObtained directly
-          _latency?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {}
+      final urlCache = _effectiveUrlCache;
+      final cachedEntry = urlCache?.get(videoId, quality: quality);
+      if (cachedEntry != null && urlCache != null) {
+        final cachedUrl = cachedEntry.url;
+        final cachedUa = cachedEntry.userAgent ?? effectiveUa;
+        final cachedCookies = cachedEntry.cookies ?? effectiveCookies;
+        var usable = true;
+
+        // A URL can sit inside the cache's TTL long after the CDN stopped
+        // honouring its signature: restored from disk, minted for another
+        // egress, or simply past `expire`. The byte request is the only thing
+        // that finds out today, and it costs the whole re-resolve plus the
+        // silence before it. One two-byte GET answers the question instead.
+        // A completed byte-cache file is read straight off disk by
+        // `request()`, which never consults the URL: probing in front of it
+        // would add a round trip (two seconds offline) to a replay that needs
+        // no network at all.
+        if (_probingEnabled &&
+            !urlCache.isVerified(videoId, quality: quality) &&
+            !await _hasCompleteByteCache()) {
+          // Same header set as the playback request, from the same helper: a
+          // probe that asks as somebody else answers a question nobody asked.
+          final headers = _playbackHeaders(cachedUrl,
+              ua: cachedUa, cookieJar: cachedCookies);
+          final verdict = await StreamUrlVerifier().probe(
+            cachedUrl,
+            userAgent: headers['User-Agent'],
+            referer: headers['Referer'],
+            cookie: headers['Cookie'],
+          );
+          if (verdict.isRejected) {
+            debugPrint(
+                '[YtmResolvingSource] Cached URL rejected (${verdict.statusCode}) for $videoId — '
+                'ageMs=${DateTime.now().difference(cachedEntry.fetchedAt).inMilliseconds} '
+                'mintUa=${cachedEntry.userAgent ?? 'none'} '
+                'host=${_hostOf(cachedUrl)} '
+                'hasPot=${_urlHasParam(cachedUrl, _potParams)} '
+                'hasSig=${_urlHasParam(cachedUrl, _sigParams)}');
+            _discardInner(invalidateUrl: true);
+            // `_discardInner` armed the latch for the *next* request, but this
+            // call already re-resolves through `skipCache` below: leaving it
+            // set would make one rejection cost two resolves.
+            _forceNextRefresh = false;
+            skipCache = true;
+            _resolvedExpiresAt = null;
+            usable = false;
+          } else if (verdict.isOk) {
+            // A working URL must never be probed twice inside the window.
+            urlCache.markVerified(videoId, quality: quality);
+          }
+          // An unknown verdict (timeout, DNS blip, 5xx) keeps the URL as-is: a
+          // flaky probe must never cost the user a paid re-resolve.
+        }
+
+        if (usable) {
+          url = cachedUrl;
+          effectiveUa = cachedUa;
+          effectiveCookies = cachedCookies;
+          _resolvedExpiresAt = cachedEntry.expiresAt;
+          try {
+            // Cache hit skips pluginEntered and marks urlObtained directly
+            _latency?.markStage(PlaybackStage.urlObtained);
+          } catch (_) {}
+        }
       }
     }
 
@@ -409,31 +479,8 @@ class YtmResolvingSource extends StreamAudioSource {
 
     final resolvedUrl = url;
     final cacheFile = await _cacheFileFor(videoId, resolvedUrl, quality);
-    final isNativeClient = effectiveUa != null &&
-        (effectiveUa.contains('com.google.android') ||
-            effectiveUa.contains('com.google.ios') ||
-            (effectiveUa.contains('Android') &&
-                !effectiveUa.contains('Mozilla')));
-
-    final headers = <String, String>{
-      if (effectiveUa != null && effectiveUa.isNotEmpty)
-        'User-Agent': effectiveUa
-      else
-        'User-Agent': EmbeddedBrowserUa.desktop,
-      // The account cookie jar is scoped to youtube.com; a browser never sends
-      // it to the media CDN, which authenticates the request from the signature
-      // in the URL instead. Attaching it here leaked the live Google session
-      // (SAPISID/SID/HSID) to every googlevideo edge node and made the fetch
-      // look unlike the web player it claims to be.
-      if (effectiveCookies != null &&
-          effectiveCookies.isNotEmpty &&
-          _cookiesBelongOn(resolvedUrl))
-        'Cookie': effectiveCookies,
-      // Native clients (e.g. ANDROID_VR, IOS_MUSIC) stream from googlevideo CDN
-      // without a web Referer. Sending 'https://music.youtube.com/' with a native
-      // app User-Agent flags the request as spoofed to CDN edge nodes and causes HTTP 403.
-      if (!isNativeClient) 'Referer': 'https://music.youtube.com/',
-    };
+    final headers =
+        _playbackHeaders(resolvedUrl, ua: effectiveUa, cookieJar: effectiveCookies);
 
     // Serialize per cache path so two sources for the same videoId never
     // initialize or write the same cache file simultaneously.
@@ -495,6 +542,15 @@ class YtmResolvingSource extends StreamAudioSource {
   Future<StreamAudioResponse> _requestOnce(
       LockCachingAudioSource inner, int? start, int? end) async {
     final res = await inner.request(start, end);
+    // A first byte that actually arrived is the strongest proof the whole
+    // chain works: remember it so the next playback of this URL inside the
+    // verification window skips the probe instead of re-measuring what just
+    // worked. The read first keeps a seek-heavy playback from re-stamping the
+    // entry on every range request.
+    final urlCache = _effectiveUrlCache;
+    if (urlCache != null && !urlCache.isVerified(videoId, quality: quality)) {
+      urlCache.markVerified(videoId, quality: quality);
+    }
     try {
       _latency?.markStage(PlaybackStage.firstBytesReady);
     } catch (_) {}
@@ -540,6 +596,102 @@ class YtmResolvingSource extends StreamAudioSource {
         }
       }
     }
+  }
+
+  /// Test seam replacing the byte-cache probe guard.
+  ///
+  /// The guard keeps the probe off a replay that a completed cache file serves
+  /// from disk. A host test needs the probe path while still seeding a cache
+  /// file — the only way to keep the byte request local — so it pins the
+  /// guard's answer instead of reproducing the on-disk layout.
+  @visibleForTesting
+  static Future<bool> Function(String videoId)?
+      debugCompleteByteCacheOverride;
+
+  /// Whether a completed byte-cache file already exists for this track.
+  ///
+  /// Consulted only to decide whether a cached URL is worth probing: a
+  /// complete file means the byte cache answers from disk, so the URL is never
+  /// read and a probe would be pure cost. A `.part` file deliberately does not
+  /// count — that download restarts from byte zero, so the URL still has to
+  /// work.
+  Future<bool> _hasCompleteByteCache() async {
+    final override = debugCompleteByteCacheOverride;
+    if (override != null) return override(videoId);
+    try {
+      final dir = await _cacheManager.getCacheDirectory();
+      final hash = _cacheManager.getHashForVideoId(videoId);
+      for (final name in YtmCacheManager.allCacheFileNames(hash)) {
+        if (File(p.join(dir.path, name)).existsSync()) return true;
+      }
+    } catch (_) {
+      // An unreadable cache directory means "unknown": probe.
+    }
+    return false;
+  }
+
+  /// Request headers for the one request that matters: the byte GET.
+  ///
+  /// Single source of truth for playback and for the pre-flight probe. A probe
+  /// that sent a different User-Agent, Referer or Cookie would answer a
+  /// question about a request nobody makes.
+  Map<String, String> _playbackHeaders(String url,
+      {String? ua, String? cookieJar}) {
+    final isNativeClient = ua != null &&
+        (ua.contains('com.google.android') ||
+            ua.contains('com.google.ios') ||
+            (ua.contains('Android') && !ua.contains('Mozilla')));
+
+    return <String, String>{
+      if (ua != null && ua.isNotEmpty)
+        'User-Agent': ua
+      else
+        'User-Agent': EmbeddedBrowserUa.desktop,
+      // The account cookie jar is scoped to youtube.com; a browser never sends
+      // it to the media CDN, which authenticates the request from the signature
+      // in the URL instead. Attaching it here leaked the live Google session
+      // (SAPISID/SID/HSID) to every googlevideo edge node and made the fetch
+      // look unlike the web player it claims to be.
+      if (cookieJar != null &&
+          cookieJar.isNotEmpty &&
+          _cookiesBelongOn(url))
+        'Cookie': cookieJar,
+      // Native clients (e.g. ANDROID_VR, IOS_MUSIC) stream from googlevideo CDN
+      // without a web Referer. Sending 'https://music.youtube.com/' with a native
+      // app User-Agent flags the request as spoofed to CDN edge nodes and causes HTTP 403.
+      if (!isNativeClient) 'Referer': 'https://music.youtube.com/',
+    };
+  }
+
+  /// Host of [url], or `unknown` when it will not parse.
+  static String _hostOf(String url) {
+    try {
+      return Uri.parse(url).host;
+    } catch (_) {
+      return 'unknown';
+    }
+  }
+
+  /// poToken query parameters a resolved URL may carry.
+  static const Set<String> _potParams = {'pot', 'potoken', 'po_token'};
+
+  /// Signature query parameters a resolved URL may carry.
+  static const Set<String> _sigParams = {'sig', 'signature', 'lsig'};
+
+  /// Whether [url]'s query carries any of [names].
+  ///
+  /// Used only by the rejection diagnostic: the difference between a URL with
+  /// a signature and one without is usually the difference between a 403 the
+  /// resolver can fix and one it cannot.
+  static bool _urlHasParam(String url, Set<String> names) {
+    try {
+      for (final key in Uri.parse(url).queryParameters.keys) {
+        if (names.contains(key.toLowerCase())) return true;
+      }
+    } on FormatException {
+      return false;
+    }
+    return false;
   }
 
   /// Whether the YouTube cookie jar may be sent to [url]'s host.

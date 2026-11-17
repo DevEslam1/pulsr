@@ -44,11 +44,17 @@ void main() {
       // the current size so they can only shrink; extract a collaborator and
       // lower the cap, never raise it. (Re-pinned after the null-safety fix in
       // ytm_account_service and the bounded-failure-map guard in ytm_service.)
-      'lib/core/services/ytm_account_service.dart': 134883,
+      // -3536B: InnerTube payload helpers (format URL selection,
+      // unauthenticated-response detection, continuation traversal) moved to
+      // the ytm_account_service_parsing part.
+      'lib/core/services/ytm_account_service.dart': 133105,
       'lib/core/services/yt_download_service.dart': 75731,
       // -8296B: substitute-upload recovery and the recording-identity checks
       // moved to the ytm_service_alternates part.
-      'lib/core/services/ytm_service.dart': 74257,
+      // -6857B: the pure-Dart InnerTube stream resolver moved to the
+      // ytm_service_dart_resolve part (and -2139B of guest-pass tier
+      // scheduling).
+      'lib/core/services/ytm_service.dart': 67400,
       'lib/features/playlists/presentation/playlists_screen.dart': 82750,
       // Full coverage tranche (current sizes).
       'lib/features/player/presentation/widgets/eq_sheet_shell.dart': 164882,

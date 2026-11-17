@@ -382,8 +382,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // unverified and must be scored compromised, not clean.
         // Unknown is not clean: a missing controller cannot prove the vendor
         // chain is bypassed, so it scores compromised like UNSUPPORTED_DEVICE.
-        bitPerfectSystemEffectsActive = bypass &&
+        val compromised = bypass &&
             status != SystemAudioEffectsController.Status.BYPASSED
+        bitPerfectSystemEffectsActive = compromised
+        // Mirrored to HiResDacPlugin's output-info map: the vendor chain sits
+        // outside every app-owned control, so this flag is the only way the
+        // Dart bit-perfect verdict can see it at all.
+        liveSystemEffectsCompromised = compromised
     }
 
     /** Number of app-owned HAL effects actually enabled right now, read from
@@ -1245,6 +1250,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         /** Live count of enabled app-owned HAL stages, mirrored for
          * HiResDacPlugin so the Dart verdict can observe it. */
         @Volatile internal var liveHalStagesActive: Int = 0
+            private set
+
+        /** Vendor/OEM effect verdict, mirrored for HiResDacPlugin so the Dart
+         * verdict can observe a chain the app does not own. True only while a
+         * bypass was requested and the system chain could not prove BYPASSED. */
+        @Volatile internal var liveSystemEffectsCompromised: Boolean = false
             private set
 
         // Must match kCustodyHeaderBytes in eq_jni_bridge.cpp.

@@ -22,6 +22,7 @@ import '../../../queue/presentation/widgets/queue_slot_switcher.dart';
 import '../themes/player_theme.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 class NowPlayingQueueView extends StatefulWidget {
   const NowPlayingQueueView({super.key});
 
@@ -400,7 +401,8 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
                                 ],
                               ),
                               onTap: () {
-                                cubit.playSong(song, queue: queue, queueIndex: index);
+                                cubit.playSong(song,
+                                    queue: queue, queueIndex: index);
                               },
                               onLongPress: () =>
                                   _showRowActions(context, cubit, song),

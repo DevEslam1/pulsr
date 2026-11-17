@@ -30,6 +30,7 @@ import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import 'eq_curve_visualizer.dart';
+import 'eq_sheet_math.dart';
 import 'autoeq_search_sheet.dart';
 import 'compressor_limiter_sheet.dart';
 import 'dsp_inspector_sheet.dart';

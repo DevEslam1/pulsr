@@ -2,58 +2,56 @@
 //
 // P1-2.8: the live signal chain's software-gain gate.
 //
-// `effectiveSoftwareGain` is the only evidence that the player volume stage
-// sits at unity. NaN compares false against every bound, so the old
-// `gain < 1.0` attenuation test read a broken reading as "not attenuated" and
-// let a would-be verified chain through. A reading that cannot be a real
+// The verdict is no longer folded here or in the sheet: every surface builds
+// `BitPerfectOutputFacts` and asks `resolveBitPerfectOutput`. This test pins
+// the gain contract on that assembler. `effectiveSoftwareGain` is the only
+// evidence that the player volume stage sits at unity; NaN compares false
+// against every bound, which is how a naive `gain < 1.0` attenuation test once
+// read a broken reading as "not attenuated". A reading that cannot be a real
 // volume multiplier is unknown, and unknown is never unity.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/audio/bit_perfect_chain.dart';
-import 'package:pulsr/features/player/presentation/widgets/audio_quality_live_chain.dart';
+import 'package:pulsr/domain/models/bit_perfect_output_facts.dart';
+import 'package:pulsr/domain/models/bit_perfect_state.dart';
 
 void main() {
-  /// A chain whose format facts agree end to end, so the gain reading is the
+  /// Direct-USB raw facts: Pulsr's own sink owns the endpoint and reported a
+  /// 24-bit raw block at the source's own 96 kHz, so the gain reading is the
   /// only thing that can change the verdict.
-  BitPerfectChainAssessment assess(
+  BitPerfectState resolve(
     double? gain, {
     bool directUsbActive = true,
-    int rawPcmBitDepth = 24,
-    int outputSampleRate = 96000,
+    int directRawPcmBitDepth = 24,
+    int directStreamSampleRate = 96000,
   }) {
-    return buildLiveChainAssessment(
+    return resolveBitPerfectOutput(BitPerfectOutputFacts(
       requested: true,
-      active: true,
+      sinkActive: true,
+      directUsbActive: directUsbActive,
       sourceSampleRate: 96000,
       sourceBitDepth: 24,
-      outputSampleRate: outputSampleRate,
-      outputBitDepth: 24,
-      isDsdDop: false,
-      transportSamplesModified: false,
-      dspProcessing: false,
-      directUsbActive: directUsbActive,
-      rawPcmBitDepth: rawPcmBitDepth,
-      sourceFloat: false,
-      sourceRepresentationUnknown: false,
-      sourceLossy: false,
-      sourceCodecUnconfirmed: false,
-      channelsAltered: false,
-      rateVerified: true,
+      sinkSampleRate: 96000,
+      sinkBitDepth: 24,
+      directStreamSampleRate: directStreamSampleRate,
+      directStreamBitDepth: 24,
+      directRawPcmBitDepth: directRawPcmBitDepth,
       softwareGain: gain,
-    );
+    ));
   }
 
-  test('a unity gain on a matching chain is verified', () {
-    final assessment = assess(1.0);
+  test('a unity gain on a matching direct raw chain verifies', () {
+    final state = resolve(1.0);
 
-    expect(assessment.verdict, BitPerfectChainVerdict.verified);
-    expect(assessment.reasonCode, isNull);
+    expect(state.assessment.verdict, BitPerfectChainVerdict.verified);
+    expect(state.assessment.reasonCode, isNull);
+    expect(state.isVerified, isTrue);
   });
 
   test('a 0.5 gain still reports the attenuated path', () {
-    final assessment = assess(0.5);
+    final state = resolve(0.5);
 
-    expect(assessment.verdict, BitPerfectChainVerdict.unverified);
-    expect(assessment.reasonCode, 'digital_volume_attenuation');
+    expect(state.assessment.verdict, BitPerfectChainVerdict.unverified);
+    expect(state.assessment.reasonCode, 'digital_volume_attenuation');
   });
 
   for (final gain in <double>[
@@ -63,42 +61,42 @@ void main() {
     -0.5,
   ]) {
     test('an unusable gain ($gain) never verifies the chain', () {
-      final assessment = assess(gain);
+      final state = resolve(gain);
 
-      expect(assessment.verdict, BitPerfectChainVerdict.unverified);
-      expect(assessment.reasonCode, 'software_gain_unknown');
+      expect(state.assessment.verdict, BitPerfectChainVerdict.unverified);
+      expect(state.assessment.reasonCode, 'software_gain_unknown');
     });
   }
 
   test('a missing handler reading never verifies the chain', () {
-    final assessment = assess(null);
+    final state = resolve(null);
 
-    expect(assessment.verdict, BitPerfectChainVerdict.unverified);
-    expect(assessment.reasonCode, 'software_gain_unknown');
+    expect(state.assessment.verdict, BitPerfectChainVerdict.unverified);
+    expect(state.assessment.reasonCode, 'software_gain_unknown');
   });
 
   test('an absurd gain reading never verifies the chain', () {
-    final assessment = assess(1e6);
+    final state = resolve(1e6);
 
-    expect(assessment.verdict, BitPerfectChainVerdict.unverified);
-    expect(assessment.reasonCode, 'software_gain_unknown');
+    expect(state.assessment.verdict, BitPerfectChainVerdict.unverified);
+    expect(state.assessment.reasonCode, 'software_gain_unknown');
   });
 
-  test('an unusable gain does not borrow the samples-modified reason', () {
-    // On an AudioTrack route the raw NaN reaches `chainSamplesModified`, which
-    // folds a non-finite gain into "samples modified". The gate must report the
-    // unmeasured volume stage instead of claiming the samples were edited.
-    final assessment = assess(double.nan,
-        directUsbActive: false, rawPcmBitDepth: 0);
+  test('no integer bypass names the float path, not a modified sample', () {
+    // The last delivered block went the float path (raw depth 0), so nothing
+    // proves the samples stayed integer. The verdict must say float conversion
+    // rather than blaming the transport/DSP for edits nobody observed.
+    final state = resolve(1.0, directRawPcmBitDepth: 0);
 
-    expect(assessment.verdict, BitPerfectChainVerdict.unverified);
-    expect(assessment.reasonCode, 'software_gain_unknown');
+    expect(state.assessment.verdict, isNot(BitPerfectChainVerdict.verified));
+    expect(state.assessment.reasonCode, 'float_conversion');
+    expect(state.assessment.reasonCode, isNot('samples_modified'));
   });
 
   test('a serious format finding outranks an unusable gain', () {
-    final assessment = assess(double.nan, outputSampleRate: 48000);
+    final state = resolve(double.nan, directStreamSampleRate: 48000);
 
-    expect(assessment.verdict, BitPerfectChainVerdict.resampled);
-    expect(assessment.reasonCode, 'rate_mismatch');
+    expect(state.assessment.verdict, BitPerfectChainVerdict.resampled);
+    expect(state.assessment.reasonCode, 'rate_mismatch');
   });
 }

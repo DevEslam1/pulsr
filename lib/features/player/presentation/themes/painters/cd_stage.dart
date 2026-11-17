@@ -141,21 +141,26 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: song != null
-                          ? CachedArtwork(
-                              id: song.id,
-                              albumId: song.albumId,
-                              remoteUrl:
-                                  song.remoteArtworkUrl ?? song.artworkUri,
-                              type: ArtworkType.AUDIO,
-                              size: cdSize * 0.44,
-                              borderRadius: 999,
-                              highQuality: true,
-                              fallbackIcon: Icons.music_note_rounded,
+                          ? PlayerArtworkSemantics(
+                              song: song,
+                              child: CachedArtwork(
+                                id: song.id,
+                                albumId: song.albumId,
+                                remoteUrl:
+                                    song.remoteArtworkUrl ?? song.artworkUri,
+                                type: ArtworkType.AUDIO,
+                                size: cdSize * 0.44,
+                                borderRadius: 999,
+                                highQuality: true,
+                                fallbackIcon: Icons.music_note_rounded,
+                              ),
                             )
-                          : const Icon(
-                              Icons.album_rounded,
-                              size: 48,
-                              color: Colors.white38,
+                          : const ExcludeSemantics(
+                              child: Icon(
+                                Icons.album_rounded,
+                                size: 48,
+                                color: Colors.white38,
+                              ),
                             ),
                     ),
 
@@ -218,10 +223,11 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                 ),
               );
 
+              // Keep the stage a single play/pause target while letting the
+              // disc artwork and HUD publish their own semantics below it.
               return Semantics(
                 button: true,
                 label: state.isPlaying ? context.l10n.pause : context.l10n.play,
-                excludeSemantics: true,
                 child: PlayerGestureScope(
                   behavior: HitTestBehavior.deferToChild,
                   onTap: () => cubit.togglePlayPause(),
@@ -346,7 +352,8 @@ class _CdTurntableStageState extends State<_CdTurntableStage> {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: activeColor.withValues(alpha: 0.40),
+                                      color:
+                                          activeColor.withValues(alpha: 0.40),
                                       blurRadius: 18,
                                       spreadRadius: 1,
                                     ),

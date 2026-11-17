@@ -422,8 +422,10 @@ void main() {
       when(() => account.isLoggedIn).thenReturn(true);
       when(() => account.dataSyncId).thenReturn(null);
       when(() => account.ensureDataSyncId()).thenAnswer((_) async {});
-      when(() => account
-              .resolvePlayerStream(any(), quality: any(named: 'quality')))
+      // A guest pass now asks for the session-bearing client only.
+      when(() => account.resolvePlayerStream(any(),
+              quality: any(named: 'quality'),
+              guestClientsEnabled: any(named: 'guestClientsEnabled')))
           .thenAnswer((_) async => YtmStream(
                 videoId: 'account0001',
                 url: 'https://account.example/a.m4a',
@@ -439,6 +441,32 @@ void main() {
       final stream = await _newService().resolveStream('account0001');
       expect(stream.url, 'https://account.example/a.m4a');
       verify(() => account.ensureDataSyncId()).called(1);
+    });
+
+    test('a guest pass starts the native chain without the hedge delay',
+        () async {
+      final account = MockYtmAccountService();
+      when(() => account.isLoggedIn).thenReturn(true);
+      when(() => account.dataSyncId).thenReturn(null);
+      when(() => account.ensureDataSyncId()).thenAnswer((_) async {});
+      when(() => account.resolvePlayerStream(any(),
+              quality: any(named: 'quality'),
+              guestClientsEnabled: any(named: 'guestClientsEnabled')))
+          .thenAnswer((_) async {
+        await Future<void>.delayed(const Duration(seconds: 5));
+        return null;
+      });
+      getIt.registerSingleton<YtmAccountService>(account);
+      channelHandler =
+          (call) async => call.method == 'resolveStream' ? _streamRow() : null;
+
+      final stopwatch = Stopwatch()..start();
+      final stream = await _newService().resolveStream('guestfast01');
+      stopwatch.stop();
+
+      expect(stream.url, 'https://example.com/stream.m4a');
+      expect(stopwatch.elapsedMilliseconds, lessThan(400),
+          reason: 'a guest pass must not hedge the native chain by 700 ms');
     });
 
     test('an auth failure in the account tier falls back to native', () async {

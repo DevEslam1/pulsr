@@ -337,7 +337,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                               : p.accent,
                           size: 20,
                         ),
-                        onPressed: _report == null ? null : () => _shareReport(),
+                        onPressed:
+                            _report == null ? null : () => _shareReport(),
                       ),
                       IconButton(
                         constraints: const BoxConstraints(

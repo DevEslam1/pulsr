@@ -248,8 +248,8 @@ class _CustodyCertificateCardState extends State<CustodyCertificateCard> {
                   : '${report.measurement!.frames} frames · '
                       '${report.measurement!.windowMs.toStringAsFixed(1)} ms · '
                       'in ${report.measurement!.inputSha256.substring(0, 12)}…',
-              style:
-                  TextStyle(fontSize: AppFontSize.caption, color: p.textSecondary),
+              style: TextStyle(
+                  fontSize: AppFontSize.caption, color: p.textSecondary),
             ),
             if (report.measurement != null)
               Text(

@@ -212,7 +212,14 @@ void main() {
       when(() => account.dataSyncId).thenReturn(null);
       when(() => account.ensureDataSyncId()).thenAnswer((_) async {});
       when(() => account.resolvePlayerStream(any(),
-          quality: any(named: 'quality'))).thenAnswer((_) async {
+              quality: any(named: 'quality'),
+              guestClientsEnabled: any(named: 'guestClientsEnabled')))
+          .thenAnswer((invocation) async {
+        // A guest-pass Tier-1 returns without issuing requests now; only an
+        // account-bound chain may spend the 4 s budget modelled here.
+        if (invocation.namedArguments[#guestClientsEnabled] == false) {
+          return null;
+        }
         await _ms(4000);
         return null;
       });
@@ -237,6 +244,9 @@ void main() {
         reason: 'a 4s Tier-1 must not delay a 500ms native answer '
             '(took ${stopwatch.elapsedMilliseconds}ms)',
       );
+      verify(() => account.resolvePlayerStream(any(),
+          quality: any(named: 'quality'),
+          guestClientsEnabled: false)).called(1);
     });
 
     test('a fast Tier-1 still wins without starting the native tier', () async {

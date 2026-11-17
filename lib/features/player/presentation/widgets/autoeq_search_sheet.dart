@@ -13,6 +13,7 @@ import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// AutoEQ profile browser backed by the bundled real-AutoEQ dataset
 /// (`headphone_profiles.json`). Profiles carry genuine parametric filters
 /// (freq/Q/gain/type) that drive the native 64-band parametric EQ, so the

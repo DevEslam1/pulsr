@@ -4,8 +4,16 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
+  # The binding entry requirement is the Flutter floor: material_ui 1.11.x and
+  # cupertino_ui 1.1.x both declare Flutter >=3.47.0, and Flutter 3.47 ships
+  # Dart 3.13, so no SDK below that can resolve this project.
+  flutter: '>=3.47.0'
+  # The Dart lower bound is deliberately left at 3.0: it selects the package
+  # language version, and raising it to ^3.13.0 switches every file to the
+  # Dart 3.7+ tall formatter and un-suppresses ~344 lint diagnostics repo-wide.
+  # That migration is tracked separately; until then the Flutter constraint
+  # above is what actually gates entry.
   sdk: '>=3.0.0 <4.0.0'
-  flutter: '>=3.41.0'
 
 # Database encryption at rest (ADR 015). package:sqlite3 ships an
 # SQLite3MultipleCiphers build that honours `PRAGMA key`.

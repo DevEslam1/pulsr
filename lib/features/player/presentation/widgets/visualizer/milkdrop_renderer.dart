@@ -154,9 +154,8 @@ class MilkdropCanvasPainter extends CustomPainter {
             (preset.waveG.clamp(0.0, 1.0) * 255).round(),
             (preset.waveB.clamp(0.0, 1.0) * 255).round(),
           );
-    final tint = isWhiteTransparent
-        ? Colors.white
-        : Color.lerp(color, waveColor, 0.55)!;
+    final tint =
+        isWhiteTransparent ? Colors.white : Color.lerp(color, waveColor, 0.55)!;
 
     if (!transparentBackground) {
       final bg = Paint()
@@ -183,11 +182,9 @@ class MilkdropCanvasPainter extends CustomPainter {
       final depth = math.pow(phase, 1.5).toDouble();
       final radius = size.shortestSide * 0.52 * depth * preset.zoom;
       if (radius < 2) continue;
-      final rawAlpha =
-          ((1.0 - phase) * (0.35 + bass * 0.65)).clamp(0.02, 0.9);
-      final alpha = isWhiteTransparent
-          ? (rawAlpha * 0.55).clamp(0.04, 0.70)
-          : rawAlpha;
+      final rawAlpha = ((1.0 - phase) * (0.35 + bass * 0.65)).clamp(0.02, 0.9);
+      final alpha =
+          isWhiteTransparent ? (rawAlpha * 0.55).clamp(0.04, 0.70) : rawAlpha;
       ringPaint
         ..color = tint.withValues(alpha: alpha.toDouble())
         ..strokeWidth = 1.0 + depth * 2.5;
@@ -208,9 +205,8 @@ class MilkdropCanvasPainter extends CustomPainter {
     }
 
     if (data.isNotEmpty && data.length > 1) {
-      final waveAlpha = isWhiteTransparent
-          ? (0.35 + bass * 0.45).clamp(0.15, 0.85)
-          : 0.85;
+      final waveAlpha =
+          isWhiteTransparent ? (0.35 + bass * 0.45).clamp(0.15, 0.85) : 0.85;
       final wavePaint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2.2 + bass * 2.0

@@ -12,6 +12,7 @@ import 'package:pulsr/domain/models/lyrics_line.dart';
 import '../../themes/player_theme.dart';
 
 import '../../../../../core/utils/pulsr_haptics.dart';
+
 /// Advanced word-level / syllable sweep karaoke lyrics renderer.
 ///
 /// Features:
@@ -386,8 +387,8 @@ class _LyricLineWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildStandardLine(
-      String text, bool isBackground, TextAlign textAlign, BuildContext context) {
+  Widget _buildStandardLine(String text, bool isBackground, TextAlign textAlign,
+      BuildContext context) {
     final isInSplit = PlayerSplitViewScope.of(context);
     final TextStyle baseStyle = TextStyle(
       fontSize: isBackground
@@ -506,31 +507,31 @@ class _KaraokeWordView extends StatelessWidget {
       } else {
         // Sub-pixel softened syllable sweep gradient fill (0.08 feather window)
         child = ShaderMask(
-        blendMode: BlendMode.srcIn,
-        shaderCallback: (bounds) {
-          final clampedProgress = progress.clamp(0.0, 1.0);
-          final p0 = (clampedProgress - 0.04).clamp(0.0, 1.0);
-          final p1 = (clampedProgress + 0.04).clamp(0.0, 1.0);
-          return LinearGradient(
-            colors: [
-              activeColor,
-              activeColor,
-              inactiveColor,
-              inactiveColor,
-            ],
-            stops: [
-              0.0,
-              p0,
-              p1,
-              1.0,
-            ],
-          ).createShader(bounds);
-        },
-        child: Text(
-          word.word,
-          style: style.copyWith(color: Colors.white),
-        ),
-      );
+          blendMode: BlendMode.srcIn,
+          shaderCallback: (bounds) {
+            final clampedProgress = progress.clamp(0.0, 1.0);
+            final p0 = (clampedProgress - 0.04).clamp(0.0, 1.0);
+            final p1 = (clampedProgress + 0.04).clamp(0.0, 1.0);
+            return LinearGradient(
+              colors: [
+                activeColor,
+                activeColor,
+                inactiveColor,
+                inactiveColor,
+              ],
+              stops: [
+                0.0,
+                p0,
+                p1,
+                1.0,
+              ],
+            ).createShader(bounds);
+          },
+          child: Text(
+            word.word,
+            style: style.copyWith(color: Colors.white),
+          ),
+        );
       }
     }
 

@@ -2,8 +2,8 @@
 
 > **Target Audience:** AI Models (Claude, Gemini, Cursor, Copilot) & Human Engineers  
 > **Repository:** `pulsr` — Premium Offline-First Audiophile Music Player  
-> **Package Metadata:** Root package `pulsr` (`pubspec.yaml`, version `1.0.0+1`, Dart SDK `>=3.0.0 <4.0.0` — note vendored `third_party/just_audio` requires Dart `^3.6.0`, so the effective workspace Dart floor is `^3.6.0`, Flutter `>=3.41.0`). Note: Root package takes precedence over vendored packages such as `third_party/just_audio`.  
-> **Frameworks & Languages:** Flutter 3.41+ (Dart `^3.6.0` effective due to vendored `third_party/just_audio`), C++20 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
+> **Package Metadata:** Root package `pulsr` (`pubspec.yaml`, version `1.0.0+1`, Flutter `>=3.47.0`). The Flutter floor is the binding entry requirement: `material_ui` 1.11.x and `cupertino_ui` 1.1.x both declare `flutter: ">=3.47.0"` and `sdk: ^3.13.0`, and Flutter 3.47 ships Dart 3.13. The `environment.sdk` lower bound is deliberately kept at `>=3.0.0` because it selects the package *language version*: raising it to `^3.13.0` switches the whole repo to the Dart 3.7+ tall formatter and un-suppresses ~344 lint diagnostics, which is tracked as a separate migration. Note: Root package takes precedence over vendored packages such as `third_party/just_audio`; that fork's Dart `^3.6.0` requirement is not the binding constraint.  
+> **Frameworks & Languages:** Flutter 3.47+ (Dart 3.13 runtime; language version pinned at 3.0 in `pubspec.yaml` pending the tall-formatter migration), C++20 (Native DSP Engine), Kotlin (Android Platform Channels), Go 1.22+ (Party Sync Server), GLSL (Custom Shaders).
 
 ---
 

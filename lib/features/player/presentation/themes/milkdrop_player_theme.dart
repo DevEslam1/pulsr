@@ -111,12 +111,14 @@ class MilkdropPlayerTheme extends StatelessWidget {
             ),
             Builder(
               builder: (context) {
-                final visualizerStyle = context.select<SettingsCubit, VisualizerStyle>(
-                    (c) => c.state.visualizerStyle);
-                final effectiveStyle = (visualizerStyle == VisualizerStyle.off ||
-                        visualizerStyle == VisualizerStyle.bar)
-                    ? VisualizerStyle.milkdrop
-                    : visualizerStyle;
+                final visualizerStyle =
+                    context.select<SettingsCubit, VisualizerStyle>(
+                        (c) => c.state.visualizerStyle);
+                final effectiveStyle =
+                    (visualizerStyle == VisualizerStyle.off ||
+                            visualizerStyle == VisualizerStyle.bar)
+                        ? VisualizerStyle.milkdrop
+                        : visualizerStyle;
                 return AudioVisualizer(
                   style: effectiveStyle,
                   color: Colors.white,
@@ -212,18 +214,21 @@ class MilkdropPlayerTheme extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: AppRadii.circular(artRadius),
-                    child: song != null
-                        ? CachedArtwork(
-                            id: song.id,
-                            albumId: song.albumId,
-                            remoteUrl: song.remoteArtworkUrl ??
-                                song.artworkUri,
-                            type: ArtworkType.AUDIO,
-                            size: double.infinity,
-                            borderRadius: 0,
-                            highQuality: true,
-                          )
-                        : const SizedBox.shrink(),
+                    child: PlayerArtworkSemantics(
+                      song: song,
+                      child: song != null
+                          ? CachedArtwork(
+                              id: song.id,
+                              albumId: song.albumId,
+                              remoteUrl:
+                                  song.remoteArtworkUrl ?? song.artworkUri,
+                              type: ArtworkType.AUDIO,
+                              size: double.infinity,
+                              borderRadius: 0,
+                              highQuality: true,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
                   ),
                 ),
               ),

@@ -17,6 +17,7 @@ import 'quran_text_attribution.dart';
 import '../themes/player_theme.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Bundled Quran reader with timing-based highlighting, tap-to-seek,
 /// and Hifz (memorization) blind recall masking.
 class QuranMushafView extends StatefulWidget {
@@ -311,7 +312,8 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                   style: TextStyle(color: p.textSecondary)),
             ),
           isInSplit
-              ? Expanded(child: _buildAyahList(context, p, ayahs, activeAyah, meta))
+              ? Expanded(
+                  child: _buildAyahList(context, p, ayahs, activeAyah, meta))
               : ConstrainedBox(
                   constraints: const BoxConstraints(maxHeight: 340),
                   child: _buildAyahList(context, p, ayahs, activeAyah, meta),

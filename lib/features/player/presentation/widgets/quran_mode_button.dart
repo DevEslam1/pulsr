@@ -9,6 +9,7 @@ import 'quran_mode_sheet.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
+
 /// Bottom-dock toggle for Quran Mode, styled to sit beside the existing
 /// equalizer / output / speed actions. Mirrors the private `_DockIconButton`
 /// that every player theme defines locally.

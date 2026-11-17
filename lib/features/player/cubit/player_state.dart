@@ -480,6 +480,58 @@ abstract class PlayerState with _$PlayerState {
         isDspActive != other.isDspActive;
   }
 
+  /// `buildWhen` gate for the main mini player body (the queue carousel).
+  ///
+  /// Covers exactly what that widget paints: the four display fields of the
+  /// current track (identity cover art, title, artist, remote artwork URL),
+  /// transport state (`isPlaying`, `isBuffering`), the inline error bar
+  /// ([errorMessage]), the progress denominator (`duration`), the carousel's
+  /// own position bookkeeping (`currentIndex`, `activeQueueSlot`) and queue
+  /// identity via [listContentDiffers].
+  ///
+  /// WHY NARROWER THAN [differsFromBeyondPosition]: the full Now Playing screen
+  /// owns shuffle/repeat/volume/sleep-timer/lyrics/DSP affordances, so it must
+  /// react to all of them. The mini player is a persistent, always-on-screen
+  /// strip that renders none of those; folding them in would rebuild it (and
+  /// every descendant layer) for changes it cannot show, so this gate is kept
+  /// to the rendered surface only. `position` ticks are deliberately excluded
+  /// here — they are consumed by a scoped `BlocSelector` inside the progress
+  /// bar, so including them would rebuild the whole strip every tick.
+  bool differsForMiniPlayer(PlayerState other) {
+    return currentSong?.id != other.currentSong?.id ||
+        currentSong?.title != other.currentSong?.title ||
+        currentSong?.artist != other.currentSong?.artist ||
+        currentSong?.remoteArtworkUrl != other.currentSong?.remoteArtworkUrl ||
+        isPlaying != other.isPlaying ||
+        isBuffering != other.isBuffering ||
+        errorMessage != other.errorMessage ||
+        duration != other.duration ||
+        currentIndex != other.currentIndex ||
+        activeQueueSlot != other.activeQueueSlot ||
+        listContentDiffers(queue, other.queue);
+  }
+
+  /// `buildWhen` gate for the 48dp single-row variant, `MiniPlayerHorizontal`.
+  ///
+  /// That row paints artwork, "title • artist", play/pause and the next button,
+  /// so it compares the *whole* [currentSong] (any column edit — album, genre,
+  /// rating, artwork — must repaint the row, which is cheap at one 48dp row),
+  /// plus transport state and the progress denominator. It renders no error bar,
+  /// no carousel and no queue, so it intentionally does not watch
+  /// [errorMessage], [currentIndex], [activeQueueSlot] or the queue list.
+  ///
+  /// WHY NARROWER THAN [differsFromBeyondPosition]: same rationale as
+  /// [differsForMiniPlayer] — this row shows no shuffle/repeat/volume/sleep
+  /// timer/lyrics/DSP state, and `position` ticks are scoped to the inner
+  /// progress widget. Keeping the two gates separate (instead of one shared
+  /// superset) preserves each variant's current rebuild behaviour exactly.
+  bool differsForMiniPlayerHorizontal(PlayerState other) {
+    return currentSong != other.currentSong ||
+        isPlaying != other.isPlaying ||
+        isBuffering != other.isBuffering ||
+        duration != other.duration;
+  }
+
   bool get hasPreviousNeighbour => _hasQueueNeighbour(forward: false);
   bool get hasNextNeighbour => _hasQueueNeighbour(forward: true);
 

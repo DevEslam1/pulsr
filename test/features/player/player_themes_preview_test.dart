@@ -96,5 +96,24 @@ void main() {
       expect(bounds.height, closeTo(640 * targetScale, 0.001));
       expect((bounds.child! as FittedBox).fit, BoxFit.contain);
     });
+
+    test('preview() lays the theme out on the requested canvas size', () {
+      const canvas = Size(392, 872);
+      const targetScale = 0.125;
+      final preview = ThemeRegistry.preview(
+        PlayerThemeMode.classic,
+        dummyProps,
+        scale: targetScale,
+        canvasSize: canvas,
+      ) as IgnorePointer;
+
+      final bounds = preview.child! as SizedBox;
+      expect(bounds.width, closeTo(canvas.width * targetScale, 0.001));
+      expect(bounds.height, closeTo(canvas.height * targetScale, 0.001));
+
+      final inner = (bounds.child! as FittedBox).child! as SizedBox;
+      expect(inner.width, canvas.width);
+      expect(inner.height, canvas.height);
+    });
   });
 }

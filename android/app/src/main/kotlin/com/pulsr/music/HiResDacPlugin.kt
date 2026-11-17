@@ -1921,6 +1921,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             result["decodedPcmEncoding"] = 0
             result["integerBypassActive"] = false
             result["halStagesActive"] = 0
+            // No route probe ran, so no vendor/OEM chain was observed.
+            result["systemEffectsCompromised"] = false
             result["floatCarrierDecodesSource"] = false
             result["bitPerfectRequested"] =
                 bitPerfectRequested || UsbExclusivePlugin.directStreamingActive
@@ -2122,6 +2124,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // Published by AudioEffectsPlugin from the live effect objects; this is
         // the only channel AudioOutputInfo reads, so it must be here.
         result["halStagesActive"] = AudioEffectsPlugin.liveHalStagesActive
+        // Same channel for the vendor/OEM chain: true means a bypass was
+        // requested and the system could not prove it bypassed.
+        result["systemEffectsCompromised"] =
+            AudioEffectsPlugin.liveSystemEffectsCompromised
         result["floatCarrierDecodesSource"] = floatCarriesDecoded
         result["bitPerfectRequested"] =
             bitPerfectRequested || UsbExclusivePlugin.directStreamingActive

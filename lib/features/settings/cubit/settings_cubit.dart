@@ -232,6 +232,14 @@ class SettingsCubit extends PulsrCubit<SettingsState>
               state.currentOutputDevice?.isUsbDac == true) &&
           !device.isUsbDac &&
           device.activeDeviceType != 'unknown';
+      // A saved preference whose transport was never armed (boot without a
+      // DAC) or was suspended by an unplug is re-armed by the DAC that appears.
+      // An unknown route is not a DAC yet: arming there would point the sink
+      // at nothing.
+      final gainedBitPerfect = !state.bitPerfectOutput &&
+          _bitPerfectPreferred &&
+          device.isUsbDac &&
+          device.activeDeviceType != 'unknown';
       safeEmit(state.copyWith(currentOutputDevice: device));
       unawaited(_applyPerDeviceBtLatency(device));
       // A DAC may have just been plugged/unplugged: re-probe DoP support so the
@@ -240,7 +248,13 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       // Same reason for the tap-side SRC: its target is the mixer rate of the
       // route that is now live, so a plug/unplug must re-derive it.
       unawaited(_syncTapSrcRate(device));
-      if (lostBitPerfect) unawaited(setBitPerfectOutput(false));
+      if (lostBitPerfect) {
+        // Suspend the transport without erasing the choice: the DAC may come
+        // back, and a boot without one must not look like a user veto.
+        unawaited(
+            _setBitPerfectOutput(false, keepPreferenceWhenDisabling: true));
+      }
+      if (gainedBitPerfect) unawaited(_rearmBitPerfectPreference());
     });
     _initThemeScheduler();
     _loadPreferences();
@@ -1138,14 +1152,20 @@ class SettingsCubit extends PulsrCubit<SettingsState>
         if (loadedState.strictBitPerfect || loadedState.bitPerfectOutput) {
           await setFloatOutputEnabled(true);
         }
+        // A saved Bit-Perfect choice outlives this boot even when no DAC is
+        // attached: the runtime transport below may stay off, but the intent is
+        // what the route handler re-arms from when a USB DAC appears.
+        _bitPerfectPreferred =
+            loadedState.strictBitPerfect || loadedState.bitPerfectOutput;
         if (loadedState.bitPerfectOutput) {
           // Resolve the current route before touching exclusive output. A
           // merely attached DAC must not steal a Bluetooth/speaker session;
           // on an unknown route the saved preference stays off.
           await refreshOutputDevice();
           if (state.currentOutputDevice?.isUsbDac != true) {
-            await prefs.setBool(PrefsKeys.bitPerfectOutput, false);
-            await prefs.setBool(PrefsKeys.strictBitPerfect, false);
+            // Boot without a DAC only leaves the runtime transport off. The
+            // saved keys are the user's choice, not this boot's outcome, so
+            // they stay for the next USB attach (and the next launch).
             loadedState = loadedState.copyWith(
               bitPerfectOutput: false,
               strictBitPerfect: false,

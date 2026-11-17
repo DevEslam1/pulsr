@@ -472,6 +472,27 @@ void main() {
       expect(stream.artist, 'YouTube Music');
     });
 
+    test('restore drops any persisted verification stamp', () async {
+      final now = clock.now().millisecondsSinceEpoch;
+      diskFile().writeAsStringSync(jsonEncode([
+        {
+          'videoId': 'stamped',
+          'url': 'https://x/stamped',
+          'quality': 'high',
+          'expiresAt': now + const Duration(hours: 2).inMilliseconds,
+          'verifiedAt': now,
+        },
+      ]));
+
+      await cache.restore();
+
+      expect(cache.get('stamped'), isNotNull);
+      expect(cache.get('stamped')!.verifiedAt, isNull,
+          reason: 'verification belongs to the process that measured it, and '
+              'a URL that survived a launch may be bound to a previous egress');
+      expect(cache.isVerified('stamped'), isFalse);
+    });
+
     test('restore tolerates corrupt JSON', () async {
       diskFile().writeAsStringSync('{definitely not json');
       await expectLater(cache.restore(), completes);

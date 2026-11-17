@@ -144,16 +144,19 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                           alignment: Alignment.center,
                           children: [
                             if (song != null)
-                              CachedArtwork(
-                                id: song.id,
-                                albumId: song.albumId,
-                                remoteUrl:
-                                    song.remoteArtworkUrl ?? song.artworkUri,
-                                type: ArtworkType.AUDIO,
-                                size: vinylSize * 0.44,
-                                borderRadius: 999,
-                                highQuality: true,
-                                fallbackIcon: Icons.music_note_rounded,
+                              PlayerArtworkSemantics(
+                                song: song,
+                                child: CachedArtwork(
+                                  id: song.id,
+                                  albumId: song.albumId,
+                                  remoteUrl:
+                                      song.remoteArtworkUrl ?? song.artworkUri,
+                                  type: ArtworkType.AUDIO,
+                                  size: vinylSize * 0.44,
+                                  borderRadius: 999,
+                                  highQuality: true,
+                                  fallbackIcon: Icons.music_note_rounded,
+                                ),
                               ),
                             // Center Spindle Hole
                             Container(
@@ -183,10 +186,12 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                 ),
               );
 
+              // The deck is one play/pause target, but its semantics must not
+              // swallow the cover art: label the button and let the artwork keep
+              // its own image node as a child.
               return Semantics(
                 button: true,
                 label: state.isPlaying ? context.l10n.pause : context.l10n.play,
-                excludeSemantics: true,
                 child: PlayerGestureScope(
                   behavior: HitTestBehavior.deferToChild,
                   onTap: () => cubit.togglePlayPause(),
@@ -361,12 +366,14 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                     color: Colors.black.withValues(alpha: 0.82),
                                     borderRadius: AppRadii.full,
                                     border: Border.all(
-                                      color: activeColor.withValues(alpha: 0.65),
+                                      color:
+                                          activeColor.withValues(alpha: 0.65),
                                       width: 1.2,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: activeColor.withValues(alpha: 0.40),
+                                        color:
+                                            activeColor.withValues(alpha: 0.40),
                                         blurRadius: 18,
                                         spreadRadius: 1,
                                       ),

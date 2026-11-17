@@ -1,4 +1,6 @@
 // lib/features/settings/presentation/widgets/settings_picker_sheets.dart
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -367,10 +369,14 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
     super.dispose();
   }
 
+  /// Theme previews are laid out against a canvas that matches the real
+  /// window (clamped so tiny or desktop-sized windows stay sensible), then
+  /// fitted into [slot]. A short fixed canvas made the live player overflow
+  /// internally — the yellow/black debug stripes seen inside picker previews.
   Widget? _buildLivePreview(
     BuildContext context,
     PlayerThemeMode mode,
-    double scale,
+    Size slot,
   ) {
     try {
       final playerCubit = context.read<PlayerCubit>();
@@ -381,7 +387,21 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
         activeColor: widget.primaryColor,
         bgColor: p.bg,
       );
-      return ThemeRegistry.preview(mode, props, scale: scale);
+      final window = MediaQuery.sizeOf(context);
+      final canvas = Size(
+        math.max(window.width, 320.0),
+        window.height.clamp(760.0, 960.0),
+      );
+      final scale = math.min(
+        slot.width / canvas.width,
+        slot.height / canvas.height,
+      );
+      return ThemeRegistry.preview(
+        mode,
+        props,
+        scale: scale,
+        canvasSize: canvas,
+      );
     } catch (_) {
       return null;
     }
@@ -441,8 +461,8 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                         },
                         child: Builder(
                           builder: (context) {
-                            final live =
-                                _buildLivePreview(context, t.mode, 0.19);
+                            final live = _buildLivePreview(
+                                context, t.mode, const Size(74, 112));
                             if (live == null) {
                               return _ThemeMockupCard(
                                 mode: t.mode,
@@ -553,8 +573,8 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                       child: ListTile(
                         leading: Builder(
                           builder: (context) {
-                            final live =
-                                _buildLivePreview(context, t.mode, 0.08);
+                            final live = _buildLivePreview(
+                                context, t.mode, const Size(40, 52));
                             if (live == null) {
                               return _ThemePreviewThumbnail(
                                 mode: t.mode,

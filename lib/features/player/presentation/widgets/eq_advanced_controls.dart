@@ -92,7 +92,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             ? context.l10n.spatialMultiChannelDesc
                             : context.l10n.spatialVirtualizerActiveDesc,
                         style: TextStyle(
-                            fontSize: AppFontSize.caption, color: p.textTertiary),
+                            fontSize: AppFontSize.caption,
+                            color: p.textTertiary),
                       ),
                     ],
                   ),
@@ -348,7 +349,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                           slider: true,
                           excludeSemantics: true,
                           label: context.l10n.width,
-                          value: '${(state.virtualizerStrength * 100).round()}%',
+                          value:
+                              '${(state.virtualizerStrength * 100).round()}%',
                           increasedValue:
                               '${((state.virtualizerStrength + 0.1).clamp(0.0, 1.0) * 100).round()}%',
                           decreasedValue:
@@ -811,8 +813,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                               padding: const EdgeInsets.symmetric(
                                   horizontal: AppSpacing.xs),
                             ),
-                            onPressed: () =>
-                                _triggerCrossfeedAudition(context, cubit, state),
+                            onPressed: () => _triggerCrossfeedAudition(
+                                context, cubit, state),
                           ),
                         ],
                       ),
@@ -1119,10 +1121,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                       builder: (context) {
                         final limitThresh =
                             state.limiterThresholdDb.clamp(-6.0, 0.0);
-                        final nextThresh =
-                            (limitThresh + 0.1).clamp(-6.0, 0.0);
-                        final prevThresh =
-                            (limitThresh - 0.1).clamp(-6.0, 0.0);
+                        final nextThresh = (limitThresh + 0.1).clamp(-6.0, 0.0);
+                        final prevThresh = (limitThresh - 0.1).clamp(-6.0, 0.0);
                         return Semantics(
                           slider: true,
                           excludeSemantics: true,
@@ -1289,7 +1289,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                             conflictReason: dspBlocked ??
                                                 (_nativePcmEffectsAvailable
                                                     ? null
-                                                    : context.l10n.dspRequiresPcmPath))),
+                                                    : context.l10n
+                                                        .dspRequiresPcmPath))),
                                   ],
                                 ),
                                 Text(
@@ -1423,8 +1424,10 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     String formatBal(double b) => b.abs() < 0.05
                         ? context.l10n.roomPositionCenter
                         : (b < 0
-                            ? context.l10n.balanceLeftPercent((-b * 100).round())
-                            : context.l10n.balanceRightPercent((b * 100).round()));
+                            ? context.l10n
+                                .balanceLeftPercent((-b * 100).round())
+                            : context.l10n
+                                .balanceRightPercent((b * 100).round()));
                     return Semantics(
                       slider: true,
                       excludeSemantics: true,
@@ -1949,8 +1952,8 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               context: context,
               p: p,
               label: l10n.dspSaturationMix,
-              valueText: context.l10n.dspWetPercent(
-                  (state.saturationMix * 100).round()),
+              valueText: context.l10n
+                  .dspWetPercent((state.saturationMix * 100).round()),
               value: state.saturationMix,
               min: 0.0,
               max: 1.0,
@@ -3100,8 +3103,7 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               icon: const Icon(Icons.folder_open_rounded, size: 16),
               label: Text(
                 hasProfile
-                    ? context.l10n
-                        .viperChangeProfile(state.viperDdcProfileName)
+                    ? context.l10n.viperChangeProfile(state.viperDdcProfileName)
                     : context.l10n.viperSelectLoadProfile,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

@@ -82,6 +82,7 @@ CastQueueSelection selectCastableQueue({
     startPositionMs: anchorFound ? position.inMilliseconds : 0,
   );
 }
+
 class PulsrCastSheet extends StatefulWidget {
   const PulsrCastSheet({super.key});
 
@@ -773,11 +774,13 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                   setState(() => _busy = true);
                                   try {
                                     final deviceName = _devices[i].name;
-                                    final res = await _service.castTo(_devices[i].id);
+                                    final res =
+                                        await _service.castTo(_devices[i].id);
                                     if (!mounted) return;
                                     final msg = res.success
                                         ? l10n.settingsCastingTo(deviceName)
-                                        : (res.message ?? l10n.settingsCastFailed);
+                                        : (res.message ??
+                                            l10n.settingsCastFailed);
                                     messenger?.showSnackBar(
                                       SnackBar(content: Text(msg)),
                                     );
