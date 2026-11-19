@@ -940,4 +940,119 @@ class UsbControlProtocolTest {
         assertEquals(listOf(44100, 48000, 96000), UsbAudioProtocol.queryPlaybackRates(device, parsed))
         assertTrue(device.requests.isEmpty())
     }
+
+    /**
+     * UAC2 device with a three-pin Clock Selector 8 on AC interface 0:
+     * pin 1 -> Clock Source 10 (fixed 44.1 kHz), pin 2 -> Clock Source 11
+     * (fixed 48 kHz), pin 3 -> Clock Source 12 (programmable, current rate moves
+     * with SET_CUR). CLOCK_VALID is not readable, so it never blocks a clock.
+     */
+    private class ThreePinSelectorDevice(var selectorPin: Int = 1) : UsbControlTransfer {
+        val requests = mutableListOf<Request>()
+        val pinWrites = mutableListOf<Int>()
+        val rateWrites = mutableListOf<Int>()
+        private var currentRate = 48000
+
+        override fun transfer(type: Int, request: Int, value: Int, index: Int, buffer: ByteArray): Int {
+            requests += Request(type, request, value, index, buffer.size)
+            if ((index and 0xFF) != 0) return -1
+            val entity = index shr 8
+            val isRead = (type and 0x80) != 0
+            fun put(raw: Int) {
+                repeat(buffer.size) { buffer[it] = (raw shr (it * 8)).toByte() }
+            }
+            if (entity == 8 && buffer.size == 1) {
+                if (isRead) {
+                    buffer[0] = selectorPin.toByte()
+                } else {
+                    selectorPin = buffer[0].toInt() and 0xFF
+                    pinWrites += selectorPin
+                }
+                return 1
+            }
+            if (value == 0x0100 && buffer.size == 4) {
+                return when (entity) {
+                    10 -> { put(44100); 4 }
+                    11 -> { put(48000); 4 }
+                    12 -> {
+                        if (isRead) {
+                            put(currentRate)
+                        } else {
+                            currentRate = buffer.indices.fold(0) { acc, i ->
+                                acc or ((buffer[i].toInt() and 255) shl (8 * i))
+                            }
+                            rateWrites += currentRate
+                        }
+                        4
+                    }
+                    else -> -1
+                }
+            }
+            return -1
+        }
+    }
+
+    private val threePinParsed = UsbAudioControlParser.Result(
+        uacVersion = 2,
+        volumeUnit = null,
+        streamingInterface = 1,
+        clockSource = UsbAudioControlParser.ClockSource(10, 0, false),
+        clockSources = listOf(
+            UsbAudioControlParser.ClockSource(10, 0, false),
+            UsbAudioControlParser.ClockSource(11, 0, false),
+            UsbAudioControlParser.ClockSource(12, 0, true),
+        ),
+        controlInterface = 0,
+        playbackTerminalId = 3,
+        terminalClockIds = mapOf(3 to 8),
+        clockSelectorInputs = mapOf(8 to listOf(10, 11, 12)),
+        clockSelectorInterfaces = mapOf(8 to 0),
+    )
+
+    @Test fun preferredSelectorPinIsUsedFirstWhenItCanDeliverTheRate() {
+        val device = ThreePinSelectorDevice(selectorPin = 1)
+        val result = UsbAudioProtocol.programPlaybackClock(
+            device, threePinParsed, 0x01, 96000, false, 3,
+        )
+        assertEquals(UsbAudioProtocol.RateSetResult.VERIFIED, result)
+        // Pin 3 was selected directly: the default scan would have written pin 2
+        // first and failed on its fixed 48 kHz clock.
+        assertEquals(listOf(3), device.pinWrites)
+        assertEquals(3, device.selectorPin)
+        assertEquals(listOf(96000), device.rateWrites)
+        // The fixed 48 kHz source was never selected, so it was never written.
+        assertFalse(device.requests.any { it.type == 0x21 && it.index == 0x0B00 })
+    }
+
+    @Test fun preferredSelectorPinThatCannotDeliverTheRateFallsBackToTheExistingScan() {
+        val device = ThreePinSelectorDevice(selectorPin = 1)
+        // Preferred pin 2 is a fixed 48 kHz source: it accepts the pin write but
+        // cannot carry 96 kHz, so the selector goes back to its original pin and
+        // the existing scan finds pin 3.
+        val result = UsbAudioProtocol.programPlaybackClock(
+            device, threePinParsed, 0x01, 96000, false, 2,
+        )
+        assertEquals(UsbAudioProtocol.RateSetResult.VERIFIED, result)
+        assertEquals(listOf(2, 1, 3), device.pinWrites)
+        assertEquals(3, device.selectorPin)
+        assertEquals(listOf(96000), device.rateWrites)
+    }
+
+    @Test fun absentPreferredSelectorPinBehavesExactlyAsTheDefaultEntryPoint() {
+        // A pin the selector does not expose is ignored: both calls must issue
+        // byte-for-byte identical request sequences.
+        val withHint = ThreePinSelectorDevice(selectorPin = 1)
+        val withoutHint = ThreePinSelectorDevice(selectorPin = 1)
+        assertEquals(
+            UsbAudioProtocol.RateSetResult.VERIFIED,
+            UsbAudioProtocol.programPlaybackClock(withoutHint, threePinParsed, 0x01, 96000, false),
+        )
+        assertEquals(
+            UsbAudioProtocol.RateSetResult.VERIFIED,
+            UsbAudioProtocol.programPlaybackClock(withHint, threePinParsed, 0x01, 96000, false, 9),
+        )
+        assertEquals(withoutHint.requests, withHint.requests)
+        assertEquals(listOf(2, 3), withHint.pinWrites)
+        assertEquals(3, withHint.selectorPin)
+    }
 }

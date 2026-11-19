@@ -1,0 +1,273 @@
+name: USB HIL
+
+# Hardware-in-the-loop gates for the USB Audio Class path.
+# An absent DAC is reported as blocked, never as a pass or a repo-wide failure.
+# Only a red run on attached hardware fails the workflow.
+
+on:
+  schedule:
+    # Nightly Tier A matrix (03:00 UTC).
+    - cron: "0 3 * * *"
+    # Weekly full matrix (Sunday 04:00 UTC).
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+    inputs:
+      tier:
+        description: "Matrix tier to run on the USB rig"
+        required: false
+        default: "all"
+        type: choice
+        options:
+          - A
+          - B
+          - all
+
+permissions:
+  contents: read
+
+concurrency:
+  group: usb-hil-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  native-sanitizers:
+    name: Native DSP tests (ASan/UBSan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++
+
+      - name: Configure native tests
+        run: |
+          cmake -S android/app/src/test/cpp -B build/hil-native -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DPULSR_TEST_SANITIZERS=ON
+
+      - name: Build native tests
+        run: cmake --build build/hil-native --parallel
+
+      - name: Run native tests
+        working-directory: build/hil-native
+        run: ctest --output-on-failure --timeout 900
+
+  kotlin-usb:
+    name: Kotlin USB control tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run USB unit tests
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon :app:testDevDebugUnitTest \
+            --tests "com.pulsr.music.Usb*" \
+            -x :app:compileDevDebugUnitTestJavaWithJavac
+
+  hil-matrix:
+    name: HIL matrix (USB rig)
+    runs-on: [self-hosted, android-usb]
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve matrix tier
+        id: tier
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tier="${{ github.event.inputs.tier }}"
+          elif [ "${{ github.event.schedule }}" = "0 4 * * 0" ]; then
+            tier="all"
+          else
+            tier="A"
+          fi
+          echo "value=${tier}" >> "$GITHUB_OUTPUT"
+          echo "matrix tier: ${tier}"
+
+      - name: Preflight (informational)
+        shell: bash
+        run: |
+          python3 --version
+          if command -v adb >/dev/null 2>&1; then
+            adb version | head -n 1
+            adb devices -l || true
+          else
+            echo "adb is not on PATH; the matrix will report blocked/no_device"
+          fi
+
+      - name: Run matrix gate
+        if: steps.tier.outputs.value != ''
+        id: matrix
+        shell: bash
+        run: |
+          set -u
+          mkdir -p scratch/hil
+          set +e
+          python3 scripts/hil/run_matrix.py \
+            --tier "${{ steps.tier.outputs.value }}" \
+            --gate \
+            --out scratch/hil/matrix.json
+          rc=$?
+          set -e
+          echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+          case "${rc}" in
+            0)
+              echo "::notice::HIL matrix passed on attached hardware"
+              ;;
+            2)
+              echo "::warning::HIL matrix blocked: no matching DAC/device attached. Hardware gate not met, not a failure."
+              ;;
+            *)
+              echo "::error::HIL matrix reported failing hardware cases (exit ${rc})"
+              exit 1
+              ;;
+          esac
+
+      - name: Summarize evidence
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(scratch/hil/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No HIL result JSON was produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          set +e
+          python3 scripts/hil/analyze_results.py "${files[@]}" \
+            --out scratch/hil/summary.md --json-out scratch/hil/summary.json
+          rc=$?
+          set -e
+          if [ -f scratch/hil/summary.md ]; then
+            cat scratch/hil/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${rc}" -eq 1 ]; then
+            echo "::error::HIL evidence contains failing cases"
+            exit 1
+          fi
+          exit 0
+
+      - name: Bundle evidence
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/hil/bundle_evidence.py --inputs scratch/hil --out-dir dist/usb-evidence
+          rc=$?
+          set -e
+          if [ "${rc}" -ne 0 ]; then
+            echo "::warning::Evidence bundling failed (exit ${rc})"
+          fi
+          exit 0
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: usb-hil-evidence
+          path: |
+            scratch/hil
+            dist/usb-evidence
+          if-no-files-found: warn
+          retention-days: 30
+
+  hil-soak:
+    name: HIL soak 8h (nightly)
+    needs: hil-matrix
+    if: github.event_name == 'schedule' && github.event.schedule == '0 3 * * *'
+    runs-on: [self-hosted, android-usb]
+    timeout-minutes: 600
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run soak gate
+        id: soak
+        shell: bash
+        run: |
+          set -u
+          mkdir -p scratch/hil
+          set +e
+          python3 scripts/hil/soak.py --hours 8 --gate --out scratch/hil/soak.json
+          rc=$?
+          set -e
+          echo "rc=${rc}" >> "$GITHUB_OUTPUT"
+          case "${rc}" in
+            0)
+              ;;
+            2)
+              echo "::warning::Soak blocked: no device attached. Hardware gate not met, not a failure."
+              ;;
+            *)
+              echo "::error::Soak gate failed on attached hardware (exit ${rc})"
+              exit 1
+              ;;
+          esac
+
+      - name: Summarize soak evidence
+        if: always()
+        shell: bash
+        run: |
+          shopt -s nullglob
+          files=(scratch/hil/*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            exit 0
+          fi
+          set +e
+          python3 scripts/hil/analyze_results.py "${files[@]}" \
+            --out scratch/hil/summary-soak.md --json-out scratch/hil/summary-soak.json
+          rc=$?
+          set -e
+          if [ -f scratch/hil/summary-soak.md ]; then
+            cat scratch/hil/summary-soak.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "${rc}" -eq 1 ]; then
+            echo "::error::Soak evidence contains failing cases"
+            exit 1
+          fi
+          exit 0
+
+      - name: Bundle soak evidence
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/hil/bundle_evidence.py --inputs scratch/hil --out-dir dist/usb-evidence
+          rc=$?
+          set -e
+          if [ "${rc}" -ne 0 ]; then
+            echo "::warning::Evidence bundling failed (exit ${rc})"
+          fi
+          exit 0
+
+      - name: Upload soak evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: usb-hil-soak
+          path: |
+            scratch/hil
+            dist/usb-evidence
+          if-no-files-found: warn
+          retention-days: 30

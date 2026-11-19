@@ -26,6 +26,14 @@ endif()
 # Opt-in ASan/UBSan for the sanitizer pass. Enabled by the gradle
 # testNative task via -DPULSR_TEST_SANITIZERS=ON; not part of the parity build.
 option(PULSR_TEST_SANITIZERS "Build native DSP tests with ASan/UBSan" OFF)
+# Windows toolchain ships no working ASan runtime (the dynamic DLL aborts before
+# main), but UBSan works when linked statically. This option provides the
+# memory-safety-adjacent evidence locally while CI runs full ASan on Linux.
+option(PULSR_TEST_UBSAN "Build native DSP tests with UBSan only" OFF)
+if(PULSR_TEST_UBSAN)
+    add_compile_options(-fsanitize=undefined -fno-sanitize=vptr -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=undefined)
+endif()
 if(PULSR_TEST_SANITIZERS)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
@@ -73,6 +81,9 @@ set(DSP_SRCS
     ${MAIN_CPP}/CustodyVerifier.cpp
     ${MAIN_CPP}/AudioDspEngine.cpp
     ${MAIN_CPP}/UsbAudioSink.cpp
+    ${MAIN_CPP}/UsbPullRenderer.cpp
+    ${MAIN_CPP}/UsbAsrcClockSync.cpp
+    ${MAIN_CPP}/UsbPcmProducer.cpp
 )
 
 include_directories(${MAIN_CPP})
@@ -95,6 +106,7 @@ pulsr_add_test(test_safety_bypass ${DSP_SRCS})
 pulsr_add_test(test_aaudio_sink_support)
 pulsr_add_test(test_sink_quantizer)
 pulsr_add_test(test_usb_gap_fader)
+pulsr_add_test(test_usb_pcm_producer ${MAIN_CPP}/UsbPcmProducer.cpp ${MAIN_CPP}/UsbPullRenderer.cpp)
 pulsr_add_test(test_ir_bounds)
 
 # ConvolutionReverb resamples its wet path above 48 kHz, so it never links alone.
@@ -135,3 +147,8 @@ pulsr_add_test(test_dsp_effects ${DSP_SRCS})
 pulsr_add_test(test_rtf_governor ${DSP_SRCS})
 
 pulsr_add_test(test_rg_dop ${DSP_SRCS})
+
+# USB clock-domain / pull renderer / ASRC / parser fuzz cores.
+pulsr_add_test(test_usb_pull_renderer ${MAIN_CPP}/UsbPullRenderer.cpp)
+pulsr_add_test(test_usb_asrc ${MAIN_CPP}/UsbAsrcClockSync.cpp)
+pulsr_add_test(test_usb_fuzz ${DSP_SRCS})

@@ -86,6 +86,15 @@ class UsbExclusivePlugin(
 
         /** Minimum gap between hardware-volume range reads during polling. */
         private const val VOLUME_REFRESH_INTERVAL_MS = 2000L
+
+        /** Per-device quirk profiles, keyed `vid:pid`, JSON document values. */
+        private const val QUIRK_PREFS = "pulsr_usb_quirks_v1"
+
+        /** Upper bound on the pre-stream silence a quirk may request. */
+        private const val MAX_QUIRK_SILENCE_MS = 2_000
+
+        /** 0 = best effort, 1 = bit-perfect, 2 = ASRC. */
+        private const val MAX_RENDER_MODE = 2
     }
 
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
@@ -128,6 +137,38 @@ class UsbExclusivePlugin(
      */
     @Volatile private var drainPending = false
 
+    /**
+     * Lifecycle of the current exclusive session. The USB worker thread owns
+     * every transition, but the permission receiver runs on the main thread, so
+     * access is serialised on [sessionLock] rather than assumed thread-confined.
+     */
+    private val session = UsbSessionStateMachine()
+    private val sessionLock = Any()
+
+    /** Redacting, bounded (500 events) ring: bug reports and `getDiagnostics`. */
+    private val usbEventLog = UsbEventLog()
+
+    // Quirk state resolved for the last start. Published in status so a quirk
+    // that changes bit-perfect semantics is never silent.
+    @Volatile private var quirkApplied: List<String> = emptyList()
+    @Volatile private var quirkRejected: Map<String, String> = emptyMap()
+    @Volatile private var quirkNotApplicable: Map<String, String> = emptyMap()
+    @Volatile private var quirkBitPerfectAffected: Boolean = false
+    @Volatile private var quirkBitPerfectReason: String? = null
+
+    /** Parameters actually applied to the live stream (null when none). */
+    @Volatile private var activeQuirks: ResolvedStreamParams? = null
+
+    /** Render mode the live native sink was opened with (0 = best effort). */
+    @Volatile private var activeRenderMode: Int = 0
+    @Volatile private var streamAltSetting: Int = 0
+    @Volatile private var streamEndpoint: Int = 0
+
+    /** Last stream request, replayed as the facts baseline for profile previews. */
+    @Volatile private var lastRequestedRate: Int = 48_000
+    @Volatile private var lastRequestedDepth: Int = 16
+    @Volatile private var lastRequestedChannels: Int = 2
+
     // Blocking USB control transfers, raw-descriptor parsing and native sink
     // start/stop/query must never run on the main thread (ANR). All such work
     // is serialized onto this single worker thread; MethodChannel replies are
@@ -145,6 +186,7 @@ class UsbExclusivePlugin(
     private external fun nativeUsbStreamStartWithFormat(
         fd: Int, endpoint: Int, interfaceNumber: Int, altSetting: Int,
         sampleRate: Int, channels: Int, bytesPerSample: Int, validBitDepth: Int,
+        renderMode: Int,
     ): Int
     private external fun nativeUsbStreamStop(): Boolean
 
@@ -170,6 +212,24 @@ class UsbExclusivePlugin(
     private external fun nativeUsbStreamGetOverrunCount(): Long
     private external fun nativeUsbStreamGetBufferedMs(): Double
 
+    /** 0 unknown, 1 bitPerfectLocked, 2 asrc, 3 bestEffort (native clock domain). */
+    private external fun nativeUsbStreamGetClockDomain(): Int
+    private external fun nativeUsbStreamGetClockDriftPpm(): Int
+    private external fun nativeUsbStreamGetRingFillMs(): Int
+    private external fun nativeUsbStreamGetFeedbackPresent(): Boolean
+
+    /** Optional reader-thread PCM source for the pull renderer. */
+    private external fun nativeUsbStreamStartPcmFile(path: String): Boolean
+    private external fun nativeUsbStreamStopPcmFile()
+    private external fun nativeUsbStreamHasPcmFile(): Boolean
+
+    /** Transfer size / buffer target / explicit-feedback policy for the sink. */
+    private external fun nativeUsbSetStreamTuning(
+        transferSizeBytes: Int,
+        bufferMs: Int,
+        disableFeedback: Boolean,
+    )
+
     private external fun nativeUsbGetProducerChannels(): Int
     private external fun nativeUsbStreamGetChannelMismatchFrames(): Long
     private external fun nativeUsbStreamResetChannelMismatchFrames()
@@ -186,6 +246,470 @@ class UsbExclusivePlugin(
     private fun safeGetProducerChannels(): Int = if (nativeLoaded) try { nativeUsbGetProducerChannels() } catch (_: Throwable) { 0 } else 0
     private fun safeGetChannelMismatchFrames(): Long = if (nativeLoaded) try { nativeUsbStreamGetChannelMismatchFrames() } catch (_: Throwable) { 0L } else 0L
     private fun safeResetChannelMismatchFrames() { if (nativeLoaded) try { nativeUsbStreamResetChannelMismatchFrames() } catch (_: Throwable) {} }
+
+    // ---- session state machine / structured event log ----
+
+    private fun sessionNow(): Long = SystemClock.elapsedRealtime()
+
+    private fun sessionStateIs(vararg states: UsbSessionState): Boolean =
+        synchronized(sessionLock) { session.state in states }
+
+    private fun sessionStateName(): String = synchronized(sessionLock) { session.state.name }
+
+    private fun sessionReset() = synchronized(sessionLock) { session.reset(sessionNow()) }
+
+    /**
+     * Runs one state-machine step. The machine is deliberately strict, so a
+     * caller that reaches a step in the wrong state must never take the audio
+     * path down with it: the violation is recorded as `state_invariant` and the
+     * machine is parked in ERROR, while the stream keeps its own separately
+     * tracked state.
+     */
+    private fun sessionStep(action: String, step: (UsbSessionStateMachine, Long) -> Unit) {
+        synchronized(sessionLock) {
+            try {
+                step(session, sessionNow())
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "USB session invariant at $action: ${e.message}")
+                recordEvent(lastError = "state_invariant:$action", resultCode = -1)
+                forceSessionErrorLocked("state_invariant")
+            }
+        }
+    }
+
+    /** Parks the machine in ERROR from whatever state it is in, without throwing. */
+    private fun forceSessionErrorLocked(code: String) {
+        try {
+            session.reset(sessionNow())
+            session.onPermissionRequested(sessionNow())
+            session.onError(code, sessionNow())
+        } catch (_: Throwable) {
+            // Nothing left to try; the audio path is unaffected either way.
+        }
+    }
+
+    /**
+     * Reports a failed start/stop attempt. IDLE is ramped through PERMISSION so
+     * the failure is visible as ERROR instead of a silent "nothing happened";
+     * DRAINING/ABANDONED are left to the teardown path that owns them.
+     */
+    private fun failSession(code: String) {
+        synchronized(sessionLock) {
+            val now = sessionNow()
+            try {
+                when (session.state) {
+                    UsbSessionState.IDLE -> {
+                        session.onPermissionRequested(now)
+                        session.onError(code, now)
+                    }
+
+                    UsbSessionState.DRAINING, UsbSessionState.ABANDONED -> Unit
+                    else -> session.onError(code, now)
+                }
+            } catch (_: IllegalStateException) {
+                forceSessionErrorLocked(code)
+            }
+        }
+    }
+
+    private fun sessionPermissionRequested() = sessionStep("permission_requested") { machine, now ->
+        machine.onPermissionRequested(now)
+    }
+
+    private fun sessionPermissionGranted() = sessionStep("permission_granted") { machine, now ->
+        machine.onPermissionGranted(now)
+    }
+
+    private fun sessionPermissionDenied() = sessionStep("permission_denied") { machine, now ->
+        machine.onPermissionDenied(now)
+    }
+
+    private fun sessionOpened() = sessionStep("open_succeeded") { machine, now ->
+        machine.onOpenSucceeded(now)
+    }
+
+    private fun sessionClaimed() = sessionStep("claim_succeeded") { machine, now ->
+        machine.onClaimSucceeded(now)
+    }
+
+    private fun sessionConfigured() = sessionStep("configure_succeeded") { machine, now ->
+        machine.onConfigureSucceeded(now)
+    }
+
+    private fun sessionStarted() = sessionStep("stream_started") { machine, now ->
+        machine.onStreamStarted(now)
+    }
+
+    /**
+     * A failed start: the session is marked ERROR, the reason is recorded and
+     * the caller gets the existing failure map (unchanged shape).
+     */
+    private fun startFailure(reason: String): Map<String, Any?> {
+        failSession(reason)
+        recordEvent(lastError = reason)
+        return failure(reason)
+    }
+
+    // ---- clock-domain / sink telemetry ----
+
+    private fun clockDomainLabel(raw: Int): String = when (raw) {
+        1 -> "bitPerfectLocked"
+        2 -> "asrc"
+        3 -> "bestEffort"
+        else -> "unknown"
+    }
+
+    /** True while the native sink owns a stream; telemetry is meaningless otherwise. */
+    private fun streamLive(): Boolean = nativeLoaded && (streaming || isNativeActive())
+
+    private fun safeGetClockDomain(): String =
+        if (!streamLive()) "unknown" else clockDomainLabel(
+            try { nativeUsbStreamGetClockDomain() } catch (_: Throwable) { 0 },
+        )
+
+    private fun safeGetClockDriftPpm(): Int =
+        if (!streamLive()) 0 else try { nativeUsbStreamGetClockDriftPpm() } catch (_: Throwable) { 0 }
+
+    private fun safeGetRingFillMs(): Int =
+        if (!streamLive()) 0 else try { nativeUsbStreamGetRingFillMs() } catch (_: Throwable) { 0 }
+
+    /**
+     * Explicit-feedback capability: measured natively while streaming, and the
+     * descriptor fact before that (a quirk profile is resolved from descriptors
+     * too, so the same answer is used consistently).
+     */
+    private fun safeGetFeedbackPresent(): Boolean {
+        if (streamLive()) {
+            return try { nativeUsbStreamGetFeedbackPresent() } catch (_: Throwable) { false }
+        }
+        val parsed = parsedResult ?: return false
+        return parsed.feedbackEndpoint != null ||
+            parsed.altSettingFormats.any { it.feedbackEndpointAddress != null }
+    }
+
+    /** Always called before a native start, so a previous profile cannot leak. */
+    private fun applyStreamTuning(params: ResolvedStreamParams?) {
+        if (!nativeLoaded) return
+        try {
+            nativeUsbSetStreamTuning(
+                params?.transferSizeBytes ?: 0,
+                params?.bufferMs ?: 0,
+                params?.disableExplicitFeedback ?: false,
+            )
+        } catch (e: Throwable) {
+            Log.w(TAG, "USB stream tuning unavailable: ${e.message}")
+        }
+    }
+
+    /** Selects alternate setting 0 on the streaming interface, best effort. */
+    private fun resetStreamingAlt(conn: UsbDeviceConnection, iface: UsbInterface): Boolean {
+        val device = openedDevice ?: return false
+        val idle = (0 until device.interfaceCount).map { device.getInterface(it) }
+            .firstOrNull { it.id == iface.id && it.alternateSetting == 0 } ?: return false
+        return try { conn.setInterface(idle) } catch (_: Exception) { false }
+    }
+
+    // ---- quirk profiles ----
+
+    private fun quirkKey(vid: Int, pid: Int): String = "$vid:$pid"
+
+    /**
+     * The quirk document from a MethodCall, tolerating both call shapes:
+     * the raw map and a `{"profile": {...}}` envelope. Values are kept as-is so
+     * [UsbQuirkResolver] can reject a wrong type instead of this reader silently
+     * coercing it.
+     */
+    private fun quirkProfileArgument(call: MethodCall): Map<String, Any?> {
+        val arguments = call.arguments as? Map<*, *> ?: return emptyMap()
+        val nested = arguments["profile"]
+        val source = if (nested is Map<*, *>) nested else arguments
+        val profile = LinkedHashMap<String, Any?>(source.size)
+        for ((key, value) in source) {
+            val name = key as? String ?: continue
+            profile[name] = value
+        }
+        return profile
+    }
+
+    private fun quirkPrefs() = context.getSharedPreferences(QUIRK_PREFS, Context.MODE_PRIVATE)
+
+    /** The stored profile for one DAC, or an empty map (never throws). */
+    private fun loadQuirkProfile(vid: Int, pid: Int): Map<String, Any?> = try {
+        UsbQuirkResolver.fromJson(quirkPrefs().getString(quirkKey(vid, pid), null))
+    } catch (_: Throwable) {
+        emptyMap()
+    }
+
+    private fun deviceFacts(
+        device: UsbDevice,
+        parsed: UsbAudioControlParser.Result,
+        rate: Int,
+        depth: Int,
+        channels: Int,
+    ): UsbDeviceFacts = UsbDeviceFacts(
+        vid = device.vendorId,
+        pid = device.productId,
+        uacVersion = parsed.uacVersion,
+        // Unknown stays unknown: a UAC2 rate table is only readable once the
+        // Audio Control interface is claimed, and an empty list must never be
+        // turned into "nothing is supported".
+        supportedRates = advertisedRates,
+        requestedRate = rate,
+        requestedDepth = depth,
+        requestedChannels = channels,
+        feedbackPresent = parsed.feedbackEndpoint != null ||
+            parsed.altSettingFormats.any { it.feedbackEndpointAddress != null },
+    )
+
+    private fun resolveQuirks(device: UsbDevice, facts: UsbDeviceFacts): ResolvedStreamParams {
+        val profile = loadQuirkProfile(device.vendorId, device.productId)
+        return try {
+            UsbQuirkResolver.resolve(profile, facts)
+        } catch (_: Throwable) {
+            UsbQuirkResolver.resolve(emptyMap(), facts)
+        }
+    }
+
+    /**
+     * Publishes the resolved quirk outcome for status/diagnostics and records
+     * rejected entries. Nothing here may block streaming: a rejected quirk only
+     * means the affected parameter keeps its request/default value.
+     */
+    private fun publishQuirks(parsed: UsbAudioControlParser.Result, resolved: ResolvedStreamParams) {
+        val applied = resolved.appliedQuirks.toMutableList()
+        val notApplicable = LinkedHashMap<String, String>()
+        if (UsbQuirkResolver.KEY_UAC1_REASSERT_AFTER_ALT in applied &&
+            parsed.uacVersion != UsbAudioControlParser.UAC1
+        ) {
+            // UAC1 already writes its rate after setInterface(); on UAC2 the
+            // quirk has no meaning and must not be reported as applied.
+            applied.remove(UsbQuirkResolver.KEY_UAC1_REASSERT_AFTER_ALT)
+            notApplicable[UsbQuirkResolver.KEY_UAC1_REASSERT_AFTER_ALT] = "not_applicable"
+        }
+        if (UsbQuirkResolver.KEY_DISABLE_UAC2_CLOCK_SWITCH in applied &&
+            parsed.uacVersion != UsbAudioControlParser.UAC2
+        ) {
+            // There is no UAC2 clock entity to leave alone on a UAC1 device.
+            applied.remove(UsbQuirkResolver.KEY_DISABLE_UAC2_CLOCK_SWITCH)
+            notApplicable[UsbQuirkResolver.KEY_DISABLE_UAC2_CLOCK_SWITCH] = "not_applicable"
+        }
+        quirkApplied = applied
+        quirkNotApplicable = notApplicable
+        quirkRejected = resolved.rejected.filterKeys { it != "rate" }
+        quirkBitPerfectAffected = resolved.bitPerfectAffected
+        quirkBitPerfectReason = resolved.bitPerfectReason
+        for ((key, reason) in resolved.rejected) {
+            // "rate" is the resolver's answer about the *request*, not a quirk;
+            // selectFormat refuses an unsupported format on its own.
+            if (key == "rate") continue
+            recordEvent(lastError = "quirk_rejected:$key=$reason", resultCode = 0)
+        }
+    }
+
+    // ---- structured events ----
+
+    /**
+     * Appends one [UsbEvent] with the real fields of the moment. Redaction and
+     * bounds live in [UsbEventLog]; no path, serial or descriptor dump is passed.
+     */
+    private fun recordEvent(
+        lastError: String? = null,
+        resultCode: Int = lastStreamResultCode ?: 0,
+        format: UsbAudioProtocol.StreamFormat? = streamFormat,
+        rate: Int = format?.sampleRate ?: 0,
+        depth: Int = format?.wireBitDepth ?: 0,
+        channels: Int = format?.wireChannels ?: 0,
+        interfaceNumber: Int = streamInterfaceNumber ?: 0,
+        altSetting: Int = streamAltSetting,
+        endpoint: Int = streamEndpoint,
+        selectorPin: Int = activeQuirks?.preferredSelectorPin ?: 0,
+        drainPending: Boolean = this.drainPending,
+    ) {
+        val device = openedDevice
+        try {
+            usbEventLog.record(
+                UsbEvent(
+                    timestampMs = SystemClock.elapsedRealtime(),
+                    build = safeBuildLabel(),
+                    deviceModel = safeDeviceModel(),
+                    androidVersion = safeAndroidVersion(),
+                    vid = device?.vendorId ?: 0,
+                    pid = device?.productId ?: 0,
+                    uacVersion = uacVersion,
+                    interfaceNumber = interfaceNumber,
+                    altSetting = altSetting,
+                    endpoint = endpoint,
+                    rate = rate,
+                    depth = depth,
+                    channels = channels,
+                    clockSource = parsedResult?.clockSource?.clockId ?: 0,
+                    selectorPin = selectorPin,
+                    feedbackPresent = safeGetFeedbackPresent(),
+                    clockDriftPpm = safeGetClockDriftPpm().toDouble(),
+                    ringFillMs = safeGetRingFillMs().toLong(),
+                    underrunCount = safeGetUnderrunCount(),
+                    overrunCount = safeGetOverrunCount(),
+                    lastError = lastError,
+                    drainPending = drainPending,
+                    resultCode = resultCode,
+                ),
+            )
+        } catch (_: Throwable) {
+            // The log is diagnostics, never part of the audio path.
+        }
+    }
+
+    private fun eventsAsMaps(events: List<UsbEvent>): List<Map<String, Any?>> = events.map { event ->
+        mapOf(
+            "timestampMs" to event.timestampMs,
+            "build" to event.build,
+            "deviceModel" to event.deviceModel,
+            "androidVersion" to event.androidVersion,
+            "vid" to event.vid,
+            "pid" to event.pid,
+            "uacVersion" to event.uacVersion,
+            "interfaceNumber" to event.interfaceNumber,
+            "altSetting" to event.altSetting,
+            "endpoint" to event.endpoint,
+            "rate" to event.rate,
+            "depth" to event.depth,
+            "channels" to event.channels,
+            "clockSource" to event.clockSource,
+            "selectorPin" to event.selectorPin,
+            "feedbackPresent" to event.feedbackPresent,
+            "clockDriftPpm" to event.clockDriftPpm,
+            "ringFillMs" to event.ringFillMs,
+            "underrunCount" to event.underrunCount,
+            "overrunCount" to event.overrunCount,
+            "lastError" to event.lastError,
+            "drainPending" to event.drainPending,
+            "resultCode" to event.resultCode,
+        )
+    }
+
+    private fun safeBuildLabel(): String = try { Build.DISPLAY ?: "unknown" } catch (_: Throwable) { "unknown" }
+
+    private fun safeAndroidVersion(): String = try {
+        Build.VERSION.RELEASE ?: "unknown"
+    } catch (_: Throwable) { "unknown" }
+
+    private fun safeDeviceModel(): String = try {
+        listOfNotNull(Build.MANUFACTURER, Build.MODEL).joinToString(" ").trim()
+            .ifEmpty { "unknown" }
+    } catch (_: Throwable) { "unknown" }
+
+    // ---- quirk profile persistence (no dependency: tiny JSON writer) ----
+
+    private fun setQuirkProfileInternal(profile: Map<String, Any?>): Map<String, Any?> {
+        val device = openedDevice ?: findAudioDevice()
+            ?: return mapOf(
+                "ok" to false,
+                "error" to "no_usb_device",
+                "applied" to emptyList<String>(),
+                "rejected" to emptyMap<String, String>(),
+                "bitPerfectAffected" to false,
+                "bitPerfectReason" to null,
+            )
+        val stored = try {
+            quirkPrefs().edit()
+                .putString(quirkKey(device.vendorId, device.productId), encodeJsonObject(profile))
+                .commit()
+        } catch (_: Throwable) {
+            false
+        }
+        if (!stored) {
+            return mapOf(
+                "ok" to false,
+                "error" to "profile_store_failed",
+                "applied" to emptyList<String>(),
+                "rejected" to emptyMap<String, String>(),
+                "bitPerfectAffected" to false,
+                "bitPerfectReason" to null,
+            )
+        }
+        val parsed = parsedResult ?: parseViaInterfaces(device).also { applyParsed(it) }
+        val resolved = UsbQuirkResolver.resolve(
+            profile,
+            deviceFacts(device, parsed, lastRequestedRate, lastRequestedDepth, lastRequestedChannels),
+        )
+        // The synthetic "rate" rejection belongs to a stream request, not to the
+        // profile: previewing a profile must not look like a bad key.
+        val rejected = resolved.rejected.filterKeys { it != "rate" }
+        recordEvent(lastError = null, resultCode = 0)
+        return mapOf(
+            "ok" to true,
+            "vid" to device.vendorId,
+            "pid" to device.productId,
+            "applied" to resolved.appliedQuirks,
+            "rejected" to rejected,
+            "bitPerfectAffected" to resolved.bitPerfectAffected,
+            "bitPerfectReason" to resolved.bitPerfectReason,
+        )
+    }
+
+    private fun encodeJsonObject(profile: Map<String, Any?>): String = buildString {
+        append('{')
+        var first = true
+        for ((key, value) in profile) {
+            if (!first) append(',')
+            first = false
+            appendJsonString(key)
+            append(':')
+            appendJsonValue(value)
+        }
+        append('}')
+    }
+
+    private fun StringBuilder.appendJsonValue(value: Any?) {
+        when (value) {
+            null -> append("null")
+            is Boolean -> append(value)
+            is Int, is Long, is Short, is Byte -> append(value.toString())
+            is Double -> if (value.isFinite()) append(value.toString()) else append("null")
+            is Float -> if (value.isFinite()) append(value.toDouble().toString()) else append("null")
+            is String -> appendJsonString(value)
+            is Map<*, *> -> {
+                append('{')
+                var first = true
+                for ((k, v) in value) {
+                    if (!first) append(',')
+                    first = false
+                    appendJsonString(k as? String ?: k.toString())
+                    append(':')
+                    appendJsonValue(v)
+                }
+                append('}')
+            }
+
+            is Iterable<*> -> {
+                append('[')
+                var first = true
+                for (item in value) {
+                    if (!first) append(',')
+                    first = false
+                    appendJsonValue(item)
+                }
+                append(']')
+            }
+
+            else -> append("null")
+        }
+    }
+
+    private fun StringBuilder.appendJsonString(value: String) {
+        append('"')
+        for (ch in value) {
+            when (ch) {
+                '"' -> append("\\\"")
+                '\\' -> append("\\\\")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (ch < ' ') append(' ') else append(ch)
+            }
+        }
+        append('"')
+    }
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var permissionReceiver: BroadcastReceiver? = null
     private var pendingPermissionTimeout: Runnable? = null
@@ -209,6 +733,8 @@ class UsbExclusivePlugin(
                     // connection (blocking); run it off the main thread.
                     workerHandler.post {
                         if (detached == null || detached.deviceId == openedDevice?.deviceId) {
+                            sessionStep("detached") { machine, now -> machine.onDetached(now) }
+                            recordEvent(lastError = "device_detached")
                             closeLocked()
                         }
                         emitState()
@@ -272,7 +798,17 @@ class UsbExclusivePlugin(
                     val channels = call.argument<Int>("channels") ?: 2
                     val bitDepth = call.argument<Int>("bitDepth") ?: 16
                     val strict = call.argument<Boolean>("strict") ?: false
-                    runAsync(call.method, result) { startStreamingInternal(sampleRate, channels, bitDepth, strict) }
+                    // 0 = best effort, 1 = bit-perfect, 2 = ASRC. An unknown or
+                    // out-of-range value degrades to best effort and is recorded
+                    // rather than silently accepted as a mode the sink never got.
+                    val rawRenderMode = call.argument<Int>("renderMode")
+                    val renderMode = (rawRenderMode ?: 0).coerceIn(0, MAX_RENDER_MODE)
+                    runAsync(call.method, result) {
+                        if (call.hasArgument("renderMode") && rawRenderMode != renderMode) {
+                            recordEvent(lastError = "render_mode_clamped:$rawRenderMode", resultCode = 0)
+                        }
+                        startStreamingInternal(sampleRate, channels, bitDepth, strict, renderMode)
+                    }
                 }
                 "stopStreaming" -> runAsync(call.method, result) { stopStreamingInternal() }
                 "resetChannelMismatchFrames" -> {
@@ -293,7 +829,7 @@ class UsbExclusivePlugin(
                     // which waits on the native control mutex that Close() can
                     // hold for up to 2 s while it drains. Never measure that on
                     // the main thread: route it through the worker like
-                    // getStatus(). The returned map is unchanged.
+                    // getStatus(). The returned map only grows with diagnostics.
                     runAsync(call.method, result) {
                         mapOf(
                             "lastError" to safeGetLastError(),
@@ -301,9 +837,46 @@ class UsbExclusivePlugin(
                             "overrunCount" to safeGetOverrunCount(),
                             "channelMismatchFrames" to safeGetChannelMismatchFrames(),
                             "isStreamActive" to safeIsStreamActive(),
-                            "bufferedMs" to safeGetBufferedMs()
+                            "bufferedMs" to safeGetBufferedMs(),
+                            "events" to eventsAsMaps(usbEventLog.snapshot()),
+                            "sessionState" to sessionStateName(),
+                            "drainPending" to drainPending,
+                            "clockDomain" to safeGetClockDomain(),
+                            "clockDriftPpm" to safeGetClockDriftPpm(),
+                            "ringFillMs" to safeGetRingFillMs(),
+                            "feedbackPresent" to safeGetFeedbackPresent(),
+                            "quirkApplied" to quirkApplied,
+                            "quirkRejected" to quirkRejected,
+                            "quirkNotApplicable" to quirkNotApplicable,
+                            "quirkBitPerfectAffected" to quirkBitPerfectAffected,
+                            "quirkBitPerfectReason" to quirkBitPerfectReason,
                         )
                     }
+                }
+                "startPcmFile" -> {
+                    val path = call.argument<String>("path")
+                    if (path.isNullOrBlank()) {
+                        result.success(false)
+                    } else {
+                        runAsync(call.method, result) { nativeUsbStreamStartPcmFile(path) }
+                    }
+                }
+                "stopPcmFile" -> runAsync(call.method, result) {
+                    nativeUsbStreamStopPcmFile()
+                    true
+                }
+                "hasPcmFileSource" -> runAsync(call.method, result) {
+                    nativeUsbStreamHasPcmFile()
+                }
+                "getUsbEvents" -> runAsync(call.method, result) {
+                    eventsAsMaps(usbEventLog.snapshot())
+                }
+                "setQuirkProfile" -> {
+                    // Two shapes are accepted: the raw document as the arguments
+                    // (`invokeMethod('setQuirkProfile', profile)`, what the Dart
+                    // service sends) and the `{"profile": {...}}` envelope.
+                    val profile = quirkProfileArgument(call)
+                    runAsync(call.method, result) { setQuirkProfileInternal(profile) }
                 }
                 "getBufferedMs" -> runAsync(call.method, result) { safeGetBufferedMs() }
                 "getProducerChannels" -> {
@@ -750,6 +1323,18 @@ class UsbExclusivePlugin(
             "channelMismatchFrames" to safeGetChannelMismatchFrames(),
             "bufferedMs" to safeGetBufferedMs(),
             "rateVerified" to (streaming && lastRateVerified),
+            // Clock-domain telemetry: cheap native getters, no USB transfer, so
+            // status polling gains no new blocking work.
+            "clockDomain" to safeGetClockDomain(),
+            "clockDriftPpm" to safeGetClockDriftPpm(),
+            "ringFillMs" to safeGetRingFillMs(),
+            "feedbackPresent" to safeGetFeedbackPresent(),
+            "sessionState" to sessionStateName(),
+            "quirkApplied" to quirkApplied,
+            "quirkRejected" to quirkRejected,
+            "quirkNotApplicable" to quirkNotApplicable,
+            "quirkBitPerfectAffected" to quirkBitPerfectAffected,
+            "quirkBitPerfectReason" to quirkBitPerfectReason,
             "advertisedFormats" to parsed.altSettingFormats.map { fmt ->
                 mapOf(
                     "interfaceNumber" to fmt.interfaceNumber,
@@ -806,6 +1391,17 @@ class UsbExclusivePlugin(
         "channelMismatchFrames" to 0L,
         "bufferedMs" to 0.0,
         "rateVerified" to false,
+        // Always present so the Dart parser never sees a missing key.
+        "clockDomain" to "unknown",
+        "clockDriftPpm" to 0,
+        "ringFillMs" to 0,
+        "feedbackPresent" to false,
+        "sessionState" to sessionStateName(),
+        "quirkApplied" to emptyList<String>(),
+        "quirkRejected" to emptyMap<String, String>(),
+        "quirkNotApplicable" to emptyMap<String, String>(),
+        "quirkBitPerfectAffected" to false,
+        "quirkBitPerfectReason" to null,
         "advertisedFormats" to emptyList<Map<String, Any?>>(),
         "volumeCalibrationOffsetDb" to (device?.let { getVolumeCalibrationOffset(it.vendorId, it.productId) } ?: 0.0),
     )
@@ -873,6 +1469,12 @@ class UsbExclusivePlugin(
             return
         }
         pendingPermissionResult = result
+        // A prompt raised mid-stream must not reset a live session: only an
+        // idle/failed/abandoned machine is admitted here.
+        if (sessionStateIs(UsbSessionState.IDLE, UsbSessionState.ERROR, UsbSessionState.ABANDONED)) {
+            sessionPermissionRequested()
+            recordEvent(resultCode = 0)
+        }
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 if (intent?.action != ACTION_USB_PERMISSION) return
@@ -925,6 +1527,15 @@ class UsbExclusivePlugin(
             try { context.unregisterReceiver(it) } catch (_: Exception) {}
         }
         permissionReceiver = null
+        if (sessionStateIs(UsbSessionState.PERMISSION)) {
+            if (granted) {
+                sessionPermissionGranted()
+                recordEvent(resultCode = 0)
+            } else {
+                sessionPermissionDenied()
+                recordEvent(lastError = "permission_denied", resultCode = 1)
+            }
+        }
         emitState()
         try { r?.success(granted) } catch (_: Exception) {}
     }
@@ -1027,14 +1638,29 @@ class UsbExclusivePlugin(
 
     // ---- raw UAC2 isochronous streaming ----
 
-    private fun startStreamingInternal(sampleRate: Int, channels: Int, bitDepth: Int = 16, strict: Boolean = false): Map<String, Any?> {
+    private fun startStreamingInternal(
+        sampleRate: Int,
+        channels: Int,
+        bitDepth: Int = 16,
+        strict: Boolean = false,
+        renderMode: Int = 0,
+    ): Map<String, Any?> {
+        val mode = renderMode.coerceIn(0, MAX_RENDER_MODE)
+        lastRequestedRate = sampleRate
+        lastRequestedDepth = bitDepth
+        lastRequestedChannels = channels
         val owner = directOwner
         if (owner != null && owner !== this) {
             lastStreamResultCode = -1
             Log.w(TAG, "Step owner: direct streaming is owned by another plugin instance")
-            return failure("direct_owner_busy")
+            return startFailure("direct_owner_busy")
         }
-        if (streaming && streamFormat?.matches(sampleRate, bitDepth, channels, isNativeActive()) == true) {
+        // A restart is only skipped for the same format *and* the same render
+        // mode: switching bit-perfect on for an already-open stream has to
+        // reopen it, otherwise the sink keeps the mode it was opened with.
+        if (streaming && activeRenderMode == mode &&
+            streamFormat?.matches(sampleRate, bitDepth, channels, isNativeActive()) == true
+        ) {
             if (strict && !lastRateVerified) {
                 lastStreamResultCode = 3
                 Log.w(TAG, "Step clock: strict mode refused unverified readback on existing stream")
@@ -1062,50 +1688,89 @@ class UsbExclusivePlugin(
             if (!clearStreaming(releaseOnDrainFailure = true)) {
                 lastStreamResultCode = -1
                 Log.w(TAG, "Step drain: forced teardown could not release the previous USB stream")
-                return failure("usb_drain_incomplete")
+                return startFailure("usb_drain_incomplete")
             }
             Log.i(TAG, "Step drain: forced teardown released the stale USB stream")
         }
+        // A start always begins a fresh session. The previous one may have been
+        // left ERROR/ABANDONED by a fault; nothing is claimed at this point
+        // (clearStreaming above released it), so IDLE is the honest state.
+        sessionReset()
         if (!nativeLoaded) {
             lastStreamResultCode = -1
             Log.w(TAG, "Step native: native library not available")
-            return failure("native_unavailable")
+            return startFailure("native_unavailable")
         }
         val device = findAudioDevice() ?: run {
             lastStreamResultCode = -1
             Log.w(TAG, "Step device: no USB audio device found")
-            return failure("no_usb_device")
+            return startFailure("no_usb_device")
         }
         if (usbManager?.hasPermission(device) != true) {
             lastStreamResultCode = 1
             Log.w(TAG, "Step permission: USB access permission required")
-            return failure("permission_required")
+            return startFailure("permission_required")
         }
+        // The permission grant survives from an earlier prompt; model the
+        // admission so the machine reaches OPENING legally.
+        sessionPermissionRequested()
+        sessionPermissionGranted()
         val conn = ensureConnection(device) ?: run {
             lastStreamResultCode = 1
             Log.w(TAG, "Step open: failed to open USB device connection")
-            return failure("open_failed")
+            return startFailure("open_failed")
         }
+        sessionOpened()
+        recordEvent(resultCode = 0)
         val parsed = parseViaRawDescriptors(conn) ?: run {
             lastStreamResultCode = 3
             Log.w(TAG, "Step descriptors: format descriptors required")
-            return failure("format_descriptors_required")
+            return startFailure("format_descriptors_required")
         }
         if (parsed.uacVersion == UsbAudioControlParser.UAC3) {
             lastStreamResultCode = 3
             Log.w(TAG, "Step uac: UAC3 is not supported for bit-perfect streaming")
-            return failure("uac3_unsupported")
+            return startFailure("uac3_unsupported")
         }
-        val selected = UsbAudioProtocol.selectFormat(parsed, sampleRate, bitDepth, channels) ?: run {
+        // Quirks are resolved *before* the alt setting is chosen: force16Bit
+        // has to change the request, or a 24-bit FORMAT_TYPE would be selected
+        // and the quirk would silently do nothing. A rejected entry only lands
+        // in the event log; it never blocks the stream.
+        val facts = deviceFacts(device, parsed, sampleRate, bitDepth, channels)
+        val resolved = resolveQuirks(device, facts)
+        publishQuirks(parsed, resolved)
+        val effectiveRate = resolved.effectiveRate
+        val effectiveDepth = resolved.effectiveDepth
+        val effectiveChannels = resolved.effectiveChannels
+        // Strict mode promises the source unchanged. A quirk that truncates the
+        // depth or leaves the DAC clock unprogrammed cannot keep that promise,
+        // so refuse before opening instead of starting a stream the contract
+        // does not cover.
+        if (strict && effectiveDepth < bitDepth) {
             lastStreamResultCode = 3
-            Log.w(TAG, "Step selectFormat: format unsupported: rate=$sampleRate, depth=$bitDepth, channels=$channels")
-            return failure("format_unsupported")
+            Log.w(TAG, "Step quirk: strict mode refuses force16Bit truncation")
+            return startFailure("format_unsupported")
+        }
+        if (strict && resolved.disableUac2ClockSwitch &&
+            parsed.uacVersion == UsbAudioControlParser.UAC2
+        ) {
+            lastStreamResultCode = 3
+            Log.w(TAG, "Step quirk: strict mode refuses an unprogrammed UAC2 clock")
+            return startFailure("clock_not_verified")
+        }
+        val selected = UsbAudioProtocol.selectFormat(
+            parsed, effectiveRate, effectiveDepth, effectiveChannels,
+        ) ?: run {
+            lastStreamResultCode = 3
+            Log.w(TAG, "Step selectFormat: format unsupported: rate=$effectiveRate, " +
+                "depth=$effectiveDepth, channels=$effectiveChannels")
+            return startFailure("format_unsupported")
         }
         val epAddress = selected.endpointAddress
         val epInterface = selected.interfaceNumber
         val epAlt = selected.altSetting
         val streamBytes = selected.subslotSize
-        val wireChannels = selected.channels.takeIf { it > 0 } ?: channels
+        val wireChannels = selected.channels.takeIf { it > 0 } ?: effectiveChannels
 
         var iface: UsbInterface? = null
         for (i in 0 until device.interfaceCount) {
@@ -1118,7 +1783,7 @@ class UsbExclusivePlugin(
         iface ?: run {
             lastStreamResultCode = 5
             Log.w(TAG, "Step alt_setting: streaming interface not found (result 5)")
-            return failure("streaming_interface_not_found")
+            return startFailure("streaming_interface_not_found")
         }
 
         releaseClaim()
@@ -1134,9 +1799,12 @@ class UsbExclusivePlugin(
             lastStreamResultCode = 1
             Log.w(TAG, "Step claim: failed to claim streaming interface (result 1)")
             rebindKernelDriver(conn, iface, null)
-            return failure("claim_failed")
+            return startFailure("claim_failed")
         }
         claimedStreamingInterface = iface
+        streamAltSetting = epAlt
+        streamEndpoint = epAddress
+        sessionClaimed()
         claimControlInterface(conn, device, parsed)
         // Audio Control is claimed now, so a UAC2 clock range can be read. A
         // refusal must never fail the stream: it only means "unknown".
@@ -1146,33 +1814,68 @@ class UsbExclusivePlugin(
             if (!conn.setInterface(iface)) {
                 lastStreamResultCode = 2
                 Log.w(TAG, "Step alt_setting: failed to set alternate setting (result 2)")
-                return failure("alt_setting_failed")
+                return startFailure("alt_setting_failed")
             }
-            val rateResult = setDacSampleRate(conn, parsed, selected, sampleRate)
+            // A profile may deliberately leave the DAC's clock switch alone
+            // (broken UAC2 clock graphs switch the whole device off when
+            // reprogrammed). The rate is then simply not verified.
+            val clockSkipped = resolved.disableUac2ClockSwitch &&
+                parsed.uacVersion == UsbAudioControlParser.UAC2
+            val rateResult = if (clockSkipped) {
+                lastRateVerified = false
+                Log.i(TAG, "Step clock: UAC2 clock switching disabled by quirk profile")
+                recordEvent(
+                    lastError = "clock_switch_disabled",
+                    resultCode = 0,
+                    rate = effectiveRate,
+                    depth = effectiveDepth,
+                    channels = wireChannels,
+                    interfaceNumber = epInterface,
+                    altSetting = epAlt,
+                    endpoint = epAddress,
+                    selectorPin = resolved.preferredSelectorPin ?: 0,
+                )
+                null
+            } else {
+                setDacSampleRate(conn, parsed, selected, effectiveRate, resolved.preferredSelectorPin)
+            }
             if (rateResult == UsbAudioProtocol.RateSetResult.SELECTOR_RESTORE_FAILED) {
                 // The clock selector was left pointing at the source that just
                 // failed and both restore attempts were refused: this is not a
                 // "rate unsupported" answer, the DAC's clock is now misrouted.
                 lastStreamResultCode = 3
                 Log.w(TAG, "Step clock: clock selector could not be restored (result 3)")
-                return failure("clock_selector_restore_failed")
+                return startFailure("clock_selector_restore_failed")
             }
             if (rateResult == UsbAudioProtocol.RateSetResult.FAILED) {
                 lastStreamResultCode = 3
                 Log.w(TAG, "Step clock: clock not verified (result 3)")
-                return failure("clock_not_verified")
+                return startFailure("clock_not_verified")
             }
             if (rateResult == UsbAudioProtocol.RateSetResult.UNVERIFIED_READBACK_UNSUPPORTED) {
                 Log.i(TAG, "Step clock: UAC1 sample-rate set succeeded, readback unsupported")
                 if (strict) {
                     lastStreamResultCode = 3
                     Log.w(TAG, "Step clock: strict mode refused unverified readback (result 3)")
-                    return failure("uac1_rate_readback_unsupported")
+                    return startFailure("uac1_rate_readback_unsupported")
                 }
                 lastRateVerified = false
-            } else {
+            } else if (rateResult != null) {
                 lastRateVerified = true
             }
+            if (rateResult != null) {
+                recordEvent(
+                    resultCode = 0,
+                    rate = effectiveRate,
+                    depth = effectiveDepth,
+                    channels = wireChannels,
+                    interfaceNumber = epInterface,
+                    altSetting = epAlt,
+                    endpoint = epAddress,
+                    selectorPin = resolved.preferredSelectorPin ?: 0,
+                )
+            }
+            sessionConfigured()
             // Clock programmed: re-read the advertised rates (a UAC2 range is
             // only readable while the AC interface is claimed). Best effort.
             refreshAdvertisedRates(conn)
@@ -1180,37 +1883,55 @@ class UsbExclusivePlugin(
             if (fd < 0) {
                 lastStreamResultCode = 5
                 Log.w(TAG, "Step native_start: invalid file descriptor (result 5)")
-                return failure("no_fd")
+                return startFailure("no_fd")
+            }
+            // Always pushed - 0/0/false when no profile is stored - so a profile
+            // from a previous device can never leak into this stream.
+            applyStreamTuning(resolved)
+            val silenceMs = resolved.silenceMs.coerceIn(0, MAX_QUIRK_SILENCE_MS)
+            if (silenceMs > 0) {
+                Log.i(TAG, "Quirk silence: waiting ${silenceMs}ms before native start")
+                try {
+                    Thread.sleep(silenceMs.toLong())
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                }
             }
             val resultCode = nativeUsbStreamStartWithFormat(
-                fd, epAddress, epInterface, epAlt, sampleRate, wireChannels, streamBytes,
-                selected.bitResolution,
+                fd, epAddress, epInterface, epAlt, effectiveRate, wireChannels, streamBytes,
+                selected.bitResolution, mode,
             )
             lastStreamResultCode = resultCode
             if (resultCode != 0 || !isNativeActive()) {
                 Log.w(TAG, "Step native_start: native start failed with result $resultCode")
-                return failure("native_stream_not_active") + mapOf("resultCode" to resultCode)
+                return startFailure("native_stream_not_active") + mapOf("resultCode" to resultCode)
             }
             // The request is remembered as the request (see StreamFormat): a
             // 16-bit track whose endpoint was opened at 24-bit must be
-            // recognised as the same stream on the next track change.
+            // recognised as the same stream on the next track change. The
+            // *effective* depth is stored, so a force16Bit profile keeps
+            // matching 16-bit requests instead of reopening on every track.
             streamFormat = UsbAudioProtocol.StreamFormat(
-                sampleRate, bitDepth, channels,
+                effectiveRate, effectiveDepth, effectiveChannels,
                 wireBitDepth = selected.bitResolution, wireChannels = wireChannels,
             )
             streaming = true
+            activeRenderMode = mode
+            activeQuirks = resolved
             directStatus = DirectStreamStatus(device.deviceId, deviceLabel(device),
-                sampleRate, selected.bitResolution, wireChannels)
+                effectiveRate, selected.bitResolution, wireChannels)
             directOwner = this
+            sessionStarted()
+            recordEvent(resultCode = 0)
             val status = buildStatus()
             started = status["streamingActive"] == true && isNativeActive()
-            if (!started) return failure("native_stream_not_active")
+            if (!started) return startFailure("native_stream_not_active")
             emitState()
             return status + mapOf("success" to true, "resultCode" to 0)
         } catch (e: Throwable) {
             Log.w(TAG, "USB streaming startup failed: ${e.message}")
             lastStreamResultCode = -1
-            return failure("stream_start_failed")
+            return startFailure("stream_start_failed")
         } finally {
             // An incomplete drain here sets drainPending and keeps the claims;
             // the next start then refuses with usb_drain_incomplete.
@@ -1230,10 +1951,12 @@ class UsbExclusivePlugin(
         parsed: UsbAudioControlParser.Result,
         selected: UsbAudioControlParser.AltSettingFormat,
         sampleRate: Int,
+        preferredSelectorPin: Int? = null,
     ): UsbAudioProtocol.RateSetResult {
         val fixedUac1 = selected.supportedRates.size == 1 || !selected.sampleRateControlSupported
         return UsbAudioProtocol.programPlaybackClock(
             transport(conn), parsed, selected.endpointAddress, sampleRate, fixedUac1,
+            preferredSelectorPin,
         )
     }
 
@@ -1331,6 +2054,16 @@ class UsbExclusivePlugin(
      *     release.
      */
     private fun clearStreaming(releaseOnDrainFailure: Boolean = false): Boolean {
+        val previousFormat = streamFormat
+        val previousQuirks = activeQuirks
+        val sessionWasStreaming = sessionStateIs(UsbSessionState.STREAMING)
+        if (sessionWasStreaming) {
+            // The stop is requested before the (blocking) native drain: the
+            // machine must not keep claiming STREAMING while the endpoint closes.
+            sessionStep("stop_requested") { machine, now -> machine.onStopRequested(now) }
+            recordEvent(resultCode = 0, format = previousFormat)
+        }
+        val sessionDraining = sessionWasStreaming || sessionStateIs(UsbSessionState.DRAINING)
         // A missing native library means nothing was ever submitted, so the
         // drain is trivially complete. A throwing JNI call is not evidence that
         // the URBs were reaped and is treated as a failed drain.
@@ -1348,6 +2081,10 @@ class UsbExclusivePlugin(
         lastRateVerified = false
         if (!drained && !releaseOnDrainFailure) {
             drainPending = true
+            if (sessionDraining) {
+                sessionStep("drain_failed") { machine, now -> machine.onDrainFailed(now) }
+            }
+            recordEvent(lastError = "drain_incomplete", format = previousFormat)
             Log.w(TAG, "USB stream stop left URBs outstanding; keeping interfaces claimed")
             return false
         }
@@ -1385,12 +2122,53 @@ class UsbExclusivePlugin(
         val control = claimedControlInterface
         claimedControlInterface = null
         val conn = connection
+        // altResetOnStop: close the DAC's isochronous pipe with an explicit
+        // SET_INTERFACE(alt 0) before the claim is released. Best effort - the
+        // interface is about to be handed back either way - but the outcome is
+        // recorded, because a DAC that ignores it can click on every stop.
+        if (previousQuirks?.altResetOnStop == true && iface != null && conn != null) {
+            val reset = resetStreamingAlt(conn, iface)
+            Log.i(TAG, "altResetOnStop: alternate setting 0 " +
+                (if (reset) "selected before release" else "refused before release"))
+            recordEvent(
+                lastError = if (reset) null else "alt_reset_on_stop_failed",
+                format = previousFormat,
+            )
+        }
         if ((iface != null || control != null) && conn != null) {
             rebindKernelDriver(conn, iface, control)
         }
         // An abandoned sink holds no URBs and no fd, so nothing is pending
         // any more; only a forced teardown that could not abandon stays flagged.
         drainPending = !drained && !abandoned
+        if (sessionDraining) {
+            when {
+                abandoned -> {
+                    // The native sink was abandoned because its URBs could not be
+                    // reaped; the session ends ABANDONED, not cleanly drained.
+                    sessionStep("abandon") { machine, now -> machine.onAbandon(now) }
+                    recordEvent(resultCode = 0, format = previousFormat)
+                }
+
+                drained -> sessionStep("drain_succeeded") { machine, now ->
+                    machine.onDrainSucceeded(now)
+                }
+
+                else -> sessionStep("drain_failed") { machine, now -> machine.onDrainFailed(now) }
+            }
+        }
+        activeQuirks = null
+        activeRenderMode = 0
+        streamAltSetting = 0
+        streamEndpoint = 0
+        if (previousFormat != null || sessionDraining || previousQuirks != null) {
+            // Only a teardown that actually had something to tear down is worth
+            // an event; the no-op probe at the top of every start stays silent.
+            recordEvent(
+                lastError = if (drained || abandoned) null else "drain_pending",
+                format = previousFormat,
+            )
+        }
         // A forced teardown that could not abandon leaves the native sink
         // retaining URBs: the interfaces are released, but the next Open would
         // still fail, so report that instead of claiming a clean teardown.

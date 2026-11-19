@@ -1730,15 +1730,21 @@ JNIEXPORT jint JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStartWithFormat(
         JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,
         jint interfaceNumber, jint altSetting, jint sampleRate, jint channels,
-        jint bytesPerSample, jint validBitDepth) {
+        jint bytesPerSample, jint validBitDepth, jint renderMode) {
     // Kotlin (UsbExclusivePlugin) already claimed the streaming interface,
     // selected altSetting, and programmed+verified the DAC sample clock.
     // Skipping duplicate SET_INTERFACE prevents resetting the DAC clock back
     // to 48 kHz on UAC1/UAC2 hardware.
-    auto res = pulsr::UsbAudioSink::instance().Open(
-               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels,
-               bytesPerSample, validBitDepth, /*alreadyConfigured=*/true);
-    return static_cast<jint>(res);
+    try {
+        auto res = pulsr::UsbAudioSink::instance().Open(
+                    fd, endpoint, interfaceNumber, altSetting, sampleRate, channels,
+                    bytesPerSample, validBitDepth, /*alreadyConfigured=*/true,
+                    renderMode);
+        return static_cast<jint>(res);
+    } catch (...) {
+        // Never let an allocation failure inside Open reach the VM as a crash.
+        return static_cast<jint>(pulsr::UsbStreamResult::InvalidArgs);
+    }
 }
 
 JNIEXPORT jboolean JNICALL
@@ -1804,6 +1810,104 @@ JNIEXPORT jdouble JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetBufferedMs(
         JNIEnv* /* env */, jobject /* thiz */) {
     return pulsr::UsbAudioSink::instance().GetBufferedMs();
+}
+
+// ---- Stream shape and clock-domain telemetry --------------------------------
+// The five entry points below are polled by the UI. Each answers the safe
+// default (Unknown / 0 / false) when the sink cannot be reached or the stream
+// is not running, and none may let an exception cross the JNI boundary: a
+// torn-down singleton is a status question, not a VM abort.
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetClockDomain(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    try {
+        return static_cast<jint>(pulsr::UsbAudioSink::instance().GetClockStatus().domain);
+    } catch (...) {
+        return static_cast<jint>(pulsr::UsbClockDomain::Unknown);
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetClockDriftPpm(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    try {
+        return static_cast<jint>(pulsr::UsbAudioSink::instance().GetClockStatus().clockDriftPpm);
+    } catch (...) {
+        return 0;
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetRingFillMs(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    try {
+        return static_cast<jint>(pulsr::UsbAudioSink::instance().GetClockStatus().ringFillMs);
+    } catch (...) {
+        return 0;
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStartPcmFile(
+        JNIEnv* env, jobject /* thiz */, jstring path) {
+    if (env == nullptr || path == nullptr) return JNI_FALSE;
+    const char* raw = env->GetStringUTFChars(path, nullptr);
+    if (raw == nullptr) return JNI_FALSE;
+    bool ok = false;
+    try {
+        ok = pulsr::UsbAudioSink::instance().StartPcmFile(std::string(raw));
+    } catch (...) {
+        ok = false;
+    }
+    env->ReleaseStringUTFChars(path, raw);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStopPcmFile(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    try {
+        pulsr::UsbAudioSink::instance().StopPcmFile();
+    } catch (...) {
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamHasPcmFile(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    try {
+        return pulsr::UsbAudioSink::instance().HasPcmFileSource()
+            ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamGetFeedbackPresent(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    try {
+        return pulsr::UsbAudioSink::instance().GetClockStatus().feedbackPresent
+            ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;
+    }
+}
+
+// Advisory: stored for the next Open(), never mutates a live stream, so a failed
+// or torn-down call is harmless and gets no return channel.
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbSetStreamTuning(
+        JNIEnv* /* env */, jobject /* thiz */, jint transferSizeBytes, jint bufferMs,
+        jboolean disableFeedback) {
+    try {
+        pulsr::UsbAudioSink::instance().SetStreamTuning(
+            static_cast<int>(transferSizeBytes), static_cast<int>(bufferMs),
+            disableFeedback == JNI_TRUE);
+    } catch (...) {
+        // Tuning is best-effort by contract: swallow and keep the defaults.
+    }
 }
 
 // Decoded track's channel count as last seen by the render tap. 0 = unknown

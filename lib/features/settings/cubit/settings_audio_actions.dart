@@ -231,6 +231,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         bitDepth: trackDepth,
         channels: effectiveChannels,
         strict: strict,
+        renderMode: await _usbRenderModeForActiveDac(),
       );
       if (!res.isOk) {
         _lastDirectUsbFailure = res.toUserMessage();
@@ -255,6 +256,20 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// could not carry the track.
   static int? _usableRate(int? value) =>
       (value == null || value <= 0) ? null : value;
+
+  /// Effective clock architecture for the attached DAC.
+  ///
+  /// The stored per-device choice is only a request: rollout flags and the
+  /// presence of a feedback endpoint decide whether it can be honoured. A
+  /// failed preference read falls back to best effort, never to a claim.
+  Future<UsbRenderMode> _usbRenderModeForActiveDac() async {
+    final status = UsbExclusiveService().lastStatus;
+    return resolveEffectiveRenderMode(
+      vid: status.vendorId,
+      pid: status.productId,
+      feedbackPresent: status.feedbackPresent,
+    );
+  }
 
   int _directStreamSampleRate() {
     final deviceRate = state.currentOutputDevice?.sampleRate ?? 0;
@@ -481,6 +496,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
         channels: effectiveChannels,
         bitDepth: sourceDepth,
         strict: state.strictBitPerfect,
+        renderMode: await _usbRenderModeForActiveDac(),
       );
       applied = res.isOk;
       _lastDirectUsbFailure = applied ? null : res.toUserMessage();

@@ -477,11 +477,23 @@ class UsbErgonomicsService extends ChangeNotifier {
     required UsbQuirkProfile? quirk,
   }) async {
     final profile = quirk ?? UsbQuirkProfile.defaults;
-    final result = await _invoke(applyMethod, <String, Object?>{
+    final payload = <String, Object?>{
+      ...profile.toJson(),
       'vid': vid ?? profile.vid,
       'pid': pid ?? profile.pid,
-      'hidEnabled': profile.hidEnabled,
-    });
+    };
+    // The exclusive plugin owns the direct audio path; it validates the same
+    // document again and applies only the safe transport quirks. A missing
+    // handler is expected on older builds and never fails the ergonomics push.
+    final usb = _usb;
+    if (usb != null) {
+      try {
+        await usb.applyQuirkProfile(payload);
+      } catch (e, st) {
+        _log('USB quirk profile push failed', e, st);
+      }
+    }
+    final result = await _invoke(applyMethod, payload);
     if (result is Map) {
       final error = result['error'];
       if (error != null) {
@@ -500,10 +512,23 @@ class UsbErgonomicsService extends ChangeNotifier {
 
   String _signature(int? vid, int? pid, UsbQuirkProfile? quirk) {
     final q = quirk;
-    return <String>[
-      '${vid ?? -1}:${pid ?? -1}',
-      if (q == null) 'none' else 'hid:${q.hidEnabled}',
-    ].join('|');
+    final fields = q == null
+        ? const <Object?>['none']
+        : <Object?>[
+            q.hidEnabled,
+            q.silenceMs,
+            q.force16Bit,
+            q.altResetOnStop,
+            q.transferSizeBytes,
+            q.bufferMs,
+            q.disableExplicitFeedback,
+            q.preferredSelectorPin,
+            q.volumeCalibrationDb,
+            q.uac1ReassertAfterAlt,
+            q.disableUac2ClockSwitch,
+          ];
+    return <String>['${vid ?? -1}:${pid ?? -1}', ...fields.map((f) => '$f')]
+        .join('|');
   }
 
   Future<Object?> _invoke(

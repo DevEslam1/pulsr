@@ -50,6 +50,64 @@ abstract final class UsbErgonomicsStrings {
   static const String hidHint =
       'Reads play/pause, skip and volume from the DAC buttons.';
 
+  /// Section header for the direct-path transport quirks.
+  static const String audioSectionTitle = 'Audio transport quirks';
+
+  /// Hint under the audio transport section.
+  static const String audioSectionHint =
+      'Applied only to the direct USB path. Values that change bit-perfect '
+      'semantics are reported in the stream status.';
+
+  /// Switch title for forced 16-bit output.
+  static const String force16Title = 'Force 16-bit output';
+
+  /// Switch hint for forced 16-bit output.
+  static const String force16Hint =
+      'Truncates wider sources; the stream can no longer claim bit-perfect.';
+
+  /// Switch title for resetting the alt setting on stop.
+  static const String altResetTitle = 'Reset alt setting on stop';
+
+  /// Switch hint for resetting the alt setting on stop.
+  static const String altResetHint =
+      'Returns the DAC to alt 0 before releasing the interface.';
+
+  /// Switch title for ignoring the feedback endpoint.
+  static const String disableFeedbackTitle = 'Ignore feedback endpoint';
+
+  /// Switch hint for ignoring the feedback endpoint.
+  static const String disableFeedbackHint =
+      'For DACs whose feedback stream is broken; drift is then steered.';
+
+  /// Switch title for re-asserting the UAC1 rate.
+  static const String uac1ReassertTitle = 'Re-assert UAC1 rate';
+
+  /// Switch hint for re-asserting the UAC1 rate.
+  static const String uac1ReassertHint =
+      'Writes the sample rate again after selecting the alt setting.';
+
+  /// Switch title for keeping the device clock untouched.
+  static const String disableClockSwitchTitle = 'Do not program UAC2 clock';
+
+  /// Switch hint for keeping the device clock untouched.
+  static const String disableClockSwitchHint =
+      'The DAC keeps its own clock; bit-perfect cannot be verified.';
+
+  /// Label of the pre-open silence field.
+  static const String silenceLabel = 'Silence before start (ms)';
+
+  /// Label of the transfer size field.
+  static const String transferSizeLabel = 'Transfer size (bytes, 0 = auto)';
+
+  /// Label of the reservoir field.
+  static const String bufferLabel = 'Buffer target (ms, 0 = auto)';
+
+  /// Label of the selector pin field.
+  static const String selectorPinLabel = 'Clock selector pin (blank = auto)';
+
+  /// Validation error for a numeric field.
+  static const String numberInvalid = 'Enter a number in the allowed range.';
+
   /// Action that measures the bus speed.
   static const String probeAction = 'Probe bus speed';
 

@@ -58,6 +58,21 @@ class PrefsKeys {
   static const String replayGainMode = 'setting_replay_gain_mode';
   static const String replayGainPreampWithRg =
       'setting_replay_gain_preamp_with_rg';
+
+  // --- USB Audio Class production-readiness rollout -----------------------
+  // Engineering flags are default-off and only ever flipped by the staged
+  // rollout policy in `FeatureFlags`, never by an unrelated settings screen.
+  static const String usbPullRenderer = 'usb_pull_renderer';
+  static const String usbClockSyncAsrc = 'usb_clock_sync_asrc';
+  // 0/5/25/100 staged rollout percentage for the two flags above.
+  static const String usbRolloutPercent = 'usb_rollout_percent';
+  // Stable per-install bucket seed; never leaves the device.
+  static const String usbRolloutInstallId = 'usb_rollout_install_id';
+
+  /// Per-device stream mode, keyed by USB vendor/product id. Stored as the
+  /// [UsbStreamMode] wire name; an unknown value falls back to best effort.
+  static String usbStreamModeKey(int vid, int pid) =>
+      'usb_stream_mode_${vid.toRadixString(16)}_${pid.toRadixString(16)}';
   static const String replayGainPreampWithoutRg =
       'setting_replay_gain_preamp_without_rg';
   static const String sleepTimerTarget = 'sleep_timer_target';

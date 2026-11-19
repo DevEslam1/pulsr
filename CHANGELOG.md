@@ -1,5 +1,83 @@
 # Pulsr Hardening & Delivery Changelog
 
+## USB UAC1/UAC2 Production-Readiness Program — 2026-11-19
+
+### Clock architecture (new)
+- **`android/app/src/main/cpp/UsbClockDomain.h`**: `UsbClockDomain` (`unknown` /
+  `bitPerfectLocked` / `asrc` / `bestEffort`) and `UsbClockStatus`
+  (drift ppm, reservoir fill, feedback present, under/over counts).
+- **`UsbPullRenderer.h/.cpp`**: lock-free SPSC whole-frame ring with a
+  multi-second reservoir, 80 % prefill gate, seek/flush, pause/resume and
+  bit-exact pull. `test_usb_pull_renderer` verifies a simulated 8 h soak with
+  0 underruns (1,382,751,360 frames produced at ±150 ppm) and memcmp-identical
+  packet payloads.
+- **`UsbAsrcClockSync.h/.cpp`**: polyphase windowed-sinc ASRC, ±0.5 % hard
+  ratio clamp, exact bypass at unity. Measured 1 kHz THD+N −117.9 dB at a
+  1.0002 ratio.
+- **`UsbPcmProducer.h/.cpp`**: reader-thread producer that fills the pull
+  reservoir ahead of real time from a local integer-PCM WAV (16/24/32-bit,
+  including 24-in-32). Strict format equality, no conversion; seek/pause; wired
+  to the sink through `StartPcmFile`/`StopPcmFile` and JNI/Kotlin/Dart.
+  `test_usb_pcm_producer` verifies ahead-of-consumption fill, bit-identical
+  payloads, seek, pause and format refusal (19 checks).
+- **`UsbAudioSink`**: `UsbRenderMode` {BestEffort=0, BitPerfectPull=1,
+  ClockSyncAsrc=2}, `SetStreamTuning`, `GetClockStatus`,
+  `DeriveClockDomain`, pull/ASRC packet fill. Bit-perfect is reported only for
+  a raw-PCM pull session with zero underruns and zero channel mismatch; one gap
+  permanently degrades the session. ASRC accepts float or converts raw integer
+  PCM before resampling, and is always `resampled`.
+  Default BestEffort behaviour is unchanged.
+- **Flags**: `usb_pull_renderer` and `usb_clock_sync_asrc`, both default off,
+  with a deterministic 0/5/25/100 staged rollout, manual override and kill
+  switch (`FeatureFlags`). Per-DAC mode selection in `UsbStreamModeStore`.
+- **Dart**: `UsbClockDomain` / `UsbRenderMode`, clock/quirk/session fields in
+  `UsbExclusiveStatus`, per-device clock-architecture selector and claim UI.
+
+### Lifecycle, quirks, observability
+- **`UsbSessionStateMachine.kt`**: the nine exported states with hard invariants
+  (no open while `drainPending`, no rebind with outstanding URBs, `Abandon()`
+  only after a failed drain). Tests include 1,000 start/stop and 500
+  unplug/replug cycles with a ≤2 s recovery budget.
+- **`UsbEventLog.kt`**: 500-entry, 23-field structured ring with path/serial/
+  email redaction; surfaced through `getUsbEvents` and the diagnostics bundle.
+- **`UsbQuirkResolver.kt` + `UsbQuirkProfile`**: validated per-VID/PID transport
+  quirks (silence, force-16-bit, alt reset, transfer size, reservoir target,
+  feedback suppression, selector pin, UAC1 re-assert, clock-switch suppression).
+  Quirks that change bit-perfect semantics set `quirkBitPerfectAffected` with a
+  stable reason; they are never applied silently.
+
+### Hardening found by the fuzz gate
+- UAC1 discrete `wSamFreq` values are now bounded to 8 kHz–1.536 MHz in both the
+  native and Kotlin parsers. The 1 M-case fuzz previously surfaced 15 MHz
+  "rates" echoed from malformed descriptors.
+- Endpoint `bInterval` is now rejected above a 10 ms service interval; the fuzz
+  surfaced a 2.048 s interval that no URB schedule can carry.
+- The Dart client now accepts 705.6/768 kHz (it refused a rate the DAC had
+  advertised) and maps `clock_selector_restore_failed` to its own result code.
+
+### HIL, CI and docs
+- `scripts/hil/`: matrix/smoke/soak/unplug-replug, bit-exact capture compare,
+  result aggregation and a sha256 evidence bundler. With no DAC every script
+  reports `status=blocked, reason=no_device` (exit 0 dry-run, 2 with `--gate`).
+- `.github/workflows/usb-hil.yml`: nightly Tier-A and weekly full matrix on a
+  self-hosted USB runner, plus Ubuntu ASan/UBSan and Kotlin suites.
+- New docs: `docs/usb/PRODUCTION_READINESS.md` (scorecard/evidence ledger),
+  `SUPPORTED_DEVICES.md`, `BIT_PERFECT_CLAIMS.md`, `RECOVERY.md`.
+
+### Evidence (this machine)
+- Native: `test_usb_sink` (17 clock-domain + 13 pull/ASRC checks),
+  `test_usb_pcm_producer` (19 checks), 8 h pull soak, ASRC −117.9 dB,
+  1,000,000-case fuzz — all pass. All four suites plus the producer are also
+  UBSan-clean (`-DPULSR_TEST_UBSAN=ON`); ASan runs in Linux CI because this
+  Windows toolchain ships no working ASan runtime.
+- Kotlin: 165 USB tests pass (39 parser + 53 protocol + 1 fuzz + 18 event log +
+  25 quirk resolver + 29 state machine); `:app:compileDevDebugKotlin` succeeds.
+- Dart: 112 targeted tests pass; `flutter analyze` clean on changed files.
+- Hardware: **not validated.** No DAC/analyzer/relay is attached, so Gates 2–4,
+  6 and the hardware half of 10 remain blocked and the program is not claimed
+  at 10/10.
+
+
 ## Documentation Refresh — 2026-11-17
 - **README.md** rewritten against the current source: 11 themes, 652 AutoEQ profiles, the 20-stage native DSP chain, DSD512/DoP, USB-DAC exclusive output, party protocol v1, Quran Mode, remote sources, DLNA, diagnostics and the honest bit-perfect policy.
 - **docs/FEATURE_MATRIX.md** added as the source-verified capability inventory, including explicit limits.

@@ -546,7 +546,20 @@ class DiagnosticsBundleService {
   }
 
   static Future<Map<String, Object?>> _defaultUsbDiagnostics() async {
-    final raw = await UsbExclusiveService().getDiagnostics();
-    return Map<String, Object?>.from(raw);
+    final usb = UsbExclusiveService();
+    final raw = await usb.getDiagnostics();
+    final section = Map<String, Object?>.from(raw);
+    // Clock-domain evidence belongs in every export even when an older native
+    // build does not fold the event ring into getDiagnostics.
+    if (!section.containsKey('events')) {
+      section['events'] = await usb.getUsbEvents();
+    }
+    final status = usb.lastStatus;
+    section.putIfAbsent('clockDomain', () => status.clockDomain.wireName);
+    section.putIfAbsent('clockDriftPpm', () => status.clockDriftPpm);
+    section.putIfAbsent('ringFillMs', () => status.ringFillMs);
+    section.putIfAbsent('feedbackPresent', () => status.feedbackPresent);
+    section.putIfAbsent('drainPending', () => status.drainPending);
+    return section;
   }
 }

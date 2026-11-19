@@ -19,6 +19,7 @@ enum UsbStreamResult {
   clockNotVerified,
   uac1RateReadbackUnsupported,
   source32BitFloatNotBitPerfect,
+  clockSelectorRestoreFailed,
   unknown;
 
   bool get isOk => this == UsbStreamResult.ok;
@@ -47,13 +48,88 @@ enum UsbStreamResult {
         return 'UAC1 sample-rate readback is not supported by this DAC; Strict Bit-Perfect requires verified rates';
       case UsbStreamResult.source32BitFloatNotBitPerfect:
         return 'Source format is 32-bit float; lossy conversion to integer is not bit-perfect';
+      case UsbStreamResult.clockSelectorRestoreFailed:
+        return 'The DAC clock selector could not be restored; streaming refused';
       case UsbStreamResult.unknown:
         return 'Failed to initialize USB bit-perfect streaming';
     }
   }
 }
 
+/// Clock architecture actually in use for an active direct-USB stream.
+///
+/// The native sink derives this from the data path, not from what the UI asked
+/// for. `bitPerfectLocked` is only reported when raw integer PCM of the same
+/// rate, depth and channel count reached the wire with no SRC, dither, remap or
+/// underrun for the session.
+enum UsbClockDomain {
+  unknown,
+  bitPerfectLocked,
+  asrc,
+  bestEffort;
+
+  /// Parses the stable wire name from Kotlin/native. Unknown values fail closed
+  /// to [unknown] so a new native label can never be rendered as a claim.
+  static UsbClockDomain fromWire(Object? value) {
+    switch (value) {
+      case 'bitPerfectLocked':
+        return UsbClockDomain.bitPerfectLocked;
+      case 'asrc':
+        return UsbClockDomain.asrc;
+      case 'bestEffort':
+        return UsbClockDomain.bestEffort;
+      default:
+        return UsbClockDomain.unknown;
+    }
+  }
+
+  String get wireName => switch (this) {
+        UsbClockDomain.bitPerfectLocked => 'bitPerfectLocked',
+        UsbClockDomain.asrc => 'asrc',
+        UsbClockDomain.bestEffort => 'bestEffort',
+        UsbClockDomain.unknown => 'unknown',
+      };
+
+  /// True only for a verified bit-exact path. Never infer this from
+  /// `streamingActive` or from the mode the user picked.
+  bool get isBitPerfect => this == UsbClockDomain.bitPerfectLocked;
+
+  /// True when the path resamples by design; must be labeled `resampled`.
+  bool get isResampled => this == UsbClockDomain.asrc;
+
+  String toShortLabel() => switch (this) {
+        UsbClockDomain.bitPerfectLocked => 'Bit-perfect',
+        UsbClockDomain.asrc => 'Resampled (clock sync)',
+        UsbClockDomain.bestEffort => 'Best effort',
+        UsbClockDomain.unknown => 'Unknown',
+      };
+}
+
+/// Clock architecture requested when opening a direct-USB stream.
+///
+/// Codes are part of the Dart -> Kotlin -> C++ contract and must stay in sync
+/// with `UsbRenderMode` in `UsbAudioSink.h`.
+enum UsbRenderMode {
+  bestEffort(0),
+  bitPerfectPull(1),
+  clockSyncAsrc(2);
+
+  const UsbRenderMode(this.nativeCode);
+
+  final int nativeCode;
+
+  static UsbRenderMode fromNativeCode(int? value) => switch (value) {
+        1 => UsbRenderMode.bitPerfectPull,
+        2 => UsbRenderMode.clockSyncAsrc,
+        _ => UsbRenderMode.bestEffort,
+      };
+}
+
 /// Snapshot of the attached USB audio device and exclusive-path state.
+///
+/// `clockDomain` is the only field an audiophile claim may be based on: it is
+/// derived by the native sink from the actual data path, never inferred by the
+/// UI. `asrc` and `bestEffort` are explicitly non-bit-perfect.
 class UsbExclusiveStatus {
   final bool attached;
   final bool permitted;
@@ -89,6 +165,45 @@ class UsbExclusiveStatus {
   final bool rateVerified;
   final List<Map<String, dynamic>> advertisedFormats;
 
+  /// Clock architecture the native sink reports for the current session.
+  final UsbClockDomain clockDomain;
+
+  /// Estimated clock drift between this device and the DAC, in parts per
+  /// million, rounded by native. 0 when no estimate is available.
+  final int clockDriftPpm;
+
+  /// Milliseconds of PCM buffered ahead of the USB worker.
+  final int ringFillMs;
+
+  /// Whether the DAC exposes an asynchronous feedback IN endpoint.
+  final bool feedbackPresent;
+
+  /// Worker-observed ring underruns for the current session.
+  final int underrunCount;
+
+  /// Frames dropped because the producer outran the ring.
+  final int overrunCount;
+
+  /// True when a failed URB drain is holding the interface claim; the next open
+  /// must not rebind the kernel driver.
+  final bool drainPending;
+
+  /// Lifecycle state reported by the Kotlin session state machine.
+  final String sessionState;
+
+  /// Quirk keys actually applied to the last start, in canonical order.
+  final List<String> quirkApplied;
+
+  /// Quirk keys rejected by validation, mapped to a stable reason.
+  final Map<String, String> quirkRejected;
+
+  /// True when an applied quirk changed bit-perfect semantics (for example
+  /// forced 16-bit). The UI must surface this instead of a bare claim.
+  final bool quirkBitPerfectAffected;
+
+  /// Stable reason when [quirkBitPerfectAffected] is true.
+  final String? quirkBitPerfectReason;
+
   const UsbExclusiveStatus({
     required this.attached,
     required this.permitted,
@@ -118,6 +233,18 @@ class UsbExclusiveStatus {
     this.channelMismatchFrames = 0,
     this.rateVerified = false,
     this.advertisedFormats = const [],
+    this.clockDomain = UsbClockDomain.unknown,
+    this.clockDriftPpm = 0,
+    this.ringFillMs = 0,
+    this.feedbackPresent = false,
+    this.underrunCount = 0,
+    this.overrunCount = 0,
+    this.drainPending = false,
+    this.sessionState = 'unknown',
+    this.quirkApplied = const [],
+    this.quirkRejected = const {},
+    this.quirkBitPerfectAffected = false,
+    this.quirkBitPerfectReason,
   });
 
   UsbExclusiveStatus copyWith({
@@ -149,6 +276,18 @@ class UsbExclusiveStatus {
     int? channelMismatchFrames,
     bool? rateVerified,
     List<Map<String, dynamic>>? advertisedFormats,
+    UsbClockDomain? clockDomain,
+    int? clockDriftPpm,
+    int? ringFillMs,
+    bool? feedbackPresent,
+    int? underrunCount,
+    int? overrunCount,
+    bool? drainPending,
+    String? sessionState,
+    List<String>? quirkApplied,
+    Map<String, String>? quirkRejected,
+    bool? quirkBitPerfectAffected,
+    String? quirkBitPerfectReason,
   }) {
     return UsbExclusiveStatus(
       attached: attached ?? this.attached,
@@ -181,6 +320,20 @@ class UsbExclusiveStatus {
           channelMismatchFrames ?? this.channelMismatchFrames,
       rateVerified: rateVerified ?? this.rateVerified,
       advertisedFormats: advertisedFormats ?? this.advertisedFormats,
+      clockDomain: clockDomain ?? this.clockDomain,
+      clockDriftPpm: clockDriftPpm ?? this.clockDriftPpm,
+      ringFillMs: ringFillMs ?? this.ringFillMs,
+      feedbackPresent: feedbackPresent ?? this.feedbackPresent,
+      underrunCount: underrunCount ?? this.underrunCount,
+      overrunCount: overrunCount ?? this.overrunCount,
+      drainPending: drainPending ?? this.drainPending,
+      sessionState: sessionState ?? this.sessionState,
+      quirkApplied: quirkApplied ?? this.quirkApplied,
+      quirkRejected: quirkRejected ?? this.quirkRejected,
+      quirkBitPerfectAffected:
+          quirkBitPerfectAffected ?? this.quirkBitPerfectAffected,
+      quirkBitPerfectReason:
+          quirkBitPerfectReason ?? this.quirkBitPerfectReason,
     );
   }
 
@@ -228,6 +381,24 @@ class UsbExclusiveStatus {
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           const [],
+      clockDomain: UsbClockDomain.fromWire(map['clockDomain']),
+      clockDriftPpm: i(map['clockDriftPpm']) ?? 0,
+      ringFillMs: i(map['ringFillMs']) ?? 0,
+      feedbackPresent: map['feedbackPresent'] == true,
+      underrunCount: i(map['underrunCount']) ?? 0,
+      overrunCount: i(map['overrunCount']) ?? 0,
+      drainPending: map['drainPending'] == true,
+      sessionState: (map['sessionState'] as String?) ?? 'unknown',
+      quirkApplied: (map['quirkApplied'] as List<dynamic>?)
+              ?.map((e) => '$e')
+              .toList() ??
+          const [],
+      quirkRejected: (map['quirkRejected'] as Map?)?.map(
+            (key, value) => MapEntry('$key', '$value'),
+          ) ??
+          const {},
+      quirkBitPerfectAffected: map['quirkBitPerfectAffected'] == true,
+      quirkBitPerfectReason: map['quirkBitPerfectReason'] as String?,
     );
   }
 }
@@ -400,8 +571,12 @@ class UsbExclusiveService {
     int channels = 2,
     int bitDepth = 16,
     bool strict = false,
+    UsbRenderMode renderMode = UsbRenderMode.bestEffort,
   }) async {
     if (!_isAndroid) return UsbStreamResult.invalidArgs;
+    // Includes the 44.1-family high-rate endpoints (705.6/768 kHz) that UAC1
+    // continuous ranges and UAC2 clock ranges advertise. Omitting them here
+    // refused a rate the DAC had actually reported.
     const validRates = [
       44100,
       48000,
@@ -410,7 +585,9 @@ class UsbExclusiveService {
       176400,
       192000,
       352800,
-      384000
+      384000,
+      705600,
+      768000
     ];
     if (!validRates.contains(sampleRate)) {
       return UsbStreamResult.rateUnsupported;
@@ -429,6 +606,7 @@ class UsbExclusiveService {
         'channels': channels,
         'bitDepth': bitDepth,
         'strict': strict,
+        'renderMode': renderMode.nativeCode,
       }).timeout(const Duration(seconds: 10));
       final status = await _readStatus();
       if (res is Map) {
@@ -468,6 +646,8 @@ class UsbExclusiveService {
             return UsbStreamResult.uac1RateReadbackUnsupported;
           case 'source_32bit_float_conversion_not_lossless':
             return UsbStreamResult.source32BitFloatNotBitPerfect;
+          case 'clock_selector_restore_failed':
+            return UsbStreamResult.clockSelectorRestoreFailed;
           default:
             return UsbStreamResult.unknown;
         }
@@ -564,6 +744,94 @@ class UsbExclusiveService {
     } catch (e, st) {
       ErrorLogger.log('Failed to get diagnostics', error: e, stackTrace: st, category: 'UsbExclusive');
       return const {};
+    }
+  }
+
+  /// Structured USB event ring the native/Kotlin layer keeps for this session.
+  ///
+  /// Returns an empty list when the platform has no handler, so a diagnostics
+  /// export still succeeds on older builds.
+  Future<List<Map<String, dynamic>>> getUsbEvents() async {
+    if (!_isAndroid) return const [];
+    try {
+      final List<dynamic>? res = await _methodChannel
+          .invokeListMethod<dynamic>('getUsbEvents')
+          .timeout(const Duration(milliseconds: 500));
+      return res
+              ?.whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList() ??
+          const [];
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read USB events',
+          error: e, stackTrace: st, category: 'UsbExclusive');
+      return const [];
+    }
+  }
+
+  /// Starts the optional reader-thread PCM source for a pull stream.
+  ///
+  /// The file must be an integer PCM WAV whose rate, channels, container and
+  /// valid bits exactly match the open stream; a mismatch is refused rather
+  /// than converted. Only meaningful in [UsbRenderMode.bitPerfectPull].
+  Future<bool> startPcmFile(String path) async {
+    if (!_isAndroid || path.isEmpty) return false;
+    try {
+      final bool? res = await _methodChannel
+          .invokeMethod<bool>('startPcmFile', <String, Object?>{'path': path})
+          .timeout(const Duration(seconds: 5));
+      return res ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to start the USB PCM source',
+          error: e, stackTrace: st, category: 'UsbExclusive');
+      return false;
+    }
+  }
+
+  /// Stops the reader-thread PCM source (the stream stays open).
+  Future<bool> stopPcmFile() async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? res = await _methodChannel
+          .invokeMethod<bool>('stopPcmFile')
+          .timeout(const Duration(seconds: 5));
+      return res ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to stop the USB PCM source',
+          error: e, stackTrace: st, category: 'UsbExclusive');
+      return false;
+    }
+  }
+
+  /// Whether a reader-thread PCM source is currently feeding the pull stream.
+  Future<bool> hasPcmFileSource() async {
+    if (!_isAndroid) return false;
+    try {
+      final bool? res = await _methodChannel
+          .invokeMethod<bool>('hasPcmFileSource')
+          .timeout(const Duration(milliseconds: 500));
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Pushes the per-device quirk profile to the exclusive plugin.
+  ///
+  /// The plugin validates it again and only applies safe quirks; a rejected
+  /// value is reported as false and never blocks streaming.
+  Future<bool> applyQuirkProfile(Map<String, Object?> profile) async {
+    if (!_isAndroid) return false;
+    try {
+      final dynamic res = await _methodChannel
+          .invokeMethod<dynamic>('setQuirkProfile', profile)
+          .timeout(const Duration(seconds: 3));
+      if (res is Map) return res['ok'] == true;
+      return res == true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to push the USB quirk profile',
+          error: e, stackTrace: st, category: 'UsbExclusive');
+      return false;
     }
   }
 

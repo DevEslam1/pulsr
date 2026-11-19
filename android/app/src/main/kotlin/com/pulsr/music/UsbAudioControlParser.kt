@@ -33,6 +33,12 @@ private val STANDARD_SAMPLE_RATES = intArrayOf(
 )
 
 object UsbAudioControlParser {
+    /** Lowest plausible audio rate a descriptor may advertise. */
+    private const val MIN_PLAUSIBLE_RATE = 8_000
+
+    /** Highest plausible audio rate a descriptor may advertise. */
+    private const val MAX_PLAUSIBLE_RATE = 1_536_000
+
 
     const val UAC_NONE = 0
     const val UAC1 = 1
@@ -872,7 +878,11 @@ object UsbAudioControlParser {
                                             val r = (descriptors[offset].toInt() and 0xFF) or
                                                 ((descriptors[offset + 1].toInt() and 0xFF) shl 8) or
                                                 ((descriptors[offset + 2].toInt() and 0xFF) shl 16)
-                                            if (r > 0) {
+                                            // Three raw bytes are not a capability.
+                                            // Guard the plausible audio band so a
+                                            // malformed descriptor cannot advertise
+                                            // a 15 MHz "rate" (found by fuzzing).
+                                            if (r in MIN_PLAUSIBLE_RATE..MAX_PLAUSIBLE_RATE) {
                                                 supportedRates.add(r)
                                                 curRates.add(r)
                                             }

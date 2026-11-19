@@ -73,6 +73,9 @@ set(DSP_CORE_SOURCES
     AudioDspEngine.cpp
     AAudioSink.cpp
     UsbAudioSink.cpp
+    UsbPullRenderer.cpp
+    UsbAsrcClockSync.cpp
+    UsbPcmProducer.cpp
 )
 
 set(JNI_BRIDGE_SOURCES

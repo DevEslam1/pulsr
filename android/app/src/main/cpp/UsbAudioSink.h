@@ -29,15 +29,22 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
 #include "SinkQuantizer.h"
 #include "DopGapSilence.h"
 #include "UsbGapFader.h"
+#include "UsbPullRenderer.h"
+#include "UsbAsrcClockSync.h"
+#include "UsbClockDomain.h"
 
 namespace pulsr {
+
+class UsbPcmProducer;
 
 enum class UsbStreamResult : int32_t {
     Ok = 0,
@@ -46,6 +53,33 @@ enum class UsbStreamResult : int32_t {
     RateUnsupported = 3,
     SubmitFailed = 4,
     InvalidArgs = 5
+};
+
+// How the USB worker obtains frames. These values are a wire contract with
+// Kotlin/Dart (lib/features/usb_tools/usb_stream_mode.dart sends the same
+// numbers), so they must never be renumbered.
+//
+//   BestEffort     - the existing real-time producer ring: float or raw PCM is
+//                    packed on the producer thread and steered by the feedback
+//                    endpoint or, when there is none, by ring fill.
+//   BitPerfectPull - whole frames are pulled from UsbPullRenderer and handed to
+//                    the wire untouched, so payloads stay bit-exact.
+//   ClockSyncAsrc  - decoded float is resampled by UsbAsrcClockSync to follow
+//                    the DAC clock. Never bit-perfect by construction.
+//
+// Open() starts BitPerfectPull/ClockSyncAsrc only when their engines are part
+// of the link. They are not yet: UsbPullRenderer.cpp and UsbAsrcClockSync.cpp
+// are absent from DSP_CORE_SOURCES (main/cpp/CMakeLists.txt) and from DSP_SRCS
+// (test/cpp/CMakeLists.txt), while this sink lives in UsbAudioSink.cpp.
+// Calling those engines from here would leave the host tests unlinked and make
+// the Android library fail to dlopen, so Open() fails both modes closed with
+// InvalidArgs instead of silently streaming something the caller did not ask
+// for. Tuning, status and domain derivation are already wired so that adding
+// the two translation units is all the engines need to go live.
+enum class UsbRenderMode : int32_t {
+    BestEffort = 0,
+    BitPerfectPull = 1,
+    ClockSyncAsrc = 2,
 };
 
 static_assert(std::atomic<int64_t>::is_always_lock_free &&
@@ -65,9 +99,13 @@ public:
     // DAC sample clock — skips redundant USBDEVFS_CLAIMINTERFACE and
     // USBDEVFS_SETINTERFACE ioctls that reset the hardware clock on UAC1/UAC2
     // DACs, and leaves kernel driver rebind order to the caller.
+    // renderMode: a UsbRenderMode value. Only BestEffort (0, the default) is
+    // startable in this build; see the UsbRenderMode note above. An unknown
+    // value is rejected like any other bad geometry.
     UsbStreamResult Open(int fd, int endpointAddress, int interfaceNumber, int altSetting,
                          int sampleRate, int channels, int bytesPerSample,
-                         int validBitDepth = 0, bool alreadyConfigured = false);
+                         int validBitDepth = 0, bool alreadyConfigured = false,
+                         int renderMode = 0);
     // Stops the worker and tears the stream down. Returns false when submitted
     // URBs could not be reaped inside the bounded drain window (lastError_ =
     // ETIMEDOUT): URB storage, the claimed interface and HAL exclusivity are
@@ -109,6 +147,46 @@ public:
     // 1 when active & exclusive but full after `maxWaitMs`, or -1 when
     // inactive/closed/unbounded so callers can route through normal error handling.
     int WaitForWriteSpace(int frames, int maxWaitMs);
+
+    // ---- Stream shape and clock-domain telemetry --------------------------
+    // Control-thread configuration for the NEXT Open(); it never mutates a live
+    // stream. Callers (UsbExclusivePlugin) set it before starting.
+    //   transferSizeBytes       > 0 batches packet sizing into
+    //                           clamp(bytes / maxBytesPerPacket, 1, 64) packets
+    //                           per URB instead of deriving it from
+    //                           kTargetUrbDurationUs. A value too small to fill
+    //                           one packet, or <= 0, keeps the automatic sizing.
+    //   bufferMs                > 0 records the pull-renderer buffer target,
+    //                           capped at 10000 ms. 0 = automatic (3000 ms for a
+    //                           pull stream). Only the pull path consumes it; the
+    //                           BestEffort ring keeps its own sizing.
+    //   disableExplicitFeedback true ignores an advertised feedback IN endpoint
+    //                           (no feedback URBs are submitted) and lets ring
+    //                           steering own the packet cadence.
+    void SetStreamTuning(int transferSizeBytes, int bufferMs, bool disableExplicitFeedback);
+
+    // Reader-thread source for the pull renderer: a local PCM WAV whose format
+    // exactly matches the open stream. Only valid in BitPerfectPull mode; the
+    // producer fills the multi-second reservoir ahead of the USB worker, which
+    // is what a real-time ExoPlayer producer cannot do. Returns false on a
+    // format mismatch, a non-pull stream, or an unreadable file.
+    bool StartPcmFile(const std::string& path);
+    void StopPcmFile();
+    bool HasPcmFileSource() const;
+
+    // Live transport status for the Kotlin/Dart telemetry surfaces. Unknown
+    // whenever no stream is running, including after a failed Open. Serialises
+    // with control teardown (the same mutex Open/Close take) instead of reading
+    // half-updated geometry; never called from the worker.
+    UsbClockStatus GetClockStatus() const;
+
+    // Pure policy: which clock domain a stream is actually in. Public so the
+    // host tests can pin the contract without a device. A pull stream only
+    // earns BitPerfectLocked while it is eligible, has never underrun and has
+    // never seen a channel mismatch; everything else degrades to BestEffort.
+    static UsbClockDomain DeriveClockDomain(UsbRenderMode mode, bool active,
+                                            bool bitPerfectEligible, uint64_t underruns,
+                                            uint64_t channelMismatch);
 
     // Parses supported sample rates from raw configuration descriptors (UAC1 Format Type I).
     static std::vector<int> ParseSupportedRatesFromDescriptors(const uint8_t* desc, size_t len, int targetInterface = -1);
@@ -180,6 +258,10 @@ private:
     void workerLoop();
     size_t fillPacketFromRing(uint8_t* dst, int framesInPacket, size_t& readFrame,
                               int& rawDepth, uint64_t& deliveryEpoch);
+    // Packet fill for the pull modes. Returns the packet length in bytes and
+    // updates rawDepth (0 for the ASRC path, validBitDepth_ for raw pull).
+    size_t fillPullPacket(uint8_t* dst, int framesInPacket, int& rawDepth);
+    size_t fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDepth);
     using UrbSubmit = int (*)(int fd, void* urb);
     static int submitUsbfsUrb(int fd, void* urb);
     // Establishes startup exclusivity before submitting; injectable syscall for
@@ -255,8 +337,55 @@ private:
     uint8_t dopMarkerPhase_ = kDopMarkerA;
     std::atomic<uint64_t> rawPcmStatus_{0}; // delivery epoch in high bits, depth in low byte
     std::atomic<uint64_t> deliveryEpoch_{0};
-    std::mutex controlMutex_; // Open/Close only; never render/worker
+    // Open/Close/Abandon plus the status getters; never render/worker.
+    // Mutable so the const status getter can serialise with control teardown.
+    mutable std::mutex controlMutex_;
     bool sinkDepthPublished_ = false;
+
+    // Requested shape of the live stream (UsbRenderMode). Reset on teardown so
+    // a stale mode cannot colour the status of the next stream.
+    int renderMode_ = 0;
+    // SetStreamTuning() values, applied by the next Open().
+    int tunedTransferSizeBytes_ = 0;
+    int tunedBufferMs_ = 0;
+    bool disableExplicitFeedback_ = false;
+    // Raw PCM blocks refused by the float-only ClockSyncAsrc path. Reported as
+    // part of overrunCount so the UI can see that the producer handed the wrong
+    // kind of data instead of a silent format change. Zero on every other path.
+    std::atomic<uint64_t> asrcRawPcmRejected_{0};
+
+    // Pull-based renderer used by BitPerfectPull (wire-format bytes) and by
+    // ClockSyncAsrc (float frames). Configured once in Open, written by the
+    // producer, read only by the USB worker; no lock in the hot path.
+    UsbPullRenderer pullRenderer_;
+    // Staging for a raw block whose source depth is narrower than the opened
+    // wire container (16-in-24, 24-in-32). Sized in Open; the common equal-depth
+    // case writes the producer buffer straight through.
+    std::vector<uint8_t> pullPack_;
+    size_t pullPackFrames_ = 0;
+    // Optional file-backed producer feeding pullRenderer_ (pull mode only).
+    std::unique_ptr<UsbPcmProducer> pcmProducer_;
+    // Polyphase ASRC for ClockSyncAsrc. Configured in Open; setRatio() and
+    // process() both run on the USB worker, so no cross-thread filter state.
+    UsbAsrcClockSync asrc_;
+    // Sticky for the session: false as soon as a float block, wrong depth/rate
+    // or a short pull proves the payload is not a byte-for-byte source copy.
+    // `disqualified` is the latch that keeps a later clean block from restoring
+    // eligibility after a fault.
+    std::atomic<bool> bitPerfectEligible_{false};
+    std::atomic<bool> bitPerfectDisqualified_{false};
+    // Worker-only ASRC staging. Sized in Open to hold one packet plus the
+    // resampler lookahead, so the packet loop never allocates.
+    std::vector<float> asrcIn_;
+    std::vector<float> asrcOut_;
+    std::vector<float> asrcPack_;
+    int asrcOutAvail_ = 0;
+    size_t asrcInputCapacityFrames_ = 0;
+    // Raw integer producer blocks are converted here before entering the float
+    // reservoir. Sized in Open; a block larger than this is refused (never
+    // allocated on the audio thread).
+    std::vector<float> asrcRawScratch_;
+    size_t asrcRawScratchFrames_ = 0;
 
     int fd_ = -1;
     int endpoint_ = 0;
@@ -284,12 +413,13 @@ private:
     // the fractional samples-per-packet remainder (e.g. 44.1 kHz -> 44/45 frame
     // packets); maxFramesPerPacket_ caps a packet so feedback can never overflow
     // the preallocated URB buffer. feedbackRatePerSec_ is the clamped target
-    // sample rate the feedback endpoint last reported (== sampleRate_ until a
-    // feedback sample arrives).
+    // sample rate the feedback endpoint (or ring steering) last asked for
+    // (== sampleRate_ until a feedback sample arrives). Atomic because the
+    // status getter reads it from the control/JNI side while the worker steers.
     uint64_t frameAccumulator_ = 0;
     int serviceIntervalUs_ = 0;
     int maxFramesPerPacket_ = 0;
-    int feedbackRatePerSec_ = 0;
+    std::atomic<int> feedbackRatePerSec_{0};
 
     // Async feedback IN endpoint (0 => DAC has no feedback endpoint).
     int feedbackEndpoint_ = 0;

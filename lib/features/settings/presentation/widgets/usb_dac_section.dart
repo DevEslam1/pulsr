@@ -1,6 +1,9 @@
 // lib/features/settings/presentation/widgets/usb_dac_section.dart
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../core/config/feature_flags.dart';
+import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../data/audio/audio_handler.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -10,6 +13,9 @@ import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
+import '../../../usb_tools/usb_quirk_store.dart';
+import '../../../usb_tools/usb_stream_mode.dart';
+import '../../../usb_tools/usb_stream_mode_selector.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'settings_tiles.dart';
@@ -36,6 +42,14 @@ class _UsbDacSectionState extends State<UsbDacSection> {
   bool _streamingBusy = false;
   double? _pendingDb;
 
+  // Per-device clock architecture. Loaded from preferences once the device ids
+  // are known; the selector itself stays presentational.
+  UsbStreamModeStore? _modeStore;
+  UsbStreamMode _streamMode = UsbStreamMode.bestEffort;
+  bool _pullFlagEnabled = false;
+  bool _asrcFlagEnabled = false;
+  int? _modeLoadedForDeviceId;
+
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
   @override
@@ -43,7 +57,11 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     super.initState();
     if (!_isAndroid) return;
     _sub = _service.statusStream.listen((s) {
-      if (mounted) setState(() => _status = s);
+      if (!mounted) return;
+      setState(() => _status = s);
+      if (s.deviceId != _modeLoadedForDeviceId) {
+        unawaited(_loadStreamMode(s));
+      }
     });
     _refresh();
   }
@@ -56,7 +74,69 @@ class _UsbDacSectionState extends State<UsbDacSection> {
 
   Future<void> _refresh() async {
     final s = await _service.getStatus();
-    if (mounted) setState(() => _status = s);
+    if (!mounted) return;
+    setState(() => _status = s);
+    if (s.deviceId != _modeLoadedForDeviceId) {
+      // Never block a streaming toggle (or its busy flag) on preference I/O:
+      // the selector is cosmetic until the next start, which re-resolves the
+      // mode on the platform side anyway.
+      unawaited(_loadStreamMode(s));
+    }
+  }
+
+  /// Loads the rollout flags and this device's stored mode. A read failure
+  /// leaves best effort selected: a missing preference never opts a user into
+  /// an experimental clock path.
+  Future<void> _loadStreamMode(UsbExclusiveStatus status) async {
+    final vid = status.vendorId;
+    final pid = status.productId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final flags = FeatureFlags(prefs: prefs);
+      await flags.init();
+      if (!mounted) return;
+      setState(() {
+        _modeStore = UsbStreamModeStore(prefs: prefs);
+        _streamMode = (vid == null || pid == null)
+            ? UsbStreamMode.bestEffort
+            : _modeStore!.read(vid, pid);
+        _pullFlagEnabled = flags.isEnabled(PrefsKeys.usbPullRenderer);
+        _asrcFlagEnabled = flags.isEnabled(PrefsKeys.usbClockSyncAsrc);
+        _modeLoadedForDeviceId = status.deviceId;
+      });
+      // The exclusive plugin persists quirks itself, but it can only persist a
+      // document it has seen. Push the stored profile for this DAC so a profile
+      // saved in a previous session is in force before the next start, without
+      // requiring the ergonomics screen to be opened first.
+      final quirk = UsbQuirkStore(prefs: prefs).profileForDevice(vid, pid);
+      if (quirk != null && vid != null && pid != null) {
+        unawaited(_service.applyQuirkProfile(<String, Object?>{
+          ...quirk.toJson(),
+          'vid': vid,
+          'pid': pid,
+        }));
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _modeStore = null;
+        _streamMode = UsbStreamMode.bestEffort;
+        _pullFlagEnabled = false;
+        _asrcFlagEnabled = false;
+        _modeLoadedForDeviceId = status.deviceId;
+      });
+    }
+  }
+
+  /// Persists a new request for this DAC. The platform still re-checks flags
+  /// and feedback support when the stream is (re)started.
+  Future<void> _onStreamModeChanged(UsbStreamMode mode) async {
+    final vid = _status.vendorId;
+    final pid = _status.productId;
+    final store = _modeStore;
+    if (vid == null || pid == null || store == null) return;
+    setState(() => _streamMode = mode);
+    await store.write(vid, pid, mode);
   }
 
   Future<void> _onToggle(bool enabled) async {
@@ -245,6 +325,15 @@ class _UsbDacSectionState extends State<UsbDacSection> {
             disabledReason:
                 _streamingBusy ? context.l10n.settingsStarting : null,
             onChanged: _streamingBusy ? (v) {} : _toggleStreaming,
+          ),
+        if (_status.streamingSupported)
+          UsbStreamModeSelector(
+            status: _status,
+            selected: _streamMode,
+            pullFlagEnabled: _pullFlagEnabled,
+            asrcFlagEnabled: _asrcFlagEnabled,
+            streamingActive: _status.streamingActive,
+            onChanged: _onStreamModeChanged,
           ),
         if (widget.cubit.state.errorMessage != null &&
             !widget.state.bitPerfectOutput)

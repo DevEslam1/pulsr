@@ -238,6 +238,47 @@ void main() {
           UsbStreamResult.rateUnsupported);
     });
 
+    test('accepts the 44.1-family high-rate endpoints', () async {
+      var openedRate = 0;
+      _messenger.setMockMethodCallHandler(_method, (call) async {
+        if (call.method == 'startStreaming') {
+          openedRate =
+              (call.arguments as Map<dynamic, dynamic>)['sampleRate'] as int;
+          return <Object?, Object?>{'success': true};
+        }
+        return _statusMap(
+          streaming: openedRate > 0,
+          sampleRate: openedRate == 0 ? 48000 : openedRate,
+        );
+      });
+      await service.getStatus();
+      for (final rate in <int>[705600, 768000]) {
+        openedRate = 0;
+        expect(
+          await service.startStreaming(sampleRate: rate),
+          UsbStreamResult.ok,
+          reason: 'a DAC that advertised $rate must not be refused by the client',
+        );
+      }
+    });
+
+    test('maps a clock selector restore failure to its own code', () async {
+      _messenger.setMockMethodCallHandler(_method, (call) async {
+        if (call.method == 'startStreaming') {
+          return <Object?, Object?>{
+            'success': false,
+            'error': 'clock_selector_restore_failed',
+          };
+        }
+        return _statusMap();
+      });
+      await service.getStatus();
+      expect(await service.startStreaming(),
+          UsbStreamResult.clockSelectorRestoreFailed);
+      expect(UsbStreamResult.clockSelectorRestoreFailed.toUserMessage(),
+          contains('selector'));
+    });
+
     test('rejects an out-of-range channel count', () async {
       expect(await service.startStreaming(channels: 0),
           UsbStreamResult.invalidArgs);
@@ -367,6 +408,156 @@ void main() {
 
     expect(received, isNotEmpty);
     expect(received.last.deviceName, 'Live DAC');
+  });
+
+  group('clock domain', () {
+    test('parses the stable wire names and fails closed', () {
+      expect(UsbClockDomain.fromWire('bitPerfectLocked'),
+          UsbClockDomain.bitPerfectLocked);
+      expect(UsbClockDomain.fromWire('asrc'), UsbClockDomain.asrc);
+      expect(UsbClockDomain.fromWire('bestEffort'), UsbClockDomain.bestEffort);
+      expect(UsbClockDomain.fromWire('bitPerfect'), UsbClockDomain.unknown);
+      expect(UsbClockDomain.fromWire(null), UsbClockDomain.unknown);
+      expect(UsbClockDomain.bitPerfectLocked.isBitPerfect, isTrue);
+      expect(UsbClockDomain.asrc.isResampled, isTrue);
+      expect(UsbClockDomain.bestEffort.isBitPerfect, isFalse);
+      expect(UsbClockDomain.unknown.toShortLabel(), 'Unknown');
+    });
+
+    test('parses status fields and keeps them through copyWith', () {
+      final status = UsbExclusiveStatus.fromMap(<String, Object?>{
+        ..._statusMap(streaming: true),
+        'clockDomain': 'bitPerfectLocked',
+        'clockDriftPpm': -37,
+        'ringFillMs': 2400,
+        'feedbackPresent': true,
+        'drainPending': true,
+        'sessionState': 'STREAMING',
+        'quirkApplied': <String>['force16Bit'],
+        'quirkRejected': <String, String>{'bufferMs': 'range'},
+        'quirkBitPerfectAffected': true,
+        'quirkBitPerfectReason': 'quirk_force_16bit',
+      });
+      expect(status.clockDomain, UsbClockDomain.bitPerfectLocked);
+      expect(status.clockDriftPpm, -37);
+      expect(status.ringFillMs, 2400);
+      expect(status.feedbackPresent, isTrue);
+      expect(status.drainPending, isTrue);
+      expect(status.sessionState, 'STREAMING');
+      expect(status.quirkApplied, <String>['force16Bit']);
+      expect(status.quirkRejected, <String, String>{'bufferMs': 'range'});
+      expect(status.quirkBitPerfectAffected, isTrue);
+      expect(status.quirkBitPerfectReason, 'quirk_force_16bit');
+      final copy = status.copyWith(clockDomain: UsbClockDomain.asrc);
+      expect(copy.clockDomain, UsbClockDomain.asrc);
+      expect(copy.ringFillMs, 2400);
+      expect(UsbExclusiveStatus.none.clockDomain, UsbClockDomain.unknown);
+    });
+  });
+
+  test('startStreaming forwards the requested render mode', () async {
+    Map<dynamic, dynamic>? startArgs;
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method == 'startStreaming') {
+        startArgs = call.arguments as Map<dynamic, dynamic>;
+        return <Object?, Object?>{'success': true};
+      }
+      return _statusMap(streaming: true);
+    });
+    await service.getStatus();
+    expect(
+      await service.startStreaming(renderMode: UsbRenderMode.bitPerfectPull),
+      UsbStreamResult.ok,
+    );
+    expect(startArgs?['renderMode'], 1);
+
+    expect(
+      await service.startStreaming(renderMode: UsbRenderMode.clockSyncAsrc),
+      UsbStreamResult.ok,
+    );
+    expect(startArgs?['renderMode'], 2);
+
+    expect(await service.startStreaming(), UsbStreamResult.ok);
+    expect(startArgs?['renderMode'], 0);
+  });
+
+  test('getUsbEvents returns structured maps and tolerates no handler',
+      () async {
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method == 'getUsbEvents') {
+        return <Object?>[
+          <Object?, Object?>{'clockDomain': 'bestEffort', 'rate': 48000},
+        ];
+      }
+      return _statusMap();
+    });
+    expect(await service.getUsbEvents(), [
+      <String, dynamic>{'clockDomain': 'bestEffort', 'rate': 48000},
+    ]);
+
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method == 'getUsbEvents') {
+        throw MissingPluginException();
+      }
+      return _statusMap();
+    });
+    expect(await service.getUsbEvents(), isEmpty);
+  });
+
+  test('applyQuirkProfile reports native acceptance', () async {
+    Map<dynamic, dynamic>? args;
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method == 'setQuirkProfile') {
+        args = call.arguments as Map<dynamic, dynamic>;
+        return <Object?, Object?>{'ok': true};
+      }
+      return _statusMap();
+    });
+    expect(
+      await service.applyQuirkProfile(<String, Object?>{'force16Bit': true}),
+      isTrue,
+    );
+    expect(args?['force16Bit'], isTrue);
+  });
+
+  test('PCM source wrappers forward the path and report the native answer',
+      () async {
+    final calls = <MethodCall>[];
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      calls.add(call);
+      switch (call.method) {
+        case 'startPcmFile':
+          return true;
+        case 'stopPcmFile':
+          return true;
+        case 'hasPcmFileSource':
+          return true;
+        default:
+          return _statusMap();
+      }
+    });
+    expect(await service.startPcmFile('/tmp/reference.wav'), isTrue);
+    expect(
+      (calls.firstWhere((c) => c.method == 'startPcmFile').arguments
+          as Map<dynamic, dynamic>)['path'],
+      '/tmp/reference.wav',
+    );
+    expect(await service.stopPcmFile(), isTrue);
+    expect(await service.hasPcmFileSource(), isTrue);
+  });
+
+  test('PCM source wrappers fail closed when native throws', () async {
+    _messenger.setMockMethodCallHandler(_method, (call) async {
+      if (call.method.startsWith('startPcmFile') ||
+          call.method.startsWith('stopPcmFile') ||
+          call.method == 'hasPcmFileSource') {
+        throw PlatformException(code: 'no_native');
+      }
+      return _statusMap();
+    });
+    expect(await service.startPcmFile('/x.wav'), isFalse);
+    expect(await service.stopPcmFile(), isFalse);
+    expect(await service.hasPcmFileSource(), isFalse);
   });
 
   test('dispose is idempotent and tears the stream down', () {

@@ -2,6 +2,7 @@
 #include "UsbAudioSink.h"
 #include "AudioDspEngine.h"
 #include "SinkQuantizer.h"
+#include "UsbPcmProducer.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -68,6 +69,7 @@ inline int ioctl(int, unsigned long, ...) { return -1; }
 #include <chrono>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <new>
 
 // Abandon() and the destructor deliberately leak the URB header storage and
@@ -95,6 +97,8 @@ namespace pulsr {
 namespace {
 constexpr int kNumUrbs = 8;
 constexpr int kTargetUrbDurationUs = 8000;
+// Upper bound for a tuned pull-renderer reservoir (SetStreamTuning).
+constexpr int kMaxTunedBufferMs = 10000;
 } // namespace
 
 UsbAudioSink& UsbAudioSink::instance() {
@@ -159,7 +163,7 @@ bool UsbAudioSink::submitAll(UrbSubmit submit) {
 UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
                                    int altSetting, int sampleRate, int channels,
                                    int bytesPerSample, int validBitDepth,
-                                   bool alreadyConfigured) {
+                                   bool alreadyConfigured, int renderMode) {
     std::lock_guard<std::mutex> control(controlMutex_);
     const int effectiveBits = validBitDepth == 0 && bytesPerSample >= 2 && bytesPerSample <= 4
         ? bytesPerSample * 8 : validBitDepth;
@@ -187,6 +191,18 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     // Isochronous OUT endpoint: addresses 1-15 with the IN bit clear. Checked
     // after the rate so an unsupported rate keeps reporting itself.
     if (endpointAddress <= 0 || endpointAddress > 0x0f || (endpointAddress & 0x80) != 0) {
+        ReportWriteError(EINVAL);
+        return UsbStreamResult::InvalidArgs;
+    }
+
+    // Geometry is settled; only now consider the requested stream shape. An
+    // unknown value is a caller bug and is rejected like bad geometry. The two
+    // clock-controlled modes are refused while their engines are not linked
+    // (see the UsbRenderMode note in the header): starting one would either
+    // fail to link or silently stream a path the caller did not ask for, and a
+    // false bit-perfect claim is worse than a clean refusal.
+    if (renderMode < static_cast<int>(UsbRenderMode::BestEffort) ||
+        renderMode > static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
         ReportWriteError(EINVAL);
         return UsbStreamResult::InvalidArgs;
     }
@@ -225,9 +241,51 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     channels_ = channels;
     bytesPerSample_ = bytesPerSample;
     validBitDepth_ = effectiveBits;
+    renderMode_ = renderMode;
+    bitPerfectEligible_.store(false, std::memory_order_relaxed);
+    bitPerfectDisqualified_.store(false, std::memory_order_relaxed);
     producerDither_ = {};
     workerDither_ = {};
     gapFader_.configure(sampleRate, channels, bytesPerSample_);
+    asrcOutAvail_ = 0;
+    if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+        const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 3000;
+        // Pull mode stores the wire bytes verbatim, so its frame size is the
+        // wire frame size. ASRC mode stores decoded float frames (4 bytes each)
+        // and packs after resampling.
+        const int storageBytes = renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)
+            ? 4 : bytesPerSample_;
+        pullPackFrames_ = static_cast<size_t>(std::max(maxFramesPerPacket_, 8192));
+        pullPack_.assign(pullPackFrames_ * static_cast<size_t>(channels_) *
+                             static_cast<size_t>(bytesPerSample_), 0);
+        if (!pullRenderer_.Configure(sampleRate_, channels_, storageBytes, reservoirMs)) {
+            lastError_.store(EINVAL, std::memory_order_relaxed);
+            releaseResources();
+            return UsbStreamResult::InvalidArgs;
+        }
+        if (renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
+            if (!asrc_.configure(channels_, UsbAsrcClockSync::kDefaultTaps,
+                                 UsbAsrcClockSync::kDefaultPhases)) {
+                lastError_.store(EINVAL, std::memory_order_relaxed);
+                releaseResources();
+                return UsbStreamResult::InvalidArgs;
+            }
+            // One packet of output plus lookahead, and a bounded input chunk.
+            // maxFramesPerPacket_ is computed later in Open, so size against a
+            // floor here; the packet loop clamps to the real packet size.
+            const size_t packetFloor = static_cast<size_t>(
+                std::max(maxFramesPerPacket_, 2048));
+            const size_t outCap = (packetFloor + 64) * static_cast<size_t>(channels_);
+            asrcOut_.assign(outCap, 0.0f);
+            asrcPack_.assign(packetFloor * static_cast<size_t>(channels_), 0.0f);
+            asrcInputCapacityFrames_ = 1024;
+            asrcIn_.assign(asrcInputCapacityFrames_ * static_cast<size_t>(channels_), 0.0f);
+            // Typical decoder blocks are 256-4096 frames; 8192 covers them
+            // without allocating in the producer path.
+            asrcRawScratchFrames_ = 8192;
+            asrcRawScratch_.assign(asrcRawScratchFrames_ * static_cast<size_t>(channels_), 0.0f);
+        }
+    }
 
 #if defined(__linux__) || defined(__ANDROID__)
     const int speed = ioctl(fd_, USBDEVFS_GET_SPEED);
@@ -242,10 +300,22 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     feedbackEndpoint_ = findFeedbackEndpoint(config.data(), config.size(),
                                              interfaceNumber_, altSetting_,
                                              &feedbackPacketSize_);
+    if (disableExplicitFeedback_) feedbackEndpoint_ = 0;
     if (feedbackEndpoint_ < 0) {
         lastError_.store(EINVAL, std::memory_order_relaxed);
         releaseResources();
         return UsbStreamResult::InvalidArgs;
+    }
+    // Stream tuning: a DAC whose feedback IN endpoint steers badly can be
+    // pinned to ring-fill steering. Treat the endpoint as absent so no feedback
+    // URB is ever submitted; the worker's steering fallback then owns cadence
+    // (the same path a DAC without feedback already takes).
+    if (disableExplicitFeedback_ && feedbackEndpoint_ != 0) {
+        PULSR_USB_LOG(ANDROID_LOG_INFO,
+                      "tuning: ignoring advertised feedback endpoint 0x%02x",
+                      feedbackEndpoint_);
+        feedbackEndpoint_ = 0;
+        feedbackPacketSize_ = 0;
     }
     serviceIntervalUs_ = timing.intervalUs;
     const int frameBytes = channels_ * bytesPerSample_;
@@ -289,12 +359,36 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
 
     const int maxBytesPerPacket = maxFramesPerPacket_ * frameBytes;
     bytesPerPacket_ = maxBytesPerPacket;
-    packetsPerUrb_ = std::max(1, kTargetUrbDurationUs / serviceIntervalUs_);
+    // Automatic sizing targets an 8 ms URB. Stream tuning may replace it with an
+    // explicit transfer size, clamped to 64 packets so one URB can never grow an
+    // unbounded buffer; a request too small to carry a single packet falls back
+    // to the automatic target (and says so once) instead of starving the pipe.
+    int packetsPerUrb = std::max(1, kTargetUrbDurationUs / serviceIntervalUs_);
+    if (tunedTransferSizeBytes_ > 0) {
+        const int requestedPackets = maxBytesPerPacket > 0
+            ? tunedTransferSizeBytes_ / maxBytesPerPacket : 0;
+        if (requestedPackets >= 1) {
+            packetsPerUrb = std::clamp(requestedPackets, 1, 64);
+            PULSR_USB_LOG(ANDROID_LOG_INFO,
+                          "tuning: transferSizeBytes=%d -> packetsPerUrb=%d",
+                          tunedTransferSizeBytes_, packetsPerUrb);
+        } else {
+            static bool loggedSmallTransfer = false;
+            if (!loggedSmallTransfer) {
+                loggedSmallTransfer = true;
+                PULSR_USB_LOG(ANDROID_LOG_WARN,
+                              "tuning: transferSizeBytes=%d cannot hold one %d-byte "
+                              "packet; using automatic URB sizing",
+                              tunedTransferSizeBytes_, maxBytesPerPacket);
+            }
+        }
+    }
+    packetsPerUrb_ = packetsPerUrb;
     bytesPerUrb_ = maxBytesPerPacket * packetsPerUrb_;
 
     // Packet-sizing / feedback state consumed by the worker thread.
     frameAccumulator_ = 0;
-    feedbackRatePerSec_ = sampleRate_;  // nominal until a feedback sample arrives
+    feedbackRatePerSec_.store(sampleRate_, std::memory_order_relaxed);  // nominal until a feedback sample arrives
 
     // Power-of-two frame capacity for mask-based frame & raw-depth indexing
     // (~1000 ms slack on standard devices; capped on <= 3 GiB RAM devices).
@@ -535,6 +629,7 @@ void UsbAudioSink::Abandon() {
     // of draining a dead descriptor forever.
     claimed_ = false;
     fd_ = -1;
+    renderMode_ = 0;
     exclusive_.store(false, std::memory_order_release);
     // A completed forced teardown is not a live fault: drop the ETIMEDOUT (or
     // any other error) the failed drain left here so the sink matches its
@@ -782,6 +877,11 @@ void UsbAudioSink::freeFeedbackResources() {
 }
 
 bool UsbAudioSink::releaseResources() {
+    // Stop the reader thread before any buffer it writes can be released.
+    if (pcmProducer_) {
+        pcmProducer_->stop();
+        pcmProducer_.reset();
+    }
     writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
     active_.store(false, std::memory_order_release);
     while (writerGate_.load(std::memory_order_acquire) & kWriterBusy) {
@@ -835,6 +935,8 @@ bool UsbAudioSink::releaseResources() {
     }
     claimed_ = false;
     fd_ = -1;
+    // No live stream: the next Open must not inherit a shape it did not request.
+    renderMode_ = 0;
     running_.store(false, std::memory_order_release);
     exclusive_.store(false, std::memory_order_release); // only after USB ownership is drained
     return true;
@@ -997,7 +1099,8 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
                           sampleRate_ > 0
                               ? static_cast<double>(fillFrames) * 1000.0 / sampleRate_
                               : 0.0,
-                          static_cast<uint32_t>(feedbackRatePerSec_),
+                          static_cast<uint32_t>(feedbackRatePerSec_.load(
+                              std::memory_order_relaxed)),
                           feedbackEndpoint_ != 0 ? 1 : 0);
         }
     }
@@ -1018,7 +1121,9 @@ void UsbAudioSink::workerLoop() {
     // xHCI isochronous schedule and causing startup glitches/underruns. While
     // waiting for prefill, OUT URBs carry clean silence (or DoP silence)
     // without incrementing underrunCount_.
-    bool prefillDone = (prefillFrames_ == 0);
+    const bool pullMode = renderMode_ != static_cast<int>(UsbRenderMode::BestEffort);
+    bool prefillDone = pullMode ? pullRenderer_.prefillSatisfied()
+                                : (prefillFrames_ == 0);
     bool producerSeen = false;
     auto prefillDeadline = std::chrono::steady_clock::time_point{};
     int repeatedReadyPolls = 0;
@@ -1085,7 +1190,7 @@ void UsbAudioSink::workerLoop() {
             }
             if (fault != 0) {
                 ReportWriteError(fault);
-                feedbackRatePerSec_ = sampleRate_;
+                feedbackRatePerSec_.store(sampleRate_, std::memory_order_relaxed);
             }
             urb->buffer_length = feedbackPacketSize_ * feedbackPacketsPerUrb_;
             urb->status = 0;
@@ -1133,7 +1238,16 @@ void UsbAudioSink::workerLoop() {
         int urbTotalBytes = 0;
         const size_t wNow = ringWrite_.load(std::memory_order_acquire);
         const size_t availNow = wNow - readFrame;
-        if (!prefillDone) {
+        if (pullMode) {
+            if (!prefillDone && pullRenderer_.prefillSatisfied()) {
+                prefillDone = true;
+                PULSR_USB_LOG(ANDROID_LOG_INFO,
+                              "pull prefill ready: fillMs=%d targetMs=%zu",
+                              pullRenderer_.fillMs(),
+                              pullRenderer_.configuredFrames() * 1000 /
+                                  static_cast<size_t>(std::max(1, sampleRate_)));
+            }
+        } else if (!prefillDone) {
             if (availNow > 0 && !producerSeen) {
                 producerSeen = true;
                 prefillDeadline = std::chrono::steady_clock::now() +
@@ -1152,7 +1266,7 @@ void UsbAudioSink::workerLoop() {
                                   static_cast<size_t>(std::max(1, sampleRate_)));
             }
         }
-        if (feedbackEndpoint_ == 0 && prefillDone) {
+        if (!pullMode && feedbackEndpoint_ == 0 && prefillDone) {
             // Steer against the operating window (~2x prefillFrames_), not the
             // full 1+ second physical ring capacity: ExoPlayer's AudioTrack
             // buffer caps producer lead at ~200-250 ms, which would otherwise
@@ -1162,10 +1276,14 @@ void UsbAudioSink::workerLoop() {
                 std::max<size_t>(
                     prefillFrames_ * 2,
                     static_cast<size_t>(packetsPerUrb_ * maxFramesPerPacket_) * 4));
-            feedbackRatePerSec_ = SteerPacketRateForRingFill(
-                feedbackRatePerSec_, sampleRate_, availNow, steerWindow);
+            feedbackRatePerSec_.store(
+                SteerPacketRateForRingFill(
+                    feedbackRatePerSec_.load(std::memory_order_relaxed),
+                    sampleRate_, availNow, steerWindow),
+                std::memory_order_relaxed);
         }
-        const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
+        const uint32_t ratePerSec =
+            static_cast<uint32_t>(feedbackRatePerSec_.load(std::memory_order_relaxed));
         int rawDepth = -1;
         uint64_t deliveryEpoch = deliveryEpoch_.load(std::memory_order_acquire);
         const size_t frameBytes =
@@ -1188,6 +1306,10 @@ void UsbAudioSink::workerLoop() {
                     }
                 }
                 rawDepth = 0;
+            } else if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull)) {
+                pktLen = fillPullPacket(dst, framesInPacket, rawDepth);
+            } else if (renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
+                pktLen = fillAsrcPacket(dst, framesInPacket, rawDepth);
             } else {
                 pktLen = fillPacketFromRing(
                     dst, framesInPacket, readFrame, rawDepth, deliveryEpoch);
@@ -1204,7 +1326,7 @@ void UsbAudioSink::workerLoop() {
         urb->error_count = 0;
         urbRawDepth_[urbIndex] = std::max(rawDepth, 0);
         urbDeliveryEpoch_[urbIndex] = deliveryEpoch;
-        ringRead_.store(readFrame, std::memory_order_release);
+        if (!pullMode) ringRead_.store(readFrame, std::memory_order_release);
 
         if (!submitUrb(urb, false, urbIndex)) {
             ReportWriteError(errno);
@@ -1308,6 +1430,105 @@ bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frame
         rejectLog(sampleRate != sampleRate_ ? "rate" : "depth");
         return false; // no implicit SRC or lossy valid-depth reduction
     }
+    if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull)) {
+        // Bit-perfect pull stores the wire bytes exactly as the producer wrote
+        // them. A float block or a different valid depth cannot be made
+        // sample-identical, so it disqualifies the session instead of being
+        // converted behind the user's back.
+        if (!pcm || sourceBitDepth <= 0 || sourceBitDepth > validBitDepth_) {
+            bitPerfectDisqualified_.store(true, std::memory_order_release);
+            bitPerfectEligible_.store(false, std::memory_order_release);
+            ReportWriteError(ENOTSUP);
+            rejectLog(!pcm ? "float_in_pull" : "depth");
+            return false;
+        }
+        const int srcBytes = sourceBitDepth / 8;
+        const void* payload = pcm;
+        if (srcBytes != bytesPerSample_) {
+            // A wider container is allowed only as zero padding: repack the
+            // source's valid bits into the wire subslot, exactly as the
+            // BestEffort path does. The sample values are unchanged.
+            if (static_cast<size_t>(frames) > pullPackFrames_) {
+                bitPerfectDisqualified_.store(true, std::memory_order_release);
+                bitPerfectEligible_.store(false, std::memory_order_release);
+                ReportWriteError(ENOTSUP);
+                rejectLog("pull_block_too_large");
+                return false;
+            }
+            const size_t fb = static_cast<size_t>(channels_) *
+                              static_cast<size_t>(bytesPerSample_);
+            for (int f = 0; f < frames; ++f) {
+                for (int c = 0; c < channels_; ++c) {
+                    const size_t sample = static_cast<size_t>(f) * channels_ + c;
+                    uint8_t packed[4] = {0, 0, 0, 0};
+                    PackRawPcmSample(pcm + sample * static_cast<size_t>(srcBytes),
+                                     sourceBitDepth, packed, bytesPerSample_,
+                                     validBitDepth_);
+                    std::memcpy(pullPack_.data() + static_cast<size_t>(f) * fb +
+                                    static_cast<size_t>(c) * bytesPerSample_,
+                                packed, static_cast<size_t>(bytesPerSample_));
+                }
+            }
+            payload = pullPack_.data();
+        }
+        if (!pullRenderer_.write(payload, frames)) {
+            overrunCount_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
+            ReportWriteError(ENOSPC);
+            return false;
+        }
+        producerRawDepth_.store(sourceBitDepth, std::memory_order_release);
+        deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
+        // Eligibility is earned by a full, bit-identical packet pull, not by a
+        // write: claiming before any payload reached the wire would be a lie.
+        return true;
+    }
+    if (renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
+        // The ASRC path is float-only by design: a decoded float block can be
+        // resampled without inventing integer bits, while a raw integer block
+        // would have to be reinterpreted first. Refuse it visibly.
+        // ASRC is a resampling path, so an integer source is legal: convert it
+        // to float first (the same scale the engine uses), then resample. The
+        // conversion is exact for 16/24-bit integer grids and is never claimed
+        // as bit-perfect.
+        if (!floats) {
+            if (!pcm || frames > static_cast<int>(asrcRawScratchFrames_) ||
+                (sourceBitDepth != 16 && sourceBitDepth != 24 && sourceBitDepth != 32)) {
+                asrcRawPcmRejected_.fetch_add(static_cast<uint64_t>(frames),
+                                              std::memory_order_relaxed);
+                ReportWriteError(ENOTSUP);
+                rejectLog("pcm_in_asrc");
+                return false;
+            }
+            const int srcBytes = sourceBitDepth / 8;
+            const float scale = 1.0f / static_cast<float>(1u << (sourceBitDepth - 1));
+            for (int f = 0; f < frames; ++f) {
+                for (int c = 0; c < channels_; ++c) {
+                    const uint8_t* src = pcm +
+                        (static_cast<size_t>(f) * channels_ + c) * static_cast<size_t>(srcBytes);
+                    int64_t value = 0;
+                    for (int b = 0; b < srcBytes; ++b) {
+                        value |= static_cast<int64_t>(src[b]) << (8 * b);
+                    }
+                    const int shift = 32 - sourceBitDepth;
+                    value = (value << shift) >> shift;  // sign-extend in 64-bit
+                    asrcRawScratch_[static_cast<size_t>(f) * channels_ + c] =
+                        static_cast<float>(value) * scale;
+                }
+            }
+            if (!pullRenderer_.write(asrcRawScratch_.data(), frames)) {
+                overrunCount_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
+                ReportWriteError(ENOSPC);
+                return false;
+            }
+        } else if (!pullRenderer_.write(floats, frames)) {
+            overrunCount_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
+            ReportWriteError(ENOSPC);
+            return false;
+        }
+        producerRawDepth_.store(0, std::memory_order_release);
+        deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
+        return true;
+    }
     const size_t capFrames = ringRawDepth_.size();
     const size_t frameBytes = static_cast<size_t>(channels_) * bytesPerSample_;
     size_t w = ringWrite_.load(std::memory_order_relaxed);
@@ -1345,9 +1566,84 @@ bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frame
     return true;
 }
 
+size_t UsbAudioSink::fillPullPacket(uint8_t* dst, int framesInPacket, int& rawDepth) {
+    const size_t frameBytes =
+        static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
+    const int got = pullRenderer_.pullExact(dst, framesInPacket);
+    if (got < framesInPacket) {
+        // pullExact zero-fills the remainder. A gap means the wire stream is no
+        // longer a byte-for-byte copy of the source, so the session loses its
+        // bit-perfect eligibility even if it recovers.
+        underrunCount_.fetch_add(1, std::memory_order_relaxed);
+        bitPerfectDisqualified_.store(true, std::memory_order_release);
+        bitPerfectEligible_.store(false, std::memory_order_release);
+    } else if (producerRawDepth_.load(std::memory_order_acquire) > 0) {
+        bitPerfectEligible_.store(
+            !bitPerfectDisqualified_.load(std::memory_order_acquire),
+            std::memory_order_release);
+    }
+    // Report the producer's valid depth, not the container width: a 16-bit
+    // source in a 24-bit subslot is still a 16-bit sample stream.
+    rawDepth = producerRawDepth_.load(std::memory_order_acquire);
+    return static_cast<size_t>(framesInPacket) * frameBytes;
+}
+
+size_t UsbAudioSink::fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDepth) {
+    const size_t ch = static_cast<size_t>(channels_);
+    const size_t frameBytes = ch * static_cast<size_t>(bytesPerSample_);
+    int produced = 0;
+    const size_t outCapacityFrames = asrcOut_.size() / ch;
+    while (produced < framesInPacket) {
+        if (asrcOutAvail_ > 0) {
+            const int take = std::min(framesInPacket - produced, asrcOutAvail_);
+            std::memcpy(asrcPack_.data() + static_cast<size_t>(produced) * ch,
+                        asrcOut_.data(), static_cast<size_t>(take) * ch * sizeof(float));
+            produced += take;
+            asrcOutAvail_ -= take;
+            if (asrcOutAvail_ > 0) {
+                std::memmove(asrcOut_.data(),
+                             asrcOut_.data() + static_cast<size_t>(take) * ch,
+                             static_cast<size_t>(asrcOutAvail_) * ch * sizeof(float));
+            }
+            if (produced >= framesInPacket) break;
+        }
+        const int got = pullRenderer_.pull(asrcIn_.data(),
+                                          static_cast<int>(asrcInputCapacityFrames_));
+        if (got <= 0) break;
+        const size_t outRoom = outCapacityFrames - static_cast<size_t>(asrcOutAvail_);
+        const int made = asrc_.process(
+            asrcIn_.data(), got,
+            asrcOut_.data() + static_cast<size_t>(asrcOutAvail_) * ch,
+            static_cast<int>(outRoom));
+        asrcOutAvail_ += made;
+        if (made == 0) break;  // needs more input than one chunk can supply
+    }
+    if (produced < framesInPacket) {
+        std::memset(asrcPack_.data() + static_cast<size_t>(produced) * ch, 0,
+                    static_cast<size_t>(framesInPacket - produced) * ch * sizeof(float));
+        underrunCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    for (int f = 0; f < framesInPacket; ++f) {
+        for (size_t c = 0; c < ch; ++c) {
+            uint8_t packed[4] = {0, 0, 0, 0};
+            PackPcmSample(asrcPack_[static_cast<size_t>(f) * ch + c], packed,
+                          bytesPerSample_, workerDither_, validBitDepth_);
+            std::memcpy(dst + static_cast<size_t>(f) * frameBytes +
+                            c * static_cast<size_t>(bytesPerSample_),
+                        packed, static_cast<size_t>(bytesPerSample_));
+        }
+    }
+    // Resampled output is never a raw-integer copy, regardless of the source.
+    rawDepth = 0;
+    return static_cast<size_t>(framesInPacket) * frameBytes;
+}
+
 double UsbAudioSink::GetBufferedMs() {
     std::lock_guard<std::mutex> control(controlMutex_); // status/control, not render
     if (!active_.load(std::memory_order_acquire)) return 0.0;
+    if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+        return static_cast<double>(pullRenderer_.fillMs());
+    }
     const size_t w = ringWrite_.load(std::memory_order_acquire);
     const size_t r = ringRead_.load(std::memory_order_acquire);
     const size_t countFrames = w - r;
@@ -1356,6 +1652,117 @@ double UsbAudioSink::GetBufferedMs() {
         : 0.0;
     const double urbMs = static_cast<double>(numUrbs_ * packetsPerUrb_) * serviceIntervalUs_ / 1000.0;
     return ringMs + urbMs;
+}
+
+void UsbAudioSink::SetStreamTuning(int transferSizeBytes, int bufferMs,
+                                   bool disableExplicitFeedback) {
+    std::lock_guard<std::mutex> control(controlMutex_);
+    // Control-thread state for the next Open(): recording it now must never
+    // disturb a stream that is already running (Open reads it once).
+    tunedTransferSizeBytes_ = transferSizeBytes > 0 ? transferSizeBytes : 0;
+    // A reservoir longer than 10 s cannot improve clock lock and turns a seek
+    // into a multi-second flush; 0 keeps the automatic 3000 ms target.
+    tunedBufferMs_ = bufferMs > 0 ? std::min(bufferMs, kMaxTunedBufferMs) : 0;
+    disableExplicitFeedback_ = disableExplicitFeedback;
+}
+
+bool UsbAudioSink::StartPcmFile(const std::string& path) {
+    std::lock_guard<std::mutex> control(controlMutex_);
+    if (!active_.load(std::memory_order_acquire) ||
+        renderMode_ != static_cast<int>(UsbRenderMode::BitPerfectPull)) {
+        return false;
+    }
+    if (pcmProducer_) {
+        pcmProducer_->stop();
+        pcmProducer_.reset();
+    }
+    auto producer = std::make_unique<UsbPcmProducer>();
+    const UsbPcmFormat target{sampleRate_, channels_, bytesPerSample_, validBitDepth_};
+    const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 3000;
+    if (!producer->open(path, target, pullRenderer_, reservoirMs,
+                       /*configureRenderer=*/false)) {
+        ReportWriteError(EINVAL);
+        return false;
+    }
+    producer->start();
+    pcmProducer_ = std::move(producer);
+    return true;
+}
+
+void UsbAudioSink::StopPcmFile() {
+    std::lock_guard<std::mutex> control(controlMutex_);
+    if (pcmProducer_) {
+        pcmProducer_->stop();
+        pcmProducer_.reset();
+    }
+}
+
+bool UsbAudioSink::HasPcmFileSource() const {
+    std::lock_guard<std::mutex> control(controlMutex_);
+    return pcmProducer_ != nullptr && pcmProducer_->isOpen();
+}
+
+UsbClockDomain UsbAudioSink::DeriveClockDomain(UsbRenderMode mode, bool active,
+                                               bool bitPerfectEligible,
+                                               uint64_t underruns,
+                                               uint64_t channelMismatch) {
+    if (!active) return UsbClockDomain::Unknown;
+    switch (mode) {
+        case UsbRenderMode::ClockSyncAsrc:
+            // The resampler *is* the clock domain by construction: samples are
+            // no longer the bits the producer wrote, whatever the source is.
+            return UsbClockDomain::Asrc;
+        case UsbRenderMode::BitPerfectPull:
+            // Payloads stay sample-identical only while the session was never
+            // disqualified, nothing had to be zero-filled, and no channel
+            // mismatch was ever summed into the wire stream.
+            return (bitPerfectEligible && underruns == 0 && channelMismatch == 0)
+                ? UsbClockDomain::BitPerfectLocked
+                : UsbClockDomain::BestEffort;
+        case UsbRenderMode::BestEffort:
+            break;
+    }
+    return UsbClockDomain::BestEffort;
+}
+
+UsbClockStatus UsbAudioSink::GetClockStatus() const {
+    std::lock_guard<std::mutex> control(controlMutex_);
+    UsbClockStatus status;
+    const bool active = active_.load(std::memory_order_acquire);
+    status.underrunCount = underrunCount_.load(std::memory_order_relaxed);
+    // Raw PCM refused by the float-only ASRC path is a producer/output format
+    // mismatch, so it is reported where the UI already looks for stream faults
+    // rather than being folded into silence. Zero outside that path.
+    status.overrunCount = overrunCount_.load(std::memory_order_relaxed) +
+        asrcRawPcmRejected_.load(std::memory_order_relaxed);
+    // No pull session can be live while its engine is unlinked, so a session is
+    // never bit-perfect eligible here; the pull path will supply the real flag.
+    status.domain = DeriveClockDomain(
+        static_cast<UsbRenderMode>(renderMode_), active,
+        bitPerfectEligible_.load(std::memory_order_acquire), status.underrunCount,
+        channelMismatchFrames_.load(std::memory_order_relaxed));
+    if (!active || sampleRate_ <= 0) return status;
+
+    status.feedbackPresent = feedbackEndpoint_ != 0;
+    if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+        status.ringFillMs = pullRenderer_.fillMs();
+    } else {
+        const size_t written = ringWrite_.load(std::memory_order_acquire);
+        const size_t read = ringRead_.load(std::memory_order_acquire);
+        const uint64_t fillMs = static_cast<uint64_t>(written - read) * 1000ull /
+                                static_cast<uint64_t>(sampleRate_);
+        status.ringFillMs = static_cast<int>(std::min<uint64_t>(
+            fillMs, static_cast<uint64_t>(std::numeric_limits<int>::max())));
+    }
+    // Positive means the producer clock is running fast relative to the DAC:
+    // the rate the feedback loop (or the ring-steering fallback) is currently
+    // asking the packet cadence to reach, against nominal.
+    const double drift =
+        (static_cast<double>(feedbackRatePerSec_.load(std::memory_order_relaxed)) -
+         static_cast<double>(sampleRate_)) * 1e6 / static_cast<double>(sampleRate_);
+    status.clockDriftPpm = static_cast<int>(
+        std::lround(std::clamp(drift, -1000000.0, 1000000.0)));
+    return status;
 }
 
 int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
@@ -1370,11 +1777,19 @@ int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
         int status = -1;
         if (exclusive_.load(std::memory_order_acquire) &&
             active_.load(std::memory_order_acquire)) {
-            const size_t capFrames = ringRawDepth_.size();
-            if (capFrames > 1) {
-                const size_t neededFrames = static_cast<size_t>(frames);
-                const size_t maxFitFrames = capFrames - 1;
-                if (neededFrames <= maxFitFrames) {
+            const size_t neededFrames = static_cast<size_t>(frames);
+            if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+                // Pull modes answer from their own reservoir, not ring_: the
+                // ring stays empty there and would always report "space free".
+                const size_t capacity = pullRenderer_.capacityFrames();
+                const size_t available = pullRenderer_.availableFrames();
+                if (capacity > available) {
+                    const size_t freeFrames = capacity - available;
+                    status = (neededFrames <= freeFrames) ? 0 : 1;
+                }
+            } else {
+                const size_t capFrames = ringRawDepth_.size();
+                if (capFrames > 1 && neededFrames <= capFrames - 1) {
                     const size_t w = ringWrite_.load(std::memory_order_relaxed);
                     const size_t r = ringRead_.load(std::memory_order_acquire);
                     const size_t occupiedFrames = w - r;
@@ -1459,7 +1874,9 @@ bool UsbAudioSink::setupFeedbackUrbs() {
 
 void UsbAudioSink::applyFeedback(const uint8_t* data, int len) {
     const int decoded = DecodeFeedbackRatePerSec(data, len, sampleRate_);
-    if (decoded > 0) feedbackRatePerSec_ = decoded;
+    if (decoded > 0) {
+        feedbackRatePerSec_.store(decoded, std::memory_order_relaxed);
+    }
 }
 
 int UsbAudioSink::DecodeFeedbackRatePerSec(const uint8_t* data, int len, int nominalRate) {
@@ -1551,7 +1968,15 @@ UsbAudioSink::EndpointTiming UsbAudioSink::ParseEndpointTiming(
                         bytesPerInterval > payload * (burst + 1) * (mult + 1)) return {};
                     capacity = bytesPerInterval;
                 }
-                return {(fullSpeed ? 1000 : 125) * (1 << (interval - 1)), capacity};
+                // bInterval is an exponent. Audio isochronous endpoints use
+                // 1 ms (FS) or 125 us (HS/SS); a malformed descriptor can ask
+                // for a multi-second service interval, which no URB schedule
+                // can carry. Reject anything above 10 ms instead of opening a
+                // stream that would starve.
+                const int intervalUs =
+                    (fullSpeed ? 1000 : 125) * (1 << (interval - 1));
+                if (intervalUs <= 0 || intervalUs > 10000) return {};
+                return {intervalUs, capacity};
             }
         }
         i += length;
@@ -1605,6 +2030,11 @@ std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(
     if (!desc || len < 8) return {};
 
     std::vector<int> rates;
+    // Range guard for discrete FORMAT_TYPE_I rates. The band is wider than the
+    // standard-rate table so a DAC advertising e.g. 32 kHz or 22.05 kHz keeps
+    // its real capability, but an arbitrary 24-bit field cannot become one.
+    constexpr int kMinPlausibleRate = 8000;
+    constexpr int kMaxPlausibleRate = 1536000;
     constexpr int kStandardRates[] = {
         44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000
     };
@@ -1652,7 +2082,13 @@ std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(
                                 size_t offset = i + 8 + 3 * k;
                                 if (offset + 3 <= i + bLength) {
                                     int r = desc[offset] | (desc[offset + 1] << 8) | (desc[offset + 2] << 16);
-                                    if (r > 0) {
+                                    // A discrete wSamFreq field is three bytes; a
+                                    // malformed or hostile descriptor can put any
+                                    // 24-bit value there. Only a plausible audio
+                                    // rate is a capability: 8 kHz..1.536 MHz. The
+                                    // fuzz suite found the old `r > 0` check echoing
+                                    // 15 MHz values into status.
+                                    if (r >= kMinPlausibleRate && r <= kMaxPlausibleRate) {
                                         rates.push_back(r);
                                     }
                                 }

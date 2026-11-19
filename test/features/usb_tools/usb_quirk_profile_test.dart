@@ -28,8 +28,10 @@ void main() {
       ]);
     });
 
-    test('drops knobs that were persisted by older builds', () {
-      // Profiles written before the dead knobs were removed still load.
+    test('loads and re-serializes transport knobs from older builds', () {
+      // Profiles written before the transport knobs had consumers still load;
+      // the values are now applied by the exclusive start path instead of
+      // being dropped.
       final decoded = UsbQuirkProfile.fromJson(<String, Object?>{
         'vid': 0x0a12,
         'pid': 1,
@@ -45,7 +47,71 @@ void main() {
       expect(decoded.vid, 0x0a12);
       expect(decoded.label, 'Ancient DAC');
       expect(decoded.hidEnabled, isFalse);
-      expect(decoded.toJson().containsKey('silenceMs'), isFalse);
+      expect(decoded.silenceMs, 250);
+      expect(decoded.bufferMs, 40);
+      expect(decoded.transferSizeBytes, 8192);
+      expect(decoded.force16Bit, isTrue);
+      expect(decoded.altResetOnStop, isTrue);
+      expect(decoded.affectsBitPerfect, isTrue);
+      expect(decoded.toJson()['silenceMs'], 250);
+    });
+
+    test('audio knobs round-trip and defaults stay compact', () {
+      final profile = UsbQuirkProfile(
+        vid: 0x1234,
+        pid: 0x5678,
+        label: 'Quirky DAC',
+        silenceMs: 120,
+        force16Bit: true,
+        altResetOnStop: true,
+        transferSizeBytes: 4096,
+        bufferMs: 3000,
+        disableExplicitFeedback: true,
+        preferredSelectorPin: 3,
+        volumeCalibrationDb: -1.5,
+        uac1ReassertAfterAlt: true,
+        disableUac2ClockSwitch: true,
+      );
+      final decoded = UsbQuirkProfile.fromJson(profile.toJson());
+      expect(decoded, profile);
+      expect(decoded.affectsBitPerfect, isTrue);
+      expect(decoded.describe(), contains('16-bit forced'));
+      expect(decoded.isNeutral, isFalse);
+
+      final defaults = UsbQuirkProfile(vid: 1, pid: 2, label: 'Plain');
+      expect(defaults.isNeutral, isTrue);
+      expect(defaults.toJson().keys, <String>['vid', 'pid', 'label', 'hidEnabled']);
+    });
+
+    test('rejects out-of-range transport knobs', () {
+      expect(
+        () => UsbQuirkProfile(vid: 1, pid: 2, label: 'd', silenceMs: 2001),
+        throwsA(isA<QuirkValidationError>()
+            .having((e) => e.field, 'field', 'silenceMs')),
+      );
+      expect(
+        () => UsbQuirkProfile(vid: 1, pid: 2, label: 'd', bufferMs: 10001),
+        throwsA(isA<QuirkValidationError>()
+            .having((e) => e.field, 'field', 'bufferMs')),
+      );
+      expect(
+        () => UsbQuirkProfile(
+            vid: 1, pid: 2, label: 'd', transferSizeBytes: 32),
+        throwsA(isA<QuirkValidationError>()
+            .having((e) => e.field, 'field', 'transferSizeBytes')),
+      );
+      expect(
+        () => UsbQuirkProfile(
+            vid: 1, pid: 2, label: 'd', preferredSelectorPin: 256),
+        throwsA(isA<QuirkValidationError>()
+            .having((e) => e.field, 'field', 'preferredSelectorPin')),
+      );
+      expect(
+        () => UsbQuirkProfile(
+            vid: 1, pid: 2, label: 'd', volumeCalibrationDb: 25),
+        throwsA(isA<QuirkValidationError>()
+            .having((e) => e.field, 'field', 'volumeCalibrationDb')),
+      );
     });
 
     test('ignores unknown keys and defaults absent knobs', () {

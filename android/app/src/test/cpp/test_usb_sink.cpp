@@ -119,6 +119,68 @@ struct UsbAudioSinkTestAccess {
         for (size_t i = 0; i < count; ++i) out[i] = sink.ring_[(startByte + i) % capBytes];
         return out;
     }
+    static void preparePull(UsbAudioSink& sink, int mode, int bufferMs) {
+        sink.renderMode_ = mode;
+        sink.sampleRate_ = 48000;
+        sink.channels_ = 2;
+        sink.bytesPerSample_ = 2;
+        sink.validBitDepth_ = 16;
+        sink.maxFramesPerPacket_ = 480;
+        sink.frameAccumulator_ = 0;
+        sink.underrunCount_.store(0);
+        sink.overrunCount_.store(0);
+        sink.channelMismatchFrames_.store(0);
+        sink.bitPerfectEligible_.store(false);
+        sink.asrcRawPcmRejected_.store(0);
+        sink.active_.store(true);
+        sink.exclusive_.store(true);
+        sink.writerGate_.store(0);
+        sink.producerOwner_.store(0);
+        sink.producerRawDepth_.store(mode == 1 ? 16 : 0);
+        const int storageBytes = mode == 2 ? 4 : 2;
+        sink.pullRenderer_.Configure(48000, 2, storageBytes, bufferMs);
+        sink.asrcOutAvail_ = 0;
+        if (mode == 2) {
+            sink.asrc_.configure(2, 32, 256);
+            const size_t packetFloor = 2048;
+            sink.asrcOut_.assign((packetFloor + 64) * 2, 0.0f);
+            sink.asrcPack_.assign(packetFloor * 2, 0.0f);
+            sink.asrcInputCapacityFrames_ = 1024;
+            sink.asrcIn_.assign(1024 * 2, 0.0f);
+            sink.asrcRawScratchFrames_ = 8192;
+            sink.asrcRawScratch_.assign(8192 * 2, 0.0f);
+        }
+    }
+    static bool writePull(UsbAudioSink& sink, const void* src, int frames) {
+        return sink.pullRenderer_.write(src, frames);
+    }
+    static size_t fillPull(UsbAudioSink& sink, uint8_t* dst, int frames, int& depth) {
+        return sink.fillPullPacket(dst, frames, depth);
+    }
+    static size_t fillAsrc(UsbAudioSink& sink, uint8_t* dst, int frames, int& depth) {
+        return sink.fillAsrcPacket(dst, frames, depth);
+    }
+    static bool writeRawAsrc(UsbAudioSink& sink, const uint8_t* pcm, int frames,
+                             int depth) {
+        return sink.writeBlock(nullptr, pcm, frames, sink.channels_, depth,
+                               sink.sampleRate_, 7);
+    }
+    static size_t underruns(UsbAudioSink& sink) {
+        return sink.underrunCount_.load();
+    }
+    static bool eligible(UsbAudioSink& sink) {
+        return sink.bitPerfectEligible_.load();
+    }
+    static void markEligible(UsbAudioSink& sink) {
+        sink.bitPerfectEligible_.store(true);
+    }
+    static void stopPull(UsbAudioSink& sink) {
+        sink.active_.store(false);
+        sink.exclusive_.store(false);
+        sink.sinkDepthPublished_ = false;
+        sink.renderMode_ = 0;
+    }
+
     static size_t fillPacket(UsbAudioSink& sink, uint8_t* dst, int framesInPacket,
                              int& rawDepth, uint64_t& deliveryEpoch) {
         size_t r = sink.ringRead_.load(std::memory_order_relaxed);
@@ -128,6 +190,9 @@ struct UsbAudioSinkTestAccess {
         return writtenBytes;
     }
     static size_t ringRawDepthBytes(const UsbAudioSink& sink) { return sink.ringRawDepth_.size(); }
+    static int tunedTransferBytes(const UsbAudioSink& sink) { return sink.tunedTransferSizeBytes_; }
+    static int tunedBufferMs(const UsbAudioSink& sink) { return sink.tunedBufferMs_; }
+    static bool feedbackDisabled(const UsbAudioSink& sink) { return sink.disableExplicitFeedback_; }
     static uint64_t underrunCount(const UsbAudioSink& sink) { return sink.underrunCount_.load(); }
     static bool enter(UsbAudioSink& sink, int64_t id) { return sink.beginWrite(id); }
     static void leave(UsbAudioSink& sink) { sink.endWrite(); }
@@ -1018,11 +1083,200 @@ int main() {
         sink.Close();
     }
 
+    // ---- Stream tuning clamps (control-thread state for the next Open) ----
+    // The values are consumed by Open(); what is pinned here is that a tuning
+    // request cannot smuggle an unbounded reservoir or a negative transfer size
+    // into the transport.
+    {
+        using Access = pulsr::UsbAudioSinkTestAccess;
+        auto& sink = UsbAudioSink::instance();
+        Access::prepare(sink);
+        sink.SetStreamTuning(4096, 20000, true);
+        check(Access::tunedTransferBytes(sink) == 4096 &&
+                  Access::tunedBufferMs(sink) == 10000 &&
+                  Access::feedbackDisabled(sink),
+              "stream tuning keeps a valid transfer size and caps the pull buffer at 10000 ms");
+        sink.SetStreamTuning(-64, -5, false);
+        check(Access::tunedTransferBytes(sink) == 0 && Access::tunedBufferMs(sink) == 0 &&
+                  !Access::feedbackDisabled(sink),
+              "non-positive tuning values fall back to automatic");
+        sink.SetStreamTuning(0, 3000, false);
+        check(Access::tunedBufferMs(sink) == 3000,
+              "a within-range pull buffer is kept as requested");
+        sink.Close();
+    }
+
+    // ---- Clock-domain policy: pure, no device or stream required ----------
+    // These are the values Kotlin/Dart quote as "what the USB path is doing",
+    // so the contract is pinned here: BitPerfectLocked must survive every
+    // precondition, and nothing else may produce it.
+    int clockDomainChecks = 0;
+    int pullChecks = 0;
+    {
+        using pulsr::UsbClockDomain;
+        using pulsr::UsbRenderMode;
+        int n = 0;
+        const auto expect = [&](bool ok, const char* what) {
+            check(ok, what);
+            ++n;
+        };
+        const auto domain = [](UsbRenderMode mode, bool active, bool eligible,
+                               uint64_t underruns, uint64_t mismatch) {
+            return UsbAudioSink::DeriveClockDomain(mode, active, eligible, underruns,
+                                                   mismatch);
+        };
+
+        expect(domain(UsbRenderMode::BestEffort, false, true, 0, 0) ==
+                   UsbClockDomain::Unknown,
+               "an inactive stream is Unknown whatever mode was requested");
+        expect(domain(UsbRenderMode::BitPerfectPull, false, true, 0, 0) ==
+                   UsbClockDomain::Unknown,
+               "an eligible pull request that is not running is still Unknown");
+        expect(domain(UsbRenderMode::ClockSyncAsrc, true, false, 0, 0) ==
+                   UsbClockDomain::Asrc,
+               "an active ASRC stream reports Asrc");
+        expect(domain(UsbRenderMode::ClockSyncAsrc, true, false, 7, 11) ==
+                   UsbClockDomain::Asrc,
+               "ASRC stays Asrc after underruns and channel mismatches");
+        expect(domain(UsbRenderMode::BitPerfectPull, true, true, 0, 0) ==
+                   UsbClockDomain::BitPerfectLocked,
+               "an eligible pull stream with no faults is BitPerfectLocked");
+        expect(domain(UsbRenderMode::BitPerfectPull, true, false, 0, 0) ==
+                   UsbClockDomain::BestEffort,
+               "an ineligible pull stream must not claim bit-perfect");
+        expect(domain(UsbRenderMode::BitPerfectPull, true, true, 1, 0) ==
+                   UsbClockDomain::BestEffort,
+               "one pull underrun drops the domain to BestEffort");
+        expect(domain(UsbRenderMode::BitPerfectPull, true, true, 0, 1) ==
+                   UsbClockDomain::BestEffort,
+               "one channel-mismatch frame drops the domain to BestEffort");
+        expect(domain(UsbRenderMode::BestEffort, true, true, 0, 0) ==
+                   UsbClockDomain::BestEffort,
+               "the default producer path is BestEffort even with a clean session");
+
+        // Wire vocabulary: the JNI getters cast the enum to jint and the status
+        // names are consumed verbatim by Kotlin/Dart telemetry.
+        expect(static_cast<int>(UsbRenderMode::BestEffort) == 0 &&
+                   static_cast<int>(UsbRenderMode::BitPerfectPull) == 1 &&
+                   static_cast<int>(UsbRenderMode::ClockSyncAsrc) == 2,
+               "UsbRenderMode wire values must stay 0/1/2");
+        expect(std::strcmp(pulsr::UsbClockDomainName(UsbClockDomain::BitPerfectLocked),
+                           "bitPerfectLocked") == 0,
+               "BitPerfectLocked must keep its wire name");
+        expect(std::strcmp(pulsr::UsbClockDomainName(UsbClockDomain::Asrc), "asrc") == 0,
+               "Asrc must keep its wire name");
+        expect(std::strcmp(pulsr::UsbClockDomainName(UsbClockDomain::BestEffort),
+                           "bestEffort") == 0,
+               "BestEffort must keep its wire name");
+        expect(std::strcmp(pulsr::UsbClockDomainName(UsbClockDomain::Unknown), "unknown") == 0,
+               "Unknown must keep its wire name");
+
+        // A value built for a torn-down or never-started stream must be inert,
+        // not merely plausible: the UI shows these fields directly.
+        const pulsr::UsbClockStatus fresh{};
+        expect(fresh.domain == UsbClockDomain::Unknown,
+               "a default-constructed clock status is Unknown");
+        expect(fresh.clockDriftPpm == 0 && fresh.ringFillMs == 0 &&
+                   !fresh.feedbackPresent,
+               "a default clock status carries no drift, fill or feedback");
+        expect(fresh.underrunCount == 0 && fresh.overrunCount == 0,
+               "a default clock status starts with zero counters");
+
+        clockDomainChecks = n;
+    }
+
+    // ---- Pull / ASRC packet-fill integration (no USB device required) ----
+    {
+        using Access = pulsr::UsbAudioSinkTestAccess;
+        auto& sink = pulsr::UsbAudioSink::instance();
+        // 100 ms reservoir at 48 kHz stereo/16-bit: 4800 frames, 80% prefill.
+        Access::preparePull(sink, /*mode=*/1, /*bufferMs=*/100);
+        std::vector<uint8_t> source(4800 * 4);
+        for (size_t i = 0; i < source.size(); ++i) {
+            source[i] = static_cast<uint8_t>((i * 37 + 11) & 0xFF);
+        }
+        check(Access::writePull(sink, source.data(), 4800),
+               "pull renderer accepts a whole prefill block");
+        std::vector<uint8_t> out(480 * 4, 0);
+        int depth = 0;
+        const size_t packetBytes = Access::fillPull(sink, out.data(), 480, depth);
+        check(packetBytes == out.size(), "pull packet fills every requested frame");
+        check(std::memcmp(out.data(), source.data(), out.size()) == 0,
+               "pull packet payload is bit-identical to what the producer wrote");
+        check(depth == 16, "raw pull packets report the source valid depth");
+        // A full, bit-identical packet pull is what earns eligibility.
+        check(Access::eligible(sink),
+               "a clean raw pull session is bit-perfect eligible");
+
+        // Drain the rest, then force one underrun.
+        for (int p = 0; p < 9; ++p) {
+            Access::fillPull(sink, out.data(), 480, depth);
+        }
+        const size_t underrunsBefore = Access::underruns(sink);
+        Access::fillPull(sink, out.data(), 480, depth);
+        check(Access::underruns(sink) == underrunsBefore + 1,
+               "a short pull counts exactly one underrun");
+        check(!Access::eligible(sink),
+               "one pull underrun permanently disqualifies the session");
+
+        // ASRC: float reservoir, 24-bit wire, resampled output must be packed
+        // and must never advertise raw-integer depth.
+        Access::preparePull(sink, /*mode=*/2, /*bufferMs=*/100);
+        std::vector<float> floats(4800 * 2);
+        for (size_t f = 0; f < 4800; ++f) {
+            const float v = 0.25f * std::sin(2.0f * 3.14159265f * 1000.0f *
+                                             static_cast<float>(f) / 48000.0f);
+            floats[f * 2] = v;
+            floats[f * 2 + 1] = v;
+        }
+        check(Access::writePull(sink, floats.data(), 4800),
+               "ASRC renderer accepts decoded float frames");
+        std::vector<uint8_t> asrcOut(480 * 2 * 2, 0x7f);
+        depth = 99;
+        const size_t asrcBytes = Access::fillAsrc(sink, asrcOut.data(), 480, depth);
+        check(asrcBytes == asrcOut.size(), "ASRC packet produces the exact byte count");
+        check(depth == 0, "ASRC output is never reported as raw integer PCM");
+        bool anyNonZero = false;
+        for (uint8_t b : asrcOut) anyNonZero = anyNonZero || b != 0;
+        check(anyNonZero, "ASRC packet carries resampled samples, not silence");
+
+        // Raw integer sources must be converted, not refused: the ASRC mode is
+        // offered for decoded sources of either storage type.
+        Access::preparePull(sink, /*mode=*/2, /*bufferMs=*/100);
+        std::vector<uint8_t> raw16(4800 * 2 * 2);
+        for (size_t i = 0; i < raw16.size(); i += 2) {
+            const int16_t sample = static_cast<int16_t>(
+                12000 * std::sin(2.0 * 3.14159265 * 1000.0 *
+                                 static_cast<double>(i / 4) / 48000.0));
+            raw16[i] = static_cast<uint8_t>(sample & 0xFF);
+            raw16[i + 1] = static_cast<uint8_t>((sample >> 8) & 0xFF);
+        }
+        check(Access::writeRawAsrc(sink, raw16.data(), 4800, 16),
+              "ASRC accepts a raw 16-bit producer block");
+        std::fill(asrcOut.begin(), asrcOut.end(), 0);
+        depth = 99;
+        const size_t rawBytes = Access::fillAsrc(sink, asrcOut.data(), 480, depth);
+        check(rawBytes == asrcOut.size(),
+              "ASRC packs a converted raw block at the wire byte count");
+        bool rawNonZero = false;
+        for (uint8_t b : asrcOut) rawNonZero = rawNonZero || b != 0;
+        check(rawNonZero, "converted raw block reaches the ASRC output");
+        Access::stopPull(sink);
+
+        pullChecks = 13;
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " USB sink check(s) failed." << std::endl;
         return 1;
     }
     std::cout << "[PASS] USB descriptor parsing, feedback decode, and packet sizing verified."
+              << std::endl;
+    std::cout << "[PASS] " << clockDomainChecks
+              << " clock-domain checks verified (policy, wire names, status default)."
+              << std::endl;
+    std::cout << "[PASS] " << pullChecks
+              << " pull/ASRC packet-fill checks verified (bit-exact payload, underrun, packing)."
               << std::endl;
     return 0;
 }
