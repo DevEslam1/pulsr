@@ -14,6 +14,7 @@ import '../../core/widgets/pulsr_progress.dart';
 import '../../domain/interfaces/remote_fs_provider.dart';
 import '../../domain/models/remote_source.dart';
 import 'remote_sources_strings.dart';
+import 'subsonic_fs_provider.dart';
 
 /// Bottom sheet that browses one remote source.
 class RemoteBrowserSheet extends StatefulWidget {
@@ -48,10 +49,110 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   String? _error;
   String? _playError;
 
+  bool _isSearching = false;
+  final TextEditingController _searchController = TextEditingController();
+  List<RemoteEntry>? _searchResults;
+  bool _searchLoading = false;
+  String? _searchError;
+
   @override
   void initState() {
     super.initState();
     _load('');
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _performSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      setState(() {
+        _searchResults = null;
+        _searchLoading = false;
+        _searchError = null;
+      });
+      return;
+    }
+    final provider = widget.provider;
+    if (provider is! SubsonicFsProvider) return;
+
+    setState(() {
+      _searchLoading = true;
+      _searchError = null;
+    });
+
+    try {
+      final results = await provider.search(trimmed);
+      if (!mounted) return;
+      final entries = <RemoteEntry>[];
+      for (final artist in results.artists) {
+        entries.add(RemoteEntry(
+          path: SubsonicFsProvider.artistPath(artist.id),
+          name: artist.name,
+          isDirectory: true,
+          artworkUri: provider.getCoverArtUrl(artist.coverArt)?.toString(),
+        ));
+      }
+      for (final album in results.albums) {
+        final displayName = album.artist.isNotEmpty
+            ? '${album.name} • ${album.artist}'
+            : album.name;
+        entries.add(RemoteEntry(
+          path: SubsonicFsProvider.albumPath(album.id),
+          name: displayName,
+          isDirectory: true,
+          artworkUri: provider.getCoverArtUrl(album.coverArt)?.toString(),
+        ));
+      }
+      for (final song in results.songs) {
+        final albumId = song.albumId ?? 'song';
+        final displayName = song.artist != null && song.artist!.isNotEmpty
+            ? '${song.title} • ${song.artist}'
+            : song.title;
+        entries.add(RemoteEntry(
+          path: SubsonicFsProvider.songPath(albumId, song.id),
+          name: displayName,
+          isDirectory: false,
+          sizeBytes: song.sizeBytes,
+          artworkUri: provider.getCoverArtUrl(song.coverArt)?.toString(),
+        ));
+      }
+
+      setState(() {
+        _searchResults = entries;
+        _searchLoading = false;
+      });
+    } on AppError catch (e, st) {
+      ErrorLogger.log(
+        'Subsonic search failed: ${e.code}',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+      );
+      if (!mounted) return;
+      setState(() {
+        _searchResults = null;
+        _searchError = e.userMessage;
+        _searchLoading = false;
+      });
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Subsonic search failed',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+      );
+      if (!mounted) return;
+      setState(() {
+        _searchResults = null;
+        _searchError = RemoteSourcesStrings.folderLoadFailed;
+        _searchLoading = false;
+      });
+    }
   }
 
   Future<void> _load(String path, {String? label}) async {
@@ -176,6 +277,21 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                       ),
                     ),
                   ),
+                  if (widget.provider is SubsonicFsProvider)
+                    IconButton(
+                      tooltip: RemoteSourcesStrings.searchLibrary,
+                      icon: Icon(_isSearching ? Icons.close : Icons.search),
+                      onPressed: () {
+                        setState(() {
+                          _isSearching = !_isSearching;
+                          if (!_isSearching) {
+                            _searchController.clear();
+                            _searchResults = null;
+                            _searchError = null;
+                          }
+                        });
+                      },
+                    ),
                   IconButton(
                     tooltip: RemoteSourcesStrings.retry,
                     onPressed: _loading ? null : () => _load(_path),
@@ -189,12 +305,110 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                 ],
               ),
             ),
-            _Breadcrumbs(crumbs: _crumbs, onNavigate: _loading ? null : _load),
-            const Divider(height: 1),
-            Expanded(child: _buildBody()),
+            if (_isSearching)
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(16, 4, 16, 8),
+                child: TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: RemoteSourcesStrings.searchHint,
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              _performSearch('');
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onChanged: _performSearch,
+                  onSubmitted: _performSearch,
+                ),
+              )
+            else ...[
+              _Breadcrumbs(crumbs: _crumbs, onNavigate: _loading ? null : _load),
+              const Divider(height: 1),
+            ],
+            Expanded(
+              child: _isSearching ? _buildSearchResults() : _buildBody(),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_searchLoading) {
+      return const Center(
+        child: SizedBox(width: 160, child: PulsrProgressBar()),
+      );
+    }
+    final error = _searchError;
+    if (error != null) {
+      return _ErrorState(
+        message: error,
+        onRetry: () => _performSearch(_searchController.text),
+      );
+    }
+    final results = _searchResults;
+    if (results == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsetsDirectional.all(24),
+          child: Text(RemoteSourcesStrings.searchHint),
+        ),
+      );
+    }
+    if (results.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsetsDirectional.all(24),
+          child: Text(RemoteSourcesStrings.noSearchResults),
+        ),
+      );
+    }
+    return Column(
+      children: [
+        if (_playError != null)
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(20, 12, 20, 0),
+            child: Text(
+              _playError!,
+              style: TextStyle(color: context.palette.error),
+            ),
+          ),
+        Expanded(
+          child: ListView.builder(
+            itemCount: results.length,
+            itemBuilder: (context, index) {
+              final entry = results[index];
+              return _EntryTile(
+                entry: entry,
+                onTap: () {
+                  if (entry.isDirectory) {
+                    setState(() {
+                      _isSearching = false;
+                      _searchController.clear();
+                      _searchResults = null;
+                    });
+                    _load(entry.path, label: entry.name);
+                  } else {
+                    _play(entry);
+                  }
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -256,15 +470,43 @@ class _EntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final size = entry.sizeBytes;
-    return ListTile(
-      minVerticalPadding: 12,
-      leading: Icon(
+    final artworkUri = entry.artworkUri;
+
+    Widget leadingWidget;
+    if (artworkUri != null && artworkUri.isNotEmpty) {
+      leadingWidget = ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Image.network(
+            artworkUri,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Icon(
+              entry.isDirectory
+                  ? Icons.folder_outlined
+                  : Icons.audio_file_outlined,
+              color: entry.isDirectory ? palette.accent : palette.textSecondary,
+              semanticLabel: entry.isDirectory
+                  ? RemoteSourcesStrings.folderLabel
+                  : RemoteSourcesStrings.fileNameUnknown,
+            ),
+          ),
+        ),
+      );
+    } else {
+      leadingWidget = Icon(
         entry.isDirectory ? Icons.folder_outlined : Icons.audio_file_outlined,
         color: entry.isDirectory ? palette.accent : palette.textSecondary,
         semanticLabel: entry.isDirectory
             ? RemoteSourcesStrings.folderLabel
             : RemoteSourcesStrings.fileNameUnknown,
-      ),
+      );
+    }
+
+    return ListTile(
+      minVerticalPadding: 12,
+      leading: leadingWidget,
       title: Text(entry.name, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: entry.isDirectory || size == null
           ? null

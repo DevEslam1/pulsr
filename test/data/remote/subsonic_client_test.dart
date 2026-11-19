@@ -582,6 +582,134 @@ void main() {
     });
   });
 
+  group('getCoverArtUrl', () {
+    test('carries auth params, id and optional size', () {
+      final client = _client(_FakeHttpClient((_) async => _textResponse('')));
+
+      final uri = client.getCoverArtUrl('al-55', size: 300);
+
+      expect(uri.path, '/rest/getCoverArt.view');
+      final query = uri.queryParameters;
+      expect(query['id'], 'al-55');
+      expect(query['size'], '300');
+      expect(query['u'], _user);
+      expect(query['s'], _salt);
+      expect(query['t'], _tokenFor(_salt));
+      expect(query['v'], '1.16.1');
+      expect(query['c'], 'Pulsr');
+      expect(query['f'], 'json');
+    });
+
+    test('omits size parameter when not supplied', () {
+      final client = _client(_FakeHttpClient((_) async => _textResponse('')));
+      final uri = client.getCoverArtUrl('cov-1');
+      expect(uri.queryParameters['id'], 'cov-1');
+      expect(uri.queryParameters.containsKey('size'), isFalse);
+    });
+
+    test('rejects blank cover art id', () {
+      final client = _client(_FakeHttpClient((_) async => _textResponse('')));
+      expect(
+        () => client.getCoverArtUrl('  '),
+        throwsA(isA<SubsonicError>()
+            .having((error) => error.code, 'code', 'SUBSONIC_BAD_ID')),
+      );
+    });
+  });
+
+  group('search3', () {
+    test('returns artists, albums and songs from searchResult3', () async {
+      final fake = _FakeHttpClient((request) async {
+        expect(request.url.path, '/rest/search3.view');
+        expect(request.url.queryParameters['query'], 'radiohead');
+        expect(request.url.queryParameters['artistCount'], '5');
+        expect(request.url.queryParameters['albumCount'], '10');
+        expect(request.url.queryParameters['songCount'], '25');
+
+        return _jsonResponse(_envelope({
+          'searchResult3': {
+            'artist': [
+              {'id': 'art-1', 'name': 'Radiohead', 'albumCount': 9, 'coverArt': 'c-art-1'}
+            ],
+            'album': [
+              {
+                'id': 'alb-1',
+                'name': 'OK Computer',
+                'artist': 'Radiohead',
+                'coverArt': 'c-alb-1',
+                'year': 1997,
+              }
+            ],
+            'song': [
+              {
+                'id': 's-1',
+                'title': 'Paranoid Android',
+                'artist': 'Radiohead',
+                'album': 'OK Computer',
+                'coverArt': 'c-alb-1',
+                'duration': 387,
+              }
+            ],
+          }
+        }));
+      });
+      final client = _client(fake);
+
+      final result = await client.search3(
+        'radiohead',
+        artistCount: 5,
+        albumCount: 10,
+        songCount: 25,
+      );
+
+      expect(result.isEmpty, isFalse);
+      expect(result.totalCount, 3);
+      expect(result.artists, hasLength(1));
+      expect(result.artists.first.id, 'art-1');
+      expect(result.artists.first.name, 'Radiohead');
+      expect(result.artists.first.coverArt, 'c-art-1');
+
+      expect(result.albums, hasLength(1));
+      expect(result.albums.first.id, 'alb-1');
+      expect(result.albums.first.name, 'OK Computer');
+      expect(result.albums.first.coverArt, 'c-alb-1');
+      expect(result.albums.first.year, 1997);
+
+      expect(result.songs, hasLength(1));
+      expect(result.songs.first.id, 's-1');
+      expect(result.songs.first.title, 'Paranoid Android');
+      expect(result.songs.first.duration, const Duration(seconds: 387));
+    });
+
+    test('returns empty result on blank query without network request', () async {
+      final fake = _FakeHttpClient((_) async => _jsonResponse(_envelope()));
+      final client = _client(fake);
+
+      final result = await client.search3('   ');
+      expect(result.isEmpty, isTrue);
+      expect(fake.requests, isEmpty);
+    });
+
+    test('tolerates single objects instead of arrays in response', () async {
+      final fake = _FakeHttpClient((_) async => _jsonResponse(_envelope({
+            'searchResult3': {
+              'artist': {'id': 'art-solo', 'name': 'Solo Artist'},
+              'album': {'id': 'alb-solo', 'name': 'Solo Album'},
+              'song': {'id': 's-solo', 'title': 'Solo Song'},
+            }
+          })));
+      final client = _client(fake);
+
+      final result = await client.search3('solo');
+      expect(result.artists, hasLength(1));
+      expect(result.artists.first.name, 'Solo Artist');
+      expect(result.albums, hasLength(1));
+      expect(result.albums.first.name, 'Solo Album');
+      expect(result.songs, hasLength(1));
+      expect(result.songs.first.title, 'Solo Song');
+    });
+  });
+
   group('configuration', () {
     test('refuses a private server unless it is allowlisted', () {
       final fake = _FakeHttpClient((_) async => _jsonResponse(_envelope()));

@@ -98,6 +98,24 @@ void main() {
       expect(AvTransportClient.buildPlayEnvelope(), _expectedPlay);
     });
 
+    test('builds an exact SetNextAVTransportURI envelope', () {
+      final envelope = AvTransportClient.buildSetNextAvTransportUriEnvelope(
+        nextUri: 'http://192.168.1.5:5555/media/next',
+        nextDidlMetadata: '<DIDL-Lite/>',
+      );
+      expect(envelope, contains('SetNextAVTransportURI'));
+      expect(envelope, contains('<NextURI>http://192.168.1.5:5555/media/next</NextURI>'));
+      expect(envelope, contains('<NextURIMetaData>&lt;DIDL-Lite/&gt;</NextURIMetaData>'));
+    });
+
+    test('builds an exact Next and Previous envelope', () {
+      final nextEnvelope = AvTransportClient.buildNextEnvelope();
+      expect(nextEnvelope, contains('<u:Next xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:Next>'));
+
+      final prevEnvelope = AvTransportClient.buildPreviousEnvelope();
+      expect(prevEnvelope, contains('<u:Previous xmlns:u="urn:schemas-upnp-org:service:AVTransport:1"><InstanceID>0</InstanceID></u:Previous>'));
+    });
+
     test('builds an exact Seek envelope with a REL_TIME target', () {
       expect(
         AvTransportClient.buildSeekEnvelope(

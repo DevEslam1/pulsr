@@ -116,6 +116,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
               path: artistPath(artist.id),
               name: artist.name,
               isDirectory: true,
+              artworkUri: _coverArtUri(artist.coverArt),
             ),
         ]);
       }
@@ -129,6 +130,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
               path: albumPath(album.id),
               name: album.name,
               isDirectory: true,
+              artworkUri: _coverArtUri(album.coverArt),
             ),
         ]);
       }
@@ -143,6 +145,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
               name: _songName(song),
               isDirectory: false,
               sizeBytes: song.sizeBytes,
+              artworkUri: _coverArtUri(song.coverArt ?? album.coverArt),
             ),
         ]);
       }
@@ -178,6 +181,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
           path: artistPath(artist.id),
           name: artist.name,
           isDirectory: true,
+          artworkUri: _coverArtUri(artist.coverArt),
         );
       }
       if (segments.length == 2 && segments.first == albumSegment) {
@@ -188,6 +192,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
           path: albumPath(album.id),
           name: album.name,
           isDirectory: true,
+          artworkUri: _coverArtUri(album.coverArt),
         );
       }
       if (segments.length == 4 &&
@@ -204,6 +209,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
             name: _songName(song),
             isDirectory: false,
             sizeBytes: song.sizeBytes,
+            artworkUri: _coverArtUri(song.coverArt ?? album.coverArt),
           );
         }
         return null;
@@ -343,6 +349,38 @@ class SubsonicFsProvider implements RemoteFsProvider {
     _api.close();
     if (_ownsClient) _client.close();
   }
+
+  /// Searches the Subsonic library for artists, albums and tracks matching [query].
+  Future<SubsonicSearchResult> search(
+    String query, {
+    int artistCount = 20,
+    int albumCount = 20,
+    int songCount = 50,
+  }) async {
+    try {
+      return await _api.search3(
+        query,
+        artistCount: artistCount,
+        albumCount: albumCount,
+        songCount: songCount,
+      );
+    } on SubsonicError catch (e, st) {
+      throw _asRemoteError(e, st);
+    }
+  }
+
+  /// Builds a signed cover art URI for [coverArtId], or `null` if blank or unresolvable.
+  Uri? getCoverArtUrl(String? coverArtId, {int? size}) {
+    if (coverArtId == null || coverArtId.trim().isEmpty) return null;
+    try {
+      return _api.getCoverArtUrl(coverArtId, size: size);
+    } on SubsonicError {
+      return null;
+    }
+  }
+
+  String? _coverArtUri(String? coverArtId, {int? size}) =>
+      getCoverArtUrl(coverArtId, size: size)?.toString();
 
   /// Path of the artist with [id].
   static String artistPath(String id) => '$artistSegment/${_encodeId(id)}';

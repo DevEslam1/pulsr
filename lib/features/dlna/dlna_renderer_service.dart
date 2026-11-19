@@ -3,9 +3,7 @@
 // Orchestrates DLNA casting: discovery, device selection, serving the file over
 // the local HTTP server, AVTransport commands and position polling.
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -18,6 +16,7 @@ import 'dlna_strings.dart';
 import 'media_http_server.dart';
 import 'ssdp_client.dart';
 import 'upnp_device.dart';
+import 'upnp_device_description_cache.dart';
 
 /// Resolves the local address that faces a renderer host and port.
 typedef DlnaLocalAddressResolver = Future<InternetAddress?> Function(
@@ -69,6 +68,7 @@ class DlnaRendererService extends ChangeNotifier {
   final Duration _discoveryTimeout;
   final Duration _descriptionTimeout;
   final DlnaLocalAddressResolver _localAddressResolver;
+  final UpnpDeviceDescriptionCache _descriptionCache;
 
   DlnaState _state = DlnaState.idle;
   List<UpnpDeviceDescription> _devices = const <UpnpDeviceDescription>[];
@@ -99,6 +99,7 @@ class DlnaRendererService extends ChangeNotifier {
     Duration discoveryTimeout = const Duration(seconds: 3),
     Duration descriptionTimeout = const Duration(seconds: 4),
     DlnaLocalAddressResolver? localAddressResolver,
+    UpnpDeviceDescriptionCache? descriptionCache,
   })  : _ssdp = ssdpClient ?? SsdpClient(),
         _mediaServer = mediaServer ?? MediaHttpServer(),
         _httpClient = httpClient ?? http.Client(),
@@ -107,10 +108,15 @@ class DlnaRendererService extends ChangeNotifier {
         _discoveryTimeout = discoveryTimeout,
         _descriptionTimeout = descriptionTimeout,
         _localAddressResolver =
-            localAddressResolver ?? MediaHttpServer.localAddressFacing;
+            localAddressResolver ?? MediaHttpServer.localAddressFacing,
+        _descriptionCache =
+            descriptionCache ?? UpnpDeviceDescriptionCache();
 
   /// Current state.
   DlnaState get state => _state;
+
+  /// Underlying AVTransport client for direct control point actions.
+  AvTransportClient? get avTransport => _avTransport;
 
   /// Renderers found by the last [discover] call.
   List<UpnpDeviceDescription> get devices =>
@@ -331,6 +337,111 @@ class DlnaRendererService extends ChangeNotifier {
     }
   }
 
+  /// Plays an arbitrary stream [url] (e.g. from a loopback proxy or remote stream)
+  /// on the selected renderer.
+  Future<void> playUrl(
+    String url, {
+    String? title,
+    String? artist,
+    String? album,
+    Duration? duration,
+    String? mimeType,
+  }) async {
+    if (_disposed) return;
+    final client = _avTransport;
+    final device = _selectedDevice;
+    if (client == null || device == null) {
+      _fail(
+        uiError('Select a DLNA renderer first.', code: 'DLNA_NO_DEVICE'),
+        StackTrace.empty,
+        'DLNA play rejected',
+      );
+      return;
+    }
+    final resolvedTitle = title ?? url;
+    _lastCastPath = null;
+    _lastCastTitle = resolvedTitle;
+    _lastCastArtist = artist;
+    _lastCastAlbum = album;
+    _lastCastDuration = duration;
+
+    try {
+      _revokeMediaToken();
+      final metadata = AvTransportClient.buildDidlLiteMetadata(
+        url: url,
+        title: resolvedTitle,
+        artist: artist,
+        album: album,
+        mimeType: mimeType ?? 'audio/mpeg',
+        duration: duration,
+      );
+
+      _nowPlayingTitle = resolvedTitle;
+      _position = Duration.zero;
+      _duration = duration ?? Duration.zero;
+      _lastError = null;
+
+      await client.setAvTransportUri(url, metadata);
+      await client.play();
+      if (_disposed) return;
+      _state = DlnaState.playing;
+      _pollFailures = 0;
+      notifyListeners();
+      _startPolling();
+    } catch (error, stackTrace) {
+      _fail(error, stackTrace, 'DLNA playUrl failed');
+    }
+  }
+
+  /// Queues [url] as the next track via SetNextAVTransportURI.
+  Future<void> queueUrl(
+    String url, {
+    String? title,
+    String? artist,
+    String? album,
+    Duration? duration,
+    String? mimeType,
+  }) async {
+    if (_disposed) return;
+    final client = _avTransport;
+    if (client == null) return;
+    try {
+      final metadata = AvTransportClient.buildDidlLiteMetadata(
+        url: url,
+        title: title ?? url,
+        artist: artist,
+        album: album,
+        mimeType: mimeType ?? 'audio/mpeg',
+        duration: duration,
+      );
+      await client.setNextAvTransportUri(url, metadata);
+    } catch (error, stackTrace) {
+      _fail(error, stackTrace, 'DLNA queueUrl failed');
+    }
+  }
+
+  /// Advances to the next track.
+  Future<void> next() async {
+    final client = _avTransport;
+    if (_disposed || client == null) return;
+    try {
+      await client.next();
+    } catch (error, stackTrace) {
+      _fail(error, stackTrace, 'DLNA next failed');
+    }
+  }
+
+  /// Returns to the previous track.
+  Future<void> previous() async {
+    final client = _avTransport;
+    if (_disposed || client == null) return;
+    try {
+      await client.previous();
+    } catch (error, stackTrace) {
+      _fail(error, stackTrace, 'DLNA previous failed');
+    }
+  }
+
   /// Pauses playback on the renderer.
   Future<void> pause() async {
     final client = _avTransport;
@@ -518,70 +629,11 @@ class DlnaRendererService extends ChangeNotifier {
   }
 
   Future<UpnpDeviceDescription?> _fetchDescription(Uri location) async {
-    try {
-      final request = http.Request('GET', location)..followRedirects = false;
-      final streamed =
-          await _httpClient.send(request).timeout(_descriptionTimeout);
-      if (streamed.statusCode != HttpStatus.ok) {
-        await _discardBody(streamed.stream);
-        ErrorLogger.log(
-          'DLNA description returned HTTP ${streamed.statusCode} for $location',
-          category: 'DLNA',
-        );
-        return null;
-      }
-
-      final declaredLength = streamed.contentLength;
-      if (declaredLength != null && declaredLength > maxDescriptionBytes) {
-        await _discardBody(streamed.stream);
-        ErrorLogger.log(
-          'DLNA description for $location is too large '
-          '($declaredLength bytes)',
-          category: 'DLNA',
-        );
-        return null;
-      }
-
-      final bytes = BytesBuilder(copy: false);
-      await for (final chunk in streamed.stream.timeout(_descriptionTimeout)) {
-        if (bytes.length + chunk.length > maxDescriptionBytes) {
-          ErrorLogger.log(
-            'DLNA description for $location exceeded '
-            '$maxDescriptionBytes bytes',
-            category: 'DLNA',
-          );
-          return null;
-        }
-        bytes.add(chunk);
-      }
-
-      final body = utf8.decode(bytes.takeBytes(), allowMalformed: true);
-      return UpnpDeviceDescription.parse(body, location: location);
-    } on UpnpParseError catch (error, stackTrace) {
-      ErrorLogger.log(
-        'DLNA description rejected for $location',
-        error: error,
-        stackTrace: stackTrace,
-        category: 'DLNA',
-      );
-      return null;
-    } catch (error, stackTrace) {
-      ErrorLogger.log(
-        'DLNA description fetch failed for $location',
-        error: error,
-        stackTrace: stackTrace,
-        category: 'DLNA',
-      );
-      return null;
-    }
-  }
-
-  Future<void> _discardBody(Stream<List<int>> stream) async {
-    try {
-      await stream.drain<void>().timeout(_descriptionTimeout);
-    } catch (_) {
-      // The response is being discarded; a failed drain has no consequence.
-    }
+    return _descriptionCache.getOrFetchDeviceDescription(
+      location,
+      client: _httpClient,
+      timeout: _descriptionTimeout,
+    );
   }
 
   DlnaState _stateFor(TransportState state) {

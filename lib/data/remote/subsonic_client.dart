@@ -148,6 +148,9 @@ final class SubsonicSong {
   /// Album title, when advertised.
   final String? album;
 
+  /// Album id, when advertised.
+  final String? albumId;
+
   /// Track artist, when advertised.
   final String? artist;
 
@@ -191,6 +194,7 @@ final class SubsonicSong {
     required this.id,
     required this.title,
     this.album,
+    this.albumId,
     this.artist,
     this.coverArt,
     this.genre,
@@ -259,6 +263,37 @@ final class SubsonicPlaylist {
 
   @override
   String toString() => 'SubsonicPlaylist($id "$name", ${songs.length} songs)';
+}
+
+/// Result of a Subsonic `search3` query, grouping matches across entity types.
+final class SubsonicSearchResult {
+  /// Matching artists.
+  final List<SubsonicArtist> artists;
+
+  /// Matching albums.
+  final List<SubsonicAlbum> albums;
+
+  /// Matching songs.
+  final List<SubsonicSong> songs;
+
+  const SubsonicSearchResult({
+    this.artists = const [],
+    this.albums = const [],
+    this.songs = const [],
+  });
+
+  /// True when the search produced no results in any category.
+  bool get isEmpty => artists.isEmpty && albums.isEmpty && songs.isEmpty;
+
+  /// True when at least one artist, album or song matched.
+  bool get isNotEmpty => !isEmpty;
+
+  /// Total count across all result types.
+  int get totalCount => artists.length + albums.length + songs.length;
+
+  @override
+  String toString() =>
+      'SubsonicSearchResult(${artists.length} artists, ${albums.length} albums, ${songs.length} songs)';
 }
 
 /// Client for one Navidrome / Subsonic server.
@@ -458,6 +493,114 @@ final class SubsonicClient {
       );
     }
     return signed.uri;
+  }
+
+  /// Builds the cover art URI for [coverArtId].
+  ///
+  /// Optional [size] scales the image to a square of size*size pixels.
+  /// The URI carries the same salt/token auth parameters as an API call and
+  /// is checked against [RemoteTargetPolicy].
+  Uri getCoverArtUrl(String coverArtId, {int? size}) {
+    final id = coverArtId.trim();
+    if (id.isEmpty) {
+      throw const SubsonicError(
+        code: 'SUBSONIC_BAD_ID',
+        userMessage: 'A cover art id is required to build a cover art URL.',
+        method: 'getCoverArt',
+      );
+    }
+    final params = <String, String>{
+      'id': id,
+      if (size != null && size > 0) 'size': size.toString(),
+    };
+    final signed = _sign('getCoverArt', params);
+    final verdict = RemoteTargetPolicy.classify(
+      signed.uri.toString(),
+      allowedHostSuffixes: _allowedHostSuffixes,
+    );
+    if (verdict != RemoteTargetVerdict.allowed) {
+      throw const SubsonicError(
+        code: 'SUBSONIC_UNSAFE_TARGET',
+        userMessage: 'The music server address is not allowed.',
+        method: 'getCoverArt',
+      );
+    }
+    return signed.uri;
+  }
+
+  /// Searches the server for artists, albums and songs matching [query]
+  /// via Subsonic `search3`.
+  Future<SubsonicSearchResult> search3(
+    String query, {
+    int artistCount = 20,
+    int artistOffset = 0,
+    int albumCount = 20,
+    int albumOffset = 0,
+    int songCount = 50,
+    int songOffset = 0,
+    String? musicFolderId,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const SubsonicSearchResult();
+
+    final params = <String, String>{
+      'query': trimmed,
+      if (artistCount > 0) 'artistCount': artistCount.toString(),
+      if (artistOffset > 0) 'artistOffset': artistOffset.toString(),
+      if (albumCount > 0) 'albumCount': albumCount.toString(),
+      if (albumOffset > 0) 'albumOffset': albumOffset.toString(),
+      if (songCount > 0) 'songCount': songCount.toString(),
+      if (songOffset > 0) 'songOffset': songOffset.toString(),
+      if (musicFolderId != null && musicFolderId.trim().isNotEmpty)
+        'musicFolderId': musicFolderId.trim(),
+    };
+
+    final envelope = await _call('search3', params);
+    final container = _asMap(envelope['searchResult3']) ??
+        _asMap(envelope['searchResult2']);
+    if (container == null) return const SubsonicSearchResult();
+
+    final artists = <SubsonicArtist>[];
+    final artistEntries = container['artist'];
+    if (artistEntries is List) {
+      for (final entry in artistEntries) {
+        final artist = _artistFrom(entry);
+        if (artist != null) artists.add(artist);
+      }
+    } else if (artistEntries != null) {
+      final artist = _artistFrom(artistEntries);
+      if (artist != null) artists.add(artist);
+    }
+
+    final albums = <SubsonicAlbum>[];
+    final albumEntries = container['album'];
+    if (albumEntries is List) {
+      for (final entry in albumEntries) {
+        final album = _albumFrom(entry);
+        if (album != null) albums.add(album);
+      }
+    } else if (albumEntries != null) {
+      final album = _albumFrom(albumEntries);
+      if (album != null) albums.add(album);
+    }
+
+    final songs = <SubsonicSong>[];
+    final songEntries = container['song'];
+    if (songEntries is List) {
+      for (final entry in songEntries) {
+        final song = _songFrom(entry);
+        if (song != null) songs.add(song);
+      }
+    } else if (songEntries != null) {
+      final song = _songFrom(songEntries);
+      if (song != null) songs.add(song);
+    }
+
+    return SubsonicSearchResult(
+      artists: artists,
+      albums: albums,
+      songs: songs,
+    );
   }
 
   Future<Map<String, dynamic>> _call(
@@ -709,6 +852,7 @@ final class SubsonicClient {
       id: id,
       title: title == null || title.isEmpty ? id : title,
       album: _asString(map['album']),
+      albumId: _asString(map['albumId']) ?? _asString(map['parent']),
       artist: _asString(map['artist']),
       coverArt: _asString(map['coverArt']),
       genre: _asString(map['genre']),

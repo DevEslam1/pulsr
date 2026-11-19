@@ -80,6 +80,12 @@ abstract final class RemoteSourcesStrings {
   static const String close = 'Close';
   static const String fileNameUnknown = 'File';
   static const String folderLabel = 'Folder';
+  static const String searchLibrary = 'Search library';
+  static const String searchHint = 'Search artists, albums, songs…';
+  static const String noSearchResults = 'No results found.';
+  static const String artistsHeader = 'Artists';
+  static const String albumsHeader = 'Albums';
+  static const String songsHeader = 'Songs';
 
   // Cache.
   static const String cacheTitle = 'Cached audio';

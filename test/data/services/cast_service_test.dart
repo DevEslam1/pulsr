@@ -48,6 +48,21 @@ void main() {
           return true;
         case 'setPlaybackState':
           return <Object?, Object?>{'success': true};
+        case 'getStatus':
+          return <Object?, Object?>{
+            'available': true,
+            'connected': true,
+            'deviceName': 'Living Room Nest',
+            'playing': true,
+            'paused': false,
+            'buffering': false,
+            'playerState': 'PLAYING',
+            'positionMs': 45000,
+            'durationMs': 180000,
+            'title': 'Track A',
+            'artist': 'Artist B',
+            'volume': 0.75,
+          };
         case 'setVolume':
           return <Object?, Object?>{'success': true};
         case 'getVolume':
@@ -252,6 +267,56 @@ void main() {
       final result = await service.castUrl(url: 'https://x/y.mp3');
       expect(result.success, isFalse);
       expect(result.error, 'unknown_response');
+    });
+
+    test('getStatus parses rich status payload', () async {
+      final status = await service.getStatus();
+      expect(status.available, isTrue);
+      expect(status.connected, isTrue);
+      expect(status.deviceName, 'Living Room Nest');
+      expect(status.playing, isTrue);
+      expect(status.paused, isFalse);
+      expect(status.buffering, isFalse);
+      expect(status.playerState, 'PLAYING');
+      expect(status.positionMs, 45000);
+      expect(status.durationMs, 180000);
+      expect(status.title, 'Track A');
+      expect(status.artist, 'Artist B');
+      expect(status.volume, 0.75);
+      expect(status.position, const Duration(milliseconds: 45000));
+      expect(status.duration, const Duration(milliseconds: 180000));
+    });
+
+    test('play, pause, stop, seek, next, previous forward to setPlaybackState', () async {
+      calls.clear();
+      final playRes = await service.play();
+      expect(playRes.success, isTrue);
+      expect(calls.last.method, 'setPlaybackState');
+      expect(calls.last.arguments['action'], 'play');
+
+      final pauseRes = await service.pause();
+      expect(pauseRes.success, isTrue);
+      expect(calls.last.arguments['action'], 'pause');
+
+      final stopRes = await service.stop();
+      expect(stopRes.success, isTrue);
+      expect(calls.last.arguments['action'], 'stop');
+
+      final seekRes = await service.seek(const Duration(seconds: 30));
+      expect(seekRes.success, isTrue);
+      expect(calls.last.arguments['action'], 'seek');
+      expect(calls.last.arguments['positionMs'], 30000);
+
+      final nextRes = await service.next();
+      expect(nextRes.success, isTrue);
+      expect(calls.last.arguments['action'], 'next');
+
+      final prevRes = await service.previous();
+      expect(prevRes.success, isTrue);
+      expect(calls.last.arguments['action'], 'previous');
+
+      final result = await service.setPlaybackStateResult('play');
+      expect(result.success, isTrue);
     });
   });
 }

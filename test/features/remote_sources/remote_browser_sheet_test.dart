@@ -9,6 +9,8 @@ import 'package:pulsr/domain/interfaces/remote_fs_provider.dart';
 import 'package:pulsr/domain/models/remote_source.dart';
 import 'package:pulsr/features/remote_sources/remote_browser_sheet.dart';
 import 'package:pulsr/features/remote_sources/remote_sources_strings.dart';
+import 'package:pulsr/features/remote_sources/subsonic_fs_provider.dart';
+import 'package:pulsr/data/remote/subsonic_client.dart';
 
 class _FakeProvider implements RemoteFsProvider {
   _FakeProvider(this.source, this.tree);
@@ -131,4 +133,100 @@ void main() {
     expect(played.single.name, 'Jóga');
     expect(played.single.sizeBytes, 42);
   });
+
+  testWidgets('Subsonic search button is visible and search results render',
+      (tester) async {
+    final subsonicSource = RemoteSource(
+      id: 'subsonic-1',
+      kind: RemoteSourceKind.subsonic,
+      displayName: 'Navidrome',
+      host: 'music.example.com',
+      port: 443,
+      rootPath: '/',
+      createdAt: DateTime.utc(2026),
+    );
+
+    final fakeSubsonic = _FakeSubsonicProvider(
+      subsonicSource,
+      searchResults: const SubsonicSearchResult(
+        artists: [SubsonicArtist(id: 'art-1', name: 'Radiohead')],
+        albums: [SubsonicAlbum(id: 'alb-1', name: 'Kid A', artist: 'Radiohead')],
+        songs: [
+          SubsonicSong(
+            id: 's-1',
+            title: 'Idioteque',
+            artist: 'Radiohead',
+            album: 'Kid A',
+            albumId: 'alb-1',
+          ),
+        ],
+      ),
+    );
+
+    final played = <RemoteEntry>[];
+    await _pumpSheet(
+      tester,
+      RemoteBrowserSheet(
+        source: subsonicSource,
+        provider: fakeSubsonic,
+        onPlay: (source, entry) async => played.add(entry),
+      ),
+    );
+
+    expect(find.byTooltip(RemoteSourcesStrings.searchLibrary), findsOneWidget);
+    await tester.tap(find.byTooltip(RemoteSourcesStrings.searchLibrary));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TextField), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'radiohead');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Radiohead'), findsOneWidget);
+    expect(find.text('Kid A • Radiohead'), findsOneWidget);
+    expect(find.text('Idioteque • Radiohead'), findsOneWidget);
+
+    await tester.tap(find.text('Idioteque • Radiohead'));
+    await tester.pumpAndSettle();
+
+    expect(played, hasLength(1));
+    expect(played.single.name, 'Idioteque • Radiohead');
+  });
+}
+
+class _FakeSubsonicProvider implements SubsonicFsProvider {
+  _FakeSubsonicProvider(this.source, {this.searchResults});
+
+  @override
+  final RemoteSource source;
+
+  final SubsonicSearchResult? searchResults;
+
+  @override
+  Future<List<RemoteEntry>> list(String path) async => const [];
+
+  @override
+  Future<RemoteEntry?> stat(String path) async => null;
+
+  @override
+  Stream<List<int>> openRead(String path, {int start = 0, int? end}) =>
+      const Stream<List<int>>.empty();
+
+  @override
+  Future<bool> testConnection() async => true;
+
+  @override
+  Future<void> close() async {}
+
+  @override
+  Future<SubsonicSearchResult> search(
+    String query, {
+    int artistCount = 20,
+    int albumCount = 20,
+    int songCount = 50,
+  }) async =>
+      searchResults ?? const SubsonicSearchResult();
+
+  @override
+  Uri? getCoverArtUrl(String? coverArtId, {int? size}) =>
+      coverArtId != null ? Uri.parse('http://127.0.0.1/art/$coverArtId') : null;
 }

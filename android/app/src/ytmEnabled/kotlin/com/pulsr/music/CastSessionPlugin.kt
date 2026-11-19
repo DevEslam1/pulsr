@@ -8,7 +8,9 @@ import androidx.mediarouter.media.MediaRouteSelector
 import androidx.mediarouter.media.MediaRouter
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.MediaQueueItem
 import com.google.android.gms.cast.MediaSeekOptions
+import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
@@ -65,33 +67,67 @@ class CastSessionPlugin(
     private val mediaServer = CastMediaServer()
 
     private var lastError: String? = null
+    private var observedMediaClient: RemoteMediaClient? = null
 
     private val sessionListener = object : SessionManagerListener<CastSession> {
-        override fun onSessionStarted(session: CastSession, sessionId: String) = emitSession(session)
-        override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) = emitSession(session)
+        override fun onSessionStarted(session: CastSession, sessionId: String) {
+            lastError = null
+            attachMediaClient(session)
+            emitSession(session)
+        }
+        override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+            lastError = null
+            attachMediaClient(session)
+            emitSession(session)
+        }
         override fun onSessionEnded(session: CastSession, error: Int) {
             selectedRouteId = null
+            detachMediaClient()
             mediaServer.stop()
             emitSession(null)
         }
         override fun onSessionStartFailed(session: CastSession, error: Int) {
             lastError = "session_start_failed_$error"
+            detachMediaClient()
             emitSession(null)
         }
         override fun onSessionStarting(session: CastSession) = emitSession(session)
         override fun onSessionEnding(session: CastSession) = emitSession(session)
-        override fun onSessionResumeFailed(session: CastSession, error: Int) {}
+        override fun onSessionResumeFailed(session: CastSession, error: Int) {
+            lastError = "session_resume_failed_$error"
+            emitSession(null)
+        }
         override fun onSessionResuming(session: CastSession, sessionId: String) {}
-        override fun onSessionSuspended(session: CastSession, reason: Int) {}
+        override fun onSessionSuspended(session: CastSession, reason: Int) = emitSession(session)
     }
 
-    private val mediaClientListener = object : RemoteMediaClient.Listener {
+    private val mediaClientCallback = object : RemoteMediaClient.Callback() {
         override fun onStatusUpdated() = emitSession(currentSession())
         override fun onMetadataUpdated() = emitSession(currentSession())
-        override fun onQueueStatusUpdated() {}
+        override fun onQueueStatusUpdated() = emitSession(currentSession())
         override fun onPreloadStatusUpdated() {}
         override fun onSendingRemoteMediaRequest() {}
         override fun onAdBreakStatusUpdated() {}
+    }
+
+    private fun attachMediaClient(session: CastSession?) {
+        val client = session?.remoteMediaClient
+        if (observedMediaClient === client) return
+        detachMediaClient()
+        if (client != null) {
+            try {
+                client.registerCallback(mediaClientCallback)
+                observedMediaClient = client
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun detachMediaClient() {
+        val prev = observedMediaClient ?: return
+        observedMediaClient = null
+        try {
+            prev.unregisterCallback(mediaClientCallback)
+        } catch (_: Exception) {}
     }
 
     private val routeCallback = object : MediaRouter.Callback() {
@@ -137,6 +173,7 @@ class CastSessionPlugin(
 
     fun dispose() {
         stopDiscovery()
+        detachMediaClient()
         try {
             castContext?.sessionManager?.removeSessionManagerListener(
                 sessionListener, CastSession::class.java,
@@ -168,6 +205,15 @@ class CastSessionPlugin(
                     result.success(true)
                 }
                 "getRoutes" -> result.success(routeList())
+                "getStatus" -> ensureCast { available ->
+                    if (!available) {
+                        result.success(mapOf("available" to false, "connected" to false))
+                    } else {
+                        val session = currentSession()
+                        attachMediaClient(session)
+                        result.success(buildSessionPayload(session))
+                    }
+                }
                 "connect" -> {
                     val routeId = call.argument<String>("routeId")
                     result.success(connect(routeId))
@@ -177,13 +223,17 @@ class CastSessionPlugin(
                         try {
                             castContext?.sessionManager?.endCurrentSession(true)
                         } catch (_: Exception) {}
+                        selectedRouteId = null
+                        detachMediaClient()
+                        mediaServer.stop()
+                        emitSession(null)
                         result.success(true)
                     }
                 }
                 "castLocalFile" -> {
                     val path = call.argument<String>("path")
                     val mime = call.argument<String>("mime")
-                    val url = if (path != null) mediaServer.serveFile(path, mime) else null
+                    val url = if (path != null) mediaServer.preBufferFile(path, mime) else null
                     if (url == null) {
                         result.success(notConfigured("local media could not be served"))
                     } else {
@@ -201,13 +251,29 @@ class CastSessionPlugin(
                     }
                 }
                 "castUrl" -> {
-                    val url = call.argument<String>("url")
-                    if (url.isNullOrBlank()) {
+                    val rawUrl = call.argument<String>("url")?.trim()
+                    val mime = call.argument<String>("mime")
+                    if (rawUrl.isNullOrBlank()) {
                         result.success(notConfigured("missing url"))
                     } else {
-                        loadOnSession(url, call, result)
+                        val scheme = try { android.net.Uri.parse(rawUrl).scheme?.lowercase() } catch (_: Exception) { null }
+                        if (scheme != "http" && scheme != "https") {
+                            result.success(notConfigured("invalid stream url scheme"))
+                        } else {
+                            val resolvedUrl = if (mediaServer.isLoopbackUrl(rawUrl)) {
+                                mediaServer.serveProxyUrl(rawUrl, mime)
+                            } else {
+                                rawUrl
+                            }
+                            if (resolvedUrl == null) {
+                                result.success(notConfigured("loopback stream could not be proxied"))
+                            } else {
+                                loadOnSession(resolvedUrl, call, result)
+                            }
+                        }
                     }
                 }
+                "castQueue" -> loadQueueOnSession(call, result)
                 "setPlaybackState" -> {
                     val action = call.argument<String>("action")
                     val positionMs = call.argument<Number>("positionMs")?.toLong()
@@ -253,6 +319,7 @@ class CastSessionPlugin(
     private fun ensureCast(cont: (Boolean) -> Unit) {
         val existing = castContext
         if (existing != null) {
+            attachMediaClient(currentSession())
             cont(true)
             return
         }
@@ -266,6 +333,7 @@ class CastSessionPlugin(
             ctx.sessionManager.addSessionManagerListener(
                 sessionListener, CastSession::class.java,
             )
+            attachMediaClient(currentSession())
             cont(true)
         } catch (e: Exception) {
             lastError = e.message
@@ -355,57 +423,166 @@ class CastSessionPlugin(
                 result.success(notConfigured("no active Cast session"))
                 return@ensureCast
             }
-            val title = call.argument<String>("title") ?: ""
-            val artist = call.argument<String>("artist") ?: ""
-            val album = call.argument<String>("album") ?: ""
-            val artwork = call.argument<String>("artwork")
-            val mime = call.argument<String>("mime") ?: "audio/mpeg"
-            val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
-                putString(MediaMetadata.KEY_TITLE, title)
-                putString(MediaMetadata.KEY_ARTIST, artist)
-                putString(MediaMetadata.KEY_ALBUM_TITLE, album)
-                if (!artwork.isNullOrBlank()) {
-                    addImage(com.google.android.gms.common.images.WebImage(
-                        android.net.Uri.parse(artwork)))
-                }
-            }
-            val info = MediaInfo.Builder(url)
-                .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                .setContentType(mime)
-                .setMetadata(metadata)
-                .build()
+            val info = buildMediaInfo(
+                url = url,
+                title = call.argument<String>("title") ?: "",
+                artist = call.argument<String>("artist") ?: "",
+                album = call.argument<String>("album") ?: "",
+                artwork = call.argument<String>("artwork"),
+                mime = call.argument<String>("mime") ?: "audio/mpeg",
+            )
             try {
                 val pending = client.load(info, true)
-                val responded = java.util.concurrent.atomic.AtomicBoolean(false)
-                val handler = Handler(Looper.getMainLooper())
-                val timeoutRunnable = Runnable {
-                    if (responded.compareAndSet(false, true)) {
-                        lastError = "load timed out waiting for receiver"
-                        result.success(mapOf("success" to false, "error" to "load timed out waiting for receiver"))
-                    }
-                }
-                handler.postDelayed(timeoutRunnable, 10_000L)
-                pending.setResultCallback { channelResult ->
-                    handler.removeCallbacks(timeoutRunnable)
-                    if (responded.compareAndSet(false, true)) {
-                        val status = channelResult.status
-                        if (status.isSuccess) {
-                            result.success(mapOf("success" to true))
-                        } else {
-                            lastError = "load rejected by receiver: status ${status.statusCode}"
-                            result.success(
-                                mapOf(
-                                    "success" to false,
-                                    "error" to "load rejected by receiver",
-                                    "statusCode" to status.statusCode
-                                )
-                            )
-                        }
-                    }
-                }
+                awaitMediaResult(pending, result)
             } catch (e: Exception) {
                 lastError = e.message
                 result.success(notConfigured("load failed: ${e.message}"))
+            }
+        }
+    }
+
+    private fun loadQueueOnSession(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val rawItems = call.argument<List<Map<String, Any?>>>("items")
+        if (rawItems.isNullOrEmpty()) {
+            result.success(notConfigured("queue is empty"))
+            return
+        }
+        val startIndex = (call.argument<Number>("startIndex")?.toInt() ?: 0)
+            .coerceIn(0, rawItems.size - 1)
+        val startPositionMs = (call.argument<Number>("startPositionMs")?.toLong() ?: 0L)
+            .coerceAtLeast(0L)
+        val repeat = call.argument<Boolean>("repeat") == true
+
+        ensureCast { available ->
+            if (!available) {
+                result.success(notConfigured("Cast is unavailable on this build"))
+                return@ensureCast
+            }
+            val session = currentSession()
+            val client = session?.remoteMediaClient
+            if (client == null) {
+                result.success(notConfigured("no active Cast session"))
+                return@ensureCast
+            }
+
+            val queueItems = mutableListOf<MediaQueueItem>()
+            for ((index, raw) in rawItems.withIndex()) {
+                val mime = (raw["mime"] as? String)?.takeIf { it.isNotBlank() } ?: "audio/mpeg"
+                val rawUrl = (raw["url"] as? String)?.trim()
+                val rawPath = (raw["path"] as? String)?.trim()
+                val resolvedUrl = when {
+                    !rawUrl.isNullOrBlank() -> {
+                        val scheme = try { android.net.Uri.parse(rawUrl).scheme?.lowercase() } catch (_: Exception) { null }
+                        if (scheme != "http" && scheme != "https") null
+                        else if (mediaServer.isLoopbackUrl(rawUrl)) mediaServer.serveProxyUrl(rawUrl, mime)
+                        else rawUrl
+                    }
+                    !rawPath.isNullOrBlank() -> {
+                        if (index == startIndex) mediaServer.preBufferFile(rawPath, mime)
+                        else mediaServer.serveFile(rawPath, mime)
+                    }
+                    else -> null
+                } ?: continue
+
+                val mediaInfo = buildMediaInfo(
+                    url = resolvedUrl,
+                    title = raw["title"] as? String ?: "",
+                    artist = raw["artist"] as? String ?: "",
+                    album = raw["album"] as? String ?: "",
+                    artwork = raw["artwork"] as? String,
+                    mime = mime,
+                )
+                queueItems.add(MediaQueueItem.Builder(mediaInfo).build())
+            }
+
+            if (queueItems.isEmpty()) {
+                result.success(notConfigured("no castable queue items"))
+                return@ensureCast
+            }
+
+            val safeStartIndex = startIndex.coerceIn(0, queueItems.size - 1)
+            val repeatMode = if (repeat) {
+                MediaStatus.REPEAT_MODE_REPEAT_ALL
+            } else {
+                MediaStatus.REPEAT_MODE_REPEAT_OFF
+            }
+            try {
+                val pending = client.queueLoad(
+                    queueItems.toTypedArray(),
+                    safeStartIndex,
+                    repeatMode,
+                    startPositionMs,
+                    null,
+                )
+                awaitMediaResult(pending, result)
+            } catch (e: Exception) {
+                lastError = e.message
+                result.success(notConfigured("queue load failed: ${e.message}"))
+            }
+        }
+    }
+
+    private fun buildMediaInfo(
+        url: String,
+        title: String,
+        artist: String,
+        album: String,
+        artwork: String?,
+        mime: String,
+    ): MediaInfo {
+        val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
+            putString(MediaMetadata.KEY_TITLE, title)
+            putString(MediaMetadata.KEY_ARTIST, artist)
+            putString(MediaMetadata.KEY_ALBUM_TITLE, album)
+            if (!artwork.isNullOrBlank()) {
+                addImage(
+                    com.google.android.gms.common.images.WebImage(
+                        android.net.Uri.parse(artwork)
+                    )
+                )
+            }
+        }
+        return MediaInfo.Builder(url)
+            .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+            .setContentType(mime)
+            .setMetadata(metadata)
+            .build()
+    }
+
+    private fun awaitMediaResult(
+        pending: com.google.android.gms.common.api.PendingResult<RemoteMediaClient.MediaChannelResult>,
+        result: MethodChannel.Result,
+    ) {
+        val responded = java.util.concurrent.atomic.AtomicBoolean(false)
+        val handler = Handler(Looper.getMainLooper())
+        val timeoutRunnable = Runnable {
+            if (responded.compareAndSet(false, true)) {
+                lastError = "load timed out waiting for receiver"
+                result.success(mapOf("success" to false, "error" to "load timed out waiting for receiver"))
+            }
+        }
+        handler.postDelayed(timeoutRunnable, 10_000L)
+        pending.setResultCallback { channelResult ->
+            handler.removeCallbacks(timeoutRunnable)
+            if (responded.compareAndSet(false, true)) {
+                val status = channelResult.status
+                if (status.isSuccess) {
+                    lastError = null
+                    emitSession(currentSession())
+                    result.success(mapOf("success" to true))
+                } else {
+                    lastError = "load rejected by receiver: status ${status.statusCode}"
+                    result.success(
+                        mapOf(
+                            "success" to false,
+                            "error" to "load rejected by receiver",
+                            "statusCode" to status.statusCode
+                        )
+                    )
+                }
             }
         }
     }
@@ -417,8 +594,11 @@ class CastSessionPlugin(
             when (action) {
                 "play" -> client.play()
                 "pause" -> client.pause()
+                "stop" -> client.stop()
+                "next" -> client.queueNext(null)
+                "previous" -> client.queuePrev(null)
                 "seek" -> {
-                    val pos = positionMs ?: 0L
+                    val pos = (positionMs ?: 0L).coerceAtLeast(0L)
                     client.seek(MediaSeekOptions.Builder().setPosition(pos).build())
                 }
                 else -> return notConfigured("unknown action")
@@ -447,23 +627,50 @@ class CastSessionPlugin(
         }
     }
 
-    private fun emitSession(session: CastSession?) {
-        val sink = eventSink ?: return
+    private fun buildSessionPayload(session: CastSession?): Map<String, Any?> {
         val client = session?.remoteMediaClient
         val playing = try { client?.isPlaying ?: false } catch (_: Exception) { false }
+        val paused = try { client?.isPaused ?: false } catch (_: Exception) { false }
+        val buffering = try { client?.isBuffering ?: false } catch (_: Exception) { false }
         val position = try { client?.approximateStreamPosition ?: 0L } catch (_: Exception) { 0L }
+        val duration = try { client?.streamDuration ?: 0L } catch (_: Exception) { 0L }
+        val stateInt = try { client?.playerState ?: MediaStatus.PLAYER_STATE_UNKNOWN } catch (_: Exception) { MediaStatus.PLAYER_STATE_UNKNOWN }
+        val playerState = when (stateInt) {
+            MediaStatus.PLAYER_STATE_PLAYING -> "playing"
+            MediaStatus.PLAYER_STATE_PAUSED -> "paused"
+            MediaStatus.PLAYER_STATE_BUFFERING -> "buffering"
+            MediaStatus.PLAYER_STATE_LOADING -> "loading"
+            MediaStatus.PLAYER_STATE_IDLE -> "idle"
+            else -> if (playing) "playing" else if (paused) "paused" else "idle"
+        }
+        val mediaMeta = try { client?.mediaInfo?.metadata } catch (_: Exception) { null }
+        val title = try { mediaMeta?.getString(MediaMetadata.KEY_TITLE) } catch (_: Exception) { null }
+        val artist = try { mediaMeta?.getString(MediaMetadata.KEY_ARTIST) } catch (_: Exception) { null }
+        val volume = try { session?.volume } catch (_: Exception) { null }
+        return mapOf(
+            "type" to "session",
+            "available" to true,
+            "connected" to (session != null),
+            "deviceName" to session?.castDevice?.friendlyName,
+            "playing" to playing,
+            "paused" to paused,
+            "buffering" to buffering,
+            "playerState" to playerState,
+            "positionMs" to position,
+            "durationMs" to duration.coerceAtLeast(0L),
+            "title" to title,
+            "artist" to artist,
+            "volume" to volume,
+            "error" to lastError,
+        )
+    }
+
+    private fun emitSession(session: CastSession?) {
+        val sink = eventSink ?: return
+        val payload = buildSessionPayload(session)
         mainHandler.post {
             try {
-                sink.success(
-                    mapOf(
-                        "type" to "session",
-                        "connected" to (session != null),
-                        "deviceName" to session?.castDevice?.friendlyName,
-                        "playing" to playing,
-                        "positionMs" to position,
-                        "error" to lastError,
-                    )
-                )
+                sink.success(payload)
             } catch (_: Exception) {}
         }
     }

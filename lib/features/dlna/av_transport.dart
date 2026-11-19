@@ -135,6 +135,26 @@ class AvTransportClient {
     );
   }
 
+  /// Sets the next track URI on the renderer with DIDL-Lite [nextDidlMetadata] for seamless queueing.
+  Future<void> setNextAvTransportUri(
+      String nextUri, String nextDidlMetadata) async {
+    await _invoke(
+      'SetNextAVTransportURI',
+      buildSetNextAvTransportUriEnvelope(
+          nextUri: nextUri, nextDidlMetadata: nextDidlMetadata),
+    );
+  }
+
+  /// Advances to the next track on the renderer.
+  Future<void> next() async {
+    await _invoke('Next', buildNextEnvelope());
+  }
+
+  /// Returns to the previous track on the renderer.
+  Future<void> previous() async {
+    await _invoke('Previous', buildPreviousEnvelope());
+  }
+
   /// Starts playback at [speed] (`1` is normal speed).
   Future<void> play({String speed = '1'}) async {
     await _invoke('Play', buildPlayEnvelope(speed: speed));
@@ -243,6 +263,41 @@ class AvTransportClient {
           '<CurrentURI>${escapeXml(uri)}</CurrentURI>'
           '<CurrentURIMetaData>${escapeXml(didlMetadata)}'
           '</CurrentURIMetaData>',
+    );
+  }
+
+  /// Envelope for `SetNextAVTransportURI`.
+  static String buildSetNextAvTransportUriEnvelope({
+    required String nextUri,
+    required String nextDidlMetadata,
+    String instanceId = defaultInstanceId,
+  }) {
+    return buildSoapEnvelope(
+      action: 'SetNextAVTransportURI',
+      arguments: '<InstanceID>$instanceId</InstanceID>'
+          '<NextURI>${escapeXml(nextUri)}</NextURI>'
+          '<NextURIMetaData>${escapeXml(nextDidlMetadata)}'
+          '</NextURIMetaData>',
+    );
+  }
+
+  /// Envelope for `Next`.
+  static String buildNextEnvelope({
+    String instanceId = defaultInstanceId,
+  }) {
+    return buildSoapEnvelope(
+      action: 'Next',
+      arguments: '<InstanceID>$instanceId</InstanceID>',
+    );
+  }
+
+  /// Envelope for `Previous`.
+  static String buildPreviousEnvelope({
+    String instanceId = defaultInstanceId,
+  }) {
+    return buildSoapEnvelope(
+      action: 'Previous',
+      arguments: '<InstanceID>$instanceId</InstanceID>',
     );
   }
 

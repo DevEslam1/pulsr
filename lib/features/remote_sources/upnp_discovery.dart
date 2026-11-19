@@ -11,9 +11,7 @@
 // Every collaborator is injectable: the search is a plain function in tests (no
 // UDP socket) and the description fetches go through an injected `http.Client`.
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -21,6 +19,7 @@ import '../../core/utils/error_logger.dart';
 import '../../domain/interfaces/remote_fs_provider.dart';
 import '../dlna/ssdp_client.dart';
 import '../dlna/upnp_device.dart';
+import '../dlna/upnp_device_description_cache.dart';
 
 /// Runs one SSDP search and returns the raw replies.
 typedef SsdpSearch = Future<List<SsdpResponse>> Function(Duration timeout);
@@ -40,10 +39,13 @@ class UpnpDiscovery {
     http.Client? client,
     Duration searchTimeout = const Duration(seconds: 3),
     Duration descriptionTimeout = const Duration(seconds: 4),
+    UpnpDeviceDescriptionCache? descriptionCache,
   })  : _client = client ?? http.Client(),
         _ownsClient = client == null,
         _searchTimeout = searchTimeout,
-        _descriptionTimeout = descriptionTimeout {
+        _descriptionTimeout = descriptionTimeout,
+        _descriptionCache =
+            descriptionCache ?? UpnpDeviceDescriptionCache() {
     final ssdpClient = ssdp ?? SsdpClient();
     _search = search ?? (timeout) => ssdpClient.search(timeout: timeout);
   }
@@ -52,6 +54,7 @@ class UpnpDiscovery {
   final bool _ownsClient;
   final Duration _searchTimeout;
   final Duration _descriptionTimeout;
+  final UpnpDeviceDescriptionCache _descriptionCache;
   late final SsdpSearch _search;
 
   /// Searches the LAN and returns the media servers that answered, by name.
@@ -124,51 +127,15 @@ class UpnpDiscovery {
   }
 
   Future<UpnpServerDescription?> _fetchDescription(Uri location) async {
-    try {
-      final request = http.Request('GET', location)..followRedirects = false;
-      final streamed = await _client.send(request).timeout(_descriptionTimeout);
-      if (streamed.statusCode != HttpStatus.ok) {
-        await _discard(streamed.stream);
-        return null;
-      }
-
-      final declaredLength = streamed.contentLength;
-      if (declaredLength != null && declaredLength > maxDescriptionBytes) {
-        await _discard(streamed.stream);
-        return null;
-      }
-
-      final bytes = BytesBuilder(copy: false);
-      await for (final chunk in streamed.stream.timeout(_descriptionTimeout)) {
-        if (bytes.length + chunk.length > maxDescriptionBytes) return null;
-        bytes.add(chunk);
-      }
-
-      final body = utf8.decode(bytes.takeBytes(), allowMalformed: true);
-      final description = UpnpServerDescription.parse(body, location: location);
-      final scheme = description.contentDirectoryControlUrl.scheme;
-      if (scheme != 'http' && scheme != 'https') return null;
-      if (description.contentDirectoryControlUrl.host.isEmpty) return null;
-      return description;
-    } on UpnpParseError {
-      // A renderer, a router or any other device that answered ssdp:all.
-      return null;
-    } catch (e, st) {
-      ErrorLogger.log(
-        'UPnP description fetch failed for $location',
-        error: e,
-        stackTrace: st,
-        category: 'RemoteSources',
-      );
-      return null;
-    }
-  }
-
-  static Future<void> _discard(Stream<List<int>> stream) async {
-    try {
-      await stream.drain<void>();
-    } on Object {
-      // The body is being thrown away; a failed drain has no consequence.
-    }
+    final description = await _descriptionCache.getOrFetchServerDescription(
+      location,
+      client: _client,
+      timeout: _descriptionTimeout,
+    );
+    if (description == null) return null;
+    final scheme = description.contentDirectoryControlUrl.scheme;
+    if (scheme != 'http' && scheme != 'https') return null;
+    if (description.contentDirectoryControlUrl.host.isEmpty) return null;
+    return description;
   }
 }

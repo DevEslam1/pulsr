@@ -67,7 +67,14 @@ class CastSessionStatus {
   final bool connected;
   final String? deviceName;
   final bool playing;
+  final bool paused;
+  final bool buffering;
+  final String playerState;
   final int positionMs;
+  final int durationMs;
+  final String? title;
+  final String? artist;
+  final double? volume;
   final String? error;
 
   const CastSessionStatus({
@@ -75,19 +82,39 @@ class CastSessionStatus {
     this.connected = false,
     this.deviceName,
     this.playing = false,
+    this.paused = false,
+    this.buffering = false,
+    this.playerState = 'idle',
     this.positionMs = 0,
+    this.durationMs = 0,
+    this.title,
+    this.artist,
+    this.volume,
     this.error,
   });
 
   static const CastSessionStatus unavailable = CastSessionStatus();
 
+  Duration get position => Duration(milliseconds: positionMs < 0 ? 0 : positionMs);
+  Duration get duration => Duration(milliseconds: durationMs < 0 ? 0 : durationMs);
+
   factory CastSessionStatus.fromMap(Map<dynamic, dynamic> map) =>
       CastSessionStatus(
-        available: true,
+        available: map['available'] is bool ? map['available'] == true : true,
         connected: map['connected'] == true,
         deviceName: map['deviceName'] as String?,
         playing: map['playing'] == true,
+        paused: map['paused'] == true,
+        buffering: map['buffering'] == true,
+        playerState: (map['playerState'] as String?) ??
+            (map['playing'] == true
+                ? 'playing'
+                : (map['paused'] == true ? 'paused' : 'idle')),
         positionMs: (map['positionMs'] as num?)?.toInt() ?? 0,
+        durationMs: (map['durationMs'] as num?)?.toInt() ?? 0,
+        title: map['title'] as String?,
+        artist: map['artist'] as String?,
+        volume: (map['volume'] as num?)?.toDouble().clamp(0.0, 1.0),
         error: map['error'] as String?,
       );
 }
@@ -238,7 +265,7 @@ class CastService {
   }
 
   Future<bool> connect(String routeId) async {
-    if (!_isAndroid) return false;
+    if (!_isAndroid || routeId.trim().isEmpty) return false;
     try {
       return await _sessionChannel
               .invokeMethod<bool>('connect', {'routeId': routeId}) ??
@@ -262,6 +289,25 @@ class CastService {
   /// Stops the active cast session.
   Future<bool> stopCasting() => disconnect();
 
+  /// Queries the live Cast session status from the platform plugin.
+  Future<CastSessionStatus> getStatus() async {
+    if (!_isAndroid) return CastSessionStatus.unavailable;
+    try {
+      final dynamic res =
+          await _sessionChannel.invokeMethod<dynamic>('getStatus');
+      if (res is Map) {
+        final status = CastSessionStatus.fromMap(res);
+        _setSessionStatus(status);
+        return status;
+      }
+      return _sessionStatus;
+    } catch (e, st) {
+      ErrorLogger.log('Cast getStatus failed',
+          error: e, stackTrace: st, category: 'Cast');
+      return _sessionStatus;
+    }
+  }
+
   Future<CastResult> castLocalFile({
     required String path,
     String title = '',
@@ -272,6 +318,13 @@ class CastService {
   }) async {
     if (!_isAndroid) {
       return const CastResult(success: false, error: 'unsupported_platform');
+    }
+    if (path.trim().isEmpty) {
+      return const CastResult(
+        success: false,
+        error: 'invalid_path',
+        message: 'A local file path is required to cast.',
+      );
     }
     try {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
@@ -304,11 +357,22 @@ class CastService {
     if (!_isAndroid) {
       return const CastResult(success: false, error: 'unsupported_platform');
     }
+    final parsed = Uri.tryParse(url.trim());
+    final scheme = parsed?.scheme.toLowerCase();
+    if (parsed == null ||
+        (scheme != 'http' && scheme != 'https') ||
+        parsed.host.isEmpty) {
+      return const CastResult(
+        success: false,
+        error: 'invalid_url',
+        message: 'A valid http(s) stream URL is required to cast.',
+      );
+    }
     try {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
         'castUrl',
         {
-          'url': url,
+          'url': parsed.toString(),
           'title': title,
           'artist': artist,
           'album': album,
@@ -324,18 +388,46 @@ class CastService {
     }
   }
 
-  Future<bool> setPlaybackState(String action, {int? positionMs}) async {
-    if (!_isAndroid) return false;
+  Future<CastResult> setPlaybackStateResult(
+    String action, {
+    int? positionMs,
+  }) async {
+    if (!_isAndroid) {
+      return const CastResult(success: false, error: 'unsupported_platform');
+    }
     try {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
         'setPlaybackState',
         {'action': action, 'positionMs': positionMs},
       );
-      return res is Map && res['success'] == true;
-    } catch (_) {
-      return false;
+      return _parseResult(res);
+    } catch (e, st) {
+      ErrorLogger.log('Cast setPlaybackState($action) failed',
+          error: e, stackTrace: st, category: 'Cast');
+      return const CastResult(success: false, error: 'channel_error');
     }
   }
+
+  Future<bool> setPlaybackState(String action, {int? positionMs}) async {
+    final result =
+        await setPlaybackStateResult(action, positionMs: positionMs);
+    return result.success;
+  }
+
+  Future<CastResult> play() => setPlaybackStateResult('play');
+
+  Future<CastResult> pause() => setPlaybackStateResult('pause');
+
+  Future<CastResult> stop() => setPlaybackStateResult('stop');
+
+  Future<CastResult> seek(Duration position) {
+    final ms = position.isNegative ? 0 : position.inMilliseconds;
+    return setPlaybackStateResult('seek', positionMs: ms);
+  }
+
+  Future<CastResult> next() => setPlaybackStateResult('next');
+
+  Future<CastResult> previous() => setPlaybackStateResult('previous');
 
   /// Sets the volume (0.0 to 1.0) on the active Cast device.
   Future<bool> setVolume(double volume) async {
@@ -379,6 +471,13 @@ class CastService {
   }) async {
     if (!_isAndroid) {
       return const CastResult(success: false, error: 'unsupported_platform');
+    }
+    if (queueItems.isEmpty) {
+      return const CastResult(
+        success: false,
+        error: 'empty_queue',
+        message: 'Queue is empty.',
+      );
     }
     try {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(

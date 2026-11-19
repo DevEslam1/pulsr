@@ -346,4 +346,59 @@ void main() {
       expect(await provider.testConnection(), isFalse);
     });
   });
+
+  group('search and coverArt', () {
+    test('search returns matching artists, albums and tracks', () async {
+      final fake = _FakeHttpClient((request) async {
+        expect(request.url.path, '/rest/search3.view');
+        expect(request.url.queryParameters['query'], 'homogenic');
+        return _json(<String, dynamic>{
+          'searchResult3': <String, dynamic>{
+            'album': <dynamic>[
+              <String, dynamic>{
+                'id': 'al-homogenic',
+                'name': 'Homogenic',
+                'artist': 'Björk',
+                'coverArt': 'cov-homo',
+              }
+            ],
+            'song': <dynamic>[
+              <String, dynamic>{
+                'id': 's-joga',
+                'title': 'Jóga',
+                'artist': 'Björk',
+                'album': 'Homogenic',
+                'coverArt': 'cov-homo',
+              }
+            ],
+          }
+        });
+      });
+      final provider = _provider(fake);
+
+      final result = await provider.search('homogenic');
+      expect(result.albums, hasLength(1));
+      expect(result.albums.first.name, 'Homogenic');
+      expect(result.songs, hasLength(1));
+      expect(result.songs.first.title, 'Jóga');
+    });
+
+    test('getCoverArtUrl builds signed URI with auth parameters', () {
+      final provider = _provider(_library());
+      final uri = provider.getCoverArtUrl('cov-homo', size: 400);
+
+      expect(uri, isNotNull);
+      expect(uri!.path, '/rest/getCoverArt.view');
+      expect(uri.queryParameters['id'], 'cov-homo');
+      expect(uri.queryParameters['size'], '400');
+      expect(uri.queryParameters['u'], 'eslam');
+      expect(uri.queryParameters['s'], 'salt');
+    });
+
+    test('getCoverArtUrl returns null for blank id', () {
+      final provider = _provider(_library());
+      expect(provider.getCoverArtUrl(null), isNull);
+      expect(provider.getCoverArtUrl('   '), isNull);
+    });
+  });
 }

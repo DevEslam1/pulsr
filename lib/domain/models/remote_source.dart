@@ -365,6 +365,7 @@ class RemoteEntry {
     this.sizeBytes,
     this.modifiedAt,
     this.etag,
+    this.artworkUri,
   });
 
   /// Restores an entry from [toJson] output.
@@ -379,6 +380,7 @@ class RemoteEntry {
           ? DateTime.fromMillisecondsSinceEpoch(modifiedMs.toInt())
           : null,
       etag: json['etag'] as String?,
+      artworkUri: json['artworkUri'] as String?,
     );
   }
 
@@ -400,6 +402,9 @@ class RemoteEntry {
   /// Server-supplied validator, used as a cache key component when present.
   final String? etag;
 
+  /// Optional artwork/cover art URI string for display in UI.
+  final String? artworkUri;
+
   /// Serializes this entry for the cache index and provider channel payloads.
   Map<String, dynamic> toJson() => {
         'path': path,
@@ -408,6 +413,7 @@ class RemoteEntry {
         if (sizeBytes != null) 'sizeBytes': sizeBytes,
         if (modifiedAt != null) 'modifiedAt': modifiedAt!.millisecondsSinceEpoch,
         if (etag != null) 'etag': etag,
+        if (artworkUri != null) 'artworkUri': artworkUri,
       };
 
   /// Sorts folders before files, then by name ignoring case.

@@ -5,13 +5,17 @@ import java.io.BufferedOutputStream
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
+import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URI
+import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class ServedFile(val path: String, val mime: String, @Volatile var timestampMs: Long)
+data class ProxiedStream(val upstreamUrl: String, val mime: String, @Volatile var timestampMs: Long)
 
 /**
  * Minimal local HTTP server used to expose one local audio file to a Cast
@@ -43,9 +47,11 @@ class CastMediaServer {
 
     private var serverSocket: ServerSocket? = null
     private var thread: Thread? = null
+    private var workerPool: java.util.concurrent.ExecutorService? = null
     private val running = AtomicBoolean(false)
 
     private val servedFiles = java.util.concurrent.ConcurrentHashMap<String, ServedFile>()
+    private val proxiedStreams = java.util.concurrent.ConcurrentHashMap<String, ProxiedStream>()
     private val prebufferCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
     private data class LegacyMedia(val path: String, val mime: String)
     @Volatile private var legacyMedia: LegacyMedia? = null
@@ -53,6 +59,7 @@ class CastMediaServer {
     @Volatile private var port: Int = 0
 
     val isRunning: Boolean get() = running.get()
+    val boundPort: Int get() = port
 
     fun start(): Boolean {
         if (running.get()) return true
@@ -60,6 +67,7 @@ class CastMediaServer {
             val ss = ServerSocket(0)
             serverSocket = ss
             port = ss.localPort
+            workerPool = java.util.concurrent.Executors.newFixedThreadPool(4)
             running.set(true)
             thread = Thread({ acceptLoop(ss) }, "PulsrCastServer").apply {
                 isDaemon = true
@@ -77,10 +85,51 @@ class CastMediaServer {
         try { serverSocket?.close() } catch (_: Exception) {}
         serverSocket = null
         thread = null
+        try { workerPool?.shutdownNow() } catch (_: Exception) {}
+        workerPool = null
         legacyMedia = null
         currentlyServingToken = null
         servedFiles.clear()
+        proxiedStreams.clear()
         prebufferCache.clear()
+    }
+
+    /**
+     * Returns true when [url] points at the local loopback interface (`127.0.0.1`,
+     * `localhost`, or `[::1]`), which a LAN Cast receiver cannot reach directly.
+     */
+    fun isLoopbackUrl(url: String): Boolean {
+        val uri = try { URI(url) } catch (_: Exception) { return false }
+        val scheme = uri.scheme?.lowercase() ?: return false
+        if (scheme != "http" && scheme != "https") return false
+        val host = uri.host?.lowercase()?.trim('[', ']') ?: return false
+        return host == "127.0.0.1" || host == "localhost" || host == "::1"
+    }
+
+    /**
+     * Bridges a loopback [upstreamUrl] (e.g. from `RemoteStreamServer`) onto the
+     * LAN interface under `/proxy/<token>` so a Cast receiver can stream and seek it.
+     * Rejects non-loopback URLs so the server never acts as an open LAN proxy.
+     */
+    fun serveProxyUrl(upstreamUrl: String, mime: String?): String? {
+        if (!isLoopbackUrl(upstreamUrl)) return null
+        if (!start()) return null
+
+        val now = System.currentTimeMillis()
+        val activeToken = currentlyServingToken
+        val it = proxiedStreams.entries.iterator()
+        while (it.hasNext()) {
+            val entry = it.next()
+            if (entry.key != activeToken && (now - entry.value.timestampMs > EVICTION_TTL_MS)) {
+                it.remove()
+            }
+        }
+
+        val resolvedMime = mime?.takeIf { it.isNotBlank() } ?: "audio/mpeg"
+        val token = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+        proxiedStreams[token] = ProxiedStream(upstreamUrl, resolvedMime, now)
+        val host = localIpv4() ?: return null
+        return "http://$host:$port/proxy/$token"
     }
 
     /**
@@ -152,12 +201,29 @@ class CastMediaServer {
             } catch (_: Exception) {
                 if (running.get()) null else break
             } ?: continue
-            try {
-                handle(socket)
-            } catch (e: Exception) {
-                logW(TAG, "handle failed: ${e.message}")
-            } finally {
-                try { socket.close() } catch (_: Exception) {}
+            val pool = workerPool
+            if (pool != null && !pool.isShutdown) {
+                try {
+                    pool.execute {
+                        try {
+                            handle(socket)
+                        } catch (e: Exception) {
+                            logW(TAG, "handle failed: ${e.message}")
+                        } finally {
+                            try { socket.close() } catch (_: Exception) {}
+                        }
+                    }
+                } catch (_: Exception) {
+                    try { socket.close() } catch (_: Exception) {}
+                }
+            } else {
+                try {
+                    handle(socket)
+                } catch (e: Exception) {
+                    logW(TAG, "handle failed: ${e.message}")
+                } finally {
+                    try { socket.close() } catch (_: Exception) {}
+                }
             }
         }
     }
@@ -166,14 +232,18 @@ class CastMediaServer {
         val input = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.ISO_8859_1))
         val requestLine = input.readLine() ?: return
         val parts = requestLine.split(" ")
-        if (parts.size < 2 || parts[0] != "GET") return
+        if (parts.size < 2) return
+        val method = parts[0].uppercase()
+        if (method != "GET" && method != "HEAD") return
 
+        var rangeHeader: String? = null
         var rangeStart = -1L
         var rangeEnd = -1L
         while (true) {
             val line = input.readLine() ?: break
             if (line.isEmpty()) break
             if (line.startsWith("Range:", ignoreCase = true)) {
+                rangeHeader = line.substringAfter(":").trim()
                 val r = line.substringAfter("=").trim()
                 val dash = r.indexOf('-')
                 if (dash >= 0) {
@@ -185,6 +255,12 @@ class CastMediaServer {
 
         val out = BufferedOutputStream(socket.getOutputStream())
         val target = parts[1].substringBefore("?")
+        if (target.startsWith("/proxy/")) {
+            val token = target.removePrefix("/proxy/").trimEnd('/')
+            handleProxy(token, method, rangeHeader, out)
+            return
+        }
+
         val resolvedFile: File?
         val resolvedMime: String
         val legacy = legacyMedia
@@ -231,16 +307,22 @@ class CastMediaServer {
             start = 0
             end = length - 1
         }
-        val contentLength = end - start + 1
+        val contentLength = (end - start + 1).coerceAtLeast(0L)
         val header = buildString {
             append("HTTP/1.1 206 Partial Content\r\n")
             append("Content-Type: $resolvedMime\r\n")
             append("Accept-Ranges: bytes\r\n")
-            append("Content-Range: bytes $start-$end/$length\r\n")
+            if (length > 0) {
+                append("Content-Range: bytes $start-$end/$length\r\n")
+            }
             append("Content-Length: $contentLength\r\n")
             append("Connection: close\r\n\r\n")
         }
         out.write(header.toByteArray())
+        if (method == "HEAD" || contentLength == 0L) {
+            out.flush()
+            return
+        }
 
         val token = if (target.startsWith("/media/")) target.removePrefix("/media/").trimEnd('/') else null
         val prebuf = if (start == 0L && token != null) prebufferCache[token] else null
@@ -275,6 +357,84 @@ class CastMediaServer {
             }
         }
         out.flush()
+    }
+
+    private fun handleProxy(
+        token: String,
+        method: String,
+        rangeHeader: String?,
+        out: BufferedOutputStream,
+    ) {
+        val proxied = proxiedStreams[token]
+        if (proxied == null) {
+            out.write("HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n".toByteArray())
+            out.flush()
+            return
+        }
+        proxied.timestampMs = System.currentTimeMillis()
+        currentlyServingToken = token
+
+        var conn: HttpURLConnection? = null
+        try {
+            conn = (URL(proxied.upstreamUrl).openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                instanceFollowRedirects = false
+                connectTimeout = 5_000
+                readTimeout = 20_000
+                if (!rangeHeader.isNullOrBlank()) {
+                    setRequestProperty("Range", rangeHeader)
+                }
+            }
+            val code = conn.responseCode
+            val statusLine = when (code) {
+                200 -> "200 OK"
+                206 -> "206 Partial Content"
+                416 -> "416 Range Not Satisfiable"
+                404 -> "404 Not Found"
+                403 -> "403 Forbidden"
+                else -> "$code ${conn.responseMessage ?: "Error"}"
+            }
+            val contentType = conn.contentType?.takeIf { it.isNotBlank() } ?: proxied.mime
+            val contentLength = conn.contentLengthLong
+            val contentRange = conn.getHeaderField("Content-Range")
+            val acceptRanges = conn.getHeaderField("Accept-Ranges") ?: "bytes"
+
+            val header = buildString {
+                append("HTTP/1.1 $statusLine\r\n")
+                append("Content-Type: $contentType\r\n")
+                append("Accept-Ranges: $acceptRanges\r\n")
+                if (!contentRange.isNullOrBlank()) {
+                    append("Content-Range: $contentRange\r\n")
+                }
+                if (contentLength >= 0) {
+                    append("Content-Length: $contentLength\r\n")
+                }
+                append("Connection: close\r\n\r\n")
+            }
+            out.write(header.toByteArray())
+            if (method != "HEAD") {
+                val stream = if (code in 200..299) conn.inputStream else conn.errorStream
+                if (stream != null) {
+                    stream.use { input ->
+                        val buf = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n <= 0) break
+                            out.write(buf, 0, n)
+                        }
+                    }
+                }
+            }
+            out.flush()
+        } catch (e: Exception) {
+            logW(TAG, "proxy upstream failed: ${e.message}")
+            try {
+                out.write("HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n".toByteArray())
+                out.flush()
+            } catch (_: Exception) {}
+        } finally {
+            conn?.disconnect()
+        }
     }
 
     private fun localIpv4(): String? {

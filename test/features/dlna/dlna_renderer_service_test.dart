@@ -228,6 +228,38 @@ void main() {
     expect(actions, containsAll(<String>['Pause', 'Play', 'Seek', 'Stop']));
   });
 
+  test('playUrl, queueUrl, next, previous send AVTransport commands', () async {
+    service = buildService();
+    addTearDown(service.dispose);
+    await service.discover();
+    await service.select(service.devices.single);
+
+    await service.playUrl(
+      'http://192.168.1.5:8000/remote/track.flac',
+      title: 'Streaming Track',
+      artist: 'Artist 1',
+    );
+    expect(service.state, DlnaState.playing);
+    expect(service.nowPlayingTitle, 'Streaming Track');
+
+    await service.queueUrl(
+      'http://192.168.1.5:8000/remote/track2.flac',
+      title: 'Next Track',
+    );
+
+    await service.next();
+    await service.previous();
+
+    final actions = requests.map(_actionOf).toList();
+    expect(actions, containsAll(<String>[
+      'SetAVTransportURI',
+      'Play',
+      'SetNextAVTransportURI',
+      'Next',
+      'Previous',
+    ]));
+  });
+
   test('polls the renderer for position while playing', () async {
     service = buildService(pollInterval: const Duration(milliseconds: 40));
     addTearDown(service.dispose);

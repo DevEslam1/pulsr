@@ -49,8 +49,8 @@ class CastSessionPlugin : MethodChannel.MethodCallHandler {
             "getRoutes" -> result.success(emptyList<Any>())
             "connect" -> result.success(false)
             "disconnect" -> result.success(true)
-            "castLocalFile", "castUrl", "setPlaybackState", "getVolume",
-            "setVolume" ->
+            "castLocalFile", "castUrl", "castQueue", "setPlaybackState",
+            "getVolume", "setVolume", "getStatus" ->
                 result.success(
                     mapOf(
                         "success" to false,
