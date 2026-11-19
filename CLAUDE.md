@@ -195,7 +195,7 @@ pulsr/
 - **`data/audio/ab_loop_manager.dart`**: Precise A-B loop point management with microsecond accuracy.
 - **`data/audio/silence_skip_controller.dart`**: Fast-forwards through dead silence at track starts and ends.
 - **`data/audio/sleep_timer_manager.dart`**: Configurable sleep timer that fades audio volume to zero before pausing.
-- **`data/audio/dop_encoder.dart` & `dsd_decoder_helper.dart`**: DSD-over-PCM (DoP) packing logic for native DSD playback on compatible USB DACs.
+- **`data/audio/dop_encoder.dart` & `dsd_decoder_helper.dart`**: DSD-over-PCM (DoP) packing logic, plus DSF/DFF parsing and DSD→PCM decoding. Native DSD output is gated off (`kNativeDsdProducerAvailable = false`): the UAC2 probe, the DSD_U32 sink path and the bit packer exist and are unit-tested, but no producer feeds them, so requesting native falls back to DoP or PCM with an explicit reason instead of claiming raw DSD.
 - **`data/audio/automix/bpm_detector.dart` & `automix_transition_planner.dart`**: Audio analysis detecting BPM and key to create seamless DJ-style automix transitions.
 
 #### `data/db/` (Database & Tables)
@@ -324,7 +324,16 @@ pulsr/
   - *AAudio-Mode Limits:* Maximum 2 channels (`channelCount > 2` unsupported on `AAudioAudioSink`), `speed`/`pitch`/`skipSilence` suspend AAudio to `AudioTrack`, no native `NativeDspAudioProcessor` gain-curve crossfade (`dspSetTransitionMuted` / `dspGetTransitionGain` return `false`/`null` while `aaudioOutputEnabled`), and Android `Equalizer` / `LoudnessEnhancer` (`AudioEffect` attached to `AudioTrack` audio session ID) do not affect AAudio output.
 
 #### `android/app/src/main/cpp/` (Native C++ DSP Engine)
-- **`AudioDspEngine.cpp / .h`**: Central DSP graph manager. Receives raw decoded PCM buffers from ExoPlayer or file streams and runs them through the active DSP chain.
+- **`AudioDspEngine.cpp / .h`**: Central DSP graph manager. Receives raw decoded PCM buffers from ExoPlayer or file streams and runs them through the active DSP chain. The in-chain `STAGE_RESAMPLER` is retained only for wire compatibility and is not evaluated; the tap-side converter is the only rate converter in the playback path.
+- **`HighQualityResampler.cpp / .h`**: Polyphase windowed-sinc converter behind the tap SRC (`AudioDspEngine::resampleForTap`). 64–512 taps × 256–2048 phases (`setTapSrcQuality`, default 256 taps), exact bypass at ratio 1.0, arbitrary ratio support for the 44.1/48 kHz families.
+- **`DopFramer.cpp / .h`**: DoP v1.1 framing shared by the DSD file path and the USB sink: `[marker | older DSD byte | newer DSD byte]` words, alternating 0x05/0xFA markers, `DopPcmSampleRate()` carrier table. Pure functions, unit-tested.
+- **`DsdNativePacker.cpp / .h`**: Packs LSB-first 1-bit DSD bytes into 2- or 4-byte little-endian DSD_U32 words for the native-DSD sink path, including the partial-word pad.
+- **`Oversampler.cpp / .h` & `SdmModulator.cpp / .h`** *(host tests only — not in `DSP_CORE_SOURCES`)*: 2×/4×/8× polyphase upsampler with Sharp, Slow/NOS-like, Apodizing and MinimumPhase kernels, and a 1–5th-order one-bit sigma-delta modulator producing DSD64/128/256 bits. Validated by `test_oversampler` and `test_sdm`; no engine stage or output route consumes them yet, so the build offers no oversampling or PCM→DSD UI and must not claim one.
+- **`Uac2Volume.cpp / .h`** *(host tests only)*: Q8.8 UAC2 Feature-Unit volume mapping (range validation, position↔Q8). Production range discovery and SET_CUR live in `UsbExclusivePlugin.kt`; the C++ helper mirrors it for tests.
+- **`Uac2Descriptors.cpp / .h`**: Bounded, allocation-free walk of a raw UAC2/UAC3 configuration descriptor that extracts DSD alternate settings (interface, alt, endpoint, channels, subslot bytes, frames/s, DSD multiple). Feeds `HiResDacPlugin`'s `nativeDsd` capability; the PCM path is unaffected when the blob proves nothing.
+- **`UsbAsrcClockSync.cpp / .h`**: 32-tap/256-phase Blackman–Harris ASRC fallback for USB DACs without a feedback endpoint, with per-branch unity-DC normalisation, coefficient interpolation, ±0.5 % clamp and exact bypass at ratio 1.0.
+- **`UsbPullRenderer.cpp / .h`**: Pull-based USB renderer. The DAC's async feedback endpoint sets the consumption rate; a bounded ring decouples producers, with underrun/overrun and fill accounting exposed to telemetry.
+- **`UsbPcmProducer.cpp / .h`**: Reader thread for the pull renderer. PCM WAV only (16/24/32-bit, including WAVE_FORMAT_EXTENSIBLE 24-in-32), bit-perfect only: any rate, channel or container mismatch is refused rather than converted.
 - **`AAudioSink.cpp / .h`**: High-performance, low-latency audio output stream using the Android AAudio native API with `AAUDIO_PERFORMANCE_MODE_LOW_LATENCY`.
 - **`UsbAudioSink.cpp / .h`**: Direct USB Audio Class 2.0 driver handling bit-perfect output directly to connected external DACs.
 - **`CustodyVerifier.cpp / .h`**: Cryptographic hash verification and bit-perfect custody tracking, ensuring bitstream integrity between disk and audio sink.

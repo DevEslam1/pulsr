@@ -43,6 +43,29 @@
 
 ---
 
+## 1a. Generated capability matrix
+
+> Generated from `AudioCapabilityMatrix.current`. `test/architecture/audio_capability_matrix_test.dart` re-derives every value from the native/Kotlin sources and fails when this block is stale, so the table cannot drift from the build.
+
+<!-- BEGIN GENERATED CAPABILITY MATRIX -->
+| Capability | This build |
+| :--- | :--- |
+| Native DSP stages | 20 |
+| Parametric EQ bands | 64 |
+| Dynamic EQ bands | 8 |
+| Multiband compressor bands | 4 |
+| Channel manager | 2–8 channels, 50 ms max delay |
+| Convolution IR | 2000000 samples / 10 s |
+| DSD decode | DSD64–DSD512 |
+| DoP carriers | 176400 / 352800 / 705600 Hz |
+| Highest PCM rate | 768000 Hz |
+| USB wire formats | s16_le / s24_3le / s32_le |
+| AAudio encodings | int16 / float / i24_packed / int32 |
+| Native DSD producer | not available |
+<!-- END GENERATED CAPABILITY MATRIX -->
+
+---
+
 ## 2. Audio and DSP
 
 ### Equalization
@@ -84,7 +107,7 @@
 ### DSD and SACD
 - DSD64, DSD128, DSD256 and DSD512 decode to PCM at 44.1–768 kHz.
 - DoP v1.1 framing at 176.4/352.8/705.6 kHz; DSD512 has no DoP carrier and falls back.
-- Native DSD output modes where the DAC advertises support.
+- Native DSD output is **not available** in this build. The UAC2 DSD alternate-setting probe, the `DSD_U32` sink path and the 1-bit packer are implemented and unit-tested, but no playback producer opens a DSD stream and pumps frames into it, so the transport resolver falls back to DoP or PCM with an explicit reason. DoP framing is likewise unverified on hardware (`dop_carrier_not_measured`).
 - SACD ISO indexing, TOC parsing and DSF extraction before playback.
 
 ### Playback
