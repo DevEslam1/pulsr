@@ -204,7 +204,12 @@ class AppUpdateService {
           for (final f in list) {
             if (f is File) f.deleteSync();
           }
-        } catch (_) {}
+        } catch (e) {
+          // Best effort: a stale APK left behind must not block the
+          // download, but the reason (disk full, permission) is worth one
+          // rate-limited log.
+          ErrorLogger.logSwallowed('AppUpdateService.clearUpdatesDir', e);
+        }
       }
 
       final targetFile = File('${updatesDir.path}/pulsr-${info.version}.apk');
