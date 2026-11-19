@@ -7,6 +7,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../data/audio/headphone_target_curve.dart';
 
 import '../../../../core/utils/pulsr_haptics.dart';
 
@@ -44,6 +45,18 @@ class EqCurveVisualizer extends StatefulWidget {
   final void Function(int bandIndex, double gain)? onGainChanged;
   final ValueChanged<int>? onBandSelected;
 
+  /// Optional reference target drawn as a dashed line behind the correction.
+  /// When null the chart plots the correction alone.
+  final HeadphoneTargetCurve? targetCurve;
+
+  /// Whether the compact corner selector for [HeadphoneTargetCurve.all] is
+  /// shown. It is skipped automatically on charts too short to host it
+  /// without covering the 0 dB line.
+  final bool showTargetCurveSelector;
+
+  /// Notified after the corner selector changes the drawn target curve.
+  final ValueChanged<HeadphoneTargetCurve?>? onTargetCurveChanged;
+
   const EqCurveVisualizer({
     super.key,
     required this.gains,
@@ -57,6 +70,9 @@ class EqCurveVisualizer extends StatefulWidget {
     this.selectedBandIndex,
     this.onGainChanged,
     this.onBandSelected,
+    this.targetCurve,
+    this.showTargetCurveSelector = true,
+    this.onTargetCurveChanged,
   });
 
   @override
@@ -66,12 +82,22 @@ class EqCurveVisualizer extends StatefulWidget {
 class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
   int? _activeDraggingBand;
   List<double>? _prevGains;
+  HeadphoneTargetCurve? _selectedTargetCurve;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTargetCurve = widget.targetCurve;
+  }
 
   @override
   void didUpdateWidget(EqCurveVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(oldWidget.gains, widget.gains)) {
       _prevGains = oldWidget.gains;
+    }
+    if (widget.targetCurve != oldWidget.targetCurve) {
+      _selectedTargetCurve = widget.targetCurve;
     }
   }
 
@@ -102,6 +128,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
               color: widget.activeColor,
               spectrumData: widget.spectrumData,
               frequencies: widget.frequencies,
+              targetCurve: _selectedTargetCurve,
               maxGain: widget.maxGain,
               showGrid: widget.showGrid,
               showLabels: widget.showLabels && widget.height >= 70,
@@ -129,10 +156,37 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       );
     }
 
+    // Target-curve selector: overlaid on the chart rather than stacked above it
+    // because the host layouts give this widget a fixed height (52–72 px), and
+    // kept outside the GestureDetector so its taps cannot be read as a band
+    // drag or delayed by the double-tap recogniser.
+    if (widget.showTargetCurveSelector && widget.height >= 48) {
+      visualizer = Stack(
+        children: [
+          visualizer,
+          PositionedDirectional(
+            top: 0,
+            end: 2,
+            child: _TargetCurvePicker(
+              selected: _selectedTargetCurve,
+              color: widget.activeColor,
+              onSelected: _handleTargetCurveSelected,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Semantics(
       label: context.l10n.equalizerResponseCurve,
       child: visualizer,
     );
+  }
+
+  void _handleTargetCurveSelected(HeadphoneTargetCurve? curve) {
+    setState(() => _selectedTargetCurve = curve);
+    PulsrHaptics.selectionClick();
+    widget.onTargetCurveChanged?.call(curve);
   }
 
   void _handleDoubleTap(Offset localPos) {
@@ -247,11 +301,80 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
   }
 }
 
+/// Compact corner control that switches the dashed reference target between
+/// [HeadphoneTargetCurve.all] and none.
+class _TargetCurvePicker extends StatelessWidget {
+  const _TargetCurvePicker({
+    required this.selected,
+    required this.color,
+    required this.onSelected,
+  });
+
+  final HeadphoneTargetCurve? selected;
+  final Color color;
+  final ValueChanged<HeadphoneTargetCurve?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = selected?.name ?? context.l10n.autoeqTargetCurve;
+    return PopupMenuButton<HeadphoneTargetCurve?>(
+      tooltip: context.l10n.autoeqTargetCurve,
+      padding: EdgeInsets.zero,
+      onSelected: onSelected,
+      itemBuilder: (context) => [
+        CheckedPopupMenuItem<HeadphoneTargetCurve?>(
+          value: null,
+          checked: selected == null,
+          child: Text(context.l10n.autoeqTargetCurveNone),
+        ),
+        for (final curve in HeadphoneTargetCurve.all)
+          CheckedPopupMenuItem<HeadphoneTargetCurve?>(
+            value: curve,
+            checked: selected == curve,
+            child: Text(curve.name),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsetsDirectional.fromSTEB(6, 1, 2, 1),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.10),
+          borderRadius: AppRadii.r8All,
+          border: Border.all(color: color.withValues(alpha: 0.22)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.straighten_rounded,
+                size: 11, color: color.withValues(alpha: 0.75)),
+            const SizedBox(width: 3),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 104),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color.withValues(alpha: 0.85),
+                  fontSize: AppFontSize.nano,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            Icon(Icons.arrow_drop_down_rounded,
+                size: 14, color: color.withValues(alpha: 0.75)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CatmullRomEqPainter extends CustomPainter {
   final List<double> gains;
   final Color color;
   final List<double>? spectrumData;
   final List<double>? frequencies;
+  final HeadphoneTargetCurve? targetCurve;
   final double maxGain;
   final bool showGrid;
   final bool showLabels;
@@ -262,6 +385,7 @@ class _CatmullRomEqPainter extends CustomPainter {
     required this.color,
     this.spectrumData,
     this.frequencies,
+    this.targetCurve,
     required this.maxGain,
     required this.showGrid,
     required this.showLabels,
@@ -285,6 +409,13 @@ class _CatmullRomEqPainter extends CustomPainter {
     // 2. Draw Gridlines (+12, +6, 0 dB, -6, -12 dB)
     if (showGrid) {
       _paintGrid(canvas, size, midY, verticalScale);
+    }
+
+    // 2b. Dashed reference target, kept behind the correction curve so the EQ
+    // response it is compared against stays the dominant stroke.
+    final target = targetCurve;
+    if (target != null && !target.isEmpty) {
+      _paintTargetCurve(canvas, size, midY, verticalScale, target);
     }
 
     // 3. Compute Control Points (Logarithmic frequency spacing when available)
@@ -435,6 +566,62 @@ class _CatmullRomEqPainter extends CustomPainter {
     }
   }
 
+  /// Draws [curve] as a dashed reference across the 20 Hz – 20 kHz log axis.
+  /// Levels outside the chart are clipped rather than clamped, so the line
+  /// leaves the plot at the true crossing point instead of hugging an edge
+  /// (Harman targets fall well below −15 dB at 20 kHz).
+  void _paintTargetCurve(Canvas canvas, Size size, double midY,
+      double verticalScale, HeadphoneTargetCurve curve) {
+    final minLog = math.log(20.0);
+    final maxLog = math.log(20000.0);
+    final span = maxLog - minLog;
+    const samples = 160;
+
+    final points = <Offset>[];
+    for (var i = 0; i <= samples; i++) {
+      final t = i / samples;
+      final hz = math.exp(minLog + span * t);
+      final db = curve.interpolateDbAt(hz);
+      final y = midY - (db / maxGain) * verticalScale;
+      points.add(Offset(t * size.width, y));
+    }
+
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.55)
+      ..strokeWidth = 1.4
+      ..style = PaintingStyle.stroke;
+
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    _paintDashedPolyline(canvas, points, paint,
+        dashLength: 5.0, gapLength: 4.0);
+    canvas.restore();
+  }
+
+  void _paintDashedPolyline(Canvas canvas, List<Offset> points, Paint paint,
+      {required double dashLength, required double gapLength}) {
+    var drawing = true;
+    var remaining = dashLength;
+    for (var i = 0; i < points.length - 1; i++) {
+      var start = points[i];
+      final end = points[i + 1];
+      var segmentLength = (end - start).distance;
+      if (segmentLength <= 0) continue;
+      while (segmentLength > 0) {
+        final step = math.min(remaining, segmentLength);
+        final next = start + (end - start) * (step / segmentLength);
+        if (drawing) canvas.drawLine(start, next, paint);
+        start = next;
+        segmentLength -= step;
+        remaining -= step;
+        if (remaining <= 1e-9) {
+          drawing = !drawing;
+          remaining = drawing ? dashLength : gapLength;
+        }
+      }
+    }
+  }
+
   Path _buildCentripetalCatmullRomSpline(List<Offset> points) {
     final path = Path();
     if (points.isEmpty) return path;
@@ -546,6 +733,7 @@ class _CatmullRomEqPainter extends CustomPainter {
         oldDelegate.color != color ||
         !listEquals(oldDelegate.spectrumData, spectrumData) ||
         !listEquals(oldDelegate.frequencies, frequencies) ||
+        oldDelegate.targetCurve != targetCurve ||
         oldDelegate.maxGain != maxGain ||
         oldDelegate.showGrid != showGrid ||
         oldDelegate.showLabels != showLabels ||

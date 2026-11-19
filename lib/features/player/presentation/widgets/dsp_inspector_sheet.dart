@@ -5,6 +5,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/di/injection.dart';
@@ -416,6 +417,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                               _buildReliabilityCard(p),
                               const SizedBox(height: AppSpacing.md),
                               const CustodyCertificateCard(),
+                              const SizedBox(height: AppSpacing.md),
+                              _buildAbxEntry(p),
                               const SizedBox(height: AppSpacing.md),
 
                               // Active Effects Summary Header
@@ -903,6 +906,60 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// Entry point for the blind ABX listening test (P2-10). The sheet is a
+  /// modal route, so it pops before pushing the full-screen test on the root
+  /// navigator instead of stacking the test on top of a live sheet.
+  Widget _buildAbxEntry(PulsrPalette p) {
+    final l10n = context.l10n;
+    return InkWell(
+      borderRadius: AppRadii.r12All,
+      onTap: () {
+        final router = GoRouter.of(context);
+        Navigator.of(context).pop();
+        router.push('/abx');
+      },
+      child: Container(
+        padding: const EdgeInsets.all(AppSpacing.s14),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.r12All,
+          border: Border.all(color: p.hairline),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.hearing_rounded, color: p.accent, size: 20),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.abxScreenTitle,
+                    style: TextStyle(
+                      fontSize: AppFontSize.bodySmall,
+                      fontWeight: FontWeight.w800,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.s2),
+                  Text(
+                    l10n.abxScreenSubtitle,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w500,
+                      color: p.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded, color: p.textSecondary, size: 20),
+          ],
+        ),
       ),
     );
   }

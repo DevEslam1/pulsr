@@ -23,6 +23,7 @@ import '../../features/library/presentation/library_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/party/presentation/party_screen.dart';
 import '../../features/player/presentation/now_playing_screen.dart';
+import '../../features/player/presentation/abx_screen.dart';
 import '../../features/player/presentation/widgets/karaoke_mode_screen.dart';
 import '../../features/playlist_detail/presentation/playlist_detail_screen.dart';
 import '../../features/playlist_detail/presentation/manage_playlist_screen.dart';
@@ -825,6 +826,15 @@ GoRouter createRouter(MediaScannerService scannerService,
         pageBuilder: (context, state) => _buildPulsrPageRoute(
           key: state.pageKey,
           child: const KaraokeModeScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/abx',
+        name: 'abx',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const AbxScreen(),
         ),
       ),
 

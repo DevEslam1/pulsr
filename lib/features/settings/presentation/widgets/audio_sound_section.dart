@@ -1,10 +1,13 @@
 // lib/features/settings/presentation/widgets/audio_sound_section.dart
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/constants/prefs_keys.dart';
+import '../../../../core/di/injection.dart';
 import '../../../../core/services/bluetooth_latency_calibrator.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
 import '../../../../core/motion/pulsr_motion.dart';
@@ -14,6 +17,7 @@ import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
+import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/audio/dac_voicing_service.dart';
 import '../../../../data/audio/bluetooth_quality_policy.dart';
 import '../../../player/cubit/player_cubit.dart';

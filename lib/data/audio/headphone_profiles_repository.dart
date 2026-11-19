@@ -63,8 +63,19 @@ class HeadphoneProfilesRepository {
   }
 
   Future<void> addCustomProfile(HeadphoneProfile profile) async {
-    if (profile.gains.isEmpty ||
-        profile.gains.any((g) => !g.isFinite || g.abs() > 15)) {
+    // A profile needs *some* correction data. Gain curves are validated as
+    // before; parametric profiles legitimately carry no gains because their
+    // filters are the authoritative correction (see AutoEqParametricParser
+    // .toHeadphoneProfile), so they pass on a non-empty filter list.
+    final hasGains = profile.gains.isNotEmpty;
+    if (!hasGains && profile.filters.isEmpty) {
+      ErrorLogger.log(
+          'Rejected custom profile with neither gains nor filters: '
+          '${profile.id}',
+          category: 'HeadphoneProfilesRepository');
+      return;
+    }
+    if (hasGains && profile.gains.any((g) => !g.isFinite || g.abs() > 15)) {
       ErrorLogger.log(
           'Rejected custom profile with invalid gains: ${profile.id}',
           category: 'HeadphoneProfilesRepository');

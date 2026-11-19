@@ -1,8 +1,12 @@
 import '../../../../core/di/injection.dart';
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
+import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/safe_file_path.dart';
+import '../../../../data/audio/autoeq_parametric_parser.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -34,6 +38,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
   String _category = 'All';
   List<String> _categories = const ['All'];
   bool _isLoading = true;
+  bool _isImporting = false;
 
   @override
   void initState() {
@@ -63,6 +68,99 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
 
   void _applyFilter() {
     _results = _repo.search(_searchController.text, category: _category);
+  }
+
+  /// Imports an AutoEQ `ParametricEQ.txt` file, persists it as a custom
+  /// profile and applies it. The filters are the authoritative correction, so
+  /// the generated profile deliberately carries no 10-band gains — the
+  /// repository accepts that shape (gains OR filters) and the native PEQ path
+  /// in `EqualizerManager` already prefers filters when present.
+  Future<void> _importParametricProfile() async {
+    if (_isImporting) return;
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _isImporting = true);
+
+    try {
+      final picked = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: const ['txt'],
+      );
+      if (picked == null) return;
+
+      final file = SafeFilePath.validate(
+        picked.path,
+        allowedExtensions: const ['txt'],
+      );
+      if (file == null) {
+        _showMessage(messenger, l10n.autoeqParametricImportFailed);
+        return;
+      }
+
+      final parsed = await AutoEqParametricParser.parseFile(file);
+      if (parsed == null) {
+        // Empty / comment-only file: valid input, but nothing to import.
+        _showMessage(messenger, l10n.autoeqParametricNoFilters);
+        return;
+      }
+
+      final profile = AutoEqParametricParser.toHeadphoneProfile(parsed);
+      if (profile.filters.isEmpty) {
+        _showMessage(messenger, l10n.autoeqParametricNoFilters);
+        return;
+      }
+
+      await _repo.addCustomProfile(profile);
+      if (!mounted) return;
+      if (_repo.getProfileById(profile.id) == null) {
+        // The repository rejected the profile — never report a phantom import.
+        _showMessage(messenger, l10n.autoeqParametricImportFailed);
+        return;
+      }
+
+      setState(() {
+        _categories = _repo.getCategories();
+        _applyFilter();
+      });
+
+      await context.read<PlayerCubit>().applyHeadphoneProfile(profile);
+      if (!mounted) return;
+
+      final warnings = parsed.warnings;
+      final message = StringBuffer(l10n.autoeqParametricImported(profile.name));
+      if (warnings.isNotEmpty) {
+        // Surface the first parse/mapping caveat; the full list went to the
+        // parser's warning sink for diagnostics.
+        message.write('\n${warnings.first}');
+      }
+      _showMessage(messenger, message.toString(),
+          duration: Duration(seconds: warnings.isEmpty ? 2 : 5));
+    } on AutoEqParametricParseFailure catch (e, st) {
+      ErrorLogger.log('AutoEQ parametric import failed',
+          error: e,
+          stackTrace: st,
+          category: 'AutoEqSearchSheet');
+      if (!mounted) return;
+      _showMessage(
+          messenger, '${l10n.autoeqParametricImportFailed}\n${e.message}',
+          duration: const Duration(seconds: 5));
+    } catch (e, st) {
+      ErrorLogger.log('AutoEQ parametric import failed',
+          error: e, stackTrace: st, category: 'AutoEqSearchSheet');
+      if (!mounted) return;
+      _showMessage(messenger, l10n.autoeqParametricImportFailed);
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
+  void _showMessage(ScaffoldMessengerState messenger, String message,
+      {Duration duration = const Duration(seconds: 3)}) {
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text(message),
+      duration: duration,
+    ));
   }
 
   @override
@@ -158,6 +256,47 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
               ),
             ),
             const SizedBox(height: AppSpacing.sm),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Tooltip(
+                message: context.l10n.autoeqParametricImportHint,
+                child: OutlinedButton.icon(
+                  onPressed: _isImporting ? null : _importParametricProfile,
+                  icon: _isImporting
+                      ? SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: p.primary,
+                          ),
+                        )
+                      : Icon(Icons.file_open_rounded,
+                          size: 16, color: p.primary),
+                  label: Text(
+                    context.l10n.autoeqParametricImport,
+                    style: TextStyle(
+                      color: p.primary,
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: p.surfaceCard,
+                    side: BorderSide(color: p.hairline),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s14,
+                      vertical: AppSpacing.s6,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: AppRadii.r12All,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
             SizedBox(
               height: 36,
               child: ListView.separated(

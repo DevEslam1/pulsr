@@ -752,7 +752,88 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
           settingsCardDivider(p),
           const BatteryOptimizationCard(),
         ],
+        // Battery saver applies to every route's DSP chain, so it sits below
+        // the per-device branches instead of inside one of them.
+        if (isAndroid) ...[
+          settingsCardDivider(p),
+          const _BatterySaverCard(),
+        ],
       ],
+    );
+  }
+}
+
+/// User-facing battery saver.
+///
+/// Pins the DSP to the same essential-only profile the automatic low-battery
+/// policy applies, on any charge level, without changing that policy. The
+/// preference and the effect are owned by [PulsrAudioHandler] (like the
+/// per-device USB stream mode), so this stays out of `SettingsState` and needs
+/// no codegen.
+class _BatterySaverCard extends StatefulWidget {
+  const _BatterySaverCard();
+
+  @override
+  State<_BatterySaverCard> createState() => _BatterySaverCardState();
+}
+
+class _BatterySaverCardState extends State<_BatterySaverCard> {
+  bool _enabled = false;
+  bool _loaded = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restore());
+  }
+
+  Future<void> _restore() async {
+    var enabled = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      enabled = prefs.getBool(PrefsKeys.batterySaverEnabled) ?? false;
+    } catch (_) {
+      // A read failure leaves the switch off, which is also the engine
+      // default: no heavy stage is disabled behind the user's back.
+    }
+    if (!mounted) return;
+    setState(() {
+      _enabled = enabled;
+      _loaded = true;
+    });
+  }
+
+  Future<void> _setEnabled(bool enabled) async {
+    if (_busy) return;
+    setState(() {
+      _enabled = enabled;
+      _busy = true;
+    });
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setBatterySaverForced(enabled);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PrefsKeys.batterySaverEnabled, enabled);
+      }
+    } catch (_) {
+      // Never leave the switch claiming a state that was not applied.
+      if (mounted) setState(() => _enabled = !enabled);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) return const SizedBox.shrink();
+    return SettingsSwitchTile(
+      Icons.battery_alert_rounded,
+      context.l10n.settingsBatterySaverTitle,
+      context.l10n.settingsBatterySaverDesc,
+      value: _enabled,
+      onChanged: _setEnabled,
     );
   }
 }

@@ -22,6 +22,7 @@ import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../core/utils/input_sanitizer.dart';
 import '../db/app_database.dart';
+import 'song_sort.dart';
 import '../services/library_maintenance_service.dart';
 
 /// Emits an error value from a watched-result stream. `Stream.handleError`
@@ -108,30 +109,6 @@ class MusicRepository implements IMusicRepository {
     query.where((_) => _notInExcludedFolders(excludedFolders));
   }
 
-  void _applySongSort(
-    SimpleSelectStatement<$SongsTableTable, SongsTableData> query,
-    String sortBy,
-    bool ascending,
-  ) {
-    final mode = ascending ? OrderingMode.asc : OrderingMode.desc;
-    final OrderingTerm Function($SongsTableTable) primary = switch (sortBy) {
-      'artist' => (t) => OrderingTerm(expression: t.artist, mode: mode),
-      'dateAdded' => (t) => OrderingTerm(expression: t.dateAdded, mode: mode),
-      'duration' => (t) => OrderingTerm(expression: t.durationMs, mode: mode),
-      'album' => (t) => OrderingTerm(expression: t.album, mode: mode),
-      'playCount' => (t) => OrderingTerm(expression: t.playCount, mode: mode),
-      'lastPlayed' => (t) => OrderingTerm(expression: t.lastPlayed, mode: mode),
-      'fileSize' => (t) => OrderingTerm(expression: t.fileSize, mode: mode),
-      'year' => (t) => OrderingTerm(expression: t.year, mode: mode),
-      'sampleRate' => (t) => OrderingTerm(expression: t.sampleRate, mode: mode),
-      'title' || _ => (t) => OrderingTerm(expression: t.title, mode: mode),
-    };
-    query.orderBy([
-      primary,
-      (t) => OrderingTerm.asc(t.id),
-    ]);
-  }
-
   // --- SONGS ---
   @override
   Stream<Result<List<SongsTableData>>> watchAllSongs({
@@ -193,7 +170,7 @@ class MusicRepository implements IMusicRepository {
         _applyExcludedFolders(query, excludedFolders);
       }
 
-      _applySongSort(query, sortBy, ascending);
+      applySongSort(query, sortBy, ascending);
 
       final effectiveLimit = limit ??
           (searchQuery != null && searchQuery.trim().isNotEmpty ? 200 : null);
@@ -356,7 +333,7 @@ class MusicRepository implements IMusicRepository {
             t.path.like('ytmusic://%').not() &
             (t.cueFile.isNull() | t.cueStartMs.isNotNull()));
       _applyExcludedFolders(query, excludedFolders);
-      _applySongSort(query, sortBy, ascending);
+      applySongSort(query, sortBy, ascending);
       if (limit != null) {
         query.limit(limit, offset: offset);
       }
@@ -1170,7 +1147,7 @@ class MusicRepository implements IMusicRepository {
     try {
       return (_db.select(_db.albumsTable)
             ..where((t) => t.songCount.isBiggerThanValue(0))
-            ..orderBy([(t) => OrderingTerm(expression: t.title)]))
+            ..orderBy(albumSortOrder()))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
           .onResultError((e, st) => Left<AppFailure, List<AlbumsTableData>>(
@@ -1272,7 +1249,7 @@ class MusicRepository implements IMusicRepository {
     try {
       return (_db.select(_db.artistsTable)
             ..where((t) => t.songCount.isBiggerThanValue(0))
-            ..orderBy([(t) => OrderingTerm(expression: t.name)]))
+            ..orderBy(artistSortOrder()))
           .watch()
           .map((artists) => Right<AppFailure, List<ArtistsTableData>>(artists))
           .onResultError((e, st) => Left<AppFailure, List<ArtistsTableData>>(

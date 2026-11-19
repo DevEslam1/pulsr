@@ -27,6 +27,7 @@ import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
+import '../../library/domain/album_disc_grouping.dart';
 import '../../library/presentation/library_quality_utils.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_options_sheet.dart';
@@ -48,6 +49,19 @@ class AlbumDetailScreen extends StatefulWidget {
 }
 
 enum _AlbumSort { track, title, duration }
+
+/// One row of the album track list: a song plus the disc header drawn above
+/// it. Header placement comes from [groupAlbumDiscs], never from comparing
+/// neighbouring rows.
+class _AlbumTrackRow {
+  const _AlbumTrackRow({required this.song, this.discHeader});
+
+  final SongsTableData song;
+
+  /// Localized `Disc <n>` / `Unnumbered` label, or null when no header is
+  /// drawn above this row.
+  final String? discHeader;
+}
 
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   late GetAlbumsUseCase _useCase;
@@ -156,16 +170,58 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       case _AlbumSort.duration:
         out.sort((a, b) => a.durationMs.compareTo(b.durationMs));
       case _AlbumSort.track:
-        out.sort((a, b) {
-          final da = a.discNumber ?? 1, db = b.discNumber ?? 1;
-          if (da != db) return da.compareTo(db);
-          return (a.trackNumber ?? 0).compareTo(b.trackNumber ?? 0);
-        });
+        // Disc grouping (`_trackRows`) owns the disc/track order.
+        break;
     }
     _cachedSongsHash = songsHash;
     _cachedSort = _sort;
     _cachedSortedSongs = out;
     return out;
+  }
+
+  /// Display rows for the track list.
+  ///
+  /// Disc/track order comes from [groupAlbumDiscs], the single grouping
+  /// implementation; title and duration sorts keep the plain sorted list and
+  /// never interleave disc headers. Headers are drawn only for multi-disc
+  /// albums, so a single-disc album renders exactly as before.
+  List<_AlbumTrackRow> _trackRows(
+    BuildContext context,
+    List<SongsTableData> songs,
+  ) {
+    if (_sort != _AlbumSort.track) {
+      return [for (final song in songs) _AlbumTrackRow(song: song)];
+    }
+    final groups = groupAlbumDiscs<SongsTableData>([
+      for (final song in songs)
+        AlbumDiscTrack<SongsTableData>(
+          track: song,
+          id: song.id.toString(),
+          title: song.title,
+          discNumber: song.discNumber,
+          trackNumber: song.trackNumber,
+        ),
+    ]);
+    return [
+      for (final group in groups)
+        for (var i = 0; i < group.tracks.length; i++)
+          _AlbumTrackRow(
+            song: group.tracks[i],
+            discHeader: groups.isMultiDisc && i == 0
+                ? _discHeader(context, group)
+                : null,
+          ),
+    ];
+  }
+
+  /// Localized header for [group]. Numbered discs keep the existing
+  /// `Disc <n>` l10n; the helper's `Unnumbered` label has no l10n key yet.
+  String _discHeader(
+    BuildContext context,
+    AlbumDiscGroup<SongsTableData> group,
+  ) {
+    final disc = group.discNumber;
+    return disc == null ? group.label : '${context.l10n.browseDisc} $disc';
   }
 
   @override
@@ -188,6 +244,10 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
       builder: (context, snapshot) {
         Widget buildSongsView(List<SongsTableData> rawSongs) {
           final songs = _sorted(rawSongs);
+          // `rows` is the rendered order; the queue follows it so a tap plays
+          // in the order the user sees.
+          final rows = _trackRows(context, songs);
+          final orderedSongs = [for (final row in rows) row.song];
           final totalDurationMs = songs.fold<int>(
             0,
             (acc, s) => acc + s.durationMs,
@@ -211,13 +271,13 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
               hero: _buildSplitHero(
                 context,
                 album,
-                songs,
+                orderedSongs,
                 totalDurationMs: totalDurationMs,
                 hasHiRes: hasHiRes,
                 hasLossless: hasLossless,
                 releaseYear: releaseYear,
               ),
-              body: _buildTrackListBody(context, songs),
+              body: _buildTrackListBody(context, rows),
             );
           }
 
@@ -294,8 +354,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                           onPressed: () {
                                             PulsrHaptics.mediumImpact();
                                             context.read<PlayerCubit>().playSong(
-                                                  songs.first,
-                                                  queue: songs,
+                                                  orderedSongs.first,
+                                                  queue: orderedSongs,
                                                 );
                                           },
                                         ),
@@ -410,7 +470,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               Adaptive.pagePadding(context),
                               AppSpacing.xs,
                             ),
-                            child: _actionButtons(context, songs),
+                            child: _actionButtons(context, orderedSongs),
                           ),
                         ),
                         SliverToBoxAdapter(
@@ -418,7 +478,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             padding: EdgeInsets.symmetric(
                               horizontal: Adaptive.pagePadding(context),
                             ),
-                            child: _queueActionsHeader(context, songs),
+                            child: _queueActionsHeader(context, orderedSongs),
                           ),
                         ),
                         SliverPadding(
@@ -426,7 +486,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                             top: AppSpacing.xxs,
                             bottom: PulsrLayoutMetrics.scrollBottom(context),
                           ),
-                          sliver: songs.isEmpty
+                          sliver: rows.isEmpty
                               ? SliverToBoxAdapter(
                                   child: Padding(
                                     padding:
@@ -442,11 +502,12 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                               : SliverList.builder(
                                   addAutomaticKeepAlives: false,
                                   addRepaintBoundaries: true,
-                                  itemCount: songs.length,
+                                  itemCount: rows.length,
                                   itemBuilder: (context, index) {
                                     return _buildSongItem(
                                       context,
-                                      songs,
+                                      orderedSongs,
+                                      rows[index],
                                       index,
                                     );
                                   },
@@ -814,21 +875,18 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   Widget _buildSongItem(
     BuildContext context,
-    List<SongsTableData> songs,
+    List<SongsTableData> queue,
+    _AlbumTrackRow row,
     int index,
   ) {
     final p = context.palette;
     final playerCubit = context.read<PlayerCubit>();
-    // Disc grouping (gap 07-02): only meaningful when the list is ordered by
-    // disc/track; title and duration sorts must not interleave disc headers.
-    final song = songs[index];
-    final showDiscHeader = _sort == _AlbumSort.track &&
-        (index == 0 ||
-            (song.discNumber ?? 1) != (songs[index - 1].discNumber ?? 1));
+    final song = row.song;
+    final discHeader = row.discHeader;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (showDiscHeader && songs.any((s) => (s.discNumber ?? 1) > 1))
+        if (discHeader != null)
           Padding(
             padding: EdgeInsetsDirectional.fromSTEB(
               Adaptive.pagePadding(context),
@@ -856,7 +914,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   ),
                   const SizedBox(width: AppSpacing.xxs),
                   Text(
-                    '${context.l10n.browseDisc} ${song.discNumber ?? 1}',
+                    discHeader,
                     style: TextStyle(
                       color: p.textPrimary,
                       fontSize: AppFontSize.caption,
@@ -910,7 +968,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                   }
                 });
               } else {
-                playerCubit.playSong(song, queue: songs);
+                playerCubit.playSong(song, queue: queue);
               }
             },
             onMorePressed: () => SongOptionsSheet.show(context, song: song),
@@ -1012,8 +1070,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
   // Right pane (tablet/landscape split): queue header + track list, reusing the
   // same item builder as the phone sliver list.
-  Widget _buildTrackListBody(BuildContext context, List<SongsTableData> songs) {
-    if (songs.isEmpty) {
+  Widget _buildTrackListBody(BuildContext context, List<_AlbumTrackRow> rows) {
+    if (rows.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: PulsrEmptyState(
@@ -1023,6 +1081,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
         ),
       );
     }
+    final queue = [for (final row in rows) row.song];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1030,11 +1089,11 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           padding: EdgeInsets.symmetric(
             horizontal: Adaptive.pagePadding(context),
           ),
-          child: _queueActionsHeader(context, songs),
+          child: _queueActionsHeader(context, queue),
         ),
         const SizedBox(height: AppSpacing.xs),
-        for (int i = 0; i < songs.length; i++)
-          _buildSongItem(context, songs, i),
+        for (int i = 0; i < rows.length; i++)
+          _buildSongItem(context, queue, rows[i], i),
       ],
     );
   }

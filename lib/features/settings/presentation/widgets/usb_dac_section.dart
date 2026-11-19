@@ -6,6 +6,7 @@ import '../../../../core/config/feature_flags.dart';
 import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../data/audio/audio_handler.dart';
+import '../../../../data/audio/hires_dac_bridge.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
@@ -36,11 +37,25 @@ class UsbDacSection extends StatefulWidget {
 
 class _UsbDacSectionState extends State<UsbDacSection> {
   final UsbExclusiveService _service = UsbExclusiveService();
+
+  /// The DAC's own attenuator. The bridge fails closed (null), and a null
+  /// range keeps the legacy dB slider exactly as it was.
+  final HiresDacBridge _dacBridge = const HiresDacBridge();
   StreamSubscription<UsbExclusiveStatus>? _sub;
   UsbExclusiveStatus _status = UsbExclusiveStatus.none;
   bool _busy = false;
   bool _streamingBusy = false;
   double? _pendingDb;
+
+  // UAC2 volume, distinct from the legacy dB slider: the DAC reports its own
+  // q8 range, and the control works in that range's 0…1 position. Unknown
+  // until a query lands, which is why the legacy path stays the default.
+  ({int minQ8, int maxQ8})? _uac2Range;
+  double? _uac2Position;
+  double? _pendingUac2Position;
+  // (deviceId, hasVolumeControl): re-query only when the device or the
+  // advertised control changes, not on every status tick.
+  (int?, bool)? _uac2Key;
 
   // Per-device clock architecture. Loaded from preferences once the device ids
   // are known; the selector itself stays presentational.
@@ -59,6 +74,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     _sub = _service.statusStream.listen((s) {
       if (!mounted) return;
       setState(() => _status = s);
+      _maybeLoadUac2Volume(s);
       if (s.deviceId != _modeLoadedForDeviceId) {
         unawaited(_loadStreamMode(s));
       }
@@ -76,6 +92,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     final s = await _service.getStatus();
     if (!mounted) return;
     setState(() => _status = s);
+    _maybeLoadUac2Volume(s);
     if (s.deviceId != _modeLoadedForDeviceId) {
       // Never block a streaming toggle (or its busy flag) on preference I/O:
       // the selector is cosmetic until the next start, which re-resolves the
@@ -128,6 +145,78 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     }
   }
 
+  /// Queries the DAC's UAC2 attenuator once per device/permission state.
+  ///
+  /// Nothing here may throw at the UI: the bridge already answers null on any
+  /// failure, and a null range simply leaves the legacy dB slider in place.
+  void _maybeLoadUac2Volume(UsbExclusiveStatus status) {
+    if (!_isAndroid) return;
+    if (!status.attached || !status.permitted) {
+      _uac2Key = null;
+      if (_uac2Range != null || _uac2Position != null) {
+        setState(() {
+          _uac2Range = null;
+          _uac2Position = null;
+          _pendingUac2Position = null;
+        });
+      }
+      return;
+    }
+    final key = (status.deviceId, status.hasVolumeControl);
+    if (key == _uac2Key) return;
+    _uac2Key = key;
+    unawaited(_loadUac2Volume(status));
+  }
+
+  Future<void> _loadUac2Volume(UsbExclusiveStatus status) async {
+    ({int minQ8, int maxQ8})? range;
+    num? raw;
+    try {
+      range = await _dacBridge.getUac2VolumeRange();
+      if (range != null) raw = await _dacBridge.getUac2HardwareVolume();
+    } catch (_) {
+      range = null;
+    }
+    if (!mounted) return;
+    setState(() {
+      _uac2Range = range;
+      _uac2Position = range == null
+          ? null
+          : _uac2PositionFrom(raw, range, status.hardwareVolumeDb);
+      _pendingUac2Position = null;
+    });
+  }
+
+  /// Normalises a bridge reading against [range].
+  ///
+  /// The bridge may answer with a 0…1 position or a raw 1/256 dB value. A
+  /// reading inside 0…1 is the position (a q8 gain of that magnitude would be
+  /// 0.004 dB, not a real set point); exactly 0 is ambiguous (0 dB is unity),
+  /// so it is resolved from the status snapshot and otherwise read as unity,
+  /// never as silence. When the bridge cannot read at all, the snapshot's dB
+  /// is the fallback: it is the same q8 scale and the same DAC.
+  double? _uac2PositionFrom(
+    num? raw,
+    ({int minQ8, int maxQ8}) range,
+    double? statusDb,
+  ) {
+    final span = range.maxQ8 - range.minQ8;
+    if (span <= 0) return null;
+    double fromQ8(double q8) => ((q8 - range.minQ8) / span).clamp(0.0, 1.0);
+    if (raw != null && raw.isFinite) {
+      final v = raw.toDouble();
+      if (v > 0.0 && v <= 1.0) return v;
+      if (v == 0.0 && statusDb != null && statusDb.isFinite) {
+        return fromQ8(statusDb * 256.0);
+      }
+      return fromQ8(v);
+    }
+    if (statusDb != null && statusDb.isFinite) {
+      return fromQ8(statusDb * 256.0);
+    }
+    return null;
+  }
+
   /// Persists a new request for this DAC. The platform still re-checks flags
   /// and feedback support when the stream is (re)started.
   Future<void> _onStreamModeChanged(UsbStreamMode mode) async {
@@ -178,6 +267,35 @@ class _UsbDacSectionState extends State<UsbDacSection> {
         getIt.isRegistered<PulsrAudioHandler>()) {
       getIt<PulsrAudioHandler>().syncVolumeFromExternalHardwareDb(
         db,
+        minDb: minDb,
+        maxDb: maxDb,
+      );
+    }
+    await _refresh();
+  }
+
+  /// Writes the DAC's own attenuator. The legacy service is deliberately not
+  /// used here: mixing a dB write into a 0…1 control would move the DAC to a
+  /// value the slider is not showing.
+  Future<void> _commitUac2Volume(double position) async {
+    final range = _uac2Range;
+    if (range == null || !widget.state.usbHardwareVolumeEnabled) return;
+    final previous = _uac2Position;
+    setState(() => _pendingUac2Position = null);
+    final applied = await _dacBridge.setUac2HardwareVolume(position);
+    if (!mounted) return;
+    if (!applied) {
+      // A rejected write must not leave the slider parked on a value the DAC
+      // never accepted.
+      setState(() => _uac2Position = previous);
+      return;
+    }
+    setState(() => _uac2Position = position);
+    final minDb = range.minQ8 / 256.0;
+    final maxDb = range.maxQ8 / 256.0;
+    if (getIt.isRegistered<PulsrAudioHandler>()) {
+      getIt<PulsrAudioHandler>().syncVolumeFromExternalHardwareDb(
+        minDb + position * (maxDb - minDb),
         minDb: minDb,
         maxDb: maxDb,
       );
@@ -238,7 +356,10 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     if (!_isAndroid || !_status.attached) return const SizedBox.shrink();
     final p = context.palette;
     final enabled = widget.state.usbHardwareVolumeEnabled;
-    final hasHwVolume = _status.hasVolumeControl;
+    final uac2Range = _uac2Range;
+    // A bridge-reported range proves a working attenuator even when the legacy
+    // status snapshot did not advertise one.
+    final hasHwVolume = _status.hasVolumeControl || uac2Range != null;
     final minDb = _status.minVolumeDb ?? -60.0;
     final maxDb = _status.maxVolumeDb ?? 0.0;
     final currentDb =
@@ -264,34 +385,9 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           Padding(
             padding: const EdgeInsetsDirectional.fromSTEB(
                 AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(context.l10n.hwVolume,
-                        style: Theme.of(context).textTheme.bodyMedium),
-                    Text('${currentDb.toStringAsFixed(1)} dB',
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                ),
-                Slider(
-                  value: currentDb,
-                  min: minDb,
-                  max: maxDb,
-                  onChanged: (enabled && hasHwVolume)
-                      ? (v) => setState(() => _pendingDb = v)
-                      : null,
-                  onChangeEnd: (enabled && hasHwVolume)
-                      ? (v) {
-                          _pendingDb = null;
-                          unawaited(_commitVolume(v));
-                        }
-                      : null,
-                ),
-              ],
-            ),
+            child: uac2Range != null
+                ? _buildUac2Volume(context)
+                : _buildDbVolume(context, currentDb, minDb, maxDb),
           ),
         SettingsSwitchTile(
           Icons.lock_rounded,
@@ -384,6 +480,87 @@ class _UsbDacSectionState extends State<UsbDacSection> {
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  /// Legacy dB slider, anchored on the DAC's reported range when it has one.
+  ///
+  /// This is the fallback only while [HiresDacBridge] reports no UAC2 range:
+  /// once the DAC states a range, the position control owns the write and this
+  /// assumed scale is never used.
+  Widget _buildDbVolume(
+    BuildContext context,
+    num currentDb,
+    double minDb,
+    double maxDb,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(context.l10n.hwVolume,
+                style: Theme.of(context).textTheme.bodyMedium),
+            Text('${currentDb.toStringAsFixed(1)} dB',
+                style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+        Slider(
+          value: currentDb.toDouble(),
+          min: minDb,
+          max: maxDb,
+          onChanged: (v) => setState(() => _pendingDb = v),
+          onChangeEnd: (v) {
+            _pendingDb = null;
+            unawaited(_commitVolume(v));
+          },
+        ),
+      ],
+    );
+  }
+
+  /// The DAC's own attenuator in its reported 0…1 position. No slider is shown
+  /// when the range exists but the current value cannot be read: a guessed
+  /// position is the failure this control exists to avoid.
+  Widget _buildUac2Volume(BuildContext context) {
+    final position = _pendingUac2Position ?? _uac2Position;
+    final textTheme = Theme.of(context).textTheme;
+    if (position == null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(context.l10n.settingsUac2VolumeTitle,
+              style: textTheme.bodyMedium),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(context.l10n.settingsUac2VolumeUnsupported,
+              style: textTheme.bodySmall),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(context.l10n.settingsUac2VolumeTitle,
+                style: textTheme.bodyMedium),
+            Text('${(position * 100).round()} %', style: textTheme.bodySmall),
+          ],
+        ),
+        Slider(
+          value: position.clamp(0.0, 1.0),
+          min: 0.0,
+          max: 1.0,
+          onChanged: (v) => setState(() => _pendingUac2Position = v),
+          onChangeEnd: (v) {
+            _pendingUac2Position = null;
+            unawaited(_commitUac2Volume(v));
+          },
+        ),
+        Text(context.l10n.settingsUac2VolumeDesc, style: textTheme.bodySmall),
       ],
     );
   }

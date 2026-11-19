@@ -36,10 +36,14 @@ void main() {
   late bool grantPermission;
   late bool refuseStreaming;
   final List<MethodCall> usbCalls = [];
+  final List<MethodCall> dacCalls = [];
   final List<bool> modeRequests = [];
+  Map<String, dynamic>? uac2Range;
+  Object? uac2Volume;
 
   const usbChannel = MethodChannel(PulsrChannels.usbExclusive);
   const usbEvents = MethodChannel(PulsrChannels.usbExclusiveEvents);
+  const hiresChannel = MethodChannel(PulsrChannels.hiresDac);
 
   Map<String, dynamic> attachedStatus({
     bool permitted = true,
@@ -102,11 +106,29 @@ void main() {
       }
     });
     messenger.setMockMethodCallHandler(usbEvents, (call) async => null);
+    // The DAC's own UAC2 attenuator lives on the hires_dac channel. Null
+    // answers keep every legacy test on the dB path it was written for.
+    messenger.setMockMethodCallHandler(hiresChannel, (call) async {
+      dacCalls.add(call);
+      switch (call.method) {
+        case 'getUac2VolumeRange':
+          return uac2Range;
+        case 'getUac2HardwareVolume':
+          return uac2Volume;
+        case 'setUac2HardwareVolume':
+          return true;
+        default:
+          return null;
+      }
+    });
   }
 
   setUp(() {
     stubSettingsChannels();
     usbCalls.clear();
+    dacCalls.clear();
+    uac2Range = null;
+    uac2Volume = null;
     hwVolumeCalls = [];
     grantPermission = true;
     refuseStreaming = false;
@@ -136,6 +158,7 @@ void main() {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(usbChannel, null);
     messenger.setMockMethodCallHandler(usbEvents, null);
+    messenger.setMockMethodCallHandler(hiresChannel, null);
   });
 
   Future<void> pump(WidgetTester tester, {SettingsState? state}) async {
@@ -206,6 +229,53 @@ void main() {
       isTrue,
       reason: 'releasing the slider must commit the hardware volume',
     );
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('a reported UAC2 range drives the DAC position slider',
+      (tester) async {
+    uac2Range = {'minQ8': -15360, 'maxQ8': 0};
+    uac2Volume = 0.5;
+    await pump(
+      tester,
+      state: const SettingsState(usbHardwareVolumeEnabled: true),
+    );
+
+    expect(find.text(l10n.settingsUac2VolumeTitle), findsOneWidget);
+    expect(find.text('50 %'), findsOneWidget);
+    expect(find.text(l10n.settingsUac2VolumeDesc), findsOneWidget);
+
+    await tester.drag(find.byType(Slider), const Offset(80, 0));
+    await tester.pump();
+
+    expect(
+      dacCalls.any((c) => c.method == 'setUac2HardwareVolume'),
+      isTrue,
+      reason: 'the position slider must write the DAC attenuator',
+    );
+    expect(
+      usbCalls.any((c) => c.method == 'setHardwareVolume'),
+      isFalse,
+      reason: 'a dB write would move the DAC off the shown position',
+    );
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('a range without a readable position shows no dead slider',
+      (tester) async {
+    uac2Range = {'minQ8': -15360, 'maxQ8': 0};
+    uac2Volume = null;
+    final noSnapshotDb = attachedStatus();
+    noSnapshotDb['hardwareVolumeDb'] = null;
+    status = noSnapshotDb;
+
+    await pump(
+      tester,
+      state: const SettingsState(usbHardwareVolumeEnabled: true),
+    );
+
+    // Neither an assumed -60 dB scale nor a guessed position is offered.
+    expect(find.byType(Slider), findsNothing);
+    expect(find.text(l10n.settingsUac2VolumeTitle), findsOneWidget);
+    expect(find.text(l10n.settingsUac2VolumeUnsupported), findsOneWidget);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('enabling without prior permission requests and persists',
