@@ -238,6 +238,51 @@ int main() {
               "full range: position 1 is 32767");
     }
 
+    // ---------------------------------------------------------------------
+    // 10. UAC CS_MUTE control requests, payloads, and per-channel read-back.
+    // ---------------------------------------------------------------------
+    {
+        Check(pulsr::kUacCsMute == 0x01, "kUacCsMute is 0x01");
+        Check(pulsr::kUacCsVolume == 0x02, "kUacCsVolume is 0x02");
+
+        // SET_CUR request for mute: bmRequestType = 0x21, bRequest = 0x01,
+        // wValue = (CS_MUTE << 8) | channel, wIndex = (unitId << 8) | interfaceNumber, wLength = 1
+        const auto setReq = pulsr::BuildUacMuteSetRequest(5, 1, 2);
+        Check(setReq.bmRequestType == 0x21, "SET_CUR bmRequestType is 0x21");
+        Check(setReq.bRequest == 0x01, "SET_CUR bRequest is 0x01");
+        Check(setReq.wValue == ((0x01 << 8) | 2), "SET_CUR wValue has CS_MUTE in high byte, ch 2 in low");
+        Check(setReq.wIndex == ((5 << 8) | 1), "SET_CUR wIndex has unitId 5 in high byte, iface 1 in low");
+        Check(setReq.wLength == 1, "SET_CUR wLength is 1 byte");
+
+        // GET_CUR request for mute in UAC2: bRequest = 0x01
+        const auto getReqUac2 = pulsr::BuildUacMuteGetRequest(5, 1, 0, 2);
+        Check(getReqUac2.bmRequestType == 0xA1, "GET_CUR bmRequestType is 0xA1");
+        Check(getReqUac2.bRequest == 0x01, "UAC2 GET_CUR bRequest is 0x01");
+        Check(getReqUac2.wValue == (0x01 << 8), "GET_CUR master channel wValue has ch 0 in low byte");
+        Check(getReqUac2.wLength == 1, "GET_CUR wLength is 1 byte");
+
+        // GET_CUR request for mute in UAC1: bRequest = 0x81
+        const auto getReqUac1 = pulsr::BuildUacMuteGetRequest(5, 1, 1, 1);
+        Check(getReqUac1.bRequest == 0x81, "UAC1 GET_CUR bRequest is 0x81");
+
+        // Payload encoding and decoding
+        Check(pulsr::EncodeUacMutePayload(true) == 0x01, "mute true encodes to 0x01");
+        Check(pulsr::EncodeUacMutePayload(false) == 0x00, "mute false encodes to 0x00");
+        Check(pulsr::DecodeUacMutePayload(0x01) == true, "0x01 decodes to mute true");
+        Check(pulsr::DecodeUacMutePayload(0xFF) == true, "non-zero decodes to mute true");
+        Check(pulsr::DecodeUacMutePayload(0x00) == false, "0x00 decodes to mute false");
+
+        // Per-channel read-back evaluation
+        const uint8_t bothMuted[] = {0x01, 0x01};
+        const uint8_t oneMuted[] = {0x01, 0x00};
+        const uint8_t noneMuted[] = {0x00, 0x00};
+        Check(pulsr::AllChannelsMuted(bothMuted, 2) == true, "all channels muted passes");
+        Check(pulsr::AllChannelsMuted(oneMuted, 2) == false, "mismatched channel mute fails");
+        Check(pulsr::AllChannelsMuted(noneMuted, 2) == false, "unmuted channels fail");
+        Check(pulsr::AllChannelsMuted(nullptr, 2) == false, "null pointer fails");
+        Check(pulsr::AllChannelsMuted(bothMuted, 0) == false, "zero channel count fails");
+    }
+
     if (gFailures == 0) {
         std::cout << "[TEST] UAC2 volume codec: all checks passed." << std::endl;
         return 0;

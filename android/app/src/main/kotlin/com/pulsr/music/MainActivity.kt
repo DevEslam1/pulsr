@@ -13,6 +13,7 @@ import android.os.PowerManager
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import android.view.KeyEvent
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -24,6 +25,20 @@ import org.jaudiotagger.tag.vorbiscomment.VorbisCommentTag
 import java.io.File
  
 class MainActivity : AudioServiceActivity() {
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (UsbExclusivePlugin.isHardwareVolumeActive()) {
+                if (event.action == KeyEvent.ACTION_DOWN) {
+                    val stepUp = keyCode == KeyEvent.KEYCODE_VOLUME_UP
+                    UsbExclusivePlugin.stepHardwareVolume(stepUp)
+                }
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     private val LYRICS_CHANNEL = "com.pulsr.music/lyrics"
     private val FILE_OPENER_CHANNEL = "com.pulsr.music/file_opener"
     private val ASSISTANT_CHANNEL = "com.pulsr.music/assistant"

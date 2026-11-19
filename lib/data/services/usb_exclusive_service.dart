@@ -56,6 +56,54 @@ enum UsbStreamResult {
   }
 }
 
+/// Probed UAC2 DSD alternate setting tuple.
+class DsdAltSettingTuple {
+  final int interfaceNumber;
+  final int altSetting;
+  final int endpointAddress;
+  final int channels;
+  final int bytesPerSample;
+  final int framesPerSecond;
+  final int dsdRate;
+
+  const DsdAltSettingTuple({
+    required this.interfaceNumber,
+    required this.altSetting,
+    required this.endpointAddress,
+    this.channels = 2,
+    this.bytesPerSample = 4,
+    required this.framesPerSecond,
+    required this.dsdRate,
+  });
+
+  factory DsdAltSettingTuple.fromList(List<dynamic> list) {
+    return DsdAltSettingTuple(
+      interfaceNumber: list[0] as int,
+      altSetting: list[1] as int,
+      endpointAddress: list[2] as int,
+      channels: list.length > 3 ? (list[3] as int) : 2,
+      bytesPerSample: list.length > 4 ? (list[4] as int) : 4,
+      framesPerSecond: list.length > 5 ? (list[5] as int) : 0,
+      dsdRate: list.length > 6 ? (list[6] as int) : 0,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+        'interfaceNumber': interfaceNumber,
+        'altSetting': altSetting,
+        'endpoint': endpointAddress,
+        'channels': channels,
+        'bytesPerSample': bytesPerSample,
+        'framesPerSecond': framesPerSecond,
+        'dsdRate': dsdRate,
+      };
+
+  @override
+  String toString() =>
+      'DsdAltSettingTuple(iface: $interfaceNumber, alt: $altSetting, ep: 0x${endpointAddress.toRadixString(16)}, '
+      'channels: $channels, bytes: $bytesPerSample, fps: $framesPerSecond, rate: DSD$dsdRate)';
+}
+
 /// Clock architecture actually in use for an active direct-USB stream.
 ///
 /// The native sink derives this from the data path, not from what the UI asked
@@ -811,6 +859,51 @@ class UsbExclusiveService {
           .invokeMethod<bool>('hasPcmFileSource')
           .timeout(const Duration(milliseconds: 500));
       return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Starts native DSD streaming with the probed alternate setting tuple.
+  Future<bool> startDsdStreaming(DsdAltSettingTuple tuple, {bool strict = true}) async {
+    if (!_isAndroid) return false;
+    try {
+      final res = await _methodChannel.invokeMapMethod<String, dynamic>(
+        'startDsdStreaming',
+        {
+          ...tuple.toMap(),
+          'strict': strict,
+        },
+      ).timeout(const Duration(seconds: 10));
+      return res?['success'] == true;
+    } catch (e, st) {
+      ErrorLogger.log('startDsdStreaming failed', error: e, stackTrace: st, category: 'UsbExclusive');
+      return false;
+    }
+  }
+
+  /// Writes one stereo 1-bit DSD block to the native DSD sink.
+  /// Returns false on backpressure (ring full) or if streaming is inactive.
+  Future<bool> writeDsd(Uint8List left, Uint8List right, {int producerId = 0}) async {
+    if (!_isAndroid) return false;
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('writeDsd', {
+        'left': left,
+        'right': right,
+        'producerId': producerId,
+      }).timeout(const Duration(seconds: 2));
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks whether native DSD streaming is active on the DAC.
+  Future<bool> isDsdActive() async {
+    if (!_isAndroid) return false;
+    try {
+      final res = await _methodChannel.invokeMethod<bool>('isDsdActive').timeout(const Duration(seconds: 2));
+      return res == true;
     } catch (_) {
       return false;
     }

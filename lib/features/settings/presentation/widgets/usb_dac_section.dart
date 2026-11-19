@@ -53,6 +53,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
   ({int minQ8, int maxQ8})? _uac2Range;
   double? _uac2Position;
   double? _pendingUac2Position;
+  bool? _uac2Muted;
   // (deviceId, hasVolumeControl): re-query only when the device or the
   // advertised control changes, not on every status tick.
   (int?, bool)? _uac2Key;
@@ -171,9 +172,13 @@ class _UsbDacSectionState extends State<UsbDacSection> {
   Future<void> _loadUac2Volume(UsbExclusiveStatus status) async {
     ({int minQ8, int maxQ8})? range;
     num? raw;
+    bool? muted;
     try {
       range = await _dacBridge.getUac2VolumeRange();
-      if (range != null) raw = await _dacBridge.getUac2HardwareVolume();
+      if (range != null) {
+        raw = await _dacBridge.getUac2HardwareVolume();
+        muted = await _dacBridge.getUac2HardwareMute();
+      }
     } catch (_) {
       range = null;
     }
@@ -184,7 +189,16 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           ? null
           : _uac2PositionFrom(raw, range, status.hardwareVolumeDb);
       _pendingUac2Position = null;
+      _uac2Muted = muted;
     });
+  }
+
+  Future<void> _toggleUac2Mute(bool muted) async {
+    final ok = await _dacBridge.setUac2HardwareMute(muted);
+    if (!mounted) return;
+    if (ok) {
+      setState(() => _uac2Muted = muted);
+    }
   }
 
   /// Normalises a bridge reading against [range].
@@ -547,7 +561,27 @@ class _UsbDacSectionState extends State<UsbDacSection> {
           children: [
             Text(context.l10n.settingsUac2VolumeTitle,
                 style: textTheme.bodyMedium),
-            Text('${(position * 100).round()} %', style: textTheme.bodySmall),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${(position * 100).round()} %', style: textTheme.bodySmall),
+                const SizedBox(width: AppSpacing.xs),
+                IconButton(
+                  icon: Icon(
+                    _uac2Muted == true
+                        ? Icons.volume_off_rounded
+                        : Icons.volume_up_rounded,
+                    size: 18,
+                    color: _uac2Muted == true ? Theme.of(context).colorScheme.error : null,
+                  ),
+                  tooltip: _uac2Muted == true ? 'Unmute DAC' : 'Mute DAC',
+                  onPressed: () => unawaited(_toggleUac2Mute(!(_uac2Muted == true))),
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
           ],
         ),
         Slider(

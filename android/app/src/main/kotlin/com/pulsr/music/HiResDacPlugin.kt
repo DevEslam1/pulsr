@@ -112,6 +112,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val nativeDsd: Boolean,
         val rates: List<Int>,
         val firstAltSetting: List<Int>?,
+        val altSettings: List<List<Int>> = emptyList(),
     )
 
     private val dsdProbeLock = Any()
@@ -584,6 +585,15 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         "setUac2HardwareVolume" -> {
             val position = call.argument<Double>("position") ?: 0.0
             UsbExclusivePlugin.setUac2HardwareVolume(position) { value ->
+                mainHandler.post { try { result.success(value) } catch (_: Throwable) {} }
+            }
+        }
+        "getUac2HardwareMute" -> UsbExclusivePlugin.uac2HardwareMute { value ->
+            mainHandler.post { try { result.success(value) } catch (_: Throwable) {} }
+        }
+        "setUac2HardwareMute" -> {
+            val muted = call.argument<Boolean>("muted") ?: false
+            UsbExclusivePlugin.setUac2HardwareMute(muted) { value ->
                 mainHandler.post { try { result.success(value) } catch (_: Throwable) {} }
             }
         }
@@ -1859,6 +1869,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     nativeDsd = true,
                     rates = tuples.map { it.dsdRate }.distinct().sorted(),
                     firstAltSetting = tuples.first().flattened,
+                    altSettings = tuples.map { it.flattened },
                 )
             }
             if (result.nativeDsd || !UsbExclusivePlugin.directStreamingActive) {
@@ -2041,6 +2052,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             "nativeDsd" to native.nativeDsd,
             "nativeDsdRates" to native.rates,
             "nativeDsdAltSetting" to native.firstAltSetting,
+            "nativeDsdAltSettings" to native.altSettings,
             "isUac2" to isUac2,
             "dopVerified" to dopVerified,
         )

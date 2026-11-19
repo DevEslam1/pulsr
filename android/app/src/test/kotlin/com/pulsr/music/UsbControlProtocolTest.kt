@@ -1055,4 +1055,37 @@ class UsbControlProtocolTest {
         assertEquals(listOf(2, 3), withHint.pinWrites)
         assertEquals(3, withHint.selectorPin)
     }
+
+    @Test fun uacControlRequestBuildersForMuteAndVolume() {
+        assertEquals(0x01, UsbAudioProtocol.CS_MUTE)
+        assertEquals(0x02, UsbAudioProtocol.CS_VOLUME)
+
+        // Mute SET_CUR: bmRequestType = 0x21, bRequest = 0x01, wValue = (CS_MUTE << 8) | ch, wLength = 1
+        val muteSet = UsbAudioProtocol.buildMuteRequest(write = true, unitId = 7, interfaceNumber = 1, channel = 2, uacVersion = 2)
+        assertEquals(0x21, muteSet.requestType)
+        assertEquals(0x01, muteSet.request)
+        assertEquals((0x01 shl 8) or 2, muteSet.value)
+        assertEquals((7 shl 8) or 1, muteSet.index)
+        assertEquals(1, muteSet.length)
+
+        // Mute GET_CUR UAC2: bmRequestType = 0xA1, bRequest = 0x01
+        val muteGetUac2 = UsbAudioProtocol.buildMuteRequest(write = false, unitId = 7, interfaceNumber = 1, channel = 0, uacVersion = 2)
+        assertEquals(0xA1, muteGetUac2.requestType)
+        assertEquals(0x01, muteGetUac2.request)
+        assertEquals(0x0100, muteGetUac2.value)
+        assertEquals((7 shl 8) or 1, muteGetUac2.index)
+        assertEquals(1, muteGetUac2.length)
+
+        // Mute GET_CUR UAC1: bmRequestType = 0xA1, bRequest = 0x81
+        val muteGetUac1 = UsbAudioProtocol.buildMuteRequest(write = false, unitId = 7, interfaceNumber = 1, channel = 1, uacVersion = 1)
+        assertEquals(0x81, muteGetUac1.request)
+
+        // Volume SET_CUR: wValue = (CS_VOLUME << 8) | ch, wLength = 2
+        val volSet = UsbAudioProtocol.buildVolumeRequest(write = true, unitId = 7, interfaceNumber = 1, channel = 1, uacVersion = 2)
+        assertEquals(0x21, volSet.requestType)
+        assertEquals(0x01, volSet.request)
+        assertEquals((0x02 shl 8) or 1, volSet.value)
+        assertEquals((7 shl 8) or 1, volSet.index)
+        assertEquals(2, volSet.length)
+    }
 }

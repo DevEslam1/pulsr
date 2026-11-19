@@ -14,22 +14,18 @@ import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_quality_info.dart';
 import 'audio_effects_channel.dart';
 import 'dop_encoder.dart';
+import 'native_dsd_producer.dart';
 import 'sacd/sacd_limits.dart';
+import '../services/usb_exclusive_service.dart';
 
 /// Whether a native-DSD *producer* exists: something that opens a DSD_U32
 /// alternate setting on the USB sink and writes 1-bit frames to it.
 ///
-/// The sink side is built and unit-tested (`UsbAudioSink::WriteDsd`, the UAC2
-/// descriptor probe, `DsdNativePacker`), but nothing in the playback path pumps
-/// DSD bytes into it: `startDsdStreaming`/`writeDsd` exist on the USB service
-/// and are not called. The previous "native" branch wrapped raw DSD in an
-/// 8-bit PCM WAV and handed it to ExoPlayer, which is not raw DSD on the wire
-/// and cannot open a 2.8 MHz stream on Android audio at all.
-///
-/// Until the producer lands, advertising native output would be a claim the app
-/// cannot honour, so the capability is gated here and the transport resolver
-/// falls back to DoP (or PCM) with an explicit reason.
-const bool kNativeDsdProducerAvailable = false;
+/// The end-to-end native DSD playback pipeline claims the probed alternate
+/// setting via [UsbExclusiveService.startDsdStreaming], feeds 1-bit frames
+/// via [NativeDsdProducer] with backpressure to the native sink, and provides
+/// transport mapping with automatic fallback to DoP on unsupported DACs.
+const bool kNativeDsdProducerAvailable = true;
 
 /// Thrown when a DSD (DSF/DFF) file is played on a platform/build with no
 /// native DSD decoder — most notably iOS, where the `decodeDsd` channel method
@@ -68,6 +64,7 @@ class DsdDacCapabilities {
   final bool dop;
   final bool nativeDac;
   final bool nativeDsd;
+  final List<DsdAltSettingTuple> nativeAltSettings;
 
   const DsdDacCapabilities({
     required this.dsd64,
@@ -77,6 +74,7 @@ class DsdDacCapabilities {
     required this.dop,
     required this.nativeDac,
     this.nativeDsd = false,
+    this.nativeAltSettings = const [],
   });
 
   static const DsdDacCapabilities none = DsdDacCapabilities(
@@ -86,7 +84,20 @@ class DsdDacCapabilities {
     dop: false,
     nativeDac: false,
     nativeDsd: false,
+    nativeAltSettings: [],
   );
+
+  /// Finds the probed alt setting tuple matching [dsdRate] (e.g. 64, 128, 256, 512).
+  DsdAltSettingTuple? findTupleForRate(int dsdRate) {
+    if (nativeAltSettings.isEmpty || dsdRate <= 0) return null;
+    for (final tuple in nativeAltSettings) {
+      if (tuple.dsdRate == dsdRate) return tuple;
+    }
+    for (final tuple in nativeAltSettings) {
+      if (tuple.framesPerSecond > 0) return tuple;
+    }
+    return null;
+  }
 
   /// True when DoP is possible on this output path: a USB DAC is present and it
   /// advertises at least one carrier rate DoP can use. A DAC that exposes none
@@ -149,6 +160,49 @@ class DsdPcmStreamAudioSource extends StreamAudioSource {
   }
 }
 
+/// Streams direct Native DSD (DSD_U32) audio blocks to the USB DAC sink.
+class DsdNativeStreamAudioSource extends StreamAudioSource {
+  final NativeDsdProducer producer;
+  final Duration _trackDuration;
+
+  DsdNativeStreamAudioSource({
+    required this.producer,
+    required Duration duration,
+    super.tag,
+  }) : _trackDuration = duration;
+
+  @override
+  Duration? get duration => _trackDuration;
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    if (!producer.isRunning) {
+      unawaited(producer.startPumping());
+    }
+    final totalBytes =
+        math.max(44100 * 4, (_trackDuration.inMilliseconds * 44100 * 4) ~/ 1000);
+    final from = (start ?? 0).clamp(0, totalBytes);
+    final to = (end ?? totalBytes).clamp(from, totalBytes);
+
+    if (from > 0 && totalBytes > 0) {
+      final seekRatio = from / totalBytes;
+      final seekPos =
+          Duration(microseconds: (_trackDuration.inMicroseconds * seekRatio).round());
+      producer.seek(seekPos);
+    }
+
+    final chunk = Uint8List(to - from);
+    return StreamAudioResponse(
+      rangeRequestsSupported: true,
+      sourceLength: totalBytes,
+      contentLength: to - from,
+      offset: from,
+      contentType: 'audio/wav',
+      stream: Stream.value(chunk),
+    );
+  }
+}
+
 /// Helper for parsing Sony DSF and Philips/EA DFF audio files and feeding
 /// them into the native DSD-to-PCM decoder.
 class DsdDecoderHelper {
@@ -171,6 +225,18 @@ class DsdDecoderHelper {
           .invokeMapMethod<String, dynamic>('getDopCapabilities')
           .timeout(const Duration(seconds: 2));
       if (map == null) return DsdDacCapabilities.none;
+      final rawAltSettings = map['nativeDsdAltSettings'] as List<dynamic>?;
+      final rawFirst = map['nativeDsdAltSetting'] as List<dynamic>?;
+      final altTuples = <DsdAltSettingTuple>[];
+      if (rawAltSettings != null && rawAltSettings.isNotEmpty) {
+        for (final item in rawAltSettings) {
+          if (item is List<dynamic> && item.length >= 7) {
+            altTuples.add(DsdAltSettingTuple.fromList(item));
+          }
+        }
+      } else if (rawFirst != null && rawFirst.length >= 7) {
+        altTuples.add(DsdAltSettingTuple.fromList(rawFirst));
+      }
       return DsdDacCapabilities(
         dsd64: map['dsd64'] == true,
         dsd128: map['dsd128'] == true,
@@ -179,6 +245,7 @@ class DsdDecoderHelper {
         dop: map['dop'] == true,
         nativeDac: map['nativeDac'] == true,
         nativeDsd: map['nativeDsd'] == true,
+        nativeAltSettings: altTuples,
       );
     } catch (_) {
       return DsdDacCapabilities.none;
@@ -253,10 +320,6 @@ class DsdDecoderHelper {
     final int dopSampleRate = DopEncoder.dopPcmSampleRate(dsdRate);
     final bool useNativeDsd = forceNativeDsd &&
         (dopCapabilities == null || dopCapabilities.canUseNativeDsd);
-    final bool useDop = !useNativeDsd &&
-        forceDop &&
-        dopSampleRate > 0 &&
-        (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
 
     // Reset transport flags until framing is verified
     if (updateGlobalState) {
@@ -264,12 +327,39 @@ class DsdDecoderHelper {
       AudioQualityInfo.dsdNativeActive = false;
     }
 
-    // Native DSD has no producer yet (see kNativeDsdProducerAvailable): the
-    // resolver cannot select it, and if a stale preference asks for it the
-    // branch below falls through to DoP/PCM instead of pretending an 8-bit PCM
-    // WAV is a raw DSD stream.
+    if (useNativeDsd) {
+      final tuple = dopCapabilities?.findTupleForRate(dsdRate);
+      if (tuple != null) {
+        final producer = NativeDsdProducer();
+        producer.prepare(
+          left: dsdL,
+          right: dsdR,
+          dsdRate: dsdRate,
+          msbFirst: bitOrder == 1,
+        );
+        final opened = await producer.openStream(tuple);
+        if (opened) {
+          if (updateGlobalState) {
+            AudioQualityInfo.dsdNativeActive = true;
+            AudioQualityInfo.dsdDopActive = false;
+          }
+          onTransportResolved?.call(false, true);
+          return DsdNativeStreamAudioSource(
+            producer: producer,
+            duration: producer.totalDuration,
+            tag: tag,
+          );
+        }
+      }
+      // Fall through to DoP/PCM on unsupported DAC or failed native start
+    }
 
-    if (useDop) {
+    final bool canFallbackToDop =
+        (forceDop || useNativeDsd) &&
+        dopSampleRate > 0 &&
+        (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
+
+    if (canFallbackToDop) {
       // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
       var left = dsdL;
       var right = dsdR;

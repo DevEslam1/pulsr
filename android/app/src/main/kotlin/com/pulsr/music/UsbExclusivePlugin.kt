@@ -123,6 +123,7 @@ class UsbExclusivePlugin(
         private const val DSD_PRODUCER_ID = 0x50554C53L  // "PULS"
 
         /** UAC2 class-specific control: CS_VOLUME in wValue's high byte. */
+        private const val UAC_CS_MUTE = 0x01
         private const val UAC_CS_VOLUME = 0x02
         private const val UAC_SET_CUR = 0x01
         private const val UAC_GET_CUR = 0x81
@@ -182,6 +183,23 @@ class UsbExclusivePlugin(
 
         internal fun setUac2HardwareVolume(position: Double, deliver: (Boolean) -> Unit) =
             dispatchToOwner(false, deliver) { it.setUac2HardwareVolumeInternal(position) }
+
+        internal fun uac2HardwareMute(deliver: (Boolean?) -> Unit) =
+            dispatchToOwner(null, deliver) { it.getUac2HardwareMuteInternal() }
+
+        internal fun setUac2HardwareMute(muted: Boolean, deliver: (Boolean) -> Unit) =
+            dispatchToOwner(false, deliver) { it.setUac2HardwareMuteInternal(muted) }
+
+        internal fun isHardwareVolumeActive(): Boolean {
+            val owner = probeHost ?: directOwner ?: return false
+            val device = owner.openedDevice ?: return false
+            if (owner.usbManager?.hasPermission(device) != true) return false
+            return (owner.hardwareVolume?.ready == true || owner.uac2RangeSnapshot != null)
+        }
+
+        internal fun stepHardwareVolume(stepUp: Boolean) {
+            dispatchToOwner(Unit, {}) { it.stepHardwareVolumeInternal(stepUp) }
+        }
 
         /** Runs [block] off the main thread and delivers its result back on it. */
         private fun <T> dispatchToOwner(
@@ -976,6 +994,13 @@ class UsbExclusivePlugin(
                 "setUac2HardwareVolume" -> {
                     val position = call.argument<Double>("position") ?: 0.0
                     runAsync(call.method, result) { setUac2HardwareVolumeInternal(position) }
+                }
+                "getUac2HardwareMute" -> runAsync(call.method, result) {
+                    getUac2HardwareMuteInternal()
+                }
+                "setUac2HardwareMute" -> {
+                    val muted = call.argument<Boolean>("muted") ?: false
+                    runAsync(call.method, result) { setUac2HardwareMuteInternal(muted) }
                 }
                 "resetChannelMismatchFrames" -> {
                     safeResetChannelMismatchFrames()
@@ -1834,11 +1859,22 @@ class UsbExclusivePlugin(
         interfaceNumber: Int,
         channel: Int,
         data: ByteArray,
+    ): Int = uac2TransferWithCs(conn, requestType, request, UAC_CS_VOLUME, unitId, interfaceNumber, channel, data)
+
+    private fun uac2TransferWithCs(
+        conn: UsbDeviceConnection,
+        requestType: Int,
+        request: Int,
+        controlSelector: Int,
+        unitId: Int,
+        interfaceNumber: Int,
+        channel: Int,
+        data: ByteArray,
     ): Int = try {
         conn.controlTransfer(
             requestType,
             request,
-            (UAC_CS_VOLUME shl 8) or channel,
+            (controlSelector shl 8) or channel,
             (unitId shl 8) or interfaceNumber,
             data,
             data.size,
@@ -2045,6 +2081,76 @@ class UsbExclusivePlugin(
         } catch (_: Throwable) {
             false
         }
+    }
+
+    private fun getUac2HardwareMuteInternal(): Boolean? {
+        return try {
+            val device = openedDevice ?: findAudioDevice() ?: return null
+            if (usbManager?.hasPermission(device) != true) return null
+            val conn = ensureConnection(device) ?: return null
+            val parsed = parsedResult ?: return null
+            val range = ensureUac2Range(conn, device, parsed) ?: return null
+            val channels = range.channels
+            if (channels.isEmpty()) return null
+            val req = if (parsed.uacVersion == 1) UAC_GET_CUR else 0x01
+            for (channel in channels) {
+                val data = ByteArray(1)
+                val ret = uac2TransferWithCs(conn, 0xA1, req, UAC_CS_MUTE, range.unitId, range.interfaceNumber, channel, data)
+                if (ret != 1) return null
+                if (data[0].toInt() == 0) return false
+            }
+            true
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun setUac2HardwareMuteInternal(muted: Boolean): Boolean {
+        return try {
+            val device = openedDevice ?: findAudioDevice() ?: return false
+            if (usbManager?.hasPermission(device) != true) return false
+            val conn = ensureConnection(device) ?: return false
+            val parsed = parsedResult ?: return false
+            val range = ensureUac2Range(conn, device, parsed) ?: return false
+            val channels = range.channels
+            if (channels.isEmpty()) return false
+            val payload = byteArrayOf(if (muted) 1.toByte() else 0.toByte())
+            for (channel in channels) {
+                val sent = uac2TransferWithCs(
+                    conn, 0x21, UAC_SET_CUR, UAC_CS_MUTE, range.unitId, range.interfaceNumber, channel, payload,
+                )
+                if (sent != payload.size) return false
+            }
+            val getReq = if (parsed.uacVersion == 1) UAC_GET_CUR else 0x01
+            val expected = if (muted) 1 else 0
+            for (channel in channels) {
+                val data = ByteArray(1)
+                val ret = uac2TransferWithCs(
+                    conn, 0xA1, getReq, UAC_CS_MUTE, range.unitId, range.interfaceNumber, channel, data,
+                )
+                if (ret != 1) return false
+                if ((data[0].toInt() and 0xFF) != expected) return false
+            }
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    private fun stepHardwareVolumeInternal(stepUp: Boolean) {
+        try {
+            val volume = hardwareVolume
+            if (volume != null && volume.ready) {
+                val cur = volume.currentDb ?: 0.0
+                val delta = if (stepUp) 1.0 else -1.0
+                applyHardwareVolumeDb(cur + delta)
+                return
+            }
+            val volMap = getUac2HardwareVolumeInternal()
+            val curPos = (volMap?.get("position") as? Number)?.toDouble() ?: 0.5
+            val delta = if (stepUp) 0.02 else -0.02
+            setUac2HardwareVolumeInternal((curPos + delta).coerceIn(0.0, 1.0))
+        } catch (_: Throwable) {}
     }
 
     // ---- native DSD (DSD_U32 over the isochronous OUT endpoint) ----

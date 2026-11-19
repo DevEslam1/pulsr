@@ -19,10 +19,10 @@
 // --------------------------------------------------------
 //   SET_CUR  bmRequestType = 0x21 (OUT | CLASS | INTERFACE)
 //            bRequest      = 0x01
-//            wValue        = (0x01 << 8) | channel   // volume
-//                            (0x02 << 8) | channel   // mute
-//            wIndex        = interface number (the AudioStreaming interface)
-//   GET_CUR  bmRequestType = 0xA1, bRequest = 0x81
+//            wValue        = (0x01 << 8) | channel   // mute (CS_MUTE = 0x01)
+//                            (0x02 << 8) | channel   // volume (CS_VOLUME = 0x02)
+//            wIndex        = entity ID in high byte | interface number in low byte
+//   GET_CUR  bmRequestType = 0xA1, bRequest = 0x01 (UAC2) or 0x81 (UAC1)
 //   GET_MIN  bmRequestType = 0xA1, bRequest = 0x82
 //   GET_MAX  bmRequestType = 0xA1, bRequest = 0x83
 //   GET_RES  bmRequestType = 0xA1, bRequest = 0x84
@@ -38,9 +38,38 @@
 #ifndef PULSR_UAC2_VOLUME_H_
 #define PULSR_UAC2_VOLUME_H_
 
+#include <cstddef>
 #include <cstdint>
 
 namespace pulsr {
+
+/// UAC Feature Unit Control Selectors
+constexpr uint8_t kUacCsMute = 0x01;
+constexpr uint8_t kUacCsVolume = 0x02;
+
+/// Standard USB Control Transfer Request layout.
+struct UacControlRequest {
+    uint8_t bmRequestType = 0;
+    uint8_t bRequest = 0;
+    uint16_t wValue = 0;
+    uint16_t wIndex = 0;
+    uint16_t wLength = 0;
+};
+
+/// Builds a SET_CUR control request for the Feature Unit CS_MUTE control.
+UacControlRequest BuildUacMuteSetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel);
+
+/// Builds a GET_CUR control request for the Feature Unit CS_MUTE control.
+UacControlRequest BuildUacMuteGetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel, int uacVersion = 2);
+
+/// Encodes a boolean mute state into the single-byte payload (0x01 = muted, 0x00 = unmuted).
+uint8_t EncodeUacMutePayload(bool muted);
+
+/// Decodes the single-byte mute payload (non-zero = muted).
+bool DecodeUacMutePayload(uint8_t payload);
+
+/// Evaluates per-channel mute readbacks. Returns true only if count > 0 and all channel bytes decode to muted.
+bool AllChannelsMuted(const uint8_t* channelBytes, size_t count);
 
 /// A device's volume range as reported by GET_MIN / GET_MAX / GET_RES, in
 /// 1/256 dB units.

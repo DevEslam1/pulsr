@@ -61,7 +61,7 @@
 | Highest PCM rate | 768000 Hz |
 | USB wire formats | s16_le / s24_3le / s32_le |
 | AAudio encodings | int16 / float / i24_packed / int32 |
-| Native DSD producer | not available |
+| Native DSD producer | available |
 <!-- END GENERATED CAPABILITY MATRIX -->
 
 ---

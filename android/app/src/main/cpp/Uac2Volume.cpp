@@ -15,6 +15,42 @@ constexpr int kQ8Max = 32767;
 
 }  // namespace
 
+UacControlRequest BuildUacMuteSetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel) {
+    UacControlRequest req;
+    req.bmRequestType = 0x21;  // Host to device | Class | Interface
+    req.bRequest = 0x01;       // UAC_SET_CUR
+    req.wValue = static_cast<uint16_t>((static_cast<uint16_t>(kUacCsMute) << 8) | channel);
+    req.wIndex = static_cast<uint16_t>((static_cast<uint16_t>(unitId) << 8) | interfaceNumber);
+    req.wLength = 1;
+    return req;
+}
+
+UacControlRequest BuildUacMuteGetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel, int uacVersion) {
+    UacControlRequest req;
+    req.bmRequestType = 0xA1;  // Device to host | Class | Interface
+    req.bRequest = (uacVersion == 1) ? 0x81 : 0x01;  // UAC1: 0x81, UAC2: 0x01
+    req.wValue = static_cast<uint16_t>((static_cast<uint16_t>(kUacCsMute) << 8) | channel);
+    req.wIndex = static_cast<uint16_t>((static_cast<uint16_t>(unitId) << 8) | interfaceNumber);
+    req.wLength = 1;
+    return req;
+}
+
+uint8_t EncodeUacMutePayload(bool muted) {
+    return muted ? 0x01 : 0x00;
+}
+
+bool DecodeUacMutePayload(uint8_t payload) {
+    return payload != 0x00;
+}
+
+bool AllChannelsMuted(const uint8_t* channelBytes, size_t count) {
+    if (channelBytes == nullptr || count == 0) return false;
+    for (size_t i = 0; i < count; ++i) {
+        if (!DecodeUacMutePayload(channelBytes[i])) return false;
+    }
+    return true;
+}
+
 int16_t Uac2VolumeToQ8(double db) {
     if (std::isnan(db)) return 0;
     const double scaled = db * kQ8PerDb;

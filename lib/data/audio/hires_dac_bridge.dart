@@ -95,4 +95,31 @@ class HiresDacBridge {
       return false;
     }
   }
+
+  /// Current hardware mute state, or null when unavailable.
+  Future<bool?> getUac2HardwareMute() async {
+    if (!PlatformCapabilities.isAndroid) return null;
+    try {
+      final res = await _channel
+          .invokeMethod<dynamic>('getUac2HardwareMute')
+          .timeout(const Duration(seconds: 2));
+      if (res is bool) return res;
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Sets hardware mute state (true = muted, false = unmuted).
+  Future<bool> setUac2HardwareMute(bool muted) async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    try {
+      final res = await _channel.invokeMethod<dynamic>(
+          'setUac2HardwareMute', {'muted': muted}).timeout(
+          const Duration(seconds: 3));
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

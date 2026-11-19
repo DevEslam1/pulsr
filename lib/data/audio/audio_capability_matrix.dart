@@ -192,7 +192,7 @@ class AudioCapabilityMatrix {
       'int32': 4,
     },
     maxDsdBufferBytes: 8388608,
-    nativeDsdProducerAvailable: false,
+    nativeDsdProducerAvailable: true,
   );
 
   /// Markdown block embedded in `docs/FEATURE_MATRIX.md`.

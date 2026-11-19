@@ -215,11 +215,10 @@ void main() {
         nativeDac: true,
         nativeDsd: true,
       );
-      // The DAC half is proven, but this build has no producer that opens a
-      // DSD stream and feeds the sink, so advertising native output would be a
-      // claim the app cannot honour. DoP/PCM remain available.
-      expect(kNativeDsdProducerAvailable, isFalse);
-      expect(nativeCapable.canUseNativeDsd, isFalse);
+      // The DAC half is proven, and now NativeDsdProducer is wired end-to-end
+      // to open the UAC2 DSD alt setting and pump DSD_U32 frames.
+      expect(kNativeDsdProducerAvailable, isTrue);
+      expect(nativeCapable.canUseNativeDsd, isTrue);
 
       const dacWithoutNative = DsdDacCapabilities(
         dsd64: true,
