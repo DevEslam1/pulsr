@@ -334,9 +334,15 @@ void main() {
         gate.complete(true);
         expect(await change, isTrue);
         expect(rig.calls, ['mixer:false', 'usb:start']);
-        expect(rig.starts.single, {
-          'sampleRate': 96000, 'bitDepth': 32, 'channels': 1, 'strict': strict,
-        });
+        // `renderMode` is resolved from the attached DAC and is orthogonal to
+        // the source-format contract this test pins; assert its shape rather
+        // than an enum value the rig never negotiates.
+        final startArgs = rig.starts.single;
+        expect(startArgs['sampleRate'], 96000);
+        expect(startArgs['bitDepth'], 32);
+        expect(startArgs['channels'], 1);
+        expect(startArgs['strict'], strict);
+        expect(startArgs['renderMode'], isA<int>());
         expect(cubit.bitPerfectViaDirectStream, isTrue);
         expect(cubit.state.bitPerfectOutput, isTrue);
       });
