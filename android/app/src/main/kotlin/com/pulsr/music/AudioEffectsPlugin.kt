@@ -2790,7 +2790,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "awaitDspControlUpdates",
                 "setReverbCrossChannel", "loadImpulseResponse", "setCacheBudgetBytes",
                 "getAutoDegradedStages", "setStereoBalance", "setMonoMix",
-                "setSincResamplerEnabled",
+                "setSincResamplerEnabled", "setTapSrcQuality", "getTapSrcQuality",
                 "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
                 "setDacVoicingEnabled", "setDacVoicingParams",
                 "setStereoWidthEnabled", "setStereoWidthParams",
