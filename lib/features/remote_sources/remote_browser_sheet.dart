@@ -32,7 +32,7 @@ class RemoteBrowserSheet extends StatefulWidget {
   final RemoteFsProvider provider;
 
   /// Invoked when the user taps a file.
-  final Future<void> Function(RemoteSource source, String path)? onPlay;
+  final Future<void> Function(RemoteSource source, RemoteEntry entry)? onPlay;
 
   @override
   State<RemoteBrowserSheet> createState() => _RemoteBrowserSheetState();
@@ -40,6 +40,9 @@ class RemoteBrowserSheet extends StatefulWidget {
 
 class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   String _path = '';
+  final List<_Crumb> _crumbs = <_Crumb>[
+    const _Crumb('', RemoteSourcesStrings.rootCrumb),
+  ];
   List<RemoteEntry> _entries = const [];
   bool _loading = true;
   String? _error;
@@ -51,9 +54,10 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
     _load('');
   }
 
-  Future<void> _load(String path) async {
+  Future<void> _load(String path, {String? label}) async {
     setState(() {
       _path = path;
+      _updateCrumbs(path, label);
       _loading = true;
       _error = null;
       _playError = null;
@@ -96,6 +100,25 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
     }
   }
 
+  /// Keeps the breadcrumb in step with [_path].
+  ///
+  /// Jumping to an ancestor truncates the trail; entering a folder appends the
+  /// entry's own name, so a provider whose paths are opaque ids (Subsonic,
+  /// UPnP) still shows readable breadcrumbs. A refresh of the current path
+  /// leaves the trail untouched.
+  void _updateCrumbs(String path, String? label) {
+    final index = _crumbs.indexWhere((crumb) => crumb.path == path);
+    if (index >= 0) {
+      _crumbs.removeRange(index + 1, _crumbs.length);
+      return;
+    }
+    if (label != null) {
+      _crumbs.add(_Crumb(path, label));
+      return;
+    }
+    _crumbs.add(_Crumb(path, path.split('/').last));
+  }
+
   Future<void> _play(RemoteEntry entry) async {
     final onPlay = widget.onPlay;
     if (onPlay == null) {
@@ -103,7 +126,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
       return;
     }
     try {
-      await onPlay(widget.source, entry.path);
+      await onPlay(widget.source, entry);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on AppError catch (e, st) {
@@ -166,7 +189,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                 ],
               ),
             ),
-            _Breadcrumbs(path: _path, onNavigate: _loading ? null : _load),
+            _Breadcrumbs(crumbs: _crumbs, onNavigate: _loading ? null : _load),
             const Divider(height: 1),
             Expanded(child: _buildBody()),
           ],
@@ -211,8 +234,9 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
               final entry = entries[index];
               return _EntryTile(
                 entry: entry,
-                onTap: () =>
-                    entry.isDirectory ? _load(entry.path) : _play(entry),
+                onTap: () => entry.isDirectory
+                    ? _load(entry.path, label: entry.name)
+                    : _play(entry),
               );
             },
           ),
@@ -255,41 +279,48 @@ class _EntryTile extends StatelessWidget {
 }
 
 class _Breadcrumbs extends StatelessWidget {
-  const _Breadcrumbs({required this.path, required this.onNavigate});
+  const _Breadcrumbs({required this.crumbs, required this.onNavigate});
 
-  final String path;
+  final List<_Crumb> crumbs;
   final ValueChanged<String>? onNavigate;
 
   @override
   Widget build(BuildContext context) {
-    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
     final palette = context.palette;
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 12, 8),
       child: Row(
         children: [
-          TextButton(
-            onPressed: onNavigate == null ? null : () => onNavigate!(''),
-            child: const Text(RemoteSourcesStrings.rootCrumb),
-          ),
-          for (var index = 0; index < segments.length; index++) ...[
-            Icon(
-              Icons.chevron_right,
-              size: 18,
-              color: palette.textTertiary,
-            ),
+          for (var index = 0; index < crumbs.length; index++) ...[
+            if (index > 0)
+              Icon(
+                Icons.chevron_right,
+                size: 18,
+                color: palette.textTertiary,
+              ),
             TextButton(
               onPressed: onNavigate == null
                   ? null
-                  : () => onNavigate!(segments.take(index + 1).join('/')),
-              child: Text(segments[index]),
+                  : () => onNavigate!(crumbs[index].path),
+              child: Text(crumbs[index].label),
             ),
           ],
         ],
       ),
     );
   }
+}
+
+/// One breadcrumb stop: the path to open and the label to show.
+class _Crumb {
+  const _Crumb(this.path, this.label);
+
+  /// Provider-relative path to navigate to.
+  final String path;
+
+  /// Display label (an entry name, not necessarily a path segment).
+  final String label;
 }
 
 class _ErrorState extends StatelessWidget {

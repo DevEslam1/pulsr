@@ -140,4 +140,109 @@ void main() {
       );
     });
   });
+
+  group('UpnpServerDescription.parse', () {
+    const mediaServer = '<?xml version="1.0"?>'
+        '<root xmlns="urn:schemas-upnp-org:device-1-0">'
+        '<URLBase>http://192.168.1.5:8200/</URLBase>'
+        '<device>'
+        '<deviceType>urn:schemas-upnp-org:device:MediaServer:1</deviceType>'
+        '<friendlyName>Living room NAS</friendlyName>'
+        '<manufacturer>Synology</manufacturer>'
+        '<modelName>DS220+</modelName>'
+        '<UDN>uuid:nas-1</UDN>'
+        '<serviceList><service>'
+        '<serviceType>urn:schemas-upnp-org:service:ContentDirectory:1'
+        '</serviceType>'
+        '<serviceId>urn:upnp-org:serviceId:ContentDirectory</serviceId>'
+        '<controlURL>/ctl/ContentDir</controlURL>'
+        '</service></serviceList>'
+        '</device></root>';
+
+    test('reads the ContentDirectory control URL', () {
+      final server = UpnpServerDescription.parse(
+        mediaServer,
+        location: Uri.parse('http://192.168.1.5:8200/desc.xml'),
+      );
+
+      expect(server.friendlyName, 'Living room NAS');
+      expect(server.manufacturer, 'Synology');
+      expect(server.modelName, 'DS220+');
+      expect(server.udn, 'uuid:nas-1');
+      expect(server.isMediaServer, isTrue);
+      expect(server.identity, 'uuid:nas-1');
+      expect(
+        server.contentDirectoryControlUrl,
+        Uri.parse('http://192.168.1.5:8200/ctl/ContentDir'),
+      );
+    });
+
+    test('resolves a relative control URL against the location', () {
+      const xml = '<root><device><friendlyName>Mini</friendlyName>'
+          '<serviceList><service>'
+          '<serviceType>urn:schemas-upnp-org:service:ContentDirectory:2'
+          '</serviceType>'
+          '<controlURL>upnp/control/cds</controlURL>'
+          '</service></serviceList></device></root>';
+
+      final server = UpnpServerDescription.parse(
+        xml,
+        location: Uri.parse('http://10.0.0.9:49152/description.xml'),
+      );
+
+      expect(
+        server.contentDirectoryControlUrl,
+        Uri.parse('http://10.0.0.9:49152/upnp/control/cds'),
+      );
+      expect(server.isMediaServer, isFalse);
+    });
+
+    test('rejects a renderer description without ContentDirectory', () {
+      expect(
+        () => UpnpServerDescription.parse(
+          _namespacedDescription,
+          location: Uri.parse('http://192.168.1.10:49152/description.xml'),
+        ),
+        throwsA(
+          isA<UpnpParseError>().having(
+            (error) => error.code,
+            'code',
+            'DLNA_CONTENT_DIRECTORY',
+          ),
+        ),
+      );
+    });
+
+    test('leaves the renderer parser unchanged for a media server', () {
+      expect(
+        () => UpnpDeviceDescription.parse(
+          mediaServer,
+          location: Uri.parse('http://192.168.1.5:8200/desc.xml'),
+        ),
+        throwsA(
+          isA<UpnpParseError>().having(
+            (error) => error.code,
+            'code',
+            'DLNA_CONTROL_URL',
+          ),
+        ),
+      );
+    });
+
+    test('rejects an empty description', () {
+      expect(
+        () => UpnpServerDescription.parse(
+          '   ',
+          location: Uri.parse('http://192.168.1.5/desc.xml'),
+        ),
+        throwsA(
+          isA<UpnpParseError>().having(
+            (error) => error.code,
+            'code',
+            'DLNA_EMPTY_DESCRIPTION',
+          ),
+        ),
+      );
+    });
+  });
 }

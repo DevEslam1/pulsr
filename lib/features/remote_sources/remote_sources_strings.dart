@@ -49,6 +49,10 @@ abstract final class RemoteSourcesStrings {
   static const String usernameLabel = 'Username';
   static const String passwordLabel = 'Password';
   static const String passwordKeepHint = 'Leave empty to keep the saved one';
+  static const String subsonicUrlLabel = 'Server URL';
+  static const String subsonicUrlHint = 'https://music.example.com';
+  static const String subsonicUrlInvalid =
+      'Enter the full server URL, for example https://music.example.com.';
   static const String cancel = 'Cancel';
   static const String save = 'Save';
   static const String saveFailed = 'The source could not be saved.';
@@ -85,6 +89,18 @@ abstract final class RemoteSourcesStrings {
   static const String cacheCleared = 'Cached audio deleted.';
   static const String calculating = 'Calculating…';
 
+  // UPnP discovery.
+  static const String upnpTitle = 'UPnP media servers';
+  static const String upnpIntro =
+      'Find a DLNA media server on this network and browse it here.';
+  static const String upnpSearch = 'Search for servers';
+  static const String upnpSearching = 'Searching for media servers…';
+  static const String upnpNone = 'No media server found';
+  static const String upnpUse = 'Use this server';
+  static const String upnpFailed =
+      'Media servers could not be discovered. Check that this device is on '
+      'the same network.';
+
   // Delete.
   static const String deleteTitle = 'Delete this source?';
   static const String deleteBody =
@@ -99,6 +115,10 @@ abstract final class RemoteSourcesStrings {
         return 'FTP';
       case RemoteSourceKind.smb:
         return 'SMB';
+      case RemoteSourceKind.subsonic:
+        return 'Subsonic / Navidrome';
+      case RemoteSourceKind.upnp:
+        return 'UPnP';
     }
   }
 
@@ -111,6 +131,10 @@ abstract final class RemoteSourcesStrings {
         return 'Plain FTP servers and routers';
       case RemoteSourceKind.smb:
         return 'Windows shares and Samba (Android only)';
+      case RemoteSourceKind.subsonic:
+        return 'Navidrome, Airsonic, Gonic and other Subsonic servers';
+      case RemoteSourceKind.upnp:
+        return 'DLNA media servers discovered on your network';
     }
   }
 

@@ -15,6 +15,7 @@ import '../../core/utils/error_logger.dart';
 import '../../core/widgets/pulsr_progress.dart';
 import '../../domain/interfaces/remote_fs_provider.dart';
 import '../../domain/models/remote_source.dart';
+import '../dlna/upnp_device.dart';
 import 'remote_browser_sheet.dart';
 import 'remote_cache_store.dart';
 import 'remote_credentials_store.dart';
@@ -22,15 +23,15 @@ import 'remote_provider_factory.dart';
 import 'remote_source_editor.dart';
 import 'remote_source_store.dart';
 import 'remote_sources_strings.dart';
+import 'upnp_server_picker_sheet.dart';
 
 /// Manages network libraries and browses them.
 class RemoteSourcesScreen extends StatefulWidget {
   /// Creates the screen.
   ///
-  /// [onPlay] receives the source and the provider-relative path of the file
-  /// the user tapped; the host is expected to make it playable (typically by
-  /// registering a provider with `RemoteStreamServer` and opening
-  /// `uriFor(source, path)`).
+  /// [onPlay] receives the source and the entry the user tapped; the host is
+  /// expected to make it playable (typically by registering a provider with
+  /// `RemoteStreamServer` and opening `uriFor(source, entry.path)`).
   const RemoteSourcesScreen({
     super.key,
     this.onPlay,
@@ -41,7 +42,7 @@ class RemoteSourcesScreen extends StatefulWidget {
   });
 
   /// Called when a file is tapped in the browser.
-  final Future<void> Function(RemoteSource source, String path)? onPlay;
+  final Future<void> Function(RemoteSource source, RemoteEntry entry)? onPlay;
 
   /// Source list storage; defaults to a new [RemoteSourceStore].
   final RemoteSourceStore? store;
@@ -327,6 +328,62 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
     }
   }
 
+  Future<void> _discoverUpnp() async {
+    final server = await showModalBottomSheet<UpnpServerDescription>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: context.palette.surfaceContainer,
+      builder: (context) => const UpnpServerPickerSheet(),
+    );
+    if (server == null || !mounted) return;
+
+    final controlUrl = server.contentDirectoryControlUrl;
+    late final RemoteSource source;
+    try {
+      source = RemoteSource.create(
+        kind: RemoteSourceKind.upnp,
+        displayName: server.friendlyName,
+        host: controlUrl.host,
+        port: controlUrl.hasPort
+            ? controlUrl.port
+            : (controlUrl.scheme == 'https' ? 443 : 80),
+        // A UPnP library has no filesystem root: the record stores the
+        // ContentDirectory control path, which is all the provider needs to
+        // rebuild the control URL after a restart.
+        rootPath: controlUrl.path.isEmpty ? '/' : controlUrl.path,
+        useTls: controlUrl.scheme == 'https',
+      );
+    } on ArgumentError catch (e, st) {
+      ErrorLogger.log(
+        'Discovered UPnP server was rejected',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+      );
+      _notify(RemoteSourcesStrings.saveFailed);
+      return;
+    }
+    try {
+      await _store.add(source);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Discovered UPnP server could not be saved',
+        error: e,
+        stackTrace: st,
+        category: 'RemoteSources',
+      );
+      _notify(RemoteSourcesStrings.saveFailed);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _sources = _store.list;
+      _status.remove(source.id);
+    });
+    await _browse(source);
+  }
+
   Future<void> _reloadCacheBytes() async {
     final bytes = await _cache.currentBytes();
     if (!mounted) return;
@@ -405,6 +462,8 @@ class _RemoteSourcesScreenState extends State<RemoteSourcesScreen> {
           ),
         ],
         const SizedBox(height: 16),
+        _UpnpCard(onSearch: _discoverUpnp),
+        const SizedBox(height: 12),
         if (_sources.isEmpty)
           _EmptyState(onAdd: _addSource)
         else
@@ -464,12 +523,7 @@ class _SourceCard extends StatelessWidget {
         onTap: onBrowse,
         contentPadding:
             const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
-        leading: Icon(
-          source.kind == RemoteSourceKind.smb
-              ? Icons.dns_outlined
-              : Icons.cloud_outlined,
-          color: palette.accent,
-        ),
+        leading: Icon(_iconFor(source.kind), color: palette.accent),
         title: Text(
           source.displayName,
           maxLines: 1,
@@ -528,12 +582,15 @@ class _SourceCard extends StatelessWidget {
                     onDelete();
                 }
               },
-              itemBuilder: (context) => const [
-                PopupMenuItem<_SourceAction>(
-                  value: _SourceAction.edit,
-                  child: Text(RemoteSourcesStrings.editSource),
-                ),
-                PopupMenuItem<_SourceAction>(
+              itemBuilder: (context) => [
+                // A discovered server has no hand-editable fields: its name,
+                // address and control path all come from the description.
+                if (!source.kind.isDiscovered)
+                  const PopupMenuItem<_SourceAction>(
+                    value: _SourceAction.edit,
+                    child: Text(RemoteSourcesStrings.editSource),
+                  ),
+                const PopupMenuItem<_SourceAction>(
                   value: _SourceAction.delete,
                   child: Text(RemoteSourcesStrings.deleteSource),
                 ),
@@ -543,6 +600,19 @@ class _SourceCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static IconData _iconFor(RemoteSourceKind kind) {
+    switch (kind) {
+      case RemoteSourceKind.webdav:
+      case RemoteSourceKind.ftp:
+      case RemoteSourceKind.subsonic:
+        return Icons.cloud_outlined;
+      case RemoteSourceKind.smb:
+        return Icons.dns_outlined;
+      case RemoteSourceKind.upnp:
+        return Icons.lan_outlined;
+    }
   }
 
   String _statusText() {
@@ -609,7 +679,6 @@ class _CacheCard extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onAdd});
-
   final VoidCallback onAdd;
 
   @override
@@ -641,6 +710,38 @@ class _EmptyState extends StatelessWidget {
             label: const Text(RemoteSourcesStrings.addSource),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _UpnpCard extends StatelessWidget {
+  const _UpnpCard({required this.onSearch});
+
+  final VoidCallback onSearch;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Card(
+      child: ListTile(
+        contentPadding:
+            const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
+        leading: Icon(Icons.lan_outlined, color: palette.accent),
+        title: const Text(RemoteSourcesStrings.upnpTitle),
+        subtitle: Text(
+          RemoteSourcesStrings.upnpIntro,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: palette.textSecondary),
+        ),
+        trailing: IconButton(
+          tooltip: RemoteSourcesStrings.upnpSearch,
+          onPressed: onSearch,
+          icon: const Icon(Icons.search),
+        ),
+        onTap: onSearch,
       ),
     );
   }

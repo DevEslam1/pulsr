@@ -59,10 +59,11 @@ class SsdpClient {
   /// SSDP discovery port.
   static const int multicastPort = 1900;
 
-  /// Search targets sent by [search]: renderer-specific first, then `ssdp:all`
-  /// so devices that under-report their device type still answer.
+  /// Search targets sent by [search]: renderer- and server-specific first, then
+  /// `ssdp:all` so devices that under-report their device type still answer.
   static const List<String> searchTargets = <String>[
     'urn:schemas-upnp-org:device:MediaRenderer:1',
+    'urn:schemas-upnp-org:device:MediaServer:1',
     'ssdp:all',
   ];
 

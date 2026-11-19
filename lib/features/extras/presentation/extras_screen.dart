@@ -388,10 +388,10 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
     }
   }
 
-  /// Serves [path] from [source] through the loopback proxy and hands the HTTP
+  /// Serves [entry] from [source] through the loopback proxy and hands the HTTP
   /// URI to the player. The provider is owned by the stream server so its
   /// connection is reused for seeks instead of reopened per range request.
-  Future<void> _playRemoteFile(RemoteSource source, String path) async {
+  Future<void> _playRemoteFile(RemoteSource source, RemoteEntry entry) async {
     try {
       final runtime = _remoteRuntime ??
           (getIt.isRegistered<RemotePlaybackRuntime>()
@@ -400,8 +400,8 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
       if (runtime == null) {
         throw StateError('Network library server is not running');
       }
-      final uri = await runtime.prepareUri(source, path);
-      final name = path.split('/').last;
+      final uri = await runtime.prepareUri(source, entry.path);
+      final name = entry.name;
       final song = SongsTableData(
         id: -DateTime.now().millisecondsSinceEpoch,
         title: name.isEmpty ? source.displayName : name,

@@ -243,10 +243,18 @@ void main() {
           'http://192.168.1.21:49152/description.xml',
         },
       );
-      expect(socket.sent, hasLength(2));
+      expect(socket.sent, hasLength(SsdpClient.searchTargets.length));
       expect(socket.sent[0], contains('M-SEARCH * HTTP/1.1'));
-      expect(socket.sent[0], contains('ST: ${SsdpClient.searchTargets[0]}'));
-      expect(socket.sent[1], contains('ST: ${SsdpClient.searchTargets[1]}'));
+      for (var index = 0; index < SsdpClient.searchTargets.length; index++) {
+        expect(
+          socket.sent[index],
+          contains('ST: ${SsdpClient.searchTargets[index]}'),
+        );
+      }
+      expect(
+        SsdpClient.searchTargets,
+        contains('urn:schemas-upnp-org:device:MediaServer:1'),
+      );
       expect(socket.sent[0], contains('HOST: 239.255.255.250:1900'));
       expect(socket.sent[0], contains('MAN: "ssdp:discover"'));
       expect(socket.closed, isTrue);

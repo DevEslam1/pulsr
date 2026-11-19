@@ -78,12 +78,16 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
   late final TextEditingController _root;
   late final TextEditingController _username;
   late final TextEditingController _password;
+  late final TextEditingController _subsonicUrl;
 
   String? _hostError;
   String? _portError;
   String? _rootError;
+  String? _subsonicUrlError;
 
   bool get _isEditing => widget.initial != null;
+
+  bool get _isSubsonic => _kind == RemoteSourceKind.subsonic;
 
   @override
   void initState() {
@@ -101,6 +105,9 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
       text: widget.initialUsername ?? initial?.username ?? '',
     );
     _password = TextEditingController();
+    _subsonicUrl = TextEditingController(
+      text: initial == null ? '' : _serverUrlFor(initial),
+    );
   }
 
   @override
@@ -111,6 +118,7 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
     _root.dispose();
     _username.dispose();
     _password.dispose();
+    _subsonicUrl.dispose();
     super.dispose();
   }
 
@@ -123,10 +131,27 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
         _port.text = '${kind.defaultPort}';
       }
       _rootError = null;
+      _subsonicUrlError = null;
+      if (kind == RemoteSourceKind.subsonic &&
+          _subsonicUrl.text.trim().isEmpty) {
+        final host = RemoteSource.normalizeHost(_host.text);
+        if (host.isNotEmpty) {
+          _subsonicUrl.text = _serverUrl(
+            host: host,
+            port: int.tryParse(_port.text.trim()) ?? kind.defaultPort,
+            useTls: true,
+            rootPath: _root.text,
+          );
+        }
+      }
     });
   }
 
   void _submit() {
+    if (_isSubsonic) {
+      _submitSubsonic();
+      return;
+    }
     final hostError = RemoteSource.validateHost(_host.text);
     final parsedPort = int.tryParse(_port.text.trim());
     final portError = parsedPort == null
@@ -160,6 +185,78 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
     );
   }
 
+  /// Persists a Subsonic source from its server URL instead of host/port.
+  void _submitSubsonic() {
+    final parsed = _parseServerUrl(_subsonicUrl.text);
+    String? error;
+    if (parsed == null) {
+      error = RemoteSourcesStrings.subsonicUrlInvalid;
+    } else {
+      final port =
+          parsed.hasPort ? parsed.port : _defaultPortFor(parsed.scheme);
+      error = RemoteSource.validateHost(parsed.host) ??
+          RemoteSource.validatePort(port);
+    }
+    setState(() => _subsonicUrlError = error);
+    if (error != null || parsed == null) return;
+    Navigator.of(context).pop(
+      RemoteSourceDraft(
+        kind: _kind,
+        displayName: _name.text.trim(),
+        host: parsed.host,
+        port: parsed.hasPort ? parsed.port : _defaultPortFor(parsed.scheme),
+        useTls: parsed.scheme == 'https',
+        rootPath: parsed.path.isEmpty ? '/' : parsed.path,
+        username: _username.text.trim(),
+        password: _password.text,
+      ),
+    );
+  }
+
+  /// Parses a server URL, accepting a bare host by assuming `https`.
+  ///
+  /// Rejects embedded credentials and a query/fragment so the stored record is
+  /// exactly the endpoint the token client will sign requests for.
+  static Uri? _parseServerUrl(String raw) {
+    var value = raw.trim();
+    if (value.isEmpty) return null;
+    if (!value.contains('://')) value = 'https://$value';
+    final uri = Uri.tryParse(value);
+    if (uri == null) return null;
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'http' && scheme != 'https') return null;
+    if (uri.host.trim().isEmpty) return null;
+    if (uri.userInfo.isNotEmpty) return null;
+    if (uri.hasQuery || uri.hasFragment) return null;
+    return uri;
+  }
+
+  static int _defaultPortFor(String scheme) =>
+      scheme.toLowerCase() == 'https' ? 443 : 80;
+
+  /// Server URL shown when editing an existing source.
+  static String _serverUrlFor(RemoteSource source) => _serverUrl(
+        host: source.host,
+        port: source.port,
+        useTls: source.useTls,
+        rootPath: source.rootPath,
+      );
+
+  /// `scheme://host[:port][/mount]` for the editor field.
+  static String _serverUrl({
+    required String host,
+    required int port,
+    required bool useTls,
+    required String rootPath,
+  }) {
+    final scheme = useTls ? 'https' : 'http';
+    final literal = RemoteSource.isIpv6Literal(host) ? '[$host]' : host;
+    final portPart = port == (useTls ? 443 : 80) ? '' : ':$port';
+    final normalizedRoot = RemoteSource.normalizeRootPath(rootPath);
+    return '$scheme://$literal$portPart'
+        '${normalizedRoot == '/' ? '' : normalizedRoot}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -177,18 +274,24 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SegmentedButton<RemoteSourceKind>(
-                segments: [
+              DropdownButtonFormField<RemoteSourceKind>(
+                initialValue: _kind,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: RemoteSourcesStrings.kindLabel,
+                  border: OutlineInputBorder(),
+                ),
+                items: [
                   for (final kind in RemoteSourceKind.values)
-                    ButtonSegment<RemoteSourceKind>(
-                      value: kind,
-                      label: Text(RemoteSourcesStrings.kindLabelFor(kind)),
-                    ),
+                    if (!kind.isDiscovered)
+                      DropdownMenuItem<RemoteSourceKind>(
+                        value: kind,
+                        child: Text(RemoteSourcesStrings.kindLabelFor(kind)),
+                      ),
                 ],
-                selected: <RemoteSourceKind>{_kind},
-                showSelectedIcon: false,
-                onSelectionChanged: (selection) =>
-                    _handleKindChanged(selection.first),
+                onChanged: (kind) {
+                  if (kind != null) _handleKindChanged(kind);
+                },
               ),
               const SizedBox(height: 6),
               Text(
@@ -205,48 +308,59 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
                 hint: RemoteSourcesStrings.nameHint,
                 textInputAction: TextInputAction.next,
               ),
-              _Field(
-                controller: _host,
-                label: RemoteSourcesStrings.hostLabel,
-                hint: RemoteSourcesStrings.hostHint,
-                errorText: _hostError,
-                keyboardType: TextInputType.url,
-                textInputAction: TextInputAction.next,
-              ),
-              _Field(
-                controller: _port,
-                label: RemoteSourcesStrings.portLabel,
-                errorText: _portError,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-              ),
-              if (_kind == RemoteSourceKind.webdav) ...[
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text(RemoteSourcesStrings.tlsLabel),
-                  value: _useTls,
-                  onChanged: (value) => setState(() => _useTls = value),
+              if (_isSubsonic)
+                _Field(
+                  controller: _subsonicUrl,
+                  label: RemoteSourcesStrings.subsonicUrlLabel,
+                  hint: RemoteSourcesStrings.subsonicUrlHint,
+                  errorText: _subsonicUrlError,
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
+                )
+              else ...[
+                _Field(
+                  controller: _host,
+                  label: RemoteSourcesStrings.hostLabel,
+                  hint: RemoteSourcesStrings.hostHint,
+                  errorText: _hostError,
+                  keyboardType: TextInputType.url,
+                  textInputAction: TextInputAction.next,
                 ),
-                if (!_useTls)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      RemoteSourcesStrings.cleartextWarning,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                    ),
+                _Field(
+                  controller: _port,
+                  label: RemoteSourcesStrings.portLabel,
+                  errorText: _portError,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                ),
+                if (_kind == RemoteSourceKind.webdav) ...[
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text(RemoteSourcesStrings.tlsLabel),
+                    value: _useTls,
+                    onChanged: (value) => setState(() => _useTls = value),
                   ),
+                  if (!_useTls)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        RemoteSourcesStrings.cleartextWarning,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                      ),
+                    ),
+                ],
+                _Field(
+                  controller: _root,
+                  label: RemoteSourcesStrings.rootLabel,
+                  hint: _kind == RemoteSourceKind.smb
+                      ? RemoteSourcesStrings.rootHintShare
+                      : RemoteSourcesStrings.rootHint,
+                  errorText: _rootError,
+                  textInputAction: TextInputAction.next,
+                ),
               ],
-              _Field(
-                controller: _root,
-                label: RemoteSourcesStrings.rootLabel,
-                hint: _kind == RemoteSourceKind.smb
-                    ? RemoteSourcesStrings.rootHintShare
-                    : RemoteSourcesStrings.rootHint,
-                errorText: _rootError,
-                textInputAction: TextInputAction.next,
-              ),
               _Field(
                 controller: _username,
                 label: RemoteSourcesStrings.usernameLabel,

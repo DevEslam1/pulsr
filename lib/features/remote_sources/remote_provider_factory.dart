@@ -10,6 +10,8 @@ import '../../domain/models/remote_source.dart';
 import 'ftp_fs_provider.dart';
 import 'remote_credentials_store.dart';
 import 'smb_fs_provider.dart';
+import 'subsonic_fs_provider.dart';
+import 'upnp_fs_provider.dart';
 import 'webdav_fs_provider.dart';
 
 /// Builds a provider for [source] using [credentials] (may be `null`).
@@ -45,6 +47,17 @@ RemoteFsProvider createRemoteProvider(
         source,
         username: credentials?.username,
         password: credentials?.password,
+      );
+    case RemoteSourceKind.subsonic:
+      return SubsonicFsProvider(
+        source,
+        username: credentials?.username,
+        password: credentials?.password,
+      );
+    case RemoteSourceKind.upnp:
+      return UpnpFsProvider(
+        source,
+        controlUrl: UpnpFsProvider.controlUrlFor(source),
       );
   }
 }

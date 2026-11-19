@@ -1,7 +1,7 @@
 // lib/domain/models/remote_source.dart
 //
 // P0-1 "remote sources": the persisted description of a network music library
-// (WebDAV / FTP / SMB) plus one directory entry inside it.
+// (WebDAV / FTP / SMB / Subsonic / UPnP) plus one directory entry inside it.
 //
 // Pure Dart (no Flutter, no plugins) so the model is unit-testable without a
 // binding. Secrets are deliberately absent: the password lives in
@@ -21,7 +21,19 @@ enum RemoteSourceKind {
   ftp(wireName: 'ftp', defaultPort: 21, requiresRootShare: false),
 
   /// SMB2/3 (Windows file sharing), served by the native Android plugin.
-  smb(wireName: 'smb', defaultPort: 445, requiresRootShare: true);
+  smb(wireName: 'smb', defaultPort: 445, requiresRootShare: true),
+
+  /// Navidrome / Subsonic / Airsonic, browsed through the JSON API.
+  subsonic(wireName: 'subsonic', defaultPort: 443, requiresRootShare: false),
+
+  /// A DLNA media server found over SSDP.
+  ///
+  /// Discovered rather than typed in by hand (see [isDiscovered]); for this
+  /// kind [RemoteSource.rootPath] carries the ContentDirectory control path,
+  /// because a UPnP library has no filesystem root and its tree is addressed
+  /// by object ids. [RemoteSource.host], [port] and [useTls] describe that
+  /// control endpoint the same way they do for WebDAV.
+  upnp(wireName: 'upnp', defaultPort: 80, requiresRootShare: false);
 
   const RemoteSourceKind({
     required this.wireName,
@@ -38,6 +50,13 @@ enum RemoteSourceKind {
   /// Whether [RemoteSource.rootPath] must name a share (SMB) rather than a
   /// directory tree (WebDAV / FTP).
   final bool requiresRootShare;
+
+  /// Whether the add/edit form can create a source of this kind by hand.
+  ///
+  /// UPnP libraries are discovered over SSDP: their control URL cannot be
+  /// typed in, so the editor omits this kind while the discovered record is
+  /// still persisted and browsable.
+  bool get isDiscovered => this == RemoteSourceKind.upnp;
 
   /// Parses a [wireName] token, returning `null` for anything unknown so a
   /// store can skip a corrupted entry instead of failing the whole load.
