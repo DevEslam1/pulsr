@@ -141,7 +141,7 @@ class _DownloadQualityPickerSheetState
             return Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.xs),
               child: AnimatedContainer(
-                duration: context.motionMs(180),
+                duration: context.motionMs(200),
                 curve: context.motionCurve(PulsrMotion.enter),
                 decoration: BoxDecoration(
                   color: isSelected
@@ -237,7 +237,7 @@ class _DownloadQualityPickerSheetState
                             ),
                           const SizedBox(width: AppSpacing.sm),
                           AnimatedSwitcher(
-                            duration: context.motionMs(180),
+                            duration: context.motionMs(200),
                             transitionBuilder: (child, animation) =>
                                 ScaleTransition(
                               scale: animation,

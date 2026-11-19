@@ -9,6 +9,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
     final albumSort = _tabSortFor('albums');
     final albums = LibraryTabSort.sortAlbums(state.albums, albumSort);
 
+    if (albums.isEmpty && state.errorMessage != null) {
+      return _buildLibraryErrorState(context, state);
+    }
     if (albums.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
@@ -256,6 +259,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       _tabSortFor('artists'),
     );
 
+    if (artists.isEmpty && state.errorMessage != null) {
+      return _buildLibraryErrorState(context, state);
+    }
     if (artists.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
@@ -536,6 +542,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
       _tabSortFor('genres'),
     );
 
+    if (genres.isEmpty && state.errorMessage != null) {
+      return _buildLibraryErrorState(context, state);
+    }
     if (genres.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
@@ -778,6 +787,9 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
 
   // Requires: provided by the composing class (same library).
   void _setTabSort(String tabName, String sortBy, bool ascending);
+
+  // Requires: provided by the composing class (same library).
+  Widget _buildLibraryErrorState(BuildContext context, LibraryState state);
 
   // Requires: provided by the composing class (same library).
   Widget _buildEmpty(

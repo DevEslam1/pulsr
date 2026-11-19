@@ -76,6 +76,11 @@ class QuickDiscoveryHeader extends StatelessWidget {
         label: context.l10n.queue,
         onTap: () => context.push('/queue'),
       ),
+      (
+        icon: Icons.group_rounded,
+        label: context.l10n.partyListenTogether,
+        onTap: () => context.push('/party'),
+      ),
     ];
 
     return SizedBox(

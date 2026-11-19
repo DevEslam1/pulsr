@@ -199,6 +199,16 @@ mixin SettingsAppearanceSection
               showThemePickerSheet(context, cubit, state.playerThemeMode),
         ),
         _divider(p),
+        // The Studio used to be reachable only from Home → Browse more tools,
+        // two taps deep in a different tab, while its controls lived in Look.
+        _navTile(
+          context,
+          Icons.palette_rounded,
+          context.l10n.themeStudio,
+          context.l10n.learnMore,
+          onTap: () => context.push('/theme-studio'),
+        ),
+        _divider(p),
         _navTile(
           context,
           Icons.linear_scale_rounded,

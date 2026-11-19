@@ -91,7 +91,7 @@ class _PulsrSliderState extends State<PulsrSlider>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _expandController.duration = context.motionMs(180);
+    _expandController.duration = context.motionMs(200);
     _waveController.duration = context.motionMs(3200);
     _syncWave();
   }

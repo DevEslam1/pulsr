@@ -166,6 +166,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 Semantics(
                   label: shuffleLabel,
                   button: true,
+                  toggled: widget.isShuffle,
                   child: _ControlButton(
                     tooltip: shuffleLabel,
                     isActive: widget.isShuffle,
@@ -238,7 +239,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   enabled: widget.hasPrevious,
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: _prevNudgeX),
-                    duration: context.motionMs(180),
+                    duration: context.motionMs(200),
                     curve: Curves.easeOutBack,
                     builder: (context, dx, child) => Transform.translate(
                       offset: Offset(dx, 0),
@@ -425,7 +426,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                   enabled: widget.hasNext,
                   child: TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0, end: _nextNudgeX),
-                    duration: context.motionMs(180),
+                    duration: context.motionMs(200),
                     curve: Curves.easeOutBack,
                     builder: (context, dx, child) => Transform.translate(
                       offset: Offset(dx, 0),
@@ -546,6 +547,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 Semantics(
                   label: repeatLabel,
                   button: true,
+                  toggled: widget.repeatMode != PlayerRepeatMode.off,
                   child: _ControlButton(
                     tooltip: repeatLabel,
                     isActive: widget.repeatMode != PlayerRepeatMode.off,

@@ -157,9 +157,8 @@ class _SpeedPickerSheetState extends State<SpeedPickerSheet> {
                         TextButton(
                           onPressed: () => cubit.setPlaybackSpeed(1.0),
                           style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            minimumSize: const Size(48, 48),
+                            tapTargetSize: MaterialTapTargetSize.padded,
                           ),
                           child: Text(context.l10n.reset,
                               style: TextStyle(
@@ -229,9 +228,8 @@ class _SpeedPickerSheetState extends State<SpeedPickerSheet> {
                         TextButton(
                           onPressed: () => cubit.setPlaybackPitch(1.0),
                           style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            minimumSize: const Size(48, 48),
+                            tapTargetSize: MaterialTapTargetSize.padded,
                           ),
                           child: Text(context.l10n.reset,
                               style: TextStyle(

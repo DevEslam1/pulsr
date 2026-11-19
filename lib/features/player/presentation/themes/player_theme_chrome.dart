@@ -323,7 +323,7 @@ class PlayerAnimatedFavoriteButton extends StatelessWidget {
           },
           child: Center(
             child: AnimatedSwitcher(
-              duration: context.motionMs(280),
+              duration: context.motionMs(260),
               transitionBuilder: (child, anim) {
                 final isHeart = (child.key as ValueKey<bool>?)?.value == true;
                 final curve =
@@ -1177,8 +1177,8 @@ class PlayerTopBar extends StatelessWidget {
       required VoidCallback onTap,
     }) {
       return SizedBox(
-        width: 46,
-        height: 46,
+        width: 48,
+        height: 48,
         child: Material(
           color: p.isDark ? AppColors.specularAt(0.08) : p.surfaceContainer,
           shape: CircleBorder(
@@ -1228,7 +1228,7 @@ class PlayerTopBar extends StatelessWidget {
               },
             )
           else if (showMore)
-            const SizedBox(width: 46, height: 46),
+            const SizedBox(width: 48, height: 48),
           Expanded(
             child: centerWidget != null
                 ? Center(child: centerWidget!)
@@ -1326,7 +1326,7 @@ class PlayerTopBar extends StatelessWidget {
               },
             )
           else if (showDismiss)
-            const SizedBox(width: 46, height: 46),
+            const SizedBox(width: 48, height: 48),
         ],
       ),
     );
@@ -1520,7 +1520,7 @@ class PlayerTrackHeader extends StatelessWidget {
                 ),
               ),
               AnimatedContainer(
-                duration: context.motionMs(220),
+                duration: context.motionMs(200),
                 width: resolvedActionButtonSize,
                 height: resolvedActionButtonSize,
                 decoration: BoxDecoration(
@@ -1716,8 +1716,9 @@ class PlayerBookmarkPromptBanner extends StatelessWidget {
               child: Text(l10n.resume),
             ),
             SizedBox(
-              width: 34,
-              height: 34,
+              // 48dp touch target; the glyph stays 17dp and is centred.
+              width: 48,
+              height: 48,
               child: IconButton(
                 padding: EdgeInsets.zero,
                 tooltip: l10n.close,

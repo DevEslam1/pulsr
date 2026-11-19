@@ -29,10 +29,12 @@ import 'core/services/sound_feedback_service.dart';
 import 'core/services/automation_trigger_service.dart';
 import 'core/bloc/pulsr_bloc_observer.dart';
 import 'core/constants/app_colors.dart';
+import 'core/constants/app_radii.dart';
 import 'core/constants/prefs_keys.dart';
 import 'core/utils/pulsr_haptics.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
+import 'core/theme/pulsr_button_style.dart';
 import 'core/widgets/cached_artwork.dart';
 import 'core/widgets/pulsr_toast.dart';
 import 'core/router/app_router.dart';
@@ -161,9 +163,28 @@ Future<void> main() async {
         // tree; a fixed dark surface keeps the fallback readable in both modes.
         color: AppColors.card,
         child: Center(
-          child: Text(
-            AppLocalizations.of(context)?.somethingWentWrong ?? 'Error',
-            style: const TextStyle(color: Colors.white70),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  size: 40,
+                  color: Colors.white54,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  AppLocalizations.of(context)?.somethingWentWrong ??
+                      'Something went wrong',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1267,7 +1288,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 String languageCode,
                 bool highContrast,
                 bool reduceMotion,
-                bool dimWhitePoint
+                bool dimWhitePoint,
+                AppButtonStyle appButtonStyle
               })>(
             selector: (state) => (
               colorSource: state.themeColorSource,
@@ -1278,6 +1300,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
               highContrast: state.highContrast,
               reduceMotion: state.reduceMotion,
               dimWhitePoint: state.dimWhitePoint,
+              appButtonStyle: state.appButtonStyle,
             ),
             builder: (context, settingsConfig) {
               return BlocSelector<DynamicThemeCubit, DynamicThemeState,
@@ -1311,22 +1334,29 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                       final isBoldText = MediaQuery.boldTextOf(context);
                       final isCalmDensity = settingsConfig.visualDensityMode ==
                           VisualDensityMode.calm;
+                      final buttonRadius = PulsrCapsuleStyle.resolveRadius(
+                        settingsConfig.appButtonStyle,
+                        rectRadius: AppRadii.r14,
+                      );
 
                       final lightTheme = isHighContrast
                           ? AuraTheme.highContrastThemeFor(Brightness.light,
                               seed: resolveAccent(lightDynamic?.primary),
-                              isCalmDensity: isCalmDensity)
+                              isCalmDensity: isCalmDensity,
+                              buttonRadius: buttonRadius)
                           : AuraTheme.customTheme(
                               resolveAccent(lightDynamic?.primary),
                               brightness: Brightness.light,
                               isBoldText: isBoldText,
                               isCalmDensity: isCalmDensity,
+                              buttonRadius: buttonRadius,
                             );
 
                       final darkTheme = isHighContrast
                           ? AuraTheme.highContrastThemeFor(Brightness.dark,
                               seed: resolveAccent(darkDynamic?.primary),
-                              isCalmDensity: isCalmDensity)
+                              isCalmDensity: isCalmDensity,
+                              buttonRadius: buttonRadius)
                           : AuraTheme.customTheme(
                               resolveAccent(darkDynamic?.primary),
                               brightness: Brightness.dark,
@@ -1335,6 +1365,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                               isBoldText: isBoldText,
                               dimWhitePoint: settingsConfig.dimWhitePoint,
                               isCalmDensity: isCalmDensity,
+                              buttonRadius: buttonRadius,
                             );
 
                       final ThemeMode flutterThemeMode;
@@ -1351,11 +1382,13 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                           break;
                       }
 
-                      final isDarkTheme = isHighContrast ||
-                          flutterThemeMode == ThemeMode.dark ||
-                          (flutterThemeMode == ThemeMode.system &&
-                              MediaQuery.platformBrightnessOf(context) ==
-                                  Brightness.dark);
+                      final isDarkTheme = switch (settingsConfig.themeMode) {
+                        AppThemeMode.light => false,
+                        AppThemeMode.dark || AppThemeMode.amoled => true,
+                        AppThemeMode.system =>
+                          MediaQuery.platformBrightnessOf(context) ==
+                              Brightness.dark,
+                      };
 
                       return AnnotatedRegion<SystemUiOverlayStyle>(
                         value: SystemUiOverlayStyle(
@@ -1388,6 +1421,14 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                             return MediaQuery(
                               data: media.copyWith(
                                 disableAnimations: reduceMotion,
+                                // The app ships its own High Contrast mode as a
+                                // theme. Mirror it into MediaQuery so every
+                                // accessibility consumer (notably
+                                // AppBlur.canBlur) sees one signal instead of
+                                // two, and the solid-surface fallback actually
+                                // fires for the in-app toggle.
+                                highContrast: settingsConfig.highContrast ||
+                                    media.highContrast,
                               ),
                               child: MediaQuery.withClampedTextScaling(
                                 // Accessibility: allow the full OS text-size
@@ -1397,7 +1438,14 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                                 minScaleFactor: 0.8,
                                 maxScaleFactor: 2.0,
                                 child: _AppOrientationSystemUiObserver(
-                                  child: child ?? const SizedBox.shrink(),
+                                  child: HeroMode(
+                                    // A shared-element flight is the largest
+                                    // movement in the product; it must obey the
+                                    // same Reduce Motion contract as every
+                                    // token-driven animation.
+                                    enabled: !reduceMotion,
+                                    child: child ?? const SizedBox.shrink(),
+                                  ),
                                 ),
                               ),
                             );

@@ -144,6 +144,7 @@ class UsbExclusivePlugin(
     private external fun nativeUsbStreamResetChannelMismatchFrames()
 
     @Volatile private var lastStreamResultCode: Int? = null
+    private var lastStreamDiagLogMs = 0L
     @Volatile private var lastRateVerified: Boolean = false
 
     private fun safeGetLastError(): Int = if (nativeLoaded) try { nativeUsbStreamGetLastError() } catch (_: Throwable) { 0 } else 0
@@ -542,6 +543,17 @@ class UsbExclusivePlugin(
         if (streaming && !isNativeActive()) {
             Log.w(TAG, "USB streaming sink inactive; releasing the interface")
             clearStreaming()
+        }
+        if (streaming) {
+            val diagNow = SystemClock.elapsedRealtime()
+            if (diagNow - lastStreamDiagLogMs >= 10_000L) {
+                lastStreamDiagLogMs = diagNow
+                Log.i(TAG, "streaming: rate=${streamFormat?.sampleRate} " +
+                    "depth=${streamFormat?.wireBitDepth} bufferedMs=${safeGetBufferedMs()} " +
+                    "underruns=${safeGetUnderrunCount()} overruns=${safeGetOverrunCount()} " +
+                    "mismatch=${safeGetChannelMismatchFrames()} " +
+                    "lastError=${safeGetLastError()} resultCode=$lastStreamResultCode")
+            }
         }
         val directCapable = parsed.uacVersion in 1..2 && parsed.altSettingFormats.isNotEmpty()
         directStreamingSupported = nativeLoaded && directCapable

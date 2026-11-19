@@ -153,6 +153,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private volatile int aaudioTargetBufferMs = 150;
     private volatile boolean disposed = false;
     private int aaudioRequestGeneration = 0;
+    // Pulsr fork: the enable probe repeats on every request (toggle, buffer or
+    // route change), so a requested-vs-proven encoding mismatch is logged once
+    // per player instead of once per attempt.
+    private volatile boolean aaudioProbeEncodingMismatchLogged = false;
     private AudioDeviceCallback routeDeviceCallback;
     private boolean routeCallbackPrimed = false;
     // Pulsr fork: tap-side SRC target (device output rate). 0 = disabled: the
@@ -542,6 +546,10 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     // A stream can be refused after the setting was accepted
                     // (a new song or device). Swap the inner sink in place and
                     // retry; never rebuild the player or label this as exclusive.
+                    // The probe certified this tuple, so clear its verdict the
+                    // way onAaudioOutputRejected does: re-enabling must re-probe
+                    // instead of reusing a success that just failed on device.
+                    clearAaudioProbeCache();
                     Log.w(TAG, "AAudio output refused; restoring AudioTrack", error);
                     final boolean wasAaudioEnabled = aaudioOutputEnabled;
                     aaudioOutputEnabled = false;
@@ -621,7 +629,15 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 nativeEncoding, preferExclusive, targetBufferMs, deviceId);
     }
 
-    int probeSingleAaudioEncoding(int sampleRate, int channels, int nativeEncoding,
+    /**
+     * Probes one real AAudio stream and reports the encoding the device
+     * actually opened: the {@code AaudioNativeBridge.ENCODING_PCM_*} value on
+     * success, 0 when the device granted no stream for this encoding (or only
+     * a shared one while exclusive was requested), and -1 when the probe was
+     * refused outright (missing native library or runtime failure) so the
+     * remaining candidates are pointless.
+     */
+    int probeAaudioEncoding(int sampleRate, int channels, int nativeEncoding,
             int targetBufferMs, boolean preferExclusive) {
         long probe = 0L;
         try {
@@ -636,13 +652,38 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                         + "); exclusive not available");
                 return 0;
             }
-            return 1;
+            return nativeEncoding;
         } catch (LinkageError | RuntimeException refused) {
             Log.w(TAG, "AAudio output probe refused", refused);
             return -1;
         } finally {
             if (probe != 0L) AaudioNativeBridge.nativeClose(probe);
         }
+    }
+
+    /**
+     * Per-candidate seam over {@link #probeAaudioEncoding}, kept
+     * package-private/overridable so JVM tests can drive the candidate loop
+     * without native code. Returns the encoding that opened, 0 when nothing
+     * opened, -1 when refused.
+     */
+    int probeSingleAaudioEncoding(int sampleRate, int channels, int nativeEncoding,
+            int targetBufferMs, boolean preferExclusive) {
+        return probeAaudioEncoding(sampleRate, channels, nativeEncoding,
+                targetBufferMs, preferExclusive);
+    }
+
+    /**
+     * Logs the requested-vs-proven encoding mismatch once per player: the
+     * enabling request repeats (toggle, buffer or route change) and one line
+     * is enough to explain why AAudio Direct stays off.
+     */
+    private void logAaudioProbeEncodingMismatch(int requested, int proved) {
+        if (aaudioProbeEncodingMismatchLogged) return;
+        aaudioProbeEncodingMismatchLogged = true;
+        Log.w(TAG, "AAudio probe opened encoding " + proved
+                + " but the sink will open encoding " + requested
+                + "; refusing AAudio Direct");
     }
 
     private static int toAaudioProbeEncoding(int pcmEncoding) {
@@ -694,10 +735,21 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             uniqueCandidates.add(enc);
         }
         for (int enc : uniqueCandidates) {
-            final int status = probeSingleAaudioEncoding(
+            final int proved = probeSingleAaudioEncoding(
                     sampleRate, channels, enc, targetBufferMs, preferExclusive);
-            if (status == 1) return true;
-            if (status < 0) return false;
+            // -1 is a hard refusal: no candidate will open, stop probing.
+            if (proved < 0) return false;
+            if (proved > 0) {
+                // The sink opens the REQUESTED encoding later
+                // (AAudioAudioSink.configure), so a fallback encoding that
+                // opens proves nothing about the request. Certifying it would
+                // swap the sink onto a stream the device refuses and drop the
+                // audio mid-play; leave AAudio Direct off instead.
+                if (proved != primary) {
+                    logAaudioProbeEncodingMismatch(primary, proved);
+                }
+                return proved == primary;
+            }
         }
         return false;
     }
@@ -708,6 +760,11 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
             result.success(false);
             return;
         }
+        // probeOk is true only when the probe proved the REQUESTED encoding
+        // (see probeAaudioOutput). A device that opened only a fallback
+        // encoding therefore lands here as false, so AAudio Direct stays off
+        // and the Dart layer refuses the mode instead of swapping the sink
+        // onto a stream that would fail mid-play.
         final boolean modeChanged = aaudioOutputEnabled != probeOk;
         final boolean forceReconfigure = probeOk && changed && !modeChanged;
         aaudioOutputEnabled = probeOk;
@@ -768,6 +825,24 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 return;
             }
 
+            // Pulsr fork: rebuild the inner sink with the current policies.
+            // The integer Bit-Perfect bypass is latched by configure(), so a
+            // bypass change made mid-track otherwise waits for the next track
+            // and the platform keeps reporting the mixer as inactive. Callers
+            // pause first, so the delegate rebuild is inaudible; with no format
+            // loaded this is a no-op.
+            if ("dspReconfigureSink".equals(call.method)) {
+                if (sinkWrapper == null) {
+                    result.success(false);
+                    return;
+                }
+                // Wait (bounded) for the rebuild to finish on the playback
+                // thread. The caller is paused, so a short block on this
+                // channel thread keeps the swap from landing after play().
+                result.success(sinkWrapper.reconfigureNow(400));
+                return;
+            }
+
             // Pulsr fork: AAudio Direct output preference must reach the player
             // BEFORE the sink is built, so handle it without forcing
             // initialization (same pattern as dspSetFloatOutput).
@@ -822,7 +897,8 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     final boolean preferExclusiveSnapshot = aaudioPreferExclusive;
                     final int targetBufferSnapshot = aaudioTargetBufferMs;
                     final String cacheKey = deviceId + ":" + rate + ":" + channels + ":"
-                            + probeEncoding + ":" + preferExclusiveSnapshot;
+                            + probeEncoding + ":" + preferExclusiveSnapshot
+                            + ":" + targetBufferSnapshot;
                     final Boolean cached = AAUDIO_PROBE_CACHE.get(cacheKey);
                     if (cached != null) {
                         finishAaudioProbe(requestGeneration, enabled, changed, cached, result);

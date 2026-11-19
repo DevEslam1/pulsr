@@ -42,6 +42,13 @@ void MultibandCompressor::setSampleRate(double sampleRate) {
         allpassLowPath_[p].reset();
         allpassHighPath_[p].reset();
     }
+    // Item 5: the odd-channel chain is reconfigured by updateCoefficients() above
+    // and carries its own registers, so flush it here too.
+    crossoverOddMid_.reset();
+    crossoverOddLow_.reset();
+    crossoverOddHigh_.reset();
+    allpassOddLowPath_.reset();
+    allpassOddHighPath_.reset();
 }
 
 void MultibandCompressor::applyParams(const MultibandCompressorParamSet& params) {
@@ -72,6 +79,15 @@ void MultibandCompressor::updateCoefficients() {
         allpassHighPath_[p].configure(sampleRate_, f0);
     }
 
+    // Item 5: the odd channel runs the same three-way split off its own chain, with
+    // the same cross-applied allpasses (see the header note), so an odd layout
+    // reproduces the pairs' phase compensation exactly without sharing state.
+    crossoverOddMid_.configure(sampleRate_, f1);
+    crossoverOddLow_.configure(sampleRate_, f0);
+    crossoverOddHigh_.configure(sampleRate_, f2);
+    allpassOddLowPath_.configure(sampleRate_, f2);
+    allpassOddHighPath_.configure(sampleRate_, f0);
+
     for (int b = 0; b < NUM_BANDS; ++b) {
         const double attSec = dsp::ranges::kMultibandAttackMs.clamp(params_.bands[b].attackMs) * 0.001;
         const double relSec = dsp::ranges::kMultibandReleaseMs.clamp(params_.bands[b].releaseMs) * 0.001;
@@ -92,6 +108,13 @@ void MultibandCompressor::reset() {
         allpassLowPath_[p].reset();
         allpassHighPath_[p].reset();
     }
+    // Item 5: clear the odd-channel chain alongside the pairs so a reset (seek /
+    // track start) cannot leave its registers loaded.
+    crossoverOddMid_.reset();
+    crossoverOddLow_.reset();
+    crossoverOddHigh_.reset();
+    allpassOddLowPath_.reset();
+    allpassOddHighPath_.reset();
     smoothedEnabledMix_ = enabled_ ? 1.0f : 0.0f;
     for (int b = 0; b < NUM_BANDS; ++b) {
         envelope_[b] = 0.0;          // linear amplitude envelope, starts at silence
@@ -212,25 +235,30 @@ void MultibandCompressor::processInterleaved(float* buffer, int frames, int chan
             }
             if (hasOddChannel) {
                 const int chLast = activeChannels - 1;
-                const int p = chLast / 2;
+                // Item 5: the odd channel has its own chain. Indexing the pair
+                // arrays with chLast/2 coupled it to a stereo pair's instance, so
+                // its LR4/allpass registers were shared with (and could be
+                // advanced by) the pair loop in the same frame. Feeding a mono
+                // sample as L=R keeps the phase-compensated split identical; the
+                // chain is advanced exactly once per frame.
                 double inLast = buffer[frameBase + chLast];
                 if (!std::isfinite(inLast)) inLast = 0.0;
 
                 double lowHalfL, lowHalfR, highHalfL, highHalfR;
-                crossoverMid_[p].process(inLast, inLast, lowHalfL, lowHalfR, highHalfL, highHalfR);
+                crossoverOddMid_.process(inLast, inLast, lowHalfL, lowHalfR, highHalfL, highHalfR);
 
                 double apLpL, apLpR, apHpL, apHpR;
-                allpassLowPath_[p].process(lowHalfL, lowHalfR, apLpL, apLpR, apHpL, apHpR);
+                allpassOddLowPath_.process(lowHalfL, lowHalfR, apLpL, apLpR, apHpL, apHpR);
                 const double lowCompL = apLpL + apHpL;
 
-                allpassHighPath_[p].process(highHalfL, highHalfR, apLpL, apLpR, apHpL, apHpR);
+                allpassOddHighPath_.process(highHalfL, highHalfR, apLpL, apLpR, apHpL, apHpR);
                 const double highCompL = apLpL + apHpL;
 
                 double b0L, b0R, b1L, b1R;
-                crossoverLow_[p].process(lowCompL, lowCompL, b0L, b0R, b1L, b1R);
+                crossoverOddLow_.process(lowCompL, lowCompL, b0L, b0R, b1L, b1R);
 
                 double b2L, b2R, b3L, b3R;
-                crossoverHigh_[p].process(highCompL, highCompL, b2L, b2R, b3L, b3R);
+                crossoverOddHigh_.process(highCompL, highCompL, b2L, b2R, b3L, b3R);
 
                 bandBuffer_[0][chLast][i] = static_cast<float>(b0L);
                 bandBuffer_[1][chLast][i] = static_cast<float>(b1L);

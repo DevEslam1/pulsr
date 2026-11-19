@@ -116,7 +116,7 @@ class PulsrProgressBar extends StatelessWidget {
         ),
         child: TweenAnimationBuilder<double>(
           tween: Tween<double>(begin: clamped, end: clamped),
-          duration: context.motionMs(180),
+          duration: context.motionMs(200),
           curve: Curves.easeOutCubic,
           builder: (context, animatedValue, _) {
             if (animatedValue <= 0.0) {

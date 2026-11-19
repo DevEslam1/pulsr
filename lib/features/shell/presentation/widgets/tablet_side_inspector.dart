@@ -365,7 +365,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                 // Content Area built dynamically from active tab descriptor
                 Expanded(
                   child: AnimatedSwitcher(
-                    duration: context.motionMs(180),
+                    duration: context.motionMs(200),
                     child: KeyedSubtree(
                       key: ValueKey('inspector_tab_${tabs[safeTabIndex].id}'),
                       child: tabs[safeTabIndex].builder(context),
@@ -465,7 +465,7 @@ class TabletSideInspectorState extends State<TabletSideInspector> {
                         width: 24,
                         child: Center(
                           child: AnimatedContainer(
-                            duration: context.motionMs(150),
+                            duration: context.motionMs(120),
                             width: _isDragging ? 4.5 : 3.0,
                             height: _isDragging ? 52.0 : 32.0,
                             decoration: BoxDecoration(

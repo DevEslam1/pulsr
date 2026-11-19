@@ -254,6 +254,36 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         }
     }
 
+    /**
+     * Rebuilds the inner sink and waits (bounded) for the playback thread to
+     * finish. Mirrors {@link #requestModeChange(boolean)} but blocks the caller
+     * until the swap is applied, which is what a paused policy transition
+     * needs: play() must not be able to overtake the rebuild. Returns false when
+     * there is no configured stream, the player is gone, or the wait timed out.
+     */
+    @Override
+    public boolean reconfigureNow(long timeoutMs) {
+        final ExoPlayer player = playerSupplier.get();
+        if (released || player == null || format == null || currentInner == null) {
+            return false;
+        }
+        final java.util.concurrent.CountDownLatch done =
+                new java.util.concurrent.CountDownLatch(1);
+        try {
+            player.createMessage((messageType, payload) -> {
+                try {
+                    applyPendingMode(true);
+                } finally {
+                    done.countDown();
+                }
+            }).send();
+            return done.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (RuntimeException | InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+
     /** Runs on the playback thread; also directly callable from unit tests. */
     void applyPendingMode(boolean force) {
         if (!aaudioEnabled.get()) {
@@ -317,20 +347,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         if (!MimeTypes.AUDIO_RAW.equals(format.sampleMimeType)
                 || !Util.isEncodingLinearPcm(format.pcmEncoding)) {
             support = SINK_FORMAT_UNSUPPORTED;
-        } else if (desiredMode() == Mode.AAUDIO
-                && format.sampleRate > 0
-                && format.channelCount > 0
-                && format.channelCount <= 2) {
-            if (format.pcmEncoding == C.ENCODING_PCM_16BIT
-                    || format.pcmEncoding == C.ENCODING_PCM_FLOAT
-                    || format.pcmEncoding == C.ENCODING_PCM_24BIT
-                    || (format.pcmEncoding == C.ENCODING_PCM_32BIT
-                            && AAudioAudioSink.deviceApiLevel() >= 31
-                            && preferExclusive.get())) {
-                support = SINK_FORMAT_SUPPORTED_DIRECTLY;
-            } else {
-                support = SINK_FORMAT_SUPPORTED_WITH_TRANSCODING;
-            }
+        } else if (aaudioSupportsFormatDirectly(format)) {
+            support = SINK_FORMAT_SUPPORTED_DIRECTLY;
         } else if (format.pcmEncoding == C.ENCODING_PCM_16BIT) {
             support = SINK_FORMAT_SUPPORTED_DIRECTLY;
         } else if (format.pcmEncoding == C.ENCODING_PCM_FLOAT) {
@@ -349,6 +367,34 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                     + ") -> " + support);
         }
         return support;
+    }
+
+    /**
+     * Whether the AAudio inner sink can carry this format directly, mirroring
+     * {@link AAudioAudioSink#getFormatSupport(Format)} so a format the inner
+     * sink would refuse is never advertised as directly supported: it falls
+     * through to the AudioTrack table instead, which is the sink that takes
+     * over after the AAudio fallback.
+     *
+     * <p>24-bit packed PCM is API 31+ only, and 32-bit needs API 31+ plus
+     * exclusive mode; above two channels the AAudio sink is never offered.
+     */
+    private boolean aaudioSupportsFormatDirectly(Format format) {
+        if (desiredMode() != Mode.AAUDIO) return false;
+        if (format.sampleRate <= 0) return false;
+        if (format.channelCount < 1 || format.channelCount > 2) return false;
+        switch (format.pcmEncoding) {
+            case C.ENCODING_PCM_16BIT:
+            case C.ENCODING_PCM_FLOAT:
+                return true;
+            case C.ENCODING_PCM_24BIT:
+                // AAUDIO_FORMAT_PCM_I24_PACKED does not exist before API 31.
+                return AAudioAudioSink.deviceApiLevel() >= 31;
+            case C.ENCODING_PCM_32BIT:
+                return AAudioAudioSink.deviceApiLevel() >= 31 && preferExclusive.get();
+            default:
+                return false;
+        }
     }
 
     @Override
@@ -373,7 +419,17 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         this.bufferSize = specifiedBufferSize;
         this.outputChannels = outputChannels == null ? null : outputChannels.clone();
         this.endOfStreamQueued = false;
-        final Mode desired = desiredMode();
+        // The mode is chosen per stream, not only per preference: a format the
+        // AAudio inner sink cannot carry (more than two channels, or 24-bit
+        // below API 31) must fall back to the AudioTrack backends here instead
+        // of entering AAUDIO, failing configure() and taking the session's
+        // AAudio preference down with it. getFormatSupport() already reports
+        // such a format through the AudioTrack table; this keeps the actual
+        // configure consistent with that answer.
+        Mode desired = desiredMode();
+        if (desired == Mode.AAUDIO && !aaudioSupportsFormatDirectly(inputFormat)) {
+            desired = (floatEnabled.get() && !precisionFallback) ? Mode.FLOAT : Mode.DEFAULT;
+        }
         if (currentInner == null || mode != desired) {
             swapTo(desired, false, false);
         } else {
@@ -650,14 +706,15 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         // fallbacks must retain trimming even when their errors are propagated.
         final Inner continuing = sameStream ? previous : null;
         if (previous != null && previous.processor != null) continuousState = previous.processor;
-        // An active exclusive AAudio stream blocks opening another one (and a
-        // shared AudioTrack while it runs). Release-first is only required when
-        // leaving AAUDIO or entering AAUDIO with preferExclusive; in shared mode
-        // or Default <-> Float transitions keep the old sink alive until the
-        // candidate is configured so a failed swap can fall back without a gap.
+        // Two AAudio streams cannot coexist (the native close now drains the
+        // queued tail), so leaving AAUDIO still releases first. Entering
+        // exclusive AAUDIO no longer does: the replacement is opened while the
+        // AudioTrack is still alive, so a refused open cannot drop its queued
+        // audio. If that open is refused the old inner is released and the
+        // normal candidate chain retries once below.
         final boolean leavingAaudio = (mode == Mode.AAUDIO);
         final boolean enteringAaudioExclusive = (desired == Mode.AAUDIO && preferExclusive.get());
-        if (currentInner != null && (leavingAaudio || enteringAaudioExclusive)) {
+        if (currentInner != null && leavingAaudio) {
             final Inner old = currentInner;
             currentInner = null;
             inner = null;
@@ -667,9 +724,12 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         }
         Mode appliedMode = desired;
         Inner candidate = null;
+        if (currentInner != null && enteringAaudioExclusive) {
+            candidate = createNextToLiveTrack(appliedMode, continuing);
+        }
         Exception lastFailure = null;
         try {
-            candidate = createConfigured(appliedMode, continuing);
+            if (candidate == null) candidate = createConfigured(appliedMode, continuing);
         } catch (ConfigurationException | RuntimeException first) {
             lastFailure = first;
             if (desired == Mode.AAUDIO) {
@@ -748,6 +808,27 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             } catch (WriteException e) {
                 notifySinkError(e);
             }
+        }
+    }
+
+    /**
+     * Opens the exclusive AAudio replacement while the previous AudioTrack sink
+     * is still alive, so a refused open cannot drop its queued audio. Returns
+     * null after releasing the old inner; the caller then retries the normal
+     * candidate chain once, and that retry owns the rejection reporting.
+     */
+    @Nullable
+    private Inner createNextToLiveTrack(Mode desired, @Nullable Inner continuing) {
+        try {
+            return createConfigured(desired, continuing);
+        } catch (ConfigurationException | RuntimeException refusedNextToOld) {
+            final Inner old = currentInner;
+            currentInner = null;
+            inner = null;
+            mode = null;
+            if (processorListener != null) processorListener.onActiveProcessorChanged(null);
+            releaseInner(old);
+            return null;
         }
     }
 

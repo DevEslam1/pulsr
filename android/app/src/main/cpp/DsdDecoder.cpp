@@ -256,6 +256,11 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
 
                 // Always push the CIC sample into the Stage 2 ring; it is the
                 // interpolation source and the FIR window history.
+                // Item 6: the slot about to be overwritten is tap 0 of the
+                // PREVIOUS inter-sample window (see the prevOut correction
+                // below), so capture it before the store clobbers it.
+                const float stage2OverwrittenL = stage2RingL_[stage2WriteIdx_];
+                const float stage2OverwrittenR = stage2RingR_[stage2WriteIdx_];
                 stage2RingL_[stage2WriteIdx_] = cicOutL;
                 stage2RingL_[stage2WriteIdx_ + DECIMATION_TAPS] = cicOutL;
                 stage2RingR_[stage2WriteIdx_] = cicOutR;
@@ -275,6 +280,14 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                     float decimationOutL = 0.0f;
                     float decimationOutR = 0.0f;
                     convolveStage2(bufL - 1, bufR - 1, prevOutL, prevOutR);
+                    // Item 6: bufL - 1 aliases slot stage2WriteIdx_, which the store
+                    // above just replaced with THIS CIC sample, so that window's
+                    // oldest tap used the just-written value instead of the one it
+                    // is supposed to end one sample before. Only tap 0 differs, so
+                    // restore it in place: add (old - new) * coeff[0]. No window
+                    // copy, no allocation.
+                    prevOutL += (stage2OverwrittenL - cicOutL) * reversedDecimationCoeffs_[0];
+                    prevOutR += (stage2OverwrittenR - cicOutR) * reversedDecimationCoeffs_[0];
                     convolveStage2(bufL, bufR, decimationOutL, decimationOutR);
                     if (std::abs(prevOutL) < 1e-30f) prevOutL = 0.0f;
                     if (std::abs(prevOutR) < 1e-30f) prevOutR = 0.0f;

@@ -247,7 +247,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               ),
                               const SizedBox(height: AppSpacing.s6),
                               AnimatedSize(
-                                duration: context.motionMs(220),
+                                duration: context.motionMs(200),
                                 curve: Curves.easeOutCubic,
                                 alignment: Alignment.topCenter,
                                 child: Text(

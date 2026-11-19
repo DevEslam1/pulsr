@@ -337,7 +337,6 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                                   .withValues(alpha: 0.4)
                                               : p.accent),
                                       tooltip: context.l10n.resetToDefault30s,
-                                      visualDensity: VisualDensity.compact,
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(
                                           minWidth: AppSpacing.minTouchTarget,

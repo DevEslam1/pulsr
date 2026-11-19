@@ -533,7 +533,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                     ? p.textTertiary.withValues(alpha: 0.4)
                     : p.accent,
                 size: 20),
-            visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(
                 minWidth: AppSpacing.minTouchTarget,
@@ -758,7 +757,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                 IconButton(
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
-                  visualDensity: VisualDensity.compact,
                   tooltip: context.l10n.dspAboutEqualizer,
                   onPressed: () => _showFeatureInfo(
                     context,
@@ -910,7 +908,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                 IconButton(
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
-                  visualDensity: VisualDensity.compact,
                   tooltip: context.l10n.dspAboutDspEngine,
                   onPressed: () => _showFeatureInfo(
                     context,
@@ -1675,7 +1672,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                           : () => _showSaveCustomPresetDialog(cubit, state),
                       icon: Icon(Icons.bookmark_add_rounded,
                           size: 18, color: p.accent),
-                      visualDensity: VisualDensity.compact,
                       padding: const EdgeInsets.all(AppSpacing.xxs),
                       constraints: const BoxConstraints(
                           minWidth: AppSpacing.minTouchTarget,
@@ -2526,7 +2522,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                                     ? p.textTertiary.withValues(alpha: 0.35)
                                     : p.accent),
                             tooltip: context.l10n.dspResetPreamp,
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                                 minWidth: 48, minHeight: 48),
@@ -2716,7 +2711,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                               IconButton(
                                 icon: Icon(Icons.info_outline_rounded,
                                     size: 16, color: p.textTertiary),
-                                visualDensity: VisualDensity.compact,
                                 tooltip: context.l10n.dspAboutBassBoost,
                                 onPressed: () => _showFeatureInfo(
                                     context, AudioFeatureRegistry.bassBoost,
@@ -2775,7 +2769,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   ? p.textTertiary.withValues(alpha: 0.35)
                                   : p.accent),
                           tooltip: context.l10n.dspResetBassEnhancer,
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
                               const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -2920,7 +2913,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                               IconButton(
                                   icon: Icon(Icons.info_outline_rounded,
                                       size: 16, color: p.textTertiary),
-                                  visualDensity: VisualDensity.compact,
                                   tooltip: context.l10n.dspAboutVolumeBoost,
                                   onPressed: () => _showFeatureInfo(
                                       context, AudioFeatureRegistry.volumeBoost,
@@ -2986,7 +2978,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   ? p.textTertiary.withValues(alpha: 0.35)
                                   : p.accent),
                           tooltip: context.l10n.dspResetVolumeBoost,
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
                               const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -3482,7 +3473,6 @@ extension _EqSheetShell on _EqualizerSheetState {
                                   IconButton(
                                     icon: Icon(Icons.delete_outline_rounded,
                                         size: 18, color: p.error),
-                                    visualDensity: VisualDensity.compact,
                                     tooltip: context.l10n.dspDeleteCustomPreset,
                                     onPressed: () async {
                                       await _headphoneRepo

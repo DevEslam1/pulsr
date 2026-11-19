@@ -115,9 +115,9 @@ class _SplashScreenState extends State<SplashScreen> {
             )
                 .animate()
                 .scale(
-                    duration: context.motionMs(800),
+                    duration: context.motionMs(400),
                     curve: context.motionCurve(Curves.easeOutBack))
-                .fadeIn(duration: context.motionMs(600)),
+                .fadeIn(duration: context.motionMs(400)),
             const SizedBox(height: AppSpacing.lg),
             Text(
               context.l10n.appTitle,
@@ -129,8 +129,8 @@ class _SplashScreenState extends State<SplashScreen> {
             )
                 .animate()
                 .fadeIn(
-                    delay: context.motionMs(300),
-                    duration: context.motionMs(600))
+                    delay: context.motionMs(260),
+                    duration: context.motionMs(400))
                 .slideY(begin: 0.2, end: 0),
             const SizedBox(height: AppSpacing.xs),
             Text(
@@ -140,7 +140,7 @@ class _SplashScreenState extends State<SplashScreen> {
                     letterSpacing: AppTracking.medium,
                   ),
             ).animate().fadeIn(
-                delay: context.motionMs(500), duration: context.motionMs(600)),
+                delay: context.motionMs(400), duration: context.motionMs(400)),
             if (_timedOut) ...[
               const SizedBox(height: AppSpacing.lg),
               FilledButton.icon(

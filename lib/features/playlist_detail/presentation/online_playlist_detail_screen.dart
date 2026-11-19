@@ -1438,7 +1438,6 @@ class _OnlinePlaylistDetailScreenState
                         ),
                       ),
                       IconButton(
-                        visualDensity: VisualDensity.compact,
                         icon: Icon(
                           Icons.edit_rounded,
                           size: 18,

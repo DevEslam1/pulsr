@@ -193,7 +193,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
               ? _triggerPeek
               : null,
           child: AnimatedContainer(
-            duration: context.motionMs(240),
+            duration: context.motionMs(260),
             curve: context.motionCurve(Curves.easeOutCubic),
             width: totalWidth,
             clipBehavior: Clip.hardEdge,
@@ -589,7 +589,7 @@ class _SidebarNavItem extends StatelessWidget {
                   child: Center(
                     child: AnimatedScale(
                       scale: isSelected ? 1.08 : 1.0,
-                      duration: context.motionMs(180),
+                      duration: context.motionMs(200),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -693,7 +693,7 @@ class _SidebarNavItem extends StatelessWidget {
                 children: [
                   // Indicator Bar
                   AnimatedContainer(
-                    duration: context.motionMs(180),
+                    duration: context.motionMs(200),
                     width: 3.5,
                     height: isSelected ? 20 : 0,
                     decoration: BoxDecoration(
@@ -714,7 +714,7 @@ class _SidebarNavItem extends StatelessWidget {
                   // Icon
                   AnimatedScale(
                     scale: isSelected ? 1.06 : 1.0,
-                    duration: context.motionMs(180),
+                    duration: context.motionMs(200),
                     child: Icon(
                       isSelected ? activeIcon : icon,
                       size: iconSize,

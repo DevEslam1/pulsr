@@ -274,6 +274,11 @@ private:
     // Source bit depth per frame (1 byte per frame, 1/frameBytes memory vs byte ring). 0 = float.
     std::vector<uint8_t> ringRawDepth_;
     size_t ringFrameMask_ = 0;
+    // Frames that must be buffered before the DAC worker starts draining. The
+    // producer writes at ~real time, so without a cushion the ring hovers near
+    // zero and every scheduler jitter turns into gap-filled packets (audible
+    // drops). Set from the sample rate in Open().
+    size_t prefillFrames_ = 0;
     alignas(64) std::atomic<size_t> ringWrite_{0}; // cumulative frame write count
     alignas(64) std::atomic<size_t> ringRead_{0};  // cumulative frame read count
 };

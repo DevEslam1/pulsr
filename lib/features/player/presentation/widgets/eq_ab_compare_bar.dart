@@ -26,7 +26,7 @@ extension _EqAbCompareBar on _EqualizerSheetState {
             cubit.endAbComparison();
           },
           child: AnimatedContainer(
-            duration: context.motionMs(150),
+            duration: context.motionMs(120),
             curve: context.motionCurve(PulsrMotion.enter),
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s8, vertical: AppSpacing.xs),

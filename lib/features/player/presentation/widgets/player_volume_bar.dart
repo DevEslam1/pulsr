@@ -61,7 +61,6 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
               color: p.textSecondary,
             ),
             tooltip: isMuted ? context.l10n.unmute : context.l10n.mute,
-            visualDensity: VisualDensity.compact,
             onPressed: () {
               setState(() => _dragVolume = null);
               widget.cubit.toggleMute();
@@ -69,7 +68,7 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
           ),
           Expanded(
             child: AnimatedContainer(
-              duration: context.motionMs(150),
+              duration: context.motionMs(120),
               curve: context.motionCurve(PulsrMotion.enter),
               height: _isDragging ? 36.0 : 30.0,
               alignment: Alignment.center,
@@ -113,7 +112,6 @@ class _PlayerVolumeBarState extends State<PlayerVolumeBar> {
               color: p.textSecondary,
             ),
             tooltip: context.l10n.maxVolume,
-            visualDensity: VisualDensity.compact,
             onPressed: () {
               setState(() => _dragVolume = null);
               widget.cubit.setVolume(1.0);

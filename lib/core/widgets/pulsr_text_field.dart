@@ -147,7 +147,7 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
               children: [
                 Flexible(
                   child: AnimatedDefaultTextStyle(
-                    duration: context.motionMs(160),
+                    duration: context.motionMs(200),
                     style: TextStyle(
                       fontFamily: 'Manrope',
                       fontSize: AppFontSize.label,
@@ -162,7 +162,7 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
                 ),
                 const SizedBox(width: 6),
                 AnimatedContainer(
-                  duration: context.motionMs(180),
+                  duration: context.motionMs(200),
                   width: _isFocused || hasError ? 5.0 : 0.0,
                   height: _isFocused || hasError ? 5.0 : 0.0,
                   decoration: BoxDecoration(
@@ -175,7 +175,7 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
           ),
         ],
         AnimatedContainer(
-          duration: context.motionMs(180),
+          duration: context.motionMs(200),
           curve: context.motionCurve(PulsrMotion.enter),
           decoration: BoxDecoration(
             borderRadius: AppRadii.r14All,
@@ -231,7 +231,7 @@ class _PulsrTextFieldState extends State<PulsrTextField> {
               prefixIcon: widget.prefixIcon != null
                   ? AnimatedScale(
                       scale: _isFocused ? 1.08 : 1.0,
-                      duration: context.motionMs(180),
+                      duration: context.motionMs(200),
                       curve: Curves.easeOutCubic,
                       child: Icon(
                         widget.prefixIcon,

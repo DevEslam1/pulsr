@@ -948,7 +948,6 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                     color: p.textTertiary,
                     size: 20,
                   ),
-                  visualDensity: VisualDensity.compact,
                   tooltip: context.l10n.browseMoreOptions,
                   onPressed: () => SongInfoSheet.show(context, song: song),
                 ),

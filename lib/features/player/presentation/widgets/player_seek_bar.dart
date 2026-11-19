@@ -316,6 +316,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
           cubit.toggleQueueVisibility();
         },
         child: Container(
+          // The strip opens the queue; keep a 48dp touch target even when the
+          // visual row is compact.
+          constraints: const BoxConstraints(minHeight: 48),
           padding: EdgeInsetsDirectional.fromSTEB(
             AppSpacing.xs,
             isCompact ? 3.0 : AppSpacing.xxs,
@@ -599,10 +602,10 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           child: IgnorePointer(
                             child: AnimatedOpacity(
                               opacity: isDragging ? 1.0 : 0.0,
-                              duration: context.motionMs(150),
+                              duration: context.motionMs(120),
                               child: AnimatedScale(
                                 scale: isDragging ? 1.0 : 0.85,
-                                duration: context.motionMs(150),
+                                duration: context.motionMs(120),
                                 curve: Curves.easeOutBack,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
@@ -653,7 +656,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     AnimatedDefaultTextStyle(
-                      duration: context.motionMs(150),
+                      duration: context.motionMs(120),
                       style: TextStyle(
                         color:
                             isDragging ? widget.activeColor : p.textSecondary,
@@ -707,7 +710,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                       behavior: HitTestBehavior.opaque,
                       onTap: () =>
                           setState(() => _showRemaining = !_showRemaining),
-                      child: Text(
+                      // Text-only tap target: give it a 48dp box without moving
+                      // the timestamp visually.
+                      child: Container(
+                        height: 48,
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Text(
                         _showRemaining
                             ? (widget.duration > currentDuration
                                 ? '-${Formatters.formatDuration(widget.duration - currentDuration)}'
@@ -719,6 +727,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           fontWeight: FontWeight.w600,
                           fontFeatures: const [FontFeature.tabularFigures()],
                           letterSpacing: AppTracking.label,
+                        ),
                         ),
                       ),
                     ),

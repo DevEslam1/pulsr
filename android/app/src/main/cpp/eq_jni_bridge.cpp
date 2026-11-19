@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <atomic>
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -1528,8 +1529,7 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
             if (processed != frameCount) return reject(EIO);
             const bool raw = engine->wasLastBlockBitPerfect();
             bool written = false;
-            if (raw) {
-                if (!sourceBytes) return reject(EINVAL); // float cannot preserve S32 LSBs
+            if (raw && sourceBytes) {
                 // Item 3: the tap knows whether these raw words are DoP-framed, so
                 // the sink can synthesize marker-carrying silence on an underrun
                 // instead of zero-filling and destroying the marker stream.
@@ -1537,6 +1537,22 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatB
                 written = usb.WritePcm(sourceBytes, frameCount, channels, sourceBitDepth,
                                       sourceSampleRate, static_cast<int64_t>(engineHandle));
             } else {
+                if (raw && !sourceBytes) {
+                    // The engine declared the block bit-perfect but the tap has no
+                    // retained source bytes (e.g. Media3 handed a Buffer without
+                    // the original direct view). The float buffer still carries
+                    // the same 24 significant bits, so writing it keeps the
+                    // samples exact; rejecting here left the USB ring empty and
+                    // the DAC streaming silence while status claimed streaming.
+                    static auto lastFallbackLog = std::chrono::steady_clock::time_point{};
+                    const auto now = std::chrono::steady_clock::now();
+                    if (now - lastFallbackLog >= std::chrono::seconds(1)) {
+                        lastFallbackLog = now;
+                        __android_log_print(ANDROID_LOG_WARN, "PulsrUsbTee",
+                                            "bit-perfect block had no source PCM; "
+                                            "writing float path (frames=%d ch=%d)", frameCount, channels);
+                    }
+                }
                 usb.SetProducerDop(false);
                 written = usb.WriteInterleaved(floatBuffer, frameCount, channels,
                     static_cast<int>(engine->getSampleRate()), static_cast<int64_t>(engineHandle));

@@ -90,7 +90,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
           ),
           duration: _activeDraggingBand != null
               ? Duration.zero
-              : context.motionMs(240),
+              : context.motionMs(260),
           curve: Curves.easeOutCubic,
           onEnd: () {
             _prevGains = widget.gains;

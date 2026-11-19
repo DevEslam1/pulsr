@@ -1081,10 +1081,32 @@ mixin SettingsSearchResults
         title: context.l10n.experienceModeTitle,
         subtitle: context.l10n.experienceModeSubtitle,
         icon: Icons.tune_rounded,
-        keywords: ['experience', 'normal', 'studio', 'professional', 'advanced'],
+        keywords: ['experience', 'normal', 'professional', 'advanced'],
         onTap: () {
           _searchController.clear();
           setState(() => _selectedCategoryId = 'sound');
+        },
+      ),
+      _SearchItem(
+        categoryId: 'look',
+        clusterId: 'appearance',
+        deepLinkUri: '/theme-studio',
+        category: lookCat,
+        title: context.l10n.themeStudio,
+        subtitle: context.l10n.learnMore,
+        icon: Icons.palette_rounded,
+        keywords: [
+          'theme studio',
+          'studio',
+          'radius',
+          'corner',
+          'glow',
+          'accent',
+          'custom',
+        ],
+        onTap: () {
+          _searchController.clear();
+          context.push('/theme-studio');
         },
       ),
       _SearchItem(

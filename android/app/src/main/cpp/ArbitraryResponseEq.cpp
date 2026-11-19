@@ -3,8 +3,14 @@
 #include <sstream>
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <locale>
+#include <atomic>
+
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 
 #if defined(__aarch64__) || defined(_M_ARM64)
 #include <arm_neon.h>
@@ -19,6 +25,31 @@ namespace {
 // A GraphicEq/EqualizerAPO string is untrusted input. Clamp the requested gain
 // so a crafted value can never overflow pow() to +inf and poison the FIR taps.
 constexpr double kMaxGainDb = 30.0;
+
+// Item 4: bound on the GraphicEq text retained by the render thread.
+// applyParams() runs on the audio thread and must never let loadedString_ grow
+// there: a std::string realloc is an xrun at best, and with -fno-exceptions a
+// failed allocation is std::terminate. MAX_NODES (1024) entries of "freq gain; "
+// are at most ~17 chars each (~17 KB) plus the "GraphicEq:" prefix, so 24 KB
+// covers every string parseGraphicEq() can accept. Anything longer cannot come
+// from a valid preset, so it is rejected without touching the retained text.
+constexpr size_t kMaxGraphicEqStringChars = 24576;
+
+// Rate-limited (once per process) diagnostic for the case above. Called only
+// from the render-thread applyParams() path, never per block.
+void logGraphicEqTooLongOnce(size_t length, size_t capacity) {
+    static std::atomic<bool> sWarned{false};
+    if (sWarned.exchange(true)) return;
+#if defined(__ANDROID__)
+    __android_log_print(ANDROID_LOG_WARN, "PulsrDSPArbitraryEq",
+        "GraphicEq string (%zu chars) exceeds the retained capacity (%zu); keeping the previous response",
+        length, capacity);
+#else
+    fprintf(stderr,
+        "ArbitraryResponseEq: GraphicEq string (%zu chars) exceeds the retained capacity (%zu); keeping the previous response\n",
+        length, capacity);
+#endif
+}
 
 double clampGainDb(double gainDb) {
     if (!std::isfinite(gainDb)) return 0.0;
@@ -57,6 +88,10 @@ ArbitraryResponseEq::ArbitraryResponseEq() {
     oldFirFilter_[0] = 1.0f;
     spectrumScratch_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     nodes_.reserve(MAX_NODES);
+    // Item 4: reserve the retained GraphicEq text here so the render-thread
+    // applyParams() capacity check below never has to grow it (see
+    // kMaxGraphicEqStringChars). clear() keeps this capacity for the session.
+    loadedString_.reserve(kMaxGraphicEqStringChars);
     setSampleRate(48000.0);
     reset();
 }
@@ -537,9 +572,19 @@ void ArbitraryResponseEq::applyParams(const ArbitraryEqParamSet& params) {
     }
     if (!params.graphicEqString.empty()) {
         if (params.graphicEqString != loadedString_ || params.linearPhase != linearPhase_) {
-            loadedString_ = params.graphicEqString;
-            linearPhase_ = params.linearPhase;
-            needsResynthesis_.store(true, std::memory_order_release);
+            // Item 4: capacity-checked assign, never operator=. This is the audio
+            // thread: reloading the retained text must not realloc. The ctor
+            // reserves kMaxGraphicEqStringChars, which covers every string
+            // parseGraphicEq() can accept. A longer payload keeps the previous
+            // text (and the kernel built from it), is logged once, and is simply
+            // re-evaluated on the next control-thread publish.
+            if (params.graphicEqString.size() <= loadedString_.capacity()) {
+                loadedString_.assign(params.graphicEqString);
+                linearPhase_ = params.linearPhase;
+                needsResynthesis_.store(true, std::memory_order_release);
+            } else {
+                logGraphicEqTooLongOnce(params.graphicEqString.size(), loadedString_.capacity());
+            }
         }
     } else if (params.graphicEqString.empty() && (hasResponse_ || preparedNodesRef_ != nullptr)) {
         loadGraphicEqString("", params.linearPhase);

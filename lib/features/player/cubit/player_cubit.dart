@@ -357,9 +357,12 @@ class PlayerCubit extends PulsrCubit<PlayerState>
           _audioHandler.setAutomixEnabled(settingsState.automixEnabled);
         }
         if (volumeRelatedChanged) {
-          // Re-apply composed gain (ReplayGain, loudness equalization, volume boost) for new settings
+          // Re-apply composed gain (ReplayGain, loudness equalization, volume boost) for new settings.
+          // `smooth` ramps it (500 ms, 10 steps): these are policy-only changes
+          // landing on audio that is already playing, so a bit-perfect / bypass /
+          // ReplayGain flip must not step the gain in a single sample (pop).
           unawaited(_audioHandler
-              .setVolume(_audioHandler.volume)
+              .setVolumeSmooth(_audioHandler.volume)
               .catchError((Object e, StackTrace st) {
             ErrorLogger.log('Re-apply volume on settings change failed',
                 error: e, stackTrace: st, category: 'PlayerCubit');
@@ -475,6 +478,10 @@ class PlayerCubit extends PulsrCubit<PlayerState>
     _consecutiveErrorCount = 0;
     unawaited(metadataController.enrichTrackParallel(song));
     // AUDIT-FIX (P0-6): guard fire-and-forget follow-rate call on track change.
+    // Ordering: this must stay unawaited (awaiting it would block the track
+    // switch), so the song identity it was raised for travels with the request —
+    // maybeFollowTrackSampleRate drops it if the player has already moved on,
+    // instead of reconfiguring the output under the next track.
     unawaited(dspController
         .maybeFollowTrackSampleRate(song)
         .catchError((Object e, StackTrace st) {

@@ -98,7 +98,7 @@ class _SongTileState extends State<SongTile> {
                         : Colors.transparent)));
 
         final materialRow = AnimatedContainer(
-          duration: context.motionMs(160),
+          duration: context.motionMs(200),
           curve: context.motionCurve(PulsrMotion.enter),
           decoration: BoxDecoration(
             color: resolvedBg,
@@ -271,10 +271,8 @@ class _SongTileState extends State<SongTile> {
                           ],
                           Expanded(
                             child: LayoutBuilder(
-                              builder: (context, textConstraints) => FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: AlignmentDirectional.centerStart,
-                                child: SizedBox(
+                              builder: (context, textConstraints) {
+                                final content = SizedBox(
                                   width: textConstraints.maxWidth,
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
@@ -328,8 +326,22 @@ class _SongTileState extends State<SongTile> {
                                   ),
                                     ],
                                   ),
-                                ),
-                              ),
+                                );
+                                // FittedBox cancels the user's text-size
+                                // setting by shrinking the row back down. Above
+                                // 1.3x let the text lay out at its real size and
+                                // ellipsize instead.
+                                return MediaQuery.textScalerOf(context)
+                                            .scale(1) >
+                                        1.3
+                                    ? content
+                                    : FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        alignment:
+                                            AlignmentDirectional.centerStart,
+                                        child: content,
+                                      );
+                              },
                             ),
                           ),
                           if (showDurationInTile) ...[
@@ -383,6 +395,9 @@ class _SongTileState extends State<SongTile> {
           label: context.l10n.songByArtist(song.title, song.artist),
           selected: isActive || widget.selected,
           button: true,
+          // The title and artist are painted inside the row; without exclusion
+          // the node would announce "title, title, artist".
+          excludeSemantics: true,
           child: MouseRegion(
             onEnter: (_) => setState(() => _hovered = true),
             onExit: (_) => setState(() => _hovered = false),

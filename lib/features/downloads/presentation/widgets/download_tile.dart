@@ -129,7 +129,7 @@ class DownloadTile extends StatelessWidget {
                                 shape: BoxShape.circle,
                               ),
                               child: AnimatedSwitcher(
-                                duration: context.motionMs(220),
+                                duration: context.motionMs(200),
                                 switchInCurve: Curves.easeOutBack,
                                 switchOutCurve: Curves.easeIn,
                                 child: Icon(
@@ -154,7 +154,7 @@ class DownloadTile extends StatelessWidget {
                     borderRadius: AppRadii.r12All,
                   ),
                   child: AnimatedSwitcher(
-                    duration: context.motionMs(220),
+                    duration: context.motionMs(200),
                     switchInCurve: Curves.easeOutBack,
                     switchOutCurve: Curves.easeIn,
                     child: Icon(
@@ -198,7 +198,7 @@ class DownloadTile extends StatelessWidget {
                         if (task.status != DownloadStatus.complete) ...[
                           const SizedBox(width: AppSpacing.xxs),
                           AnimatedSwitcher(
-                            duration: context.motionMs(180),
+                            duration: context.motionMs(200),
                             child: PulsrBadge(
                               key: ValueKey(task.status),
                               label: statusLabel,

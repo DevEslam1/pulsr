@@ -13,7 +13,17 @@ void main() {
   final dirs = [
     Directory('lib/features'),
     Directory('lib/core/widgets'),
+    // The router used to be unscanned, so its bare consts escaped the ratchet.
+    Directory('lib/core/router'),
   ];
+
+  /// The only durations a call site may pass to `motionMs(...)`.
+  const tokenValues = {120, 200, 260, 320, 400};
+
+  /// Documented physics / ambient loops that are not part of the UI rhythm:
+  /// 650 vinyl motor spin-down, 900 tonearm, 1300/1400 & 2400/2600/3200/4000
+  /// carousel and visualiser loops, 15000 idle hint auto-dismiss.
+  const physicsAllowlist = {650, 900, 1300, 1400, 2400, 2600, 3200, 4000, 15000};
 
   test('no bare PulsrMotion durations in animated widgets', () {
     final offenders = <String>[];
@@ -82,6 +92,44 @@ void main() {
       reason: 'Every Animated* widget must resolve its duration through '
           'context.motion(...) so Reduce Motion collapses it to zero:\n'
           '${offenders.join('\n')}',
+    );
+  });
+
+  test('every motionMs literal is a token value or an allowlisted physics value',
+      () {
+    final offenders = <String>[];
+    final literal = RegExp(r'motionMs\((\d+)\)');
+
+    for (final dir in dirs) {
+      if (!dir.existsSync()) continue;
+      for (final entity in dir.listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        if (entity.path.endsWith('.g.dart') ||
+            entity.path.endsWith('.freezed.dart')) {
+          continue;
+        }
+        final lines = entity.readAsLinesSync();
+        for (var i = 0; i < lines.length; i++) {
+          final line = lines[i];
+          if (line.trimLeft().startsWith('//')) continue;
+          for (final match in literal.allMatches(line)) {
+            final value = int.parse(match.group(1)!);
+            if (!tokenValues.contains(value) &&
+                !physicsAllowlist.contains(value)) {
+              offenders.add('${entity.path}:${i + 1}: motionMs($value)');
+            }
+          }
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      isEmpty,
+      reason: 'Passing arbitrary milliseconds through motionMs() keeps the '
+          'token *API* but loses the token *rhythm*. Map to '
+          '120/200/260/320/400, or add the value to physicsAllowlist with a '
+          'comment explaining the physical model:\n${offenders.join('\n')}',
     );
   });
 

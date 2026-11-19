@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <memory>
 #include <vector>
 
 namespace {
@@ -41,7 +42,10 @@ constexpr double kCeilingDb = -6.0;
 int main() {
     std::printf("[TEST] LookaheadLimiter sample-rate change on an active stage...\n");
 
-    LookaheadLimiter limiter;
+    // Two ~460 KB limiters plus test frames overflow the 1 MB Windows test
+    // stack; keep the objects on the heap. The limiter logic is unchanged.
+    auto limiterStorage = std::make_unique<LookaheadLimiter>();
+    LookaheadLimiter& limiter = *limiterStorage;
     limiter.setSampleRate(48000.0);
     limiter.configure(5.0, kCeilingDb, 50.0, true);
     limiter.setEnabled(true);
@@ -115,7 +119,8 @@ int main() {
 
     // A dormant limiter keeps the plain reset: no latency, no residual state.
     {
-        LookaheadLimiter dormant;
+        auto dormantStorage = std::make_unique<LookaheadLimiter>();
+        LookaheadLimiter& dormant = *dormantStorage;
         dormant.setSampleRate(48000.0);
         dormant.configure(5.0, kCeilingDb, 50.0, true);
         dormant.setSampleRate(96000.0);

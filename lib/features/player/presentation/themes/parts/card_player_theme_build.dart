@@ -147,11 +147,11 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
             }) {
               return AnimatedSlide(
                 offset: Offset(0, offsetY),
-                duration: context.motionMs(420),
+                duration: context.motionMs(320),
                 curve: context.motionCurve(Curves.easeOutCubic),
                 child: AnimatedRotation(
                   turns: turn,
-                  duration: context.motionMs(420),
+                  duration: context.motionMs(320),
                   curve: context.motionCurve(Curves.easeOutCubic),
                   child: Container(
                     width: sleeveSize,
@@ -218,20 +218,20 @@ extension _CardPlayerThemeBuild on CardPlayerTheme {
                         // it straightens, scales up and casts a longer shadow.
                         AnimatedScale(
                           scale: isPlaying ? 1.0 : 0.955,
-                          duration: context.motionMs(420),
+                          duration: context.motionMs(320),
                           curve: context.motionCurve(Curves.easeOutCubic),
                           child: AnimatedRotation(
                             // 1.8° while it rests in the stack, square once
                             // it is out.
                             turns: isPlaying ? 0.0 : 0.005,
-                            duration: context.motionMs(420),
+                            duration: context.motionMs(320),
                             curve: context.motionCurve(Curves.easeOutCubic),
                             child: AnimatedSlide(
                               offset: Offset(0, isPlaying ? -0.014 : 0.0),
-                              duration: context.motionMs(420),
+                              duration: context.motionMs(320),
                               curve: context.motionCurve(Curves.easeOutCubic),
                               child: AnimatedContainer(
-                                duration: context.motionMs(420),
+                                duration: context.motionMs(320),
                                 curve: context.motionCurve(Curves.easeOutCubic),
                                 width: sleeveSize,
                                 height: sleeveSize,

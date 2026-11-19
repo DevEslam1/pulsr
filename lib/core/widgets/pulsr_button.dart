@@ -250,7 +250,7 @@ class _PulsrButtonState extends State<PulsrButton> {
       children: [
         if (hasLeading) ...[
           AnimatedSwitcher(
-            duration: context.motionMs(180),
+            duration: context.motionMs(200),
             child: widget.loading
                 ? SizedBox(
                     key: const ValueKey('loading'),
@@ -275,7 +275,7 @@ class _PulsrButtonState extends State<PulsrButton> {
     );
 
     final visual = AnimatedContainer(
-      duration: context.motionMs(150),
+      duration: context.motionMs(120),
       curve: context.motionCurve(PulsrMotion.enter),
       constraints: BoxConstraints(minHeight: _height),
       padding: _padding.add(
@@ -310,6 +310,9 @@ class _PulsrButtonState extends State<PulsrButton> {
       button: true,
       enabled: enabled,
       label: widget.label,
+      // `widget.label` is also painted inside the button; exclude the child so
+      // the node is announced once rather than twice.
+      excludeSemantics: true,
       child: PulsrPressable(
         focusBorderRadius: radius,
         onTap: enabled ? widget.onPressed : null,

@@ -58,7 +58,6 @@ class _DspSection extends StatelessWidget {
                               icon: Icon(Icons.info_outline_rounded,
                                   size: 18, color: p.textTertiary),
                               tooltip: context.l10n.learnMore,
-                              visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(),
                               onPressed: () => showAudioFeatureInfoDialog(
@@ -282,7 +281,6 @@ class _DspSection extends StatelessWidget {
                                   icon: Icon(Icons.info_outline_rounded,
                                       size: 18, color: p.textTertiary),
                                   tooltip: context.l10n.learnMore,
-                                  visualDensity: VisualDensity.compact,
                                   onPressed: () => showAudioFeatureInfoDialog(
                                       context,
                                       AudioFeatureRegistry.loudnessContour,

@@ -638,9 +638,19 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> setBitPerfectOutput(bool enabled) =>
       _audioModeMutex.protect(() => _setBitPerfectOutput(enabled));
 
+  /// Seam for the mute envelope wrapped by [SettingsAudioOutputSync].
+  Future<void> _setBitPerfectOutput(
+    bool enabled, {
+    bool keepPreferenceWhenDisabling = false,
+  }) =>
+      SettingsAudioOutputSync(this).applyBitPerfectPolicyMuted(
+        enabled,
+        keepPreferenceWhenDisabling: keepPreferenceWhenDisabling,
+      );
+
   /// [keepPreferenceWhenDisabling] releases the transport without saving
   /// "off", so a route change cannot erase the user's Bit-Perfect choice.
-  Future<void> _setBitPerfectOutput(
+  Future<void> _applyBitPerfectPolicy(
     bool enabled, {
     bool keepPreferenceWhenDisabling = false,
   }) async {
@@ -1944,34 +1954,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// the one before it actually applying: when the platform refuses exclusive
   /// output, silently bypassing the user's EQ and gain would leave a chain with
   /// no processing and no bit-perfect either.
-  Future<void> applyMaximumQualityPreset() async {
-    // Depth first: with the float DSP path off Media3 inserts a 16-bit
-    // converter ahead of the native chain, so a 24/32-bit source would reach
-    // the DAC as 16-bit no matter what Bit-Perfect later reports.
-    if (!state.floatOutputEnabled) {
-      await setFloatOutputEnabled(true);
-    }
-    // AAudio replaces the ExoPlayer sink the direct UAC2 tee lives in. On a
-    // USB DAC the tee is the path that can prove its format, so prefer it.
-    if (state.aaudioOutputEnabled &&
-        state.currentOutputDevice?.isUsbDac == true) {
-      await setAaudioOutputEnabled(false);
-      if (state.aaudioOutputEnabled) return;
-    }
-    await setBitPerfectOutput(true);
-    if (!state.bitPerfectOutput) return;
-    await setBypassDspOnBitPerfect(true);
-    if (!state.bypassDspOnBitPerfect) return;
-    // These stages edit or overlap the stream; a bit-exact claim cannot
-    // coexist with them. Order: crossfade before gapless (gapless refuses a
-    // non-zero crossfade), silence skip before it is re-armed anywhere.
-    await setCrossfade(0.0);
-    if (state.silenceSkipSensitivity > 0) {
-      await setSilenceSkipSensitivity(0);
-    }
-    await setGapless(true);
-    await setReplayGainMode(ReplayGainMode.off);
-  }
+  Future<void> applyMaximumQualityPreset() =>
+      _audioModeMutex.protect(() async {
+        await SettingsAudioOutputSync(this).runMaximumQualityPreset();
+      });
 
   /// Applies the "Smooth Playback" preset: no bit-perfect, automatic
   /// ReplayGain and a 4 s crossfade. Gapless is turned off first because

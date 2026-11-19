@@ -43,7 +43,7 @@ mixin SettingsScreenController on State<SettingsScreen> {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         0.0,
-        duration: context.motionMs(280),
+        duration: context.motionMs(260),
         curve: context.motionCurve(Curves.easeOutCubic),
       );
     }
@@ -82,7 +82,7 @@ mixin SettingsScreenController on State<SettingsScreen> {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
             0.0,
-            duration: context.motionMs(240),
+            duration: context.motionMs(260),
             curve: context.motionCurve(Curves.easeOutCubic),
           );
         }
@@ -97,7 +97,7 @@ mixin SettingsScreenController on State<SettingsScreen> {
           if (_scrollController.hasClients) {
             _scrollController.animateTo(
               0.0,
-              duration: context.motionMs(240),
+              duration: context.motionMs(260),
               curve: context.motionCurve(Curves.easeOutCubic),
             );
           }

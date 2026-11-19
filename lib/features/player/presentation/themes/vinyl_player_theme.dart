@@ -73,7 +73,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _tonearmController.duration = context.motionMs(480);
+    _tonearmController.duration = context.motionMs(400);
     _velocityController.duration = context.motionMs(650);
     _syncRotation();
   }

@@ -850,7 +850,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
       if (!context.motionEnabled) {
         _vuController.value = 0.0;
       } else if (_vuController.value > 0.0) {
-        _vuController.animateTo(0.0, duration: context.motionMs(300));
+        _vuController.animateTo(0.0, duration: context.motionMs(260));
       }
     }
   }

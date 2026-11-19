@@ -79,8 +79,12 @@ public:
 
     void Play();
     void Pause();
-    // Best-effort flush (pause + requestFlush + restart); rebases the
-    // position counters so position math stays monotonic per configuration.
+    // Best-effort flush (pause + requestFlush + restart); rebases the position
+    // counters so position math stays monotonic per configuration. Some MMAP /
+    // exclusive HALs refuse requestFlush; rebasing over an untouched device
+    // buffer would replay pre-seek audio, so the stream is rebuilt at the same
+    // config instead. A rebuild that fails leaves the sink closed: Write() then
+    // reports -1 and the caller's AudioTrack fallback ladder engages.
     void Flush();
 
     // Unity-only while the sink is bit-perfect or a DoP carrier: the requested
@@ -122,10 +126,22 @@ public:
     bool HasPendingData() const;
 
 private:
+    // Open() body with streamMutex_ already held (Open() = lock + CloseLocked +
+    // OpenLocked). Flush() reuses it to rebuild a stream whose requestFlush was
+    // refused, without unlocking and racing Close()/Open() in between.
+    // recoverPrev* forward TryOpen's recovery counters so a rebuild keeps
+    // framesWritten_ continuous instead of jumping back to zero.
+    bool OpenLocked(const Config& config, std::string* error,
+                    int64_t* recoverPrevFramesWritten = nullptr,
+                    int64_t* recoverPrevWrittenBase = nullptr);
     bool TryOpen(aaudio_sharing_mode_t sharing, aaudio_performance_mode_t perf,
                  int64_t* recoverPrevFramesWritten = nullptr,
                  int64_t* recoverPrevWrittenBase = nullptr);
-    void CloseLocked(bool waitForWriters = true);
+    // drainTail: wait (bounded) for the device to consume frames it has already
+    // accepted before requestStop() discards them. True for a live hand-over
+    // (Close()/Open()), false when the queued tail is supposed to disappear
+    // (Flush()) or cannot be consumed at all (disconnect recovery).
+    void CloseLocked(bool waitForWriters = true, bool drainTail = true);
     static void ErrorCallback(AAudioStream* stream, void* userData, aaudio_result_t error);
     bool RecoverDisconnected();
     // Item 12: the buffer governor is a query-and-adjust helper that touches only
@@ -165,6 +181,13 @@ private:
     mutable std::atomic<int64_t> lastXRunTimestampMs_{0};
     mutable std::atomic<int64_t> lastShrinkTimestampMs_{0};
     std::atomic<float> volume_{1.0f};
+    // Gain the writer thread actually ended the previous Write() on. Protected
+    // by writeMutex_ (plain float, not atomic: it is only touched under that
+    // lock). Write() ramps from here to volume_ across the whole call and stores
+    // the endpoint, so a slider drag becomes one continuous ramp instead of a
+    // hard step per buffer; Play() and SetBitPerfect() snap it so no stale
+    // multiplier survives a flush/reopen or a mode flip.
+    float appliedVolume_ = 1.0f;
     std::atomic<aaudio_result_t> lastWriteResult_{AAUDIO_OK};
     std::string lastError_;
     // Preallocated once in the constructor (64 KB). TryOpen never resizes it

@@ -179,7 +179,6 @@ mixin SettingsSectionPrimitives on State<SettingsScreen> {
                               .withValues(alpha: 0.38)
                           : context.palette.accent),
                   tooltip: context.l10n.resetToDefault30s,
-                  visualDensity: VisualDensity.compact,
                   onPressed: selected == 30
                       ? null
                       : () => setDialogState(() => selected = 30),

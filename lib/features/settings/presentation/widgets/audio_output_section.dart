@@ -410,7 +410,6 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                           size: 18, color: p.textTertiary),
                       tooltip: context.l10n
                           .settingsAboutTitle(context.l10n.dsdOutputModeTitle),
-                      visualDensity: VisualDensity.compact,
                       onPressed: () => showAudioFeatureInfoDialog(
                         context,
                         AudioFeatureRegistry.dsdNative,

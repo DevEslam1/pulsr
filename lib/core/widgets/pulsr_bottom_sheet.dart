@@ -1,8 +1,11 @@
 // lib/core/widgets/pulsr_bottom_sheet.dart
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:material_ui/material_ui.dart';
+import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_strokes.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 
@@ -165,6 +168,12 @@ class PulsrSheetHelper {
       isScrollControlled: isScrollControlled,
       isDismissible: isDismissible,
       enableDrag: enableDrag,
+      // Sheets belong to the same transition family as routes instead of
+      // Material's untokenized default.
+      sheetAnimationStyle: AnimationStyle(
+        duration: context.motion(PulsrDurations.page),
+        reverseDuration: context.motion(PulsrDurations.layout),
+      ),
       backgroundColor: Colors.transparent,
       barrierColor: barrierColor ?? AppColors.scrimAt(p.isDark ? 0.62 : 0.40),
       builder: (ctx) {
@@ -352,11 +361,14 @@ class PulsrBottomSheetContainer extends StatelessWidget {
       );
     }
 
+    // Real material: enough translucency for the backdrop to read through,
+    // but never below the legibility floor. GPU Saver keeps the opaque
+    // surface (and canBlur disables the filter at the same time).
     final baseSurfaceColor = GpuBudget.isGpuSaverActive
         ? p.surfaceContainer
         : (p.isDark
-            ? p.surfaceContainer.withValues(alpha: 0.96)
-            : p.surfaceContainer.withValues(alpha: 0.98));
+            ? p.surfaceContainer.withValues(alpha: 0.86)
+            : p.surfaceContainer.withValues(alpha: 0.90));
 
     final topBlendColor = Color.alphaBlend(
       p.accent.withValues(alpha: p.isDark ? 0.045 : 0.025),
@@ -368,7 +380,13 @@ class PulsrBottomSheetContainer extends StatelessWidget {
         : (isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius);
 
     final sheetSurface = RepaintBoundary(
-      child: Container(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(
+          sigmaX: AppBlur.sheet,
+          sigmaY: AppBlur.sheet,
+        ),
+        enabled: AppBlur.canBlur(context),
+        child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -379,16 +397,9 @@ class PulsrBottomSheetContainer extends StatelessWidget {
           borderRadius: effectiveBorderRadius,
           border: Border.all(
             color: p.isDark ? Colors.white.withValues(alpha: 0.10) : p.hairline,
-            width: 1.0,
+            width: AppStrokes.hairline,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.scrimAt(p.isDark ? 0.42 : 0.12),
-              blurRadius: 20,
-              spreadRadius: 0,
-              offset: const Offset(0, -4),
-            ),
-          ],
+          boxShadow: PulsrElevation.level3(context),
         ),
         margin: (!isDialog && isTablet)
             ? const EdgeInsetsDirectional.fromSTEB(
@@ -487,6 +498,7 @@ class PulsrBottomSheetContainer extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
 

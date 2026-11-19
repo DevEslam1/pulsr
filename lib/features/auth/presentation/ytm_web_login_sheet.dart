@@ -1143,7 +1143,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           ),
           child: AnimatedPadding(
             padding: EdgeInsets.only(bottom: bottomInset),
-            duration: context.motionMs(150),
+            duration: context.motionMs(120),
             child: Container(
               height: targetHeight,
               decoration: BoxDecoration(

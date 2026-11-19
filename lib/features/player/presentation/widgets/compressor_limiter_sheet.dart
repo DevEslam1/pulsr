@@ -720,7 +720,6 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                               ? p.textSecondary.withValues(alpha: 0.35)
                               : p.primary),
                       tooltip: context.l10n.dspResetToDefault,
-                      visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
                         minWidth: AppSpacing.minTouchTarget,

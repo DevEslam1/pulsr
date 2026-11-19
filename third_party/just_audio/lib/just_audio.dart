@@ -1416,6 +1416,27 @@ class AudioPlayer {
     }
   }
 
+  /// Pulsr fork: rebuilds the native sink with the current output policies.
+  ///
+  /// The integer Bit-Perfect bypass is latched when the sink is configured, so
+  /// a bypass change made mid-track only takes effect at the next track unless
+  /// the sink is rebuilt. Callers pause first; with no format loaded this is a
+  /// no-op and returns false.
+  Future<bool> dspReconfigureSink() async {
+    if (_disposed) return false;
+    try {
+      final channel = _activeControlChannel;
+      if (!_active || channel == null) return false;
+      if (!_isAndroid()) return false;
+      return await channel.invokeMethod<bool>('dspReconfigureSink') ?? false;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('dspReconfigureSink failed: $e');
+      }
+      return false;
+    }
+  }
+
   /// Pulsr fork: sets the tap-side sample-rate conversion target for this
   /// player's PCM tap — the sample rate the output device runs at. When it
   /// differs from the track's rate, [NativeDspAudioProcessor] converts the

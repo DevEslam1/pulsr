@@ -117,6 +117,8 @@ pulsr_add_test(test_engine_registry ${DSP_SRCS})
 pulsr_add_test(test_limiter_true_peak ${MAIN_CPP}/LookaheadLimiter.cpp)
 # Item 1: a sample-rate change on an active limiter must re-prime, not go silent.
 pulsr_add_test(test_limiter_rate_change ${MAIN_CPP}/LookaheadLimiter.cpp)
+# Item 1: reset() on a live limiter must re-prime, not emit one lookahead window of silence.
+pulsr_add_test(test_limiter_reset_live ${MAIN_CPP}/LookaheadLimiter.cpp)
 # Item 4: the range table must survive SanitizeSnapshot and every stage clamp.
 pulsr_add_test(test_param_ranges ${DSP_SRCS})
 # Item 3: DoP underrun silence is a pure helper (header only).

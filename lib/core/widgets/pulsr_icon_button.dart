@@ -61,7 +61,7 @@ class _PulsrIconButtonState extends State<PulsrIconButton> {
         : baseBg;
 
     Widget button = AnimatedContainer(
-      duration: context.motionMs(140),
+      duration: context.motionMs(120),
       curve: context.motionCurve(PulsrMotion.enter),
       width: widget.size,
       height: widget.size,

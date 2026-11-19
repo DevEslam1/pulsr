@@ -11,6 +11,7 @@ import '../services/sound_feedback_service.dart';
 import '../theme/aura_theme.dart';
 import 'pulsr_pressable.dart';
 
+import '../utils/l10n_extensions.dart';
 import '../utils/pulsr_haptics.dart';
 /// {@category DesignSystem}
 enum PulsrSwitchSize {
@@ -240,7 +241,7 @@ class _PulsrSwitchState extends State<PulsrSwitch>
                         child: Transform.translate(
                           offset: Offset(direction * slideX, 0),
                           child: AnimatedContainer(
-                            duration: context.motionMs(130),
+                            duration: context.motionMs(120),
                             curve: context.motionCurve(PulsrMotion.enter),
                             width: stretchWidth,
                             height: thumbDiameter,
@@ -339,30 +340,42 @@ class PulsrSwitchListTile extends StatelessWidget {
                       ),
                       if (onInfoTap != null) ...[
                         const SizedBox(width: AppSpacing.s6),
-                        GestureDetector(
-                          onTap: () {
-                            PulsrHaptics.selectionClick();
-                            onInfoTap!();
-                          },
-                          behavior: HitTestBehavior.opaque,
-                          child: Container(
-                            padding: const EdgeInsets.all(3.5),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: p.isDark
-                                  ? AppColors.specularAt(0.07)
-                                  : p.surfaceContainerHigh,
-                              border: Border.all(
-                                color: p.isDark
-                                    ? AppColors.specularAt(0.12)
-                                    : p.hairline,
-                                width: 0.8,
+                        Semantics(
+                          button: true,
+                          label: context.l10n.learnMore,
+                          excludeSemantics: true,
+                          child: GestureDetector(
+                            onTap: () {
+                              PulsrHaptics.selectionClick();
+                              onInfoTap!();
+                            },
+                            behavior: HitTestBehavior.opaque,
+                            // 48dp target around a ~20dp visual disc.
+                            child: SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(3.5),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: p.isDark
+                                        ? AppColors.specularAt(0.07)
+                                        : p.surfaceContainerHigh,
+                                    border: Border.all(
+                                      color: p.isDark
+                                          ? AppColors.specularAt(0.12)
+                                          : p.hairline,
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.info_outline_rounded,
+                                    size: 13.5,
+                                    color: p.textSecondary,
+                                  ),
+                                ),
                               ),
-                            ),
-                            child: Icon(
-                              Icons.info_outline_rounded,
-                              size: 13.5,
-                              color: p.textSecondary,
                             ),
                           ),
                         ),

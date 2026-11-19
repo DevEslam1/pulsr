@@ -145,6 +145,81 @@ inline void ApplyI32Volume(int32_t* data, int32_t sampleCount, float gain,
     }
 }
 
+/**
+ * Per-frame linear gain ramp for the sink's soft volume.
+ *
+ * The sink samples volume_ once per Write(); multiplying a whole block by the
+ * new value turns a slider drag into one hard gain step per buffer (5-20 ms at
+ * typical block sizes) — the textbook zipper artefact. These variants walk the
+ * gain from gainStart towards gainEnd across the block instead, and the caller
+ * returns the endpoint as the next block's start so the seam is continuous.
+ *
+ * The step advances once per *frame*, not per sample: every channel of a frame
+ * shares one gain, so a ramp cannot shift the stereo image or modulate the
+ * inter-channel balance. Requantization follows the constant-gain versions
+ * above (TPDF only when the product leaves the integer grid), so a zero-slope
+ * ramp is bit-identical to them.
+ */
+inline void ApplyI16VolumeRamp(int16_t* data, int32_t frameCount,
+                               int32_t channelCount, float gainStart,
+                               float gainEnd, SinkDitherState& st) {
+    if (frameCount <= 0 || channelCount <= 0) return;
+    const float step = (gainEnd - gainStart) / static_cast<float>(frameCount);
+    float gain = gainStart;
+    int16_t* frame = data;
+    for (int32_t f = 0; f < frameCount; ++f) {
+        for (int32_t c = 0; c < channelCount; ++c) {
+            frame[c] = static_cast<int16_t>(QuantizeLsbWithDither(
+                static_cast<double>(frame[c]) * static_cast<double>(gain),
+                -32768, 32767, st));
+        }
+        frame += channelCount;
+        gain += step;
+    }
+}
+
+inline void ApplyI24PackedVolumeRamp(uint8_t* data, int32_t frameCount,
+                                     int32_t channelCount, float gainStart,
+                                     float gainEnd, SinkDitherState& st) {
+    if (frameCount <= 0 || channelCount <= 0) return;
+    const float step = (gainEnd - gainStart) / static_cast<float>(frameCount);
+    float gain = gainStart;
+    uint8_t* p = data;
+    for (int32_t f = 0; f < frameCount; ++f) {
+        for (int32_t c = 0; c < channelCount; ++c) {
+            const int32_t raw = static_cast<int32_t>(p[0]) |
+                                (static_cast<int32_t>(p[1]) << 8) |
+                                (static_cast<int32_t>(static_cast<int8_t>(p[2])) << 16);
+            const int64_t scaled = QuantizeLsbWithDither(
+                static_cast<double>(raw) * static_cast<double>(gain),
+                -8388608, 8388607, st);
+            p[0] = static_cast<uint8_t>(scaled & 0xFF);
+            p[1] = static_cast<uint8_t>((scaled >> 8) & 0xFF);
+            p[2] = static_cast<uint8_t>((scaled >> 16) & 0xFF);
+            p += 3;
+        }
+        gain += step;
+    }
+}
+
+inline void ApplyI32VolumeRamp(int32_t* data, int32_t frameCount,
+                               int32_t channelCount, float gainStart,
+                               float gainEnd, SinkDitherState& st) {
+    if (frameCount <= 0 || channelCount <= 0) return;
+    const float step = (gainEnd - gainStart) / static_cast<float>(frameCount);
+    float gain = gainStart;
+    int32_t* frame = data;
+    for (int32_t f = 0; f < frameCount; ++f) {
+        for (int32_t c = 0; c < channelCount; ++c) {
+            frame[c] = static_cast<int32_t>(QuantizeLsbWithDither(
+                static_cast<double>(frame[c]) * static_cast<double>(gain),
+                -2147483648LL, 2147483647LL, st));
+        }
+        frame += channelCount;
+        gain += step;
+    }
+}
+
 // Computes stream buffer capacity headroom in frames. The builder capacity is
 // an immutable ceiling for AAudioStream_setBufferSizeInFrames, so clamping it
 // to targetBufferMs prevents CheckAndAdaptBuffer from expanding on XRuns.
@@ -163,22 +238,24 @@ inline int32_t ComputeStreamCapacityFrames(int32_t sampleRate,
 
 // Computes initial AAudio buffer size in frames. Starting at only burst*2
 // (~2 ms at 48 kHz) starves exclusive streams fed by non-real-time Java
-// threads; floor to max(burst*4, targetFrames/2), keep >= burst*2 (bounded
-// by capacity), and never exceed capacity or positive targetFrames.
+// threads, so start at max(burst*4, targetFrames/2) instead. A small target
+// must not clamp that headroom away — an 8 ms target (384 frames at 48 kHz)
+// cannot absorb one 4-burst wake-up gap from the Java writer — so the floor is
+// min(targetFrames, burst*4): a small target starts at burst*4 (16 ms with a
+// 192-frame burst), a deep one (120 ms) still starts at half of it. The result
+// never exceeds the reported capacity.
 inline int32_t ComputeInitialBufferFrames(int32_t burst, int32_t capacity,
                                           int32_t targetFrames) {
     if (capacity <= 0 && targetFrames <= 0) {
         return burst > 0 ? burst * 4 : 0;
     }
-    int32_t desired = burst > 0 ? burst * 4 : capacity;
+    const int32_t burstHeadroom = burst > 0 ? burst * 4 : 0;
+    int32_t desired = burst > 0 ? burstHeadroom : capacity;
     if (targetFrames > 0) {
         const int32_t halfTarget = targetFrames / 2;
         if (halfTarget > desired) desired = halfTarget;
-        if (desired > targetFrames) desired = targetFrames;
-    }
-    if (burst > 0) {
-        const int32_t floorFrames = burst * 2;
-        if (desired < floorFrames) desired = floorFrames;
+        const int32_t targetFloor = std::min(targetFrames, burstHeadroom);
+        if (desired < targetFloor) desired = targetFloor;
     }
     if (capacity > 0 && desired > capacity) {
         desired = capacity;

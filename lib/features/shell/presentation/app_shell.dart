@@ -22,6 +22,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/a11y_live_announcer.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../../core/widgets/pulsr_dock_tracker.dart';
+import '../../../core/widgets/pulsr_error_boundary.dart';
 import '../../../core/widgets/pulsr_modal_tracker.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -175,7 +176,7 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
       if (primary != null && primary.hasClients) {
         primary.animateTo(
           0.0,
-          duration: context.motionMs(300),
+          duration: context.motionMs(260),
           curve: context.motionCurve(Curves.easeOutCubic),
         );
       }
@@ -366,7 +367,15 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
         body: Stack(
           children: [
             Positioned.fill(
-              child: PulsrDockAware(child: widget.navigationShell),
+              child: PulsrDockAware(
+                // A build error in one branch must not take down the dock or
+                // the mini player: the boundary keeps the rest of the shell
+                // alive and offers a retry for the failed subtree.
+                child: PulsrErrorBoundary(
+                  category: 'Shell.branch',
+                  child: widget.navigationShell,
+                ),
+              ),
             ),
             // Soft bottom ambient vignette so scrolling content fades into the floating dock
             PositionedDirectional(
@@ -397,13 +406,23 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
               bottom: 0,
               child: ValueListenableBuilder<DockStackMode>(
                 valueListenable: DockStyleController.mode,
-                builder: (context, dockMode, _) => StackedBottomDock(
-                  currentIndex: widget.navigationShell.currentIndex,
-                  onTapNav: _onTapNav,
-                  onOpenNowPlaying: () => _openNowPlaying(context),
-                  mode: dockMode,
-                  layoutMode: layoutDelegate.layoutMode,
-                  onModeChanged: DockStyleController.set,
+                builder: (context, dockMode, _) => AnimatedSize(
+                  // The first song used to swap the whole dock subtree in a
+                  // single frame — the one un-animated transition in a player
+                  // where every later track change is choreographed. Growing
+                  // the surface (and clipping the child) makes the mini player
+                  // slide into existence instead of hard-cutting.
+                  duration: context.motion(PulsrDurations.page),
+                  curve: context.motionCurve(PulsrMotion.enter),
+                  alignment: AlignmentDirectional.bottomCenter,
+                  child: StackedBottomDock(
+                    currentIndex: widget.navigationShell.currentIndex,
+                    onTapNav: _onTapNav,
+                    onOpenNowPlaying: () => _openNowPlaying(context),
+                    mode: dockMode,
+                    layoutMode: layoutDelegate.layoutMode,
+                    onModeChanged: DockStyleController.set,
+                  ),
                 ),
               ),
             ),
@@ -486,12 +505,15 @@ class AppShellState extends State<AppShell> with WidgetsBindingObserver {
                               order: const NumericFocusOrder(2.0),
                               child: PulsrDockAware(
                                 heightIncludesSafeArea: true,
-                                child: widget.navigationShell,
+                                child: PulsrErrorBoundary(
+                                  category: 'Shell.branch',
+                                  child: widget.navigationShell,
+                                ),
                               ),
                             ),
                           ),
                           AnimatedSwitcher(
-                            duration: context.motionMs(240),
+                            duration: context.motionMs(260),
                             switchInCurve:
                                 context.motionCurve(Curves.easeOutCubic),
                             switchOutCurve:

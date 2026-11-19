@@ -1569,10 +1569,9 @@ class EqualizerManager {
     var targetVolumeLinear = prevVolumeLinear;
 
     if (enabled && !wasEnabled && PlatformCapabilities.isAndroid) {
-      // Query once on enable. getSystemMusicVolume returns 1.0 when
-      // unavailable, which gates the lift off (the safe default); the previous
-      // software-fed [loudnessVolumeLinear] is only overwritten with a finite
-      // in-range reading, so an error leaves the existing value as fallback.
+      // Query once on enable. getSystemMusicVolume returns -1.0 when
+      // unavailable; that fails the range check below so the previous
+      // software-fed [loudnessVolumeLinear] is kept as the fallback.
       try {
         final sysRatio = await _effectsChannel.getSystemMusicVolume();
         if (sysRatio.isFinite && sysRatio >= 0.0) {

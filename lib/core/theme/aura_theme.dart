@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 import 'player_material_colors.dart';
+import 'pulsr_page_transitions.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 export 'pulsr_elevation.dart';
@@ -310,13 +311,16 @@ class AuraTheme {
   /// dark-AMOLED cyan everywhere, while genuinely raising text/outline
   /// contrast (the palette and component outlines differ from [customTheme]).
   static ThemeData highContrastThemeFor(Brightness brightness,
-      {Color seed = AppColors.accentCyan, bool isCalmDensity = false}) {
+      {Color seed = AppColors.accentCyan,
+      bool isCalmDensity = false,
+      BorderRadius? buttonRadius}) {
     final isDark = brightness == Brightness.dark;
     return customTheme(seed,
         brightness: brightness,
         isAmoled: isDark ? true : false,
         isHighContrast: true,
-        isCalmDensity: isCalmDensity);
+        isCalmDensity: isCalmDensity,
+        buttonRadius: buttonRadius);
   }
 
   /// Gold tier marker that stays legible on a light surface: darken the brand
@@ -629,7 +633,12 @@ class AuraTheme {
     bool dimWhitePoint = false,
     bool isHighContrast = false,
     bool isCalmDensity = false,
+    BorderRadius? buttonRadius,
   }) {
+    // "Button style" in Settings → Look resolves to one radius used by every
+    // Material button, so changing it changes real buttons rather than only
+    // chips and section headers.
+    final resolvedButtonRadius = buttonRadius ?? AppRadii.buttonRadius;
     final p = _palette(accent, brightness, isAmoled,
         dimWhitePoint: dimWhitePoint,
         isHighContrast: isHighContrast,
@@ -730,7 +739,16 @@ class AuraTheme {
       // framework defaults.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
+          // Android 14+ predictive back owns the gesture; the router returns
+          // MaterialPage so this builder is actually consulted.
           TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
+          // iOS/macOS keep the native edge-swipe pop.
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          // Desktop keeps Pulsr's tuned slide + parallax.
+          TargetPlatform.windows: PulsrPageTransitionsBuilder(),
+          TargetPlatform.linux: PulsrPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: PulsrPageTransitionsBuilder(),
         },
       ),
       fontFamily: fontFamily,
@@ -917,6 +935,38 @@ class AuraTheme {
           visualDensity: VisualDensity.compact,
         ),
       ),
+      // One material for every context menu. Without this the 12 raw
+      // PopupMenuButtons inherit the Material default surface, elevation and
+      // radius — the only surface class outside the Pulsr system.
+      popupMenuTheme: PopupMenuThemeData(
+        color: p.surfaceContainerHigh,
+        surfaceTintColor: Colors.transparent,
+        elevation: 18,
+        shape: RoundedRectangleBorder(
+          borderRadius: AppRadii.cardRadius,
+          side: BorderSide(color: p.hairline, width: 1.0),
+        ),
+        textStyle: TextStyle(
+          color: p.textPrimary,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks,
+          fontSize: AppFontSize.body,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      // Material's compact density subtracts 8dp from the *tap target*, so an
+      // IconButton under `VisualDensity.compact` renders 40x40 even when the
+      // call site declares a 48dp constraint. Standardise on the design
+      // system's 48dp floor at the theme level.
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(
+          visualDensity: VisualDensity.standard,
+          tapTargetSize: MaterialTapTargetSize.padded,
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(borderRadius: AppRadii.r14All),
+          ),
+        ),
+      ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.surface,
         modalBackgroundColor: p.surface,
@@ -1005,8 +1055,7 @@ class AuraTheme {
           foregroundColor: p.onAccent,
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s20, vertical: AppSpacing.sm),
-          shape:
-              const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
+          shape: RoundedRectangleBorder(borderRadius: resolvedButtonRadius),
           textStyle: const TextStyle(
               fontFamily: fontFamily,
               fontFamilyFallback: fontFallbacks,
@@ -1021,8 +1070,7 @@ class AuraTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.lg, vertical: AppSpacing.s14),
-          shape:
-              const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
+          shape: RoundedRectangleBorder(borderRadius: resolvedButtonRadius),
           textStyle: const TextStyle(
               fontFamily: fontFamily,
               fontFamilyFallback: fontFallbacks,
@@ -1036,8 +1084,7 @@ class AuraTheme {
           side: BorderSide(color: p.hairline, width: outlineWidth),
           padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.s20, vertical: AppSpacing.s14),
-          shape:
-              const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
+          shape: RoundedRectangleBorder(borderRadius: resolvedButtonRadius),
           textStyle: const TextStyle(
               fontFamily: fontFamily,
               fontFamilyFallback: fontFallbacks,

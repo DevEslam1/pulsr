@@ -53,25 +53,14 @@ LookaheadLimiter::LookaheadLimiter() {
 
 void LookaheadLimiter::setSampleRate(double sampleRate) {
     if (sampleRate <= 0.0 || std::abs(sampleRate_ - sampleRate) < 1.0) return;
-    // Item 1: a live limiter must re-prime, not go silent. configure() may
-    // already start an enable transition when the lookahead length changed, but
-    // the unconditional reset() below wipes it: reset() zeroes the delay line
-    // while bypassMix_ returns to 1.0 (fully wet) and clears processingActive_,
-    // so the stage emits one lookahead window of digital silence in the middle
-    // of an otherwise continuous stream. Capture the live state first, then
-    // restore the insertion transition after the reset.
-    const bool wasActive = (processingActive_ && enabled_);
+    // Item 1: a live limiter must re-prime, not go silent. That re-arm now lives
+    // inside reset() so every reset caller (this rate change, engine seek /
+    // track start, NaN recovery) gets it; here we only re-derive the lookahead
+    // length and the coefficients for the new rate and let reset() re-prime the
+    // stage when it was live. A dormant limiter still ends up fully cleared.
     sampleRate_ = sampleRate;
     configure(lookaheadMs_, thresholdDb_, releaseMs_, truePeakMode_);
     reset();
-    if (wasActive) {
-        // Same dry hold + fade as setEnabled(true)/setProcessingActive(true):
-        // the next lookaheadSamples_ + FILTER_DELAY frames pass the current
-        // input through (gain-limited) and then crossfade to the fresh delayed
-        // stream. A dormant/reset limiter keeps the plain reset above.
-        processingActive_ = true;
-        beginEnableTransition();
-    }
 }
 
 void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double releaseMs, bool truePeakMode) {
@@ -196,6 +185,19 @@ void LookaheadLimiter::syncPendingParams() {
 }
 
 void LookaheadLimiter::reset() {
+    // Item 1: a LIVE stage must re-prime, not jump to fully wet. reset() is
+    // called for every seek / track start (AudioDspEngine::resetInternal), for
+    // a sample-rate change and from the NaN-recovery path. Zeroing the delay
+    // line while bypassMix_ returned to 1.0 (fully wet) made the next
+    // lookaheadSamples_ + FILTER_DELAY frames read the memset zeros and then
+    // step hard back to level: one lookahead window of digital silence plus a
+    // broadband click in the middle of a continuous stream. Capture the live
+    // state first, clear the state as before, then restart exactly the same
+    // dry hold + fade that setEnabled(true) / setProcessingActive(true) use
+    // (beginEnableTransition() does its own delay-line/deque memsets, so none
+    // are repeated after it). A dormant stage keeps the plain cleared state:
+    // zero latency, not draining.
+    const bool wasLive = (processingActive_ && enabled_);
     std::memset(delayBuf_, 0, sizeof(delayBuf_));
     std::fill(std::begin(gainBuf_), std::end(gainBuf_), 1.0f);
     std::memset(deque_, 0, sizeof(deque_));
@@ -217,6 +219,10 @@ void LookaheadLimiter::reset() {
     bypassPending_ = false;
     processingActive_ = false;
     disabledSinceProcess_ = false;
+    if (wasLive) {
+        processingActive_ = true;
+        beginEnableTransition();
+    }
 }
 
 float LookaheadLimiter::estimateTruePeak(const float* history) {

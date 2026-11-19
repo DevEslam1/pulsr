@@ -6,7 +6,9 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_strokes.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -22,6 +24,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/list_content_diff.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
 import '../../../core/widgets/marquee_text.dart';
 import '../../../core/widgets/spinning_vinyl_disc.dart';
@@ -583,14 +586,9 @@ class MiniPlayerState extends State<MiniPlayer> {
                     decoration: BoxDecoration(
                       borderRadius: playerRadius,
                       boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(
-                              alpha: (p.isDark ? 0.42 : 0.10) *
-                                  (isCalm ? 0.5 : 1.0)),
-                          blurRadius: isCalm ? 12 : 22,
-                          spreadRadius: -2,
-                          offset: const Offset(0, 6),
-                        ),
+                        ...PulsrElevation.level4(context),
+                        // Intentional accent glow (not depth): keeps the
+                        // player's identity over bright artwork.
                         if (!isCalm)
                           BoxShadow(
                             color: activeAccent.withValues(
@@ -603,30 +601,25 @@ class MiniPlayerState extends State<MiniPlayer> {
                     ),
                     child: ClipRRect(
                       borderRadius: playerRadius,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: playerRadius,
-                          color: isCalm ? p.surfaceContainerHigh : null,
-                          gradient: isCalm
-                              ? null
-                              : LinearGradient(
-                                  begin: AlignmentDirectional.centerStart,
-                                  end: AlignmentDirectional.centerEnd,
-                                  colors: [
-                                    Color.alphaBlend(
-                                      activeAccent.withValues(
-                                          alpha: p.isDark ? 0.09 : 0.06),
-                                      p.surfaceContainerHigh,
-                                    ),
-                                    p.surfaceContainer,
-                                  ],
-                                  stops: const [0.0, 0.68],
-                                ),
-                          border: Border.all(
-                            color: p.hairline,
-                            width: 1.0,
-                          ),
+                      // The surface the user sees most: it floats over artwork
+                      // all day, so it is genuinely entitled to a backdrop
+                      // filter instead of an opaque slab.
+                      child: GlassContainer(
+                        blur: AppBlur.standard,
+                        opacity: p.isDark ? 0.62 : 0.80,
+                        borderRadius: playerRadius,
+                        border: Border.all(
+                          color: p.hairline,
+                          width: AppStrokes.hairline,
                         ),
+                        enableBlur: !isCalm,
+                        color: isCalm
+                            ? p.surfaceContainerHigh
+                            : Color.alphaBlend(
+                                activeAccent.withValues(
+                                    alpha: p.isDark ? 0.09 : 0.06),
+                                p.surfaceContainerHigh,
+                              ),
                         child: Stack(
                           alignment: Alignment.topCenter,
                           children: [
@@ -1977,7 +1970,7 @@ class MiniPlayerHorizontal extends StatelessWidget {
                           minScaleFactor: 0.8,
                           maxScaleFactor: 2.0,
                           child: AnimatedSwitcher(
-                            duration: context.motionMs(220),
+                            duration: context.motionMs(200),
                             transitionBuilder: (child, anim) => FadeTransition(
                               opacity: anim,
                               child: SlideTransition(
@@ -2034,7 +2027,6 @@ class MiniPlayerHorizontal extends StatelessWidget {
                             ? context.l10n.pause
                             : context.l10n.play,
                         iconSize: 26,
-                        visualDensity: VisualDensity.compact,
                         constraints:
                             const BoxConstraints(minWidth: 48, minHeight: 48),
                         icon: state.isBuffering
@@ -2060,7 +2052,6 @@ class MiniPlayerHorizontal extends StatelessWidget {
                       IconButton(
                         tooltip: context.l10n.next,
                         iconSize: 24,
-                        visualDensity: VisualDensity.compact,
                         constraints:
                             const BoxConstraints(minWidth: 48, minHeight: 48),
                         icon: Icon(

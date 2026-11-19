@@ -96,7 +96,7 @@ class _WaveformHeroStage extends StatelessWidget {
                     child: TweenAnimationBuilder<double>(
                       tween: Tween<double>(
                           begin: 0.0, end: isPlaying ? 1.0 : 0.0),
-                      duration: context.motionMs(450),
+                      duration: context.motionMs(320),
                       curve: Curves.easeOutCubic,
                       builder: (context, fadeMultiplier, _) {
                         if (fadeMultiplier <= 0.001) {
@@ -263,7 +263,7 @@ class _TiltableArtworkSquircleState extends State<_TiltableArtworkSquircle>
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Reduce Motion: the release snaps flat instead of tweening back.
-    _springController.duration = context.motionMs(350);
+    _springController.duration = context.motionMs(320);
   }
 
   @override

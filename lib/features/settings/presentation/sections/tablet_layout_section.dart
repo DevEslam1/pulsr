@@ -81,7 +81,7 @@ mixin TabletLayoutSection
                           }
                         },
                         child: AnimatedContainer(
-                          duration: context.motionMs(180),
+                          duration: context.motionMs(200),
                           curve: context.motionCurve(PulsrMotion.enter),
                           padding: const EdgeInsets.symmetric(
                               horizontal: AppSpacing.sm,
@@ -206,7 +206,7 @@ mixin TabletLayoutSection
     final bottomInset = PulsrLayoutMetrics.scrollBottom(context);
 
     return AnimatedSwitcher(
-      duration: context.motionMs(220),
+      duration: context.motionMs(200),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) => FadeTransition(

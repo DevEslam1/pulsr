@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
+import '../constants/app_strokes.dart';
 import '../constants/app_typography.dart';
 import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
@@ -477,14 +478,8 @@ class _ToastWidgetState extends State<_ToastWidget>
                           decoration: BoxDecoration(
                             borderRadius: snackbarRadius,
                             boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(
-                                  alpha: p.isDark ? 0.38 : 0.10,
-                                ),
-                                blurRadius: 18,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 6),
-                              ),
+                              ...PulsrElevation.level3(context),
+                              // Status-tinted glow (intentional signal colour).
                               BoxShadow(
                                 color: statusColor.withValues(
                                   alpha: p.isDark ? 0.14 : 0.06,
@@ -517,7 +512,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                   ),
                                   border: Border.all(
                                     color: borderColor,
-                                    width: 1.0,
+                                    width: AppStrokes.hairline,
                                   ),
                                 ),
                                 padding: EdgeInsetsDirectional.fromSTEB(

@@ -94,7 +94,7 @@ mixin PhoneLayoutSection
     final currentCat = categories.firstWhere((c) => c.id == selectedId);
 
     return AnimatedSwitcher(
-      duration: context.motionMs(220),
+      duration: context.motionMs(200),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) => FadeTransition(

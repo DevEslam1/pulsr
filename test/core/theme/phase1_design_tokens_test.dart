@@ -1,7 +1,7 @@
 // test/core/theme/phase1_design_tokens_test.dart
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/core/constants/app_elevation.dart';
+import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/theme/focus_tokens.dart';
 import 'package:pulsr/core/theme/scrim_tokens.dart';
 import 'package:pulsr/core/widgets/glass_container.dart';
@@ -10,10 +10,14 @@ import 'package:pulsr/core/widgets/highlighted_text.dart';
 void main() {
   group('Phase 1 Design System Tokens & Components', () {
     test('GlassPreset definitions map to valid blur and opacity pairs', () {
-      expect(GlassPreset.dock.blur, 24.0);
+      // A preset must never declare a sigma above AppBlur.maxSigma: the token
+      // would then lie about what the GPU rasterises (24 -> 18).
+      expect(GlassPreset.dock.blur, AppBlur.maxSigma);
+      expect(GlassPreset.dock.blur, AppBlur.clampSigma(GlassPreset.dock.blur));
       expect(GlassPreset.dock.opacity, 0.72);
 
-      expect(GlassPreset.sheet.blur, 20.0);
+      expect(GlassPreset.sheet.blur, AppBlur.maxSigma);
+      expect(GlassPreset.sheet.blur, AppBlur.clampSigma(GlassPreset.sheet.blur));
       expect(GlassPreset.sheet.opacity, 0.82);
 
       expect(GlassPreset.dialog.blur, 16.0);
@@ -21,25 +25,6 @@ void main() {
 
       expect(GlassPreset.chip.blur, 8.0);
       expect(GlassPreset.chip.opacity, 0.60);
-    });
-
-    test('AppElevation scale produces valid BoxShadow cascades', () {
-      expect(AppElevation.e0, isEmpty);
-
-      final e1 = AppElevation.e1(Colors.black);
-      expect(e1.length, 1);
-      expect(e1.first.blurRadius, 8.0);
-      expect(e1.first.offset, const Offset(0, 2));
-
-      final e2 = AppElevation.e2(Colors.black, glowColor: Colors.blue);
-      expect(e2.length, 2);
-      expect(e2.first.blurRadius, 16.0);
-      expect(e2.first.offset, const Offset(0, 4));
-
-      final e3 = AppElevation.e3(Colors.black, glowColor: Colors.purple);
-      expect(e3.length, 2);
-      expect(e3.first.blurRadius, 24.0);
-      expect(e3.first.offset, const Offset(0, 8));
     });
 
     test('ScrimTokens return dark and light theme alpha variants', () {

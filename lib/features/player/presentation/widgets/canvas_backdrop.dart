@@ -438,7 +438,7 @@ class CanvasToggleChip extends StatelessWidget {
         },
         borderRadius: AppRadii.r20All,
         child: AnimatedContainer(
-          duration: context.motionMs(240),
+          duration: context.motionMs(260),
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 8 : 10,
             vertical: compact ? 3 : 5,

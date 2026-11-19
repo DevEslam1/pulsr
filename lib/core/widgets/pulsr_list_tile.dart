@@ -167,7 +167,10 @@ class PulsrListTile extends StatelessWidget {
         button: onTap != null,
         enabled: enabled,
         selected: selected,
-        label: title,
+        // The visible title/subtitle live inside `content`; without exclusion
+        // Flutter merges them into this node and TalkBack reads the row twice.
+        excludeSemantics: true,
+        label: subtitle == null ? title : '$title, $subtitle',
         child: content,
       ),
     );

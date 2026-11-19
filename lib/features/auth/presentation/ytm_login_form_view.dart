@@ -66,13 +66,12 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
             style: FilledButton.styleFrom(
               backgroundColor: p.success,
               elevation: 2,
-              visualDensity: VisualDensity.compact,
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s10,
                 vertical: AppSpacing.s6,
               ),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(48, 48),
+              tapTargetSize: MaterialTapTargetSize.padded,
               shape: RoundedRectangleBorder(
                 borderRadius: AppRadii.r8All,
               ),
@@ -85,13 +84,12 @@ extension _YtmLoginFormView on _YtmWebLoginSheetState {
               backgroundColor: p.surfaceContainerHigh,
               foregroundColor: p.textPrimary,
               elevation: 0,
-              visualDensity: VisualDensity.compact,
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s10,
                 vertical: AppSpacing.s6,
               ),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              minimumSize: const Size(48, 48),
+              tapTargetSize: MaterialTapTargetSize.padded,
               shape: RoundedRectangleBorder(
                 borderRadius: AppRadii.r8All,
                 side: BorderSide(color: p.hairline),

@@ -833,7 +833,7 @@ class _PresetPill extends StatelessWidget {
         onTap();
       },
       child: AnimatedContainer(
-        duration: context.motionMs(180),
+        duration: context.motionMs(200),
         curve: context.motionCurve(PulsrMotion.enter),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.xs,

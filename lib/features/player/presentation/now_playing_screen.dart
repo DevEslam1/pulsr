@@ -12,6 +12,7 @@ import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/gesture_hint_overlay.dart';
+import '../../shell/presentation/widgets/player_shortcut_scope.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
@@ -181,8 +182,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           bgColor: bgColor,
         );
 
-        final themeWidget =
-            ThemeRegistry.build(settingsConfig.playerThemeMode, props);
+        final themeWidget = PlayerArrowShortcutScope(
+          // Arrow keys are transport controls *only* here; mounting the scope
+          // inside the player leaves directional focus traversal intact on
+          // every other screen. The shell's error boundary already keeps the
+          // dock alive around this route.
+          onSeekForward: () => cubit.fastForward(const Duration(seconds: 10)),
+          onSeekBackward: () => cubit.rewind(const Duration(seconds: 10)),
+          onVolumeUp: () => cubit.adjustVolume(0.05),
+          onVolumeDown: () => cubit.adjustVolume(-0.05),
+          child: ThemeRegistry.build(settingsConfig.playerThemeMode, props),
+        );
 
         return PopScope(
           canPop: false,
@@ -193,15 +203,23 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           child: Scaffold(
             backgroundColor: Colors.transparent,
             body: AnimatedContainer(
-              duration: context.motionMs(420),
+              duration: context.motionMs(320),
               curve: context.motionCurve(Curves.easeOutCubic),
-              color: bgColor,
+              // Transparent stage: the route is non-opaque, so a drag reveals
+              // the library and mini player instead of a flat colour panel.
+              // Each theme paints its own background inside the transform.
+              color: Colors.transparent,
               child: _SwipeDownToDismiss(
                 activeColor: activeColor,
                 onDismiss: () => _safePop(context),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
+                    // Surface colour lives inside the dismiss transform so it
+                    // travels (and fades) with the player.
+                    Positioned.fill(
+                      child: ColoredBox(color: bgColor),
+                    ),
                     if (settingsConfig.canvasEnabled &&
                         settingsConfig.canvasAsBackdrop)
                       Positioned.fill(
@@ -244,7 +262,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                       state: state,
                       cubit: cubit,
                       themeWidget: AnimatedSwitcher(
-                        duration: context.motionMs(380),
+                        duration: context.motionMs(320),
                         switchInCurve: context.motionCurve(Curves.easeOutCubic),
                         switchOutCurve: context.motionCurve(Curves.easeInCubic),
                         transitionBuilder: (child, animation) {

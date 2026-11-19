@@ -527,7 +527,6 @@ class _LyricsViewState extends State<LyricsView> {
       key: key,
       icon: Icon(icon, color: widget.activeColor, size: 20),
       tooltip: tooltip,
-      visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(
         minWidth: AppSpacing.minTouchTarget,
         minHeight: AppSpacing.minTouchTarget,
@@ -839,7 +838,7 @@ class _LyricsViewState extends State<LyricsView> {
       selectionSnapDelay: const Duration(seconds: 2),
       resumeDelay: const Duration(seconds: 4),
       scrollAnimation: LyricScrollAnimation.fixed(
-        duration: context.motionMs(300),
+        duration: context.motionMs(260),
       ),
     );
 

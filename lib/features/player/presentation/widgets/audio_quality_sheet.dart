@@ -796,7 +796,7 @@ class AudioQualitySheet extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xs),
             child: AnimatedContainer(
-              duration: context.motionMs(180),
+              duration: context.motionMs(200),
               decoration: BoxDecoration(
                 color: isSelected
                     ? activeColor.withValues(alpha: 0.12)
@@ -886,7 +886,7 @@ class AudioQualitySheet extends StatelessWidget {
                           ),
                         ),
                         AnimatedSwitcher(
-                          duration: context.motionMs(150),
+                          duration: context.motionMs(120),
                           child: isSelected
                               ? Icon(
                                   Icons.check_circle_rounded,
@@ -1422,7 +1422,6 @@ class AudioQualitySheet extends StatelessWidget {
                             size: 16,
                             color: p.textTertiary,
                           ),
-                          visualDensity: VisualDensity.compact,
                           tooltip: context.l10n.dspAboutBitPerfect,
                           onPressed: () {
                             PulsrDialogHelper.showCustomDialog<void>(
@@ -2006,7 +2005,7 @@ class _OptionPill extends StatelessWidget {
     return Opacity(
       opacity: isEnabled ? 1.0 : 0.45,
       child: AnimatedContainer(
-        duration: context.motionMs(180),
+        duration: context.motionMs(200),
         curve: context.motionCurve(Curves.easeOutCubic),
         decoration: BoxDecoration(
           color: isSelected

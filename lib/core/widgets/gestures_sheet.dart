@@ -82,6 +82,7 @@ class _GestureEntryCard extends StatelessWidget {
 
     return Semantics(
       label: '$title. $desc',
+      excludeSemantics: true,
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSpacing.xs),
         padding: const EdgeInsets.symmetric(

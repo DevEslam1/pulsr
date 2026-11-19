@@ -76,7 +76,6 @@ class SettingSliderRow extends StatelessWidget {
                   tooltip: label,
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
-                  visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
                     minWidth: AppSpacing.minTouchTarget,
@@ -109,7 +108,6 @@ class SettingSliderRow extends StatelessWidget {
                         : p.accent),
                 tooltip: context.l10n
                     .settingsResetToDefaultValue(_fmt(defaultValue)),
-                visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints(
                   minWidth: AppSpacing.minTouchTarget,
                   minHeight: AppSpacing.minTouchTarget,

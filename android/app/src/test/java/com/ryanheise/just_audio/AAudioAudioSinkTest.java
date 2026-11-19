@@ -467,7 +467,7 @@ public class AAudioAudioSinkTest {
     }
 
     @Test
-    public void pcm32TranscodeConsumesTrailingSubSampleBytesWithoutStalling() throws Exception {
+    public void pcm32TranscodeDoesNotAdvancePastUnwrittenSubSampleBytes() throws Exception {
         final FakeBridge bridge = new FakeBridge();
         final AAudioAudioSink sink = newSink(bridge);
         sink.configure(pcm32(), 0, null);
@@ -475,11 +475,21 @@ public class AAudioAudioSinkTest {
         // Direct buffer with 2 full samples (8 bytes) + 2 trailing bytes.
         bridge.writeResult = 8;
         final ByteBuffer direct = ByteBuffer.allocateDirect(10);
+        // Only 8 of 10 bytes were written. The 2-byte tail was never converted,
+        // so the buffer is reported unconsumed instead of advancing past it.
+        assertFalse(sink.handleBuffer(direct, 0L, 1));
+        assertEquals(8, direct.position());
+        // The retry converts zero whole samples and consumes the incomplete tail
+        // without issuing a zero-length write.
+        final int writesBeforeTail = bridge.writeCount;
         assertTrue(sink.handleBuffer(direct, 0L, 1));
         assertEquals(10, direct.position());
+        assertEquals(writesBeforeTail, bridge.writeCount);
 
         // Non-direct buffer with 2 full samples (8 bytes) + 1 trailing byte.
         final ByteBuffer heap = ByteBuffer.allocate(9);
+        assertFalse(sink.handleBuffer(heap, 0L, 1));
+        assertEquals(8, heap.position());
         assertTrue(sink.handleBuffer(heap, 0L, 1));
         assertEquals(9, heap.position());
 

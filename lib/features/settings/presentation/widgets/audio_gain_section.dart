@@ -62,7 +62,6 @@ class _GainSection extends StatelessWidget {
                                 icon: Icon(Icons.info_outline_rounded,
                                     size: 18, color: p.textTertiary),
                                 tooltip: context.l10n.learnMore,
-                                visualDensity: VisualDensity.compact,
                                 onPressed: () => showAudioFeatureInfoDialog(
                                     context, AudioFeatureRegistry.replayGain,
                                     conflictReason: rgBlocked),

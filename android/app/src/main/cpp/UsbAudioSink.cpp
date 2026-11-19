@@ -5,6 +5,10 @@
 
 #if defined(__ANDROID__)
 #include <android/log.h>
+#define PULSR_USB_LOG(prio, ...) \
+    __android_log_print(prio, "PulsrUsbSink", __VA_ARGS__)
+#else
+#define PULSR_USB_LOG(prio, ...) ((void)0)
 #endif
 
 #if defined(__linux__) || defined(__ANDROID__)
@@ -266,6 +270,12 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     ring_.assign(capFrames * static_cast<size_t>(frameBytes), 0);
     ringRawDepth_.assign(capFrames, 0);
     ringFrameMask_ = capFrames - 1;
+    // 200 ms of cushion (capped to half the ring): long enough to absorb app,
+    // USB and scheduler jitter. The producer cannot get much further ahead than
+    // the AudioTrack buffer (250 ms), so a larger target would only time out.
+    prefillFrames_ = std::min(
+        static_cast<size_t>(sampleRate_) * 200 / 1000,
+        capFrames / 2);
     ringRead_.store(0, std::memory_order_relaxed);
     ringWrite_.store(0, std::memory_order_relaxed);
 
@@ -282,6 +292,13 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     urbOwned_.assign(numUrbs_, 0);
     urbRawDepth_.assign(numUrbs_, 0);
     urbDeliveryEpoch_.assign(numUrbs_, deliveryEpoch_.load(std::memory_order_acquire));
+    PULSR_USB_LOG(ANDROID_LOG_INFO,
+                  "open: rate=%d ch=%d bytes=%d intervalUs=%d packetsPerUrb=%d "
+                  "urbs=%d feedbackEp=0x%02x ringMs=%zu capacityFrames=%d",
+                  sampleRate_, channels_, bytesPerSample_, serviceIntervalUs_,
+                  packetsPerUrb_, numUrbs_, feedbackEndpoint_,
+                  ringRawDepth_.size() * 1000 / static_cast<size_t>(std::max(1, sampleRate_)),
+                  capacityFrames);
 
     // Nominal (feedback-free) initial packet lengths. frameAccumulator_ is a
     // member so the worker thread continues the same fractional cadence when it
@@ -358,6 +375,15 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
 
 void UsbAudioSink::Close() {
     std::lock_guard<std::mutex> control(controlMutex_);
+    if (active_.load(std::memory_order_acquire) || underrunCount_.load() > 0 ||
+        overrunCount_.load() > 0) {
+        PULSR_USB_LOG(ANDROID_LOG_INFO,
+                      "close: rate=%d underruns=%llu overruns=%llu lastError=%d",
+                      sampleRate_,
+                      static_cast<unsigned long long>(underrunCount_.load()),
+                      static_cast<unsigned long long>(overrunCount_.load()),
+                      lastError_.load());
+    }
     writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
     // Always stop and join the worker, even if it already self-exited: a
     // joinable std::thread must never be reassigned (Open) or destroyed
@@ -748,7 +774,24 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
         }
         rawDepth = 0;
         deliveryEpoch = deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel) + 1;
-        underrunCount_.fetch_add(1, std::memory_order_relaxed);
+        const uint64_t total = underrunCount_.fetch_add(1, std::memory_order_relaxed) + 1;
+        // Rate-limited: an underrun burst can span every packet of a URB.
+        static auto lastLog = std::chrono::steady_clock::time_point{};
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastLog >= std::chrono::seconds(1)) {
+            lastLog = now;
+            const size_t w = ringWrite_.load(std::memory_order_acquire);
+            const size_t fillFrames = w - readFrame;
+            PULSR_USB_LOG(ANDROID_LOG_WARN,
+                          "underrun #%llu: missing=%d ringFillMs=%.1f rate=%u "
+                          "feedback=%d",
+                          static_cast<unsigned long long>(total), missingFrames,
+                          sampleRate_ > 0
+                              ? static_cast<double>(fillFrames) * 1000.0 / sampleRate_
+                              : 0.0,
+                          static_cast<uint32_t>(feedbackRatePerSec_),
+                          feedbackEndpoint_ != 0 ? 1 : 0);
+        }
     }
 
     return pktLen;
@@ -761,6 +804,40 @@ void UsbAudioSink::workerLoop() {
     // some kernels refuse the negative nice for app threads.
     setpriority(PRIO_PROCESS, 0, -19);
 #endif
+    // Prefill before the first drain. The producer writes at roughly real time,
+    // so a worker that starts immediately keeps the ring pinned at zero and
+    // every producer/USB/scheduler hiccup becomes a gap-filled packet — an
+    // audible drop. Waiting for a cushion (bounded so a paused stream still
+    // reaches the idle-silence behaviour) keeps gaps out of steady playback.
+    if (prefillFrames_ > 0) {
+        const auto started = std::chrono::steady_clock::now();
+        const auto deadline = started + std::chrono::milliseconds(1500);
+        bool reached = false;
+        while (running_.load(std::memory_order_acquire)) {
+            const size_t w = ringWrite_.load(std::memory_order_acquire);
+            const size_t r = ringRead_.load(std::memory_order_relaxed);
+            if (w - r >= prefillFrames_) {
+                reached = true;
+                break;
+            }
+            if (std::chrono::steady_clock::now() >= deadline) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        }
+        const size_t fillNow = ringWrite_.load(std::memory_order_acquire) -
+                               ringRead_.load(std::memory_order_relaxed);
+        PULSR_USB_LOG(ANDROID_LOG_INFO,
+                      "prefill: reached=%d waitedMs=%lld targetMs=%zu fillMs=%.1f",
+                      reached ? 1 : 0,
+                      static_cast<long long>(
+                          std::chrono::duration_cast<std::chrono::milliseconds>(
+                              std::chrono::steady_clock::now() - started)
+                              .count()),
+                      prefillFrames_ * 1000 /
+                          static_cast<size_t>(std::max(1, sampleRate_)),
+                      sampleRate_ > 0
+                          ? static_cast<double>(fillNow) * 1000.0 / sampleRate_
+                          : 0.0);
+    }
     int repeatedReadyPolls = 0;
     int consecutiveOutFaults = 0;
     constexpr int kMaxConsecutiveOutFaults = 3;
@@ -839,6 +916,16 @@ void UsbAudioSink::workerLoop() {
         }
         if (fault != 0) {
             ReportWriteError(fault);
+            static auto lastFaultLog = std::chrono::steady_clock::time_point{};
+            const auto faultNow = std::chrono::steady_clock::now();
+            if (faultNow - lastFaultLog >= std::chrono::seconds(1)) {
+                lastFaultLog = faultNow;
+                PULSR_USB_LOG(ANDROID_LOG_WARN,
+                              "urb fault=%d consecutive=%d underruns=%llu errno=%d",
+                              fault, consecutiveOutFaults + 1,
+                              static_cast<unsigned long long>(underrunCount_.load()),
+                              lastError_.load());
+            }
             // One short/failed isochronous OUT is usually a transient
             // controller/DAC hiccup. Killing the worker turns it into a hard
             // silent stream; requeue the URB instead, using the ring's current
@@ -966,13 +1053,28 @@ bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frame
         UsbAudioSink* sink;
         ~WriterExit() { sink->endWrite(); }
     } exit{this};
+    // Rate-limited rejection diagnostics: a silent ring while the status says
+    // "streaming" is invisible otherwise, and the reason is one of these three.
+    static auto lastRejectLog = std::chrono::steady_clock::time_point{};
+    const auto rejectLog = [&](const char* reason) {
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastRejectLog < std::chrono::seconds(1)) return;
+        lastRejectLog = now;
+        PULSR_USB_LOG(ANDROID_LOG_WARN,
+                      "write rejected (%s): frames=%d ch=%d/%d rate=%d/%d "
+                      "depth=%d/%d lastError=%d",
+                      reason, frames, channels, channels_, sampleRate, sampleRate_,
+                      sourceBitDepth, validBitDepth_, lastError_.load());
+    };
     if (channels != channels_) {
         channelMismatchFrames_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
         ReportWriteError(EINVAL);
+        rejectLog("channels");
         return false; // no duplication, silence-fill, drop, or remap
     }
     if (sampleRate != sampleRate_ || sourceBitDepth > validBitDepth_) {
         ReportWriteError(ERANGE);
+        rejectLog(sampleRate != sampleRate_ ? "rate" : "depth");
         return false; // no implicit SRC or lossy valid-depth reduction
     }
     const size_t capFrames = ringRawDepth_.size();
@@ -1238,7 +1340,13 @@ int UsbAudioSink::NextPacketFrames(uint64_t& accumulator, uint32_t ratePerSec,
 int UsbAudioSink::SteerPacketRateForRingFill(int currentRatePerSec, int nominalRate,
                                              size_t occupiedBytes, size_t capacityBytes) {
     if (nominalRate <= 0) return currentRatePerSec;
-    const int deltaMax = std::max(1, nominalRate / 1000); // +/-0.1% clamp
+    // A DAC without an explicit feedback endpoint can run off by hundreds of
+    // ppm (cheap USB-C dongles especially). The old +/-0.1% clamp saturated
+    // before the true ratio was reached, so the ring drained at a steady
+    // ~0.2% and gap-filled every ~80 s. +/-1% reaches any consumer-grade clock
+    // while remaining far from an audible pitch shift (the loop only moves
+    // while the fill is outside the 200-800 permille band).
+    const int deltaMax = std::max(1, nominalRate / 100); // +/-1.0% clamp
     const int minRate = std::max(1, nominalRate - deltaMax);
     const int maxRate = nominalRate + deltaMax;
     int rate = (currentRatePerSec > 0)

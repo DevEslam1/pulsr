@@ -62,6 +62,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
     final p = context.palette;
     final songs = state.songs;
     _warmHeadOnlineIfNeeded(songs, playerCubit);
+    if (songs.isEmpty && state.errorMessage != null) {
+      return _buildLibraryErrorState(context, state);
+    }
     if (songs.isEmpty) {
       if (state.isLoading) {
         return SkeletonList(
@@ -800,6 +803,9 @@ mixin LibrarySongsTab on State<LibraryScreen> {
       ),
     );
   }
+
+  // Requires: provided by the composing class (same library).
+  Widget _buildLibraryErrorState(BuildContext context, LibraryState state);
 
   // Requires: provided by the composing class (same library).
   Widget _buildEmpty(

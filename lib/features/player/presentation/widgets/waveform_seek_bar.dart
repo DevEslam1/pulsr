@@ -451,11 +451,11 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                                     child: IgnorePointer(
                                       child: AnimatedOpacity(
                                         opacity: _dragValue != null ? 1.0 : 0.0,
-                                        duration: context.motionMs(150),
+                                        duration: context.motionMs(120),
                                         child: AnimatedScale(
                                           scale:
                                               _dragValue != null ? 1.0 : 0.85,
-                                          duration: context.motionMs(150),
+                                          duration: context.motionMs(120),
                                           curve: Curves.easeOutBack,
                                           child: Container(
                                             padding: const EdgeInsets.symmetric(

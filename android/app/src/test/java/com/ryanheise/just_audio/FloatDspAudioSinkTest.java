@@ -828,20 +828,43 @@ public class FloatDspAudioSinkTest {
         assertArrayEquals("the 16-bit bypass must hand over the decoded bytes unchanged",
                 firstBytes, acceptedBytes(sink));
 
+        // A mid-track policy change must NOT reconfigure the sink from
+        // handleBuffer(): that flushed the DSP, rebuilt the delegate and dropped
+        // the encoder delay. The bypass stays latched until the next configure.
         bitPerfect[0] = false;
         ByteBuffer second = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
         second.putShort((short) 2000).putShort((short) -2000).flip();
+        byte[] secondBytes = new byte[4];
+        second.duplicate().get(secondBytes);
         assertTrue(wrapper.handleBuffer(second, 10L, 1));
-        assertEquals(C.ENCODING_PCM_FLOAT, lastConfigured(sink).pcmEncoding);
-        assertEquals(1, nativeCalls[0]);
+        assertEquals(C.ENCODING_PCM_16BIT, lastConfigured(sink).pcmEncoding);
+        assertEquals(0, nativeCalls[0]);
+        byte[] acceptedBoth = acceptedBytes(sink);
+        assertEquals(8, acceptedBoth.length);
+        assertArrayEquals("still the latched 16-bit bypass", secondBytes,
+                java.util.Arrays.copyOfRange(acceptedBoth, 4, 8));
 
-        usbExclusive[0] = true;
-        bitPerfect[0] = true;
+        // The next configure() (track boundary / gapless hand-off) applies the
+        // new policy: the float path and the native engine run again.
+        wrapper.configure(format, 0, null);
+        assertEquals(C.ENCODING_PCM_FLOAT, lastConfigured(sink).pcmEncoding);
         ByteBuffer third = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
         third.putShort((short) 3000).putShort((short) -3000).flip();
         assertTrue(wrapper.handleBuffer(third, 20L, 1));
         assertEquals(C.ENCODING_PCM_FLOAT, lastConfigured(sink).pcmEncoding);
-        assertEquals(2, nativeCalls[0]);
+        assertEquals(1, nativeCalls[0]);
+
+        // Re-entering bit-perfect is likewise latched by the next configure.
+        // (USB-exclusive off: that path keeps the float chain by design.)
+        usbExclusive[0] = false;
+        bitPerfect[0] = true;
+        wrapper.configure(format, 0, null);
+        assertEquals(C.ENCODING_PCM_16BIT, lastConfigured(sink).pcmEncoding);
+        ByteBuffer fourth = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
+        fourth.putShort((short) 4000).putShort((short) -4000).flip();
+        assertTrue(wrapper.handleBuffer(fourth, 30L, 1));
+        assertEquals(C.ENCODING_PCM_16BIT, lastConfigured(sink).pcmEncoding);
+        assertEquals(1, nativeCalls[0]);
 
         wrapper.reset();
         processor.release();

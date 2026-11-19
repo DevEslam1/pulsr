@@ -85,7 +85,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
       _scrollController.position.ensureVisible(
         target.findRenderObject()!,
         alignment: 0.15,
-        duration: context.motionMs(300),
+        duration: context.motionMs(260),
         curve: Curves.easeOutCubic,
       );
     });
@@ -360,7 +360,7 @@ class _QuranMushafViewState extends State<QuranMushafView> {
                 }
               },
               child: AnimatedContainer(
-                duration: context.motionMs(250),
+                duration: context.motionMs(260),
                 curve: context.motionCurve(PulsrMotion.enter),
                 padding: const EdgeInsets.all(AppSpacing.s12),
                 decoration: BoxDecoration(

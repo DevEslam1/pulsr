@@ -154,7 +154,7 @@ class _PulsrCardState extends State<PulsrCard> {
     final isTappable = widget.onTap != null || widget.onLongPress != null;
 
     Widget card = AnimatedContainer(
-      duration: context.motionMs(180),
+      duration: context.motionMs(200),
       curve: context.motionCurve(Curves.easeOutCubic),
       margin: widget.margin,
       decoration: BoxDecoration(
@@ -176,7 +176,7 @@ class _PulsrCardState extends State<PulsrCard> {
           scale: widget.enableHoverScale && _isHovered && context.motionEnabled
               ? 1.012
               : 1.0,
-          duration: context.motionMs(180),
+          duration: context.motionMs(200),
           curve: context.motionCurve(Curves.easeOutCubic),
           child: PulsrPressable(
             pressedScale: 0.985,

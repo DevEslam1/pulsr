@@ -100,6 +100,9 @@ class PulsrChip extends StatelessWidget {
       button: true,
       selected: selected,
       label: label,
+      // The visible chip text is inside the child; exclude it so the label is
+      // not announced on top of itself.
+      excludeSemantics: true,
       child: PulsrPressable(
         onTap: onTap,
         hapticStyle: PulsrHapticStyle.selection,
@@ -185,7 +188,7 @@ class PulsrChip extends StatelessWidget {
                   // is actually available.
                   if (context.motionEnabled)
                     AnimatedSize(
-                      duration: context.motionMs(180),
+                      duration: context.motionMs(200),
                       curve: Curves.easeOutCubic,
                       child: leadingSlot,
                     )
@@ -213,23 +216,31 @@ class PulsrChip extends StatelessWidget {
                       button: true,
                       label:
                           MaterialLocalizations.of(context).deleteButtonTooltip,
+                      excludeSemantics: true,
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () {
                           PulsrHaptics.selectionClick();
                           onDeleted!();
                         },
-                        child: Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: textColor.withValues(alpha: 0.12),
-                          ),
-                          child: Icon(
-                            Icons.close_rounded,
-                            size: 13.5,
-                            color: textColor.withValues(alpha: 0.85),
+                        // 48dp target around a 22dp visual disc.
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: Container(
+                              width: 22,
+                              height: 22,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: textColor.withValues(alpha: 0.12),
+                              ),
+                              child: Icon(
+                                Icons.close_rounded,
+                                size: 13.5,
+                                color: textColor.withValues(alpha: 0.85),
+                              ),
+                            ),
                           ),
                         ),
                       ),

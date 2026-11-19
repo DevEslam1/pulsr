@@ -269,7 +269,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
             ),
             prefixIcon: AnimatedScale(
               scale: _isFocused ? 1.08 : 1.0,
-              duration: context.motionMs(180),
+              duration: context.motionMs(200),
               curve: context.motionCurve(Curves.easeOutCubic),
               child: Icon(
                 Icons.search_rounded,
@@ -278,7 +278,7 @@ class _PulsrSearchFieldState extends State<PulsrSearchField> {
               ),
             ),
             suffixIcon: AnimatedSwitcher(
-              duration: context.motionMs(160),
+              duration: context.motionMs(200),
               transitionBuilder: (child, anim) => FadeTransition(
                 opacity: anim,
                 child: ScaleTransition(scale: anim, child: child),

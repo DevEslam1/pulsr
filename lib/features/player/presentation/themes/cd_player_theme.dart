@@ -88,7 +88,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _pickupController.duration = context.motionMs(480);
+    _pickupController.duration = context.motionMs(400);
     _velocityController.duration = context.motionMs(650);
     _glossController.duration = context.motionMs(900);
     _syncRotation();

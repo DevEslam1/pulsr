@@ -77,7 +77,6 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private Format lastInputFormat;
     private Format configuredOutputFormat;
     private int lastBufferSize;
-    private int[] lastOutputChannels;
     private boolean eosQueued;
     private Format deferredFormat;
     private int deferredBufferSize;
@@ -273,7 +272,6 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         }
         lastInputFormat = format;
         lastBufferSize = bufferSize;
-        lastOutputChannels = outputChannels == null ? null : outputChannels.clone();
         final int encoding = format.pcmEncoding;
         final boolean sameInput = processFloat
                 && format.sampleRate == lastSampleRate
@@ -298,6 +296,14 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         // bypass, so a false flag changes nothing.
         final boolean integerDirectPath = integerBypassEligible
                 || (!forceFloatForPcm16 && encoding == C.ENCODING_PCM_16BIT);
+        Log.i(TAG, "configure: enc=" + pcmEncodingName(encoding)
+                + " rate=" + format.sampleRate
+                + " native=" + (processor != null && processor.isNativeAvailableForConfiguration())
+                + " bpNative=" + (processor != null && processor.isBitPerfectNative())
+                + " usbExclusive=" + (processor != null && processor.isUsbExclusiveActive())
+                + " pcm16Boundary=" + pcm16Boundary
+                + " bypass=" + integerBypassEligible
+                + " directPath=" + integerDirectPath);
         if (processor == null || !supported || integerDirectPath) {
             bypassedForBitPerfect = integerBypassEligible;
             frameEditor = null;
@@ -398,26 +404,13 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     public boolean handleBuffer(ByteBuffer input, long presentationTimeUs, int accessUnits)
             throws InitializationException, WriteException {
         if (!input.hasRemaining()) return true;
-        // A live policy change (DSP switched on/off, USB exclusive engaged) must
-        // be honoured mid-stream for both integer encodings the bypass covers;
-        // integerBypassWanted() keeps this switch from flapping when 24-bit is
-        // held back by a 16-bit boundary.
-        if (pendingInput == null && deferredFormat == null
-                && allowBitPerfectIntegerBypass && forceFloatForPcm16
-                && processor != null && lastInputFormat != null
-                && (lastInputFormat.pcmEncoding == C.ENCODING_PCM_16BIT
-                        || lastInputFormat.pcmEncoding == C.ENCODING_PCM_24BIT)) {
-            final boolean wantBypass = integerBypassWanted(lastInputFormat.pcmEncoding);
-            if (wantBypass != bypassedForBitPerfect) {
-                try {
-                    configure(lastInputFormat.buildUpon().setEncoderDelay(0).build(),
-                            lastBufferSize, lastOutputChannels);
-                } catch (ConfigurationException e) {
-                    throw new InitializationException("Mid-stream PCM bypass switch failed",
-                            0, lastInputFormat, false, e);
-                }
-            }
-        }
+        // The integer bypass policy is latched by configure() only. Re-entering
+        // configure() here used to flush the DSP, rebuild the delegate and drop
+        // the encoder delay (gapless trimming) mid-buffer, which is exactly
+        // where a crossfade or sleep fade arms its gain curve. A mid-track
+        // policy change therefore takes effect at the next configure() (track
+        // boundary / gapless hand-off), while isBitPerfectIntegerBypassActive()
+        // keeps reporting the live truth for the stream that is configured.
         if ((!processFloat || processor == null) && frameEditor == null) {
             return super.handleBuffer(input, presentationTimeUs, accessUnits);
         }
@@ -676,7 +669,6 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         lastSampleRate = -1;
         lastChannelCount = -1;
         lastPcmEncoding = C.ENCODING_INVALID;
-        lastOutputChannels = null;
         bypassedForBitPerfect = false;
         processorOutputFormat = AudioProcessor.AudioFormat.NOT_SET;
         if (processFloat && processor != null) processor.reset();

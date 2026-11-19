@@ -17,19 +17,31 @@ class PulsrPagePopScope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // `maybeOf` keeps the widget usable in tests and in subtrees that are not
+    // under the app router; only the pop *callback* used to touch GoRouter,
+    // and moving that lookup into build broke those cases.
+    final router = GoRouter.maybeOf(context);
+    final canPop = router?.canPop() ??
+        (Navigator.maybeOf(context)?.canPop() ?? false);
     return PopScope(
-      canPop: false,
+      // Reporting the real value is what lets Android 14 draw the
+      // predictive-back preview. The old hard-coded `false` suppressed the
+      // animation on every screen and forced the callback path.
+      canPop: canPop,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (onPop != null) {
           onPop!();
           return;
         }
-        final router = GoRouter.of(context);
-        if (router.canPop()) {
-          router.pop();
+        if (router != null) {
+          if (router.canPop()) {
+            router.pop();
+          } else {
+            router.go('/');
+          }
         } else {
-          router.go('/');
+          Navigator.maybeOf(context)?.maybePop();
         }
       },
       child: child,

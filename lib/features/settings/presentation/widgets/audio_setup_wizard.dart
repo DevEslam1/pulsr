@@ -221,7 +221,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
             const SizedBox(height: AppSpacing.md),
             // Animated Step Body
             AnimatedSwitcher(
-              duration: context.motionMs(220),
+              duration: context.motionMs(200),
               child: switch (_currentStep) {
                 0 => _buildStep1(context),
                 1 => _buildStep2(context),
@@ -511,7 +511,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           onTap();
         },
         child: AnimatedContainer(
-          duration: context.motionMs(180),
+          duration: context.motionMs(200),
           padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
             color: isSelected

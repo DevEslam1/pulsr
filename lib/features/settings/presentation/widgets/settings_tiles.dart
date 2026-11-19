@@ -91,7 +91,6 @@ class SettingsNavTile extends StatelessWidget {
                   icon: Icon(Icons.info_outline_rounded,
                       size: 18, color: p.textTertiary),
                   tooltip: context.l10n.settingsAboutTitle(title),
-                  visualDensity: VisualDensity.compact,
                   onPressed: () => showAudioFeatureInfoDialog(
                       context, featureInfo!,
                       conflictReason: disabledReason),
@@ -194,7 +193,6 @@ class SettingsSwitchTile extends StatelessWidget {
                   icon: Icon(Icons.info_outline_rounded,
                       size: 18, color: p.textTertiary),
                   tooltip: context.l10n.settingsAboutTitle(title),
-                  visualDensity: VisualDensity.compact,
                   onPressed: () => showAudioFeatureInfoDialog(
                       context, featureInfo!,
                       conflictReason: disabledReason),

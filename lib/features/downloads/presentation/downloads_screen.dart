@@ -534,10 +534,10 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                               child: Row(
                                 children: [
                                   AnimatedSize(
-                                    duration: context.motionMs(180),
+                                    duration: context.motionMs(200),
                                     curve: Curves.easeOutCubic,
                                     child: AnimatedSwitcher(
-                                      duration: context.motionMs(180),
+                                      duration: context.motionMs(200),
                                       transitionBuilder: (child, animation) =>
                                           FadeTransition(
                                         opacity: animation,

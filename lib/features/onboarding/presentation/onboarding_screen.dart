@@ -283,7 +283,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     SoundFeedbackService.playClick(mirrorHaptics: true);
     if (_currentPage < _lastPage) {
       _pageController.nextPage(
-        duration: context.motionMs(350),
+        duration: context.motionMs(320),
         curve: context.motionCurve(Curves.easeInOut),
       );
     }
@@ -293,7 +293,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     SoundFeedbackService.playClick(mirrorHaptics: true);
     if (_currentPage > 0) {
       _pageController.previousPage(
-        duration: context.motionMs(300),
+        duration: context.motionMs(260),
         curve: context.motionCurve(Curves.easeInOut),
       );
     }
@@ -304,7 +304,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     PulsrHaptics.selection();
     _pageController.animateToPage(
       index,
-      duration: context.motionMs(350),
+      duration: context.motionMs(320),
       curve: context.motionCurve(Curves.easeInOut),
     );
   }
@@ -334,7 +334,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             end: 0,
             child: IgnorePointer(
               child: AnimatedContainer(
-                duration: context.motionMs(450),
+                duration: context.motionMs(320),
                 height: 360,
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
@@ -502,7 +502,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       vertical: AppSpacing.xs,
                                     ),
                                     child: AnimatedContainer(
-                                      duration: context.motionMs(300),
+                                      duration: context.motionMs(260),
                                       curve: context.motionCurve(PulsrMotion.enter),
                                       height: isLandscape ? 6 : 8,
                                       width: isActive
@@ -717,7 +717,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                 ),
               ).animate().scale(
-                    duration: context.motionMs(600),
+                    duration: context.motionMs(400),
                     curve: context.motionCurve(Curves.easeOutBack),
                   ),
               SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
@@ -743,7 +743,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
               )
                   .animate()
-                  .fadeIn(delay: context.motionMs(350))
+                  .fadeIn(delay: context.motionMs(320))
                   .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.xl),
               Container(
@@ -784,7 +784,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ],
                 ),
-              ).animate().fadeIn(delay: context.motionMs(450)),
+              ).animate().fadeIn(delay: context.motionMs(320)),
               SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
             ],
           ),
@@ -897,7 +897,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               )
                   .animate()
-                  .fadeIn(duration: context.motionMs(500))
+                  .fadeIn(duration: context.motionMs(400))
                   .scale(begin: const Offset(0.92, 0.92)),
               SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
               Text(
@@ -922,7 +922,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
               )
                   .animate()
-                  .fadeIn(delay: context.motionMs(350))
+                  .fadeIn(delay: context.motionMs(320))
                   .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.sm : AppSpacing.lg),
               Wrap(
@@ -947,7 +947,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     label: context.l10n.gaplessPlayback,
                   ),
                 ],
-              ).animate().fadeIn(delay: context.motionMs(450)),
+              ).animate().fadeIn(delay: context.motionMs(320)),
               SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
             ],
           ),
@@ -1064,7 +1064,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               )
                   .animate()
-                  .fadeIn(duration: context.motionMs(500))
+                  .fadeIn(duration: context.motionMs(400))
                   .scale(begin: const Offset(0.92, 0.92)),
               SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
               Text(
@@ -1089,7 +1089,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
               )
                   .animate()
-                  .fadeIn(delay: context.motionMs(350))
+                  .fadeIn(delay: context.motionMs(320))
                   .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
             ],
@@ -1152,7 +1152,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
               )
                   .animate()
-                  .fadeIn(delay: context.motionMs(150))
+                  .fadeIn(delay: context.motionMs(120))
                   .slideY(begin: 0.1, end: 0),
               const SizedBox(height: AppSpacing.xs),
               Text(
@@ -1164,7 +1164,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
               )
                   .animate()
-                  .fadeIn(delay: context.motionMs(300))
+                  .fadeIn(delay: context.motionMs(260))
                   .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.sm : AppSpacing.md),
               Column(
@@ -1283,7 +1283,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     // Live interactive mini-player preview banner
                     AnimatedContainer(
-                      duration: context.motionMs(250),
+                      duration: context.motionMs(260),
                       padding: const EdgeInsets.symmetric(
                         horizontal: AppSpacing.sm,
                         vertical: AppSpacing.xs,
@@ -1405,7 +1405,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               )
                   .animate()
-                  .fadeIn(duration: context.motionMs(500))
+                  .fadeIn(duration: context.motionMs(400))
                   .scale(begin: const Offset(0.92, 0.92)),
               SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
               Text(
@@ -1430,7 +1430,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
               )
                   .animate()
-                  .fadeIn(delay: context.motionMs(350))
+                  .fadeIn(delay: context.motionMs(320))
                   .slideY(begin: 0.1, end: 0),
               SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
             ],

@@ -207,7 +207,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                     // Deep ambient base gradient
                     Positioned.fill(
                       child: AnimatedContainer(
-                        duration: context.motionMs(500),
+                        duration: context.motionMs(400),
                         curve: context.motionCurve(Curves.easeInOut),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -238,7 +238,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                     Positioned.fill(
                       child: IgnorePointer(
                         child: AnimatedContainer(
-                          duration: context.motionMs(500),
+                          duration: context.motionMs(400),
                           decoration: BoxDecoration(
                             gradient: RadialGradient(
                               center: const Alignment(-0.55, -0.22),
@@ -264,7 +264,7 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
                     Positioned.fill(
                       child: IgnorePointer(
                         child: AnimatedContainer(
-                          duration: context.motionMs(500),
+                          duration: context.motionMs(400),
                           decoration: BoxDecoration(
                             gradient: RadialGradient(
                               center: const Alignment(0.60, 0.15),
@@ -560,7 +560,7 @@ class _FoldableTabletopLayout extends StatelessWidget {
                       Row(
                         children: [
                           AnimatedContainer(
-                            duration: context.motionMs(240),
+                            duration: context.motionMs(260),
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
@@ -973,7 +973,7 @@ class _SignalStageChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return AnimatedContainer(
-      duration: context.motionMs(220),
+      duration: context.motionMs(200),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
         color: isActive
@@ -1025,7 +1025,7 @@ class _SignalConnectorLine extends StatelessWidget {
     final p = context.palette;
     return Expanded(
       child: AnimatedContainer(
-        duration: context.motionMs(220),
+        duration: context.motionMs(200),
         height: 1.5,
         margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
@@ -1062,7 +1062,7 @@ class _DspModuleBentoCard extends StatelessWidget {
       pressedScale: 0.985,
       onTap: () => onChanged(!value),
       child: AnimatedContainer(
-        duration: context.motionMs(220),
+        duration: context.motionMs(200),
         curve: context.motionCurve(Curves.easeOutCubic),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
@@ -1103,7 +1103,7 @@ class _DspModuleBentoCard extends StatelessWidget {
         child: Row(
           children: [
             AnimatedContainer(
-              duration: context.motionMs(220),
+              duration: context.motionMs(200),
               width: 44,
               height: 44,
               decoration: BoxDecoration(
@@ -1239,7 +1239,7 @@ class _TabletLandscapeFloatingDock extends StatelessWidget {
                 },
                 borderRadius: AppRadii.r16All,
                 child: AnimatedContainer(
-                  duration: context.motionMs(220),
+                  duration: context.motionMs(200),
                   curve: context.motionCurve(Curves.easeOutCubic),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14.0,

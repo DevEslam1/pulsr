@@ -247,7 +247,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _offsetController.duration = context.motionMs(250);
+    _offsetController.duration = context.motionMs(260);
     _resizeController.duration = context.motionMs(260);
     final newPosition = Scrollable.maybeOf(context)?.position;
     if (_scrollPosition != newPosition) {
@@ -287,7 +287,7 @@ class _PulsrDismissibleState extends State<PulsrDismissible>
       });
       _offsetController.animateTo(
         0.0,
-        duration: context.motionMs(250),
+        duration: context.motionMs(260),
         curve: Curves.easeOutCubic,
       );
     }

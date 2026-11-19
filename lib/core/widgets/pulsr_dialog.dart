@@ -276,7 +276,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
               const SizedBox(height: AppSpacing.s14),
             ],
             AnimatedContainer(
-              duration: context.motionMs(180),
+              duration: context.motionMs(200),
               decoration: BoxDecoration(
                 color: p.surfaceContainer.withValues(
                   alpha: p.isDark ? 0.72 : 0.90,
@@ -426,7 +426,9 @@ class PulsrDialog extends StatelessWidget {
           preset: GlassPreset.dialog,
           specularHighlight: true,
           borderRadius: AppRadii.dialogRadius,
-          color: p.surfaceContainerHigh,
+          // Glass tint is derived from the palette + Glass Intensity; an
+          // opaque colour here would paint over the 16σ BackdropFilter and
+          // make the blur invisible.
           border: Border.all(
             color: p.isDark ? AppColors.specularAt(0.16) : p.hairline,
             width: 1.0,

@@ -52,7 +52,7 @@ mixin CategoryFilterBarSection
                   _selectCategory(item.id);
                 },
                 child: AnimatedContainer(
-                  duration: context.motionMs(180),
+                  duration: context.motionMs(200),
                   curve: context.motionCurve(PulsrMotion.enter),
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm, vertical: AppSpacing.xs),

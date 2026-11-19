@@ -61,7 +61,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
         Scrollable.ensureVisible(
           activeContext,
           alignment: 0.35,
-          duration: context.motionMs(300),
+          duration: context.motionMs(260),
           curve: context.motionCurve(Curves.easeOutCubic),
         );
         return;
@@ -76,7 +76,7 @@ class _NowPlayingQueueViewState extends State<NowPlayingQueueView> {
       );
       _scrollController.animateTo(
         targetOffset,
-        duration: context.motionMs(300),
+        duration: context.motionMs(260),
         curve: context.motionCurve(Curves.easeOutCubic),
       );
     });

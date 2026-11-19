@@ -9,8 +9,9 @@ import '../performance/gpu_budget.dart';
 /// Every `BackdropFilter` or `ImageFilter.blur` in Pulsr must resolve its sigma
 /// and eligibility through [AppBlur] so that:
 /// 1. GPU Saver ([GpuBudget.isGpuSaverActive]) disables expensive blur passes.
-/// 2. OS High Contrast ([MediaQuery.highContrastOf]) falls back to solid,
-///    high-contrast surfaces for maximum legibility.
+/// 2. High Contrast — both the OS flag and Pulsr's own accessibility mode,
+///    which `main.dart` mirrors into `MediaQuery.highContrast` — falls back to
+///    solid, high-contrast surfaces for maximum legibility.
 /// 3. Blur radius is strictly capped at [maxSigma] to bound per-frame raster cost.
 abstract class AppBlur {
   AppBlur._();
@@ -33,11 +34,12 @@ abstract class AppBlur {
   /// 18.0 — hard ceiling on BackdropFilter sigma to prevent GPU frame spikes.
   static const double maxSigma = 18.0;
 
-  /// 20.0 — bottom sheet preset (clamped to [maxSigma] at raster time).
-  static const double sheet = 20.0;
+  /// 18.0 — bottom sheet preset. Declared at the ceiling (not above it) so the
+  /// token a designer reads is the sigma the GPU actually rasterises.
+  static const double sheet = maxSigma;
 
-  /// 24.0 — liquid dock preset (clamped to [maxSigma] at raster time).
-  static const double dock = 24.0;
+  /// 18.0 — floating dock preset, also at the ceiling for the same reason.
+  static const double dock = maxSigma;
 
   /// Minimum surface alpha used when blur is disabled or High Contrast is active
   /// so text over arbitrary artwork maintains WCAG AA (>= 4.5:1) contrast.

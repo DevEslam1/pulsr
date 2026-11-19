@@ -208,7 +208,6 @@ class _GestureHintOverlayState extends State<GestureHintOverlay> {
                           IconButton(
                             tooltip: context.l10n.close,
                             onPressed: () => _dismiss(fromUserTap: true),
-                            visualDensity: VisualDensity.compact,
                             constraints: const BoxConstraints(
                               minWidth: AppSpacing.minTouchTarget,
                               minHeight: AppSpacing.minTouchTarget,

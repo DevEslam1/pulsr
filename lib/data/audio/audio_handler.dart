@@ -727,6 +727,19 @@ class PulsrAudioHandler extends BaseAudioHandler
   static const String outputModeNoticePrefix = '__pulsr_output_mode__:';
   static const String failureCascadeHaltPrefix = '__pulsr_cascade_halt__:';
   String? _lastOutputModeNotice;
+  /// Last temporary-suspension reason logged. A suspension and its resume
+  /// repeat the same reason, so this keeps the informational line to one per
+  /// episode instead of two.
+  String? _lastSuspendedReason;
+  /// Sink reasons that mean "temporarily parked on the AudioTrack path", not
+  /// "this output refuses the direct path". Both arrive with a non-null reason,
+  /// but only a real rejection may feed safe mode or raise a notice.
+  static const Set<String> _suspensionReasons = {
+    'speed_requires_audiotrack',
+    'skip_silence_requires_audiotrack',
+    'aaudio_suspended',
+    'aaudio_write_failed',
+  };
   SafeModeController? _safeModeController;
   bool _safeModeApplyInFlight = false;
   int? _currentAudioSessionId;
@@ -1362,6 +1375,24 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   bool? _bitPerfectTransportBypass;
 
+  /// Rebuilds both players' inner sinks with the current output policies.
+  ///
+  /// The integer Bit-Perfect bypass is applied by the sink's configure(), so a
+  /// bypass change made mid-track needs one rebuild to take effect. The
+  /// Bit-Perfect transition pauses first, which is what makes the rebuild
+  /// inaudible; callers must not use this while audio is actively rendering.
+  Future<void> reconfigurePlaybackSink() async {
+    try {
+      await Future.wait([
+        _playerA.dspReconfigureSink(),
+        _playerB.dspReconfigureSink(),
+      ]);
+    } catch (e, st) {
+      ErrorLogger.log('Sink reconfigure after a policy change failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
   /// Reconcile the live transport without changing saved speed/pitch/silence
   /// choices. Set the boundary guard before awaiting any player writes.
   Future<void> setBitPerfectTransportPolicy(bool enabled) async {
@@ -1402,14 +1433,19 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// already zero. Preserve the actual held gain, not the slider/RG target.
   Future<void> cancelActiveCrossfade() async {
     final heldGain = _activePlayer.volume;
+    // The pause below exists only so the unobservable native curve can be
+    // cleared without a gain jump; it must not outlive the cancel, or enabling
+    // Bit-Perfect during the last seconds of a track stops audio dead.
+    final wasPlaying = _activePlayer.playing;
     if (_crossfadeManager.isNativeCurveArmedOnOutgoing) {
       // The native curve's gain is unobservable. Clearing it while playing
-      // could jump to full gain, so leave playback paused for an explicit resume.
+      // could jump to full gain, so park playback on a buffer boundary first.
       await _activePlayer.pause();
     }
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: heldGain);
     setCrossfadeDuration(Duration.zero);
+    if (wasPlaying) await _activePlayer.play();
   }
 
   /// Most recent ANDROID system STREAM_MUSIC volume ratio (0..1), fed by the
@@ -1603,13 +1639,26 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Applies [targetVolume] (scaled by [_sleepFadeFactor]) to both [player]
   /// and the native Direct USB gain stage so track starts, gapless transitions,
   /// and live volume updates never diverge.
+  ///
+  /// [smooth] ramps the player gain instead of stepping it. A policy-only gain
+  /// change (Bit-Perfect, the DSP bypass or a ReplayGain mode) must ramp: the
+  /// new target can differ by several dB, and a step at an arbitrary sample is
+  /// audible as a click. On that path the Direct USB stage is synced first and
+  /// awaited, so the hardware gain and the software ramp never disagree.
   @override
   Future<void> _applyPlayerOutputVolume(
     AudioPlayer player,
     double targetVolume, {
     SongsTableData? song,
+    bool smooth = false,
   }) async {
     final applied = (targetVolume * _sleepFadeFactor).clamp(0.0, 1.0);
+    final controller = _volumeController;
+    if (smooth && controller != null) {
+      await _syncDirectUsbVolume(applied, song: song);
+      await controller.applyVolume(player, applied, smoothTransition: true);
+      return;
+    }
     await Future.wait([
       _syncDirectUsbVolume(applied, song: song),
       player.setVolume(applied),
@@ -1969,7 +2018,20 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volumeController?.updateSettings(userVolume: _volume);
   }
 
-  Future<void> setVolume(double volume) async {
+  /// Sets the user-facing volume and re-applies the composed output gain.
+  Future<void> setVolume(double volume) => _setVolumeInternal(volume);
+
+  /// Re-applies the current gain with a short ramp instead of a step.
+  ///
+  /// A policy-only gain change (Bit-Perfect, the DSP bypass or a ReplayGain
+  /// mode) can move the composed target by several dB; applying it through
+  /// [setVolume] would step the gain in one sample, which is audible as a
+  /// click. Kept as a separate entry point so the existing [setVolume]
+  /// signature (and the fakes that implement it) stay untouched.
+  Future<void> setVolumeSmooth(double volume) =>
+      _setVolumeInternal(volume, smooth: true);
+
+  Future<void> _setVolumeInternal(double volume, {bool smooth = false}) async {
     // NaN.clamp() returns NaN, which would poison every composed gain after it.
     _externalHardwareVolumeSet = false;
     _volume = volume.isFinite ? volume.clamp(0.0, 1.0) : _volume;
@@ -2000,7 +2062,12 @@ class PulsrAudioHandler extends BaseAudioHandler
           error: e, stackTrace: st, category: 'AudioHandler');
     }
     if (!_crossfadeManager.isCrossfading) {
-      await _applyPlayerOutputVolume(_activePlayer, target, song: song);
+      await _applyPlayerOutputVolume(
+        _activePlayer,
+        target,
+        song: song,
+        smooth: smooth,
+      );
     }
   }
 
@@ -2044,6 +2111,31 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volumeController?.updateSettings(isDucked: false);
   }
 
+  /// Seeds the app/software volume from the device's live STREAM_MUSIC level
+  /// before DVC takes ownership.
+  ///
+  /// DVC pins the system stream to max and moves the user level into the DSP
+  /// gain. Without this seed the first gain push is the 1.0 default and the
+  /// output jumps to full scale — the "sometimes gets the highest, not the
+  /// device volume" report — instead of carrying the level the device is
+  /// actually at.
+  Future<void> _seedVolumeFromSystemForDvc() async {
+    if (!PlatformCapabilities.isAndroid) return;
+    try {
+      final sys = await AudioEffectsChannel()
+          .getSystemMusicVolume()
+          .timeout(const Duration(milliseconds: 400));
+      if (!sys.isFinite || sys < 0.0) return; // unknown: keep current level
+      _volume = sys.clamp(0.0, 1.0);
+      _lastSystemVolumeRatio = _volume;
+      if (!_volumeSubject.isClosed) _volumeSubject.add(_volume);
+      _volumeController?.updateSettings(userVolume: _volume);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to seed volume before DVC',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
   /// Toggles Direct Volume Control. Enabling pins Android's media stream to
   /// maximum and applies the composed gain in the native float DSP path;
   /// disabling restores the previous system volume. No-op when native DVC is
@@ -2063,6 +2155,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         await AudioEffectsChannel().setDvcEnabled(false);
         return;
       }
+      // Carry the device level into the gain before the stream is pinned to
+      // max, or the DSP gets unity and playback jumps to full volume.
+      await _seedVolumeFromSystemForDvc();
       _dvcEnabled = true;
       _volumeController?.setDvcEnabled(true);
       await AudioEffectsChannel().setDvcEnabled(true);
@@ -2201,7 +2296,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       _dvcEnabled = _cachedPrefs?.getBool(PrefsKeys.dvcEnabled) ?? false;
       if (_dvcEnabled) {
+        // The stream is at its real device level right now; capture it as the
+        // app volume before DVC pins the stream to max.
+        await _seedVolumeFromSystemForDvc();
         unawaited(AudioEffectsChannel().setDvcEnabled(true));
+        unawaited(_pushDvcGain(_volume));
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore DVC setting',
@@ -2423,11 +2522,38 @@ class PulsrAudioHandler extends BaseAudioHandler
             if (effect.reason == null) {
               // A mode became effective again; allow a future failure on the
               // same output to surface once more.
+              _lastSuspendedReason = null;
               if (effect.aaudioActive || effect.floatActive) {
                 _lastOutputModeNotice = null;
               }
               return;
             }
+            // A non-null reason is not automatically a failure: the sink
+            // reports temporary suspensions (speed/pitch, skip-silence) the
+            // same way. AAudio is parked on the AudioTrack path and restored
+            // once the parameter returns to default, so those must not count
+            // as rejections - three of them would make safe mode permanently
+            // disable AAudio for the device.
+            if (_suspensionReasons.contains(effect.reason)) {
+              if (effect.aaudioActive) {
+                // Resume after the suspension: direct output is back, so the
+                // next episode may be logged again.
+                _lastSuspendedReason = null;
+                return;
+              }
+              if (effect.reason == _lastSuspendedReason) return;
+              _lastSuspendedReason = effect.reason;
+              // Informational: no safe-mode counter and no rejection notice -
+              // the direct path comes back on its own. No localized string
+              // exists for this line yet, so it stays in the log.
+              ErrorLogger.log(
+                'Direct output was suspended (${effect.reason}); '
+                'playback continues.',
+                category: 'AudioHandler',
+              );
+              return;
+            }
+            _lastSuspendedReason = null;
             final message = effect.reason == 'float_rejected'
                 ? "High-resolution float output isn't available on this "
                     'output; using 16-bit output.'

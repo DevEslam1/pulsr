@@ -73,6 +73,19 @@ private:
     LinkwitzRiley4 allpassLowPath_[MAX_PAIRS];  // allpass @ f2, applied to the low half
     LinkwitzRiley4 allpassHighPath_[MAX_PAIRS]; // allpass @ f0, applied to the high half
 
+    // Item 5: the odd channel (1/3/5/7-channel layouts) owns its own crossover
+    // chain instead of indexing the pair arrays with chLast/2. Sharing a pair's
+    // instance meant the odd channel and a stereo pair updated the same LR4 /
+    // allpass registers, so an instance could be clocked twice in one frame and
+    // the odd channel inherited the pair's state on a layout change. Sized like
+    // the pairs, so nothing allocates on the audio thread; even layouts never
+    // touch these.
+    LinkwitzRiley4 crossoverOddMid_;            // splits at crossoverFreqs[1]
+    LinkwitzRiley4 crossoverOddLow_;            // splits LowHalf at crossoverFreqs[0]
+    LinkwitzRiley4 crossoverOddHigh_;           // splits HighHalf at crossoverFreqs[2]
+    LinkwitzRiley4 allpassOddLowPath_;          // allpass @ f2, applied to the odd low half
+    LinkwitzRiley4 allpassOddHighPath_;         // allpass @ f0, applied to the odd high half
+
     // Per-band ballistics
     double attackCoeff_[NUM_BANDS] = {};
     double releaseCoeff_[NUM_BANDS] = {};

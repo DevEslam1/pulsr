@@ -147,13 +147,39 @@ int main() {
               "I32 -max saturates at -max");
     }
 
+    {
+        // A zero-slope ramp must be bit-identical to the constant-gain path: the
+        // per-frame stepping fixes the step at the block seam, it is not a
+        // different quantizer. 4 frames x 2 ch, equal dither seeds, so any
+        // difference would come from the sampling of the gain itself.
+        const std::vector<int16_t> source = {
+            1000, -1000, 32767, -32768, 12345, -23456, 777, -778
+        };
+        std::vector<int16_t> constant = source;
+        std::vector<int16_t> ramped = source;
+        pulsr::SinkDitherState constantDither{};
+        pulsr::SinkDitherState rampDither{};
+        pulsr::ApplyI16Volume(constant.data(), static_cast<int32_t>(constant.size()), 0.5f,
+                              constantDither);
+        pulsr::ApplyI16VolumeRamp(ramped.data(), 4, 2, 0.5f, 0.5f, rampDither);
+        check(constant == ramped,
+              "zero-slope I16 ramp must match the constant-gain path sample for sample");
+    }
+
     // Initial AAudio buffer sizing must prevent 2 ms exclusive-mode starvation.
     check(pulsr::ComputeInitialBufferFrames(48, 5760, 5760) == 2880,
           "120 ms target at 48 kHz should prefill 60 ms instead of 2 ms");
     check(pulsr::ComputeInitialBufferFrames(48, 1152, 1152) == 576,
           "24 ms target at 48 kHz should start at 12 ms");
+    // An 8 ms target cannot be clamped down to itself: one 4-burst wake-up gap
+    // from the non-RT Java writer is already longer than the whole target, so the
+    // initial size stays at burst*4 (16 ms at a 192-frame burst).
+    check(pulsr::ComputeInitialBufferFrames(192, 24000, 384) == 768,
+          "8 ms target at 48 kHz must start at burst*4 (16 ms), not at the target");
+    check(pulsr::ComputeInitialBufferFrames(192, 512, 384) == 512,
+          "burst*4 headroom for a small target must still respect stream capacity");
     check(pulsr::ComputeInitialBufferFrames(960, 1920, 1152) == 1920,
-          "burst*2 floor should hold when burst is large relative to target");
+          "burst*4 headroom must be clamped to the reported capacity");
     check(pulsr::ComputeInitialBufferFrames(960, 480, 0) == 480,
           "initial buffer must never exceed reported stream capacity");
     check(pulsr::ComputeInitialBufferFrames(0, 2048, 4096) == 2048,

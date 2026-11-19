@@ -5,6 +5,7 @@ import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../config/app_config.dart';
 import '../errors/failures.dart';
+import '../theme/pulsr_page_transitions.dart';
 import '../utils/l10n_extensions.dart';
 import '../widgets/ticker_gated_branch_container.dart';
 import '../../domain/models/genre_item.dart';
@@ -20,6 +21,7 @@ import '../../features/genre_detail/presentation/genre_detail_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/library/presentation/library_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../features/party/presentation/party_screen.dart';
 import '../../features/player/presentation/now_playing_screen.dart';
 import '../../features/player/presentation/widgets/karaoke_mode_screen.dart';
 import '../../features/playlist_detail/presentation/playlist_detail_screen.dart';
@@ -50,7 +52,6 @@ import '../../features/library/presentation/favorites_screen.dart';
 import '../../features/playlist_detail/presentation/online_playlist_detail_screen.dart';
 import '../../features/playlists/cubit/playlist_cubit.dart';
 import '../../features/quran_mode/presentation/quran_mode_screen.dart';
-import '../motion/pulsr_motion.dart';
 import '../services/ytm_account_service.dart';
 import '../widgets/pulsr_modal_tracker.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -63,59 +64,16 @@ Page<dynamic> _buildPulsrPageRoute({
   required LocalKey key,
   required Widget child,
 }) {
-  return CustomTransitionPage<void>(
+  // A MaterialPage (not a CustomTransitionPage) is what lets
+  // PageTransitionsTheme run: Android gets the predictive-back preview,
+  // iOS/macOS keep the interactive edge-swipe, desktop keeps Pulsr's tuned
+  // slide via PulsrPageTransitionsBuilder.
+  return MaterialPage<void>(
     key: key,
     child: child,
-    transitionDuration: PulsrMotion.page,
-    reverseTransitionDuration: PulsrMotion.layout,
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      if (!context.motionEnabled) {
-        return child;
-      }
-
-      // Primary entrance: smooth slide in from right with fade
-      final slide = animation.drive(
-        Tween<Offset>(
-          begin: const Offset(0.12, 0.0),
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
-      );
-      final fade = animation.drive(
-        Tween<double>(
-          begin: 0.0,
-          end: 1.0,
-        ).chain(CurveTween(
-            curve: const Interval(0.0, 0.75, curve: Curves.easeOut))),
-      );
-
-      // Secondary exit: subtle Apple-style parallax recession
-      final secondarySlide = secondaryAnimation.drive(
-        Tween<Offset>(
-          begin: Offset.zero,
-          end: const Offset(-0.04, 0.0),
-        ).chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
-      );
-      final secondaryFade = secondaryAnimation.drive(
-        Tween<double>(
-          begin: 1.0,
-          end: 0.92,
-        ).chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
-      );
-
-      return SlideTransition(
-        position: secondarySlide,
-        child: FadeTransition(
-          opacity: secondaryFade,
-          child: SlideTransition(
-            position: slide,
-            child: FadeTransition(
-              opacity: fade,
-              child: child,
-            ),
-          ),
-        ),
-      );
-    },
+    // Route-derived keys (ValueKey('/album/42')) are stable across relaunches,
+    // so the navigator can restore the stack after process death.
+    restorationId: key is ValueKey<String> ? key.value : null,
   );
 }
 
@@ -126,28 +84,10 @@ Page<dynamic> _buildTabPage({
   required LocalKey key,
   required Widget child,
 }) {
-  return CustomTransitionPage<void>(
+  return MaterialPage<void>(
     key: key,
     child: child,
-    transitionDuration: PulsrMotion.state,
-    reverseTransitionDuration: PulsrMotion.state,
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      if (!context.motionEnabled) return child;
-      final fade = animation.drive(CurveTween(curve: Curves.easeOutCubic));
-      final slide = animation.drive(
-        Tween<Offset>(
-          begin: const Offset(0.0, 0.012),
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeOutCubic)),
-      );
-      return FadeTransition(
-        opacity: fade,
-        child: SlideTransition(
-          position: slide,
-          child: child,
-        ),
-      );
-    },
+    restorationId: key is ValueKey<String> ? key.value : null,
   );
 }
 
@@ -490,25 +430,23 @@ GoRouter createRouter(MediaScannerService scannerService,
         ],
       ),
       GoRoute(
+        path: '/party',
+        name: 'party',
+        parentNavigatorKey: rootNavigatorKey,
+        pageBuilder: (context, state) => _buildPulsrPageRoute(
+          key: state.pageKey,
+          child: const PartyScreen(),
+        ),
+      ),
+      GoRoute(
         path: '/now-playing',
         name: 'now-playing',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) => CustomTransitionPage(
+        pageBuilder: (context, state) => PulsrNowPlayingPage<void>(
           key: state.pageKey,
+          name: state.name,
+          restorationId: state.name,
           child: const NowPlayingScreen(),
-          transitionDuration: PulsrMotion.page,
-          reverseTransitionDuration: PulsrMotion.layout,
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            if (!context.motionEnabled) return child;
-            final slide = animation.drive(
-              Tween<Offset>(begin: const Offset(0.0, 1.0), end: Offset.zero)
-                  .chain(CurveTween(curve: Curves.fastEaseInToSlowEaseOut)),
-            );
-            return SlideTransition(
-              position: slide,
-              child: child,
-            );
-          },
         ),
       ),
       GoRoute(

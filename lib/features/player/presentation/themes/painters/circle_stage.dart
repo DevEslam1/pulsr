@@ -62,7 +62,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
     super.didChangeDependencies();
     // Reduce Motion collapses this to zero, so the bead snaps to its grabbed
     // size instead of tweening.
-    _grabController.duration = context.motionMs(160);
+    _grabController.duration = context.motionMs(200);
   }
 
   @override

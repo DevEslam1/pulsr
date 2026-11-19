@@ -175,7 +175,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                   IconButton(
                       icon: Icon(Icons.info_outline_rounded,
                           size: 16, color: p.textTertiary),
-                      visualDensity: VisualDensity.compact,
                       tooltip: context.l10n.dspAboutSpatializer,
                       onPressed: () => _showFeatureInfo(
                           context, AudioFeatureRegistry.spatializer,
@@ -260,7 +259,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     IconButton(
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
-                        visualDensity: VisualDensity.compact,
                         tooltip: context.l10n.dspAboutVirtualizer,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.virtualizer,
@@ -322,7 +320,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                         ? p.textTertiary.withValues(alpha: 0.35)
                                         : p.accent),
                                 tooltip: context.l10n.dspResetToDefault0,
-                                visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(
                                     minWidth: 48, minHeight: 48),
@@ -444,7 +441,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     IconButton(
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
-                        visualDensity: VisualDensity.compact,
                         tooltip: context.l10n.dspAboutDynamics,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.dynamics,
@@ -624,7 +620,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     IconButton(
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
-                        visualDensity: VisualDensity.compact,
                         tooltip: context.l10n.dspAboutCrossfeed,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.crossfeed,
@@ -851,7 +846,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                       ? p.textTertiary.withValues(alpha: 0.35)
                                       : p.accent),
                               tooltip: context.l10n.dspResetToDefault350us,
-                              visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
                                   minWidth: 48, minHeight: 48),
@@ -928,7 +922,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                       ? p.textTertiary.withValues(alpha: 0.35)
                                       : p.accent),
                               tooltip: context.l10n.dspResetToDefault9db,
-                              visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
                                   minWidth: 48, minHeight: 48),
@@ -1040,7 +1033,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     IconButton(
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
-                        visualDensity: VisualDensity.compact,
                         tooltip: context.l10n.dspAboutLimiter,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.limiter,
@@ -1094,7 +1086,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                         ? p.textTertiary.withValues(alpha: 0.35)
                                         : p.accent),
                             tooltip: context.l10n.dspResetToDefault02dbfs,
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                                 minWidth: 48, minHeight: 48),
@@ -1175,7 +1166,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                         ? p.textTertiary.withValues(alpha: 0.35)
                                         : p.accent),
                             tooltip: context.l10n.dspResetToDefault50ms,
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                                 minWidth: 48, minHeight: 48),
@@ -1280,7 +1270,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                     IconButton(
                                         icon: Icon(Icons.info_outline_rounded,
                                             size: 16, color: p.textTertiary),
-                                        visualDensity: VisualDensity.compact,
                                         tooltip:
                                             context.l10n.dspAboutStereoBalance,
                                         onPressed: () => _showFeatureInfo(
@@ -1391,7 +1380,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                   ? p.textTertiary.withValues(alpha: 0.35)
                                   : p.accent),
                           tooltip: context.l10n.dspResetBalanceCenter,
-                          visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           constraints:
                               const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -1528,7 +1516,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                     IconButton(
                         icon: Icon(Icons.info_outline_rounded,
                             size: 16, color: p.textTertiary),
-                        visualDensity: VisualDensity.compact,
                         tooltip: context.l10n.dspAboutReverb,
                         onPressed: () => _showFeatureInfo(
                             context, AudioFeatureRegistry.reverb,
@@ -1608,7 +1595,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                                     ? p.textTertiary.withValues(alpha: 0.35)
                                     : p.accent),
                             tooltip: context.l10n.dspResetToDefault20wet,
-                            visualDensity: VisualDensity.compact,
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(
                                 minWidth: 48, minHeight: 48),
@@ -1803,7 +1789,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
                             ? p.textTertiary.withValues(alpha: 0.35)
                             : p.accent),
                     tooltip: context.l10n.dspResetToDefault,
-                    visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints:
                         const BoxConstraints(minWidth: 48, minHeight: 48),
@@ -1903,7 +1888,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
-                  visualDensity: VisualDensity.compact,
                   tooltip: l10n.dspSaturationTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.saturation,
@@ -2064,7 +2048,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
-                  visualDensity: VisualDensity.compact,
                   tooltip: l10n.dspStereoWidthTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.stereoWidth,
@@ -2224,7 +2207,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
-                  visualDensity: VisualDensity.compact,
                   tooltip: l10n.dspSubCrossoverTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.subCrossover,
@@ -2385,7 +2367,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                   icon: Icon(Icons.info_outline_rounded,
                       size: 16, color: p.textTertiary),
-                  visualDensity: VisualDensity.compact,
                   tooltip: l10n.dspDynamicEqTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.dynamicEq,
@@ -3048,7 +3029,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
-                visualDensity: VisualDensity.compact,
                 tooltip:
                     AudioFeatureRegistry.viperDdc.localized(context.l10n).title,
                 onPressed: () => _showFeatureInfo(
@@ -3192,7 +3172,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
-                visualDensity: VisualDensity.compact,
                 tooltip: AudioFeatureRegistry.arbitraryEq
                     .localized(context.l10n)
                     .title,
@@ -3337,7 +3316,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
-                visualDensity: VisualDensity.compact,
                 tooltip:
                     AudioFeatureRegistry.liveProg.localized(context.l10n).title,
                 onPressed: () => _showFeatureInfo(
@@ -3479,7 +3457,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               IconButton(
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
-                visualDensity: VisualDensity.compact,
                 tooltip: AudioFeatureRegistry.dynamicBass
                     .localized(context.l10n)
                     .title,

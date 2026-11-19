@@ -137,9 +137,16 @@ public final class AAudioAudioSink implements AudioSink {
     private int pcmEncoding = C.ENCODING_PCM_FLOAT;
     private boolean transcodingPcm32 = false;
 
+    /**
+     * API level gating AAudio PCM encodings. Honours the per-instance test
+     * seam, otherwise the process-wide override or the platform level.
+     */
+    private int apiLevel() {
+        return deviceApiLevelForTest >= 0 ? deviceApiLevelForTest : deviceApiLevel();
+    }
+
     private boolean useNativeInt32() {
-        final int sdk = deviceApiLevelForTest >= 0 ? deviceApiLevelForTest : deviceApiLevel();
-        return preferExclusive && sdk >= 31;
+        return preferExclusive && apiLevel() >= 31;
     }
     // Reusable scratch buffer for 32-bit → float32 conversion. Allocated
     // lazily in handleBuffer and grown on demand; never shrunk.
@@ -169,6 +176,12 @@ public final class AAudioAudioSink implements AudioSink {
 
     private volatile boolean playing = false;
     private volatile int[] measuredStream = new int[] {0, 0, 0};
+    // nativeGetDeviceId() is a JNI call behind a global shared lock, so the
+    // measured route is refreshed at most every 32 buffers instead of on every
+    // write. configure() and a pending route change force the next query.
+    private static final int ROUTE_QUERY_INTERVAL_BUFFERS = 32;
+    private int buffersSinceRouteQuery;
+    private boolean forceRouteQuery = true;
     private int preferredDeviceId = 0;
     private int openedDeviceId = 0;
     private int openedEncoding = 0;
@@ -192,6 +205,9 @@ public final class AAudioAudioSink implements AudioSink {
         if (id == preferredDeviceId) return;
         preferredDeviceId = id;
         routePending = handle != 0L;
+        // Report the new route on the first buffer after the change.
+        forceRouteQuery = true;
+        buffersSinceRouteQuery = 0;
     }
 
     private boolean eosWritten = false;
@@ -229,8 +245,13 @@ public final class AAudioAudioSink implements AudioSink {
         switch (format.pcmEncoding) {
             case C.ENCODING_PCM_16BIT:
             case C.ENCODING_PCM_FLOAT:
-            case C.ENCODING_PCM_24BIT:
                 return SINK_FORMAT_SUPPORTED_DIRECTLY;
+            case C.ENCODING_PCM_24BIT:
+                // AAUDIO_FORMAT_PCM_I24_PACKED only exists from API 31, and
+                // handleBuffer has no 24 -> float transcode, so below 31 this
+                // is unsupported rather than WITH_TRANSCODING.
+                return apiLevel() >= 31 ? SINK_FORMAT_SUPPORTED_DIRECTLY
+                        : SINK_FORMAT_UNSUPPORTED;
             case C.ENCODING_PCM_32BIT:
                 if (useNativeInt32()) {
                     return SINK_FORMAT_SUPPORTED_DIRECTLY;
@@ -292,6 +313,9 @@ public final class AAudioAudioSink implements AudioSink {
             throw new ConfigurationException(
                 "Unsupported PCM format for AAudio sink", inputFormat);
         }
+        // A (re)configured stream must report its route on the first buffer.
+        forceRouteQuery = true;
+        buffersSinceRouteQuery = 0;
         final boolean useNative32 = useNativeInt32();
         final int encoding;
         if (inputFormat.pcmEncoding == C.ENCODING_PCM_16BIT) {
@@ -543,7 +567,7 @@ public final class AAudioAudioSink implements AudioSink {
                         /* isRecoverable= */ true);
             }
             updateMeasuredRoute();
-            advanceAfterPcmWrite(buffer, written);
+            if (!advanceAfterPcmWrite(buffer, written)) return false;
             return !buffer.hasRemaining();
         }
         int offset = writeBuffer.position();
@@ -554,24 +578,28 @@ public final class AAudioAudioSink implements AudioSink {
                     /* isRecoverable= */ true);
         }
         updateMeasuredRoute();
-        advanceAfterPcmWrite(buffer, written);
+        if (!advanceAfterPcmWrite(buffer, written)) return false;
         return !buffer.hasRemaining();
     }
 
-    private void advanceAfterPcmWrite(ByteBuffer buffer, int written) {
+    /**
+     * Advances the source buffer by the bytes the native write accepted, keeping
+     * it sample aligned. Returns false when a 32-bit -> float write stopped
+     * mid-sample: the trailing 1-3 bytes stay unconsumed so handleBuffer reports
+     * the buffer as not consumed and Media3 retries, instead of silently
+     * dropping source bytes that were never written.
+     */
+    private boolean advanceAfterPcmWrite(ByteBuffer buffer, int written) {
         if (transcodingPcm32) {
-            // int32 -> float is 1:1 in samples (4 bytes in, 4 bytes out),
-            // so a partial native write must advance the source by the
-            // same byte count; once fewer than 4 bytes remain, consume
-            // the incomplete trailing sample so handleBuffer cannot stall.
-            int nextPos = Math.min(buffer.limit(), buffer.position() + written);
-            if (buffer.limit() - nextPos < 4) {
-                nextPos = buffer.limit();
-            }
-            buffer.position(nextPos);
-        } else {
-            buffer.position(buffer.position() + written);
+            // int32 -> float is 1:1 in samples (4 bytes in, 4 bytes out), so a
+            // partial native write advances the source by the same byte count,
+            // never past a sample boundary that was not written.
+            final int aligned = written & ~3;
+            buffer.position(buffer.position() + aligned);
+            return aligned == written;
         }
+        buffer.position(buffer.position() + written);
+        return true;
     }
 
     /**
@@ -809,6 +837,14 @@ public final class AAudioAudioSink implements AudioSink {
     }
 
     private void updateMeasuredRoute() {
+        // At most one native query per ROUTE_QUERY_INTERVAL_BUFFERS, unless
+        // configure() or a route change asked for a fresh reading.
+        if (!forceRouteQuery
+                && ++buffersSinceRouteQuery < ROUTE_QUERY_INTERVAL_BUFFERS) {
+            return;
+        }
+        forceRouteQuery = false;
+        buffersSinceRouteQuery = 0;
         int device = bridge.getDeviceId(handle);
         int[] previous = measuredStream;
         if (previous[0] != device) measuredStream = new int[] {device, previous[1], previous[2]};

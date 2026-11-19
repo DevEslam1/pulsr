@@ -19,6 +19,7 @@ class PulsrElevation {
 
   static List<BoxShadow> level1([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
+        isAmoled: _isAmoled(contextOrPalette),
         keyAlpha: 0.16,
         ambAlpha: 0.10,
         keyBlur: 3,
@@ -29,6 +30,7 @@ class PulsrElevation {
 
   static List<BoxShadow> level2([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
+        isAmoled: _isAmoled(contextOrPalette),
         keyAlpha: 0.24,
         ambAlpha: 0.16,
         keyBlur: 6,
@@ -39,6 +41,7 @@ class PulsrElevation {
 
   static List<BoxShadow> level3([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
+        isAmoled: _isAmoled(contextOrPalette),
         keyAlpha: 0.34,
         ambAlpha: 0.24,
         keyBlur: 10,
@@ -49,6 +52,7 @@ class PulsrElevation {
 
   static List<BoxShadow> level4([dynamic contextOrPalette]) => _pair(
         _isDark(contextOrPalette),
+        isAmoled: _isAmoled(contextOrPalette),
         keyAlpha: 0.44,
         ambAlpha: 0.32,
         keyBlur: 16,
@@ -59,6 +63,7 @@ class PulsrElevation {
 
   static List<BoxShadow> _pair(
     bool isDark, {
+    bool isAmoled = false,
     required double keyAlpha,
     required double ambAlpha,
     required double keyBlur,
@@ -68,6 +73,9 @@ class PulsrElevation {
   }) {
     // Light mode needs far less ink to read the same depth.
     final scale = isDark ? 1.0 : 0.45;
+    // Over pure black both translucency and shadow lose signal, so the ambient
+    // pass needs more ink to keep a surface from reading as a flat rectangle.
+    final ambientScale = isAmoled ? 1.25 : 1.0;
     return [
       BoxShadow(
         color: AppColors.scrimAt(keyAlpha * scale),
@@ -75,11 +83,20 @@ class PulsrElevation {
         offset: Offset(0, keyDy),
       ),
       BoxShadow(
-        color: AppColors.scrimAt(ambAlpha * scale),
+        color: AppColors.scrimAt(ambAlpha * scale * ambientScale),
         blurRadius: ambBlur,
         offset: Offset(0, ambDy),
       ),
     ];
+  }
+
+  static bool _isAmoled(dynamic contextOrPalette) {
+    final candidate = contextOrPalette is BuildContext
+        ? contextOrPalette.palette
+        : contextOrPalette;
+    if (candidate is! PulsrPalette || !candidate.isDark) return false;
+    // AMOLED's base is pure black; dark's is #12151D.
+    return candidate.bg.computeLuminance() < 0.005;
   }
 
   static bool _isDark(dynamic contextOrPalette) {

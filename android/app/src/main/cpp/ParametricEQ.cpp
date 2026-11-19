@@ -474,7 +474,11 @@ void ParametricEQ::processSubBlock(float* buffer, int frames, int channels, int 
     if (std::abs(initialPreampLinear - 1.0) > 1e-4 || std::abs(targetPLinear - 1.0) > 1e-4) {
         const float startP = static_cast<float>(initialPreampLinear);
         const float endP = static_cast<float>(targetPLinear);
-        const float pStep = (frames > 1) ? ((endP - startP) / static_cast<float>(frames)) : 0.0f;
+        // Item 6: divide by (frames - 1) so the LAST sample of the sub-block lands
+        // exactly on endP. Dividing by `frames` left the ramp one sample short, and
+        // since preampLinear_ already held endP the next sub-block restarted one
+        // step below it: a small repeated step at every 64-frame boundary.
+        const float pStep = (frames > 1) ? ((endP - startP) / static_cast<float>(frames - 1)) : 0.0f;
         float curP = startP;
         for (int f = 0; f < frames; ++f) {
             for (int ch = 0; ch < channels; ++ch) {

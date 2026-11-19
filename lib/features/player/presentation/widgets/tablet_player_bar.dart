@@ -522,7 +522,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                         child:
                                                                             AnimatedContainer(
                                                                           duration:
-                                                                              context.motionMs(180),
+                                                                              context.motionMs(200),
                                                                           width: isShortHeight
                                                                               ? 30
                                                                               : 36,
@@ -661,7 +661,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                       child:
                                                                           AnimatedContainer(
                                                                         duration:
-                                                                            context.motionMs(180),
+                                                                            context.motionMs(200),
                                                                         width: isShortHeight
                                                                             ? 40
                                                                             : 48,
@@ -704,7 +704,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                           child:
                                                                               AnimatedSwitcher(
                                                                             duration:
-                                                                                context.motionMs(160),
+                                                                                context.motionMs(200),
                                                                             transitionBuilder: (child, anim) =>
                                                                                 ScaleTransition(
                                                                               scale: anim,
@@ -840,7 +840,7 @@ class _TabletPlayerBarState extends State<TabletPlayerBar> {
                                                                         child:
                                                                             AnimatedContainer(
                                                                           duration:
-                                                                              context.motionMs(180),
+                                                                              context.motionMs(200),
                                                                           width: isShortHeight
                                                                               ? 30
                                                                               : 36,

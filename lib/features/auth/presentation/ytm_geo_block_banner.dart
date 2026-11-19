@@ -101,11 +101,10 @@ extension _YtmGeoBlockBanner on _YtmWebLoginSheetState {
                 style: FilledButton.styleFrom(
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
-                  visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: const Size(48, 48),
+                  tapTargetSize: MaterialTapTargetSize.padded,
                 ),
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -115,11 +114,10 @@ extension _YtmGeoBlockBanner on _YtmWebLoginSheetState {
                 label: Text(context.l10n.openYtWeb,
                     style: TextStyle(fontSize: AppFontSize.caption)),
                 style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.s10, vertical: AppSpacing.xxs),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: const Size(48, 48),
+                  tapTargetSize: MaterialTapTargetSize.padded,
                 ),
               ),
             ],

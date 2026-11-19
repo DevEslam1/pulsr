@@ -330,7 +330,6 @@ class _RadioNowPlayingRecommendationsState
     final collapseButton = IconButton(
       constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
       padding: EdgeInsets.zero,
-      visualDensity: VisualDensity.compact,
       tooltip:
           _isCollapsed ? 'Expand recommendations' : 'Collapse recommendations',
       icon: Icon(
@@ -648,7 +647,6 @@ class _RadioNowPlayingRecommendationsState
           IconButton(
             constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
             padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
             icon: Icon(
               Icons.open_in_new_rounded,
               size: 15,

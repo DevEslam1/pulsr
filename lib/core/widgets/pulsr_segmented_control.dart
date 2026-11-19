@@ -96,7 +96,7 @@ class PulsrSegmentedControl extends StatelessWidget {
                 children: [
                   // Pill indicator matching Equalizer / AutoEq / Spatial & DSP
                   AnimatedPositionedDirectional(
-                    duration: context.motionMs(240),
+                    duration: context.motionMs(260),
                     curve: context.motionCurve(Curves.easeOutCubic),
                     start: fitLabels
                         ? fractionStart(clampedIndex) * innerWidth
@@ -121,6 +121,9 @@ class PulsrSegmentedControl extends StatelessWidget {
                           flex: fitLabels ? weights[i] : 1,
                           child: Semantics(
                             selected: clampedIndex == i,
+                            // Tell screen readers this is "1 of N" rather than
+                            // a standalone selected button.
+                            inMutuallyExclusiveGroup: true,
                             button: true,
                             label: segments[i].label,
                             onTap: () => onChanged(i),

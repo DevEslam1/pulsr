@@ -23,6 +23,15 @@ namespace {
 
 constexpr int64_t kWriteTimeoutNs = 50LL * 1000 * 1000;  // 50 ms per attempt
 
+// Upper bound for the pre-stop drain in CloseLocked(): waiting for the device
+// tail is worth it, stalling a control thread is not. 250 ms covers the default
+// 150 ms target, a deeper target gets twice its own buffer, and nothing waits
+// longer than 500 ms.
+int64_t DrainBudgetMs(int32_t targetBufferMs) {
+    return std::min<int64_t>(
+        std::max<int64_t>(250, static_cast<int64_t>(targetBufferMs) * 2), 500);
+}
+
 int32_t ContainerBytesPerFrame(AAudioSink::Encoding encoding, int32_t channels) {
     int32_t sampleBytes;
     switch (encoding) {
@@ -134,9 +143,30 @@ bool AAudioSink::TryOpen(aaudio_sharing_mode_t sharing,
     {
         const int32_t burst = AAudioStream_getFramesPerBurst(stream);
         const int32_t capacity = AAudioStream_getBufferCapacityInFrames(stream);
-        initialBuffer = ComputeInitialBufferFrames(burst, capacity, targetFrames);
-        if (initialBuffer > 0) {
-            AAudioStream_setBufferSizeInFrames(stream, initialBuffer);
+        const int32_t requested =
+            ComputeInitialBufferFrames(burst, capacity, targetFrames);
+        if (requested > 0) {
+            const int32_t applied =
+                AAudioStream_setBufferSizeInFrames(stream, requested);
+            if (applied > 0) {
+                // The HAL may clamp the request (MMAP granularity, minimum
+                // burst count), so publish what it actually gave us. The
+                // governor's shrink floor is this value: keeping the request
+                // would let ShrinkBufferIfStable "shrink" to a size the
+                // buffer never had.
+                initialBuffer = applied;
+            } else {
+                if (applied < 0) {
+                    // Negative is AAudio's error return. Say it once per open
+                    // attempt instead of silently believing the request.
+                    LOGW("AAudio setBufferSizeInFrames(%d) failed: %s",
+                         requested, AAudio_convertResultToText(
+                             static_cast<aaudio_result_t>(applied)));
+                }
+                const int32_t readBack =
+                    AAudioStream_getBufferSizeInFrames(stream);
+                initialBuffer = readBack > 0 ? readBack : requested;
+            }
         }
     }
     const bool exclusive =
@@ -212,6 +242,17 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
     // scratch state under an active writer. Drain writers first (this is a
     // control-thread call, not the audio thread).
     CloseLocked(/* waitForWriters = */ true);
+    return OpenLocked(config, error);
+}
+
+bool AAudioSink::OpenLocked(const Config& config, std::string* error,
+                            int64_t* recoverPrevFramesWritten,
+                            int64_t* recoverPrevWrittenBase) {
+    // streamMutex_ is held by the caller, which has already closed the previous
+    // stream: everything below validates the config and walks the ladder, so
+    // Flush() can rebuild a stream under the same lock instead of dropping it
+    // and racing Close()/Open() in between. recoverPrev* are forwarded verbatim
+    // to every rung so a rebuild keeps framesWritten_ continuous.
     recoveryAttempts_ = 0;
     config_ = config;
     bytesPerFrame_ =
@@ -243,10 +284,13 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
         // receive a bit-perfect stream.
         const bool preferDeepExclusive = config_.targetBufferMs >= 180;
         if ((!preferDeepExclusive &&
-             TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) ||
-            TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_NONE) ||
+             TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                     recoverPrevFramesWritten, recoverPrevWrittenBase)) ||
+            TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_NONE,
+                    recoverPrevFramesWritten, recoverPrevWrittenBase) ||
             (preferDeepExclusive &&
-             TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY))) {
+             TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                     recoverPrevFramesWritten, recoverPrevWrittenBase))) {
             if (error != nullptr) error->clear();
             return true;
         }
@@ -255,11 +299,13 @@ bool AAudioSink::Open(const Config& config, std::string* error) {
     }
     if (config_.lowLatency &&
         config_.targetBufferMs < 180 &&
-        TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY)) {
+        TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                recoverPrevFramesWritten, recoverPrevWrittenBase)) {
         if (error != nullptr) error->clear();
         return true;
     }
-    if (TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_NONE)) {
+    if (TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_NONE,
+                recoverPrevFramesWritten, recoverPrevWrittenBase)) {
         if (error != nullptr) error->clear();
         return true;
     }
@@ -285,29 +331,49 @@ bool AAudioSink::RecoverDisconnected() {
     // both verdicts, so capture them before the reopen and re-assert them on
     // the replacement stream; otherwise a reconnect would silently drop the
     // unity-only guarantee while Java still believes bit-perfect is engaged.
+    // A live DoP carrier counts as exclusive too: its words are DSD payload, and
+    // a SHARED stream is resampled by AudioFlinger, so recovering it there
+    // would corrupt the bitstream as well as the unity claim.
     const bool liveBitPerfect = bitPerfect_.load(std::memory_order_acquire);
     const bool liveDop = dop_.load(std::memory_order_acquire);
-    const bool requireExclusive =
-        config_.preferExclusive || config_.bitPerfect || liveBitPerfect;
+    const bool requireExclusive = config_.preferExclusive || config_.bitPerfect ||
+                                  liveBitPerfect || liveDop;
     // Current writer thread is active, so do not wait for writers here
-    CloseLocked(/* waitForWriters = */ false);
+    CloseLocked(/* waitForWriters = */ false, /* drainTail = */ false);
     // The disconnected flag is deliberately not cleared here. TryOpen clears
     // it only after a stream is actually live; if the whole ladder fails the
     // flag must stay set so Write keeps retrying with backoff.
     int64_t prevFramesWritten = framesWritten_;
     int64_t prevWrittenBase = framesWrittenBase_;
 
+    // Mirror the Open() rung order. A recovery that picks a different rung than
+    // the original open silently changes latency and exclusivity, and the old
+    // ladder had no EXCLUSIVE+NONE rung even though Open() does: a HAL that only
+    // grants exclusive mode on PERFORMANCE_MODE_NONE could open but never
+    // recover. NONE comes first for a deep buffer (>= 180 ms target), exactly
+    // as in Open().
+    const bool preferDeepExclusive = config_.targetBufferMs >= 180;
     const bool recovered = recovery_.attempt([&]() {
-        if (requireExclusive &&
-            TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-                    &prevFramesWritten, &prevWrittenBase)) {
-            LOGI("Recovered AAudio stream in EXCLUSIVE mode");
-            return true;
+        if (requireExclusive) {
+            const bool exclusiveOk =
+                (!preferDeepExclusive &&
+                 TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                         &prevFramesWritten, &prevWrittenBase)) ||
+                TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_NONE,
+                        &prevFramesWritten, &prevWrittenBase) ||
+                (preferDeepExclusive &&
+                 TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+                         &prevFramesWritten, &prevWrittenBase));
+            if (exclusiveOk) {
+                LOGI("Recovered AAudio stream in EXCLUSIVE mode");
+                return true;
+            }
+            // Neither an exclusive request nor a bit-perfect/DoP assertion may
+            // fall back to SHARED: a resampled stream would silently void the
+            // contract.
+            return false;
         }
-        // Neither an exclusive request nor a bit-perfect assertion may fall back
-        // to SHARED: a resampled stream would silently void the contract.
-        if (requireExclusive) return false;
-        if (config_.lowLatency &&
+        if (config_.lowLatency && config_.targetBufferMs < 180 &&
             TryOpen(AAUDIO_SHARING_MODE_SHARED, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
                     &prevFramesWritten, &prevWrittenBase)) {
             LOGI("Recovered AAudio stream in SHARED low-latency mode");
@@ -329,13 +395,38 @@ bool AAudioSink::RecoverDisconnected() {
     return recovered;
 }
 
-void AAudioSink::CloseLocked(bool waitForWriters) {
+void AAudioSink::CloseLocked(bool waitForWriters, bool drainTail) {
     AAudioStream* st = stream_.exchange(nullptr, std::memory_order_acq_rel);
     if (st != nullptr) {
         // This stream was the sink the engines were shaping for; the next one
         // (usually the Java fallback) decides its own depth. Registry, not the
         // control singleton, so every render engine clears.
         DspEngineRegistry::instance().setSinkBitDepth(0);
+        // Drain before stop: requestStop() discards whatever the device has not
+        // consumed yet, which is exactly the up-to-targetBufferMs cut a
+        // hand-over used to produce (AAudio -> AudioTrack goes through Close()
+        // from the Java release path). 1 ms polling steps, no allocation, and
+        // no writeMutex_ here — a writer parked on that lock still counts as
+        // active, so taking it under streamMutex_ would risk a cycle; the loop
+        // only reads AAudio counters.
+        //
+        // `releasing_` is deliberately not an up-front skip: Close() sets it
+        // before calling in, so gating on it would make this drain unreachable
+        // on the very path it exists for. The error paths are excluded by
+        // `drainTail` (flush and disconnect recovery pass false) and by the
+        // state check: a disconnected or paused stream never advances
+        // framesRead, so waiting on it would only burn the budget.
+        if (drainTail && !recovery_.isDisconnected()) {
+            const int64_t budgetMs = DrainBudgetMs(config_.targetBufferMs);
+            int64_t waitedMs = 0;
+            while (waitedMs < budgetMs &&
+                   AAudioStream_getState(st) == AAUDIO_STREAM_STATE_STARTED &&
+                   AAudioStream_getFramesRead(st) <
+                       AAudioStream_getFramesWritten(st)) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                ++waitedMs;
+            }
+        }
         // Request stop immediately so any in-flight write unblocks without blocking Close
         AAudioStream_requestStop(st);
         // Wait for any in-flight lock-free queries to finish before closing
@@ -424,7 +515,18 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     const bool unityOnly = !SinkVolumeAllowed(
         bitPerfect_.load(std::memory_order_relaxed),
         dop_.load(std::memory_order_relaxed));
-    const bool applyVol = !unityOnly && (curVol != 1.0f);
+    if (unityOnly) {
+        // Byte-exact delivery: never scale, and drop the ramp state a previous
+        // volume-scaled configuration may have left behind, so the next mode
+        // flip back to scaled output starts from unity instead of a multiplier
+        // that no longer describes the signal.
+        appliedVolume_ = 1.0f;
+    }
+    // Ramp start for this call: the gain the previous call ended on. volume_
+    // is sampled once per Write(), so applying it as one constant factor turns
+    // a slider drag into one hard step per buffer (5-20 ms) — zipper noise.
+    const float rampStart = appliedVolume_;
+    const bool applyVol = !unityOnly && (curVol != 1.0f || rampStart != 1.0f);
 
     alignas(16) uint8_t stackScratch[2048];
     uint8_t* scratchPtr = nullptr;
@@ -464,22 +566,40 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
             const int32_t chunkBytes = framesToWrite * bytesPerFrame_;
             std::memcpy(scratchPtr, inCursor, static_cast<size_t>(chunkBytes));
 
+            // Spread the ramp over the whole call, not per chunk: a 16 ms call
+            // split into two 8 ms chunks would otherwise ramp twice from
+            // rampStart and stop half way. framesDone is the offset of this
+            // chunk inside the call, so the chunks concatenate into one line.
+            const int32_t framesDone = totalFrames - framesLeft;
+            const float gainStart = rampStart +
+                (curVol - rampStart) * static_cast<float>(framesDone) /
+                    static_cast<float>(totalFrames);
+            const float gainEnd = rampStart +
+                (curVol - rampStart) * static_cast<float>(framesDone + framesToWrite) /
+                    static_cast<float>(totalFrames);
+
             if (config_.encoding == Encoding::Float) {
                 float* f = reinterpret_cast<float*>(scratchPtr);
-                const int n = chunkBytes / static_cast<int32_t>(sizeof(float));
-                for (int i = 0; i < n; ++i) {
-                    f[i] *= curVol;
+                const float step =
+                    (gainEnd - gainStart) / static_cast<float>(framesToWrite);
+                const int32_t channels = config_.channelCount;
+                float gain = gainStart;
+                for (int32_t fr = 0; fr < framesToWrite; ++fr) {
+                    // One gain per frame keeps the channels of a frame
+                    // identical, so the ramp cannot shift the stereo image.
+                    float* frame = f + static_cast<size_t>(fr) * channels;
+                    for (int32_t c = 0; c < channels; ++c) frame[c] *= gain;
+                    gain += step;
                 }
             } else if (config_.encoding == Encoding::Int16) {
-                int16_t* s = reinterpret_cast<int16_t*>(scratchPtr);
-                const int n = chunkBytes / static_cast<int32_t>(sizeof(int16_t));
-                ApplyI16Volume(s, n, curVol, sinkDither_);
+                ApplyI16VolumeRamp(reinterpret_cast<int16_t*>(scratchPtr), framesToWrite,
+                                   config_.channelCount, gainStart, gainEnd, sinkDither_);
             } else if (config_.encoding == Encoding::I24Packed) {
-                ApplyI24PackedVolume(scratchPtr, chunkBytes, curVol, sinkDither_);
+                ApplyI24PackedVolumeRamp(scratchPtr, framesToWrite, config_.channelCount,
+                                         gainStart, gainEnd, sinkDither_);
             } else if (config_.encoding == Encoding::Int32) {
-                int32_t* s = reinterpret_cast<int32_t*>(scratchPtr);
-                const int n = chunkBytes / static_cast<int32_t>(sizeof(int32_t));
-                ApplyI32Volume(s, n, curVol, sinkDither_);
+                ApplyI32VolumeRamp(reinterpret_cast<int32_t*>(scratchPtr), framesToWrite,
+                                   config_.channelCount, gainStart, gainEnd, sinkDither_);
             }
             writeSrc = scratchPtr;
         }
@@ -506,6 +626,19 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
         }
     }
 
+    // Persist the ramp endpoint: the next Write() continues from exactly where
+    // this one stopped, so a chunked block or a short write leaves no seam. A
+    // fully written block ends exactly on volume_, which is what lets a settled
+    // slider become bit-exact again (unity stops scaling and stops touching
+    // scratch).
+    if (!unityOnly) {
+        const int32_t writtenFrames = totalFrames - framesLeft;
+        appliedVolume_ = (writtenFrames >= totalFrames)
+            ? curVol
+            : rampStart + (curVol - rampStart) *
+                  (static_cast<float>(writtenFrames) / static_cast<float>(totalFrames));
+    }
+
     // Feed the buffer governor from the writer thread. XRunDelta() is the only
     // adaptation trigger: real underruns grow the buffer, a quiet stream
     // shrinks it back. Write timeouts must not affect the buffer size.
@@ -518,7 +651,23 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
 void AAudioSink::Play() {
     std::lock_guard<std::mutex> lock(streamMutex_);
     AAudioStream* st = stream_.load(std::memory_order_acquire);
-    if (st != nullptr) AAudioStream_requestStart(st);
+    if (st == nullptr) return;
+    {
+        // A (re)started stream carries no gain history: begin the next block at
+        // the stored volume instead of ramping up from whatever the previous
+        // stream ended on. Java calls play() right after a flush/reopen, which
+        // makes this the point where the ramp is re-seeded — a stale endpoint
+        // here would fade the first blocks back in from an old slider position.
+        // Lock order is streamMutex_ -> writeMutex_, same as Flush().
+        std::lock_guard<std::mutex> writeLock(writeMutex_);
+        const float stored = volume_.load(std::memory_order_relaxed);
+        appliedVolume_ =
+            SinkVolumeAllowed(bitPerfect_.load(std::memory_order_relaxed),
+                              dop_.load(std::memory_order_relaxed))
+                ? stored
+                : 1.0f;
+    }
+    AAudioStream_requestStart(st);
 }
 
 void AAudioSink::Pause() {
@@ -531,21 +680,76 @@ void AAudioSink::Flush() {
     flushing_.store(true, std::memory_order_release);
     std::lock_guard<std::mutex> lock(streamMutex_);
     AAudioStream* st = stream_.load(std::memory_order_acquire);
+    bool flushRefused = false;
+    bool wasRunning = false;
     if (st != nullptr) {
+        wasRunning = AAudioStream_getState(st) == AAUDIO_STREAM_STATE_STARTED;
         AAudioStream_requestPause(st);
         aaudio_stream_state_t nextState = AAUDIO_STREAM_STATE_UNINITIALIZED;
         AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_PAUSING, &nextState, 100000000LL);
-        // requestFlush is unsupported on some MMAP streams; ignore the result.
-        if (AAudioStream_requestFlush(st) == AAUDIO_OK) {
+        const aaudio_result_t flushResult = AAudioStream_requestFlush(st);
+        if (flushResult == AAUDIO_OK) {
             AAudioStream_waitForStateChange(st, AAUDIO_STREAM_STATE_FLUSHING, &nextState, 50000000LL);
+        } else {
+            // requestFlush is unsupported on some MMAP/exclusive streams. The
+            // old code ignored this and rebased the counters anyway, which left
+            // the device buffer untouched and let pre-seek audio replay from it.
+            // Rebuild the stream instead: a fresh stream is empty by
+            // construction, so the counter rebase below is truthful.
+            LOGW("AAudio requestFlush failed (%s); rebuilding the stream",
+                 AAudio_convertResultToText(flushResult));
+            flushRefused = true;
         }
     }
-    // Wait for any in-flight writer holding writeMutex_ to exit before rebasing counters.
-    std::lock_guard<std::mutex> writeLock(writeMutex_);
-    if (st != nullptr) {
-        readBase_ = AAudioStream_getFramesRead(st);
-        readOffset_ = 0;
-        framesWrittenBase_ = framesWritten_.load(std::memory_order_relaxed);
+    if (flushRefused) {
+        // Capture what CloseLocked() clears and what a reopen must continue:
+        // the live unity verdicts (a seek must not silently drop bit-perfect or
+        // the DoP carrier) and the written-frame counter (so FramesWritten()
+        // does not jump backwards under Java's position math).
+        const bool liveBitPerfect = bitPerfect_.load(std::memory_order_acquire);
+        const bool liveDop = dop_.load(std::memory_order_acquire);
+        const Config reopenConfig = config_;
+        int64_t prevFramesWritten = framesWritten_.load(std::memory_order_relaxed);
+        int64_t prevWrittenBase = framesWrittenBase_.load(std::memory_order_relaxed);
+        // CloseLocked(true) spins on activeWriters_ while a writer parked on
+        // writeMutex_ still counts as active, so it must run with that lock
+        // released (Flush takes writeMutex_ exactly once, at the rebase below).
+        CloseLocked(/* waitForWriters = */ true, /* drainTail = */ false);
+        std::string reopenError;
+        const bool reopened = OpenLocked(reopenConfig, &reopenError,
+                                         &prevFramesWritten, &prevWrittenBase);
+        if (!reopened) {
+            // stream_ stays null: Write() returns -1 and Java's AudioTrack
+            // fallback ladder engages, which is the contract for any failed
+            // open. flushing_ still has to clear or the writer stays parked.
+            LOGE("AAudio flush rebuild failed: %s", reopenError.c_str());
+            st = nullptr;
+        } else {
+            st = stream_.load(std::memory_order_acquire);
+            if ((liveBitPerfect || liveDop) &&
+                !SetBitPerfect(liveBitPerfect, liveDop)) {
+                LOGE("Rebuilt stream refused the live unity-only assertion");
+            }
+            // A rebuild starts the replacement (TryOpen calls requestStart).
+            // Park it again when the sink was not running before the flush: a
+            // seek made while paused would otherwise leave an empty STARTED
+            // stream underrunning into XRunCount and inflating the buffer
+            // governor on the next write. Best effort — Java re-issues play()
+            // itself whenever it is playing.
+            if (!wasRunning && st != nullptr) AAudioStream_requestPause(st);
+        }
+    }
+    // Wait for any in-flight writer holding writeMutex_ to exit before rebasing
+    // counters, and rebase only against a stream that is actually live. With no
+    // stream the counters are left alone: FramesRead() falls back to
+    // FramesWritten(), so pending-data/EOS checks still terminate.
+    {
+        std::lock_guard<std::mutex> writeLock(writeMutex_);
+        if (st != nullptr) {
+            readBase_ = AAudioStream_getFramesRead(st);
+            readOffset_ = 0;
+            framesWrittenBase_ = framesWritten_.load(std::memory_order_relaxed);
+        }
     }
     flushing_.store(false, std::memory_order_release);
 }
@@ -592,6 +796,13 @@ bool AAudioSink::SetBitPerfect(bool bitPerfect, bool dop) {
     }
     bitPerfect_.store(bitPerfect, std::memory_order_release);
     dop_.store(dop, std::memory_order_release);
+    if (!SinkVolumeAllowed(bitPerfect, dop)) {
+        // Entering unity-only: snap the writer's ramp state now, so no stale
+        // multiplier survives even if the next Write() is the one that flips
+        // the gate (Write() snaps it too, on the writer thread).
+        std::lock_guard<std::mutex> writeLock(writeMutex_);
+        appliedVolume_ = 1.0f;
+    }
     return true;
 }
 

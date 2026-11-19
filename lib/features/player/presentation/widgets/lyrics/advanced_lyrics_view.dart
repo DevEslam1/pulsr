@@ -145,7 +145,7 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
       Scrollable.ensureVisible(
         currentContext,
         alignment: 0.35,
-        duration: context.motionMs(380),
+        duration: context.motionMs(320),
         curve: context.motionCurve(Curves.easeOutCubic),
       );
     } else {
@@ -157,7 +157,7 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
           Scrollable.ensureVisible(
             ctx,
             alignment: 0.35,
-            duration: context.motionMs(380),
+            duration: context.motionMs(320),
             curve: context.motionCurve(Curves.easeOutCubic),
           );
         } else if (_scrollController.hasClients) {
@@ -167,7 +167,7 @@ class _AdvancedLyricsViewState extends State<AdvancedLyricsView> {
           );
           _scrollController.animateTo(
             targetOffset,
-            duration: context.motionMs(380),
+            duration: context.motionMs(320),
             curve: context.motionCurve(Curves.easeOutCubic),
           );
         }
@@ -364,11 +364,11 @@ class _LyricLineWidget extends StatelessWidget {
       onLongPress: onLongPress,
       borderRadius: AppRadii.r12All,
       child: AnimatedOpacity(
-        duration: context.motionMs(250),
+        duration: context.motionMs(260),
         curve: context.motionCurve(Curves.easeOutCubic),
         opacity: lineOpacity,
         child: AnimatedContainer(
-          duration: context.motionMs(250),
+          duration: context.motionMs(260),
           curve: context.motionCurve(Curves.easeOutCubic),
           padding: const EdgeInsets.symmetric(
             vertical: AppSpacing.s8,

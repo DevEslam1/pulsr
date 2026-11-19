@@ -1546,17 +1546,33 @@ class SettingsCubit extends PulsrCubit<SettingsState>
 
   Future<void> setCustomThemeRadius(double radius) async {
     markDirty('customThemeRadius');
+    markDirty('themeColorSource');
     final clamped = radius.clamp(0.0, 48.0);
-    safeEmit(state.copyWith(customThemeRadius: clamped));
+    // The chrome only honours the custom radius while the accent source is
+    // `custom`. Touching the slider is an explicit request to use it, so
+    // promote the source instead of silently no-op'ing (the same rule
+    // setCustomAccentColor already follows).
+    safeEmit(state.copyWith(
+      customThemeRadius: clamped,
+      themeColorSource: ThemeColorSource.custom,
+    ));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyCustomThemeRadius, clamped);
+    await prefs.setString(_keyThemeColorSource, ThemeColorSource.custom.name);
+    await prefs.setBool(_keyDynamicTheme, false);
   }
 
   Future<void> setCustomThemeGlow(bool enabled) async {
     markDirty('customThemeGlow');
-    safeEmit(state.copyWith(customThemeGlow: enabled));
+    markDirty('themeColorSource');
+    safeEmit(state.copyWith(
+      customThemeGlow: enabled,
+      themeColorSource: ThemeColorSource.custom,
+    ));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyCustomThemeGlow, enabled);
+    await prefs.setString(_keyThemeColorSource, ThemeColorSource.custom.name);
+    await prefs.setBool(_keyDynamicTheme, false);
   }
 
   Future<void> setPlayerSliderStyle(PlayerSliderStyle style) async {

@@ -120,7 +120,10 @@ class ExportBackupUseCase {
           prefs.getDouble('setting_replay_gain_preamp_without_rg') ?? -3.0,
       'wifiOnlyMode': prefs.getBool('setting_wifi_only_mode') ?? false,
       'offlineOnlyMode': prefs.getBool('setting_offline_only_mode') ?? false,
-      'bitPerfectMode': prefs.getBool('setting_bit_perfect') ?? false,
+      // The live key is …_output; the old 'setting_bit_perfect' key has no
+      // reader, so restoring a backup used to report success while leaving
+      // bit-perfect off.
+      'bitPerfectMode': prefs.getBool(PrefsKeys.bitPerfectOutput) ?? false,
       'dspPreference': prefs.getString('setting_dsp_preference') ?? 'native',
       'streamingQuality':
           prefs.getString('setting_streaming_quality') ?? 'high',
@@ -138,6 +141,34 @@ class ExportBackupUseCase {
       'eqCustom32Frequencies': prefs.getString(PrefsKeys.eqCustom32Frequencies),
       'eqCustom64Frequencies': prefs.getString(PrefsKeys.eqCustom64Frequencies),
       'playbackSpeed': prefs.getDouble('setting_playback_speed') ?? 1.0,
+      // Appearance & accessibility: these were omitted from backups, so a
+      // device migration silently reset the user's look and comfort settings.
+      'languageCode': prefs.getString(PrefsKeys.languageCode) ?? 'system',
+      'highContrast': prefs.getBool('setting_high_contrast') ?? false,
+      'dimWhitePoint': prefs.getBool('setting_dim_white_point') ?? false,
+      'reduceMotion': prefs.getBool('setting_reduce_motion') ?? false,
+      'hapticsEnabled': prefs.getBool(PrefsKeys.hapticsEnabled) ?? true,
+      'liquidGlassTint': prefs.getDouble(PrefsKeys.liquidGlassTint) ?? 0.8,
+      'visualDensityMode':
+          prefs.getString(PrefsKeys.visualDensityMode) ?? 'comfortable',
+      'customThemeRadius':
+          prefs.getDouble('setting_custom_theme_radius') ?? 18.0,
+      'customThemeGlow': prefs.getBool('setting_custom_theme_glow') ?? true,
+      'miniPlayerSwipeLeft':
+          prefs.getString('setting_mini_player_swipe_left'),
+      'miniPlayerSwipeRight':
+          prefs.getString('setting_mini_player_swipe_right'),
+      'nowPlayingDoubleTap':
+          prefs.getString('setting_now_playing_double_tap'),
+      'nowPlayingArtworkSwipe':
+          prefs.getString('setting_now_playing_artwork_swipe'),
+      'dockStackMode': prefs.getString(PrefsKeys.dockStackMode),
+      'canvasEnabled': prefs.getBool('setting_canvas_enabled') ?? false,
+      'canvasAsBackdrop': prefs.getBool('setting_canvas_as_backdrop') ?? false,
+      'waveformSeekBar': prefs.getBool('setting_waveform_seek_bar') ?? false,
+      'autoThemeByTime': prefs.getBool('setting_auto_theme_by_time') ?? false,
+      'themeScheduleStart': prefs.getInt('setting_theme_schedule_start'),
+      'themeScheduleEnd': prefs.getInt('setting_theme_schedule_end'),
     };
 
     // 4. Play History (paths, count, lastPlayed)
@@ -777,7 +808,52 @@ class ImportBackupUseCase {
             'setting_offline_only_mode', settings['offlineOnlyMode']);
       }
       if (settings['bitPerfectMode'] is bool) {
-        await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode']);
+        await prefs.setBool(
+            PrefsKeys.bitPerfectOutput, settings['bitPerfectMode']);
+      }
+      // Appearance & accessibility keys restored in the same pass, so a backup
+      // is a complete snapshot rather than a partial one.
+      if (settings['languageCode'] is String) {
+        await prefs.setString(PrefsKeys.languageCode, settings['languageCode']);
+      }
+      for (final entry in <String, String>{
+        'highContrast': 'setting_high_contrast',
+        'dimWhitePoint': 'setting_dim_white_point',
+        'reduceMotion': 'setting_reduce_motion',
+        'hapticsEnabled': PrefsKeys.hapticsEnabled,
+        'customThemeGlow': 'setting_custom_theme_glow',
+        'canvasEnabled': 'setting_canvas_enabled',
+        'canvasAsBackdrop': 'setting_canvas_as_backdrop',
+        'waveformSeekBar': 'setting_waveform_seek_bar',
+        'autoThemeByTime': 'setting_auto_theme_by_time',
+      }.entries) {
+        final value = settings[entry.key];
+        if (value is bool) await prefs.setBool(entry.value, value);
+      }
+      for (final entry in <String, String>{
+        'liquidGlassTint': PrefsKeys.liquidGlassTint,
+        'customThemeRadius': 'setting_custom_theme_radius',
+      }.entries) {
+        final value = settings[entry.key];
+        if (value is num) await prefs.setDouble(entry.value, value.toDouble());
+      }
+      for (final entry in <String, String>{
+        'visualDensityMode': PrefsKeys.visualDensityMode,
+        'miniPlayerSwipeLeft': 'setting_mini_player_swipe_left',
+        'miniPlayerSwipeRight': 'setting_mini_player_swipe_right',
+        'nowPlayingDoubleTap': 'setting_now_playing_double_tap',
+        'nowPlayingArtworkSwipe': 'setting_now_playing_artwork_swipe',
+        'dockStackMode': PrefsKeys.dockStackMode,
+      }.entries) {
+        final value = settings[entry.key];
+        if (value is String) await prefs.setString(entry.value, value);
+      }
+      for (final entry in <String, String>{
+        'themeScheduleStart': 'setting_theme_schedule_start',
+        'themeScheduleEnd': 'setting_theme_schedule_end',
+      }.entries) {
+        final value = settings[entry.key];
+        if (value is int) await prefs.setInt(entry.value, value);
       }
       if (settings['dspPreference'] is String) {
         await prefs.setString(

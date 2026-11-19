@@ -1742,6 +1742,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val r = Runnable {
             if (disposed.get()) return@Runnable
             val ratio = computeSystemMusicVolumeRatio()
+            // Unknown (-1) must not look like any real level: the Dart side
+            // would read it as a loudness change and re-seed its volume.
+            if (ratio < 0.0) return@Runnable
             if (abs(ratio - lastSystemVolumeRatio) < 1e-6) return@Runnable
             lastSystemVolumeRatio = ratio
             try {
@@ -1805,15 +1808,35 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun applyDvcRuntimeState(activate: Boolean) {
         val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
         if (activate) {
-            if (!dvcEnabled) return
+            if (!dvcEnabled || dvcActive) return
+            // Capture the level the device is actually at and carry it into the
+            // DSP gain. Pinning STREAM_MUSIC to max without transferring the
+            // ratio is what made enabling DVC — and re-engaging it when leaving
+            // Bit-Perfect — jump to full scale instead of the user's volume.
+            try {
+                if (am != null) {
+                    val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                    val current = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+                    if (max > 0 && current >= 0) {
+                        dvcSavedSystemVolume = current
+                        dvcGain = (current.toDouble() / max.toDouble()).coerceIn(0.0, 1.0)
+                        context?.getSharedPreferences("pulsr_dvc_prefs", Context.MODE_PRIVATE)
+                            ?.edit()
+                            ?.putInt("dvc_saved_volume", current)
+                            ?.putBoolean("dvc_enabled", true)
+                            ?.apply()
+                    }
+                }
+            } catch (_: Throwable) {}
             dvcActive = true
+            // Hearing-safety: fade down before moving the system stream to max.
+            if (isNativeDspLoaded) {
+                try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
+            }
             try {
                 if (am != null) {
                     val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                     if (max > 0) {
-                        if (isNativeDspLoaded) {
-                            try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                        }
                         am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
                     }
                 }
@@ -1822,7 +1845,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
             }
         } else {
-            if (!dvcEnabled) return
+            if (!dvcEnabled || !dvcActive) return
             dvcActive = false
             if (isNativeDspLoaded) {
                 try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
@@ -1839,17 +1862,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     // Current ANDROID STREAM_MUSIC volume as a 0..1 ratio
-    // (getStreamVolume / getStreamMaxVolume). Returns 1.0 when unavailable so
-    // the loudness contour defaults to "full volume = no lift".
+    // (getStreamVolume / getStreamMaxVolume). Returns -1.0 when unavailable:
+    // callers must treat that as "unknown" and keep their existing level.
+    // Returning 1.0 made a failed read indistinguishable from "device at max",
+    // and the Bit-Perfect volume seeding read that as full scale.
     private fun computeSystemMusicVolumeRatio(): Double {
-        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return 1.0
+        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return -1.0
         return try {
             val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            if (max <= 0) return 1.0
+            if (max <= 0) return -1.0
             val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+            if (cur < 0) return -1.0
             (cur.toDouble() / max.toDouble()).coerceIn(0.0, 1.0)
         } catch (e: Exception) {
-            1.0
+            -1.0
         }
     }
 
@@ -4416,10 +4442,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "getSystemMusicVolume" -> {
                     // Hardware STREAM_MUSIC level as a 0..1 ratio for the
-                    // equal-loudness contour. KNOWN CAVEAT: while DVC /
-                    // hearing-safety pin STREAM_MUSIC to device max, this reads
-                    // ~1.0, so the contour stays off even though DVC attenuates
-                    // digitally — accepted tradeoff.
+                    // equal-loudness contour and the Bit-Perfect volume seed.
+                    // -1.0 when unavailable so callers keep their existing
+                    // level instead of reading a failed probe as full scale.
+                    // KNOWN CAVEAT: while DVC / hearing-safety pin STREAM_MUSIC
+                    // to device max, this reads ~1.0, so the contour stays off
+                    // even though DVC attenuates digitally — accepted tradeoff.
                     result.success(computeSystemMusicVolumeRatio())
                 }
 
@@ -4594,38 +4622,19 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         return
                     }
                     try {
-                        val am = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                         val dvcPrefs = context?.getSharedPreferences("pulsr_dvc_prefs", Context.MODE_PRIVATE)
                         if (enabled) {
-                            if (!dvcEnabled && am != null) {
-                                dvcSavedSystemVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC)
-                                dvcPrefs?.edit()
-                                    ?.putInt("dvc_saved_volume", dvcSavedSystemVolume)
-                                    ?.putBoolean("dvc_enabled", true)
-                                    ?.apply()
-                                // Fade down before changing system stream volume to max
-                                if (isNativeDspLoaded) {
-                                    try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                                }
-                                val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-                                if (max > 0) {
-                                    am.setStreamVolume(AudioManager.STREAM_MUSIC, max, 0)
-                                }
-                                if (isNativeDspLoaded) {
-                                    try { nativeSetDirectVolumeParams(true, dvcGain) } catch (_: Throwable) {}
-                                }
-                            }
                             dvcEnabled = true
+                            // Re-arm from the live system level: activation
+                            // captures it and derives the DSP gain from it.
+                            applyDvcRuntimeState(true)
                             dvcActive = true
                         } else {
+                            // Restore the saved stream level while DVC still
+                            // owns it, then drop every piece of DVC state.
+                            applyDvcRuntimeState(false)
                             dvcEnabled = false
                             dvcActive = false
-                            if (dvcSavedSystemVolume >= 0 && am != null) {
-                                if (isNativeDspLoaded) {
-                                    try { nativeSetDirectVolumeParams(true, 0.0) } catch (_: Throwable) {}
-                                }
-                                am.setStreamVolume(AudioManager.STREAM_MUSIC, dvcSavedSystemVolume, 0)
-                            }
                             dvcGain = 1.0
                             dvcSavedSystemVolume = -1
                             dvcPrefs?.edit()?.clear()?.apply()

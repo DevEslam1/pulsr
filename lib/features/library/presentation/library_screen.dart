@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/widgets/pulsr_toast.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -622,7 +623,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     final maxScroll = _songsScrollController.position.maxScrollExtent;
     _songsScrollController.animateTo(
       target.clamp(0.0, maxScroll),
-      duration: context.motionMs(250),
+      duration: context.motionMs(260),
       curve: Curves.easeOut,
     );
   }
@@ -639,33 +640,24 @@ class _LibraryScreenState extends State<LibraryScreen>
         // state, then consume the message so it is not replayed.
         final error = state.errorMessage;
         if (error != null && error.isNotEmpty) {
-          ScaffoldMessenger.of(context)
-            ..clearSnackBars()
-            ..showSnackBar(
-              SnackBar(
-                content: Row(
-                  children: [
-                    const Icon(
-                      Icons.error_outline_rounded,
-                      size: 16,
-                      color: Colors.white70,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        error,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                backgroundColor: context.palette.error,
-                duration: const Duration(seconds: 4),
-                behavior: SnackBarBehavior.floating,
-              ),
+          final hasContent = state.songs.isNotEmpty ||
+              state.albums.isNotEmpty ||
+              state.artists.isNotEmpty;
+          if (hasContent) {
+            // A refresh over existing content failed: keep the content and
+            // report it without destroying the screen.
+            PulsrToast.show(
+              context,
+              message: error,
+              icon: Icons.error_outline_rounded,
+              isError: true,
             );
-          context.read<LibraryCubit>().clearError();
+            context.read<LibraryCubit>().clearError();
+          }
+          // With no content the active tab renders a persistent, retryable
+          // error card. Clearing the error here used to turn that into
+          // "No songs found" + a Scan CTA, which is the single most
+          // misleading state in the app.
           return;
         }
         // M-6: Surface infoMessage (e.g. song-cap notifications) as a SnackBar.
@@ -767,7 +759,6 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     FilledButton.tonalIcon(
                       style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
                         backgroundColor: p.accent.withValues(alpha: 0.18),
                         foregroundColor: p.accent,
                         shape: RoundedRectangleBorder(
@@ -1750,6 +1741,28 @@ class _LibraryScreenState extends State<LibraryScreen>
         ),
       );
     }
+  }
+
+  @override
+  /// Persistent, retryable failure state for the library tabs.
+  ///
+  /// Retry re-subscribes the Drift streams via [LibraryCubit.init] rather than
+  /// running a full disk rescan: a failure is a stream/DB problem, not a
+  /// missing-files problem.
+  Widget _buildLibraryErrorState(
+    BuildContext context,
+    LibraryState state,
+  ) {
+    final message = state.errorMessage ?? context.l10n.somethingWentWrong;
+    return PulsrEmptyState(
+      icon: Icons.error_outline_rounded,
+      iconColor: context.palette.error,
+      title: context.l10n.somethingWentWrong,
+      subtitle: message,
+      primaryActionLabel: context.l10n.retry,
+      primaryActionIcon: Icons.refresh_rounded,
+      onPrimaryAction: () => context.read<LibraryCubit>().init(),
+    );
   }
 
   @override

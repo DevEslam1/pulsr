@@ -4,6 +4,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_strokes.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
@@ -156,21 +157,23 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                   final isDraggingDock = visualDy.abs() > 0.5;
                   final isCalm = p.isCalmDensity || GpuBudget.isEnabled;
                   return AnimatedContainer(
-                    duration: context.motionMs(120),
+                    // Direct manipulation must track the finger 1:1. Tweening a
+                    // transform that is rewritten every drag frame meant the
+                    // dock could never catch up (constant ~120ms lag) and the
+                    // backdrop filter re-rasterised on every frame. Once the
+                    // drag ends the reset animates normally.
+                    duration: isDraggingDock
+                        ? Duration.zero
+                        : context.motionMs(120),
                     curve: context.motionCurve(Curves.easeOutCubic),
                     transform: Matrix4.translationValues(0, visualDy, 0),
                     height: barHeight,
                     decoration: BoxDecoration(
                       borderRadius: navRadius,
                       boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(
-                              alpha: (p.isDark ? 0.38 : 0.09) *
-                                  (isCalm ? 0.5 : 1.0)),
-                          blurRadius: isCalm ? 10 : 18,
-                          spreadRadius: -2,
-                          offset: const Offset(0, 5),
-                        ),
+                        ...PulsrElevation.level4(context),
+                        // Intentional accent glow (not depth), brightened while
+                        // the dock is being dragged.
                         if (!isCalm)
                           BoxShadow(
                             color: p.accent.withValues(
@@ -226,7 +229,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                 color: isDraggingDock
                                     ? p.accent.withValues(alpha: 0.35)
                                     : p.hairline,
-                                width: 1.0,
+                                width: AppStrokes.hairline,
                               ),
                             ),
                             child: Stack(
@@ -266,7 +269,7 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                   alignment: Alignment.topCenter,
                                   child: IgnorePointer(
                                     child: AnimatedContainer(
-                                      duration: context.motionMs(160),
+                                      duration: context.motionMs(200),
                                       margin: const EdgeInsets.only(top: 3.5),
                                       width: isDraggingDock ? 32 : 24,
                                       height: 2.5,
@@ -322,12 +325,16 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                           if (!allowBlur) {
                             return navContainer;
                           }
-                          return BackdropFilter(
-                            filter: ImageFilter.blur(
-                              sigmaX: AppBlur.nav,
-                              sigmaY: AppBlur.nav,
+                          // Isolate the filter layer so the drag transform
+                          // does not force a re-raster of the backdrop.
+                          return RepaintBoundary(
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: AppBlur.clampSigma(AppBlur.nav),
+                                sigmaY: AppBlur.clampSigma(AppBlur.nav),
+                              ),
+                              child: navContainer,
                             ),
-                            child: navContainer,
                           );
                         },
                       ),
@@ -398,7 +405,7 @@ class _NavTabItem extends StatelessWidget {
             splashColor: p.accent.withValues(alpha: 0.12),
             highlightColor: Colors.transparent,
             child: AnimatedContainer(
-              duration: context.motionMs(220),
+              duration: context.motionMs(200),
               curve: context.motionCurve(PulsrMotion.enter),
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               padding: EdgeInsets.symmetric(
@@ -440,7 +447,7 @@ class _NavTabItem extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         AnimatedContainer(
-                          duration: context.motionMs(220),
+                          duration: context.motionMs(200),
                           curve: context.motionCurve(Curves.easeOutCubic),
                           height: 2,
                           width: isSelected ? 14 : 0,
@@ -476,7 +483,7 @@ class _NavTabItem extends StatelessWidget {
                       children: [
                         // Selection LED capsule: grows and lights up when active.
                         AnimatedContainer(
-                          duration: context.motionMs(220),
+                          duration: context.motionMs(200),
                           curve: context.motionCurve(Curves.easeOutCubic),
                           height: 2.2,
                           width: isSelected ? 18 : 5,
@@ -498,7 +505,7 @@ class _NavTabItem extends StatelessWidget {
                         ),
                         AnimatedScale(
                           scale: isSelected ? 1.08 : 1.0,
-                          duration: context.motionMs(220),
+                          duration: context.motionMs(200),
                           curve: context.motionCurve(Curves.easeOutBack),
                           child: Icon(
                             isSelected ? item.activeIcon : item.icon,

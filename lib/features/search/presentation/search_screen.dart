@@ -2192,8 +2192,8 @@ Widget _buildRecentSectionHeader({
         ),
         TextButton(
           style: TextButton.styleFrom(
-            minimumSize: const Size(48, 32),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: const Size(48, 48),
+            tapTargetSize: MaterialTapTargetSize.padded,
           ),
           onPressed: onClear,
           child: Text(

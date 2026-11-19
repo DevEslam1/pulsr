@@ -716,7 +716,6 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
                           icon:
                               Icon(Icons.close_rounded, color: p.textSecondary),
                           tooltip: context.l10n.close,
-                          visualDensity: VisualDensity.compact,
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                       ],

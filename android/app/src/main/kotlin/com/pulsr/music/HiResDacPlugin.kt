@@ -2075,9 +2075,15 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             (activeMixerRate == 0 || stream[1] == activeMixerRate) &&
             (activeMixerEncoding == 0 ||
                 (stream[2] == activeMixerEncoding && sinkDepth >= reportedDepth) ||
+                // A float sink still carries the decoded 16/24-bit grid exactly
+                // (floatCarriesDecoded), and a deeper integer mixer attribute
+                // carries it exactly too. Comparing the mixer depth against the
+                // reported source depth is what the platform fact means here;
+                // requiring the sink encoding to equal the mixer encoding made a
+                // mid-track float carrier read as mixer-inactive and left the
+                // chip at ARMING instead of its true unverified state.
                 (activeMixerEncoding != AudioFormat.ENCODING_PCM_FLOAT &&
-                    stream[2] != AudioFormat.ENCODING_PCM_FLOAT &&
-                    encodingBitDepth(activeMixerEncoding) >= sinkDepth))
+                    encodingBitDepth(activeMixerEncoding) >= reportedDepth))
         // Confirmed only when the sink itself is alive AND still owns the
         // endpoint it opened: a boolean alone could outlive a device unplug.
         val directStream = UsbExclusivePlugin.confirmedDirectStream()

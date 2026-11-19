@@ -5,6 +5,14 @@ extension PlayerDspFollowRate on PlayerDspController {
   /// changes) through a mutex so overlapping native output-format switches
   /// apply in strict order instead of racing one another.
   Future<void> maybeFollowTrackSampleRate(SongsTableData song) async {
+    // Ordering guard for the fire-and-forget track-change call: the request can
+    // still be queued (or blocked on the follow-rate mutex) when the player has
+    // already moved on. Applying it then would reconfigure the output for the
+    // previous track while the next one is starting — a stale rate switch that
+    // lands mid-stream. [song] carries the identity captured at call time; a null
+    // live song means the state is not populated yet (cold start / unit tests),
+    // which is not a mismatch.
+    if (_isStaleFollowRequest(song)) return;
     // Track start: re-evaluate codec-aware music compensation (fix #2) so each
     // new track picks up the current route's codec adaptation (and so a route
     // whose EQ base changed between tracks is re-merged). Fire-and-forget and
@@ -21,6 +29,9 @@ extension PlayerDspFollowRate on PlayerDspController {
     await _followSampleRateMutex.protect(() async {
       try {
         if (_isClosed()) return;
+        // Re-check after the mutex wait: the lock can be held across a track
+        // change, so this request may have gone stale while queued here.
+        if (_isStaleFollowRequest(song)) return;
         final settings = _settingsCubit!.state;
         // Log real-time 4-stage signal path telemetry per track start (no-op if disabled).
         final outputDevice = settings.currentOutputDevice;
@@ -255,6 +266,22 @@ extension PlayerDspFollowRate on PlayerDspController {
           followTrackEnabled: following || canResumeSuspendedDirect,
         );
         if (rate == null) return;
+        // An already-matching live sink must not be reconfigured. The mixer path
+        // re-requests the format on every track, and a redundant
+        // `setPreferredMixerAttributes` on a playing stream is audible: the
+        // mixer reopens mid-buffer and the user hears a click at the boundary.
+        // Only the mixer path qualifies — the direct UAC2 sink switches rate by
+        // restarting its isochronous stream and keeps its own bookkeeping below.
+        if (!directOwned &&
+            settings.bitPerfectOutput &&
+            device?.decodedSampleRate == rate &&
+            (device?.decodedBitDepth ?? 0) >= depth &&
+            device?.isBitPerfectActive == true) {
+          _lastFollowedSampleRate = rate;
+          _lastFollowedBitDepth = depth;
+          _lastFollowedRoute = route;
+          return;
+        }
         // Negotiate the format against the advertised device caps so a device
         // that cannot honour the track's exact rate still receives the highest
         // supported tier instead of a flat exclusive-mixer rejection. Unknown
@@ -361,6 +388,14 @@ extension PlayerDspFollowRate on PlayerDspController {
             error: e, stackTrace: st, category: 'PlayerDspController');
       }
     });
+  }
+
+  /// True when [song] is no longer the track the player is on, i.e. the
+  /// follow-rate request went stale between being raised and being applied.
+  /// A null live song is "not known yet", never a mismatch.
+  bool _isStaleFollowRequest(SongsTableData song) {
+    final liveSongId = _getState().currentSong?.id;
+    return liveSongId != null && liveSongId != song.id;
   }
 
   /// Bluetooth Hi-Res item 3: ask the A2DP codec to run at the track's native

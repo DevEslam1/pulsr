@@ -13,9 +13,12 @@ import '../../../../core/utils/pulsr_haptics.dart';
 ///
 /// Bindings:
 ///   Space        → play/pause
-///   → / ←        → seek forward / backward 10s
-///   ↑ / ↓        → volume up / down 5%
 ///   N / P        → next / previous
+///
+/// Arrow keys are **not** global: they would shadow Flutter's
+/// `DirectionalFocusIntent` and break keyboard focus traversal on every
+/// screen. [PlayerArrowShortcutScope] binds →/← (seek ±10s) and ↑/↓ (volume
+/// ±5%) only inside Now Playing.
 ///   F            → toggle favorite (if provided)
 ///   M            → mute toggle
 ///   L            → toggle lyrics
@@ -115,30 +118,6 @@ class PlayerShortcutScope extends StatelessWidget {
         message: l10n.shortcutPlayPause,
         icon: Icons.play_arrow_rounded,
       ),
-      const SingleActivator(LogicalKeyboardKey.arrowRight): _guardWithToast(
-        context,
-        onSeekForward,
-        message: l10n.shortcutSeekForward,
-        icon: Icons.forward_10_rounded,
-      ),
-      const SingleActivator(LogicalKeyboardKey.arrowLeft): _guardWithToast(
-        context,
-        onSeekBackward,
-        message: l10n.shortcutSeekBackward,
-        icon: Icons.replay_10_rounded,
-      ),
-      const SingleActivator(LogicalKeyboardKey.arrowUp): _guardWithToast(
-        context,
-        onVolumeUp,
-        message: l10n.shortcutVolumeUp,
-        icon: Icons.volume_up_rounded,
-      ),
-      const SingleActivator(LogicalKeyboardKey.arrowDown): _guardWithToast(
-        context,
-        onVolumeDown,
-        message: l10n.shortcutVolumeDown,
-        icon: Icons.volume_down_rounded,
-      ),
       const SingleActivator(LogicalKeyboardKey.keyN): _guardWithToast(
         context,
         onNext,
@@ -191,6 +170,53 @@ class PlayerShortcutScope extends StatelessWidget {
       bindings: bindings,
       // autofocus guarantees a focused descendant exists so key events reach
       // the CallbackShortcuts Focus even when no control has focus.
+      child: Focus(autofocus: true, child: child),
+    );
+  }
+}
+
+/// Arrow-key transport bindings, scoped to the Now Playing surface.
+///
+/// Mounting this only inside the player leaves the rest of the app free to use
+/// arrow keys for directional focus traversal — the standard desktop contract.
+class PlayerArrowShortcutScope extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onSeekForward;
+  final VoidCallback onSeekBackward;
+  final VoidCallback onVolumeUp;
+  final VoidCallback onVolumeDown;
+
+  const PlayerArrowShortcutScope({
+    super.key,
+    required this.child,
+    required this.onSeekForward,
+    required this.onSeekBackward,
+    required this.onVolumeUp,
+    required this.onVolumeDown,
+  });
+
+  VoidCallback _guard(BuildContext context, VoidCallback action) {
+    return () {
+      if (PlayerShortcutScope.isTextInputFocused()) return;
+      PulsrHaptics.selectionClick();
+      action();
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bindings = <ShortcutActivator, VoidCallback>{
+      const SingleActivator(LogicalKeyboardKey.arrowRight):
+          _guard(context, onSeekForward),
+      const SingleActivator(LogicalKeyboardKey.arrowLeft):
+          _guard(context, onSeekBackward),
+      const SingleActivator(LogicalKeyboardKey.arrowUp):
+          _guard(context, onVolumeUp),
+      const SingleActivator(LogicalKeyboardKey.arrowDown):
+          _guard(context, onVolumeDown),
+    };
+    return CallbackShortcuts(
+      bindings: bindings,
       child: Focus(autofocus: true, child: child),
     );
   }

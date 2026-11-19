@@ -193,7 +193,7 @@ public class AudioPlayerLifecycleTest {
     }
 
     @Test
-    public void aaudioProbePrefersCompatibleEncodingAndFallsBackFromRejectedFormats()
+    public void aaudioProbeRefusesAnEncodingTheRequestedFormatCannotProve()
             throws Exception {
         final List<Integer> probedEncodings = new ArrayList<>();
         final AudioPlayer player = new AudioPlayer(
@@ -224,13 +224,16 @@ public class AudioPlayerLifecycleTest {
         player.onMethodCall(new MethodCall("dspSetAaudioOutput", args), result);
         org.robolectric.shadows.ShadowLooper.idleMainLooper();
 
-        verify(result).success(true);
+        // Only I16 opened. The sink would later open the REQUESTED float
+        // encoding, so a fallback that opens must not certify the request:
+        // AAudio Direct stays off instead of swapping mid-play.
+        verify(result).success(false);
         assertEquals(2, probedEncodings.size());
         assertEquals(Integer.valueOf(AaudioNativeBridge.ENCODING_PCM_FLOAT),
                 probedEncodings.get(0));
         assertEquals(Integer.valueOf(AaudioNativeBridge.ENCODING_PCM_I16),
                 probedEncodings.get(1));
-        assertEquals(Boolean.TRUE, getField(player, "aaudioOutputEnabled"));
+        assertEquals(Boolean.FALSE, getField(player, "aaudioOutputEnabled"));
     }
 
     @Test

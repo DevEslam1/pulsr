@@ -35,7 +35,7 @@ class StaggeredReveal extends StatelessWidget {
     // in long libraries, so later rows are mounted fully visible.
     if (!context.motionEnabled || index >= 16) return child;
     final delay = index < 8 ? (index * 30).ms : 0.ms;
-    final duration = context.motionMs(250);
+    final duration = context.motionMs(260);
     final curve = context.motionCurve(Curves.easeOutCubic);
 
     final anim = child

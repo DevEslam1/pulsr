@@ -339,7 +339,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: AnimatedContainer(
-            duration: context.motionMs(150),
+            duration: context.motionMs(120),
             curve: context.motionCurve(PulsrMotion.enter),
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s6, vertical: AppSpacing.s2),

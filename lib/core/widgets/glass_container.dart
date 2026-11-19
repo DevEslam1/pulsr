@@ -157,8 +157,15 @@ class GlassContainer extends StatelessWidget {
         ? math.max(rawTintAlpha, AppBlur.solidFallbackMinAlpha)
         : rawTintAlpha;
     final base = color ?? (p.isDark ? p.surfaceContainer : p.surface);
-    final baseColor =
-        color == null ? base.withValues(alpha: base.a * tintAlpha) : base;
+    // A caller-supplied colour used to bypass the tint maths entirely, which
+    // meant an opaque colour painted a slab over its own BackdropFilter and
+    // made the blur invisible. The caller's alpha is now a *cap* that the
+    // glass intensity modulates, so every glass surface actually diffuses
+    // what is behind it. [GlassTier.solid] is the one exception: it exists to
+    // be genuinely opaque.
+    final desiredAlpha =
+        base.a * (tier == GlassTier.solid ? 1.0 : tintAlpha);
+    final baseColor = base.withValues(alpha: desiredAlpha.clamp(0.0, 1.0));
 
     final showLiquidSheen = isLiquid || specularHighlight;
 

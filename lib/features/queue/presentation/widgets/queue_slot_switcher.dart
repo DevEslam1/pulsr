@@ -64,7 +64,7 @@ class QueueSlotSwitcher extends StatelessWidget {
                     borderRadius: queueRadius,
                     child: Center(
                       child: AnimatedContainer(
-                        duration: context.motionMs(180),
+                        duration: context.motionMs(200),
                         padding: EdgeInsets.symmetric(
                           horizontal: isCapsule ? 10.0 : AppSpacing.sm,
                           vertical: isCapsule ? 4.0 : AppSpacing.s6,

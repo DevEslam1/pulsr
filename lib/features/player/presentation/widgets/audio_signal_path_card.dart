@@ -78,7 +78,6 @@ class AudioSignalPathCard extends StatelessWidget {
               IconButton(
                 icon:
                     Icon(Icons.copy_rounded, size: 16, color: p.textSecondary),
-                visualDensity: VisualDensity.compact,
                 tooltip: context.l10n.signalPathCopyTooltip,
                 onPressed: () {
                   Clipboard.setData(

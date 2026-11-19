@@ -115,66 +115,97 @@ void LoudnessContour::computeHighShelf(Biquad& bq, double f0, double gainDb, dou
 void LoudnessContour::process(float* L, float* R, int frames) {
     if (!L || !R || frames <= 0) return;
     if (!enabled_ && std::abs(currentBassDb_) < 1e-4 && std::abs(currentTrebleDb_) < 1e-4) return;
-    rampTowardTarget(frames);
-    if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) return;
 
-    if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
-        std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
-        Biquad tempBass, tempTreble;
-        computeLowShelf(tempBass, kBassShelfHz, currentBassDb_, sampleRate_);
-        computeHighShelf(tempTreble, kTrebleShelfHz, currentTrebleDb_, sampleRate_);
-        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-            bass_[ch].b0 = tempBass.b0;
-            bass_[ch].b1 = tempBass.b1;
-            bass_[ch].b2 = tempBass.b2;
-            bass_[ch].a1 = tempBass.a1;
-            bass_[ch].a2 = tempBass.a2;
+    // Item 3: walk the block in sub-blocks of at most 64 frames. The one-pole
+    // ramp used to be advanced once per block with the WHOLE block length in its
+    // coefficient while the shelves were rebuilt once per block, so a 4096-frame
+    // block moved up to ~5 dB in a single step: a bass thump/zipper on every
+    // volume-slider move (the engine drives loudnessParams.volumeLinear from the
+    // DVC ramp). Ramping per sub-block bounds that step, and the shelf
+    // coefficients are rebuilt only when the dB values actually moved more than
+    // 0.01 dB, staying constant for the whole sub-block. No allocation and no
+    // per-sample pow/exp.
+    constexpr int kMaxSubBlockFrames = 64;
+    for (int base = 0; base < frames; base += kMaxSubBlockFrames) {
+        const int subFrames = std::min(kMaxSubBlockFrames, frames - base);
+        rampTowardTarget(subFrames);
+        if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) break;
 
-            treble_[ch].b0 = tempTreble.b0;
-            treble_[ch].b1 = tempTreble.b1;
-            treble_[ch].b2 = tempTreble.b2;
-            treble_[ch].a1 = tempTreble.a1;
-            treble_[ch].a2 = tempTreble.a2;
+        if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
+            std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
+            Biquad tempBass, tempTreble;
+            computeLowShelf(tempBass, kBassShelfHz, currentBassDb_, sampleRate_);
+            computeHighShelf(tempTreble, kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+            for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+                bass_[ch].b0 = tempBass.b0;
+                bass_[ch].b1 = tempBass.b1;
+                bass_[ch].b2 = tempBass.b2;
+                bass_[ch].a1 = tempBass.a1;
+                bass_[ch].a2 = tempBass.a2;
+
+                treble_[ch].b0 = tempTreble.b0;
+                treble_[ch].b1 = tempTreble.b1;
+                treble_[ch].b2 = tempTreble.b2;
+                treble_[ch].a1 = tempTreble.a1;
+                treble_[ch].a2 = tempTreble.a2;
+            }
+            lastComputedBassDb_ = currentBassDb_;
+            lastComputedTrebleDb_ = currentTrebleDb_;
         }
-        lastComputedBassDb_ = currentBassDb_;
-        lastComputedTrebleDb_ = currentTrebleDb_;
-    }
 
-    for (int i = 0; i < frames; ++i) {
-        L[i] = bass_[0].process(treble_[0].process(L[i]));
-        R[i] = bass_[1].process(treble_[1].process(R[i]));
+        for (int i = 0; i < subFrames; ++i) {
+            L[base + i] = bass_[0].process(treble_[0].process(L[base + i]));
+            R[base + i] = bass_[1].process(treble_[1].process(R[base + i]));
+        }
     }
 }
 
-void LoudnessContour::processInterleaved(float* buffer, int frames, int channels) {
-    if (!buffer || frames <= 0 || channels <= 0) return;
+void LoudnessContour::processInterleaved(float* bufferStart, int frames, int channels) {
+    if (!bufferStart || frames <= 0 || channels <= 0) return;
     if (!enabled_ && std::abs(currentBassDb_) < 1e-4 && std::abs(currentTrebleDb_) < 1e-4) return;
-    rampTowardTarget(frames);
-    if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) return;
 
-    if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
-        std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
-        Biquad tempBass, tempTreble;
-        computeLowShelf(tempBass, kBassShelfHz, currentBassDb_, sampleRate_);
-        computeHighShelf(tempTreble, kTrebleShelfHz, currentTrebleDb_, sampleRate_);
-        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-            bass_[ch].b0 = tempBass.b0;
-            bass_[ch].b1 = tempBass.b1;
-            bass_[ch].b2 = tempBass.b2;
-            bass_[ch].a1 = tempBass.a1;
-            bass_[ch].a2 = tempBass.a2;
+    // Item 3: walk the block in sub-blocks of at most 64 frames. The one-pole
+    // ramp used to be advanced once per block with the WHOLE block length in its
+    // coefficient while the shelves were rebuilt once per block, so a 4096-frame
+    // block moved up to ~5 dB in a single step: a bass thump/zipper on every
+    // volume-slider move (the engine drives loudnessParams.volumeLinear from the
+    // DVC ramp). Ramping per sub-block bounds that step, and the shelf
+    // coefficients are rebuilt only when the dB values actually moved more than
+    // 0.01 dB, staying constant for the whole sub-block. No allocation and no
+    // per-sample pow/exp. The SIMD/scalar sample loops below are unchanged; they
+    // run over subFrames on a span that already carries the interleave stride.
+    constexpr int kMaxSubBlockFrames = 64;
+    for (int base = 0; base < frames; base += kMaxSubBlockFrames) {
+        const int subFrames = std::min(kMaxSubBlockFrames, frames - base);
+        // Stride-aware span for this sub-block, so the existing buffer[i * 2] /
+        // buffer[i * channels + ch] indices stay valid without a rebase.
+        float* const buffer = bufferStart + base * channels;
+        rampTowardTarget(subFrames);
+        if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) continue;
 
-            treble_[ch].b0 = tempTreble.b0;
-            treble_[ch].b1 = tempTreble.b1;
-            treble_[ch].b2 = tempTreble.b2;
-            treble_[ch].a1 = tempTreble.a1;
-            treble_[ch].a2 = tempTreble.a2;
+        if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
+            std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
+            Biquad tempBass, tempTreble;
+            computeLowShelf(tempBass, kBassShelfHz, currentBassDb_, sampleRate_);
+            computeHighShelf(tempTreble, kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+            for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+                bass_[ch].b0 = tempBass.b0;
+                bass_[ch].b1 = tempBass.b1;
+                bass_[ch].b2 = tempBass.b2;
+                bass_[ch].a1 = tempBass.a1;
+                bass_[ch].a2 = tempBass.a2;
+
+                treble_[ch].b0 = tempTreble.b0;
+                treble_[ch].b1 = tempTreble.b1;
+                treble_[ch].b2 = tempTreble.b2;
+                treble_[ch].a1 = tempTreble.a1;
+                treble_[ch].a2 = tempTreble.a2;
+            }
+            lastComputedBassDb_ = currentBassDb_;
+            lastComputedTrebleDb_ = currentTrebleDb_;
         }
-        lastComputedBassDb_ = currentBassDb_;
-        lastComputedTrebleDb_ = currentTrebleDb_;
-    }
 
-    if (channels == 2) {
+        if (channels == 2) {
 #if defined(PULSR_F32_BIQUADS)
 #if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
         const float32x2_t tb0 = vdup_n_f32(static_cast<float>(treble_[0].b0));
@@ -199,7 +230,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         float32x2_t by1 = { bass_[0].y1, bass_[1].y1 };
         float32x2_t by2 = { bass_[0].y2, bass_[1].y2 };
 
-        for (int i = 0; i < frames; ++i) {
+        for (int i = 0; i < subFrames; ++i) {
             float l = buffer[i * 2];
             float r = buffer[i * 2 + 1];
             if (!std::isfinite(l)) l = 0.0f;
@@ -266,7 +297,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         bass_[0].x2 = flushReg(vget_lane_f32(bx2, 0)); bass_[1].x2 = flushReg(vget_lane_f32(bx2, 1));
         bass_[0].y1 = flushReg(vget_lane_f32(by1, 0)); bass_[1].y1 = flushReg(vget_lane_f32(by1, 1));
         bass_[0].y2 = flushReg(vget_lane_f32(by2, 0)); bass_[1].y2 = flushReg(vget_lane_f32(by2, 1));
-        return;
+        continue;
 #elif defined(PULSR_HAS_SSE2)
         const __m128 tb0 = _mm_set1_ps(static_cast<float>(treble_[0].b0));
         const __m128 tb1 = _mm_set1_ps(static_cast<float>(treble_[0].b1));
@@ -290,7 +321,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         __m128 by1 = _mm_set_ps(0.0f, 0.0f, bass_[1].y1, bass_[0].y1);
         __m128 by2 = _mm_set_ps(0.0f, 0.0f, bass_[1].y2, bass_[0].y2);
 
-        for (int i = 0; i < frames; ++i) {
+        for (int i = 0; i < subFrames; ++i) {
             float l = buffer[i * 2];
             float r = buffer[i * 2 + 1];
             if (!std::isfinite(l)) l = 0.0f;
@@ -359,7 +390,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         _mm_store_ps(b_arr, bx2); bass_[0].x2 = flushReg(b_arr[0]); bass_[1].x2 = flushReg(b_arr[1]);
         _mm_store_ps(b_arr, by1); bass_[0].y1 = flushReg(b_arr[0]); bass_[1].y1 = flushReg(b_arr[1]);
         _mm_store_ps(b_arr, by2); bass_[0].y2 = flushReg(b_arr[0]); bass_[1].y2 = flushReg(b_arr[1]);
-        return;
+        continue;
 #endif
 #else
 #if defined(PULSR_HAS_NEON) && (defined(__aarch64__) || defined(_M_ARM64))
@@ -385,7 +416,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         float64x2_t by1 = { bass_[0].y1, bass_[1].y1 };
         float64x2_t by2 = { bass_[0].y2, bass_[1].y2 };
 
-        for (int i = 0; i < frames; ++i) {
+        for (int i = 0; i < subFrames; ++i) {
             double l = buffer[i * 2];
             double r = buffer[i * 2 + 1];
             if (!std::isfinite(l)) l = 0.0;
@@ -452,7 +483,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         bass_[0].x2 = flushReg(vgetq_lane_f64(bx2, 0)); bass_[1].x2 = flushReg(vgetq_lane_f64(bx2, 1));
         bass_[0].y1 = flushReg(vgetq_lane_f64(by1, 0)); bass_[1].y1 = flushReg(vgetq_lane_f64(by1, 1));
         bass_[0].y2 = flushReg(vgetq_lane_f64(by2, 0)); bass_[1].y2 = flushReg(vgetq_lane_f64(by2, 1));
-        return;
+        continue;
 #elif defined(PULSR_HAS_SSE2)
         const __m128d tb0 = _mm_set1_pd(treble_[0].b0);
         const __m128d tb1 = _mm_set1_pd(treble_[0].b1);
@@ -476,7 +507,7 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         __m128d by1 = _mm_set_pd(bass_[1].y1, bass_[0].y1);
         __m128d by2 = _mm_set_pd(bass_[1].y2, bass_[0].y2);
 
-        for (int i = 0; i < frames; ++i) {
+        for (int i = 0; i < subFrames; ++i) {
             double l = buffer[i * 2];
             double r = buffer[i * 2 + 1];
             if (!std::isfinite(l)) l = 0.0;
@@ -541,15 +572,16 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
         _mm_store_pd(b_arr, bx2); bass_[0].x2 = flushReg(b_arr[0]); bass_[1].x2 = flushReg(b_arr[1]);
         _mm_store_pd(b_arr, by1); bass_[0].y1 = flushReg(b_arr[0]); bass_[1].y1 = flushReg(b_arr[1]);
         _mm_store_pd(b_arr, by2); bass_[0].y2 = flushReg(b_arr[0]); bass_[1].y2 = flushReg(b_arr[1]);
-        return;
+        continue;
 #endif
 #endif
-    }
+        }
 
-    const int activeChannels = std::min(channels, MAX_CHANNELS);
-    for (int i = 0; i < frames; ++i) {
-        for (int ch = 0; ch < activeChannels; ++ch) {
-            buffer[i * channels + ch] = bass_[ch].process(treble_[ch].process(buffer[i * channels + ch]));
+        const int activeChannels = std::min(channels, MAX_CHANNELS);
+        for (int i = 0; i < subFrames; ++i) {
+            for (int ch = 0; ch < activeChannels; ++ch) {
+                buffer[i * channels + ch] = bass_[ch].process(treble_[ch].process(buffer[i * channels + ch]));
+            }
         }
     }
 }
