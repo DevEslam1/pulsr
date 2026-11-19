@@ -205,7 +205,7 @@ void main() {
       expect(DopEncoder.dopPcmSampleRate(512), 0);
     });
 
-    test('canUseNativeDsd requires the measured nativeDsd flag only', () {
+    test('canUseNativeDsd needs a measured alt setting and a producer', () {
       const nativeCapable = DsdDacCapabilities(
         dsd64: true,
         dsd128: true,
@@ -215,7 +215,11 @@ void main() {
         nativeDac: true,
         nativeDsd: true,
       );
-      expect(nativeCapable.canUseNativeDsd, isTrue);
+      // The DAC half is proven, but this build has no producer that opens a
+      // DSD stream and feeds the sink, so advertising native output would be a
+      // claim the app cannot honour. DoP/PCM remain available.
+      expect(kNativeDsdProducerAvailable, isFalse);
+      expect(nativeCapable.canUseNativeDsd, isFalse);
 
       const dacWithoutNative = DsdDacCapabilities(
         dsd64: true,
