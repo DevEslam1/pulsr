@@ -16,6 +16,21 @@ import 'audio_effects_channel.dart';
 import 'dop_encoder.dart';
 import 'sacd/sacd_limits.dart';
 
+/// Whether a native-DSD *producer* exists: something that opens a DSD_U32
+/// alternate setting on the USB sink and writes 1-bit frames to it.
+///
+/// The sink side is built and unit-tested (`UsbAudioSink::WriteDsd`, the UAC2
+/// descriptor probe, `DsdNativePacker`), but nothing in the playback path pumps
+/// DSD bytes into it: `startDsdStreaming`/`writeDsd` exist on the USB service
+/// and are not called. The previous "native" branch wrapped raw DSD in an
+/// 8-bit PCM WAV and handed it to ExoPlayer, which is not raw DSD on the wire
+/// and cannot open a 2.8 MHz stream on Android audio at all.
+///
+/// Until the producer lands, advertising native output would be a claim the app
+/// cannot honour, so the capability is gated here and the transport resolver
+/// falls back to DoP (or PCM) with an explicit reason.
+const bool kNativeDsdProducerAvailable = false;
+
 /// Thrown when a DSD (DSF/DFF) file is played on a platform/build with no
 /// native DSD decoder — most notably iOS, where the `decodeDsd` channel method
 /// returns null. Callers must catch this and fail the track gracefully instead
@@ -85,7 +100,12 @@ class DsdDacCapabilities {
   /// carrier rate the USB sink can switch to (768 kHz); it says nothing about
   /// raw-DSD alt settings, and treating it as native proof sent a 768 kHz PCM
   /// stream at a DAC that cannot accept it.
-  bool get canUseNativeDsd => nativeDac && nativeDsd;
+  ///
+  /// The producer gate is separate from the DAC proof on purpose: a DAC that
+  /// advertises DSD_U32 and a build that cannot feed it are both blockers, and
+  /// today the second one is false for every build.
+  bool get canUseNativeDsd =>
+      nativeDac && nativeDsd && kNativeDsdProducerAvailable;
 
   /// Whether this device advertises the DoP carrier rate for [dsdRate]
   /// (the DSD multiple of 44.1 kHz: 64, 128 or 256). Rates above DSD256 have no
@@ -244,36 +264,10 @@ class DsdDecoderHelper {
       AudioQualityInfo.dsdNativeActive = false;
     }
 
-    if (useNativeDsd) {
-      // Direct Native DSD (Raw bitstream without DoP marker overhead)
-      var left = dsdL;
-      var right = dsdR;
-      if (left.length != right.length) {
-        final minLen = math.min(left.length, right.length);
-        left = Uint8List.sublistView(left, 0, minLen);
-        right = Uint8List.sublistView(right, 0, minLen);
-      }
-      if (bitOrder == 0) {
-        left = _reverseBits(left);
-        right = _reverseBits(right);
-      }
-      final rawBytes = DsdRawEncoder.encodeToDsdRawInterleaved(
-        dsdLeft: left,
-        dsdRight: right,
-      );
-      final nativeRate = DsdRawEncoder.nativeDsdSampleRate(dsdRate);
-      final wavBytes = buildDopWavContainer(
-        dopPcmBytes: rawBytes,
-        sampleRate: nativeRate > 0 ? nativeRate : 2822400,
-        channels: 2,
-        bitsPerSample: 8,
-      );
-      if (updateGlobalState) {
-        AudioQualityInfo.dsdNativeActive = true;
-      }
-      onTransportResolved?.call(false, true);
-      return DsdPcmStreamAudioSource(wavBytes, tag: tag);
-    }
+    // Native DSD has no producer yet (see kNativeDsdProducerAvailable): the
+    // resolver cannot select it, and if a stale preference asks for it the
+    // branch below falls through to DoP/PCM instead of pretending an 8-bit PCM
+    // WAV is a raw DSD stream.
 
     if (useDop) {
       // DoP framing (DSD over PCM v1.1): pack 16-bit DSD chunks with alternating 0x05/0xFA markers
@@ -374,28 +368,6 @@ class DsdDecoderHelper {
     }
     onTransportResolved?.call(false, false);
     return DsdPcmStreamAudioSource(wavBytes, tag: tag);
-  }
-
-  static final Uint8List _bitReverseTable = () {
-    final table = Uint8List(256);
-    for (var i = 0; i < 256; i++) {
-      var v = i, r = 0;
-      for (var b = 0; b < 8; b++) {
-        r = (r << 1) | (v & 1);
-        v >>= 1;
-      }
-      table[i] = r;
-    }
-    return table;
-  }();
-
-  /// Returns a copy of [src] with the bits of every byte reversed.
-  static Uint8List _reverseBits(Uint8List src) {
-    final out = Uint8List(src.length);
-    for (var i = 0; i < src.length; i++) {
-      out[i] = _bitReverseTable[src[i]];
-    }
-    return out;
   }
 
   /// Parses DSF header and demuxes planar channel data blocks.

@@ -4931,6 +4931,324 @@ abstract class AppLocalizations {
   /// **'DoP'**
   String get dsdOutputDop;
 
+  /// No description provided for @dsdOutputNative.
+  ///
+  /// In en, this message translates to:
+  /// **'Native'**
+  String get dsdOutputNative;
+
+  /// No description provided for @dsdNativeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs a DAC that advertises a native DSD alt setting'**
+  String get dsdNativeUnavailable;
+
+  /// No description provided for @conversionQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversion quality'**
+  String get conversionQuality;
+
+  /// No description provided for @conversionQualityDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Only when the sink rate differs; bit-perfect playback is unaffected.'**
+  String get conversionQualityDesc;
+
+  /// No description provided for @conversionOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get conversionOff;
+
+  /// No description provided for @settingsUac2VolumeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'UAC2 volume'**
+  String get settingsUac2VolumeTitle;
+
+  /// No description provided for @settingsUac2VolumeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Moves the DAC\'s own attenuator; 100 % is unity.'**
+  String get settingsUac2VolumeDesc;
+
+  /// No description provided for @settingsUac2VolumeUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This DAC exposes no hardware volume control.'**
+  String get settingsUac2VolumeUnsupported;
+
+  /// No description provided for @conversionTaps64.
+  ///
+  /// In en, this message translates to:
+  /// **'64 taps (fast)'**
+  String get conversionTaps64;
+
+  /// No description provided for @conversionTaps128.
+  ///
+  /// In en, this message translates to:
+  /// **'128 taps'**
+  String get conversionTaps128;
+
+  /// No description provided for @conversionTaps256.
+  ///
+  /// In en, this message translates to:
+  /// **'256 taps (balanced)'**
+  String get conversionTaps256;
+
+  /// No description provided for @conversionTaps512.
+  ///
+  /// In en, this message translates to:
+  /// **'512 taps (best)'**
+  String get conversionTaps512;
+
+  /// No description provided for @settingsBatterySaverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Battery saver'**
+  String get settingsBatterySaverTitle;
+
+  /// No description provided for @settingsBatterySaverDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Turns off the heavy DSP stages and keeps the equalizer.'**
+  String get settingsBatterySaverDesc;
+
+  /// No description provided for @settingsChannelTrimsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Channel trim & delay'**
+  String get settingsChannelTrimsTitle;
+
+  /// No description provided for @settingsChannelTrimsDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-channel level and distance for 2–8 channel output.'**
+  String get settingsChannelTrimsDesc;
+
+  /// No description provided for @channelTrim.
+  ///
+  /// In en, this message translates to:
+  /// **'Trim {channel}'**
+  String channelTrim(int channel);
+
+  /// No description provided for @channelDelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Delay {channel}'**
+  String channelDelay(int channel);
+
+  /// No description provided for @autoeqParametricImport.
+  ///
+  /// In en, this message translates to:
+  /// **'Import parametric profile'**
+  String get autoeqParametricImport;
+
+  /// No description provided for @autoeqParametricImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'AutoEq ParametricEQ.txt'**
+  String get autoeqParametricImportHint;
+
+  /// No description provided for @autoeqParametricImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Imported “{name}”'**
+  String autoeqParametricImported(String name);
+
+  /// No description provided for @autoeqParametricImportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not import this profile'**
+  String get autoeqParametricImportFailed;
+
+  /// No description provided for @autoeqParametricNoFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'No usable filters in this file'**
+  String get autoeqParametricNoFilters;
+
+  /// No description provided for @autoeqTargetCurve.
+  ///
+  /// In en, this message translates to:
+  /// **'Target curve'**
+  String get autoeqTargetCurve;
+
+  /// No description provided for @autoeqTargetCurveNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get autoeqTargetCurveNone;
+
+  /// No description provided for @abxScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Blind ABX test'**
+  String get abxScreenTitle;
+
+  /// No description provided for @abxScreenSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch between two conditions without knowing which is which.'**
+  String get abxScreenSubtitle;
+
+  /// No description provided for @abxStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get abxStart;
+
+  /// No description provided for @abxRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get abxRestart;
+
+  /// No description provided for @abxBypassCondition.
+  ///
+  /// In en, this message translates to:
+  /// **'Bypass'**
+  String get abxBypassCondition;
+
+  /// No description provided for @abxDspCondition.
+  ///
+  /// In en, this message translates to:
+  /// **'DSP'**
+  String get abxDspCondition;
+
+  /// No description provided for @abxTrialLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial {current} of {total}'**
+  String abxTrialLabel(int current, int total);
+
+  /// No description provided for @abxQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Which condition is X?'**
+  String get abxQuestion;
+
+  /// No description provided for @abxAnswerA.
+  ///
+  /// In en, this message translates to:
+  /// **'X is A'**
+  String get abxAnswerA;
+
+  /// No description provided for @abxAnswerB.
+  ///
+  /// In en, this message translates to:
+  /// **'X is B'**
+  String get abxAnswerB;
+
+  /// No description provided for @abxCorrectShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct'**
+  String get abxCorrectShort;
+
+  /// No description provided for @abxIncorrectShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect'**
+  String get abxIncorrectShort;
+
+  /// No description provided for @abxResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Result'**
+  String get abxResultTitle;
+
+  /// No description provided for @abxPValue.
+  ///
+  /// In en, this message translates to:
+  /// **'p = {value}'**
+  String abxPValue(String value);
+
+  /// No description provided for @abxVerdictInsufficient.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough trials'**
+  String get abxVerdictInsufficient;
+
+  /// No description provided for @abxVerdictChance.
+  ///
+  /// In en, this message translates to:
+  /// **'No better than chance'**
+  String get abxVerdictChance;
+
+  /// No description provided for @abxVerdictSuggestive.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestive'**
+  String get abxVerdictSuggestive;
+
+  /// No description provided for @abxVerdictSignificant.
+  ///
+  /// In en, this message translates to:
+  /// **'Significant'**
+  String get abxVerdictSignificant;
+
+  /// No description provided for @abxVerdictStrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong evidence'**
+  String get abxVerdictStrong;
+
+  /// No description provided for @abxNeedsPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a track and enable DSP to run this test.'**
+  String get abxNeedsPlayback;
+
+  /// No description provided for @remoteKindSubsonic.
+  ///
+  /// In en, this message translates to:
+  /// **'Subsonic / Navidrome'**
+  String get remoteKindSubsonic;
+
+  /// No description provided for @remoteSubsonicUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get remoteSubsonicUrl;
+
+  /// No description provided for @remoteSubsonicUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get remoteSubsonicUser;
+
+  /// No description provided for @remoteSubsonicPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get remoteSubsonicPassword;
+
+  /// No description provided for @remoteUpnpServers.
+  ///
+  /// In en, this message translates to:
+  /// **'UPnP media servers'**
+  String get remoteUpnpServers;
+
+  /// No description provided for @remoteUpnpSearching.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching for media servers…'**
+  String get remoteUpnpSearching;
+
+  /// No description provided for @remoteUpnpNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No media server found'**
+  String get remoteUpnpNone;
+
+  /// No description provided for @remoteUpnpUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this server'**
+  String get remoteUpnpUse;
+
   /// No description provided for @enableShuffle.
   ///
   /// In en, this message translates to:

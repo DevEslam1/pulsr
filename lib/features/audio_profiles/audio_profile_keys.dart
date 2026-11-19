@@ -101,6 +101,7 @@ abstract final class AudioProfileKeys {
     PrefsKeys.aaudioTargetBufferMs,
     PrefsKeys.sincResamplerEnabled,
     PrefsKeys.sincResamplerQuality,
+    PrefsKeys.tapSrcQuality,
     PrefsKeys.usbHardwareVolumeEnabled,
     PrefsKeys.dvcEnabled,
     PrefsKeys.bluetoothHiResEnabled,

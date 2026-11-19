@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22.1)
+﻿cmake_minimum_required(VERSION 3.22.1)
 project(pulsr_dsp_tests CXX)
 
 # Must match main/cpp/CMakeLists.txt: the DSP sources are shared, so a lower
@@ -64,7 +64,10 @@ set(DSP_SRCS
     ${MAIN_CPP}/LookaheadLimiter.cpp
     ${MAIN_CPP}/ConvolutionReverb.cpp
     ${MAIN_CPP}/SincResampler.cpp
+    ${MAIN_CPP}/HighQualityResampler.cpp
     ${MAIN_CPP}/DsdDecoder.cpp
+    ${MAIN_CPP}/DsdNativePacker.cpp
+    ${MAIN_CPP}/Uac2Descriptors.cpp
     ${MAIN_CPP}/SpatialPanner.cpp
     ${MAIN_CPP}/HarmonicSaturation.cpp
     ${MAIN_CPP}/StereoWidth.cpp
@@ -152,3 +155,11 @@ pulsr_add_test(test_rg_dop ${DSP_SRCS})
 pulsr_add_test(test_usb_pull_renderer ${MAIN_CPP}/UsbPullRenderer.cpp)
 pulsr_add_test(test_usb_asrc ${MAIN_CPP}/UsbAsrcClockSync.cpp)
 pulsr_add_test(test_usb_fuzz ${DSP_SRCS})
+
+# Additive test targets live in extra_tests/*.cmake so parallel workstreams never
+# edit this file. Each include may call pulsr_add_test() and may use DSP_SRCS /
+# MAIN_CPP from this scope.
+file(GLOB PULSR_EXTRA_TEST_CMAKE "${CMAKE_CURRENT_SOURCE_DIR}/extra_tests/*.cmake")
+foreach(extra_cmake ${PULSR_EXTRA_TEST_CMAKE})
+    include(${extra_cmake})
+endforeach()

@@ -121,12 +121,8 @@ class AudioEffectsChannel {
     }
   }
 
-  /// Drops the singleton and closes its route stream (BUG-25).
-  ///
-  /// In production this is never called, so the app keeps one long-lived
-  /// instance. Tests call it in teardown so the next [AudioEffectsChannel()]
-  /// returns a fresh instance instead of leaking stale capability/session
-  /// state from a previous test.
+  /// Drops the singleton and closes its streams (BUG-25). Production keeps one
+  /// long-lived instance; tests call it so a recreated instance starts clean.
   void dispose() {
     if (!_routeChangedController.isClosed) {
       _routeChangedController.close();
@@ -189,15 +185,15 @@ class AudioEffectsChannel {
 
   /// Whether the native C++ DSP chain is in ExoPlayer's audible path.
   bool get hasPcmDspPath => _hasPcmDspPath;
-  // The playback processor cannot emit a variable number of output frames.
-  // Planar sinc conversion remains available internally to the reverb.
+  // The playback processor cannot emit a variable number of output frames;
+  // planar sinc conversion stays internal to the reverb.
   bool get isPlaybackSincResamplerSupported => false;
   bool get hasOemAudio => _hasOemAudio;
   List<String> get detectedOemEngines => List.unmodifiable(_detectedOemEngines);
 
   Future<void> init() async {
     if (!_isAndroid) return;
-    // Run capability probes in parallel to prevent sequential timeout stacking (worst case 32s -> 8s)
+    // Probe in parallel so timeouts do not stack (32s worst case -> 8s).
     await Future.wait([
       () async {
         try {
@@ -391,11 +387,8 @@ class AudioEffectsChannel {
   }
 
   /// Pushes the active player's audio session id to the native effect stack.
-  ///
-  /// Guards against invalid ids: 0 (or negative) means "no session" and would
-  /// bind AudioEffect instances to the global output mix, so it is ignored.
-  /// The native side additionally releases + recreates the effects on the new
-  /// session and reports truthful attachment state back.
+  /// Ids <= 0 mean "no session" and would bind AudioEffect to the global output
+  /// mix, so they are ignored; the native side recreates the effects on a new id.
   Future<void> setAudioSessionId(int sessionId) async {
     if (!_isAndroid) return;
     if (sessionId <= 0) {
@@ -428,11 +421,9 @@ class AudioEffectsChannel {
     }
   }
 
-  /// Returns true when the native layer confirmed the boost was applied.
-  /// An explicit `false` means the device has no LoudnessEnhancer, the effect
-  /// failed to build, no audio session is attached, or the platform is not
-  /// Android (unsupported). A missing return (older bridges) is treated as
-  /// success so nothing regresses.
+  /// True when the native layer confirmed the boost. `false` means no
+  /// LoudnessEnhancer, no attached session, a failed build or non-Android; a
+  /// missing return (older bridges) is treated as success so nothing regresses.
   Future<bool> setVolumeBoost(int milliBels) async {
     if (!_isAndroid) return false;
     try {
@@ -650,10 +641,9 @@ class AudioEffectsChannel {
     }
   }
 
-  /// Sets the band center frequencies (Hz). Length defines the band count.
-  /// Returns true when the platform channel acknowledged the call.
-  /// Single-application guarantee (13-01): callers use the return value to
-  /// decide whether the legacy mirror write is needed as a fallback.
+  /// Sets the band center frequencies (Hz); length defines the band count.
+  /// Callers use the return value to decide whether the legacy mirror write is
+  /// still needed as a fallback (single-application guarantee, 13-01).
   Future<bool> setEqBands(List<double> frequencies) async {
     if (!_isAndroid) return true;
     try {
@@ -935,15 +925,11 @@ class AudioEffectsChannel {
 
   // --- NATIVE REPLAYGAIN (tag-supplied pre-gain in DSP) ---
 
-  /// Pushes ReplayGain tags into the native DSP pre-gain stage. The gain comes
-  /// from the track's existing ReplayGain tags; there is no EBU R128 / RG 2.0
-  /// measurement in the native path (the Dart side computes the multiplier).
-  /// [mode]: 0=off, 1=track, 2=album. Keeps the Android mixer at unity so
-  /// DoP markers and bit-perfect PCM survive; volume slider stays separate.
-  ///
-  /// Returns true when the native engine applied the params. An explicit
-  /// `false` means the native DSP engine is not loaded. A missing return
-  /// (older bridges) is treated as success.
+  /// Pushes tag-supplied ReplayGain into the native DSP pre-gain stage; there
+  /// is no EBU R128 measurement in the native path (Dart computes the
+  /// multiplier). [mode]: 0=off, 1=track, 2=album. The Android mixer stays at
+  /// unity so DoP markers and bit-perfect PCM survive. `false` = engine not
+  /// loaded; a missing return (older bridges) is treated as success.
   Future<bool> setReplayGainParams({
     required int mode,
     required double trackGainDb,
@@ -1140,9 +1126,8 @@ class AudioEffectsChannel {
   }
 
   /// Loads a custom impulse response into the native convolution reverb.
-  /// Returns false when the request was rejected (invalid/empty samples,
-  /// native DSP unavailable, channel error, or an explicit native failure)
-  /// so callers do not report a successful custom-IR load untruthfully.
+  /// False when rejected (empty samples, no native DSP, channel error), so a
+  /// caller never reports a successful custom-IR load untruthfully.
   Future<bool> loadImpulseResponse(List<double> irSamples) async {
     if (!_isAndroid) return false;
     if (irSamples.isEmpty) {
@@ -1268,6 +1253,37 @@ class AudioEffectsChannel {
     }
   }
 
+  // --- TAP-SIDE SAMPLE-RATE CONVERSION ---
+
+  /// Conversion kernel when the sink rate differs from the track rate:
+  /// 0..3 = 64/128/256/512-tap. Never throws: [_invokeNativeSetter] has already
+  /// logged the refusal, so false simply means "no DSP tap on this platform".
+  Future<bool> setTapSrcQuality(int quality) async {
+    if (!_isAndroid) return false;
+    try {
+      await _invokeNativeSetter('setTapSrcQuality',
+          {'quality': quality.clamp(0, 3)});
+      return true;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Current conversion quality (0..3), or null when unavailable.
+  Future<int?> getTapSrcQuality() async {
+    if (!_isAndroid) return null;
+    try {
+      final quality = await _channel
+          .invokeMethod<int>('getTapSrcQuality')
+          .timeout(const Duration(seconds: 2));
+      return quality?.clamp(0, 3);
+    } catch (e, st) {
+      ErrorLogger.log('getTapSrcQuality failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+      return null;
+    }
+  }
+
   // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---
 
   Future<void> setSaturationEnabled(bool enabled) async {
@@ -1362,12 +1378,10 @@ class AudioEffectsChannel {
 
   // --- PHASE 1 DSP EXPANSION: LOUDNESS CONTOUR (FLETCHER-MUNSON) ---
 
-  /// Reads the Android STREAM_MUSIC volume as a 0..1 ratio
-  /// (getStreamVolume / getStreamMaxVolume). Returns 1.0 off-Android or when
-  /// the value is unavailable (so the loudness contour defaults to "full
-  /// volume = no lift" rather than engaging spuriously). Live changes are also
-  /// pushed over [onSystemVolumeChanged]; this is the one-shot query used on
-  /// loudness-enable / track start.
+  /// Reads the Android STREAM_MUSIC volume as a 0..1 ratio. Returns 1.0
+  /// off-Android or when unavailable, so the loudness contour defaults to
+  /// "full volume = no lift" rather than engaging spuriously. Live changes
+  /// arrive over [onSystemVolumeChanged]; this is the one-shot query.
   Future<double> getSystemMusicVolume() async {
     if (!_isAndroid) return 1.0;
     try {
@@ -1895,14 +1909,10 @@ class AudioEffectsChannel {
 
   // --- DITHER (TPDF) + BIT-PERFECT SNAPSHOT ---
 
-  /// Returns true when the native dither stage accepted the params. Dither is
-  /// skipped on BT routes by the native side unless [allowBluetoothDither] is
-  /// true (the Bluetooth Hi-Res opt-in). Returns false off Android, where there
-  /// is no native DSP stage.
-  ///
-  /// This is the single reachable dither entry point: it carries the enable
-  /// flag, target depth and route together. The old enable-only
-  /// `setDitherEnabled` wrapper was unreachable and has been removed.
+  /// True when the native dither stage accepted the params. Dither is skipped
+  /// on BT routes unless [allowBluetoothDither] (the Hi-Res opt-in) is true,
+  /// and is always false off Android. This is the single reachable entry point:
+  /// enable flag, target depth and route travel together.
   Future<bool> setDitherParams({
     required bool enabled,
     required int targetBitDepth,
@@ -2430,11 +2440,9 @@ class AudioEffectsChannel {
     }
   }
 
-  /// Calculates real-time DSP battery drain estimate (mAh/hr with DSP active vs off).
-  /// Note: Values returned are heuristic model estimates based on active stage count and RTF,
-  /// not direct hardware coulomb-counter measurements (indicated by 'isHeuristic': true).
-  /// Retrieves heuristic battery drain estimates for active DSP stages.
-  /// Note: outputs are heuristic estimates based on RTF and stage bit counts (Part 2).
+  /// Heuristic DSP battery drain estimates (mAh/hr) for the active stages.
+  /// Modelled from RTF and stage count — not coulomb-counter measurements, as
+  /// the `isHeuristic` flag says.
   Future<Map<String, dynamic>> getDspBatteryDrainEstimate() async {
     if (!_isAndroid) return const {};
     try {

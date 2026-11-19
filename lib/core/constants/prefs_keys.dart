@@ -277,6 +277,10 @@ class PrefsKeys {
   static const String usbHardwareVolumeEnabled =
       'setting_usb_hardware_volume_enabled';
 
+  // User-facing battery saver: pins the DSP to the low-power essential profile
+  // on any charge level. The automatic <15 %/<5 % policy is unchanged.
+  static const String batterySaverEnabled = 'setting_battery_saver_enabled';
+
   // Per-session audio telemetry (route/codec/negotiated format/interruptions).
   static const String audioSessionLogEnabled =
       'setting_audio_session_log_enabled';
@@ -307,6 +311,11 @@ class PrefsKeys {
   // Resampler quality: 0 = Fast (linear), 1 = Standard (16-tap),
   // 2 = High (32-tap), 3 = Ultra (64-tap, default).
   static const String sincResamplerQuality = 'setting_sinc_resampler_quality';
+
+  // Tap-side conversion kernel, owned by the DSP tap (not the sinc stage):
+  // -1 = off (the platform converter runs), 0..3 = 64/128/256/512-tap. Mirrors
+  // the native TapTapsForQuality ladder so the two can never drift.
+  static const String tapSrcQuality = 'setting_tap_src_quality';
 
   // BPM-synced crossfade: align crossfade duration to the nearest
   // 2/4/8/16/32 beats of the incoming track when a BPM value is known.

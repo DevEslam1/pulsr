@@ -66,8 +66,20 @@ void runEngineCommandContractsTest() {
     // Reset smoothed DVC so only the safety limiter contributes delay.
     engine->reset();
     engine->processInterleaved(pcm.data(), 512, 2);
-    assert(engine->getPipelineLatencyFrames() ==
-           480 + LookaheadLimiter::FILTER_DELAY); // 5ms at 96kHz + true-peak FIR
+    const int safetyOnly = 480 + LookaheadLimiter::FILTER_DELAY; // 5 ms @ 96 kHz + true-peak FIR
+    // `reset()` queues the reset; it does not snap the direct-volume smoother.
+    // The chain was applying a 4x DVC gain, so the smoother ramps down from 4x
+    // and the auto-limiter legitimately stays in the path while the signal is
+    // still above unity. Asserting safetyOnly on this first block assumed an
+    // instant snap and contradicted the documented click-free smoothing.
+    assert(engine->getPipelineLatencyFrames() >= safetyOnly);
+    int settleBlocks = 0;
+    while (engine->getPipelineLatencyFrames() != safetyOnly && settleBlocks < 400) {
+        engine->processInterleaved(pcm.data(), 512, 2);
+        ++settleBlocks;
+    }
+    assert(settleBlocks > 0); // the transient is observable, not assumed away
+    assert(engine->getPipelineLatencyFrames() == safetyOnly);
     params->headphoneSafety.enabled = false;
     params->resampler.enabled = true;
     params->resampler.inRate = 44100;

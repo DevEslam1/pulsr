@@ -67,6 +67,19 @@ enum class UsbStreamResult : int32_t {
 //   ClockSyncAsrc  - decoded float is resampled by UsbAsrcClockSync to follow
 //                    the DAC clock. Never bit-perfect by construction.
 //
+//   DsdNative      - native DSD transport (DSD_U32). The producer hands over one
+//                    1-bit payload per channel and the sink packs it into 32-bit
+//                    little-endian words (pulsr::PackDsdBitsToWords) with no
+//                    dither, no software gain and no float roundtrip, so the
+//                    payload reaches the wire bit-for-bit. BitPerfect-shaped:
+//                    no ASRC and no pull reservoir. Payloads travel through the
+//                    same ring/URB path as BestEffort, but an underrun is filled
+//                    with the DC-neutral DSD silence pattern instead of PCM
+//                    zeroes, and UsbGapFader stays out of the path (it fades PCM
+//                    words). Admitted only for a 4-byte subslot, 32 valid bits,
+//                    two channels and a framesPerSecond on the DSD64/128/256/512
+//                    U32 ladder (see CheckStreamShape).
+//
 // Open() starts BitPerfectPull/ClockSyncAsrc only when their engines are part
 // of the link. They are not yet: UsbPullRenderer.cpp and UsbAsrcClockSync.cpp
 // are absent from DSP_CORE_SOURCES (main/cpp/CMakeLists.txt) and from DSP_SRCS
@@ -80,6 +93,7 @@ enum class UsbRenderMode : int32_t {
     BestEffort = 0,
     BitPerfectPull = 1,
     ClockSyncAsrc = 2,
+    DsdNative = 3,
 };
 
 static_assert(std::atomic<int64_t>::is_always_lock_free &&
@@ -226,6 +240,49 @@ public:
                           int sampleRate, int64_t producerId);
     bool WritePcm(const uint8_t* buffer, int frames, int channels,
                   int sourceBitDepth, int sampleRate, int64_t producerId);
+    // Native DSD (DsdNative) producer call. `bytesPerChannel` is the 1-bit
+    // payload size per channel, NOT a PCM sample count: each byte carries 8 DSD
+    // samples, LSB-first (DSF bit order; DFF is MSB-first and must be
+    // bit-reversed upstream). The sink packs each channel into 4-byte
+    // little-endian words (pulsr::PackDsdBitsToWords), so `bytesPerChannel`
+    // bytes become ceil(bytesPerChannel / 4) stereo frames and a trailing
+    // partial word is zero-padded on its high side. No dither, no gain and no
+    // float conversion: the payload reaches the wire bit-for-bit.
+    //
+    // Same transport semantics as WritePcm: all-or-nothing (a block that does
+    // not fit the ring is refused whole, with overrunCount and ENOSPC, never
+    // partially delivered), the same producer admission gate, and ordering is
+    // preserved across refused blocks. Returns false in every PCM mode, when no
+    // DSD stream is open, and for a payload larger than kMaxDsdBytesPerCall.
+    bool WriteDsd(const uint8_t* left, const uint8_t* right, int bytesPerChannel,
+                  int64_t producerId);
+    // True only while a native-DSD stream is open and live. Telemetry only; it
+    // is lock-free and answers false in every PCM mode and after teardown.
+    bool IsDsdActive() const;
+    // Upper bound on one WriteDsd call, per channel (1 MiB of 1-bit payload -
+    // ~23 s of DSD64, far beyond any decoder block). Enforced here and mirrored
+    // by the JNI array copy so a bogus Kotlin length is rejected before it can
+    // size a buffer.
+    static constexpr int kMaxDsdBytesPerCall = 1 << 20;
+    // Native-DSD gap silence: alternating 0x69 / 0x96 bytes, LSB-first, as a
+    // continuous byte stream. Both bytes carry exactly four 1-bits out of eight,
+    // so every byte - and therefore every 32-bit word built from four of them -
+    // is exactly 50 % bit density: zero DC after the DAC's low-pass, with the
+    // alternation keeping the idle pattern off a standing DC and sharing the
+    // quantisation noise across the band. `firstPhase` is kDsdSilenceByteA or
+    // kDsdSilenceByteB; the return value is the phase the next call must use.
+    static constexpr uint8_t kDsdSilenceByteA = 0x69;
+    static constexpr uint8_t kDsdSilenceByteB = 0x96;
+    static uint8_t FillDsdSilence(uint8_t* dst, int bytes, uint8_t firstPhase);
+    // Pure stream-shape admission policy (no device access), so the PCM/DSD
+    // geometry matrix has exactly one implementation and is host-testable.
+    // Returns Ok when `mode` can carry this geometry, InvalidArgs when it
+    // cannot, and RateUnsupported when the geometry fits but framesPerSecond is
+    // off the mode's ladder (for DsdNative the DSD64/128/256/512 U32 rungs, via
+    // pulsr::DsdRateForAltSetting). An unknown mode value is InvalidArgs.
+    static UsbStreamResult CheckStreamShape(UsbRenderMode mode, int channels,
+                                            int bytesPerSample, int validBitDepth,
+                                            int framesPerSecond);
     // Item 3: per-producer DoP marker flag. The JNI direct-USB tap sets this from
     // `engine->getParams()->bitPerfect.isDop` before WritePcm(); the USB worker
     // reads it so an underrun gap is filled with valid DoP silence (zero payload
@@ -331,6 +388,14 @@ private:
     // Item 3: true while the producer is handing us DoP words (raw, marker in
     // the MSB). Read only by the USB worker; written by the JNI tap.
     std::atomic<bool> producerIsDop_{false};
+    // Native-DSD admission latch, published by Open() and cleared by
+    // releaseResources()/Abandon(). Lock-free so the PCM-API refusal in
+    // writeBlock(), the DSD gap fill and IsDsdActive() telemetry never touch the
+    // control mutex (a producer must never contend with teardown).
+    std::atomic<bool> dsdMode_{false};
+    // Worker-only phase of the DSD gap pattern, so the alternation stays
+    // continuous across packets and URBs (0x69 first, then 0x96, ...).
+    uint8_t dsdSilencePhase_ = kDsdSilenceByteA;
     // Marker the next synthesized DoP gap frame must use. Worker-thread-only:
     // it is re-derived from the last real frame of every packet, so a mid-stream
     // restart or a producer phase change cannot desynchronise the alternation.

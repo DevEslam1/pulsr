@@ -431,6 +431,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   late final TripleBufferPipeline _tripleBufferPipeline;
   @override
   late final BatteryAwarePlayback _batteryAwarePlayback;
+
+  /// User-forced battery saver. Distinct from the automatic level policy: it
+  /// pins the essential DSP profile regardless of charge and survives restart.
+  bool _batterySaverForced = false;
   @override
   late final StreamPreResolver _streamPreResolver;
   bool _disposed = false;
@@ -1986,6 +1990,55 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  // --- User-forced battery saver -----------------------------------------
+  // The automatic policy below 15 % / 5 % is untouched; this is an explicit
+  // override that pins the same essential-only DSP profile. Persisted so a
+  // restart does not silently restore the heavy stages.
+
+  bool get batterySaverForced => _batterySaverForced;
+
+  /// Applies (or lifts) the user's battery-saver profile.
+  ///
+  /// Lifting is a no-op while the automatic policy is degraded: that state is
+  /// owned by [BatteryAwarePlayback] and is restored by its own callback.
+  Future<void> setBatterySaverForced(bool enabled) async {
+    _batterySaverForced = enabled;
+    try {
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+      await prefs.setBool(PrefsKeys.batterySaverEnabled, enabled);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to persist battery saver preference',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+    try {
+      if (enabled) {
+        await _equalizerManager.degradeToEssentials();
+      } else if (_batteryAwarePlayback.currentLevel ==
+          BatteryOptimizationLevel.normal) {
+        await _equalizerManager.restoreFromDegrade();
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply battery saver state',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
+  /// Re-applies the stored override after the equalizer has loaded its own
+  /// state; running it earlier would let init restore the heavy stages.
+  Future<void> _restoreBatterySaverPreference() async {
+    try {
+      final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+      _batterySaverForced =
+          prefs.getBool(PrefsKeys.batterySaverEnabled) ?? false;
+      if (_batterySaverForced) {
+        await _equalizerManager.degradeToEssentials();
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore battery saver preference',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+  }
+
   /// Synchronizes active gain stages immediately when [usbHardwareVolumeEnabled]
   /// is toggled in Settings so disabling hardware volume resets the DAC Feature
   /// Unit to 0 dB and restores Direct USB/software attenuation without a jump.
@@ -2294,14 +2347,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       ErrorLogger.log('Failed to restore DAC voicing preference',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
-    // Unsupported optional DSP preferences must not abort player startup.
-    // Android currently handles playback rate conversion itself.
+    // Restore the tap-side SRC kernel. The in-chain sinc stage no longer
+    // converts anything (a fixed-size block cannot change rate), so the tap is
+    // the only converter and the stored 64/128/256/512-tap choice has to reach
+    // native before the first track is prepared.
     try {
-      await setSincResamplerQuality(
-        _cachedPrefs?.getInt(PrefsKeys.sincResamplerQuality) ?? 3,
+      await AudioEffectsChannel().setTapSrcQuality(
+        _cachedPrefs?.getInt(PrefsKeys.tapSrcQuality) ?? 2,
       );
     } catch (e, st) {
-      ErrorLogger.log('Failed to restore Sinc resampler setting',
+      ErrorLogger.log('Failed to restore tap SRC quality',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
     // Restore Direct Volume Control. Only the system-stream pinning needs to
@@ -2434,7 +2489,11 @@ class PulsrAudioHandler extends BaseAudioHandler
           setCrossfadeDuration(_preBatteryCriticalCrossfadeDuration!);
           _preBatteryCriticalCrossfadeDuration = null;
         }
-        unawaited(_equalizerManager.restoreFromDegrade());
+        // A forced battery saver outlives an automatic restore: the user asked
+        // for the essential profile regardless of the charge level.
+        if (!_batterySaverForced) {
+          unawaited(_equalizerManager.restoreFromDegrade());
+        }
         _adaptiveBufferEngine.releaseForce();
       },
     );
@@ -3036,6 +3095,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         ErrorLogger.log('EqualizerManager init failed',
             error: e, stackTrace: st, category: 'AudioHandler');
       }
+      await _restoreBatterySaverPreference();
       unawaited(_refreshBluetoothRoute());
       try {
         // Query the system STREAM_MUSIC volume once at cold start so a restored

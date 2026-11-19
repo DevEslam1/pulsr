@@ -619,6 +619,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetStereoBalance(balance: Double)
     private external fun nativeSetMonoMix(mono: Boolean)
     private external fun nativeSetSincResamplerEnabled(enabled: Boolean)
+    // Tap-side SRC kernel size (0..3 -> 64/128/256/512 taps). The engine
+    // rebuilds it on the control thread; the audio callback never reallocates.
+    private external fun nativeSetTapSrcQuality(quality: Int)
+    private external fun nativeGetTapSrcQuality(): Int
     private external fun nativeSetSaturationEnabled(enabled: Boolean)
     private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double, mode: Int, multiband: Boolean)
     private external fun nativeSetSaturationMultiband(multiband: Boolean)
@@ -3814,6 +3818,38 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                     recalculateActiveStages()
                     result.success(true)
+                }
+
+                // Tap-side SRC kernel. The in-chain sinc stage no longer
+                // converts anything (the block contract is N-in/N-out), so the
+                // tap is the only converter and this is its quality knob.
+                "setTapSrcQuality" -> {
+                    val quality = (call.argument<Int>("quality") ?: 2).coerceIn(0, 3)
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    try {
+                        nativeSetTapSrcQuality(quality)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetTapSrcQuality failed: ${e.message}")
+                        result.error("NATIVE_ERROR", e.message, null)
+                    }
+                }
+                "getTapSrcQuality" -> {
+                    if (!isNativeDspLoaded) {
+                        result.success(null)
+                        return
+                    }
+                    result.success(
+                        try {
+                            nativeGetTapSrcQuality()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetTapSrcQuality failed: ${e.message}")
+                            null
+                        }
+                    )
                 }
 
                 // Sinc Resampler (enable-true and quality/rates rejected at top of dispatch)

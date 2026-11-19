@@ -1058,6 +1058,23 @@ void AudioDspEngine::reset() {
     });
 }
 
+namespace {
+
+// Tap-kernel geometry per quality step. The default (2) is 256 taps,
+// which measures about -130 dB THD+N for 44.1 -> 48 kHz; step 3 doubles
+// it for offline-grade conversion at ~4x the multiply cost.
+int TapTapsForQuality(int quality) {
+    static const int kTaps[4] = {64, 128, 256, 512};
+    return kTaps[quality < 0 ? 0 : (quality > 3 ? 3 : quality)];
+}
+
+int TapPhasesForQuality(int quality) {
+    static const int kPhases[4] = {256, 512, 1024, 2048};
+    return kPhases[quality < 0 ? 0 : (quality > 3 ? 3 : quality)];
+}
+
+}  // namespace
+
 void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int channels) {
     // Called only by the serialized player configure/flush lifecycle. Do not
     // publish these fields through the independently changing DSP snapshot.
@@ -1068,22 +1085,57 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
         dstRate < 8000.0 || dstRate > 768000.0 ||
         channels < 1 || channels > kTapMaxChannels) return;
 
-    tapResampler_.setRates(srcRate, dstRate);
-    tapResampler_.setQuality(3);
-    tapResampler_.setEnabled(true);
-    tapResampler_.reset(); // Also flush when the rate pair has not changed.
     const double expansion = dstRate / srcRate;
     tapChunkFrames_ = std::min(kTapInputFrames, std::max(1,
         static_cast<int>(std::floor((kTapOutputFrames - 2) / expansion))));
-    if (std::abs(srcRate - dstRate) >= 0.5) {
-        for (int ch = 0; ch < channels; ++ch) {
-            tapPlaneIn_[ch].resize(kTapInputFrames);
-            tapPlaneOut_[ch].resize(kTapOutputFrames);
-        }
-    }
     tapSrcRate_ = srcRate;
     tapDstRate_ = dstRate;
+
+    if (std::abs(srcRate - dstRate) < 0.5) {
+        // A locked clock domain must stay bit-identical, and a converter
+        // table would only burn memory and CPU for a passthrough.
+        tapResampler_.release();
+        tapChunkFrames_ = std::max(1, kTapInputFrames);
+        tapChannels_ = channels;
+        return;
+    }
+
+    // Real playback spans at most a few octaves (44.1 <-> 48 <-> 96 <-> 192
+    // <-> 384). Beyond +/-4 octaves the kernel's transition band is wider
+    // than the band itself, so the tap refuses rather than pretending: the
+    // caller falls back to the platform converter, which is what happened
+    // before this stage existed.
+    const double nominalRatio = dstRate / srcRate;
+    if (nominalRatio < 1.0 / 16.0 || nominalRatio > 16.0) {
+        tapResampler_.release();
+        tapChannels_ = channels;
+        return;
+    }
+
+    if (!tapResampler_.configure(channels, TapTapsForQuality(tapSrcQuality_),
+                                 TapPhasesForQuality(tapSrcQuality_),
+                                 srcRate, dstRate)) {
+        tapResampler_.release();
+        return;
+    }
+    tapResampler_.reset();  // Also flush when the rate pair has not changed.
+
+    for (int ch = 0; ch < channels; ++ch) {
+        tapPlaneIn_[ch].resize(kTapInputFrames);
+        tapPlaneOut_[ch].resize(kTapOutputFrames);
+    }
     tapChannels_ = channels;
+}
+
+void AudioDspEngine::setTapSrcQuality(int quality) {
+    const int clamped = quality < 0 ? 0 : (quality > 3 ? 3 : quality);
+    if (clamped == tapSrcQuality_) return;
+    tapSrcQuality_ = clamped;
+    // Rebuild on the control thread; the next configure/flush picks the
+    // kernel up. Never reconfigure from the audio callback.
+    if (tapChannels_ > 0 && std::abs(tapSrcRate_ - tapDstRate_) >= 0.5) {
+        prepareTapResampler(tapSrcRate_, tapDstRate_, tapChannels_);
+    }
 }
 
 int AudioDspEngine::resampleForTap(const float* in, int inFrames, float* out,
@@ -1102,33 +1154,64 @@ int AudioDspEngine::resampleForTap(const float* in, int inFrames, float* out,
         }
         return inFrames;
     }
-    // No partial consumption: this API has no consumed-input return value.
-    // Reject insufficient capacity before touching FIFO or samples.
-    if (in == out || tapResampler_.maximumOutputFrames(inFrames) > maxOutFrames) return -1;
+    if (in == out || !tapResampler_.isConfigured()) return -1;
     tapSrcEngaged_ = true;
 
-    const float* inPlanes[kTapMaxChannels];
-    float* outPlanes[kTapMaxChannels];
-    for (int ch = 0; ch < channels; ++ch) {
-        inPlanes[ch] = tapPlaneIn_[ch].data();
-        outPlanes[ch] = tapPlaneOut_[ch].data();
-    }
-    int consumed = 0;
+    const double ratio = dstRate / srcRate;
+    const int taps = tapResampler_.taps();
+    // Headroom the converter needs, expressed in OUTPUT frames: its
+    // lookahead is taps/2 INPUT frames, so the output cost scales with the
+    // ratio. At 1/96 that rounds to one frame; at 96x it is thousands. Using
+    // a flat `taps` here rejected the extreme downsampling case outright.
+    const int outputHeadroom = std::max(
+        1, static_cast<int>(std::ceil(0.5 * static_cast<double>(taps) * ratio)));
+    int consumedTotal = 0;
     int produced = 0;
-    while (consumed < inFrames) {
-        const int slice = std::min(tapChunkFrames_, inFrames - consumed);
+    while (consumedTotal < inFrames) {
+        // The converter needs `taps` frames of output headroom for its
+        // lookahead, so the chunk is sized from what is actually left in the
+        // caller's buffer, not from a fixed block size.
+        const int remainingOut = maxOutFrames - produced;
+        if (remainingOut <= outputHeadroom) {
+            // The caller's buffer is exhausted. Returning what was already
+            // produced is correct: the unconsumed input was never taken, so
+            // the caller can retry with more room. Failing the whole block
+            // would discard audio already written to its buffer.
+            return produced > 0 ? produced : -1;
+        }
+        const int capacityChunk = static_cast<int>(std::floor(
+            static_cast<double>(remainingOut - outputHeadroom) / ratio));
+        if (capacityChunk <= 0) return produced > 0 ? produced : -1;
+        const int slice = std::min({tapChunkFrames_, capacityChunk,
+                                    inFrames - consumedTotal});
+        if (slice <= 0) return produced > 0 ? produced : -1;
+
         for (int f = 0; f < slice; ++f) {
-            const float* src = in + static_cast<size_t>(consumed + f) * channels;
+            const float* src = in + static_cast<size_t>(consumedTotal + f) * channels;
             for (int ch = 0; ch < channels; ++ch) tapPlaneIn_[ch][f] = src[ch];
         }
-        const int got = tapResampler_.processPlanar(
-            inPlanes, outPlanes, slice, channels, kTapOutputFrames);
-        for (int f = 0; f < got; ++f) {
-            float* dst = out + static_cast<size_t>(produced + f) * channels;
-            for (int ch = 0; ch < channels; ++ch) dst[ch] = tapPlaneOut_[ch][f];
+        int sliceConsumed = 0;
+        while (sliceConsumed < slice) {
+            const float* inPlanes[kTapMaxChannels];
+            float* outPlanes[kTapMaxChannels];
+            for (int ch = 0; ch < channels; ++ch) {
+                inPlanes[ch] = tapPlaneIn_[ch].data() + sliceConsumed;
+                outPlanes[ch] = tapPlaneOut_[ch].data();
+            }
+            int consumed = 0;
+            const int got = tapResampler_.process(
+                inPlanes, slice - sliceConsumed, outPlanes,
+                std::min(kTapOutputFrames, maxOutFrames - produced), consumed);
+            if (got < 0 || consumed < 0) return -1;
+            if (got == 0 && consumed == 0) return produced > 0 ? produced : -1;
+            for (int f = 0; f < got; ++f) {
+                float* dst = out + static_cast<size_t>(produced + f) * channels;
+                for (int ch = 0; ch < channels; ++ch) dst[ch] = tapPlaneOut_[ch][f];
+            }
+            produced += got;
+            sliceConsumed += consumed;
         }
-        produced += got;
-        consumed += slice;
+        consumedTotal += slice;
     }
     return produced;
 }
@@ -1829,7 +1912,6 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         (((stages & STAGE_VIPER_DDC) != 0) && snapshot->viperDdc.enabled) || viperDdc_.isRamping() ||
         (((stages & STAGE_MULTIBAND_COMPRESSOR) != 0) && snapshot->multibandCompressor.enabled) || multibandCompressor_.isRamping() ||
         (((stages & STAGE_LIVE_PROG) != 0) && snapshot->liveProg.enabled) || liveProg_.isRamping() ||
-        (((stages & STAGE_RESAMPLER) != 0) && snapshot->resampler.enabled && !resampler_.isEffectivelyBypassed()) ||
         (((stages & STAGE_CHANNEL_MANAGER) != 0) && snapshot->channelManager.enabled) || channelManager_.isRamping() ||
         (((stages & STAGE_DAC_VOICING) != 0) && snapshot->dacVoicing.enabled) || dacVoicing_.isRamping();
     const bool nonUnityGain = anyStageEnabled ||
@@ -1870,13 +1952,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             }
         }
 
-        // 0. Sinc Resampler Stage — rate-matches the track to the engine rate
-        //    first so all downstream coefficients (EQ, reverb, crossover) run
-        //    at the true rate. In-place polyphase FIR keeps the N-in/N-out
-        //    block contract; bypassed when rates match (zero cost).
-        if ((stages & STAGE_RESAMPLER) && snapshot->resampler.enabled && !resampler_.isEffectivelyBypassed()) {
-            resampler_.processInterleaved(buffer, frames, channels);
-        }
+        // 0. No in-chain sample-rate conversion. The engine block contract is
+        //    N-in/N-out, and a causal rate converter cannot honour it: it either
+        //    reads future samples or grows/skips its FIFO. Rate conversion is
+        //    therefore done upstream (the Java tap SRC, which sizes its own
+        //    output) or by the HAL when the sink runs at a different rate.
+        //    STAGE_RESAMPLER stays defined for wire compatibility, but the stage
+        //    is intentionally not evaluated here; resampler_ remains only so the
+        //    control surface and telemetry keep their existing shape.
 
         // 1. Parametric EQ Stage
         if ((stages & STAGE_EQ) || (!(degraded & STAGE_EQ) && eq_.isRamping())) {
@@ -2007,9 +2090,15 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             limiter_.processInterleaved(buffer, frames, channels);
             limiterActive_.store(true, std::memory_order_relaxed);
             blockLatency += limiter_.getLatencyFrames();
+        } else {
+            // The flag is telemetry, not state: a limiter that has left the
+            // path (no requested gain, no draining fade) must report inactive,
+            // or the UI keeps showing gain reduction from the last time it ran.
+            limiterActive_.store(false, std::memory_order_relaxed);
         }
     } else {
         smoothedDirectVolume_ = 1.0;
+        limiterActive_.store(false, std::memory_order_relaxed);
     }
 
     // 10b. Post-chain loudness delta (before safety), smoothed over 400 ms.
@@ -2343,7 +2432,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // real delay the position tracker must know about when the tap converts
     // the source rate to the device rate ahead of this chain.
     if (tapSrcEngaged_) {
-        blockLatency += tapResampler_.getLatencyFrames();
+        blockLatency += tapResampler_.latencyFrames();
     }
     effectiveLatencyFrames_.store(blockLatency, std::memory_order_release);
 

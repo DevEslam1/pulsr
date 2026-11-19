@@ -93,8 +93,121 @@ class UsbExclusivePlugin(
         /** Upper bound on the pre-stream silence a quirk may request. */
         private const val MAX_QUIRK_SILENCE_MS = 2_000
 
-        /** 0 = best effort, 1 = bit-perfect, 2 = ASRC. */
-        private const val MAX_RENDER_MODE = 2
+        /** 0 = best effort, 1 = bit-perfect, 2 = ASRC, 3 = native DSD. */
+        private const val MAX_RENDER_MODE = 3
+
+        /** `UsbRenderMode::DsdNative` on the native side (UsbAudioSink.h). */
+        private const val RENDER_MODE_DSD = 3
+
+        /**
+         * Wire shape UsbAudioSink::CheckStreamShape admits for native DSD:
+         * stereo DSD_U32 (4-byte subslot, 32 valid bits) at the alternate
+         * setting's framesPerSecond. Anything else is refused before the device
+         * is touched.
+         */
+        private const val DSD_CHANNELS = 2
+        private const val DSD_BYTES_PER_SAMPLE = 4
+        private const val DSD_VALID_BIT_DEPTH = 32
+
+        /** framesPerSecond of DSD64/128/256/512 packed as DSD_U32. */
+        private val DSD_U32_RATES = intArrayOf(88200, 176400, 352800, 705600)
+
+        /** `UsbAudioSink::kMaxDsdBytesPerCall` — 1-bit payload bytes per channel. */
+        private const val MAX_DSD_BYTES_PER_CALL = 1 shl 20
+
+        /**
+         * Producer id used when the caller supplies none. The sink rejects 0
+         * (EINVAL) and admits one producer per stream, so this is a fixed
+         * non-zero constant rather than a per-call value.
+         */
+        private const val DSD_PRODUCER_ID = 0x50554C53L  // "PULS"
+
+        /** UAC2 class-specific control: CS_VOLUME in wValue's high byte. */
+        private const val UAC_CS_VOLUME = 0x02
+        private const val UAC_SET_CUR = 0x01
+        private const val UAC_GET_CUR = 0x81
+        private const val UAC_GET_MIN = 0x82
+        private const val UAC_GET_MAX = 0x83
+        private const val UAC_GET_RES = 0x84
+
+        /** UAC2 GET_RANGE shares GET_MIN's request code; the payload differs. */
+        private const val UAC_GET_RANGE = 0x82
+
+        /** One probed native-DSD alternate setting, in flattened 7-tuple order. */
+        internal data class DsdAltSettingTuple(
+            val interfaceNumber: Int,
+            val altSetting: Int,
+            val endpointAddress: Int,
+            val channels: Int,
+            val bytesPerSample: Int,
+            val framesPerSecond: Int,
+            val dsdRate: Int,
+        ) {
+            val flattened: List<Int>
+                get() = listOf(
+                    interfaceNumber, altSetting, endpointAddress,
+                    channels, bytesPerSample, framesPerSecond, dsdRate,
+                )
+        }
+
+        /**
+         * The live plugin instance. HiResDacPlugin owns the DAC capability
+         * facade, but the JNI symbol for the DSD probe is bound to THIS class
+         * (Java_com_pulsr_music_UsbExclusivePlugin_nativeProbeDsdAltSettings),
+         * so the probe has to run on an instance of this class. One engine owns
+         * one USB DAC, the same assumption [directOwner] already makes.
+         */
+        @Volatile private var probeHost: UsbExclusivePlugin? = null
+
+        /**
+         * Probes a raw configuration descriptor blob for native-DSD alternate
+         * settings. Null means "the probe could not answer" (no instance, no
+         * native library, unusable blob, JNI failure); an empty list means
+         * "parsed, no provable DSD" — the same contract as the JNI entry point.
+         */
+        internal fun probeDsdAltSettings(rawConfig: ByteArray?): List<DsdAltSettingTuple>? =
+            probeHost?.probeDsdAltSettingsInternal(rawConfig)
+
+        /**
+         * UAC2 volume entry points for the `pulsr/hires_dac` facade. The
+         * control transfers run on the USB worker thread (they block) and the
+         * answer is delivered on the main thread; a missing owner or a throwing
+         * transfer resolves to null/false, never to an exception.
+         */
+        internal fun uac2VolumeRange(deliver: (Map<String, Any?>?) -> Unit) =
+            dispatchToOwner(null, deliver) { it.getUac2VolumeRangeInternal() }
+
+        internal fun uac2HardwareVolume(deliver: (Map<String, Any?>?) -> Unit) =
+            dispatchToOwner(null, deliver) { it.getUac2HardwareVolumeInternal() }
+
+        internal fun setUac2HardwareVolume(position: Double, deliver: (Boolean) -> Unit) =
+            dispatchToOwner(false, deliver) { it.setUac2HardwareVolumeInternal(position) }
+
+        /** Runs [block] off the main thread and delivers its result back on it. */
+        private fun <T> dispatchToOwner(
+            fallback: T,
+            deliver: (T) -> Unit,
+            block: (UsbExclusivePlugin) -> T,
+        ) {
+            val owner = probeHost
+            if (owner == null) {
+                try { deliver(fallback) } catch (_: Throwable) {}
+                return
+            }
+            val posted = try {
+                owner.workerHandler.post {
+                    val value = try { block(owner) } catch (_: Throwable) { fallback }
+                    try {
+                        owner.mainHandler.post { try { deliver(value) } catch (_: Throwable) {} }
+                    } catch (_: Throwable) {}
+                }
+            } catch (_: Throwable) {
+                false
+            }
+            if (!posted) {
+                try { deliver(fallback) } catch (_: Throwable) {}
+            }
+        }
     }
 
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as? UsbManager
@@ -120,6 +233,10 @@ class UsbExclusivePlugin(
 
     private var hardwareVolume: UsbHardwareVolume? = null
     private var lastVolumeRefreshAtMs = 0L
+
+    /** UAC2 GET_MIN/GET_MAX/GET_RES, read once per device. */
+    private var uac2RangeSnapshot: Uac2RangeSnapshot? = null
+    private var uac2RangeDeviceId: Int = -1
 
     private var nativeLoaded = false
     @Volatile private var streaming = false
@@ -189,6 +306,14 @@ class UsbExclusivePlugin(
         renderMode: Int,
     ): Int
     private external fun nativeUsbStreamStop(): Boolean
+
+    /** DSD feed: LSB-first payload, one producer per stream (id 0 is refused). */
+    private external fun nativeUsbStreamWriteDsd(
+        left: ByteArray, right: ByteArray, bytesPerChannel: Int, producerId: Long,
+    ): Boolean
+
+    /** Raw configuration descriptor -> flattened DSD alt-setting 7-tuples. */
+    private external fun nativeProbeDsdAltSettings(rawConfig: ByteArray): IntArray?
 
     /**
      * Forced teardown for a caller that already decided to release the interface
@@ -756,6 +881,7 @@ class UsbExclusivePlugin(
             Log.w(TAG, "Native DSP library unavailable: ${e.message}")
             false
         }
+        probeHost = this
     }
 
     private fun registerDeviceReceiver() {
@@ -811,6 +937,46 @@ class UsbExclusivePlugin(
                     }
                 }
                 "stopStreaming" -> runAsync(call.method, result) { stopStreamingInternal() }
+                // Native DSD (DSD_U32). The alt setting comes from the
+                // descriptor probe (`getDopCapabilities` -> nativeDsdAltSetting),
+                // never from a rate/depth guess: the sink admits exactly one
+                // wire shape per alternate setting.
+                "startDsdStreaming" -> {
+                    val tuple = DsdAltSettingTuple(
+                        interfaceNumber = call.argument<Int>("interfaceNumber") ?: -1,
+                        altSetting = call.argument<Int>("altSetting") ?: -1,
+                        endpointAddress = call.argument<Int>("endpoint") ?: 0,
+                        channels = call.argument<Int>("channels") ?: DSD_CHANNELS,
+                        bytesPerSample = call.argument<Int>("bytesPerSample") ?: DSD_BYTES_PER_SAMPLE,
+                        framesPerSecond = call.argument<Int>("framesPerSecond") ?: 0,
+                        dsdRate = call.argument<Int>("dsdRate") ?: 0,
+                    )
+                    val dsdStrict = call.argument<Boolean>("strict") ?: true
+                    runAsync(call.method, result) { startDsdStreamingInternal(tuple, dsdStrict) }
+                }
+                "writeDsd" -> {
+                    val left = call.argument<ByteArray>("left")
+                    val right = call.argument<ByteArray>("right")
+                    val producerId = call.argument<Long>("producerId") ?: DSD_PRODUCER_ID
+                    runAsync(call.method, result) {
+                        writeDsd(
+                            left ?: ByteArray(0),
+                            right ?: ByteArray(0),
+                            producerId,
+                        )
+                    }
+                }
+                "isDsdActive" -> runAsync(call.method, result) { isDsdActive }
+                "getUac2VolumeRange" -> runAsync(call.method, result) {
+                    getUac2VolumeRangeInternal()
+                }
+                "getUac2HardwareVolume" -> runAsync(call.method, result) {
+                    getUac2HardwareVolumeInternal()
+                }
+                "setUac2HardwareVolume" -> {
+                    val position = call.argument<Double>("position") ?: 0.0
+                    runAsync(call.method, result) { setUac2HardwareVolumeInternal(position) }
+                }
                 "resetChannelMismatchFrames" -> {
                     safeResetChannelMismatchFrames()
                     result.success(true)
@@ -977,6 +1143,7 @@ class UsbExclusivePlugin(
             try { closeLocked() } catch (_: Exception) {}
         }
         try { workerThread.quitSafely() } catch (_: Exception) {}
+        if (probeHost === this) probeHost = null
     }
 
     // ---- device discovery / descriptor parsing ----
@@ -1304,6 +1471,7 @@ class UsbExclusivePlugin(
             "exclusiveActive" to (claimedInterface != null),
             "exclusiveSupported" to hasVolume,
             "streamingActive" to streaming,
+            "dsdActive" to isDsdActive,
             "drainPending" to drainPending,
             "streamingSupported" to (nativeLoaded && directCapable),
             "streamingSampleRate" to (streamFormat?.sampleRate ?: 0),
@@ -1372,6 +1540,7 @@ class UsbExclusivePlugin(
         "exclusiveActive" to false,
         "exclusiveSupported" to false,
         "streamingActive" to false,
+        "dsdActive" to false,
         "drainPending" to false,
         "streamingSupported" to false,
         "streamingSampleRate" to 0,
@@ -1619,6 +1788,554 @@ class UsbExclusivePlugin(
         return applyHardwareVolumeDb(unityDb)
     }
 
+    // ---- UAC2 hardware volume (Contract B) ----
+    //
+    // UAC2 volume is a signed 16-bit 1/256 dB value on the wire. The Control
+    // Selector sits in the high byte of wValue (CS_VOLUME = 0x02; 0x01 is
+    // CS_MUTE) and the channel in the low byte; wIndex carries the Feature
+    // Unit's Entity ID in its high byte and the Audio Control interface number
+    // in its low byte. GET_MIN/GET_MAX/GET_RES are read once per device and the
+    // 0..1 UI position is mapped through those values, never through an assumed
+    // 0..-60 dB range.
+
+    private data class Uac2RangeSnapshot(
+        val minQ8: Int,
+        val maxQ8: Int,
+        val resQ8: Int,
+        val unitId: Int,
+        val interfaceNumber: Int,
+        val channels: List<Int>,
+        val fromRangeRequest: Boolean,
+    )
+
+    private fun clearUac2RangeCache() {
+        uac2RangeSnapshot = null
+        uac2RangeDeviceId = -1
+    }
+
+    /** Little-endian unsigned 16-bit read. */
+    private fun le16(data: ByteArray, offset: Int = 0): Int =
+        (data[offset].toInt() and 0xFF) or ((data[offset + 1].toInt() and 0xFF) shl 8)
+
+    /** Little-endian signed 16-bit read (Q8.8 dB). */
+    private fun le16Signed(data: ByteArray, offset: Int = 0): Int =
+        le16(data, offset).toShort().toInt()
+
+    /**
+     * One class-specific request on the Audio Control interface. `wValue`
+     * carries the Control Selector and channel, `wIndex` the entity and
+     * interface. Never throws: a refused transfer answers -1.
+     */
+    private fun uac2Transfer(
+        conn: UsbDeviceConnection,
+        requestType: Int,
+        request: Int,
+        unitId: Int,
+        interfaceNumber: Int,
+        channel: Int,
+        data: ByteArray,
+    ): Int = try {
+        conn.controlTransfer(
+            requestType,
+            request,
+            (UAC_CS_VOLUME shl 8) or channel,
+            (unitId shl 8) or interfaceNumber,
+            data,
+            data.size,
+            CTRL_TIMEOUT_MS,
+        )
+    } catch (_: Throwable) {
+        -1
+    }
+
+    private fun uac2ReadQ8(
+        conn: UsbDeviceConnection,
+        request: Int,
+        unitId: Int,
+        interfaceNumber: Int,
+        channel: Int,
+    ): Int? {
+        val data = ByteArray(2)
+        if (uac2Transfer(conn, 0xA1, request, unitId, interfaceNumber, channel, data) != 2) {
+            return null
+        }
+        return le16Signed(data)
+    }
+
+    /** UAC1-style GET_MIN / GET_MAX / GET_RES: exactly one range. */
+    private fun uac2MinMaxResRange(
+        conn: UsbDeviceConnection,
+        unit: UsbAudioControlParser.FeatureUnitVolume,
+        interfaceNumber: Int,
+        channels: List<Int>,
+    ): Uac2RangeSnapshot? {
+        val channel = channels.firstOrNull() ?: return null
+        val min = uac2ReadQ8(conn, UAC_GET_MIN, unit.unitId, interfaceNumber, channel) ?: return null
+        val max = uac2ReadQ8(conn, UAC_GET_MAX, unit.unitId, interfaceNumber, channel) ?: return null
+        val res = uac2ReadQ8(conn, UAC_GET_RES, unit.unitId, interfaceNumber, channel) ?: return null
+        if (min >= max) return null
+        return Uac2RangeSnapshot(min, max, res and 0xFFFF, unit.unitId, interfaceNumber, channels, false)
+    }
+
+    /**
+     * UAC2 GET_RANGE: wNumSubRanges followed by (wMIN, wMAX, wRES) triplets.
+     * Firmware that only answers the UAC1 shape fails the count check here and
+     * falls back to [uac2MinMaxResRange].
+     */
+    private fun uac2SubRangeRange(
+        conn: UsbDeviceConnection,
+        unit: UsbAudioControlParser.FeatureUnitVolume,
+        interfaceNumber: Int,
+        channels: List<Int>,
+    ): Uac2RangeSnapshot? {
+        val channel = channels.firstOrNull() ?: return null
+        val header = ByteArray(2)
+        if (uac2Transfer(conn, 0xA1, UAC_GET_RANGE, unit.unitId, interfaceNumber, channel, header) != 2) {
+            return null
+        }
+        val count = le16(header)
+        if (count !in 1..64) return null
+        val data = ByteArray(2 + count * 6)
+        if (uac2Transfer(conn, 0xA1, UAC_GET_RANGE, unit.unitId, interfaceNumber, channel, data) != data.size) {
+            return null
+        }
+        if (le16(data) != count) return null
+        for (index in 0 until count) {
+            val at = 2 + index * 6
+            val min = le16Signed(data, at)
+            val max = le16Signed(data, at + 2)
+            if (min >= max) continue
+            return Uac2RangeSnapshot(
+                min, max, le16(data, at + 4), unit.unitId, interfaceNumber, channels, true,
+            )
+        }
+        return null
+    }
+
+    /** Reads the range once per device; null when the DAC exposes no volume control. */
+    private fun ensureUac2Range(
+        conn: UsbDeviceConnection,
+        device: UsbDevice,
+        parsed: UsbAudioControlParser.Result,
+    ): Uac2RangeSnapshot? {
+        val cached = uac2RangeSnapshot
+        if (cached != null && uac2RangeDeviceId == device.deviceId) return cached
+        val unit = parsed.volumeUnit ?: return null
+        val interfaceNumber = unit.interfaceNumber.takeIf { it >= 0 } ?: parsed.controlInterface
+        if (interfaceNumber < 0) return null
+        val channels = unit.controlChannels.take(8)
+        if (channels.isEmpty()) return null
+        val snapshot = if (parsed.uacVersion == UsbAudioControlParser.UAC2) {
+            uac2SubRangeRange(conn, unit, interfaceNumber, channels)
+                ?: uac2MinMaxResRange(conn, unit, interfaceNumber, channels)
+        } else {
+            uac2MinMaxResRange(conn, unit, interfaceNumber, channels)
+                ?: uac2SubRangeRange(conn, unit, interfaceNumber, channels)
+        } ?: return null
+        uac2RangeSnapshot = snapshot
+        uac2RangeDeviceId = device.deviceId
+        return snapshot
+    }
+
+    /** Kotlin mirror of pulsr::Uac2VolumePositionToQ8 (Uac2Volume.cpp). */
+    private fun uac2PositionToQ8(position: Double, range: Uac2RangeSnapshot): Int {
+        val min = range.minQ8
+        val max = range.maxQ8
+        if (min >= max) return if (max < min) max else min
+        val step = if (range.resQ8 > 0) range.resQ8 else 1
+        var clamped = position
+        if (clamped.isNaN()) clamped = 0.0
+        clamped = clamped.coerceIn(0.0, 1.0)
+        val target = min.toDouble() + clamped * (max - min).toDouble()
+        val steps = roundHalfAwayFromZero((target - min) / step)
+        var snapped = min + steps * step
+        if (snapped < min) snapped = min
+        if (snapped > max) snapped = max
+        return snapped
+    }
+
+    /** Kotlin mirror of pulsr::Uac2VolumeQ8ToPosition — clamped, not snapped. */
+    private fun uac2Q8ToPosition(q8: Int, range: Uac2RangeSnapshot): Double {
+        val min = range.minQ8
+        val max = range.maxQ8
+        if (min >= max) return 0.0
+        val position = (q8 - min).toDouble() / (max - min).toDouble()
+        if (!(position >= 0.0)) return 0.0
+        return if (position > 1.0) 1.0 else position
+    }
+
+    /** std::llround: rounds half away from zero. */
+    private fun roundHalfAwayFromZero(value: Double): Int =
+        if (value >= 0.0) (value + 0.5).toInt() else -((-value + 0.5).toInt())
+
+    private fun getUac2VolumeRangeInternal(): Map<String, Any?>? {
+        return try {
+            val device = openedDevice ?: findAudioDevice() ?: return null
+            if (usbManager?.hasPermission(device) != true) return null
+            val conn = ensureConnection(device) ?: return null
+            val parsed = parsedResult ?: return null
+            val range = ensureUac2Range(conn, device, parsed) ?: return null
+            mapOf(
+                "minQ8" to range.minQ8,
+                "maxQ8" to range.maxQ8,
+                "resQ8" to range.resQ8,
+                "minDb" to range.minQ8 / 256.0,
+                "maxDb" to range.maxQ8 / 256.0,
+                "resDb" to range.resQ8 / 256.0,
+                "unitId" to range.unitId,
+                "interfaceNumber" to range.interfaceNumber,
+                "channels" to range.channels,
+                "source" to if (range.fromRangeRequest) "get_range" else "get_min_max_res",
+            )
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun getUac2HardwareVolumeInternal(): Map<String, Any?>? {
+        return try {
+            val device = openedDevice ?: findAudioDevice() ?: return null
+            if (usbManager?.hasPermission(device) != true) return null
+            val conn = ensureConnection(device) ?: return null
+            val parsed = parsedResult ?: return null
+            val range = ensureUac2Range(conn, device, parsed) ?: return null
+            val channel = range.channels.firstOrNull() ?: return null
+            val q8 = uac2ReadQ8(conn, UAC_GET_CUR, range.unitId, range.interfaceNumber, channel)
+                ?: return null
+            mapOf(
+                "q8" to q8,
+                "db" to q8 / 256.0,
+                "position" to uac2Q8ToPosition(q8, range),
+                "minQ8" to range.minQ8,
+                "maxQ8" to range.maxQ8,
+                "resQ8" to range.resQ8,
+            )
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun setUac2HardwareVolumeInternal(position: Double): Boolean {
+        return try {
+            val device = openedDevice ?: findAudioDevice() ?: return false
+            if (usbManager?.hasPermission(device) != true) return false
+            val conn = ensureConnection(device) ?: return false
+            val parsed = parsedResult ?: return false
+            val range = ensureUac2Range(conn, device, parsed) ?: return false
+            val target = uac2PositionToQ8(position, range)
+            val payload = byteArrayOf(
+                (target and 0xFF).toByte(),
+                ((target shr 8) and 0xFF).toByte(),
+            )
+            for (channel in range.channels) {
+                val sent = uac2Transfer(
+                    conn, 0x21, UAC_SET_CUR, range.unitId, range.interfaceNumber, channel, payload,
+                )
+                if (sent != payload.size) return false
+            }
+            // Same tolerance as the db path: +/-1 LSB (1/256 dB) is device
+            // quantisation, a whole resolution step is a refused write.
+            for (channel in range.channels) {
+                val readBack = uac2ReadQ8(
+                    conn, UAC_GET_CUR, range.unitId, range.interfaceNumber, channel,
+                )
+                if (readBack == null || (readBack - target) !in -1..1) return false
+            }
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    // ---- native DSD (DSD_U32 over the isochronous OUT endpoint) ----
+
+    /** True while the live stream was opened as native DSD and the sink is up. */
+    val isDsdActive: Boolean
+        get() = streaming && activeRenderMode == RENDER_MODE_DSD && isNativeActive()
+
+    /**
+     * Probes one raw configuration descriptor blob for native-DSD alternate
+     * settings. Never throws: a missing native library or a JNI failure answers
+     * null, and an output length that is not a multiple of 7 answers null too
+     * rather than reporting a half-parsed tuple.
+     */
+    private fun probeDsdAltSettingsInternal(rawConfig: ByteArray?): List<DsdAltSettingTuple>? {
+        if (!nativeLoaded || rawConfig == null || rawConfig.isEmpty()) return null
+        return try {
+            val flat = nativeProbeDsdAltSettings(rawConfig) ?: return null
+            if (flat.isEmpty()) return emptyList()
+            if (flat.size % 7 != 0) return null
+            val tuples = ArrayList<DsdAltSettingTuple>(flat.size / 7)
+            var index = 0
+            while (index + 6 < flat.size) {
+                tuples.add(
+                    DsdAltSettingTuple(
+                        interfaceNumber = flat[index],
+                        altSetting = flat[index + 1],
+                        endpointAddress = flat[index + 2],
+                        channels = flat[index + 3],
+                        bytesPerSample = flat[index + 4],
+                        framesPerSecond = flat[index + 5],
+                        dsdRate = flat[index + 6],
+                    ),
+                )
+                index += 7
+            }
+            tuples
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * Feeds one stereo native-DSD block (DSF order, LSB-first). The sink accepts
+     * at most 1 MiB per channel per call and refuses a block that does not fit
+     * the ring whole, so false means "retry later", not a fault. Safe to call
+     * from any thread; never throws.
+     */
+    fun writeDsd(left: ByteArray, right: ByteArray, producerId: Long = DSD_PRODUCER_ID): Boolean {
+        if (!nativeLoaded || !isDsdActive) return false
+        if (left.isEmpty() || left.size != right.size) return false
+        if (left.size > MAX_DSD_BYTES_PER_CALL) return false
+        val id = if (producerId != 0L) producerId else DSD_PRODUCER_ID
+        return try {
+            nativeUsbStreamWriteDsd(left, right, left.size, id)
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    /**
+     * Opens the sink in native-DSD mode. Mirrors [startStreamingInternal]'s
+     * ordering — single-owner guard, drain, claim, alt setting, clock, native
+     * start — with the wire shape fixed by the prober's tuple: the alternate
+     * setting is selected before Open() and the clock is programmed to its
+     * framesPerSecond through the same [setDacSampleRate] path, so a duplicate
+     * SET_INTERFACE never resets the DAC clock.
+     */
+    private fun startDsdStreamingInternal(
+        tuple: DsdAltSettingTuple,
+        strict: Boolean = true,
+    ): Map<String, Any?> {
+        val sampleRate = tuple.framesPerSecond
+        // Admission before any device state is touched: UsbAudioSink::CheckStreamShape
+        // would otherwise reject the shape only after the interface was claimed
+        // and the DAC clock had already been reprogrammed.
+        if (tuple.channels != DSD_CHANNELS ||
+            tuple.bytesPerSample != DSD_BYTES_PER_SAMPLE ||
+            (tuple.endpointAddress and 0x80) != 0 ||
+            sampleRate !in DSD_U32_RATES ||
+            tuple.dsdRate <= 0
+        ) {
+            lastStreamResultCode = 3
+            Log.w(TAG, "Step dsd_probe: refused DSD tuple $tuple")
+            return startFailure("dsd_format_unsupported")
+        }
+        val owner = directOwner
+        if (owner != null && owner !== this) {
+            lastStreamResultCode = -1
+            Log.w(TAG, "Step owner: direct streaming is owned by another plugin instance")
+            return startFailure("direct_owner_busy")
+        }
+        // Same single-owner rule as PCM: one stream, one mode, one owner.
+        if (streaming && activeRenderMode == RENDER_MODE_DSD &&
+            streamFormat?.matches(sampleRate, DSD_VALID_BIT_DEPTH, DSD_CHANNELS, isNativeActive()) == true
+        ) {
+            val current = buildStatus()
+            if (current["streamingActive"] == true) {
+                lastStreamResultCode = 0
+                cachedStatus = current
+                emitState()
+                return current + mapOf("success" to true, "resultCode" to 0)
+            }
+        }
+        if (!clearStreaming()) {
+            Log.w(TAG, "Step drain: previous USB stream still has outstanding URBs; forcing teardown")
+            if (!clearStreaming(releaseOnDrainFailure = true)) {
+                lastStreamResultCode = -1
+                Log.w(TAG, "Step drain: forced teardown could not release the previous USB stream")
+                return startFailure("usb_drain_incomplete")
+            }
+            Log.i(TAG, "Step drain: forced teardown released the stale USB stream")
+        }
+        sessionReset()
+        if (!nativeLoaded) {
+            lastStreamResultCode = -1
+            Log.w(TAG, "Step native: native library not available")
+            return startFailure("native_unavailable")
+        }
+        val device = findAudioDevice() ?: run {
+            lastStreamResultCode = -1
+            Log.w(TAG, "Step device: no USB audio device found")
+            return startFailure("no_usb_device")
+        }
+        if (usbManager?.hasPermission(device) != true) {
+            lastStreamResultCode = 1
+            Log.w(TAG, "Step permission: USB access permission required")
+            return startFailure("permission_required")
+        }
+        sessionPermissionRequested()
+        sessionPermissionGranted()
+        val conn = ensureConnection(device) ?: run {
+            lastStreamResultCode = 1
+            Log.w(TAG, "Step open: failed to open USB device connection")
+            return startFailure("open_failed")
+        }
+        sessionOpened()
+        recordEvent(resultCode = 0)
+        val parsed = parseViaRawDescriptors(conn) ?: run {
+            lastStreamResultCode = 3
+            Log.w(TAG, "Step descriptors: format descriptors required")
+            return startFailure("format_descriptors_required")
+        }
+        if (parsed.uacVersion == UsbAudioControlParser.UAC3) {
+            lastStreamResultCode = 3
+            Log.w(TAG, "Step uac: UAC3 is not supported for native DSD")
+            return startFailure("uac3_unsupported")
+        }
+        var iface: UsbInterface? = null
+        for (index in 0 until device.interfaceCount) {
+            val candidate = device.getInterface(index)
+            if (candidate.id == tuple.interfaceNumber && candidate.alternateSetting == tuple.altSetting) {
+                iface = candidate
+                break
+            }
+        }
+        val streamingIface = iface ?: run {
+            lastStreamResultCode = 5
+            Log.w(TAG, "Step alt_setting: probed DSD interface/alt not found (result 5)")
+            return startFailure("streaming_interface_not_found")
+        }
+        // The parser's own record of this alt setting when it saw one (it does
+        // for FORMAT_TYPE_I 32-bit alts); otherwise the probed values are the
+        // only description available.
+        val altFormat = parsed.altSettingFormats.firstOrNull {
+            it.interfaceNumber == tuple.interfaceNumber &&
+                it.altSetting == tuple.altSetting &&
+                it.endpointAddress == tuple.endpointAddress
+        } ?: UsbAudioControlParser.AltSettingFormat(
+            interfaceNumber = tuple.interfaceNumber,
+            altSetting = tuple.altSetting,
+            endpointAddress = tuple.endpointAddress,
+            maxPacketSize = 0,
+            subslotSize = DSD_BYTES_PER_SAMPLE,
+            bitResolution = DSD_VALID_BIT_DEPTH,
+            channels = DSD_CHANNELS,
+            feedbackEndpointAddress = null,
+            supportedRates = emptyList(),
+        )
+        var started = false
+        try {
+            releaseClaim()
+            try {
+                com.ryanheise.just_audio.PulsrOutputRouting.select(null)
+            } catch (_: Throwable) {}
+            val claimed = try { conn.claimInterface(streamingIface, true) } catch (_: Exception) { false }
+            if (!claimed) {
+                lastStreamResultCode = 1
+                Log.w(TAG, "Step claim: failed to claim DSD streaming interface (result 1)")
+                rebindKernelDriver(conn, streamingIface, null)
+                return startFailure("claim_failed")
+            }
+            claimedStreamingInterface = streamingIface
+            streamAltSetting = tuple.altSetting
+            streamEndpoint = tuple.endpointAddress
+            sessionClaimed()
+            claimControlInterface(conn, device, parsed)
+            refreshAdvertisedRates(conn)
+            if (!conn.setInterface(streamingIface)) {
+                lastStreamResultCode = 2
+                Log.w(TAG, "Step alt_setting: failed to set DSD alternate setting (result 2)")
+                return startFailure("alt_setting_failed")
+            }
+            when (setDacSampleRate(conn, parsed, altFormat, sampleRate, null)) {
+                UsbAudioProtocol.RateSetResult.SELECTOR_RESTORE_FAILED -> {
+                    lastStreamResultCode = 3
+                    Log.w(TAG, "Step clock: clock selector could not be restored (result 3)")
+                    return startFailure("clock_selector_restore_failed")
+                }
+
+                UsbAudioProtocol.RateSetResult.FAILED -> {
+                    lastStreamResultCode = 3
+                    Log.w(TAG, "Step clock: clock not verified (result 3)")
+                    return startFailure("clock_not_verified")
+                }
+
+                UsbAudioProtocol.RateSetResult.UNVERIFIED_READBACK_UNSUPPORTED -> {
+                    Log.i(TAG, "Step clock: UAC1 rate set succeeded, readback unsupported")
+                    if (strict) {
+                        lastStreamResultCode = 3
+                        Log.w(TAG, "Step clock: strict DSD refused unverified readback (result 3)")
+                        return startFailure("uac1_rate_readback_unsupported")
+                    }
+                    lastRateVerified = false
+                }
+
+                UsbAudioProtocol.RateSetResult.VERIFIED -> {
+                    lastRateVerified = true
+                    recordEvent(
+                        resultCode = 0,
+                        rate = sampleRate,
+                        depth = DSD_VALID_BIT_DEPTH,
+                        channels = DSD_CHANNELS,
+                        interfaceNumber = tuple.interfaceNumber,
+                        altSetting = tuple.altSetting,
+                        endpoint = tuple.endpointAddress,
+                        selectorPin = 0,
+                    )
+                }
+            }
+            sessionConfigured()
+            refreshAdvertisedRates(conn)
+            val fd = conn.fileDescriptor
+            if (fd < 0) {
+                lastStreamResultCode = 5
+                Log.w(TAG, "Step native_start: invalid file descriptor (result 5)")
+                return startFailure("no_fd")
+            }
+            // 0/0/false: DSD never inherits a quirk profile's transfer tuning.
+            applyStreamTuning(null)
+            val resultCode = try {
+                nativeUsbStreamStartWithFormat(
+                    fd, tuple.endpointAddress, tuple.interfaceNumber, tuple.altSetting,
+                    sampleRate, DSD_CHANNELS, DSD_BYTES_PER_SAMPLE, DSD_VALID_BIT_DEPTH,
+                    RENDER_MODE_DSD,
+                )
+            } catch (_: Throwable) {
+                -1
+            }
+            lastStreamResultCode = resultCode
+            if (resultCode != 0 || !isNativeActive()) {
+                Log.w(TAG, "Step native_start: native DSD start failed with result $resultCode")
+                return startFailure("native_stream_not_active") + mapOf("resultCode" to resultCode)
+            }
+            streamFormat = UsbAudioProtocol.StreamFormat(
+                sampleRate, DSD_VALID_BIT_DEPTH, DSD_CHANNELS,
+                wireBitDepth = DSD_VALID_BIT_DEPTH, wireChannels = DSD_CHANNELS,
+            )
+            streaming = true
+            activeRenderMode = RENDER_MODE_DSD
+            activeQuirks = null
+            directStatus = DirectStreamStatus(
+                device.deviceId, deviceLabel(device), sampleRate, DSD_VALID_BIT_DEPTH, DSD_CHANNELS,
+            )
+            directOwner = this
+            sessionStarted()
+            recordEvent(resultCode = 0)
+            val status = buildStatus()
+            started = status["streamingActive"] == true && isNativeActive()
+            if (!started) return startFailure("native_stream_not_active")
+            emitState()
+            return status + mapOf("success" to true, "resultCode" to 0)
+        } catch (e: Throwable) {
+            Log.w(TAG, "USB DSD startup failed: ${e.message}")
+            lastStreamResultCode = -1
+            return startFailure("stream_start_failed")
+        } finally {
+            if (!started) clearStreaming()
+        }
+    }
+
     private fun failure(reason: String): Map<String, Any?> =
         mapOf(
             "success" to false,
@@ -1646,6 +2363,12 @@ class UsbExclusivePlugin(
         renderMode: Int = 0,
     ): Map<String, Any?> {
         val mode = renderMode.coerceIn(0, MAX_RENDER_MODE)
+        if (mode == RENDER_MODE_DSD) {
+            // Native DSD needs the prober's alternate setting; a plain PCM
+            // start never has one, so it must not open mode 3 with a PCM shape.
+            lastStreamResultCode = 3
+            return startFailure("dsd_requires_alt_setting")
+        }
         lastRequestedRate = sampleRate
         lastRequestedDepth = bitDepth
         lastRequestedChannels = channels
@@ -2265,6 +2988,7 @@ class UsbExclusivePlugin(
         advertisedRates = emptyList()
         hardwareVolume?.invalidate()
         hardwareVolume = null
+        clearUac2RangeCache()
         cachedStatus = baseStatus(attached = false, permitted = false, device = null)
             .toMutableMap()
             .also { it["drainPending"] = drainPending }

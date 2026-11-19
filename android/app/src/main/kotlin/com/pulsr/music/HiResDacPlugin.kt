@@ -103,6 +103,31 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     @Volatile private var cachedDirectFormatsDeviceId: Int? = null
     @Volatile private var cachedDirectFormats: List<Map<String, Any?>>? = null
 
+    /**
+     * One descriptor probe result, cached per (deviceId, descriptor hash) and
+     * dropped on USB attach/detach. `nativeDsd` is only true when the native
+     * parser proved at least one DSD_U32 alternate setting.
+     */
+    private data class DsdProbeResult(
+        val nativeDsd: Boolean,
+        val rates: List<Int>,
+        val firstAltSetting: List<Int>?,
+    )
+
+    private val dsdProbeLock = Any()
+    private var dsdProbeDeviceId: Int = -1
+    private var dsdProbeDescriptorHash: Int = 0
+    private var dsdProbeResult: DsdProbeResult? = null
+    private val emptyDsdProbe = DsdProbeResult(false, emptyList(), null)
+
+    private fun invalidateDsdProbeCache() {
+        synchronized(dsdProbeLock) {
+            dsdProbeDeviceId = -1
+            dsdProbeDescriptorHash = 0
+            dsdProbeResult = null
+        }
+    }
+
     private fun invalidateDirectFormatsCache() {
         synchronized(directFormatsCacheLock) {
             cachedDirectFormatsDeviceId = null
@@ -308,11 +333,13 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                         }
                         lastBitPerfectReason = null
                         invalidateDirectFormatsCache()
+                        invalidateDsdProbeCache()
                         scheduleDeviceChange()
                     }
                     UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
                         lastBitPerfectReason = null
                         invalidateDirectFormatsCache()
+                        invalidateDsdProbeCache()
                         scheduleDeviceChange()
                     }
                 }
@@ -534,7 +561,31 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             result.success(mapOf("directFormats" to getCachedDirectFormats()))
         }
         "getDopCapabilities" -> {
-            result.success(getDopCapabilities())
+            // Reading the DAC's raw descriptors is a USB operation with a
+            // permission check and must not run on the main thread.
+            probeHandler.post {
+                val capabilities = try { getDopCapabilities() } catch (_: Throwable) {
+                    dopCapabilitiesUnavailable()
+                }
+                mainHandler.post {
+                    try { result.success(capabilities) } catch (_: Throwable) {}
+                }
+            }
+        }
+        // UAC2 hardware volume (Contract E keeps these on the DAC channel). The
+        // implementation lives in UsbExclusivePlugin, which owns the connection
+        // and the interface claims the class-specific transfers need.
+        "getUac2VolumeRange" -> UsbExclusivePlugin.uac2VolumeRange { value ->
+            mainHandler.post { try { result.success(value) } catch (_: Throwable) {} }
+        }
+        "getUac2HardwareVolume" -> UsbExclusivePlugin.uac2HardwareVolume { value ->
+            mainHandler.post { try { result.success(value) } catch (_: Throwable) {} }
+        }
+        "setUac2HardwareVolume" -> {
+            val position = call.argument<Double>("position") ?: 0.0
+            UsbExclusivePlugin.setUac2HardwareVolume(position) { value ->
+                mainHandler.post { try { result.success(value) } catch (_: Throwable) {} }
+            }
         }
         "verifyDopLock" -> {
             result.success(verifyDopLockInternal())
@@ -589,6 +640,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
         try { eventChannel.setStreamHandler(null) } catch (_: Exception) {}
         eventSink = null
+        invalidateDsdProbeCache()
         probeHandler.removeCallbacksAndMessages(null)
         routeHandler.removeCallbacksAndMessages(null)
         probeThread.quitSafely()
@@ -1717,6 +1769,111 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         return false
     }
 
+    /**
+     * The attached USB device the current route names, as a [UsbDevice]. Mirrors
+     * the selection [probeUsbDac] performs (route-aware, never "first audio
+     * device") but returns the device itself so the DSD probe can read its raw
+     * configuration descriptor. Null when nothing is attached or selectable.
+     */
+    private fun selectUsbDacDevice(): UsbDevice? {
+        return try {
+            val attached = usbManager?.deviceList?.values?.toList().orEmpty()
+            if (attached.isEmpty()) return null
+            val summaries = attached.map { device ->
+                val ifaces = (0 until device.interfaceCount).map { index ->
+                    val iface = device.getInterface(index)
+                    UsbAudioControlParser.InterfaceSignature(
+                        iface.interfaceClass,
+                        iface.interfaceSubclass,
+                        iface.interfaceProtocol,
+                    )
+                }
+                UsbAudioControlParser.UsbDeviceSummary(
+                    id = device.deviceId,
+                    vendorId = device.vendorId,
+                    productId = device.productId,
+                    manufacturerName = device.manufacturerName,
+                    productName = device.productName,
+                    interfaces = ifaces,
+                )
+            }
+            val routeUsb = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try {
+                    audioManager?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                        ?.let { pickUsbOutputDevice(it) }
+                } catch (_: Throwable) {
+                    null
+                }
+            } else {
+                null
+            }
+            val routeAddress = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                routeUsb?.address
+            } else {
+                null
+            }
+            val preferred = UsbAudioControlParser.selectPreferredAudioDevice(
+                devices = summaries,
+                routeProductName = routeUsb?.productName?.toString(),
+                routeAddress = routeAddress,
+            ) ?: return null
+            attached.firstOrNull { it.deviceId == preferred.id }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
+     * Reads the connected DAC's raw configuration descriptor and asks the native
+     * parser for provable DSD_U32 alternate settings. Never throws: no device, no
+     * permission, an unreadable or empty descriptor blob, a missing plugin or a
+     * JNI failure all answer [emptyDsdProbe], so DoP stays the answer.
+     *
+     * Cached per (deviceId, descriptor hash); attach/detach drops it. A negative
+     * observed while the exclusive sink owns the device is not cached: opening a
+     * second usbfs handle can fail for that reason alone.
+     */
+    private fun probeNativeDsd(): DsdProbeResult {
+        val device = selectUsbDacDevice() ?: return emptyDsdProbe
+        if (usbManager?.hasPermission(device) != true) return emptyDsdProbe
+        val conn = try { usbManager?.openDevice(device) } catch (_: Throwable) { null }
+            ?: return emptyDsdProbe
+        try {
+            val blob = try { conn.rawDescriptors } catch (_: Throwable) { null }
+            if (blob == null || blob.isEmpty()) return emptyDsdProbe
+            val hash = blob.contentHashCode()
+            synchronized(dsdProbeLock) {
+                if (dsdProbeDeviceId == device.deviceId && dsdProbeDescriptorHash == hash) {
+                    dsdProbeResult?.let { return it }
+                }
+            }
+            val tuples = try {
+                UsbExclusivePlugin.probeDsdAltSettings(blob)
+            } catch (_: Throwable) {
+                null
+            }
+            val result = if (tuples.isNullOrEmpty()) {
+                emptyDsdProbe
+            } else {
+                DsdProbeResult(
+                    nativeDsd = true,
+                    rates = tuples.map { it.dsdRate }.distinct().sorted(),
+                    firstAltSetting = tuples.first().flattened,
+                )
+            }
+            if (result.nativeDsd || !UsbExclusivePlugin.directStreamingActive) {
+                synchronized(dsdProbeLock) {
+                    dsdProbeDeviceId = device.deviceId
+                    dsdProbeDescriptorHash = hash
+                    dsdProbeResult = result
+                }
+            }
+            return result
+        } finally {
+            try { conn.close() } catch (_: Throwable) {}
+        }
+    }
+
     /** Phase 4: enumerate USB audio devices and report the advertised UAC
      * version + label (diagnostics only - never claims native-DSD support). */
     private fun probeUsbDac(): Pair<Int, String?> {
@@ -1814,6 +1971,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
     }
 
+    /** Every capability false: no DAC, no permission, or an unusable probe. */
+    private fun dopCapabilitiesUnavailable(): Map<String, Any?> = mapOf(
+        "dsd64" to false,
+        "dsd128" to false,
+        "dsd256" to false,
+        "dsd512" to false,
+        "dop" to false,
+        "nativeDac" to false,
+        "nativeDsd" to false,
+        "nativeDsdRates" to emptyList<Int>(),
+        "nativeDsdAltSetting" to null,
+        "isUac2" to false,
+        "dopVerified" to false,
+    )
+
     /**
      * T4: DoP (DSD over PCM) capability probe.
      *
@@ -1834,17 +2006,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             null
         }
         if (usbDac == null) {
-            return mapOf(
-                "dsd64" to false,
-                "dsd128" to false,
-                "dsd256" to false,
-                "dsd512" to false,
-                "dop" to false,
-                "nativeDac" to false,
-                "nativeDsd" to false,
-                "isUac2" to false,
-                "dopVerified" to false,
-            )
+            invalidateDsdProbeCache()
+            return dopCapabilitiesUnavailable()
         }
 
         val (uac, _) = probeUsbDac()
@@ -1860,6 +2023,10 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         // Advertised carriers and UAC version are heuristics, not a measured
         // DAC DoP lock. Ignore legacy persisted heuristic 'verified' flags.
         val dopVerified = false
+        // Native DSD is a descriptor fact, not a heuristic: the probe answers
+        // false when the DAC, the permission, the descriptors or the native
+        // library are missing, and DoP stays exactly as it is above.
+        val native = try { probeNativeDsd() } catch (_: Throwable) { emptyDsdProbe }
 
         return mapOf(
             "dsd64" to hasDsd64Carrier,
@@ -1869,12 +2036,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             // DoP requires a UAC2+ DAC or an explicit 176.4/352.8/705.6 kHz carrier rate.
             "dop" to (isUac2 || hasAnyDopCarrier),
             "nativeDac" to true,
-            // Android exposes no standard raw DSD flag on USB audio descriptors.
-            "nativeDsd" to false,
+            // Proved by the native descriptor parser (probeNativeDsd), never by
+            // an Android flag: there is no standard raw-DSD flag on USB audio.
+            "nativeDsd" to native.nativeDsd,
+            "nativeDsdRates" to native.rates,
+            "nativeDsdAltSetting" to native.firstAltSetting,
             "isUac2" to isUac2,
             "dopVerified" to dopVerified,
         )
     }
+
+    // ── Tap SRC quality (Contract E) ────────────────────────────────────────
+    //
+    // The tap-SRC quality knob lives on the audio_effects channel next to the
+    // engine it configures (AudioEffectsPlugin). It was never a DAC capability,
+    // and answering it here produced a second, always-false answer.
 
     private fun verifyDopLockInternal(): Map<String, Any?> {
         val usbDac = try {

@@ -1287,6 +1287,97 @@
   "dsdDopRequiresUsbDac": "Requires a connected USB DAC that supports DSD over PCM (DoP)",
   "dsdOutputPcm": "PCM",
   "dsdOutputDop": "DoP",
+  "dsdOutputNative": "Native",
+  "dsdNativeUnavailable": "Needs a DAC that advertises a native DSD alt setting",
+  "conversionQuality": "Conversion quality",
+  "conversionQualityDesc": "Only when the sink rate differs; bit-perfect playback is unaffected.",
+  "conversionOff": "Off",
+  "settingsUac2VolumeTitle": "UAC2 volume",
+  "settingsUac2VolumeDesc": "Moves the DAC's own attenuator; 100 % is unity.",
+  "settingsUac2VolumeUnsupported": "This DAC exposes no hardware volume control.",
+  "conversionTaps64": "64 taps (fast)",
+  "conversionTaps128": "128 taps",
+  "conversionTaps256": "256 taps (balanced)",
+  "conversionTaps512": "512 taps (best)",
+  "settingsBatterySaverTitle": "Battery saver",
+  "settingsBatterySaverDesc": "Turns off the heavy DSP stages and keeps the equalizer.",
+  "settingsChannelTrimsTitle": "Channel trim & delay",
+  "settingsChannelTrimsDesc": "Per-channel level and distance for 2–8 channel output.",
+  "channelTrim": "Trim {channel}",
+  "@channelTrim": {
+    "placeholders": {
+      "channel": {
+        "type": "int"
+      }
+    }
+  },
+  "channelDelay": "Delay {channel}",
+  "@channelDelay": {
+    "placeholders": {
+      "channel": {
+        "type": "int"
+      }
+    }
+  },
+  "autoeqParametricImport": "Import parametric profile",
+  "autoeqParametricImportHint": "AutoEq ParametricEQ.txt",
+  "autoeqParametricImported": "Imported “{name}”",
+  "@autoeqParametricImported": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "autoeqParametricImportFailed": "Could not import this profile",
+  "autoeqParametricNoFilters": "No usable filters in this file",
+  "autoeqTargetCurve": "Target curve",
+  "autoeqTargetCurveNone": "None",
+  "abxScreenTitle": "Blind ABX test",
+  "abxScreenSubtitle": "Switch between two conditions without knowing which is which.",
+  "abxStart": "Start",
+  "abxRestart": "Restart",
+  "abxBypassCondition": "Bypass",
+  "abxDspCondition": "DSP",
+  "abxTrialLabel": "Trial {current} of {total}",
+  "@abxTrialLabel": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "abxQuestion": "Which condition is X?",
+  "abxAnswerA": "X is A",
+  "abxAnswerB": "X is B",
+  "abxCorrectShort": "Correct",
+  "abxIncorrectShort": "Incorrect",
+  "abxResultTitle": "Result",
+  "abxPValue": "p = {value}",
+  "@abxPValue": {
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "abxVerdictInsufficient": "Not enough trials",
+  "abxVerdictChance": "No better than chance",
+  "abxVerdictSuggestive": "Suggestive",
+  "abxVerdictSignificant": "Significant",
+  "abxVerdictStrong": "Strong evidence",
+  "abxNeedsPlayback": "Start a track and enable DSP to run this test.",
+  "remoteKindSubsonic": "Subsonic / Navidrome",
+  "remoteSubsonicUrl": "Server URL",
+  "remoteSubsonicUser": "Username",
+  "remoteSubsonicPassword": "Password",
+  "remoteUpnpServers": "UPnP media servers",
+  "remoteUpnpSearching": "Searching for media servers…",
+  "remoteUpnpNone": "No media server found",
+  "remoteUpnpUse": "Use this server",
   "enableShuffle": "Enable shuffle",
   "disableShuffle": "Disable shuffle",
   "like": "Like",

@@ -120,6 +120,7 @@ int main() {
         auto sDop = base();
         sDop->bitPerfect.enabled = true;
         sDop->bitPerfect.isDop = true;
+        sDop->bitPerfect.directUsbActive = true;
         sDop->bitPerfect.directUsbGain = 0.25;
         e->publishParams(sDop);
         auto w = in;
@@ -131,6 +132,7 @@ int main() {
         auto sUnity = base();
         sUnity->bitPerfect.enabled = true;
         sUnity->bitPerfect.isDop = false;
+        sUnity->bitPerfect.directUsbActive = true;
         sUnity->bitPerfect.directUsbGain = 1.0;
         e->publishParams(sUnity);
         w = in;
@@ -139,9 +141,24 @@ int main() {
               "bit-perfect PCM at directUsbGain=1.0 must stay bit-exact");
 
         // Bit-perfect PCM at <1.0 attenuates smoothly and returns to raw on 1.0.
+        // The software-gain stage is gated on directUsbActive: with no live
+        // Direct USB endpoint a stale gain must not scale (and de-bit-perfect)
+        // the stream. That gate is asserted first, then the attenuation case.
+        auto sStale = base();
+        sStale->bitPerfect.enabled = true;
+        sStale->bitPerfect.isDop = false;
+        sStale->bitPerfect.directUsbActive = false;
+        sStale->bitPerfect.directUsbGain = 0.25;
+        e->publishParams(sStale);
+        for (int b = 0; b < 40; ++b) { w = in; e->processInterleaved(w.data(), 512, 2); }
+        check(w == in && e->wasLastBlockBitPerfect(),
+              "inactive Direct USB must ignore a stale directUsbGain");
+
+        // Bit-perfect PCM at <1.0 attenuates smoothly and returns to raw on 1.0.
         auto sAtten = base();
         sAtten->bitPerfect.enabled = true;
         sAtten->bitPerfect.isDop = false;
+        sAtten->bitPerfect.directUsbActive = true;
         sAtten->bitPerfect.directUsbGain = 0.25;
         e->publishParams(sAtten);
         for (int b = 0; b < 40; ++b) { w = in; e->processInterleaved(w.data(), 512, 2); }

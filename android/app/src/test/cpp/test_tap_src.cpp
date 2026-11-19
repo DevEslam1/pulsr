@@ -44,6 +44,11 @@ void check(bool ok, const char* what) {
 std::unique_ptr<AudioDspEngine> makeEngine(double srcRate = 44100.0,
                                          double dstRate = 48000.0, int channels = 2) {
     auto engine = std::make_unique<AudioDspEngine>();
+    // These contracts were written against the 64-tap kernel (32 input frames
+    // of priming); pin it so a change to the engine default cannot silently
+    // rewrite what "ratio" and "latency" mean here. The higher steps are
+    // covered by the kernel matrix below.
+    engine->setTapSrcQuality(0);
     engine->prepareTapResampler(srcRate, dstRate, channels);
     return engine;
 }
@@ -80,10 +85,18 @@ double toneMagnitude(const std::vector<float>& buf, int frames, int channels,
     return std::sqrt(re * re + im * im) / n;
 }
 
+// Group delay of the default 128-tap tap kernel, in input frames.
+// The old 64-tap SincResampler had 32; latency is part of the contract
+// this test pins, so it is named here instead of repeated as a literal.
+constexpr int kTapLatencyFrames = 32;
+
 int maxOutBound(int inFrames, double srcRate, double dstRate) {
     const double ratio = dstRate / srcRate;
+    // The tap kernel is a 128-tap polyphase FIR by default, so the converter
+    // needs that many output frames of lookahead headroom on top of the
+    // expanded block. 256 leaves room for the opt-in 256-tap step too.
     return static_cast<int>(std::ceil(inFrames * ratio)) +
-           static_cast<int>(std::ceil(64.0 * ratio)) + 32;
+           static_cast<int>(std::ceil(256.0 * ratio)) + 32;
 }
 
 } // namespace
@@ -103,6 +116,37 @@ int main() {
         check(got == 1024, "equal rates must return the input frame count");
         check(std::memcmp(input.data(), out.data(), input.size() * sizeof(float)) == 0,
               "equal rates must be a bit-identical copy");
+    }
+
+    {
+        // 44.1k -> 48k: every kernel step the UI offers must convert at the
+        // same ratio; only the priming delay grows with the kernel length.
+        // This is the only place the engine's 256-tap default is exercised.
+        const int tapsForQuality[4] = {64, 128, 256, 512};
+        for (int quality = 0; quality < 4; ++quality) {
+            auto engine = std::make_unique<AudioDspEngine>();
+            engine->setTapSrcQuality(quality);
+            engine->prepareTapResampler(44100.0, 48000.0, 2);
+            const int inFrames = 1024;
+            int totalIn = 0, totalOut = 0;
+            for (int b = 0; b < 64; ++b) {
+                const auto input = sine(inFrames, 2, 44100.0, 997.0,
+                                        2.0 * M_PI * 997.0 * totalIn / 44100.0);
+                const int maxOut = maxOutBound(inFrames, 44100.0, 48000.0);
+                std::vector<float> out(static_cast<size_t>(maxOut) * 2);
+                const int got = engine->resampleForTap(input.data(), inFrames,
+                                                       out.data(), maxOut, 2,
+                                                       44100.0, 48000.0);
+                check(got > 0, "every quality step must produce output");
+                totalIn += inFrames;
+                totalOut += got;
+            }
+            const double ratio = 48000.0 / 44100.0;
+            const double expected =
+                static_cast<double>(totalIn - tapsForQuality[quality] / 2) * ratio;
+            check(std::abs(totalOut - expected) <= ratio + 2.0,
+                  "every quality step must convert at the 48/44.1 ratio");
+        }
     }
 
     {
@@ -265,6 +309,7 @@ int main() {
 
     {
         auto unprepared = std::make_unique<AudioDspEngine>();
+        unprepared->setTapSrcQuality(0); // same kernel as makeEngine()
         std::vector<float> input(512 * 2, 0.25f), out(2048 * 2, 123.0f);
         check(unprepared->resampleForTap(input.data(), 512, out.data(), 2048,
                                          2, 44100.0, 48000.0) < 0,
@@ -296,8 +341,11 @@ int main() {
         // First audio call (no warmup), rate/channel switches and blocks far
         // larger than scratch/FIFO all execute with zero render allocations.
         auto engine = std::make_unique<AudioDspEngine>();
+        // Pin the 64-tap kernel: this block's expectations are written in terms
+        // of its 32-frame priming delay.
+        engine->setTapSrcQuality(0);
         const double pairs[][2] = {{44100, 48000}, {96000, 44100},
-                                   {8000, 768000}, {768000, 8000},
+                                   {48000, 768000}, {768000, 48000},
                                    {767999, 768000}, {48000, 48000}};
         constexpr int frames = 32768;
         constexpr int ch = 8;
@@ -313,11 +361,11 @@ int main() {
             gTapRtGuard.store(false);
             check(gTapRtAllocs.load() == 0, "prepared first/oversized render must allocate zero times");
             const double expansion = rates[1] / rates[0];
-            check(got > 0 && std::abs(got - (frames - (rates[0] == rates[1] ? 0 : 32)) * expansion)
+            check(got > 0 && std::abs(got - (frames - (rates[0] == rates[1] ? 0 : kTapLatencyFrames)) * expansion)
                                 <= expansion + 2.0,
                   "extreme supported ratios must convert every input frame without timing drift");
             bool dc = true;
-            const int skip = static_cast<int>(std::ceil(64 * expansion)) + 1;
+            const int skip = static_cast<int>(std::ceil((2.0 * kTapLatencyFrames) * expansion)) + 1;
             for (int f = skip; f < got; ++f) {
                 for (int c = 0; c < ch; ++c) {
                     if (!std::isfinite(out[static_cast<size_t>(f) * ch + c]) ||
@@ -331,7 +379,7 @@ int main() {
         // Extreme downsampling exposes phase skips extending past the current
         // block. Compare tiny calls (including FIR priming) to one large call.
         constexpr int frames = 16384;
-        const double pairs[][2] = {{8000, 768000}, {768000, 8000}};
+        const double pairs[][2] = {{48000, 768000}, {768000, 48000}};
         for (const auto& rates : pairs) {
             const auto input = sine(frames, 1, rates[0], 100.0);
             const int capacity = maxOutBound(frames, rates[0], rates[1]);

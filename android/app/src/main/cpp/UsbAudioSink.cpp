@@ -1,7 +1,9 @@
 // android/app/src/main/cpp/UsbAudioSink.cpp
 #include "UsbAudioSink.h"
 #include "AudioDspEngine.h"
+#include "DsdNativePacker.h"
 #include "SinkQuantizer.h"
+#include "Uac2Descriptors.h"
 #include "UsbPcmProducer.h"
 
 #if defined(__ANDROID__)
@@ -99,6 +101,17 @@ constexpr int kNumUrbs = 8;
 constexpr int kTargetUrbDurationUs = 8000;
 // Upper bound for a tuned pull-renderer reservoir (SetStreamTuning).
 constexpr int kMaxTunedBufferMs = 10000;
+
+// True for the two modes that stream through UsbPullRenderer's reservoir.
+// Everything else - BestEffort and the native-DSD ring path - is served from
+// ring_ and must keep the ring read pointer / prefill / steering logic live.
+constexpr bool IsReservoirMode(int mode) {
+    return mode == static_cast<int>(UsbRenderMode::BitPerfectPull) ||
+           mode == static_cast<int>(UsbRenderMode::ClockSyncAsrc);
+}
+constexpr bool IsDsdMode(int mode) {
+    return mode == static_cast<int>(UsbRenderMode::DsdNative);
+}
 } // namespace
 
 UsbAudioSink& UsbAudioSink::instance() {
@@ -148,6 +161,23 @@ bool UsbAudioSink::IsActive() const {
     return active_.load(std::memory_order_acquire);
 }
 
+bool UsbAudioSink::IsDsdActive() const {
+    // Both halves matter: the latch alone survives a worker fault until control
+    // teardown, and an active PCM stream is obviously not DSD.
+    return dsdMode_.load(std::memory_order_acquire) &&
+           active_.load(std::memory_order_acquire);
+}
+
+uint8_t UsbAudioSink::FillDsdSilence(uint8_t* dst, int bytes, uint8_t firstPhase) {
+    if (dst == nullptr || bytes <= 0) return firstPhase;
+    uint8_t phase = (firstPhase == kDsdSilenceByteB) ? kDsdSilenceByteB : kDsdSilenceByteA;
+    for (int i = 0; i < bytes; ++i) {
+        dst[i] = phase;
+        phase = (phase == kDsdSilenceByteA) ? kDsdSilenceByteB : kDsdSilenceByteA;
+    }
+    return phase;
+}
+
 bool UsbAudioSink::submitAll(UrbSubmit submit) {
     // HAL must stay muted even if only part of startup reaches the kernel and
     // rollback cannot reap it. releaseResources clears this only after drain.
@@ -165,44 +195,28 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
                                    int bytesPerSample, int validBitDepth,
                                    bool alreadyConfigured, int renderMode) {
     std::lock_guard<std::mutex> control(controlMutex_);
+    if (fd < 0 || interfaceNumber < 0 || altSetting < 0) {
+        ReportWriteError(EINVAL);
+        return UsbStreamResult::InvalidArgs;
+    }
+    // Stream shape is one policy for every mode: PCM takes the S16/S24/S32 wire
+    // geometries on the standard rate list, DsdNative only a 4-byte subslot at
+    // 32 valid bits, two channels, and a framesPerSecond that maps onto the
+    // DSD64/128/256/512 U32 ladder. An unknown renderMode value is a caller bug
+    // and is rejected the same way. Doing it before any device state is touched
+    // keeps PCM geometry in DSD mode (and DSD geometry in a PCM mode) a clean
+    // refusal instead of a half-open stream.
+    const UsbStreamResult shape = CheckStreamShape(
+        static_cast<UsbRenderMode>(renderMode), channels, bytesPerSample,
+        validBitDepth, sampleRate);
+    if (shape != UsbStreamResult::Ok) {
+        ReportWriteError(EINVAL);
+        return shape;
+    }
     const int effectiveBits = validBitDepth == 0 && bytesPerSample >= 2 && bytesPerSample <= 4
         ? bytesPerSample * 8 : validBitDepth;
-    if (fd < 0 || interfaceNumber < 0 || altSetting < 0 || channels <= 0 ||
-        channels > 8 || !IsPcmWireFormat(bytesPerSample, effectiveBits)) {
-        ReportWriteError(EINVAL);
-        return UsbStreamResult::InvalidArgs;
-    }
-    if (sampleRate <= 0) {
-        ReportWriteError(EINVAL);
-        return UsbStreamResult::RateUnsupported;
-    }
-    static const int kValidRates[] = {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
-    bool validRate = false;
-    for (int r : kValidRates) {
-        if (sampleRate == r) {
-            validRate = true;
-            break;
-        }
-    }
-    if (!validRate) {
-        ReportWriteError(EINVAL);
-        return UsbStreamResult::RateUnsupported;
-    }
-    // Isochronous OUT endpoint: addresses 1-15 with the IN bit clear. Checked
-    // after the rate so an unsupported rate keeps reporting itself.
+    // Isochronous OUT endpoint: addresses 1-15 with the IN bit clear.
     if (endpointAddress <= 0 || endpointAddress > 0x0f || (endpointAddress & 0x80) != 0) {
-        ReportWriteError(EINVAL);
-        return UsbStreamResult::InvalidArgs;
-    }
-
-    // Geometry is settled; only now consider the requested stream shape. An
-    // unknown value is a caller bug and is rejected like bad geometry. The two
-    // clock-controlled modes are refused while their engines are not linked
-    // (see the UsbRenderMode note in the header): starting one would either
-    // fail to link or silently stream a path the caller did not ask for, and a
-    // false bit-perfect claim is worse than a clean refusal.
-    if (renderMode < static_cast<int>(UsbRenderMode::BestEffort) ||
-        renderMode > static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
         ReportWriteError(EINVAL);
         return UsbStreamResult::InvalidArgs;
     }
@@ -242,13 +256,24 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     bytesPerSample_ = bytesPerSample;
     validBitDepth_ = effectiveBits;
     renderMode_ = renderMode;
+    // Published before any blocking setup so the producer-side refusals and
+    // IsDsdActive() can never observe a PCM mode with DSD ring contents (or the
+    // reverse). Every failure path below runs releaseResources(), which clears
+    // it again.
+    dsdMode_.store(IsDsdMode(renderMode), std::memory_order_release);
+    dsdSilencePhase_ = kDsdSilenceByteA;
     bitPerfectEligible_.store(false, std::memory_order_relaxed);
     bitPerfectDisqualified_.store(false, std::memory_order_relaxed);
     producerDither_ = {};
     workerDither_ = {};
-    gapFader_.configure(sampleRate, channels, bytesPerSample_);
+    // UsbGapFader fades PCM words around a ring gap; a DSD packet is a 1-bit
+    // payload where that arithmetic is meaningless, so it is never configured
+    // (and never applied) for a DSD stream.
+    if (!IsDsdMode(renderMode_)) {
+        gapFader_.configure(sampleRate, channels, bytesPerSample_);
+    }
     asrcOutAvail_ = 0;
-    if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+    if (IsReservoirMode(renderMode_)) {
         const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 3000;
         // Pull mode stores the wire bytes verbatim, so its frame size is the
         // wire frame size. ASRC mode stores decoded float frames (4 bytes each)
@@ -551,6 +576,7 @@ void UsbAudioSink::Abandon() {
     writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
     running_.store(false, std::memory_order_release);
     active_.store(false, std::memory_order_release);
+    dsdMode_.store(false, std::memory_order_release);
     if (worker_.joinable()) {
         worker_.join();
     }
@@ -884,6 +910,10 @@ bool UsbAudioSink::releaseResources() {
     }
     writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
     active_.store(false, std::memory_order_release);
+    // Teardown retires the DSD latch immediately: no producer call and no status
+    // read may keep describing a native-DSD stream while the ring is being
+    // drained or freed.
+    dsdMode_.store(false, std::memory_order_release);
     while (writerGate_.load(std::memory_order_acquire) & kWriterBusy) {
         std::this_thread::yield(); // control only; never free a live writer's ring
     }
@@ -985,6 +1015,12 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
         static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
     const size_t pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
     if (pktLen == 0) return 0;
+    // Native DSD: the wire payload is a 1-bit stream packed into 32-bit words. It
+    // is never dithered, faded, requantised or gap-faded, and a gap is filled
+    // with the alternating 0x69/0x96 pattern instead of PCM zeroes: an all-zero
+    // word is 32 zero DSD bits, i.e. hard negative DC that a DSD DAC renders as
+    // a thump rather than silence.
+    const bool dsd = dsdMode_.load(std::memory_order_relaxed);
 
     const size_t w = ringWrite_.load(std::memory_order_acquire);
     const size_t availFrames = w - readFrame; // unsigned arithmetic survives counter wrap
@@ -1008,8 +1044,10 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
     const size_t realBytes = copyFrames * frameBytes;
     // Item 3: DoP words carry a 0x05/0xFA marker in their MSB. A raw underrun on a
     // DoP stream must therefore be filled with valid DoP silence that continues
-    // the producer's phase, not with plain zeros.
-    const bool dopGap = producerIsDop_.load(std::memory_order_relaxed) &&
+    // the producer's phase, not with plain zeros. A DSD stream is not DoP: its
+    // words are plain DSD payload, so the DoP marker machinery stays out of it.
+    const bool dopGap = !dsd &&
+                        producerIsDop_.load(std::memory_order_relaxed) &&
                         IsDopSilenceContainer(bytesPerSample_);
     if (copyFrames == static_cast<size_t>(framesInPacket)) {
         if (packetRaw) {
@@ -1020,6 +1058,14 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
                 // Carry the marker phase forward so a later gap stays in lockstep.
                 dopMarkerPhase_ = DopMarkerAfterLastFrame(
                     dst, copyFrames, channels_, bytesPerSample_, dopMarkerPhase_);
+            }
+            if (dsd) {
+                // A whole packet of producer DSD bytes reached the wire exactly as
+                // written, so the session has earned the BitPerfect-shaped domain
+                // (DeriveClockDomain still requires zero underruns/mismatches).
+                bitPerfectEligible_.store(
+                    !bitPerfectDisqualified_.load(std::memory_order_acquire),
+                    std::memory_order_release);
             }
         } else {
             if (gapFader_.recovering()) {
@@ -1038,7 +1084,17 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
         // packet head rather than discarding up to a full packet of buffered audio.
         const int missingFrames = framesInPacket - static_cast<int>(copyFrames);
         if (copyFrames > 0) {
-            if (packetRaw || producerRawDepth_.load(std::memory_order_acquire) != 0) {
+            if (dsd) {
+                // Head of the packet is real DSD; the tail is the DSD silence
+                // pattern. No fader, no requantisation: both would rewrite payload
+                // words the DAC reads as bitstream.
+                dsdSilencePhase_ = FillDsdSilence(
+                    dst + realBytes, static_cast<int>(pktLen - realBytes),
+                    dsdSilencePhase_);
+                bitPerfectDisqualified_.store(true, std::memory_order_release);
+                bitPerfectEligible_.store(false, std::memory_order_release);
+                gapFader_.reset();
+            } else if (packetRaw || producerRawDepth_.load(std::memory_order_acquire) != 0) {
                 if (dopGap) {
                     // Continue the marker alternation from the last real frame and
                     // emit zero payload; no fader and no requantisation (both would
@@ -1064,7 +1120,13 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
             }
         } else {
             // Raw/DoP gaps must be silence, not synthesized marker/audio bytes.
-            if (producerRawDepth_.load(std::memory_order_acquire) != 0) {
+            if (dsd) {
+                dsdSilencePhase_ = FillDsdSilence(dst, static_cast<int>(pktLen),
+                                                 dsdSilencePhase_);
+                bitPerfectDisqualified_.store(true, std::memory_order_release);
+                bitPerfectEligible_.store(false, std::memory_order_release);
+                gapFader_.reset();
+            } else if (producerRawDepth_.load(std::memory_order_acquire) != 0) {
                 if (dopGap) {
                     dopMarkerPhase_ = FillDopSilence(dst, framesInPacket, channels_,
                                                      bytesPerSample_, dopMarkerPhase_);
@@ -1082,7 +1144,11 @@ size_t UsbAudioSink::fillPacketFromRing(uint8_t* dst, int framesInPacket,
                 }
             }
         }
-        rawDepth = 0;
+        // A PCM gap is no longer a raw delivery. A DSD gap still is: the words
+        // written there are genuine DSD_U32 payload (silence), not float, so the
+        // depth marker must say 32 - reporting 0 would make the status surfaces
+        // describe a DSD stream as float.
+        rawDepth = dsd ? 32 : 0;
         deliveryEpoch = deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel) + 1;
         const uint64_t total = underrunCount_.fetch_add(1, std::memory_order_relaxed) + 1;
         // Rate-limited: an underrun burst can span every packet of a URB.
@@ -1121,7 +1187,7 @@ void UsbAudioSink::workerLoop() {
     // xHCI isochronous schedule and causing startup glitches/underruns. While
     // waiting for prefill, OUT URBs carry clean silence (or DoP silence)
     // without incrementing underrunCount_.
-    const bool pullMode = renderMode_ != static_cast<int>(UsbRenderMode::BestEffort);
+    const bool pullMode = IsReservoirMode(renderMode_);
     bool prefillDone = pullMode ? pullRenderer_.prefillSatisfied()
                                 : (prefillFrames_ == 0);
     bool producerSeen = false;
@@ -1288,7 +1354,9 @@ void UsbAudioSink::workerLoop() {
         uint64_t deliveryEpoch = deliveryEpoch_.load(std::memory_order_acquire);
         const size_t frameBytes =
             static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
-        const bool dopSilence = producerIsDop_.load(std::memory_order_relaxed) &&
+        const bool dsdStream = IsDsdMode(renderMode_);
+        const bool dopSilence = !dsdStream &&
+                                producerIsDop_.load(std::memory_order_relaxed) &&
                                 IsDopSilenceContainer(bytesPerSample_);
         for (int p = 0; p < urb->number_of_packets; ++p) {
             const int framesInPacket = NextPacketFrames(
@@ -1297,7 +1365,12 @@ void UsbAudioSink::workerLoop() {
             if (!prefillDone) {
                 pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
                 if (pktLen > 0) {
-                    if (dopSilence) {
+                    if (dsdStream) {
+                        // The cushion packets before the first producer block must
+                        // already be valid DSD: zero words would be -FS, not silence.
+                        dsdSilencePhase_ = FillDsdSilence(
+                            dst, static_cast<int>(pktLen), dsdSilencePhase_);
+                    } else if (dopSilence) {
                         dopMarkerPhase_ = FillDopSilence(
                             dst, framesInPacket, channels_, bytesPerSample_,
                             dopMarkerPhase_);
@@ -1305,7 +1378,10 @@ void UsbAudioSink::workerLoop() {
                         std::memset(dst, 0, pktLen);
                     }
                 }
-                rawDepth = 0;
+                // DSD silence is genuine DSD_U32 payload, so the depth marker
+                // must not say "float" or the status surfaces would misreport a
+                // DSD stream as a float one.
+                rawDepth = dsdStream ? 32 : 0;
             } else if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull)) {
                 pktLen = fillPullPacket(dst, framesInPacket, rawDepth);
             } else if (renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
@@ -1395,8 +1471,73 @@ bool UsbAudioSink::WritePcm(const uint8_t* buffer, int frames, int channels,
     return writeBlock(nullptr, buffer, frames, channels, sourceBitDepth, sampleRate, producerId);
 }
 
+bool UsbAudioSink::WriteDsd(const uint8_t* left, const uint8_t* right,
+                            int bytesPerChannel, int64_t producerId) {
+    if (left == nullptr || right == nullptr || bytesPerChannel <= 0 ||
+        bytesPerChannel > kMaxDsdBytesPerCall) {
+        ReportWriteError(EINVAL);
+        return false;
+    }
+    // Every PCM mode refuses 1-bit payloads: there is no PCM reading of a DSD
+    // byte string, and a silent reinterpretation would be worse than a refusal.
+    if (!dsdMode_.load(std::memory_order_acquire)) {
+        ReportWriteError(ENOTSUP);
+        return false;
+    }
+    if (!beginWrite(producerId)) return false;
+    struct WriterExit {
+        UsbAudioSink* sink;
+        ~WriterExit() { sink->endWrite(); }
+    } exit{this};
+    // One wire frame is one 32-bit word per channel, so a 4-byte subslot turns
+    // 4 DSD bytes into one frame; a trailing partial word is zero-padded on its
+    // high side by the packer (never sign-extended, never dithered).
+    const int frames = (bytesPerChannel + bytesPerSample_ - 1) / bytesPerSample_;
+    const size_t capFrames = ringRawDepth_.size();
+    const size_t frameBytes =
+        static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
+    size_t w = ringWrite_.load(std::memory_order_relaxed);
+    const size_t r = ringRead_.load(std::memory_order_acquire);
+    const size_t occupiedFrames = w - r;
+    const size_t freeFrames = capFrames > occupiedFrames ? capFrames - occupiedFrames - 1 : 0;
+    if (capFrames == 0 || static_cast<size_t>(frames) > freeFrames) {
+        // All-or-nothing exactly like WritePcm: a half-delivered DSD block would
+        // splice a truncated word into the bitstream and shift every later word.
+        overrunCount_.fetch_add(static_cast<uint64_t>(frames), std::memory_order_relaxed);
+        ReportWriteError(ENOSPC);
+        return false;
+    }
+    for (int f = 0; f < frames; ++f) {
+        const int offset = f * bytesPerSample_;
+        const int chunk = std::min(bytesPerSample_, bytesPerChannel - offset);
+        const size_t slot = w & ringFrameMask_;
+        // 32 = "these words are raw 32-bit payload, not float". The worker uses
+        // it to skip dither/fade/requantisation on the packet.
+        ringRawDepth_[slot] = 32;
+        uint8_t* frameDst = ring_.data() + slot * frameBytes;
+        uint8_t wordL[4] = {0, 0, 0, 0};
+        uint8_t wordR[4] = {0, 0, 0, 0};
+        PackDsdBitsToWords(left + offset, chunk, wordL, bytesPerSample_, bytesPerSample_);
+        PackDsdBitsToWords(right + offset, chunk, wordR, bytesPerSample_, bytesPerSample_);
+        std::memcpy(frameDst, wordL, static_cast<size_t>(bytesPerSample_));
+        std::memcpy(frameDst + bytesPerSample_, wordR, static_cast<size_t>(bytesPerSample_));
+        ++w;
+    }
+    producerRawDepth_.store(32, std::memory_order_release);
+    ringWrite_.store(w, std::memory_order_release);
+    return true;
+}
+
 bool UsbAudioSink::writeBlock(const float* floats, const uint8_t* pcm, int frames,
         int channels, int sourceBitDepth, int sampleRate, int64_t producerId) {
+    // PCM producer calls are refused outright while a native-DSD stream is live.
+    // Packing a float or integer PCM block into the DSD ring would dither/gain
+    // words the DAC reads as bitstream - full-scale noise, not audio - so the
+    // only honest answer is a clean refusal.
+    if (dsdMode_.load(std::memory_order_acquire)) {
+        ReportWriteError(ENOTSUP);
+        return false;
+    }
     if ((!floats && !pcm) || frames <= 0 || channels <= 0 || channels > 8) {
         ReportWriteError(EINVAL);
         return false;
@@ -1641,7 +1782,7 @@ size_t UsbAudioSink::fillAsrcPacket(uint8_t* dst, int framesInPacket, int& rawDe
 double UsbAudioSink::GetBufferedMs() {
     std::lock_guard<std::mutex> control(controlMutex_); // status/control, not render
     if (!active_.load(std::memory_order_acquire)) return 0.0;
-    if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+    if (IsReservoirMode(renderMode_)) {
         return static_cast<double>(pullRenderer_.fillMs());
     }
     const size_t w = ringWrite_.load(std::memory_order_acquire);
@@ -1702,6 +1843,42 @@ bool UsbAudioSink::HasPcmFileSource() const {
     return pcmProducer_ != nullptr && pcmProducer_->isOpen();
 }
 
+UsbStreamResult UsbAudioSink::CheckStreamShape(UsbRenderMode mode, int channels,
+                                               int bytesPerSample, int validBitDepth,
+                                               int framesPerSecond) {
+    const int effectiveBits = validBitDepth == 0 && bytesPerSample >= 2 && bytesPerSample <= 4
+        ? bytesPerSample * 8 : validBitDepth;
+    if (mode == UsbRenderMode::DsdNative) {
+        // DSD_U32 is the only native-DSD wire shape this sink speaks: one 32-bit
+        // word per channel per frame, so a 4-byte subslot at 32 valid bits and a
+        // stereo pair. Anything else is a PCM request wearing a DSD mode.
+        if (bytesPerSample != 4 || effectiveBits != 32 || channels != 2) {
+            return UsbStreamResult::InvalidArgs;
+        }
+        // The frame rate *is* the DSD clock: 88200/176400/352800/705600 for
+        // DSD64/128/256/512. A rate off that ladder (48 kHz family, DSD1024,
+        // plain PCM rates) has no native-DSD packing this sink can honour.
+        if (DsdRateForAltSetting(framesPerSecond, bytesPerSample) == 0) {
+            return UsbStreamResult::RateUnsupported;
+        }
+        return UsbStreamResult::Ok;
+    }
+    if (mode != UsbRenderMode::BestEffort && mode != UsbRenderMode::BitPerfectPull &&
+        mode != UsbRenderMode::ClockSyncAsrc) {
+        return UsbStreamResult::InvalidArgs;  // unknown wire value: caller bug
+    }
+    if (channels <= 0 || channels > 8 ||
+        !IsPcmWireFormat(bytesPerSample, effectiveBits)) {
+        return UsbStreamResult::InvalidArgs;
+    }
+    if (framesPerSecond <= 0) return UsbStreamResult::RateUnsupported;
+    static const int kValidRates[] = {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
+    for (int r : kValidRates) {
+        if (framesPerSecond == r) return UsbStreamResult::Ok;
+    }
+    return UsbStreamResult::RateUnsupported;
+}
+
 UsbClockDomain UsbAudioSink::DeriveClockDomain(UsbRenderMode mode, bool active,
                                                bool bitPerfectEligible,
                                                uint64_t underruns,
@@ -1713,9 +1890,12 @@ UsbClockDomain UsbAudioSink::DeriveClockDomain(UsbRenderMode mode, bool active,
             // no longer the bits the producer wrote, whatever the source is.
             return UsbClockDomain::Asrc;
         case UsbRenderMode::BitPerfectPull:
-            // Payloads stay sample-identical only while the session was never
-            // disqualified, nothing had to be zero-filled, and no channel
-            // mismatch was ever summed into the wire stream.
+        case UsbRenderMode::DsdNative:
+            // Both are BitPerfect-shaped: payloads stay sample-identical only
+            // while the session was never disqualified, nothing had to be
+            // zero-filled, and no channel mismatch was ever summed into the wire
+            // stream. DsdNative reuses the same rule instead of a private one so
+            // a DSD stream can never claim more than the pull path does.
             return (bitPerfectEligible && underruns == 0 && channelMismatch == 0)
                 ? UsbClockDomain::BitPerfectLocked
                 : UsbClockDomain::BestEffort;
@@ -1744,7 +1924,7 @@ UsbClockStatus UsbAudioSink::GetClockStatus() const {
     if (!active || sampleRate_ <= 0) return status;
 
     status.feedbackPresent = feedbackEndpoint_ != 0;
-    if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+    if (IsReservoirMode(renderMode_)) {
         status.ringFillMs = pullRenderer_.fillMs();
     } else {
         const size_t written = ringWrite_.load(std::memory_order_acquire);
@@ -1778,7 +1958,7 @@ int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
         if (exclusive_.load(std::memory_order_acquire) &&
             active_.load(std::memory_order_acquire)) {
             const size_t neededFrames = static_cast<size_t>(frames);
-            if (renderMode_ != static_cast<int>(UsbRenderMode::BestEffort)) {
+            if (IsReservoirMode(renderMode_)) {
                 // Pull modes answer from their own reservoir, not ring_: the
                 // ring stays empty there and would always report "space free".
                 const size_t capacity = pullRenderer_.capacityFrames();

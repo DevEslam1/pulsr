@@ -14,6 +14,7 @@
 #include "AudioDspEngine.h"
 #include "DspParamRanges.h"
 #include "IrBounds.h"
+#include "Uac2Descriptors.h"
 #include "UsbAudioSink.h"
 
 // Item 4: short alias for the shared parameter contract (DspParamRanges.h).
@@ -549,6 +550,23 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerQuality(
     AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
         snap.resampler.quality = quality;
     });
+}
+
+// Tap-side SRC quality (0..3 -> 64/128/256/512 taps). The engine rebuilds
+// its kernel on this thread and the next configure/flush picks it up, so the
+// audio callback never reallocates. Storing is all this can promise: a stream
+// that keeps the same rate pair reads the new kernel at the next track
+// boundary, which is the only place the converter can change shape.
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetTapSrcQuality(
+        JNIEnv* /* env */, jobject /* thiz */, jint quality) {
+    AudioDspEngine::instance().setTapSrcQuality(static_cast<int>(quality));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetTapSrcQuality(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(AudioDspEngine::instance().tapSrcQuality());
 }
 
 JNIEXPORT jfloatArray JNICALL
@@ -1928,6 +1946,111 @@ JNIEXPORT void JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamResetChannelMismatchFrames(
         JNIEnv* /* env */, jobject /* thiz */) {
     pulsr::UsbAudioSink::instance().ResetChannelMismatchFrames();
+}
+
+// ---- Native DSD (DSD_U32) producer and capability probe --------------------
+
+namespace {
+// Reused per-thread staging so a DSD producer block does not allocate on every
+// call: the vectors grow to the largest block ever seen and are then reused for
+// the life of the thread. 1 MiB per channel is the hard ceiling (kMaxDsdBytesPerCall).
+thread_local std::vector<uint8_t> gDsdLeft;
+thread_local std::vector<uint8_t> gDsdRight;
+}  // namespace
+
+// Writes one stereo native-DSD block. `bytesPerChannel` counts 1-bit payload
+// bytes per channel (8 DSD samples each, LSB-first), NOT PCM samples. Returns
+// false for a null/short array pair, a length outside (0, 1 MiB], a producer
+// that is not admitted, or any non-DSD stream. Never throws into the VM.
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamWriteDsd(
+        JNIEnv* env, jobject /* thiz */, jbyteArray left, jbyteArray right,
+        jint bytesPerChannel, jlong producerId) {
+    if (env == nullptr || left == nullptr || right == nullptr) return JNI_FALSE;
+    if (bytesPerChannel <= 0 ||
+        bytesPerChannel > pulsr::UsbAudioSink::kMaxDsdBytesPerCall) {
+        return JNI_FALSE;
+    }
+    const jsize payload = static_cast<jsize>(bytesPerChannel);
+    // Bounded size check before reading anything: a short array would make the
+    // tail of the block uninitialised memory that still reaches the DAC.
+    if (env->GetArrayLength(left) < payload || env->GetArrayLength(right) < payload) {
+        return JNI_FALSE;
+    }
+    try {
+        const size_t bytes = static_cast<size_t>(bytesPerChannel);
+        if (gDsdLeft.size() < bytes) gDsdLeft.resize(bytes);
+        if (gDsdRight.size() < bytes) gDsdRight.resize(bytes);
+        env->GetByteArrayRegion(left, 0, payload,
+                                reinterpret_cast<jbyte*>(gDsdLeft.data()));
+        env->GetByteArrayRegion(right, 0, payload,
+                                reinterpret_cast<jbyte*>(gDsdRight.data()));
+        // A pending exception here means the arrays were not copied; clear it
+        // and answer false instead of letting it surface inside native code.
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return JNI_FALSE;
+        }
+        const bool ok = pulsr::UsbAudioSink::instance().WriteDsd(
+            gDsdLeft.data(), gDsdRight.data(), static_cast<int>(bytesPerChannel),
+            static_cast<int64_t>(producerId));
+        return ok ? JNI_TRUE : JNI_FALSE;
+    } catch (...) {
+        return JNI_FALSE;  // allocation failure must not cross the boundary
+    }
+}
+
+// Probes a raw configuration descriptor blob for native-DSD alternate settings.
+// Returns a jintArray of flattened 7-tuples
+//   [interface, alt, endpoint, channels, bytesPerSample, framesPerSecond, dsdRate]
+// for every setting pulsr::ParseDsdAltSettings() accepts, an empty array when the
+// blob is well-formed but proves no DSD support, or null when the input is
+// unusable (null/empty array, JNI copy failure, allocation failure) - i.e. "the
+// probe could not answer", never "the DAC supports nothing".
+// The VID/PID quirk path is not reachable here (the tunable entry point takes
+// the ids as arguments); Kotlin must pass the descriptor blob alone and keep DoP
+// as the fallback until a native-DSD buffer is confirmed on the device.
+JNIEXPORT jintArray JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeProbeDsdAltSettings(
+        JNIEnv* env, jobject /* thiz */, jbyteArray rawConfig) {
+    if (env == nullptr || rawConfig == nullptr) return nullptr;
+    const jsize len = env->GetArrayLength(rawConfig);
+    if (len <= 0) return nullptr;
+    try {
+        std::vector<uint8_t> blob(static_cast<size_t>(len));
+        env->GetByteArrayRegion(rawConfig, 0, len,
+                                reinterpret_cast<jbyte*>(blob.data()));
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return nullptr;
+        }
+        const auto settings = pulsr::ParseDsdAltSettings(
+            blob.data(), blob.size(), /*vendorId=*/0, /*productId=*/0);
+        const jsize outLen = static_cast<jsize>(settings.size() * 7);
+        jintArray out = env->NewIntArray(outLen);
+        if (out == nullptr) return nullptr;  // OutOfMemoryError already pending
+        if (outLen == 0) return out;         // parsed, nothing DSD-provable
+        std::vector<jint> flat(static_cast<size_t>(outLen));
+        for (size_t i = 0; i < settings.size(); ++i) {
+            const pulsr::DsdAltSetting& s = settings[i];
+            const size_t at = i * 7;
+            flat[at + 0] = static_cast<jint>(s.interfaceNumber);
+            flat[at + 1] = static_cast<jint>(s.altSetting);
+            flat[at + 2] = static_cast<jint>(s.endpointAddress);
+            flat[at + 3] = static_cast<jint>(s.channels);
+            flat[at + 4] = static_cast<jint>(s.bytesPerSample);
+            flat[at + 5] = static_cast<jint>(s.framesPerSecond);
+            flat[at + 6] = static_cast<jint>(s.dsdRate);
+        }
+        env->SetIntArrayRegion(out, 0, outLen, flat.data());
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            return nullptr;
+        }
+        return out;
+    } catch (...) {
+        return nullptr;
+    }
 }
 
 // ---------------------------------------------------------------------------

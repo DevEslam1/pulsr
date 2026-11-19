@@ -2738,6 +2738,184 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dsdOutputDop => 'DoP';
 
   @override
+  String get dsdOutputNative => 'Nativo';
+
+  @override
+  String get dsdNativeUnavailable =>
+      'Requiere un DAC con un alt setting DSD nativo';
+
+  @override
+  String get conversionQuality => 'Calidad de conversión';
+
+  @override
+  String get conversionQualityDesc =>
+      'Solo actúa si la frecuencia del sink difiere; no afecta al bit-perfect.';
+
+  @override
+  String get conversionOff => 'Desactivado';
+
+  @override
+  String get settingsUac2VolumeTitle => 'Volumen UAC2';
+
+  @override
+  String get settingsUac2VolumeDesc =>
+      'Mueve el atenuador propio del DAC; 100 % es unidad.';
+
+  @override
+  String get settingsUac2VolumeUnsupported =>
+      'Este DAC no expone control de volumen por hardware.';
+
+  @override
+  String get conversionTaps64 => '64 taps (rápido)';
+
+  @override
+  String get conversionTaps128 => '128 taps';
+
+  @override
+  String get conversionTaps256 => '256 taps (equilibrado)';
+
+  @override
+  String get conversionTaps512 => '512 taps (mejor)';
+
+  @override
+  String get settingsBatterySaverTitle => 'Ahorro de batería';
+
+  @override
+  String get settingsBatterySaverDesc =>
+      'Desactiva las etapas DSP pesadas y mantiene el ecualizador.';
+
+  @override
+  String get settingsChannelTrimsTitle => 'Ajuste y retardo por canal';
+
+  @override
+  String get settingsChannelTrimsDesc =>
+      'Nivel y distancia por canal para salidas de 2 a 8 canales.';
+
+  @override
+  String channelTrim(int channel) {
+    return 'Ajuste $channel';
+  }
+
+  @override
+  String channelDelay(int channel) {
+    return 'Retardo $channel';
+  }
+
+  @override
+  String get autoeqParametricImport => 'Importar perfil paramétrico';
+
+  @override
+  String get autoeqParametricImportHint => 'AutoEq ParametricEQ.txt';
+
+  @override
+  String autoeqParametricImported(String name) {
+    return 'Se importó «$name»';
+  }
+
+  @override
+  String get autoeqParametricImportFailed => 'No se pudo importar este perfil';
+
+  @override
+  String get autoeqParametricNoFilters =>
+      'No hay filtros utilizables en este archivo';
+
+  @override
+  String get autoeqTargetCurve => 'Curva objetivo';
+
+  @override
+  String get autoeqTargetCurveNone => 'Ninguna';
+
+  @override
+  String get abxScreenTitle => 'Prueba ABX a ciegas';
+
+  @override
+  String get abxScreenSubtitle =>
+      'Alterna entre dos condiciones sin saber cuál es cuál.';
+
+  @override
+  String get abxStart => 'Empezar';
+
+  @override
+  String get abxRestart => 'Reiniciar';
+
+  @override
+  String get abxBypassCondition => 'Sin procesado';
+
+  @override
+  String get abxDspCondition => 'DSP';
+
+  @override
+  String abxTrialLabel(int current, int total) {
+    return 'Ensayo $current de $total';
+  }
+
+  @override
+  String get abxQuestion => '¿Qué condición es X?';
+
+  @override
+  String get abxAnswerA => 'X es A';
+
+  @override
+  String get abxAnswerB => 'X es B';
+
+  @override
+  String get abxCorrectShort => 'Correcto';
+
+  @override
+  String get abxIncorrectShort => 'Incorrecto';
+
+  @override
+  String get abxResultTitle => 'Resultado';
+
+  @override
+  String abxPValue(String value) {
+    return 'p = $value';
+  }
+
+  @override
+  String get abxVerdictInsufficient => 'Ensayos insuficientes';
+
+  @override
+  String get abxVerdictChance => 'No mejor que el azar';
+
+  @override
+  String get abxVerdictSuggestive => 'Sugerente';
+
+  @override
+  String get abxVerdictSignificant => 'Significativo';
+
+  @override
+  String get abxVerdictStrong => 'Evidencia fuerte';
+
+  @override
+  String get abxNeedsPlayback =>
+      'Reproduce una pista y activa el DSP para hacer esta prueba.';
+
+  @override
+  String get remoteKindSubsonic => 'Subsonic / Navidrome';
+
+  @override
+  String get remoteSubsonicUrl => 'URL del servidor';
+
+  @override
+  String get remoteSubsonicUser => 'Usuario';
+
+  @override
+  String get remoteSubsonicPassword => 'Contraseña';
+
+  @override
+  String get remoteUpnpServers => 'Servidores multimedia UPnP';
+
+  @override
+  String get remoteUpnpSearching => 'Buscando servidores multimedia…';
+
+  @override
+  String get remoteUpnpNone => 'No se encontró ningún servidor multimedia';
+
+  @override
+  String get remoteUpnpUse => 'Usar este servidor';
+
+  @override
   String get enableShuffle => 'Activar aleatorio';
 
   @override

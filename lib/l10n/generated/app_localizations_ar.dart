@@ -2731,6 +2731,181 @@ class AppLocalizationsAr extends AppLocalizations {
   String get dsdOutputDop => 'DoP';
 
   @override
+  String get dsdOutputNative => 'أصلي';
+
+  @override
+  String get dsdNativeUnavailable => 'يتطلب DAC يدعم إعداد DSD أصلي';
+
+  @override
+  String get conversionQuality => 'جودة التحويل';
+
+  @override
+  String get conversionQualityDesc =>
+      'تعمل فقط عند اختلاف معدل الإخراج؛ لا تؤثر على التشغيل بتطابق البتات.';
+
+  @override
+  String get conversionOff => 'إيقاف';
+
+  @override
+  String get settingsUac2VolumeTitle => 'مستوى UAC2';
+
+  @override
+  String get settingsUac2VolumeDesc =>
+      'يحرّك مخفّض صوت DAC نفسه؛ 100% يعني دون تخفيض.';
+
+  @override
+  String get settingsUac2VolumeUnsupported =>
+      'لا يوفّر هذا الـ DAC تحكّماً في مستوى الصوت.';
+
+  @override
+  String get conversionTaps64 => '64 مرشّحاً (سريع)';
+
+  @override
+  String get conversionTaps128 => '128 مرشّحاً';
+
+  @override
+  String get conversionTaps256 => '256 مرشّحاً (متوازن)';
+
+  @override
+  String get conversionTaps512 => '512 مرشّحاً (الأفضل)';
+
+  @override
+  String get settingsBatterySaverTitle => 'موفّر الطاقة';
+
+  @override
+  String get settingsBatterySaverDesc =>
+      'يعطّل مراحل DSP الثقيلة ويُبقي المعادل.';
+
+  @override
+  String get settingsChannelTrimsTitle => 'ضبط وتأخير القنوات';
+
+  @override
+  String get settingsChannelTrimsDesc =>
+      'مستوى ومسافة لكل قناة لإخراج من 2 إلى 8 قنوات.';
+
+  @override
+  String channelTrim(int channel) {
+    return 'الضبط $channel';
+  }
+
+  @override
+  String channelDelay(int channel) {
+    return 'التأخير $channel';
+  }
+
+  @override
+  String get autoeqParametricImport => 'استيراد ملف معايرة بارامتري';
+
+  @override
+  String get autoeqParametricImportHint => 'AutoEq ParametricEQ.txt';
+
+  @override
+  String autoeqParametricImported(String name) {
+    return 'تم استيراد “$name”';
+  }
+
+  @override
+  String get autoeqParametricImportFailed => 'تعذّر استيراد هذا الملف';
+
+  @override
+  String get autoeqParametricNoFilters => 'لا توجد مرشّحات صالحة في هذا الملف';
+
+  @override
+  String get autoeqTargetCurve => 'منحنى الاستهداف';
+
+  @override
+  String get autoeqTargetCurveNone => 'بدون';
+
+  @override
+  String get abxScreenTitle => 'اختبار ABX أعمى';
+
+  @override
+  String get abxScreenSubtitle => 'بدّل بين حالتين دون معرفة أيّهما.';
+
+  @override
+  String get abxStart => 'ابدأ';
+
+  @override
+  String get abxRestart => 'إعادة';
+
+  @override
+  String get abxBypassCondition => 'بدون معالجة';
+
+  @override
+  String get abxDspCondition => 'DSP';
+
+  @override
+  String abxTrialLabel(int current, int total) {
+    return 'المحاولة $current من $total';
+  }
+
+  @override
+  String get abxQuestion => 'أيّ حالة هي X؟';
+
+  @override
+  String get abxAnswerA => 'X هي A';
+
+  @override
+  String get abxAnswerB => 'X هي B';
+
+  @override
+  String get abxCorrectShort => 'صحيح';
+
+  @override
+  String get abxIncorrectShort => 'خطأ';
+
+  @override
+  String get abxResultTitle => 'النتيجة';
+
+  @override
+  String abxPValue(String value) {
+    return 'p = $value';
+  }
+
+  @override
+  String get abxVerdictInsufficient => 'محاولات غير كافية';
+
+  @override
+  String get abxVerdictChance => 'لا يزيد عن الصدفة';
+
+  @override
+  String get abxVerdictSuggestive => 'مُلمح';
+
+  @override
+  String get abxVerdictSignificant => 'دالّ';
+
+  @override
+  String get abxVerdictStrong => 'دليل قوي';
+
+  @override
+  String get abxNeedsPlayback =>
+      'ابدأ تشغيل مقطع وفعّل DSP لإجراء هذا الاختبار.';
+
+  @override
+  String get remoteKindSubsonic => 'Subsonic / Navidrome';
+
+  @override
+  String get remoteSubsonicUrl => 'عنوان الخادم';
+
+  @override
+  String get remoteSubsonicUser => 'اسم المستخدم';
+
+  @override
+  String get remoteSubsonicPassword => 'كلمة المرور';
+
+  @override
+  String get remoteUpnpServers => 'خوادم UPnP الوسائطية';
+
+  @override
+  String get remoteUpnpSearching => 'جارٍ البحث عن خوادم الوسائط…';
+
+  @override
+  String get remoteUpnpNone => 'لم يُعثر على خادم وسائط';
+
+  @override
+  String get remoteUpnpUse => 'استخدم هذا الخادم';
+
+  @override
   String get enableShuffle => 'تفعيل العشوائي';
 
   @override

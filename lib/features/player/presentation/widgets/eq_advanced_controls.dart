@@ -1680,8 +1680,11 @@ extension _EqAdvancedControls on _EqualizerSheetState {
           _buildDitherCard(context, state, cubit, dspBlocked, p),
           const SizedBox(height: AppSpacing.md),
 
-          // 9. Sinc Resampler — previously persisted with no reachable control.
-          _buildSincResamplerCard(context, state, cubit, dspBlocked, p),
+          // 9. Conversion quality — tap-side SRC kernel, or the platform's.
+          ConversionQualityCard(
+            blockedReason: dspBlocked,
+            nativeAvailable: _nativePcmEffectsAvailable,
+          ),
           const SizedBox(height: AppSpacing.md),
 
           // 10. ViPER-DDC Headphone Correction (JamesDSP parity)
@@ -2879,92 +2882,6 @@ extension _EqAdvancedControls on _EqualizerSheetState {
     );
   }
 
-  /// Sinc Resampler toggle (auto-bypasses when track and device rates match).
-  Widget _buildSincResamplerCard(BuildContext context, PlayerState state,
-      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
-    final available = dspBlocked == null &&
-        _nativePcmEffectsAvailable &&
-        AudioEffectsChannel().isPlaybackSincResamplerSupported;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: p.surfaceContainer,
-        borderRadius: AppRadii.cardRadius,
-        border: Border.all(color: p.hairline),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.xs),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: AppRadii.r8All,
-                      ),
-                      child: Icon(Icons.sync_alt_rounded,
-                          color: p.accent, size: 20),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(context.l10n.sincResampler,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: AppFontSize.body,
-                                  color: p.textPrimary),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                          Text(context.l10n.sincDesc,
-                              style: TextStyle(
-                                  fontSize: AppFontSize.caption,
-                                  color: p.textTertiary),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xxs),
-              Switch.adaptive(
-                value: available && state.isSincResamplerEnabled,
-                activeTrackColor: p.accent,
-                activeThumbColor: p.onAccent,
-                onChanged:
-                    !available ? null : (val) => cubit.setSincResampler(val),
-              ),
-            ],
-          ),
-          if (dspBlocked != null)
-            Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.s6),
-                child: Text(context.l10n.blockedByBitPerfectShort,
-                    style: TextStyle(
-                        color: p.error,
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w600)))
-          else if (!_nativePcmEffectsAvailable)
-            Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.s6),
-                child: Text(context.l10n.nativeDspUnavailable,
-                    style: TextStyle(
-                        color: p.textTertiary,
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w600))),
-        ],
-      ),
-    );
-  }
-
   Widget _buildViperDdcCard(BuildContext context, PlayerState state,
       PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
     final hasProfile = state.viperDdcProfileName.isNotEmpty;
@@ -3591,6 +3508,204 @@ extension _EqAdvancedControls on _EqualizerSheetState {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Conversion-quality control for the tap-side sample-rate converter.
+///
+/// The choice is a preference rather than [SettingsState]: it mirrors a native
+/// kernel size, so it is read on mount and written straight back to prefs.
+/// 64/128/256/512 taps select the tap kernel; 256 is the default. Conversion
+/// only runs when the sink rate differs from the track rate, so a bit-perfect
+/// path is never altered. There is no "off": the tap is the only converter in
+/// the playback path (the in-chain sinc stage cannot convert a fixed-size
+/// block), and refusing to convert would hand the track to the platform's
+/// resampler silently.
+class ConversionQualityCard extends StatefulWidget {
+  /// Non-null when bit-perfect playback currently bypasses the DSP chain.
+  final String? blockedReason;
+
+  /// False when no native PCM effect chain is loaded on this platform.
+  final bool nativeAvailable;
+
+  const ConversionQualityCard({
+    super.key,
+    this.blockedReason,
+    this.nativeAvailable = true,
+  });
+
+  @override
+  State<ConversionQualityCard> createState() => _ConversionQualityCardState();
+}
+
+class _ConversionQualityCardState extends State<ConversionQualityCard> {
+  /// Segment index == native quality index (0..3 = 64/128/256/512 taps), so
+  /// the stored preference is the value the engine consumes verbatim. The
+  /// labels come from l10n; the tap counts are named there once.
+  static const int _defaultQuality = 2; // 256 taps, the documented baseline.
+  static const TextStyle _labelStyle = TextStyle(
+    fontSize: AppFontSize.caption,
+    fontWeight: FontWeight.w700,
+  );
+
+  int _segment = 0;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _restore();
+  }
+
+  Future<void> _restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    final stored = (prefs.getInt(PrefsKeys.tapSrcQuality) ?? _defaultQuality)
+        .clamp(0, 3);
+    setState(() {
+      _segment = stored;
+      _loaded = true;
+    });
+    // Reconcile the engine with the stored value. Without this the pref only
+    // reaches native when the user touches this card, so a chosen kernel would
+    // silently revert to the default on the next launch.
+    try {
+      await AudioEffectsChannel().setTapSrcQuality(stored);
+    } catch (_) {
+      // Off Android (or without the DSP bridge) there is nothing to apply;
+      // the card stays usable as a stored preference.
+    }
+  }
+
+  Future<void> _select(int quality) async {
+    if (quality == _segment) return;
+    PulsrHaptics.selectionClick();
+    final previous = _segment;
+    setState(() => _segment = quality);
+    try {
+      final applied = await AudioEffectsChannel().setTapSrcQuality(quality);
+      if (!applied) throw StateError('tap SRC refused');
+    } catch (_) {
+      // A refused kernel must not be persisted as if it were in force: put the
+      // control back where the engine still is.
+      if (mounted) setState(() => _segment = previous);
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(PrefsKeys.tapSrcQuality, quality);
+  }
+
+  static String _tapLabel(BuildContext context, int quality) {
+    switch (quality.clamp(0, 3)) {
+      case 0:
+        return context.l10n.conversionTaps64;
+      case 1:
+        return context.l10n.conversionTaps128;
+      case 2:
+        return context.l10n.conversionTaps256;
+      default:
+        return context.l10n.conversionTaps512;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final enabled =
+        widget.blockedReason == null && widget.nativeAvailable && _loaded;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.xs),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.15),
+                  borderRadius: AppRadii.r8All,
+                ),
+                child: Icon(Icons.sync_alt_rounded, color: p.accent, size: 20),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.conversionQuality,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: AppFontSize.body,
+                          color: p.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      context.l10n.conversionQualityDesc,
+                      style: TextStyle(
+                          fontSize: AppFontSize.caption, color: p.textTertiary),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.s10),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<int>(
+              showSelectedIcon: false,
+              style: const ButtonStyle(
+                visualDensity: VisualDensity.compact,
+                padding: WidgetStatePropertyAll(
+                  EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
+                ),
+              ),
+              segments: [
+                for (var i = 0; i < 4; i++)
+                  ButtonSegment(
+                    value: i,
+                    label: Text(_tapLabel(context, i), style: _labelStyle),
+                  ),
+              ],
+              selected: {_segment},
+              onSelectionChanged: enabled
+                  ? (values) {
+                      if (values.isNotEmpty) _select(values.first);
+                    }
+                  : null,
+            ),
+          ),
+          if (widget.blockedReason != null)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
+              child: Text(context.l10n.blockedByBitPerfectShort,
+                  style: TextStyle(
+                      color: p.error,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w600)),
+            )
+          else if (!widget.nativeAvailable)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.s6),
+              child: Text(context.l10n.nativeDspUnavailable,
+                  style: TextStyle(
+                      color: p.textTertiary,
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w600)),
+            ),
         ],
       ),
     );

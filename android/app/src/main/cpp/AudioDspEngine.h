@@ -7,6 +7,7 @@
 #include "LookaheadLimiter.h"
 #include "ConvolutionReverb.h"
 #include "SincResampler.h"
+#include "HighQualityResampler.h"
 #include "DsdDecoder.h"
 #include "SpatialPanner.h"
 #include "HarmonicSaturation.h"
@@ -74,8 +75,8 @@ enum class DspPerformanceProfile {
 // now used ONLY by control threads (the currentParams_ owner + getParams()),
 // where the __sp_mut fallback is harmless because those threads are not RT. The
 // render thread instead reads a raw std::atomic<const DspParamSnapshot*>
-// (currentParamsPtr_) — a genuinely lock-free acquire-load with zero shared_ptr
-// refcount traffic — and lifetime is covered by the retire pool + single-reader
+// (currentParamsPtr_) â€” a genuinely lock-free acquire-load with zero shared_ptr
+// refcount traffic â€” and lifetime is covered by the retire pool + single-reader
 // hazard pointer (audioHazardPtr_) handshake. See processInterleaved(),
 // swapCurrentLocked() and retireAndDrain(). Validate with test_snapshot_race.cpp
 // (no torn/leaked snapshots across concurrent publish+render) and
@@ -137,7 +138,7 @@ public:
     void resyncForTrack(double sampleRate, int channels = 2);
 
     // The integer PCM depth the live sink actually writes (16/24/32), or 0 when
-    // unknown — the shared mixer owns its own last conversion and the app cannot
+    // unknown â€” the shared mixer owns its own last conversion and the app cannot
     // observe it. The dither stage never shapes for a finer grid than this: a
     // 24-bit-shaped signal that a 16-bit sink then rounds has its shaping partly
     // destroyed by that final undithered requantization. This setter is LOCAL:
@@ -277,6 +278,11 @@ public:
     int resampleForTap(const float* in, int inFrames, float* out, int maxOutFrames,
                        int channels, double srcRate, double dstRate);
 
+    // Selects the tap kernel. Reconfigures nothing by itself: the next
+    // prepareTapResampler() call (track/route change) picks it up.
+    void setTapSrcQuality(int quality);
+    int tapSrcQuality() const { return tapSrcQuality_; }
+
     void reset();
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
@@ -388,13 +394,13 @@ private:
     // Control-side owner of the live snapshot: keeps it alive and backs the
     // (non-RT) getParams() read and the updateParams/applySampleRateLocked base
     // read. Only control threads touch this, so its libc++ __sp_mut fallback is
-    // harmless here. The audio render thread does NOT read this — it reads
+    // harmless here. The audio render thread does NOT read this â€” it reads
     // currentParamsPtr_ below.
     AtomicSharedPtr<const DspParamSnapshot> currentParams_;
 
     // Lock-free snapshot handoff to the audio render thread. The publisher
     // release-stores the raw pointer (under publishMutex_, via swapCurrentLocked);
-    // the render thread acquire-loads it once per block — a genuinely lock-free
+    // the render thread acquire-loads it once per block â€” a genuinely lock-free
     // read with no shared_ptr refcount traffic and no __sp_mut spinlock, removing
     // the priority-inversion hazard. Lifetime is covered by retireQueue_ +
     // audioHazardPtr_ (see processInterleaved / retireAndDrain).
@@ -427,12 +433,17 @@ private:
     // Tap-side SRC: configuration prepares the kernel and fixed-size planes.
     // All these fields are accessed under the player's serialized lifecycle,
     // not from the concurrently published DSP snapshot/control path.
-    SincResampler tapResampler_;
+    // The tap is the only real rate converter in the playback path; the
+    // in-chain stage cannot convert under the N-in/N-out block contract.
+    pulsr::HighQualityResampler tapResampler_;
     double tapSrcRate_ = 0.0;
     double tapDstRate_ = 0.0;
     int tapChannels_ = 0;
     int tapChunkFrames_ = 0;
     bool tapSrcEngaged_ = false;
+    // 0 = 64 taps, 1 = 128, 2 = 256 (default), 3 = 512. Control thread only.
+    // The default matches the documented baseline: 256 taps / 1024 phases.
+    int tapSrcQuality_ = 2;
     static constexpr int kTapMaxChannels = 8;
     static constexpr int kTapInputFrames = 2048;
     static constexpr int kTapOutputFrames = 4096;
@@ -501,7 +512,7 @@ private:
             case 24: return 8388608.0f;    // 2^23
             case 32: return 2147483648.0f; // 2^31 (float holds ~24-bit mantissa,
                                            // so 32-bit dither is a no-op by
-                                           // construction — still correct math)
+                                           // construction â€” still correct math)
             default: return 32768.0f;      // 2^15 (16-bit)
         }
     }
@@ -520,7 +531,7 @@ private:
     ArbitraryResponseEq arbitraryEq_;
     LiveProg liveProg_;
 
-    // DAC voicing (4x oversampling stage) — carries getLatencyFrames() when
+    // DAC voicing (4x oversampling stage) â€” carries getLatencyFrames() when
     // enabled; bit-exact passthrough when disabled and settled.
     DacVoicing dacVoicing_;
 
@@ -644,4 +655,5 @@ private:
     int sharedSinkBitDepth_ = 0;  // protected by mutex_, never read on render path
     Slot slots_[kMaxEngines];
 };
+
 

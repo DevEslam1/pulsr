@@ -213,30 +213,10 @@ class _GainSection extends StatelessWidget {
               ? (v) {}
               : cubit.setDvcEnabled,
         ),
-        settingsCardDivider(p),
-        SettingSliderRow(
-          label: context.l10n.settingsResamplerQuality,
-          enabled: false,
-          subtitle: context.l10n.settingsResamplerQualityDesc,
-          value: state.sincResamplerQuality.toDouble(),
-          min: 0,
-          max: 3,
-          divisions: 3,
-          defaultValue: 3,
-          formatValue: (v) {
-            switch (v.round()) {
-              case 0:
-                return context.l10n.settingsResamplerFast;
-              case 1:
-                return context.l10n.settingsResamplerStandard;
-              case 2:
-                return context.l10n.settingsResamplerHigh;
-              default:
-                return context.l10n.settingsResamplerUltra;
-            }
-          },
-          onChanged: (v) => cubit.setSincResamplerQuality(v.round()),
-        ),
+        // The in-chain sinc resampler was a documented no-op (a fixed-size
+        // block cannot change rate), so its disabled slider is gone. The real
+        // converter is the tap, configured under "Conversion quality" in the
+        // EQ advanced sheet.
       ],
     );
   }

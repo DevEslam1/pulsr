@@ -54,7 +54,10 @@ set(DSP_CORE_SOURCES
     LookaheadLimiter.cpp
     ConvolutionReverb.cpp
     SincResampler.cpp
+    HighQualityResampler.cpp
     DsdDecoder.cpp
+    DsdNativePacker.cpp
+    Uac2Descriptors.cpp
     DopFramer.cpp
     SpatialPanner.cpp
     HarmonicSaturation.cpp
