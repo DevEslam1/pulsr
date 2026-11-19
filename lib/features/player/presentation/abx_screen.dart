@@ -8,25 +8,50 @@
 // from AbxCubit/AbxSession; this file only renders them.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/services/abx_report_export.dart';
+import '../../../core/services/hires_audio_service.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../domain/models/abx_session.dart';
+import '../../../domain/models/audio_output_info.dart';
 import '../../../l10n/generated/app_localizations.dart';
+import '../../settings/cubit/settings_cubit.dart';
 import '../cubit/abx_cubit.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 
 class AbxScreen extends StatefulWidget {
-  const AbxScreen({super.key});
+  const AbxScreen({
+    super.key,
+    this.trials = AbxCubit.defaultTrials,
+    this.sessionFactory,
+    this.getTempDirectory,
+    this.getSaveDirectory,
+    this.shareReport,
+    this.onReportSaved,
+    this.outputInfoProvider,
+  });
+
+  final int trials;
+  final AbxSession Function(int trials)? sessionFactory;
+  final Future<Directory> Function()? getTempDirectory;
+  final Future<Directory> Function()? getSaveDirectory;
+  final Future<ShareResult> Function(AbxReportArtifact artifact)? shareReport;
+  final Future<void> Function(AbxReportArtifact artifact)? onReportSaved;
+  final AudioOutputInfo? Function()? outputInfoProvider;
 
   @override
   State<AbxScreen> createState() => _AbxScreenState();
@@ -34,6 +59,7 @@ class AbxScreen extends StatefulWidget {
 
 class _AbxScreenState extends State<AbxScreen> {
   late final AbxCubit _cubit;
+  bool _exporting = false;
 
   @override
   void initState() {
@@ -51,6 +77,8 @@ class _AbxScreenState extends State<AbxScreen> {
         await handler?.setBypassCompare(bypass: bypass);
       },
       isReady: () => handler != null && _canRun(player.state),
+      trials: widget.trials,
+      sessionFactory: widget.sessionFactory,
     );
   }
 
@@ -71,6 +99,139 @@ class _AbxScreenState extends State<AbxScreen> {
 
   void _answer(AbxAnswer answer) {
     _cubit.answer(answer);
+  }
+
+  AudioOutputInfo? _resolveOutputInfo() {
+    final override = widget.outputInfoProvider?.call();
+    if (override != null) return override;
+    if (getIt.isRegistered<SettingsCubit>()) {
+      final fromSettings = getIt<SettingsCubit>().state.currentOutputDevice;
+      if (fromSettings != null) return fromSettings;
+    }
+    if (getIt.isRegistered<HiResAudioService>()) {
+      return getIt<HiResAudioService>().currentOutputInfo;
+    }
+    return null;
+  }
+
+  AbxReport _buildCompletedReport() {
+    final song = context.read<PlayerCubit>().state.currentSong;
+    final output = _resolveOutputInfo();
+    final outputDevice = output != null
+        ? AbxOutputDeviceInfo(
+            name: output.deviceName,
+            type: output.activeDeviceType,
+            isUsbDac: output.isUsbDac,
+            sampleRate: output.sampleRate > 0
+                ? output.sampleRate
+                : output.nativeSampleRate,
+            bitDepth: output.bitDepth > 0 ? output.bitDepth : null,
+            isBitPerfectActive: output.isBitPerfectActive,
+          )
+        : const AbxOutputDeviceInfo(
+            name: 'Unknown',
+            type: 'unknown',
+            isUsbDac: false,
+          );
+    final activeSampleRate = (output?.sampleRate ?? 0) > 0
+        ? output!.sampleRate
+        : (output?.nativeSampleRate ?? song?.sampleRate);
+    return _cubit.buildReport(
+      outputDevice: outputDevice,
+      sampleRate: activeSampleRate,
+      codec: song?.codec ?? 'Unknown',
+      trackTitle: song?.title,
+      trackArtist: song?.artist,
+      sourceSampleRate: song?.sampleRate,
+      sourceBitDepth: song?.bitDepth,
+    );
+  }
+
+  Future<void> _shareReport() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final l10n = context.l10n;
+      final report = _buildCompletedReport();
+      final directory =
+          await (widget.getTempDirectory ?? getTemporaryDirectory)();
+      final artifact = await exportAbxReport(report, directory: directory);
+      final ShareResult result = widget.shareReport != null
+          ? await widget.shareReport!(artifact)
+          : await SharePlus.instance.share(
+              ShareParams(
+                files: <XFile>[
+                  XFile(artifact.file.path, mimeType: 'application/json'),
+                ],
+                text: artifact.jsonText,
+                subject: l10n.abxScreenTitle,
+              ),
+            );
+      if (!mounted || result.status == ShareResultStatus.dismissed) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(artifact.file.uri.pathSegments.last),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'ABX report share failed',
+        error: e,
+        stackTrace: st,
+        category: 'AbxScreen',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.exportFailed),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _saveReport() async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final report = _buildCompletedReport();
+      final directory = await (widget.getSaveDirectory ??
+          getApplicationDocumentsDirectory)();
+      final artifact = await exportAbxReport(report, directory: directory);
+      if (widget.onReportSaved != null) {
+        await widget.onReportSaved!(artifact);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(artifact.file.uri.pathSegments.last),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e, st) {
+      ErrorLogger.log(
+        'ABX report save failed',
+        error: e,
+        stackTrace: st,
+        category: 'AbxScreen',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.exportFailed),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
   }
 
   @override
@@ -375,6 +536,42 @@ class _AbxScreenState extends State<AbxScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _exporting ? null : _shareReport,
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: Text(
+                    l10n.share,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: p.textPrimary,
+                    side: BorderSide(color: p.hairline),
+                    minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _exporting ? null : _saveReport,
+                  icon: const Icon(Icons.save_alt_rounded, size: 18),
+                  label: Text(
+                    l10n.save,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: p.textPrimary,
+                    side: BorderSide(color: p.hairline),
+                    minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(

@@ -49,6 +49,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler
     setVolumeCallCount += 1;
   }
 
+  @override
+  Future<void> setVolumeSmooth(double volume) => setVolume(volume);
+
   bool eqEnabled = false;
   EqPreset currentEqPreset = EqPreset.defaultPresets.first;
   Duration? sleepTimerDuration;

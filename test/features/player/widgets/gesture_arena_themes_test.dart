@@ -42,6 +42,13 @@ void main() {
     PlayerThemeMode.circle,
     PlayerThemeMode.waveform,
   };
+  // Cassette's center acrylic well owns horizontal scrub (see cassette_body.dart),
+  // winning the horizontal drag arena over stage next/previous swipe just like
+  // the platter/waveform scrub surfaces.
+  const horizontalScrubThemes = <PlayerThemeMode>{
+    ...platterThemes,
+    PlayerThemeMode.cassette,
+  };
 
   group('Gesture arena across all 11 player themes', () {
     for (final mode in PlayerThemeMode.values) {
@@ -156,8 +163,11 @@ void main() {
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 150));
             expect(horizRun.observer.popCount, 0);
-            if (!platterThemes.contains(mode)) {
+            if (!horizontalScrubThemes.contains(mode)) {
               verify(() => horizRun.player.next()).called(1);
+            } else if (mode == PlayerThemeMode.cassette) {
+              verifyNever(() => horizRun.player.next());
+              verify(() => horizRun.player.seek(any())).called(1);
             }
           }
 

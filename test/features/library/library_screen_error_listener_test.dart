@@ -24,7 +24,34 @@ void main() {
     });
   });
 
-  testWidgets('a stream error surfaces a SnackBar and consumes the message',
+  testWidgets(
+      'a stream error over loaded content surfaces a toast and consumes the message',
+      (tester) async {
+    disableAnimations(tester);
+    setSurface(tester);
+    final controller = StreamController<LibraryState>.broadcast();
+    addTearDown(controller.close);
+    final loaded = LibraryState(songs: [testSong(id: 1)]);
+    final cubit = stubLibraryCubit(
+      loaded,
+      stream: controller.stream,
+    );
+
+    await tester.pumpWidget(libraryHarness(
+      libraryCubit: cubit,
+      child: const LibraryScreen(),
+    ));
+    await tester.pump();
+
+    controller.add(loaded.copyWith(error: uiError('read failed')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('read failed'), findsOneWidget);
+    verify(() => cubit.clearError()).called(1);
+  });
+
+  testWidgets(
+      'a stream error with no content keeps the error card without clearing error',
       (tester) async {
     disableAnimations(tester);
     setSurface(tester);
@@ -45,7 +72,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('read failed'), findsOneWidget);
-    verify(() => cubit.clearError()).called(1);
+    verifyNever(() => cubit.clearError());
   });
 
   testWidgets('an infoMessage still renders its own SnackBar', (tester) async {

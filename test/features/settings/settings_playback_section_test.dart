@@ -207,15 +207,19 @@ void main() {
     await tapText(tester, l10n.settingsSponsorBlock);
 
     await tapText(tester, l10n.settingsSkipCategories);
+    // Allow PulsrDurations.page (320ms) sheet slide-up animation to finish so
+    // the bottom Done button is inside the viewport before tapping.
+    await tester.pump(const Duration(milliseconds: 150));
     drainFrameworkExceptions(tester);
     // The picker sheet lists every supported category.
     expect(find.byType(CheckboxListTile), findsWidgets);
     await tester.tap(find.byType(CheckboxListTile).first);
     await tester.pump();
     drainFrameworkExceptions(tester);
+    await tester.ensureVisible(find.text(l10n.doneAction));
     await tester.tap(find.text(l10n.doneAction));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump(const Duration(milliseconds: 350));
     drainFrameworkExceptions(tester);
 
     expect(SponsorBlockService.instance.enabledCategories, isNotEmpty);

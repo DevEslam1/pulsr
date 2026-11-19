@@ -1226,7 +1226,7 @@ void main() {
       final playbackState =
           BehaviorSubject<PlaybackState>.seeded(PlaybackState(playing: true));
       addTearDown(playbackState.close);
-      when(() => handler.playbackState).thenReturn(playbackState);
+      when(() => handler.playbackState).thenAnswer((_) => playbackState);
       when(() => handler.pause()).thenAnswer((_) async {
         events.add('pause');
       });
@@ -1288,7 +1288,7 @@ void main() {
       final playbackState =
           BehaviorSubject<PlaybackState>.seeded(PlaybackState(playing: true));
       addTearDown(playbackState.close);
-      when(() => handler.playbackState).thenReturn(playbackState);
+      when(() => handler.playbackState).thenAnswer((_) => playbackState);
       when(() => handler.pause()).thenAnswer((_) async {
         events.add('pause');
       });

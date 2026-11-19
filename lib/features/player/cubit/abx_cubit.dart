@@ -13,6 +13,7 @@
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/services/abx_report_export.dart';
 import '../../../domain/models/abx_session.dart';
 
 /// Switches the live signal path between the two conditions under test.
@@ -168,6 +169,35 @@ class AbxCubit extends Cubit<AbxState> {
 
   /// Stable machine key for the verdict (`insufficient` while incomplete).
   String get verdictKey => _session.verdictKey;
+
+  /// Read-only snapshot of every trial in the current session.
+  List<AbxTrial> get trials => _session.trials;
+
+  /// Builds a structured export report for the completed session.
+  ///
+  /// Throws [StateError] when the session is not yet complete.
+  AbxReport buildReport({
+    required AbxOutputDeviceInfo outputDevice,
+    int? sampleRate,
+    String? codec,
+    String? trackTitle,
+    String? trackArtist,
+    int? sourceSampleRate,
+    int? sourceBitDepth,
+    DateTime? exportedAt,
+  }) {
+    return AbxReport.fromSession(
+      _session,
+      outputDevice: outputDevice,
+      sampleRate: sampleRate,
+      codec: codec,
+      trackTitle: trackTitle,
+      trackArtist: trackArtist,
+      sourceSampleRate: sourceSampleRate,
+      sourceBitDepth: sourceBitDepth,
+      exportedAt: exportedAt,
+    );
+  }
 
   /// Starts the run. Returns false when there is nothing to listen to or DSP
   /// is off, in which case the screen keeps showing [AbxState.canStart] false.

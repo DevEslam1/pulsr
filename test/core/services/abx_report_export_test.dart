@@ -1,0 +1,112 @@
+// test/core/services/abx_report_export_test.dart
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/services/abx_report_export.dart';
+import 'package:pulsr/domain/models/abx_session.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late Directory tempDir;
+
+  setUp(() async {
+    tempDir = await Directory.systemTemp.createTemp('pulsr_abx_export_');
+  });
+
+  tearDown(() async {
+    if (tempDir.existsSync()) await tempDir.delete(recursive: true);
+  });
+
+  const usbDac = AbxOutputDeviceInfo(
+    name: 'FiiO KA17',
+    type: 'usb',
+    isUsbDac: true,
+    sampleRate: 96000,
+    bitDepth: 24,
+    isBitPerfectActive: false,
+  );
+
+  test('refuses to build a report from an incomplete session', () {
+    final session = AbxSession(trials: 12, seed: 42);
+    session.answer(AbxAnswer.a);
+
+    expect(
+      () => AbxReport.fromSession(
+        session,
+        outputDevice: usbDac,
+        sampleRate: 96000,
+        codec: 'FLAC',
+      ),
+      throwsStateError,
+    );
+  });
+
+  test(
+      'exports completed session JSON with trials, exact binomial p-value, verdict, device, rate, and codec',
+      () async {
+    final session = AbxSession(trials: 12, seed: 19);
+    for (final trial in session.trials) {
+      session.answer(
+        trial.hiddenX == AbxStimulus.a ? AbxAnswer.a : AbxAnswer.b,
+      );
+    }
+
+    final exportedAt = DateTime.utc(2026, 11, 20, 1, 2, 3);
+    final report = AbxReport.fromSession(
+      session,
+      outputDevice: usbDac,
+      sampleRate: 96000,
+      codec: 'FLAC',
+      trackTitle: 'Reference Track',
+      trackArtist: 'Studio Ensemble',
+      sourceSampleRate: 96000,
+      sourceBitDepth: 24,
+      exportedAt: exportedAt,
+    );
+
+    final artifact = await exportAbxReport(report, directory: tempDir);
+    expect(artifact.file.existsSync(), isTrue);
+
+    final decoded =
+        jsonDecode(await artifact.file.readAsString()) as Map<String, dynamic>;
+    expect(decoded['schemaVersion'], 1);
+    expect(decoded['kind'], 'abx_report');
+    expect(decoded['exportedAt'], exportedAt.toIso8601String());
+    expect(decoded['totalTrials'], 12);
+    expect(decoded['answeredTrials'], 12);
+    expect(decoded['correctCount'], 12);
+    expect(decoded['proportionCorrect'], 1.0);
+    // 12/12 under H0: p = 0.5 -> 2^-12 = 0.000244140625
+    expect(decoded['pValue'], closeTo(0.000244140625, 1e-12));
+    expect(decoded['confidence'], closeTo(1.0 - 0.000244140625, 1e-12));
+    expect(decoded['verdict'], AbxSession.strongKey);
+    expect(decoded['sampleRate'], 96000);
+    expect(decoded['codec'], 'FLAC');
+
+    final device = decoded['outputDevice'] as Map<String, dynamic>;
+    expect(device['name'], 'FiiO KA17');
+    expect(device['type'], 'usb');
+    expect(device['isUsbDac'], isTrue);
+    expect(device['sampleRate'], 96000);
+    expect(device['bitDepth'], 24);
+
+    final track = decoded['track'] as Map<String, dynamic>;
+    expect(track['title'], 'Reference Track');
+    expect(track['artist'], 'Studio Ensemble');
+    expect(track['codec'], 'FLAC');
+    expect(track.containsKey('path'), isFalse);
+
+    final trials = (decoded['trials'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    expect(trials, hasLength(12));
+    for (var i = 0; i < 12; i++) {
+      expect(trials[i]['index'], i);
+      expect(trials[i]['trialNumber'], i + 1);
+      expect(trials[i]['hiddenX'], anyOf('a', 'b'));
+      expect(trials[i]['answer'], trials[i]['hiddenX']);
+      expect(trials[i]['correct'], isTrue);
+    }
+  });
+}
