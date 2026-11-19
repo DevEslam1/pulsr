@@ -35,6 +35,7 @@ class AudioFormats {
     'it',
     'xm',
     's3m',
+    'dst',
   };
 
   /// Extensions excluded from playable library scanning. The native tier is

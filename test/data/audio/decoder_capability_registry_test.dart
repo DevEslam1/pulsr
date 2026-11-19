@@ -83,6 +83,7 @@ void main() {
       'it',
       'xm',
       's3m',
+      'dst',
     ];
 
     final expectations = <String, DecoderSupport>{

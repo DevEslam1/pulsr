@@ -13,6 +13,7 @@ import '../../core/di/injection.dart';
 import '../../core/services/playlist_suggestions_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import '../audio/mp4_box_parser.dart';
 import '../db/app_database.dart';
 
 class ScanError {
@@ -655,9 +656,9 @@ class MediaScannerService {
       if (tags == null) return;
 
       int? sampleRate = _asInt(tags['sampleRate']);
-      final bitDepth = _asInt(tags['bitsPerSample']);
+      int? bitDepth = _asInt(tags['bitsPerSample']);
       // Header bitRate is in kbps for lossy, bps-ish for some lossless; jaudiotagger reports kbps here.
-      final bitrateKbps = _asInt(tags['bitRate']);
+      int? bitrateKbps = _asInt(tags['bitRate']);
       String? codec = (tags['format'] as String?)?.trim();
       final lraVal = (tags['loudnessRange'] as num?)?.toDouble();
 
@@ -670,6 +671,29 @@ class MediaScannerService {
         sampleRate ??= 48000;
         if (sampleRate <= 0) sampleRate = 48000;
         codec ??= 'OPUS';
+      }
+
+      final isMp4 = pathLower.endsWith('.m4a') ||
+          pathLower.endsWith('.mp4') ||
+          pathLower.endsWith('.m4b') ||
+          pathLower.endsWith('.m4p') ||
+          pathLower.endsWith('.alac');
+      if (isMp4) {
+        final mp4Probe = await Mp4BoxParser.probePath(path);
+        if (mp4Probe.hasAudioTrack) {
+          codec = mp4Probe.codec;
+          if (mp4Probe.sampleRate != null && mp4Probe.sampleRate! > 0) {
+            sampleRate = mp4Probe.sampleRate;
+          }
+          if (mp4Probe.bitDepth != null && mp4Probe.bitDepth! > 0) {
+            bitDepth = mp4Probe.bitDepth;
+          } else if (mp4Probe.isAac) {
+            bitDepth = null;
+          }
+          if (mp4Probe.bitrateKbps != null && mp4Probe.bitrateKbps! > 0) {
+            bitrateKbps = mp4Probe.bitrateKbps;
+          }
+        }
       }
 
       await _repository.updateAudioQuality(
@@ -760,8 +784,8 @@ class MediaScannerService {
             });
             if (tags != null) {
               int? sampleRate = _asInt(tags['sampleRate']);
-              final bitDepth = _asInt(tags['bitsPerSample']);
-              final bitrateKbps = _asInt(tags['bitRate']);
+              int? bitDepth = _asInt(tags['bitsPerSample']);
+              int? bitrateKbps = _asInt(tags['bitRate']);
               String? codec = (tags['format'] as String?)?.trim();
               final lraVal = (tags['loudnessRange'] as num?)?.toDouble();
 
@@ -774,6 +798,29 @@ class MediaScannerService {
                 sampleRate ??= 48000;
                 if (sampleRate <= 0) sampleRate = 48000;
                 codec ??= 'OPUS';
+              }
+
+              final isMp4 = pathLower.endsWith('.m4a') ||
+                  pathLower.endsWith('.mp4') ||
+                  pathLower.endsWith('.m4b') ||
+                  pathLower.endsWith('.m4p') ||
+                  pathLower.endsWith('.alac');
+              if (isMp4) {
+                final mp4Probe = await Mp4BoxParser.probePath(song.path);
+                if (mp4Probe.hasAudioTrack) {
+                  codec = mp4Probe.codec;
+                  if (mp4Probe.sampleRate != null && mp4Probe.sampleRate! > 0) {
+                    sampleRate = mp4Probe.sampleRate;
+                  }
+                  if (mp4Probe.bitDepth != null && mp4Probe.bitDepth! > 0) {
+                    bitDepth = mp4Probe.bitDepth;
+                  } else if (mp4Probe.isAac) {
+                    bitDepth = null;
+                  }
+                  if (mp4Probe.bitrateKbps != null && mp4Probe.bitrateKbps! > 0) {
+                    bitrateKbps = mp4Probe.bitrateKbps;
+                  }
+                }
               }
 
               final path = song.path;

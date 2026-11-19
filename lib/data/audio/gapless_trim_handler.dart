@@ -356,6 +356,10 @@ class GaplessTrimHandler {
         postTrim: mp3EncoderPadding,
       );
     }
+    final isAlac = c.contains('alac') || lower.endsWith('.alac');
+    if (isAlac) {
+      return const GaplessTrim();
+    }
     final isAac = c.contains('aac') ||
         c.contains('mp4a') ||
         lower.endsWith('.aac') ||

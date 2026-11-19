@@ -256,6 +256,12 @@ abstract final class DecoderCapabilityRegistry {
       support: DecoderSupport.notBundled,
       reasonCode: reasonNotBundled,
     ),
+    DecoderCapability(
+      extension: 'dst',
+      displayName: 'Direct Stream Transfer (DST)',
+      support: DecoderSupport.notBundled,
+      reasonCode: reasonNotBundled,
+    ),
   ];
 
   /// MIME types mapped onto the canonical extension. Container MIME types with
@@ -298,6 +304,7 @@ abstract final class DecoderCapabilityRegistry {
     'audio/x-it': 'it',
     'audio/x-xm': 'xm',
     'audio/x-s3m': 's3m',
+    'audio/x-dst': 'dst',
   };
 
   static final Map<String, DecoderCapability> _byExtension = () {
