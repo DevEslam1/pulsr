@@ -299,6 +299,22 @@ public final class PulsrOutputRouting {
      * Media3 float-tap configure, or zeros when it has not run yet.
      */
     public static synchronized int[] decodedPcmSnapshot() {
+        return decodedPcmSnapshotInternal(/*includePaused=*/false);
+    }
+
+    /**
+     * Same as {@link #decodedPcmSnapshot()}, but falls back to a single
+     * configured-but-paused sink when no sink is actively playing. Needed when
+     * negotiating exclusive mixer attributes inside a paused policy transition
+     * (otherwise the paused sink reports [0, 0, 0] and forces the DAC's max rate).
+     */
+    public static synchronized int[] decodedPcmSnapshotIncludingPaused() {
+        int[] playing = decodedPcmSnapshotInternal(/*includePaused=*/false);
+        if (playing[1] > 0) return playing;
+        return decodedPcmSnapshotInternal(/*includePaused=*/true);
+    }
+
+    private static int[] decodedPcmSnapshotInternal(boolean includePaused) {
         PulsrAudioSink active = null;
         final Iterator<Map.Entry<PulsrAudioSink, WeakReference<ExoPlayer>>> it =
                 decodedOwners.entrySet().iterator();
@@ -309,7 +325,9 @@ public final class PulsrOutputRouting {
                 continue;
             }
             final PulsrAudioSink sink = entry.getKey();
-            if (!sink.isPlayingForTelemetry()) continue;
+            if (includePaused ? !sink.hasConfiguredStreamForTelemetry() : !sink.isPlayingForTelemetry()) {
+                continue;
+            }
             // During crossfade there is no unique active session. Unknown is
             // safer than mixing one player's decoder with another's output.
             if (active != null) return new int[] {0, 0, 0};

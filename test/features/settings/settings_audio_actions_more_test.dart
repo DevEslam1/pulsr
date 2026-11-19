@@ -6,11 +6,13 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/di/injection.dart';
@@ -184,6 +186,7 @@ void main() {
         .thenAnswer((_) async {});
     when(() => handler.cancelActiveCrossfade()).thenAnswer((_) async {});
     when(() => handler.setTapSrcRate(any())).thenAnswer((_) async {});
+    when(() => handler.reconfigurePlaybackSink()).thenAnswer((_) async {});
     getIt.registerSingleton<PulsrAudioHandler>(handler);
     return handler;
   }
@@ -1192,5 +1195,125 @@ void main() {
     await pumpEventQueue();
     // A's compensation must not leak onto B: B falls back to the stored global.
     expect(cubit.state.bluetoothLatencyOffsetMs, globalMs);
+  });
+
+  group('bit-perfect transition ordering and tap-SRC safety', () {
+    test('disabling bit-perfect while playing pauses, reconfigures, plays before final refresh, and never passes USB sampleRate to tap-SRC',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final rig = _SourceTransitionRig()
+        ..song = _transitionSong(rate: 96000, depth: 24)
+        ..mixerEnableWorks = true;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(hiresChannel, rig.hiresCall);
+      messenger.setMockMethodCallHandler(usbChannel, rig.usbCall);
+      messenger.setMockMethodCallHandler(usbEvents, (_) async => null);
+      const hiresEvents = MethodChannel(PulsrChannels.hiresDacEvents);
+      messenger.setMockMethodCallHandler(hiresEvents, (_) async => null);
+      addTearDown(() => messenger.setMockMethodCallHandler(hiresEvents, null));
+
+      final events = <String>[];
+      final tapSrcRates = <int>[];
+      final handler = registeredHandler();
+      when(() => handler.currentSong).thenAnswer((_) => rig.song);
+      final playbackState =
+          BehaviorSubject<PlaybackState>.seeded(PlaybackState(playing: true));
+      addTearDown(playbackState.close);
+      when(() => handler.playbackState).thenReturn(playbackState);
+      when(() => handler.pause()).thenAnswer((_) async {
+        events.add('pause');
+      });
+      when(() => handler.play()).thenAnswer((_) async {
+        events.add('play');
+      });
+      when(() => handler.reconfigurePlaybackSink()).thenAnswer((_) async {
+        events.add('reconfigure');
+      });
+      when(() => handler.setTapSrcRate(any())).thenAnswer((inv) async {
+        final r = inv.positionalArguments.first as int;
+        tapSrcRates.add(r);
+        events.add('tapSrc:$r');
+      });
+      when(() => handler.setFloatOutputEnabled(any()))
+          .thenAnswer((_) async {});
+
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.bitPerfectOutput: true,
+        PrefsKeys.outputFormatNegotiationEnabled: true,
+      });
+      final hires = HiResAudioService();
+      addTearDown(hires.dispose);
+      final cubit = SettingsCubit(
+        scannerService: MockMediaScannerService(),
+        hiResAudioService: hires,
+      );
+      addTearDown(cubit.close);
+      await cubit.preferencesReady;
+      events.clear();
+      tapSrcRates.clear();
+
+      await cubit.setBitPerfectOutput(false);
+
+      expect(cubit.state.bitPerfectOutput, isFalse);
+      expect(events, containsAllInOrder(['pause', 'reconfigure', 'play']));
+      // USB DAC must never feed its own AudioTrack sampleRate (48000) into tap-SRC.
+      expect(tapSrcRates.where((r) => r > 0), isEmpty);
+    });
+
+    test('toggling bypassDspOnBitPerfect while playing wraps in muted sink rebuild',
+        () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final rig = _SourceTransitionRig()
+        ..song = _transitionSong()
+        ..mixerEnableWorks = true;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(hiresChannel, rig.hiresCall);
+      messenger.setMockMethodCallHandler(usbChannel, rig.usbCall);
+      messenger.setMockMethodCallHandler(usbEvents, (_) async => null);
+      const hiresEvents = MethodChannel(PulsrChannels.hiresDacEvents);
+      messenger.setMockMethodCallHandler(hiresEvents, (_) async => null);
+      addTearDown(() => messenger.setMockMethodCallHandler(hiresEvents, null));
+
+      final events = <String>[];
+      final handler = registeredHandler();
+      when(() => handler.currentSong).thenAnswer((_) => rig.song);
+      final playbackState =
+          BehaviorSubject<PlaybackState>.seeded(PlaybackState(playing: true));
+      addTearDown(playbackState.close);
+      when(() => handler.playbackState).thenReturn(playbackState);
+      when(() => handler.pause()).thenAnswer((_) async {
+        events.add('pause');
+      });
+      when(() => handler.play()).thenAnswer((_) async {
+        events.add('play');
+      });
+      when(() => handler.reconfigurePlaybackSink()).thenAnswer((_) async {
+        events.add('reconfigure');
+      });
+      when(() => handler.setFloatOutputEnabled(any()))
+          .thenAnswer((_) async {});
+
+      SharedPreferences.setMockInitialValues({
+        PrefsKeys.bitPerfectOutput: true,
+        PrefsKeys.bypassDspOnBitPerfect: true,
+        PrefsKeys.strictBitPerfect: false,
+      });
+      final hires = HiResAudioService();
+      addTearDown(hires.dispose);
+      final cubit = SettingsCubit(
+        scannerService: MockMediaScannerService(),
+        hiResAudioService: hires,
+      );
+      addTearDown(cubit.close);
+      await cubit.preferencesReady;
+      events.clear();
+
+      await cubit.setBypassDspOnBitPerfect(false);
+
+      expect(cubit.state.bypassDspOnBitPerfect, isFalse);
+      expect(events, containsAllInOrder(['pause', 'reconfigure', 'play']));
+    });
   });
 }

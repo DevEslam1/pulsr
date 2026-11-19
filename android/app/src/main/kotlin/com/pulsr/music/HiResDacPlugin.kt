@@ -1609,6 +1609,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         if (!enabled) {
             val clearTarget = trackedUsb ?: usbDevice
+            val wasFallbackRoute = directRouteFallbackActive
             val confirmed = clearMixerOwnership(clear = {
                 if (!mixerAttributesApplied) true
                 else if (clearTarget == null || Build.VERSION.SDK_INT < 34) false
@@ -1623,7 +1624,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 bitPerfectRequested = false
                 directRouteFallbackActive = false
                 bitPerfectUsbDeviceId = null
+                targetSampleRate = 0
+                targetBitDepth = 0
             })
+            if (confirmed && wasFallbackRoute && selectedDeviceId == null) {
+                try { com.ryanheise.just_audio.PulsrOutputRouting.select(null) } catch (_: Throwable) {}
+            }
             if (!confirmed) lastBitPerfectReason = "clear_mixer_attributes_failed"
             return confirmed
         }
@@ -1639,14 +1645,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         // With no explicit user target, aim the mixer at the format the decoder
         // is actually producing instead of whichever rate the DAC advertises as
-        // its highest. A zero snapshot means no track format is known yet, in
-        // which case both targets stay 0 and the selection is unchanged. The
-        // persisted targetSampleRate/targetBitDepth fields are not mutated: only
-        // this negotiation uses the live values.
+        // its highest. Include configured-but-paused streams because
+        // applyBitPerfectPolicyMuted pauses playback before calling here.
         val effectiveTargetRate: Int
         val effectiveTargetDepth: Int
         if (targetSampleRate == 0 && targetBitDepth == 0) {
-            val liveFormat = com.ryanheise.just_audio.PulsrOutputRouting.decodedPcmSnapshot()
+            val liveFormat = com.ryanheise.just_audio.PulsrOutputRouting.decodedPcmSnapshotIncludingPaused()
             effectiveTargetRate = liveFormat[1].coerceAtLeast(0)
             effectiveTargetDepth = encodingBitDepth(liveFormat[0])
         } else {
@@ -1941,11 +1945,30 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val routeDevice = resolveCurrentRouteDevice(devices)
         val routeUsbDevice = routeDevice?.takeIf { isUsbOutputType(it.type) }
         val mixerTarget = routeUsbDevice ?: usbDevice
+        // Check Direct USB ownership BEFORE resolving isUsb/activeType: while
+        // UsbExclusivePlugin owns the isochronous interface, snd-usb-audio is
+        // intentionally detached so AudioManager.GET_DEVICES_OUTPUTS temporarily
+        // drops TYPE_USB_DEVICE. Reporting "Phone Speaker" there made
+        // SettingsCubit think the DAC was unplugged and tear down Bit-Perfect
+        // 200 ms after startup! Only an active Bluetooth route overrides it.
+        val directStream = UsbExclusivePlugin.confirmedDirectStream()
+        val routeIsBluetooth = routeDevice != null && isBluetoothOutputType(routeDevice.type)
+        val directOwnsUsb = directStream != null && !routeIsBluetooth
 
-        val isUsb = routeUsbDevice != null
-        val deviceName =
-            if (routeDevice != null) getCleanDeviceName(routeDevice)
-            else "Output route unverified"
+        val isUsb = routeUsbDevice != null || directOwnsUsb
+        val deviceName = when {
+            routeUsbDevice != null -> getCleanDeviceName(routeUsbDevice)
+            directOwnsUsb -> {
+                val n = directStream!!.deviceName.trim()
+                when {
+                    n.isEmpty() -> "USB Audio DAC"
+                    n.contains("(USB DAC)", ignoreCase = true) -> n
+                    else -> "$n (USB DAC)"
+                }
+            }
+            routeDevice != null -> getCleanDeviceName(routeDevice)
+            else -> "Output route unverified"
+        }
 
         val sampleRates = routeDevice?.sampleRates?.toList()?.filter { it > 0 } ?: emptyList()
 
@@ -2030,8 +2053,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             ))
         }
 
-        val isBluetooth = routeDevice != null && isBluetoothOutputType(routeDevice.type)
+        val isBluetooth = routeIsBluetooth
         val activeType = when {
+            directOwnsUsb -> "usb"
             routeDevice == null -> "unknown"
             isUsbOutputType(routeDevice.type) -> "usb"
             isWiredOutputType(routeDevice.type) -> "wired"
@@ -2086,7 +2110,6 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     encodingBitDepth(activeMixerEncoding) >= reportedDepth))
         // Confirmed only when the sink itself is alive AND still owns the
         // endpoint it opened: a boolean alone could outlive a device unplug.
-        val directStream = UsbExclusivePlugin.confirmedDirectStream()
         val directActive = isUsb && !isBluetooth && directStream != null
         val finalIsBitPerfectActive = isUsb && !isBluetooth && (mixerActive || directActive)
         val failureReason = when {

@@ -139,6 +139,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     int[] decodedPcmSnapshot() { return decodedPcm.clone(); }
     boolean isPlayingForTelemetry() { return playWhenReady && format != null && !released; }
+    boolean hasConfiguredStreamForTelemetry() { return format != null && !released; }
 
     /**
      * Decoded input PCM encoding of the configured stream (Media3
@@ -272,7 +273,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         try {
             player.createMessage((messageType, payload) -> {
                 try {
-                    applyPendingMode(true);
+                    reconfigureOnPlaybackThread();
                 } finally {
                     done.countDown();
                 }
@@ -282,6 +283,40 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    @Override
+    public void reconfigureAsync(java.util.function.Consumer<Boolean> onComplete) {
+        final ExoPlayer player = playerSupplier.get();
+        if (released || player == null || format == null || currentInner == null) {
+            onComplete.accept(false);
+            return;
+        }
+        try {
+            player.createMessage((messageType, payload) -> {
+                boolean applied = false;
+                try {
+                    applied = reconfigureOnPlaybackThread();
+                } finally {
+                    onComplete.accept(applied);
+                }
+            }).send();
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Could not schedule async audio sink reconfigure", e);
+            onComplete.accept(false);
+        }
+    }
+
+    private boolean reconfigureOnPlaybackThread() {
+        if (released || format == null || currentInner == null) return false;
+        // When paused with a partially-written buffer staged, flush the old
+        // inner first so applyPendingMode(true) runs immediately instead of
+        // silently deferring until after play() resumes on the stale sink.
+        if (!playWhenReady && hasStagedInput() && inner != null) {
+            inner.flush();
+        }
+        applyPendingMode(true);
+        return true;
     }
 
     /** Runs on the playback thread; also directly callable from unit tests. */

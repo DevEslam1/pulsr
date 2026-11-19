@@ -198,15 +198,19 @@ class AudioSignalPath {
     final hwRateText = hwRate > 0 ? formatRate(hwRate) : 'Unverified rate';
     final hwDepthText = hwDepth > 0 ? '$hwDepth-bit' : 'Unknown depth';
     // Only a verified state may say Bit-Perfect. When a state exists and is
-    // not verified, the honest tag is that the route is exclusive at best.
+    // not verified, the honest tag is that the route is exclusive at best -
+    // and `armed` is not exclusive at all: the platform never confirmed a sink,
+    // so it is intent only and must not borrow the exclusive wording.
+    final tier = bitPerfectState?.tier;
     final statusTag = bitPerfect
         ? 'Bit-Perfect'
         : (isBt
             ? 'Lossy A2DP/LE'
-            : ((bitPerfectState != null &&
-                    bitPerfectState.tier != BitPerfectTier.off)
-                ? 'Exclusive / Unverified'
-                : (direct ? 'Direct PCM' : 'OS Mixer')));
+            : (tier == BitPerfectTier.armed
+                ? 'Arming'
+                : (tier != null && tier != BitPerfectTier.off
+                    ? 'Exclusive / Unverified'
+                    : (direct ? 'Direct PCM' : 'OS Mixer'))));
     final hwText = '$driver • $hwDepthText / $hwRateText ($statusTag)';
 
     return AudioSignalPath(

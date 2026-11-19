@@ -1413,6 +1413,19 @@ class PulsrAudioHandler extends BaseAudioHandler
         final volumeSync = _syncOutputVolumeBeforeLoad();
         if (volumeSync != null) await volumeSync;
       } else if (previous == true) {
+        // Synchronously reset any Direct USB software attenuation before
+        // resuming normal playback so an async statusStream event cannot race
+        // with play() and leave output muted/attenuated.
+        if (PlatformCapabilities.isAndroid &&
+            _lastDirectUsbVolume >= 0.0 &&
+            (_lastDirectUsbVolume - 1.0).abs() >= 1e-6) {
+          _lastDirectUsbVolume = -1.0;
+          try {
+            await AudioEffectsChannel().setDirectUsbVolume(1.0);
+          } catch (_) {}
+        } else {
+          _lastDirectUsbVolume = -1.0;
+        }
         await restorePersistedSpeed();
         final skip = silenceSkipController.enabled;
         await Future.wait([

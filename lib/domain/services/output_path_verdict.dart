@@ -114,7 +114,10 @@ class OutputPathVerdict {
       return OutputPathVerdict(
         OutputPathQuality.losslessProcessed,
         'EXCLUSIVE',
-        _withReason(format, bitPerfectState?.reasonCode),
+        // The format only. Why the chain is not verified belongs to the
+        // diagnostics screen, which has the localized wording; a machine code
+        // appended here ("· rate_unknown") is not user-facing text.
+        format,
       );
     }
 
@@ -133,10 +136,6 @@ class OutputPathVerdict {
     );
   }
 
-  static String _withReason(String detail, String? reasonCode) =>
-      reasonCode == null || reasonCode.isEmpty
-          ? detail
-          : '$detail · $reasonCode';
 
   static String _khz(int hz) {
     final k = hz / 1000.0;

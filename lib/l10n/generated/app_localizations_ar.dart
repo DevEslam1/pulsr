@@ -4102,6 +4102,55 @@ class AppLocalizationsAr extends AppLocalizations {
   String get bpChainInactive => 'وضع بت-بيرفكت مُفعّل لكنه غير نشط';
 
   @override
+  String get bpChainNotRequested => 'Bit-Perfect متوقف • لم يتم القياس';
+
+  @override
+  String get bpReasonSamplesModified => 'تم تعديل العينات بواسطة DSP';
+
+  @override
+  String get bpReasonHalEffect => 'تأثير HAL نشط';
+
+  @override
+  String get bpReasonSystemEffect => 'تأثير النظام نشط';
+
+  @override
+  String get bpReasonFloatConversion => 'تحويل إلى الفاصلة العائمة';
+
+  @override
+  String get bpReasonRateUnknown => 'معدل الإخراج غير معروف';
+
+  @override
+  String get bpReasonRateNotVerified => 'معدل الإخراج غير موثق';
+
+  @override
+  String get bpReasonDepthUnknown => 'عمق الإخراج غير معروف';
+
+  @override
+  String get bpReasonSourceDepthUnknown => 'عمق المصدر غير معروف';
+
+  @override
+  String get bpReasonSourceLossy =>
+      'مصدر مضغوط بفقدان • لا يمكن الجزم بالبت المثالي';
+
+  @override
+  String get bpReasonPrecisionNotPreserved => 'دقة المصدر غير محفوظة';
+
+  @override
+  String get bpReasonChannelsRemapped => 'أعاد المستقبل تعيين القنوات';
+
+  @override
+  String get bpReasonDopCarrier => 'حامل DoP • بتات العلامة غير مقيسة';
+
+  @override
+  String get bpReasonGainUnknown => 'تعذر قراءة كسب البرنامج';
+
+  @override
+  String get bpReasonNotExclusive => 'المسار غير حصري';
+
+  @override
+  String get bpReasonUnknown => 'غير موثق • السبب غير متاح';
+
+  @override
   String bpMoreEffects(int count) {
     return '+$count تأثيرات إضافية';
   }
@@ -4111,10 +4160,6 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get bpDspCleanPath => 'لا يوجد (مسار نظيف)';
-
-  @override
-  String get bpPlatformConversion =>
-      'تحويل المنصة • لم يتم قياسه بواسطة هذا التطبيق';
 
   @override
   String get btAudioCodec => 'كودك البلوتوث';

@@ -674,6 +674,211 @@ void main() {
     expect(find.textContaining('48 kHz'), findsWidgets);
   });
 
+  testWidgets('hardware endpoint reports the format the platform opened',
+      (tester) async {
+    final player = stubPlayerCubit();
+    final settings = stubSettingsCubit(
+      state: const SettingsState().copyWith(
+        // Bit-Perfect is off: nothing was requested, so the endpoint row may
+        // not read as a failed verification when the format is known.
+        currentOutputDevice: AudioOutputInfo(
+          deviceName: 'Phone Speaker',
+          isUsbDac: false,
+          sampleRate: 48000,
+          bitDepth: 16,
+          isBitPerfectActive: false,
+          sinkSampleRate: 48000,
+          sinkBitDepth: 16,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+    await _openDiagnosticsTab(tester);
+
+    expect(
+      find.textContaining('48 kHz / 16-bit reported by platform'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('hardware format not verified'), findsNothing);
+  });
+
+  testWidgets('hardware endpoint falls back to the reported route format',
+      (tester) async {
+    final player = stubPlayerCubit();
+    final settings = stubSettingsCubit(
+      state: const SettingsState().copyWith(
+        // No sink truth fields: the route's reported format is the only
+        // measurement left, so it must still name the endpoint format.
+        currentOutputDevice: AudioOutputInfo(
+          deviceName: 'Wired Buds',
+          isUsbDac: false,
+          sampleRate: 44100,
+          bitDepth: 16,
+          isBitPerfectActive: false,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+    await _openDiagnosticsTab(tester);
+
+    expect(
+      find.textContaining('44.1 kHz / 16-bit reported by platform'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('hardware format not verified'), findsNothing);
+  });
+
+  testWidgets('hardware endpoint stays unverified with no reported format',
+      (tester) async {
+    final player = stubPlayerCubit();
+    final settings = stubSettingsCubit(
+      state: const SettingsState().copyWith(
+        currentOutputDevice: const AudioOutputInfo(
+          deviceName: 'Mystery Output',
+          isUsbDac: false,
+          sampleRate: 0,
+          bitDepth: 0,
+          isBitPerfectActive: false,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+    await _openDiagnosticsTab(tester);
+
+    expect(
+      find.textContaining('Mystery Output • hardware format not verified'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('float carrier keeps the endpoint depth unverified',
+      (tester) async {
+    final player = stubPlayerCubit();
+    final settings = stubSettingsCubit(
+      state: const SettingsState().copyWith(
+        currentOutputDevice: AudioOutputInfo(
+          deviceName: 'Float Sink',
+          isUsbDac: false,
+          sampleRate: 48000,
+          // The display depth is the collapsed decoder grid; the container the
+          // sink opened is float32, so no integer depth was ever reported.
+          bitDepth: 24,
+          isBitPerfectActive: false,
+          sinkSampleRate: 48000,
+          floatCarrierDecodesSource: true,
+        ),
+        bitPerfectOutput: true,
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+    await _openDiagnosticsTab(tester);
+
+    expect(
+      find.textContaining('Float Sink • hardware format not verified'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('24-bit reported by platform'), findsNothing);
+  });
+
+  testWidgets('bit-perfect off names no conversion instead of a catch-all',
+      (tester) async {
+    final player = stubPlayerCubit();
+    final settings = stubSettingsCubit(
+      state: const SettingsState().copyWith(
+        currentOutputDevice: AudioOutputInfo(
+          deviceName: 'Phone Speaker',
+          isUsbDac: false,
+          sampleRate: 48000,
+          bitDepth: 16,
+          isBitPerfectActive: false,
+          sinkSampleRate: 48000,
+          sinkBitDepth: 16,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+    await _openDiagnosticsTab(tester);
+
+    // Nothing was requested, so nothing may claim a platform conversion the
+    // app never measured. The old catch-all said exactly that.
+    expect(
+      find.textContaining(_l10n(tester).bpChainNotRequested),
+      findsWidgets,
+    );
+    expect(find.textContaining('Platform conversion'), findsNothing);
+  });
+
+  testWidgets('a HAL stage never reads as a verified chain', (tester) async {
+    _registerUnityTransport();
+    final player = stubPlayerCubit(
+      state: const PlayerState(
+        playback: PlaybackSlice(currentSong: testSong),
+      ),
+    );
+    final settings = stubSettingsCubit(
+      state: const SettingsState(
+        bitPerfectOutput: true,
+        currentOutputDevice: AudioOutputInfo(
+          deviceName: 'Topping D90',
+          isUsbDac: true,
+          sampleRate: 96000,
+          bitDepth: 24,
+          isBitPerfectActive: true,
+          sinkSampleRate: 96000,
+          sinkBitDepth: 24,
+          integerBypassActive: true,
+          // A HAL AudioEffect the app cannot prove bypassed: the format still
+          // agrees with the source, so the assessment says `verified` while
+          // the tier is degraded.
+          halStagesActive: 1,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(_host(
+      settings: settings,
+      player: player,
+      sheet: const AudioQualitySheet(song: testSong, activeColor: Colors.teal),
+    ));
+    await tester.pump();
+    await _openDiagnosticsTab(tester);
+
+    // Format agreement is not sample identity: the row names the HAL effect
+    // instead of printing "Bit-perfect chain verified" off the assessment.
+    expect(find.textContaining(_l10n(tester).bpChainVerified), findsNothing);
+    expect(find.textContaining('HAL effect active'), findsWidgets);
+  });
+
   testWidgets('DSD source and active DSP stages render in the signal chain',
       (tester) async {
     const dsdSong = SongsTableData(

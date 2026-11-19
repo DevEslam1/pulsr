@@ -70,6 +70,26 @@ inline int ioctl(int, unsigned long, ...) { return -1; }
 #include <cstring>
 #include <new>
 
+// Abandon() and the destructor deliberately leak the URB header storage and
+// packet payloads the kernel may still be writing to. Those allocations are
+// permanent by design, so tell LeakSanitizer about them instead of disabling
+// leak detection for the whole suite. Only sanitizer runtimes that publish
+// __lsan_ignore_object are annotated; every other build expands to a no-op.
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define PULSR_HAS_ADDRESS_SANITIZER 1
+#endif
+#endif
+#if defined(__SANITIZE_ADDRESS__)
+#define PULSR_HAS_ADDRESS_SANITIZER 1
+#endif
+#if (defined(__linux__) || defined(__ANDROID__)) && defined(PULSR_HAS_ADDRESS_SANITIZER)
+extern "C" void __lsan_ignore_object(const void* p);
+#define PULSR_LSAN_IGNORE_OBJECT(ptr) __lsan_ignore_object(static_cast<const void*>(ptr))
+#else
+#define PULSR_LSAN_IGNORE_OBJECT(ptr) ((void)(ptr))
+#endif
+
 namespace pulsr {
 
 namespace {
@@ -87,13 +107,36 @@ UsbAudioSink& UsbAudioSink::instance() {
 }
 
 UsbAudioSink::~UsbAudioSink() {
-    Close();
+    // A joinable worker must always be reaped; otherwise ~thread terminates.
+    if (worker_.joinable()) {
+        running_.store(false, std::memory_order_release);
+        active_.store(false, std::memory_order_release);
+        worker_.join();
+    }
+    // Close() publishes to AudioDspEngine/DspEngineRegistry. At static
+    // destruction those singletons may already be gone, so only run the full
+    // teardown when this sink still owns a stream, a claim or a publication.
+    if (active_.load(std::memory_order_acquire) ||
+        exclusive_.load(std::memory_order_acquire) || sinkDepthPublished_ ||
+        hasOutstandingUrbs()) {
+        Close();
+    }
     if (hasOutstandingUrbs()) {
         // A fatal reap error is not proof of returned kernel ownership. Keep
         // header allocations and payloads alive even at static destruction.
         // Payload pointers deliberately leak; moving storage preserves addresses.
-        (void)new std::vector<uint8_t>(std::move(urbStorage_));
-        (void)new std::vector<uint8_t>(std::move(feedbackUrbStorage_));
+        // The allocation is bound to a local first: the annotation macro is a
+        // no-op outside sanitizer builds and must never swallow the new.
+        auto* leakedOut = new std::vector<uint8_t>(std::move(urbStorage_));
+        PULSR_LSAN_IGNORE_OBJECT(leakedOut);
+        auto* leakedIn = new std::vector<uint8_t>(std::move(feedbackUrbStorage_));
+        PULSR_LSAN_IGNORE_OBJECT(leakedIn);
+        for (uint8_t* payload : urbBuffers_) {
+            if (payload) PULSR_LSAN_IGNORE_OBJECT(payload);
+        }
+        for (uint8_t* payload : feedbackBuffers_) {
+            if (payload) PULSR_LSAN_IGNORE_OBJECT(payload);
+        }
     }
 }
 
@@ -115,7 +158,8 @@ bool UsbAudioSink::submitAll(UrbSubmit submit) {
 
 UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNumber,
                                    int altSetting, int sampleRate, int channels,
-                                   int bytesPerSample, int validBitDepth) {
+                                   int bytesPerSample, int validBitDepth,
+                                   bool alreadyConfigured) {
     std::lock_guard<std::mutex> control(controlMutex_);
     const int effectiveBits = validBitDepth == 0 && bytesPerSample >= 2 && bytesPerSample <= 4
         ? bytesPerSample * 8 : validBitDepth;
@@ -159,9 +203,12 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     if (worker_.joinable()) {
         worker_.join();
     }
-    releaseResources(); // also tears down a worker that self-exited
-    if (hasOutstandingUrbs()) {
-        lastError_.store(EBUSY, std::memory_order_release);
+    // A prior drain that failed leaves kernel-owned storage and HAL exclusivity
+    // live. Never start a new stream on top of that half-torn-down sink.
+    if (!releaseResources() || hasOutstandingUrbs()) {
+        if (lastError_.load(std::memory_order_acquire) == 0) {
+            lastError_.store(EBUSY, std::memory_order_release);
+        }
         return UsbStreamResult::ClaimFailed; // never overwrite kernel-owned storage
     }
 
@@ -211,27 +258,33 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         return UsbStreamResult::RateUnsupported;
     }
     maxFramesPerPacket_ = std::min(capacityFrames, nominalFrames + 1);
-    // Claim the AudioStreaming interface (force: detaches the kernel audio
-    // driver so the HAL can no longer own the endpoint) and select the alt
-    // setting that exposes the isochronous OUT endpoint.
-    int iface = interfaceNumber_;
-    if (ioctl(fd_, USBDEVFS_CLAIMINTERFACE, &iface) < 0) {
-        lastError_.store(errno, std::memory_order_relaxed);
-        releaseResources();
-        return UsbStreamResult::ClaimFailed;
-    }
-    claimed_ = true;
-
-    struct usbdevfs_setinterface si {};
-    si.interface = static_cast<unsigned int>(interfaceNumber_);
-    si.altsetting = static_cast<unsigned int>(altSetting_);
-    // Best-effort: some HALs already selected the alt setting.
-    if (ioctl(fd_, USBDEVFS_SETINTERFACE, &si) < 0) {
-        if (errno != 0 && errno != EBUSY && altSetting_ > 0) {
+    // When Kotlin already claimed the interface, selected the alternate setting
+    // and programmed+verified the DAC sample clock, do NOT send a second
+    // USBDEVFS_SETINTERFACE here: on many UAC1/UAC2 DACs a redundant
+    // SET_INTERFACE resets the sample clock back to 48 kHz while the host
+    // streams at the track rate (producing slow/glitchy playback).
+    if (!alreadyConfigured) {
+        int iface = interfaceNumber_;
+        if (ioctl(fd_, USBDEVFS_CLAIMINTERFACE, &iface) < 0) {
             lastError_.store(errno, std::memory_order_relaxed);
             releaseResources();
-            return UsbStreamResult::AltSettingFailed;
+            return UsbStreamResult::ClaimFailed;
         }
+        claimed_ = true;
+
+        struct usbdevfs_setinterface si {};
+        si.interface = static_cast<unsigned int>(interfaceNumber_);
+        si.altsetting = static_cast<unsigned int>(altSetting_);
+        // Best-effort: some HALs already selected the alt setting.
+        if (ioctl(fd_, USBDEVFS_SETINTERFACE, &si) < 0) {
+            if (errno != 0 && errno != EBUSY && altSetting_ > 0) {
+                lastError_.store(errno, std::memory_order_relaxed);
+                releaseResources();
+                return UsbStreamResult::AltSettingFailed;
+            }
+        }
+    } else {
+        claimed_ = false;
     }
 
     const int maxBytesPerPacket = maxFramesPerPacket_ * frameBytes;
@@ -270,11 +323,11 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     ring_.assign(capFrames * static_cast<size_t>(frameBytes), 0);
     ringRawDepth_.assign(capFrames, 0);
     ringFrameMask_ = capFrames - 1;
-    // 200 ms of cushion (capped to half the ring): long enough to absorb app,
-    // USB and scheduler jitter. The producer cannot get much further ahead than
-    // the AudioTrack buffer (250 ms), so a larger target would only time out.
+    // 120 ms of cushion (capped to half the ring): sits comfortably inside
+    // ExoPlayer's 250 ms AudioTrack buffer so the producer reaches prefill
+    // immediately without stalling, while absorbing app/USB scheduler jitter.
     prefillFrames_ = std::min(
-        static_cast<size_t>(sampleRate_) * 200 / 1000,
+        static_cast<size_t>(sampleRate_) * 120 / 1000,
         capFrames / 2);
     ringRead_.store(0, std::memory_order_relaxed);
     ringWrite_.store(0, std::memory_order_relaxed);
@@ -373,7 +426,7 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
 #endif
 }
 
-void UsbAudioSink::Close() {
+bool UsbAudioSink::Close() {
     std::lock_guard<std::mutex> control(controlMutex_);
     if (active_.load(std::memory_order_acquire) || underrunCount_.load() > 0 ||
         overrunCount_.load() > 0) {
@@ -395,7 +448,98 @@ void UsbAudioSink::Close() {
         worker_.join();
     }
 
-    releaseResources();
+    return releaseResources();
+}
+
+void UsbAudioSink::Abandon() {
+    std::lock_guard<std::mutex> control(controlMutex_);
+    // Stop the worker first: nothing it writes may look live afterwards.
+    writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
+    running_.store(false, std::memory_order_release);
+    active_.store(false, std::memory_order_release);
+    if (worker_.joinable()) {
+        worker_.join();
+    }
+    // An admitted producer keeps its ring slot until it leaves. The gate is
+    // already closed, so this terminates after the current writer.
+    while (writerGate_.load(std::memory_order_acquire) & kWriterBusy) {
+        std::this_thread::yield();
+    }
+    producerOwner_.store(0, std::memory_order_release);
+    producerRawDepth_.store(0, std::memory_order_release);
+    // A new stream starts as plain PCM; the JNI tap re-declares DoP on its next
+    // direct-USB block. Reset the marker phase so it starts on 0x05 like every
+    // other DoP framer in this codebase.
+    producerIsDop_.store(false, std::memory_order_relaxed);
+    dopMarkerPhase_ = kDopMarkerA;
+    deliveryEpoch_.fetch_add(1, std::memory_order_acq_rel);
+    rawPcmStatus_.store(0, std::memory_order_release);
+    if (sinkDepthPublished_) {
+        DspEngineRegistry::instance().setSinkBitDepth(0);
+        sinkDepthPublished_ = false;
+    }
+    // No live Direct USB endpoint any more: gate directUsbGain back to unity so
+    // an attenuation left over from this DAC cannot scale a speaker/Bluetooth
+    // stream that is still claiming bit-perfect.
+    AudioDspEngine::instance().updateParams([](DspParamSnapshot& snap) {
+        snap.bitPerfect.directUsbActive = false;
+    });
+
+    // The caller has force-released the interface and closed the connection, so
+    // this fd is dead: no RELEASEINTERFACE/CONNECT ioctl may run and no URB can
+    // ever be reaped. Anything the kernel may still write through must stay
+    // allocated for the lifetime of the process. Moving the header storage into
+    // a leaked vector keeps every URB address valid (urbs_ points into it); the
+    // packet payloads are leaked by dropping their pointers without delete[].
+    // LSan is told about each allocation so leak checking stays meaningful for
+    // the rest of the suite while the intentional leak remains documented here.
+    if (!urbStorage_.empty()) {
+        auto* leakedOut = new std::vector<uint8_t>(std::move(urbStorage_));
+        PULSR_LSAN_IGNORE_OBJECT(leakedOut);
+    }
+    if (!feedbackUrbStorage_.empty()) {
+        auto* leakedIn = new std::vector<uint8_t>(std::move(feedbackUrbStorage_));
+        PULSR_LSAN_IGNORE_OBJECT(leakedIn);
+    }
+    for (uint8_t* payload : urbBuffers_) {
+        if (payload) PULSR_LSAN_IGNORE_OBJECT(payload);
+    }
+    for (uint8_t* payload : feedbackBuffers_) {
+        if (payload) PULSR_LSAN_IGNORE_OBJECT(payload);
+    }
+    urbBuffers_.clear();     // payload arrays deliberately leaked
+    feedbackBuffers_.clear(); // payload arrays deliberately leaked
+    urbs_.clear();
+    feedbackUrbs_.clear();
+    urbOwned_.clear();
+    feedbackOwned_.clear();
+    urbRawDepth_.clear();
+    urbDeliveryEpoch_.clear();
+    urbStride_ = 0;
+    numUrbs_ = 0;
+    feedbackUrbStride_ = 0;
+    numFeedbackUrbs_ = 0;
+    feedbackPacketsPerUrb_ = 0;
+    feedbackEndpoint_ = 0;
+    feedbackPacketSize_ = 0;
+    // The producer is stopped and the gate is closed, so the ring can go.
+    ring_.clear();
+    ring_.shrink_to_fit();
+    ringRawDepth_.clear();
+    ringRawDepth_.shrink_to_fit();
+    ringFrameMask_ = 0;
+    prefillFrames_ = 0;
+    ringWrite_.store(0, std::memory_order_relaxed);
+    ringRead_.store(0, std::memory_order_relaxed);
+    // No fd, no claim, no exclusivity: the next Open starts from scratch instead
+    // of draining a dead descriptor forever.
+    claimed_ = false;
+    fd_ = -1;
+    exclusive_.store(false, std::memory_order_release);
+    // A completed forced teardown is not a live fault: drop the ETIMEDOUT (or
+    // any other error) the failed drain left here so the sink matches its
+    // pristine pre-Open contract and status reads stop reporting a dead stream.
+    lastError_.store(0, std::memory_order_release);
 }
 
 bool UsbAudioSink::hasOutstandingUrbs() const {
@@ -433,42 +577,97 @@ bool UsbAudioSink::markReaped(void* urb, bool* feedback, size_t* index) {
     return false; // unrelated/duplicate completion does not discharge ownership
 }
 
-bool UsbAudioSink::drainUrbCompletions() {
+int UsbAudioSink::reapUsbfsUrb(int fd, void** urb) {
 #if defined(__linux__) || defined(__ANDROID__)
+    return ioctl(fd, USBDEVFS_REAPURBNDELAY, urb);
+#else
+    (void)fd;
+    (void)urb;
+    // No usbfs endpoint exists on this host, so answer exactly like an idle one:
+    // the caller's deadline logic is then exercised unchanged by the host tests.
+    errno = EAGAIN;
+    return -1;
+#endif
+}
+
+bool UsbAudioSink::drainUrbCompletions(int timeoutMs, UrbReap reap) {
     if (!hasOutstandingUrbs()) return true;
+    if (!reap) {
+        lastError_.store(EINVAL, std::memory_order_release);
+        return false;
+    }
     if (fd_ < 0) {
         ReportWriteError(EBADF);
         return false;
     }
+#if defined(__linux__) || defined(__ANDROID__)
+    // Ask the kernel to cancel every transfer we still own. Cancellation has no
+    // shortcut: a submitted header/payload stays allocated until that exact URB
+    // is reaped, so the poll below is the only proof ownership came back.
     for (size_t i = 0; i < urbs_.size(); ++i) {
         if (urbOwned_[i]) ioctl(fd_, USBDEVFS_DISCARDURB, urbs_[i]);
     }
     for (size_t i = 0; i < feedbackUrbs_.size(); ++i) {
         if (feedbackOwned_[i]) ioctl(fd_, USBDEVFS_DISCARDURB, feedbackUrbs_[i]);
     }
-    // Teardown is control-thread only. Cancellation has no safe timeout: a
-    // submitted header/payload stays allocated until that exact URB is reaped.
+#endif
+    // Bounded teardown (control thread only). USBDEVFS_REAPURB blocks forever
+    // when the HAL stops servicing the endpoint, which would wedge Close() and
+    // pin HAL exclusivity for the rest of the process. Poll non-blocking with a
+    // 1 ms backoff instead and give the kernel a fixed budget to hand back
+    // every cancelled URB. The loop itself is not #if'd out: `reap` is
+    // injectable, so the host build tests the deadline, not just the helpers.
+    const auto deadline = std::chrono::steady_clock::now() +
+        std::chrono::milliseconds(std::max(0, timeoutMs));
+    bool sawUnknownCompletion = false;
     while (hasOutstandingUrbs()) {
-        struct usbdevfs_urb* urb = nullptr;
-        if (ioctl(fd_, USBDEVFS_REAPURB, &urb) < 0) {
-            if (errno == EINTR) continue;
-            if (errno == EAGAIN || errno == EINPROGRESS) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
-                continue;
+        // The budget is checked before every reap, not only after an idle one:
+        // a device or queue that keeps returning duplicate/foreign completion
+        // pointers would otherwise spin here forever, pinning HAL exclusivity.
+        if (std::chrono::steady_clock::now() >= deadline) break;
+        void* urb = nullptr;
+        if (reap(fd_, &urb) < 0) {
+            const int err = errno;
+            if (err != EINTR && err != EAGAIN && err != EINPROGRESS) {
+                lastError_.store(err, std::memory_order_release);
+                return false; // retain ALL storage; error is not an ownership proof
             }
-            lastError_.store(errno, std::memory_order_release);
-            return false; // retain ALL storage; error is not an ownership proof
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
         }
         bool feedback = false;
         size_t index = 0;
         if (!markReaped(urb, &feedback, &index)) {
             // The claimed interface is exclusive. Unknown completions cannot
-            // be safely requeued or counted as our cancellation acknowledgments.
+            // be safely requeued or counted as our cancellation acknowledgments,
+            // but they must not poison diagnostics after a clean drain either
+            // (see the EPROTO clear below).
             lastError_.store(EPROTO, std::memory_order_release);
+            sawUnknownCompletion = true;
         }
     }
-#endif
-    return !hasOutstandingUrbs();
+    if (hasOutstandingUrbs()) {
+        // Ownership is unproven: keep every buffer and the interface claim so a
+        // later teardown can still reap the exact URBs the kernel holds.
+        lastError_.store(ETIMEDOUT, std::memory_order_release);
+        return false;
+    }
+    if (sawUnknownCompletion) {
+        // Every URB we own came back, so a stray completion was noise rather
+        // than proof the stream is corrupt. Leaving EPROTO latched would make
+        // the next status/diagnostic read report a protocol error forever after
+        // an otherwise successful teardown.
+        lastError_.store(0, std::memory_order_release);
+        static auto lastUnknownLog = std::chrono::steady_clock::time_point{};
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastUnknownLog >= std::chrono::seconds(1)) {
+            lastUnknownLog = now;
+            PULSR_USB_LOG(ANDROID_LOG_WARN,
+                          "drain: ignored an unrecognized URB completion; "
+                          "cleared stale EPROTO");
+        }
+    }
+    return true;
 }
 
 // ---- Async feedback (anti-drift) support, FIX 2 ----
@@ -477,7 +676,7 @@ std::vector<uint8_t> UsbAudioSink::fetchConfigDescriptor(int fd) {
 #if defined(__linux__) || defined(__ANDROID__)
     if (fd < 0) return {};
     // GET_DESCRIPTOR(CONFIG): first read 4 bytes to learn wTotalLength, then the
-    // whole configuration (same control request QuerySupportedRates uses).
+    // whole configuration.
     uint8_t header[4] = {0};
     struct usbdevfs_ctrltransfer ctrl {};
     ctrl.bRequestType = 0x80; // IN | STANDARD | DEVICE
@@ -582,7 +781,7 @@ void UsbAudioSink::freeFeedbackResources() {
     feedbackPacketSize_ = 0;
 }
 
-void UsbAudioSink::releaseResources() {
+bool UsbAudioSink::releaseResources() {
     writerGate_.fetch_or(kWriterClosed, std::memory_order_acq_rel);
     active_.store(false, std::memory_order_release);
     while (writerGate_.load(std::memory_order_acquire) & kWriterBusy) {
@@ -608,7 +807,7 @@ void UsbAudioSink::releaseResources() {
         snap.bitPerfect.directUsbActive = false;
     });
 
-    if (!drainUrbCompletions()) return; // preserve kernel-owned buffers on failure
+    if (!drainUrbCompletions()) return false; // keep kernel-owned buffers + claim on failure
 
     for (uint8_t* b : urbBuffers_) {
         delete[] b;
@@ -632,19 +831,28 @@ void UsbAudioSink::releaseResources() {
     if (claimed_ && fd_ >= 0) {
         int iface = interfaceNumber_;
         ioctl(fd_, USBDEVFS_RELEASEINTERFACE, &iface);
-#if defined(__linux__) || defined(__ANDROID__)
-        // Re-attach the kernel snd-usb-audio driver so system audio routing and ALSA recover immediately
-        struct usbdevfs_ioctl cmd {};
-        cmd.ifno = interfaceNumber_;
-        cmd.ioctl_code = USBDEVFS_CONNECT;
-        cmd.data = nullptr;
-        ioctl(fd_, USBDEVFS_IOCTL, &cmd);
-#endif
+        RebindKernelDriver(fd_, interfaceNumber_);
     }
     claimed_ = false;
     fd_ = -1;
     running_.store(false, std::memory_order_release);
     exclusive_.store(false, std::memory_order_release); // only after USB ownership is drained
+    return true;
+}
+
+bool UsbAudioSink::RebindKernelDriver(int fd, int interfaceNumber) {
+#if defined(__linux__) || defined(__ANDROID__)
+    if (fd < 0 || interfaceNumber < 0) return false;
+    struct usbdevfs_ioctl cmd {};
+    cmd.ifno = interfaceNumber;
+    cmd.ioctl_code = USBDEVFS_CONNECT;
+    cmd.data = nullptr;
+    return ioctl(fd, USBDEVFS_IOCTL, &cmd) >= 0;
+#else
+    (void)fd;
+    (void)interfaceNumber;
+    return false;
+#endif
 }
 
 int UsbAudioSink::completionError(const void* raw, bool feedback, int packets, int maxBytes) {
@@ -804,40 +1012,15 @@ void UsbAudioSink::workerLoop() {
     // some kernels refuse the negative nice for app threads.
     setpriority(PRIO_PROCESS, 0, -19);
 #endif
-    // Prefill before the first drain. The producer writes at roughly real time,
-    // so a worker that starts immediately keeps the ring pinned at zero and
-    // every producer/USB/scheduler hiccup becomes a gap-filled packet — an
-    // audible drop. Waiting for a cushion (bounded so a paused stream still
-    // reaches the idle-silence behaviour) keeps gaps out of steady playback.
-    if (prefillFrames_ > 0) {
-        const auto started = std::chrono::steady_clock::now();
-        const auto deadline = started + std::chrono::milliseconds(1500);
-        bool reached = false;
-        while (running_.load(std::memory_order_acquire)) {
-            const size_t w = ringWrite_.load(std::memory_order_acquire);
-            const size_t r = ringRead_.load(std::memory_order_relaxed);
-            if (w - r >= prefillFrames_) {
-                reached = true;
-                break;
-            }
-            if (std::chrono::steady_clock::now() >= deadline) break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
-        }
-        const size_t fillNow = ringWrite_.load(std::memory_order_acquire) -
-                               ringRead_.load(std::memory_order_relaxed);
-        PULSR_USB_LOG(ANDROID_LOG_INFO,
-                      "prefill: reached=%d waitedMs=%lld targetMs=%zu fillMs=%.1f",
-                      reached ? 1 : 0,
-                      static_cast<long long>(
-                          std::chrono::duration_cast<std::chrono::milliseconds>(
-                              std::chrono::steady_clock::now() - started)
-                              .count()),
-                      prefillFrames_ * 1000 /
-                          static_cast<size_t>(std::max(1, sampleRate_)),
-                      sampleRate_ > 0
-                          ? static_cast<double>(fillNow) * 1000.0 / sampleRate_
-                          : 0.0);
-    }
+    // Keep the URB pipeline continuously reaped and resubmitted while waiting
+    // for the ring cushion (`prefillFrames_`). Sleeping BEFORE entering the
+    // reap loop starved all 8 submitted URBs within ~64 ms, stalling the USB
+    // xHCI isochronous schedule and causing startup glitches/underruns. While
+    // waiting for prefill, OUT URBs carry clean silence (or DoP silence)
+    // without incrementing underrunCount_.
+    bool prefillDone = (prefillFrames_ == 0);
+    bool producerSeen = false;
+    auto prefillDeadline = std::chrono::steady_clock::time_point{};
     int repeatedReadyPolls = 0;
     int consecutiveOutFaults = 0;
     constexpr int kMaxConsecutiveOutFaults = 3;
@@ -948,19 +1131,67 @@ void UsbAudioSink::workerLoop() {
         size_t readFrame = ringRead_.load(std::memory_order_relaxed);
         uint8_t* dst = buf;
         int urbTotalBytes = 0;
-        if (feedbackEndpoint_ == 0) {
-            const size_t wNow = ringWrite_.load(std::memory_order_acquire);
+        const size_t wNow = ringWrite_.load(std::memory_order_acquire);
+        const size_t availNow = wNow - readFrame;
+        if (!prefillDone) {
+            if (availNow > 0 && !producerSeen) {
+                producerSeen = true;
+                prefillDeadline = std::chrono::steady_clock::now() +
+                                  std::chrono::milliseconds(250);
+            }
+            if (availNow >= prefillFrames_ ||
+                (producerSeen && availNow > 0 &&
+                 std::chrono::steady_clock::now() >= prefillDeadline)) {
+                prefillDone = true;
+                PULSR_USB_LOG(ANDROID_LOG_INFO,
+                              "prefill ready: fillMs=%.1f targetMs=%zu",
+                              sampleRate_ > 0
+                                  ? static_cast<double>(availNow) * 1000.0 / sampleRate_
+                                  : 0.0,
+                              prefillFrames_ * 1000 /
+                                  static_cast<size_t>(std::max(1, sampleRate_)));
+            }
+        }
+        if (feedbackEndpoint_ == 0 && prefillDone) {
+            // Steer against the operating window (~2x prefillFrames_), not the
+            // full 1+ second physical ring capacity: ExoPlayer's AudioTrack
+            // buffer caps producer lead at ~200-250 ms, which would otherwise
+            // stay permanently below 20% of a 1.3 s ring and drag the rate down.
+            const size_t steerWindow = std::min(
+                ringFrames,
+                std::max<size_t>(
+                    prefillFrames_ * 2,
+                    static_cast<size_t>(packetsPerUrb_ * maxFramesPerPacket_) * 4));
             feedbackRatePerSec_ = SteerPacketRateForRingFill(
-                feedbackRatePerSec_, sampleRate_, wNow - readFrame, ringFrames);
+                feedbackRatePerSec_, sampleRate_, availNow, steerWindow);
         }
         const uint32_t ratePerSec = static_cast<uint32_t>(feedbackRatePerSec_);
         int rawDepth = -1;
         uint64_t deliveryEpoch = deliveryEpoch_.load(std::memory_order_acquire);
+        const size_t frameBytes =
+            static_cast<size_t>(channels_) * static_cast<size_t>(bytesPerSample_);
+        const bool dopSilence = producerIsDop_.load(std::memory_order_relaxed) &&
+                                IsDopSilenceContainer(bytesPerSample_);
         for (int p = 0; p < urb->number_of_packets; ++p) {
             const int framesInPacket = NextPacketFrames(
                 frameAccumulator_, ratePerSec, serviceIntervalUs_, maxFramesPerPacket_);
-            const size_t pktLen = fillPacketFromRing(
-                dst, framesInPacket, readFrame, rawDepth, deliveryEpoch);
+            size_t pktLen = 0;
+            if (!prefillDone) {
+                pktLen = static_cast<size_t>(framesInPacket) * frameBytes;
+                if (pktLen > 0) {
+                    if (dopSilence) {
+                        dopMarkerPhase_ = FillDopSilence(
+                            dst, framesInPacket, channels_, bytesPerSample_,
+                            dopMarkerPhase_);
+                    } else {
+                        std::memset(dst, 0, pktLen);
+                    }
+                }
+                rawDepth = 0;
+            } else {
+                pktLen = fillPacketFromRing(
+                    dst, framesInPacket, readFrame, rawDepth, deliveryEpoch);
+            }
             urb->iso_frame_desc[p].length = static_cast<unsigned int>(pktLen);
             urb->iso_frame_desc[p].actual_length = 0;
             urb->iso_frame_desc[p].status = 0;
@@ -1340,13 +1571,11 @@ int UsbAudioSink::NextPacketFrames(uint64_t& accumulator, uint32_t ratePerSec,
 int UsbAudioSink::SteerPacketRateForRingFill(int currentRatePerSec, int nominalRate,
                                              size_t occupiedBytes, size_t capacityBytes) {
     if (nominalRate <= 0) return currentRatePerSec;
-    // A DAC without an explicit feedback endpoint can run off by hundreds of
-    // ppm (cheap USB-C dongles especially). The old +/-0.1% clamp saturated
-    // before the true ratio was reached, so the ring drained at a steady
-    // ~0.2% and gap-filled every ~80 s. +/-1% reaches any consumer-grade clock
-    // while remaining far from an audible pitch shift (the loop only moves
-    // while the fill is outside the 200-800 permille band).
-    const int deltaMax = std::max(1, nominalRate / 100); // +/-1.0% clamp
+    // +/-1% of nominal. Cheap feedback-less DACs commonly run their crystal
+    // 0.2-0.6% off the host clock; a +/-0.1% window saturates almost immediately
+    // and leaves the ring to gap-fill every ~80 s. 1% is still far below an
+    // audible pitch shift, yet wide enough to hold lock for a whole session.
+    const int deltaMax = std::max(1, nominalRate / 100); // +/-1% clamp
     const int minRate = std::max(1, nominalRate - deltaMax);
     const int maxRate = nominalRate + deltaMax;
     int rate = (currentRatePerSec > 0)
@@ -1439,116 +1668,6 @@ std::vector<int> UsbAudioSink::ParseSupportedRatesFromDescriptors(
     std::sort(rates.begin(), rates.end());
     rates.erase(std::unique(rates.begin(), rates.end()), rates.end());
     return rates;
-}
-
-std::vector<int> UsbAudioSink::QuerySupportedRates(int fd, int interfaceNumber) {
-#if defined(__linux__) || defined(__ANDROID__)
-    if (fd < 0) return {};
-
-    uint8_t header[4] = {0};
-    struct usbdevfs_ctrltransfer ctrl {};
-    ctrl.bRequestType = 0x80; // USB_DIR_IN | USB_TYPE_STANDARD | USB_RECIP_DEVICE
-    ctrl.bRequest = 0x06;     // USB_REQ_GET_DESCRIPTOR
-    ctrl.wValue = 0x0200;     // (USB_DT_CONFIG << 8) | 0
-    ctrl.wIndex = 0;
-    ctrl.wLength = sizeof(header);
-    ctrl.timeout = 1000;
-    ctrl.data = header;
-
-    if (ioctl(fd, USBDEVFS_CONTROL, &ctrl) < 0) {
-        return {};
-    }
-
-    uint16_t totalLength = static_cast<uint16_t>(header[2] | (header[3] << 8));
-    if (totalLength < 9 || totalLength > 16384) {
-        totalLength = 4096;
-    }
-
-    std::vector<uint8_t> configDesc(totalLength);
-    ctrl.wLength = totalLength;
-    ctrl.data = configDesc.data();
-
-    int res = ioctl(fd, USBDEVFS_CONTROL, &ctrl);
-    if (res < 0) {
-        return {};
-    }
-    configDesc.resize(std::min(static_cast<size_t>(res), configDesc.size()));
-
-    std::vector<int> rates = ParseSupportedRatesFromDescriptors(
-        configDesc.data(), configDesc.size(), interfaceNumber);
-
-    // Scan for UAC2 Clock Source entities and query sample rates
-    int acInterface = 0;
-    std::vector<uint8_t> clockIds;
-    size_t dIdx = 0;
-    while (dIdx + 2 <= configDesc.size()) {
-        uint8_t bLength = configDesc[dIdx];
-        if (bLength < 2 || dIdx + bLength > configDesc.size()) break;
-        uint8_t bType = configDesc[dIdx + 1];
-        if (bType == 0x04 && bLength >= 9) { // DESC_INTERFACE
-            if (configDesc[dIdx + 5] == 0x01 && configDesc[dIdx + 6] == 0x01) {
-                acInterface = configDesc[dIdx + 2]; // AudioControl interface
-            }
-        } else if (bType == 0x24 && bLength >= 8) { // CS_INTERFACE
-            if (configDesc[dIdx + 2] == 0x0B) { // CLOCK_SOURCE
-                clockIds.push_back(configDesc[dIdx + 3]); // bClockID
-            }
-        }
-        dIdx += bLength;
-    }
-
-    for (uint8_t clockId : clockIds) {
-        uint8_t rangeBuf[256] = {0};
-        struct usbdevfs_ctrltransfer rangeCtrl {};
-        rangeCtrl.bRequestType = 0xA1; // IN | CLASS | INTERFACE
-        rangeCtrl.bRequest = 0x02;     // UAC2 RANGE
-        rangeCtrl.wValue = 0x0100;     // CS_SAM_FREQ_CONTROL (0x01) << 8
-        rangeCtrl.wIndex = static_cast<uint16_t>((clockId << 8) | acInterface);
-        rangeCtrl.wLength = sizeof(rangeBuf);
-        rangeCtrl.timeout = 1000;
-        rangeCtrl.data = rangeBuf;
-
-        const int rangeLen = ioctl(fd, USBDEVFS_CONTROL, &rangeCtrl);
-        if (rangeLen >= 2) {
-            const size_t validBytes = std::min(
-                sizeof(rangeBuf), static_cast<size_t>(rangeLen));
-            uint16_t numRanges = rangeBuf[0] | (rangeBuf[1] << 8);
-            size_t offset = 2;
-            for (uint16_t r = 0; r < numRanges && offset + 12 <= validBytes; ++r) {
-                uint32_t dMin = rangeBuf[offset] | (rangeBuf[offset + 1] << 8) |
-                                (rangeBuf[offset + 2] << 16) | (rangeBuf[offset + 3] << 24);
-                uint32_t dMax = rangeBuf[offset + 4] | (rangeBuf[offset + 5] << 8) |
-                                (rangeBuf[offset + 6] << 16) | (rangeBuf[offset + 7] << 24);
-                if (dMin == dMax && dMin > 0) {
-                    rates.push_back(static_cast<int>(dMin));
-                } else if (dMin < dMax) {
-                    constexpr int kStandardRates[] = {
-                        44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000
-                    };
-                    for (int sr : kStandardRates) {
-                        if (static_cast<uint32_t>(sr) >= dMin && static_cast<uint32_t>(sr) <= dMax) {
-                            rates.push_back(sr);
-                        }
-                    }
-                }
-                offset += 12;
-            }
-        }
-    }
-
-    if (!rates.empty()) {
-        std::sort(rates.begin(), rates.end());
-        rates.erase(std::unique(rates.begin(), rates.end()), rates.end());
-        return rates;
-    }
-
-    // Fallback: If no UAC1 rates detected (e.g. UAC2 DAC), probe standard high-res rates
-    return {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
-#else
-    (void)fd;
-    (void)interfaceNumber;
-    return {44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000};
-#endif
 }
 
 } // namespace pulsr

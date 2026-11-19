@@ -34,19 +34,13 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
     }
   }
 
-  /// Runs the Bit-Perfect policy with the transport parked on a buffer
-  /// boundary.
-  ///
-  /// The exclusive-mode swap and the native bypass flip both land at an
-  /// arbitrary sample when issued mid-buffer, which is audible as a click or
-  /// pop. `pause()` stops on a buffer boundary, so neither change can be
-  /// heard, and `play()` resumes from the same position. This is deliberately
-  /// not `withSmoothDspTransition`: that mutes the native processor, and the
-  /// integer bit-perfect bypass runs no processor at all, so there is nothing
-  /// for it to mute.
-  Future<void> applyBitPerfectPolicyMuted(
-    bool enabled, {
-    bool keepPreferenceWhenDisabling = false,
+  /// Runs a Bit-Perfect / DSP-bypass transition with playback parked on a
+  /// buffer boundary, suppressing intermediate tap-SRC flips so the sink is
+  /// rebuilt at most once before playback resumes.
+  Future<void> runSinkTransitionMuted({
+    required bool disarmTapSrc,
+    required Future<void> Function() body,
+    bool syncTapSrcAfter = false,
   }) async {
     final handler = getIt.isRegistered<PulsrAudioHandler>()
         ? getIt<PulsrAudioHandler>()
@@ -68,18 +62,25 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
         // Keep applying the policy; a failed pause only costs the mute.
       }
     }
+    final prevSuppress = _suppressTapSrcSync;
+    _suppressTapSrcSync = true;
     try {
-      if (enabled) await _disarmTapSrcRate();
-      await _applyBitPerfectPolicy(
-        enabled,
-        keepPreferenceWhenDisabling: keepPreferenceWhenDisabling,
-      );
+      if (disarmTapSrc) await _disarmTapSrcRate();
+      await body();
+      if (syncTapSrcAfter) {
+        // Push the final tap-SRC target ONCE before the single sink rebuild so
+        // no secondary async requestModeChange races with play().
+        _suppressTapSrcSync = false;
+        await _syncTapSrcRate(state.currentOutputDevice);
+        _suppressTapSrcSync = true;
+      }
       // The bypass is latched by the sink's configure(), so a mid-track toggle
       // needs one rebuild to engage (or release) the integer path for THIS
       // track; without it the platform keeps reporting the mixer as inactive
       // until the next track. Still inside the pause, so the rebuild is silent.
       await handler?.reconfigurePlaybackSink();
     } finally {
+      _suppressTapSrcSync = prevSuppress;
       if (wasPlaying) {
         try {
           await handler!.play();
@@ -88,6 +89,56 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
         }
       }
     }
+    // Re-read the device AFTER resume so the published mixer/bypass/rate truth
+    // reflects the live rebuilt AudioTrack instead of a paused [0,0,0] snapshot.
+    if (handler != null) await refreshOutputDevice();
+  }
+
+  /// Runs the Bit-Perfect policy with the transport parked on a buffer
+  /// boundary.
+  ///
+  /// The exclusive-mode swap and the native bypass flip both land at an
+  /// arbitrary sample when issued mid-buffer, which is audible as a click or
+  /// pop. `pause()` stops on a buffer boundary, so neither change can be
+  /// heard, and `play()` resumes from the same position. This is deliberately
+  /// not `withSmoothDspTransition`: that mutes the native processor, and the
+  /// integer bit-perfect bypass runs no processor at all, so there is nothing
+  /// for it to mute.
+  Future<void> applyBitPerfectPolicyMuted(
+    bool enabled, {
+    bool keepPreferenceWhenDisabling = false,
+  }) =>
+      runSinkTransitionMuted(
+        disarmTapSrc: enabled,
+        syncTapSrcAfter: !enabled,
+        body: () => _applyBitPerfectPolicy(
+          enabled,
+          keepPreferenceWhenDisabling: keepPreferenceWhenDisabling,
+        ),
+      );
+
+  /// Runs the Strict Bit-Perfect policy through the same muted rebuild
+  /// envelope so enabling/disabling Strict mid-track disarms tap-SRC, rebuilds
+  /// the sink cleanly, and aligns the current track format.
+  Future<void> applyStrictBitPerfectMuted(bool enabled) =>
+      runSinkTransitionMuted(
+        disarmTapSrc: enabled,
+        syncTapSrcAfter: !enabled && !state.bitPerfectOutput,
+        body: () => _applyStrictBitPerfectPolicy(enabled),
+      );
+
+  /// Runs a DSP-bypass-on-Bit-Perfect toggle through the muted rebuild
+  /// envelope when Bit-Perfect is active, so the integer bypass engages or
+  /// releases on the current track immediately.
+  Future<void> applyBypassDspOnBitPerfectMuted(bool enabled) async {
+    if (!state.bitPerfectOutput) {
+      await _applyBypassDspOnBitPerfectPolicy(enabled);
+      return;
+    }
+    await runSinkTransitionMuted(
+      disarmTapSrc: enabled,
+      body: () => _applyBypassDspOnBitPerfectPolicy(enabled),
+    );
   }
 
   /// Body of `SettingsAudioActions.applyMaximumQualityPreset`, run while the
@@ -154,14 +205,18 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
   /// of the chain, so the mixer becomes a 1:1 copy. A route whose rate cannot be
   /// verified keeps the historical platform path; this never throws.
   Future<void> _syncTapSrcRate(AudioOutputInfo? info) async {
+    if (_suppressTapSrcSync) return;
     if (!getIt.isRegistered<PulsrAudioHandler>()) return;
+    // PROPERTY_OUTPUT_SAMPLE_RATE (`nativeSampleRate`) describes the primary
+    // built-in/wired mixer, NOT USB DACs (whose HAL negotiates per-track rates)
+    // and NOT Bluetooth. Never pass `info.sampleRate`: that is the app's own
+    // AudioTrack rate, which previously fed a previous track's rate back as an
+    // SRC target and triggered mid-playback sink swaps / rate glitches.
+    final isPrimaryOutput = info != null && !info.isUsbDac && !info.isBluetooth;
+    final mixerRate = isPrimaryOutput ? (info.nativeSampleRate ?? 0) : 0;
     final rate = decideTapSrcTargetRate(
       enabled: state.outputFormatNegotiationEnabled,
-      // PROPERTY_OUTPUT_SAMPLE_RATE describes the primary output, not the
-      // current USB/BT route. Only a live route-specific sink is usable here.
-      nativeSampleRate: info?.availableDevices.any((d) => d.isCurrent) == true
-          ? (info?.sampleRate ?? 0)
-          : 0,
+      nativeSampleRate: mixerRate,
       // Decide from the REQUEST, not the polled echo: `isBitPerfectActive`
       // reads false while paused and during the enable transition, which used
       // to leave a resampler armed inside a bit-perfect session. Pulsr's own

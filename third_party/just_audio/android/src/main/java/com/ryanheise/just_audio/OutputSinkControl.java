@@ -25,5 +25,15 @@ interface OutputSinkControl {
      */
     default boolean reconfigureNow(long timeoutMs) { return false; }
 
+    /**
+     * Non-blocking counterpart to {@link #reconfigureNow(long)}: posts the
+     * forced rebuild onto the ExoPlayer playback thread and invokes
+     * {@code onComplete} with whether the rebuild ran. Avoids blocking the
+     * Android main thread on a CountDownLatch.
+     */
+    default void reconfigureAsync(java.util.function.Consumer<Boolean> onComplete) {
+        onComplete.accept(reconfigureNow(400));
+    }
+
     void release();
 }

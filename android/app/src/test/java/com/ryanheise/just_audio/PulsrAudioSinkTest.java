@@ -990,4 +990,33 @@ public class PulsrAudioSinkTest {
             sink.release();
         }
     }
+
+    @Test
+    public void reconfigureAsyncFlushesStagedInputWhilePausedAndInvokesCallback() throws Exception {
+        final AudioSink rawFirst = mock(AudioSink.class);
+        when(rawFirst.handleBuffer(any(), anyLong(), anyInt())).thenReturn(false);
+        final FloatDspAudioSink first = new FloatDspAudioSink(rawFirst, new CopyProcessor());
+        final AudioSink replacement = mock(AudioSink.class);
+
+        final Flag aaudio = new Flag(false);
+        final Flag floatMode = new Flag(true);
+        final Factory factory = new Factory();
+        factory.queue.add(holder(first));
+        factory.queue.add(holder(replacement));
+        final PulsrAudioSink sink = newSink(aaudio, floatMode,
+                new Fallbacks(aaudio, floatMode), factory);
+        sink.configure(FORMAT, 0, null);
+        // Stage input on the first sink while paused (playWhenReady == false).
+        assertFalse(sink.handleBuffer(stereo16(100, -100), 10L, 1));
+        assertTrue(first.hasStagedInput());
+
+        final List<Boolean> results = new ArrayList<>();
+        sink.reconfigureAsync(results::add);
+
+        assertEquals(List.of(Boolean.TRUE), results);
+        verify(rawFirst).flush();
+        verify(rawFirst).release();
+        verify(replacement).configure(FORMAT, 0, null);
+        sink.release();
+    }
 }

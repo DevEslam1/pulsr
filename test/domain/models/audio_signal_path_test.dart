@@ -266,6 +266,31 @@ void main() {
       expect(path.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
 
+    test('an armed state never borrows the exclusive wording', () {
+      final state = resolveBitPerfectState(
+        requested: true,
+        sinkActive: false,
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        sinkSampleRate: 0,
+        sinkBitDepth: 0,
+      );
+      // Requested, but the platform never confirmed a sink: intent only.
+      expect(state.tier, BitPerfectTier.armed);
+
+      final path = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: _usbDacOutput,
+        bitPerfectState: state,
+      );
+
+      expect(path.isBitPerfect, isFalse);
+      expect(path.hardwareSummary, contains('Arming'));
+      expect(path.hardwareSummary, isNot(contains('Exclusive')));
+    });
+
     test('without a state no route claims Bit-Perfect', () {
       // AudioOutputInfo.isBitPerfectActive echoes the request, so it cannot
       // stand in for evidence when no state was supplied.

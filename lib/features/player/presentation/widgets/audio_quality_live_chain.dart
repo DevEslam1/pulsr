@@ -11,27 +11,56 @@ import 'package:flutter/widgets.dart';
 
 import '../../../../core/utils/l10n_extensions.dart';
 
-/// Wording for the reasons a live chain can name without an l10n key.
+/// Wording for every reason a live chain can name.
 ///
-/// The old catch-all ("platform conversion") said the same thing for a DSP
-/// stage, a HAL AudioEffect and a float carrier, so a chain this app had
-/// itself modified looked like an OS resample. Only those three reasons are
-/// replaced; every other code keeps its existing explanation.
+/// Each code the domain can emit has its own sentence: the old catch-all
+/// ("Platform conversion") described an OS resample for a volume attenuation,
+/// an unreadable gain or an unknown output rate alike, so a chain this app had
+/// itself left untouched looked like a platform resample - and a real resample
+/// looked the same as a missing measurement. An unknown code now says only
+/// that nothing verified the chain, never what did it.
 String liveChainReasonLabel(BuildContext context, String? reasonCode) {
+  final l10n = context.l10n;
   switch (reasonCode) {
     case 'samples_modified':
-      return 'Samples modified by DSP';
+      return l10n.bpReasonSamplesModified;
     case 'hal_effect_active':
-      return 'HAL effect active';
+      return l10n.bpReasonHalEffect;
     case 'system_effect_active':
-      return 'System effect active';
+      return l10n.bpReasonSystemEffect;
     case 'float_conversion':
-      return 'Float conversion';
+      return l10n.bpReasonFloatConversion;
     case 'source_codec_unconfirmed':
-      return context.l10n.bpSourceCodecUnconfirmed;
+      return l10n.bpSourceCodecUnconfirmed;
     case 'digital_volume_attenuation':
-      return context.l10n.bpDigitalVolumeAttenuation;
+      return l10n.bpDigitalVolumeAttenuation;
+    case 'rate_unknown':
+      return l10n.bpReasonRateUnknown;
+    case 'rate_not_verified':
+      return l10n.bpReasonRateNotVerified;
+    case 'rate_mismatch':
+      return l10n.bpChainResampled;
+    case 'depth_unknown':
+      return l10n.bpReasonDepthUnknown;
+    case 'source_depth_unknown':
+      return l10n.bpReasonSourceDepthUnknown;
+    case 'depth_truncated':
+      return l10n.bpChainDepthReduced;
+    case 'source_lossy':
+      return l10n.bpReasonSourceLossy;
+    case 'source_precision_not_preserved':
+      return l10n.bpReasonPrecisionNotPreserved;
+    case 'channels_remapped':
+      return l10n.bpReasonChannelsRemapped;
+    case 'dop_carrier_not_measured':
+      return l10n.bpReasonDopCarrier;
+    case 'software_gain_unknown':
+      return l10n.bpReasonGainUnknown;
+    case 'not_exclusive':
+      return l10n.bpReasonNotExclusive;
+    case 'sink_not_active':
+      return l10n.bpChainInactive;
     default:
-      return context.l10n.bpPlatformConversion;
+      return l10n.bpReasonUnknown;
   }
 }

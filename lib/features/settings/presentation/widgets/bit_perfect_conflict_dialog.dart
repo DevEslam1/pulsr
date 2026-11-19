@@ -5,7 +5,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../data/audio/bit_perfect_chain.dart';
 import '../../../../data/db/tables.dart';
+import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
@@ -53,11 +55,22 @@ Future<bool> requestBitPerfectOutput(BuildContext context, bool enable) async {
   } catch (_) {}
 
   final currentSong = player?.state.currentSong;
+  final usbStatus = UsbExclusiveService().lastStatus;
+  final integer32DirectUsbEligible =
+      settings.state.currentOutputDevice?.isUsbDac == true &&
+          !settings.state.aaudioOutputEnabled &&
+          usbStatus.streamingSupported &&
+          usbStatus.advertisedFormats
+              .any((f) => ((f['bitResolution'] as num?)?.toInt() ?? 0) >= 32);
   final sourceBlock = AudioConflicts.bitPerfectSourceBlockedReason(
     path: currentSong?.path,
-    bitDepth: currentSong?.bitDepth ?? 0,
+    bitDepth: effectiveSourceBitDepth(
+      tagged: currentSong?.bitDepth ?? 0,
+      decoded: settings.state.currentOutputDevice?.decodedBitDepth ?? 0,
+    ),
     isRadio: currentSong?.source == SongSource.radio,
     codec: currentSong?.codec,
+    integer32DirectUsbEligible: integer32DirectUsbEligible,
   );
   if (sourceBlock != null) {
     settings.safeEmit(settings.state.copyWith(error: uiError(sourceBlock)));

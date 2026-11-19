@@ -1720,15 +1720,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeWasLastBlockBitPerfect(
 
 // ---- USB UAC2 isochronous exclusive streaming (UsbExclusivePlugin) ----
 
-JNIEXPORT jint JNICALL
-Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStart(
-        JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,
-        jint interfaceNumber, jint altSetting, jint sampleRate, jint channels) {
-    auto res = pulsr::UsbAudioSink::instance().Open(
-               fd, endpoint, interfaceNumber, altSetting, sampleRate, channels, 2);
-    return static_cast<jint>(res);
-}
-
 JNIEXPORT jboolean JNICALL
 Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsUsbExclusive(
         JNIEnv* /* env */, jclass /* clazz */) {
@@ -1740,28 +1731,43 @@ Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStartWithFormat(
         JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,
         jint interfaceNumber, jint altSetting, jint sampleRate, jint channels,
         jint bytesPerSample, jint validBitDepth) {
+    // Kotlin (UsbExclusivePlugin) already claimed the streaming interface,
+    // selected altSetting, and programmed+verified the DAC sample clock.
+    // Skipping duplicate SET_INTERFACE prevents resetting the DAC clock back
+    // to 48 kHz on UAC1/UAC2 hardware.
     auto res = pulsr::UsbAudioSink::instance().Open(
                fd, endpoint, interfaceNumber, altSetting, sampleRate, channels,
-               bytesPerSample, validBitDepth);
+               bytesPerSample, validBitDepth, /*alreadyConfigured=*/true);
     return static_cast<jint>(res);
 }
 
-JNIEXPORT jintArray JNICALL
-Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbQuerySupportedRates(
-        JNIEnv* env, jobject /* thiz */, jint fd, jint interfaceNumber) {
-    std::vector<int> rates = pulsr::UsbAudioSink::QuerySupportedRates(fd, interfaceNumber);
-    jintArray result = env->NewIntArray(static_cast<jsize>(rates.size()));
-    if (result != nullptr && !rates.empty()) {
-        env->SetIntArrayRegion(result, 0, static_cast<jsize>(rates.size()),
-                               reinterpret_cast<const jint*>(rates.data()));
-    }
-    return result;
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbRebindInterface(
+        JNIEnv* /* env */, jobject /* thiz */, jint fd, jint interfaceNumber) {
+    return pulsr::UsbAudioSink::RebindKernelDriver(fd, interfaceNumber)
+        ? JNI_TRUE : JNI_FALSE;
 }
 
-JNIEXPORT void JNICALL
+// Returns false when the bounded teardown could not reap every submitted URB.
+// The sink then keeps its URB storage and HAL exclusivity, and the next Open
+// refuses to start, so Kotlin must surface the failure instead of assuming the
+// exclusive path was released.
+JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStop(
         JNIEnv* /* env */, jobject /* thiz */) {
-    pulsr::UsbAudioSink::instance().Close();
+    return pulsr::UsbAudioSink::instance().Close() ? JNI_TRUE : JNI_FALSE;
+}
+
+// After a failed stop the plugin still has to release the interface and close
+// the connection (dispose / detach / device gone). Those usbfs fds are dead, so
+// nothing the kernel may still reference can be reaped or freed ever again:
+// Abandon() leaks that memory on purpose, withdraws the sink-depth/direct-USB
+// publication and resets the sink to its pre-Open state. Without this call the
+// next Open would drain a dead fd and fail with ClaimFailed permanently.
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamAbandon(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    pulsr::UsbAudioSink::instance().Abandon();
 }
 
 JNIEXPORT jboolean JNICALL

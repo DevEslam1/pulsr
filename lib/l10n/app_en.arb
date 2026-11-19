@@ -3023,6 +3023,22 @@
   "bpChainResampled": "Platform resample detected",
   "bpChainDepthReduced": "Bit depth truncated",
   "bpChainInactive": "Bit-Perfect armed but not active",
+  "bpChainNotRequested": "Bit-Perfect off • not measured",
+  "bpReasonSamplesModified": "Samples modified by DSP",
+  "bpReasonHalEffect": "HAL effect active",
+  "bpReasonSystemEffect": "System effect active",
+  "bpReasonFloatConversion": "Float conversion",
+  "bpReasonRateUnknown": "Output rate unknown",
+  "bpReasonRateNotVerified": "Output rate not verified",
+  "bpReasonDepthUnknown": "Output depth unknown",
+  "bpReasonSourceDepthUnknown": "Source depth unknown",
+  "bpReasonSourceLossy": "Lossy source • no bit-perfect claim possible",
+  "bpReasonPrecisionNotPreserved": "Source precision not preserved",
+  "bpReasonChannelsRemapped": "Sink remapped the channel layout",
+  "bpReasonDopCarrier": "DoP carrier • marker bits not measured",
+  "bpReasonGainUnknown": "Software gain unreadable",
+  "bpReasonNotExclusive": "Route not exclusive",
+  "bpReasonUnknown": "Not verified • reason unavailable",
   "bpMoreEffects": "+{count} more effects",
   "@bpMoreEffects": {
     "description": "Label in audio quality sheet for additional active DSP effects",
@@ -3039,10 +3055,6 @@
   "bpDspCleanPath": "None (Clean Path)",
   "@bpDspCleanPath": {
     "description": "DSP stage status when no DSP effects are active"
-  },
-  "bpPlatformConversion": "Platform conversion • not measured by this app",
-  "@bpPlatformConversion": {
-    "description": "Status when platform resampler or conversion is unmeasured"
   },
   "@bpGuardrails": {
     "description": "tranche7 quality"

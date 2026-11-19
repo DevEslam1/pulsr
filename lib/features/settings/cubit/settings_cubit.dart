@@ -251,8 +251,10 @@ class SettingsCubit extends PulsrCubit<SettingsState>
       if (lostBitPerfect) {
         // Suspend the transport without erasing the choice: the DAC may come
         // back, and a boot without one must not look like a user veto.
-        unawaited(
-            _setBitPerfectOutput(false, keepPreferenceWhenDisabling: true));
+        // Serialize through _audioModeMutex so a route event cannot interleave
+        // with an in-flight user toggle or format switch.
+        unawaited(_audioModeMutex.protect(
+            () => _setBitPerfectOutput(false, keepPreferenceWhenDisabling: true)));
       }
       if (gainedBitPerfect) unawaited(_rearmBitPerfectPreference());
     });
@@ -1173,6 +1175,7 @@ class SettingsCubit extends PulsrCubit<SettingsState>
             safeEmit(state.copyWith(
                 bitPerfectOutput: false, strictBitPerfect: false));
           } else {
+            await _disarmTapSrcRate();
             if (!state.aaudioOutputEnabled) {
               await UsbExclusiveService().getStatus();
             }
@@ -1249,6 +1252,9 @@ class SettingsCubit extends PulsrCubit<SettingsState>
           // the saved bit-perfect conflict rule is not enforced this session.
           await _pushBitPerfectBypass(state.bitPerfectOutput &&
               (state.bypassDspOnBitPerfect || state.strictBitPerfect));
+          if (state.bitPerfectOutput && getIt.isRegistered<PulsrAudioHandler>()) {
+            await getIt<PulsrAudioHandler>().reconfigurePlaybackSink();
+          }
         } catch (e, st) {
           ErrorLogger.log('Failed to restore native bit-perfect bypass',
               error: e, stackTrace: st, category: 'SettingsCubit');

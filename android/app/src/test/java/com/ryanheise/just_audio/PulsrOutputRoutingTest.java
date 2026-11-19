@@ -87,6 +87,12 @@ public class PulsrOutputRoutingTest {
         a.pause();
         org.junit.Assert.assertArrayEquals(new int[] {pcm16.pcmEncoding, 48000, 2},
                 PulsrOutputRouting.decodedPcmSnapshot());
+        b.pause();
+        // When both sinks are paused, decodedPcmSnapshot() stays [0,0,0] while
+        // decodedPcmSnapshotIncludingPaused() still exposes the configured format.
+        org.junit.Assert.assertArrayEquals(new int[] {0, 0, 0}, PulsrOutputRouting.decodedPcmSnapshot());
+        final int[] pausedSnap = PulsrOutputRouting.decodedPcmSnapshotIncludingPaused();
+        assertTrue(pausedSnap[1] == 44100 || pausedSnap[1] == 48000);
         b.reset();
         org.junit.Assert.assertArrayEquals(new int[] {0, 0, 0}, PulsrOutputRouting.decodedPcmSnapshot(playerB));
         a.release();
@@ -155,9 +161,13 @@ public class PulsrOutputRoutingTest {
             final android.media.AudioTrack captured = provider.getCapturedTrack();
             org.junit.Assert.assertNotNull(captured);
             assertTrue(captured == ((androidx.media3.exoplayer.audio.AudioTrackAudioOutput) output).getAudioTrack());
+            // snapshot() also carries the decoded-input encoding and the integer
+            // bypass flag ([3] and [4]); this test only asserts the measured
+            // device/rate/encoding triple, so compare that prefix instead of
+            // pinning the telemetry fields to a value the fake sink never set.
             org.junit.Assert.assertArrayEquals(
                     new int[] {0, 48000, android.media.AudioFormat.ENCODING_PCM_16BIT},
-                    PulsrOutputRouting.snapshot());
+                    java.util.Arrays.copyOf(PulsrOutputRouting.snapshot(), 3));
 
             output.release();
             provider.release();

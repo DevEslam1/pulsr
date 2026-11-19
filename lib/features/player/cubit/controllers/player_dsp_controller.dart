@@ -26,7 +26,7 @@ import '../../../../data/audio/output_format_negotiation.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/audio_output_info.dart';
-import '../../../../domain/models/bit_perfect_output_facts.dart';
+import '../../../../data/audio/live_output_verdict.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/audio_signal_path.dart';
 import '../../../../core/telemetry/audio_session_log.dart';
@@ -38,6 +38,7 @@ import '../../../../data/services/settings_profiles_service.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../player_state.dart';
 import 'dsp_effect_applier.dart';
 

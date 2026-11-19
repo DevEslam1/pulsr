@@ -11,6 +11,12 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/telemetry/dsp_reliability_tracker.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
+import '../../../../data/audio/live_output_verdict.dart';
+import '../../../../data/audio/audio_handler.dart';
+import '../../../../data/db/app_database.dart';
+import '../../../../data/services/usb_exclusive_service.dart';
+import '../../../../domain/models/audio_quality_info.dart';
+import '../../../settings/cubit/settings_state.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/services/output_path_verdict.dart';
 import '../../../../domain/models/dsp_debug_report.dart';
@@ -789,8 +795,50 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
               ),
               if (currentOutputDevice != null)
                 Builder(builder: (_) {
+                  // Same verdict as the quality sheet: a PATH label is a claim
+                  // about the live chain, so it reads the one assembler
+                  // instead of keeping a second, partial fold here.
+                  final settingsState = context.read<SettingsCubit>().state;
+                  final playerState = context.read<PlayerCubit>().state;
+                  final dspSlice = playerState.dsp;
+                  final song = playerState.currentSong;
+                  PulsrAudioHandler? handler;
+                  if (getIt.isRegistered<PulsrAudioHandler>()) {
+                    handler = getIt<PulsrAudioHandler>();
+                  }
+                  final usb = UsbExclusiveService().lastStatus;
+                  final verdict =
+                      resolveLiveOutputVerdict(LiveOutputObservation(
+                    output: currentOutputDevice,
+                    directStreamingActive: usb.streamingActive,
+                    streamingSampleRate: usb.streamingSampleRate,
+                    streamingBitDepth: usb.streamingBitDepth,
+                    rawPcmBitDepth: usb.rawPcmBitDepth,
+                    channelMismatchFrames: usb.channelMismatchFrames,
+                    rateVerified: usb.rateVerified,
+                    taggedSampleRate: song?.sampleRate ?? 0,
+                    taggedBitDepth: song?.bitDepth ?? 0,
+                    codec: song?.codec,
+                    path: song?.path ?? '',
+                    isRadioSource: song?.source == SongSource.radio,
+                    bitPerfectOutput: settingsState.bitPerfectOutput,
+                    strictBitPerfect: settingsState.strictBitPerfect,
+                    bypassDspOnBitPerfect: settingsState.bypassDspOnBitPerfect,
+                    dspEffectsActive: dspSlice.isDspActive,
+                    channelBalanceActive:
+                        dspSlice.stereoBalance != 0.0 || dspSlice.monoMix,
+                    ditherActive: dspSlice.isDitherEnabled,
+                    replayGainActive:
+                        settingsState.replayGainMode != ReplayGainMode.off,
+                    dvcActive: settingsState.dvcEnabled,
+                    transportSamplesModified:
+                        handler?.transportSamplesModified ?? true,
+                    softwareGain: handler?.effectiveSoftwareGain,
+                    isDsdDop: AudioQualityInfo.dsdDopActive,
+                  ));
                   final v = OutputPathVerdict.of(currentOutputDevice,
-                      dspActive: isDspActive || isEqEnabled);
+                      dspActive: isDspActive || isEqEnabled,
+                      bitPerfectState: verdict.state);
                   return _buildStatChip(
                     p,
                     'PATH',

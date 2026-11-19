@@ -4122,6 +4122,55 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bpChainInactive => 'Bit-Perfect armed but not active';
 
   @override
+  String get bpChainNotRequested => 'Bit-Perfect off • not measured';
+
+  @override
+  String get bpReasonSamplesModified => 'Samples modified by DSP';
+
+  @override
+  String get bpReasonHalEffect => 'HAL effect active';
+
+  @override
+  String get bpReasonSystemEffect => 'System effect active';
+
+  @override
+  String get bpReasonFloatConversion => 'Float conversion';
+
+  @override
+  String get bpReasonRateUnknown => 'Output rate unknown';
+
+  @override
+  String get bpReasonRateNotVerified => 'Output rate not verified';
+
+  @override
+  String get bpReasonDepthUnknown => 'Output depth unknown';
+
+  @override
+  String get bpReasonSourceDepthUnknown => 'Source depth unknown';
+
+  @override
+  String get bpReasonSourceLossy =>
+      'Lossy source • no bit-perfect claim possible';
+
+  @override
+  String get bpReasonPrecisionNotPreserved => 'Source precision not preserved';
+
+  @override
+  String get bpReasonChannelsRemapped => 'Sink remapped the channel layout';
+
+  @override
+  String get bpReasonDopCarrier => 'DoP carrier • marker bits not measured';
+
+  @override
+  String get bpReasonGainUnknown => 'Software gain unreadable';
+
+  @override
+  String get bpReasonNotExclusive => 'Route not exclusive';
+
+  @override
+  String get bpReasonUnknown => 'Not verified • reason unavailable';
+
+  @override
   String bpMoreEffects(int count) {
     return '+$count more effects';
   }
@@ -4131,10 +4180,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bpDspCleanPath => 'None (Clean Path)';
-
-  @override
-  String get bpPlatformConversion =>
-      'Platform conversion • not measured by this app';
 
   @override
   String get btAudioCodec => 'BLUETOOTH AUDIO CODEC';

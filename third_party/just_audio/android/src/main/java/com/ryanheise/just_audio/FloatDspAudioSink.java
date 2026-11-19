@@ -559,14 +559,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
 
     /** Configure the track for already-processed bytes, not the queued source. */
     void configurePendingReplacement(FloatDspAudioSink target) throws ConfigurationException {
-        target.configure(lastInputFormat, lastBufferSize, frameEditor.channels);
+        final int[] channels = frameEditor == null ? null : frameEditor.channels;
+        target.configure(lastInputFormat, lastBufferSize, channels);
         if (target.configuredOutputFormat.sampleRate != configuredOutputFormat.sampleRate
                 || target.configuredOutputFormat.channelCount != configuredOutputFormat.channelCount) {
             // A new route/SRC target affects future input only. Its old-rate tail
             // must still reach the replacement track at the rate it was produced.
             target.deferredFormat = lastInputFormat;
             target.deferredBufferSize = lastBufferSize;
-            target.deferredChannels = frameEditor.channels;
+            target.deferredChannels = channels;
             target.configurePendingTrack(configuredOutputFormat);
         }
     }
@@ -593,7 +594,15 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         target.pendingInputEnd = pendingInputEnd;
         target.pendingPresentationTimeUs = pendingPresentationTimeUs;
         target.pendingAccessUnits = pendingAccessUnits;
-        target.frameEditor = frameEditor;
+        // Preserve target's freshly-built frameEditor when transitioning out of
+        // integer bypass (where previous frameEditor was null), but never
+        // re-trim initial encoder delay mid-stream.
+        if (frameEditor != null) {
+            target.frameEditor = frameEditor;
+        } else if (target.frameEditor != null) {
+            target.frameEditor.delayBytes = 0;
+            target.frameEditor.started = true;
+        }
         pendingOutput = null;
         pendingInput = null;
     }

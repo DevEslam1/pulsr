@@ -836,10 +836,25 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     result.success(false);
                     return;
                 }
-                // Wait (bounded) for the rebuild to finish on the playback
-                // thread. The caller is paused, so a short block on this
-                // channel thread keeps the swap from landing after play().
-                result.success(sinkWrapper.reconfigureNow(400));
+                // Run the forced rebuild asynchronously on ExoPlayer's playback
+                // thread and reply on the main handler once done, avoiding any
+                // main-thread CountDownLatch stall while still guaranteeing the
+                // swap finishes before the Dart caller invokes play().
+                final java.util.concurrent.atomic.AtomicBoolean replied =
+                        new java.util.concurrent.atomic.AtomicBoolean(false);
+                final Runnable timeout = () -> {
+                    if (replied.compareAndSet(false, true)) {
+                        try { result.success(false); } catch (RuntimeException ignored) {}
+                    }
+                };
+                handler.postDelayed(timeout, 600);
+                sinkWrapper.reconfigureAsync(applied -> handler.post(() -> {
+                    handler.removeCallbacks(timeout);
+                    if (replied.compareAndSet(false, true)) {
+                        try { result.success(Boolean.TRUE.equals(applied)); }
+                        catch (RuntimeException ignored) {}
+                    }
+                }));
                 return;
             }
 

@@ -13,8 +13,8 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/audio/bit_perfect_chain.dart';
+import '../../../../data/audio/live_output_verdict.dart';
 import '../../../../domain/models/audio_output_info.dart';
-import '../../../../domain/models/bit_perfect_output_facts.dart';
 import '../../../../domain/models/bit_perfect_state.dart';
 import '../../../../domain/models/audio_quality_info.dart';
 import '../../../../domain/models/audio_signal_path.dart';
@@ -642,69 +642,38 @@ class AudioQualitySheet extends StatelessWidget {
     UsbExclusiveStatus usb,
     PulsrAudioHandler? handler,
   ) {
-    final requested = settings?.bitPerfectOutput == true ||
-        outputDevice?.bitPerfectRequested == true;
-    final bypassed = settings?.strictBitPerfect == true ||
-        AudioConflicts.dspBypassActive(
-          bitPerfectOutput: requested,
-          bypassDspOnBitPerfect: settings?.bypassDspOnBitPerfect ?? true,
-          device: outputDevice,
-        );
-    final direct = usb.streamingActive &&
-        outputDevice?.isUsbDac == true &&
-        outputDevice?.isBluetooth != true;
-    final stages = dsp.isDspActive ||
-        dsp.stereoBalance != 0.0 ||
-        dsp.monoMix ||
-        dsp.isDitherEnabled ||
-        (settings?.replayGainMode != null &&
-            settings!.replayGainMode != ReplayGainMode.off) ||
-        settings?.dvcEnabled == true;
-    final codec = AudioConflicts.classifySourceCodec(
-        path: source.path, codec: source.codec);
-    final sourceSampleRate = effectiveSourceSampleRate(
-        tagged: source.sampleRate ?? 0,
-        decoded: outputDevice?.decodedSampleRate ?? 0);
-    final sourceBitDepth = effectiveSourceBitDepth(
-        tagged: source.bitDepth ?? 0,
-        decoded: outputDevice?.decodedBitDepth ?? 0);
-    // This method reports observations; the verdict itself belongs to the one
-    // assembler. A second copy of the fold here is how the sheet and the
-    // per-track session log came to disagree about the same stream.
-    final facts = BitPerfectOutputFacts(
-      requested: requested,
-      // Neither an AAudio preference nor an attached USB DAC proves ownership;
-      // only the observed bypass (or the direct sink) says the route is ours.
-      sinkActive: direct || outputDevice?.isBitPerfectActive == true,
-      directUsbActive: direct,
-      bluetooth: outputDevice?.isBluetooth == true,
-      sourceSampleRate: sourceSampleRate,
-      sourceBitDepth: sourceBitDepth,
-      sinkSampleRate: outputDevice?.sinkSampleRate ?? 0,
-      sinkBitDepth: outputDevice?.sinkBitDepth ?? 0,
-      directStreamSampleRate: usb.streamingSampleRate,
-      directStreamBitDepth: usb.streamingBitDepth,
-      directRawPcmBitDepth: usb.rawPcmBitDepth,
-      floatCarrierDecodesSource:
-          outputDevice?.floatCarrierDecodesSource == true,
-      sourceFloat:
-          AudioConflicts.classifySourceSampleFormat(codec: source.codec) ==
-              AudioSourceSampleFormat.float,
-      sinkIntegerBypass: outputDevice?.integerBypassActive == true,
-      halStagesActive: outputDevice?.halStagesActive ?? 0,
-      systemEffectsCompromised: outputDevice?.systemEffectsCompromised == true,
-      softwareGain: handler?.effectiveSoftwareGain,
-      dspProcessing: !bypassed && stages,
+    // Collect what was observed and let the one assembler judge it. The fold
+    // used to live here and again in the per-track session log, which forgot
+    // dither, balance, ReplayGain and DVC; the log could then record a
+    // verified bit-perfect session for a chain this screen called unverified.
+    final verdict = resolveLiveOutputVerdict(LiveOutputObservation(
+      output: outputDevice,
+      directStreamingActive: usb.streamingActive,
+      streamingSampleRate: usb.streamingSampleRate,
+      streamingBitDepth: usb.streamingBitDepth,
+      rawPcmBitDepth: usb.rawPcmBitDepth,
+      channelMismatchFrames: usb.channelMismatchFrames,
+      rateVerified: usb.rateVerified,
+      taggedSampleRate: source.sampleRate ?? 0,
+      taggedBitDepth: source.bitDepth ?? 0,
+      codec: source.codec,
+      path: source.path,
+      isRadioSource: source.source == SongSource.radio,
+      bitPerfectOutput: settings?.bitPerfectOutput == true,
+      strictBitPerfect: settings?.strictBitPerfect == true,
+      bypassDspOnBitPerfect: settings?.bypassDspOnBitPerfect ?? true,
+      dspEffectsActive: dsp.isDspActive,
+      channelBalanceActive: dsp.stereoBalance != 0.0 || dsp.monoMix,
+      ditherActive: dsp.isDitherEnabled,
+      replayGainActive:
+          settings != null && settings.replayGainMode != ReplayGainMode.off,
+      dvcActive: settings?.dvcEnabled == true,
+      // An unreadable transport state is unknown, never "untouched".
       transportSamplesModified: handler?.transportSamplesModified ?? true,
-      channelsAltered: direct && usb.channelMismatchFrames > 0,
-      rateVerified: !direct || usb.rateVerified,
+      softwareGain: handler?.effectiveSoftwareGain,
       isDsdDop: AudioQualityInfo.dsdDopActive,
-      sourceLossy: source.source == SongSource.radio ||
-          codec == AudioSourceCodecState.lossy,
-      sourceCodecUnconfirmed: codec == AudioSourceCodecState.unknown,
-      failureReason: outputDevice?.bitPerfectFailureReason,
-    );
-    return resolveBitPerfectOutput(facts);
+    ));
+    return verdict.state;
   }
 
   Widget _buildOutputDevicesSelector(
@@ -1674,23 +1643,33 @@ class AudioQualitySheet extends StatelessWidget {
             : activeStages.join(' + '));
     // The selectors and chain share one live format-preservation verdict.
     final isBitPerfect = state.isVerified;
-    final resamplerLabel = switch (assessment.verdict) {
-      BitPerfectChainVerdict.verified =>
-        '${_sampleRateLabel(assessment.outputSampleRate)} / '
-            '${assessment.outputBitDepth}-bit • ${context.l10n.bpChainVerified}',
-      BitPerfectChainVerdict.resampled =>
-        '${_sampleRateLabel(assessment.sourceSampleRate)} → '
-            '${_sampleRateLabel(assessment.outputSampleRate)} • '
-            '${context.l10n.bpChainResampled}',
-      BitPerfectChainVerdict.depthReduced =>
-        '${assessment.sourceBitDepth}-bit → '
-            '${assessment.outputBitDepth}-bit • '
-            '${context.l10n.bpChainDepthReduced}',
-      BitPerfectChainVerdict.inactive => context.l10n.bpChainInactive,
-      BitPerfectChainVerdict.notRequested ||
-      BitPerfectChainVerdict.unverified =>
-        liveChainReasonLabel(context, state.reasonCode),
-    };
+    // This row describes the resampling stage, and it may only say "verified"
+    // when the tier is active. An assessment can return `verified` for the
+    // format alone while the tier is degraded (HAL effect, attenuation, a
+    // route nobody proved exclusive); switching on the verdict printed
+    // "Bit-perfect chain verified" on exactly those chains.
+    final resamplerLabel = state.isVerified
+        ? '${_sampleRateLabel(assessment.outputSampleRate)} / '
+            '${assessment.outputBitDepth}-bit • ${context.l10n.bpChainVerified}'
+        : switch (assessment.verdict) {
+            BitPerfectChainVerdict.resampled =>
+              '${_sampleRateLabel(assessment.sourceSampleRate)} → '
+                  '${_sampleRateLabel(assessment.outputSampleRate)} • '
+                  '${context.l10n.bpChainResampled}',
+            BitPerfectChainVerdict.depthReduced =>
+              '${assessment.sourceBitDepth}-bit → '
+                  '${assessment.outputBitDepth}-bit • '
+                  '${context.l10n.bpChainDepthReduced}',
+            BitPerfectChainVerdict.inactive => context.l10n.bpChainInactive,
+            // Not requested: no check was ever asked for, so the row must not
+            // claim a platform conversion nobody measured.
+            BitPerfectChainVerdict.notRequested =>
+              context.l10n.bpChainNotRequested,
+            // The format identity held; a non-format fact kept the tier down.
+            BitPerfectChainVerdict.verified ||
+            BitPerfectChainVerdict.unverified =>
+              liveChainReasonLabel(context, state.reasonCode),
+          };
     final resamplerColor = assessment.isProblem
         ? p.warning
         : (state.isVerified ? p.success : p.textSecondary);
@@ -1705,6 +1684,27 @@ class AudioQualitySheet extends StatelessWidget {
         (outputDevice?.isUsbDac == true
             ? context.l10n.outputDeviceUsbHiResDac
             : context.l10n.outputDeviceInternalDac);
+    // What the HARDWARE ENDPOINT node prints is the format the endpoint opened,
+    // not the verdict. Gating that text on `isVerified` printed "hardware format
+    // not verified" for every chain that was merely unverified - Bit-Perfect
+    // off, software volume below unity, a float carrier, a DSP stage - while the
+    // platform had in fact reported a concrete 48 kHz / 24-bit endpoint. "Not
+    // verified" stays reserved for a format the platform never reported.
+    final bool floatCarrierActive =
+        outputDevice?.floatCarrierDecodesSource == true;
+    // The assessment holds the sink truth; the route's reported format is the
+    // fallback when the snapshot published no sink fields (non-Android
+    // platforms, or an output info built from the display values alone).
+    final int hardwareRate = assessment.outputSampleRate > 0
+        ? assessment.outputSampleRate
+        : (outputDevice?.sampleRate ?? 0);
+    // A float carrier's container is float32 and the assessment zeroes its depth
+    // on purpose; reviving the collapsed display depth here would claim an
+    // integer container the sink never opened.
+    final int hardwareDepth = assessment.outputBitDepth > 0
+        ? assessment.outputBitDepth
+        : (floatCarrierActive ? 0 : (outputDevice?.bitDepth ?? 0));
+    final bool hardwareFormatKnown = hardwareRate > 0 && hardwareDepth > 0;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.s14),
@@ -1827,18 +1827,24 @@ class AudioQualitySheet extends StatelessWidget {
             title: context.l10n.dspOutputDriver,
             detail: driverLabel,
             icon: Icons.cable_rounded,
-            color: isBitPerfect ? AppColors.dacGold : p.warning,
+            // Amber marks a real problem (sink not active, resample, depth
+            // truncation). A route that is simply not bit-perfect - Bit-Perfect
+            // off, volume below unity - is healthy and must not be painted as a
+            // warning; every non-verified chain used to be amber.
+            color: isBitPerfect
+                ? AppColors.dacGold
+                : (assessment.isProblem ? p.warning : activeColor),
             p: p,
           ),
           _SignalChainConnector(p: p),
           _SignalChainNode(
             step: 6,
             title: context.l10n.dspHardwareEndpoint,
-            detail: assessment.isVerified
+            detail: hardwareFormatKnown
                 ? context.l10n.hardwareFormatReportedByPlatform(
                     dacLabel,
-                    _sampleRateLabel(assessment.outputSampleRate),
-                    assessment.outputBitDepth,
+                    _sampleRateLabel(hardwareRate),
+                    hardwareDepth,
                   )
                 : context.l10n.hardwareFormatNotVerified(dacLabel),
             icon: outputDevice?.isUsb == true
@@ -1848,7 +1854,9 @@ class AudioQualitySheet extends StatelessWidget {
                     : (outputDevice?.isHeadphones == true
                         ? Icons.headphones_rounded
                         : Icons.speaker_rounded)),
-            color: assessment.isVerified
+            // Gold is the verified-chain accent: the endpoint is only as
+            // verified as the tier, never as the format comparison alone.
+            color: isBitPerfect
                 ? AppColors.dacGold
                 : (assessment.isProblem ? p.warning : activeColor),
             p: p,

@@ -7445,6 +7445,102 @@ abstract class AppLocalizations {
   /// **'Bit-Perfect armed but not active'**
   String get bpChainInactive;
 
+  /// No description provided for @bpChainNotRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect off • not measured'**
+  String get bpChainNotRequested;
+
+  /// No description provided for @bpReasonSamplesModified.
+  ///
+  /// In en, this message translates to:
+  /// **'Samples modified by DSP'**
+  String get bpReasonSamplesModified;
+
+  /// No description provided for @bpReasonHalEffect.
+  ///
+  /// In en, this message translates to:
+  /// **'HAL effect active'**
+  String get bpReasonHalEffect;
+
+  /// No description provided for @bpReasonSystemEffect.
+  ///
+  /// In en, this message translates to:
+  /// **'System effect active'**
+  String get bpReasonSystemEffect;
+
+  /// No description provided for @bpReasonFloatConversion.
+  ///
+  /// In en, this message translates to:
+  /// **'Float conversion'**
+  String get bpReasonFloatConversion;
+
+  /// No description provided for @bpReasonRateUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Output rate unknown'**
+  String get bpReasonRateUnknown;
+
+  /// No description provided for @bpReasonRateNotVerified.
+  ///
+  /// In en, this message translates to:
+  /// **'Output rate not verified'**
+  String get bpReasonRateNotVerified;
+
+  /// No description provided for @bpReasonDepthUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Output depth unknown'**
+  String get bpReasonDepthUnknown;
+
+  /// No description provided for @bpReasonSourceDepthUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Source depth unknown'**
+  String get bpReasonSourceDepthUnknown;
+
+  /// No description provided for @bpReasonSourceLossy.
+  ///
+  /// In en, this message translates to:
+  /// **'Lossy source • no bit-perfect claim possible'**
+  String get bpReasonSourceLossy;
+
+  /// No description provided for @bpReasonPrecisionNotPreserved.
+  ///
+  /// In en, this message translates to:
+  /// **'Source precision not preserved'**
+  String get bpReasonPrecisionNotPreserved;
+
+  /// No description provided for @bpReasonChannelsRemapped.
+  ///
+  /// In en, this message translates to:
+  /// **'Sink remapped the channel layout'**
+  String get bpReasonChannelsRemapped;
+
+  /// No description provided for @bpReasonDopCarrier.
+  ///
+  /// In en, this message translates to:
+  /// **'DoP carrier • marker bits not measured'**
+  String get bpReasonDopCarrier;
+
+  /// No description provided for @bpReasonGainUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Software gain unreadable'**
+  String get bpReasonGainUnknown;
+
+  /// No description provided for @bpReasonNotExclusive.
+  ///
+  /// In en, this message translates to:
+  /// **'Route not exclusive'**
+  String get bpReasonNotExclusive;
+
+  /// No description provided for @bpReasonUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not verified • reason unavailable'**
+  String get bpReasonUnknown;
+
   /// Label in audio quality sheet for additional active DSP effects
   ///
   /// In en, this message translates to:
@@ -7462,12 +7558,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'None (Clean Path)'**
   String get bpDspCleanPath;
-
-  /// Status when platform resampler or conversion is unmeasured
-  ///
-  /// In en, this message translates to:
-  /// **'Platform conversion • not measured by this app'**
-  String get bpPlatformConversion;
 
   /// tranche7 quality
   ///

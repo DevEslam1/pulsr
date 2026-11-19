@@ -26,6 +26,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Last rate pushed to the tap-side SRC, so a route refresh that changes
   /// nothing does not re-fan-out to every player. Null = never pushed.
   int? _lastTapSrcTargetRate;
+  bool _suppressTapSrcSync = false;
 
   /// Restores user DSP/follow preferences when Strict Bit-Perfect is turned OFF.
   bool? _preStrictBypass;
@@ -864,7 +865,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> setBypassDspOnBitPerfect(bool enabled) =>
       _audioModeMutex.protect(() => _setBypassDspOnBitPerfect(enabled));
 
-  Future<void> _setBypassDspOnBitPerfect(bool enabled) async {
+  Future<void> _setBypassDspOnBitPerfect(bool enabled) =>
+      SettingsAudioOutputSync(this).applyBypassDspOnBitPerfectMuted(enabled);
+
+  Future<void> _applyBypassDspOnBitPerfectPolicy(bool enabled) async {
     if (!enabled && state.strictBitPerfect) {
       safeEmit(state.copyWith(
         error: uiError(
@@ -956,7 +960,10 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   Future<void> setStrictBitPerfect(bool enabled) =>
       _audioModeMutex.protect(() => _setStrictBitPerfect(enabled));
 
-  Future<void> _setStrictBitPerfect(bool enabled) async {
+  Future<void> _setStrictBitPerfect(bool enabled) =>
+      SettingsAudioOutputSync(this).applyStrictBitPerfectMuted(enabled);
+
+  Future<void> _applyStrictBitPerfectPolicy(bool enabled) async {
     markDirty('strictBitPerfect');
     markDirty('bitPerfectOutput');
     markDirty('bypassDspOnBitPerfect');
@@ -1168,6 +1175,9 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
       }
     }
     await refreshOutputDevice();
+    if (!_bitPerfectViaDirectStream) {
+      await _alignBitPerfectTransportToCurrentTrack();
+    }
   }
 
   /// Requests an app media route and reads back the outcome while playing.

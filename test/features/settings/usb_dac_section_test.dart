@@ -304,4 +304,30 @@ void main() {
     expect(modeRequests, [false]);
     expect(usbCalls.where((c) => c.method == 'stopStreaming'), isEmpty);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets(
+      'active direct stream displays rate/depth telemetry and locks exclusive toggle',
+      (tester) async {
+    status = {
+      ...attachedStatus(
+        exclusiveSupported: true,
+        exclusiveActive: true,
+        streamingSupported: true,
+        streamingActive: true,
+      ),
+      'streamingSampleRate': 96000,
+      'streamingBitDepth': 24,
+      'rateVerified': true,
+    };
+    await pump(tester, state: const SettingsState(bitPerfectOutput: true));
+    await tester.pump();
+
+    expect(find.textContaining('96 kHz'), findsOneWidget);
+    expect(find.textContaining('24-bit'), findsOneWidget);
+    expect(find.textContaining('Clock verified'), findsOneWidget);
+
+    await tester.tap(find.text(l10n.settingsExclusiveUsb));
+    await tester.pump();
+    expect(usbCalls.where((c) => c.method == 'setExclusive'), isEmpty);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 }

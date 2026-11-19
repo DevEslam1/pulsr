@@ -488,6 +488,9 @@ class UsbAudioControlParserTest {
         assertEquals(listOf(10, 11), result.clockSelectorInputs.getValue(8))
         assertEquals(mapOf(3 to 8), result.terminalClockIds)
         assertEquals(0, result.controlInterface)
+        // The selector's owning AC interface is recorded so a runtime pin write
+        // can address it even when it is not `controlInterface`.
+        assertEquals(mapOf(8 to 0), result.clockSelectorInterfaces)
         // Static resolution cannot read the active pin; it stays on the
         // documented single-programmable-clock guess while the runtime
         // resolver (UsbAudioProtocol.resolveActiveClock) reads the pin.
@@ -615,6 +618,71 @@ class UsbAudioControlParserTest {
     }
 
     @Test
+    fun selectPreferredAudioDeviceCanRequireARealRouteMatch() {
+        // Two DACs attached at once and the routed output is the only one worth
+        // streaming to: with requireRouteMatch the parser must not fall back to
+        // "the first qualifying device" (which could be the silent other DAC).
+        val vendorDac = UsbAudioControlParser.UsbDeviceSummary(
+            id = 2,
+            vendorId = 0x20B1,
+            productId = 0x3008,
+            manufacturerName = "Acme",
+            productName = "Vendor DAC",
+            interfaces = listOf(
+                UsbAudioControlParser.InterfaceSignature(0xFF, 0x01, 0x20),
+                UsbAudioControlParser.InterfaceSignature(0xFF, 0x02, 0x20),
+            ),
+        )
+        val standardDac = UsbAudioControlParser.UsbDeviceSummary(
+            id = 3,
+            vendorId = 0x1234,
+            productId = 0x5678,
+            manufacturerName = "FiiO",
+            productName = "K11",
+            interfaces = listOf(
+                UsbAudioControlParser.InterfaceSignature(0x01, 0x01, 0x20),
+                UsbAudioControlParser.InterfaceSignature(0x01, 0x02, 0x20),
+            ),
+        )
+        val attached = listOf(vendorDac, standardDac)
+
+        // Default behaviour is unchanged: the standard-audio bonus alone picks
+        // the first candidate.
+        assertEquals(standardDac, UsbAudioControlParser.selectPreferredAudioDevice(attached))
+        // ...but that bonus is not a route match, so requiring one yields null.
+        assertNull(
+            UsbAudioControlParser.selectPreferredAudioDevice(attached, requireRouteMatch = true),
+        )
+        // A hint that matches neither device is refused the same way.
+        assertNull(
+            UsbAudioControlParser.selectPreferredAudioDevice(
+                devices = attached,
+                routeProductName = "Unrelated",
+                routeAddress = "usb-0000:0000-0",
+                requireRouteMatch = true,
+            ),
+        )
+        // A route VID/PID match is enough.
+        assertEquals(
+            vendorDac,
+            UsbAudioControlParser.selectPreferredAudioDevice(
+                devices = attached,
+                routeAddress = "usb-20b1:3008-0",
+                requireRouteMatch = true,
+            ),
+        )
+        // A route product-name match is enough too.
+        assertEquals(
+            standardDac,
+            UsbAudioControlParser.selectPreferredAudioDevice(
+                devices = attached,
+                routeProductName = "K11",
+                requireRouteMatch = true,
+            ),
+        )
+    }
+
+    @Test
     fun selectPreferredAudioDevicePrefersRoutedVidPidThenNameThenStandardAudio() {
         val nonAudio = UsbAudioControlParser.UsbDeviceSummary(
             id = 1,
@@ -668,5 +736,132 @@ class UsbAudioControlParserTest {
                 routeAddress = null,
             ),
         )
+    }
+
+    @Test
+    fun clockSelectorRecordsItsOwnAudioControlInterface() {
+        val config = byteArrayOf(
+            // AudioControl interface #3, UAC2.
+            9, 0x04, 0x03, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            8, 0x24, 0x0A, 0x0A, 0x03, 0x03, 0x00, 0x00, // Clock Source 10
+            8, 0x24, 0x0A, 0x0B, 0x03, 0x03, 0x00, 0x00, // Clock Source 11
+            8, 0x24, 0x0B, 0x08, 0x02, 0x0A, 0x0B, 0x00, // Clock Selector 8: pins 10, 11
+            // Output Terminal 6, fed by source 1 and clocked by selector 8.
+            12, 0x24, 0x03, 0x06, 0x01, 0x03, 0x00, 0x01, 0x08, 0x00, 0x00, 0x00,
+            // Playback stream on interface #4, linked to Output Terminal 6.
+            9, 0x04, 0x04, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+            16, 0x24, 0x01, 0x06, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+            6, 0x24, 0x02, 0x01, 0x03, 0x18,
+            7, 0x05, 0x04, 0x05, 0x00, 0x03, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(config)
+        assertEquals(mapOf(8 to 3), result.clockSelectorInterfaces)
+        assertEquals(3, result.controlInterface)
+        assertEquals(6, result.playbackTerminalId)
+        assertEquals(mapOf(6 to 8), result.terminalClockIds)
+    }
+
+    @Test
+    fun clockSourceValidityControlIsReadableWhenBmControlsD3D2IsSet() {
+        // 0x0C and 0x0F both carry Clock Validity Control as read/write (D3..D2).
+        assertTrue(
+            UsbAudioControlParser.parse(uac2MultiAltConfig(clockControls = 0x0C))
+                .clockSource!!.validityReadable,
+        )
+        assertTrue(
+            UsbAudioControlParser.parse(uac2MultiAltConfig(clockControls = 0x0F))
+                .clockSource!!.validityReadable,
+        )
+        // 0x0D = validity read-only (D3..D2 = 0b01) is still readable.
+        assertTrue(
+            UsbAudioControlParser.parse(uac2MultiAltConfig(clockControls = 0x0D))
+                .clockSource!!.validityReadable,
+        )
+        // 0x03 = frequency control only: there is nothing to ask.
+        assertFalse(
+            UsbAudioControlParser.parse(uac2MultiAltConfig(clockControls = 0x03))
+                .clockSource!!.validityReadable,
+        )
+    }
+
+    @Test
+    fun continuousUac1RangeCoversSevenHundredSixtyEightKilohertz() {
+        val continuous = byteArrayOf(
+            // AudioStreaming interface #1 alt 1, UAC1 (protocol 0x00).
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x00, 0x00,
+            // UAC1 FORMAT_TYPE_I: 2 ch, 3-byte subframe, 24-bit,
+            // bSamFreqType = 0 => continuous range.
+            14, 0x24, 0x02, 0x01, 0x02, 0x03, 0x18, 0x00,
+            // 44100 = 0x00AC44, 768000 = 0x0BB800.
+            0x44, 0xAC.toByte(), 0x00,
+            0x00, 0xB8.toByte(), 0x0B,
+            // Isochronous OUT endpoint.
+            7, 0x05, 0x01, 0x09, 0x00, 0x03, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(continuous)
+        assertEquals(
+            listOf(44100, 48000, 88200, 96000, 176400, 192000, 352800, 384000, 705600, 768000),
+            result.supportedRates,
+        )
+        assertEquals(result.supportedRates, result.altSettingFormats.single().supportedRates)
+    }
+
+    @Test
+    fun uac3StreamingFormatIsNotParsedWithTheUac1Layout() {
+        val config = byteArrayOf(
+            // AudioControl interface #0, protocol 0x30 = UAC3.
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x30, 0x00,
+            // AudioStreaming interface #1 alt 1, UAC3.
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x30, 0x00,
+            // FORMAT_TYPE_I shaped class-specific descriptor. UAC3 lays these
+            // out differently, so the UAC1 offsets must never be applied.
+            6, 0x24, 0x02, 0x01, 0x04, 0x20,
+            // Isochronous OUT endpoint.
+            7, 0x05, 0x01, 0x05, 0x00, 0x04, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(config)
+        assertEquals(UsbAudioControlParser.UAC3, result.uacVersion)
+        assertTrue(result.altSettingFormats.isEmpty())
+        // The endpoint is still discoverable, so streaming is refused later
+        // with a precise reason instead of no DAC found.
+        assertEquals(0x01, result.streamingEndpoint!!.address)
+    }
+
+    @Test
+    fun featureUnitOffThePlaybackPathIsNotASilentFallback() {
+        val config = byteArrayOf(
+            // AudioControl interface #0, UAC2.
+            9, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x20, 0x00,
+            // Feature Unit 2 with writable volume, on the CAPTURE path, FIRST.
+            18, 0x24, 0x06, 0x02, 0x01,
+            0x0F, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x0F, 0x00, 0x00, 0x00, 0x00,
+            // Input Terminal 5 (microphone) feeds Feature Unit 2.
+            17, 0x24, 0x02, 0x05, 0x01, 0x01, 0x00, 0x08, 0x02,
+            0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // Output Terminal 6, fed by source 1: no Feature Unit here.
+            12, 0x24, 0x03, 0x06, 0x01, 0x03, 0x00, 0x01, 0x08, 0x00, 0x00, 0x00,
+            8, 0x24, 0x0A, 0x08, 0x03, 0x03, 0x00, 0x00, // Clock Source 8
+            // Playback stream linked to Output Terminal 6.
+            9, 0x04, 0x01, 0x01, 0x01, 0x01, 0x02, 0x20, 0x00,
+            16, 0x24, 0x01, 0x06, 0x00, 0x01, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+            6, 0x24, 0x02, 0x01, 0x03, 0x18,
+            7, 0x05, 0x01, 0x05, 0x00, 0x03, 0x01,
+        )
+        val result = UsbAudioControlParser.parse(config)
+        assertEquals(6, result.playbackTerminalId)
+        // Feature Unit 2 belongs to the microphone: writing it would move the
+        // record gain. With the playback terminal known, the first candidate is
+        // not an acceptable answer.
+        assertNull(result.volumeUnit)
+        assertFalse(result.hasVolumeControl)
+    }
+
+    @Test
+    fun featureUnitIsStillFoundWithoutAnyStreamingInterface() {
+        // No AudioStreaming interface means no playback terminal at all, so the
+        // single-candidate fallback must keep working there.
+        val result = UsbAudioControlParser.parse(uac1Config())
+        assertNull(result.playbackTerminalId)
+        assertEquals(3, result.volumeUnit!!.unitId)
     }
 }

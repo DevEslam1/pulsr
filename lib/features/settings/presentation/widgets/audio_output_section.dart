@@ -489,16 +489,6 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
             ),
           ),
           settingsCardDivider(p),
-          // Exclusive claim
-          SettingsSwitchTile(
-            Icons.lock_outline_rounded,
-            'Exclusive Audio Claim',
-            'Claim dedicated hardware mixer endpoint for zero interference',
-            value: isAndroid && state.aaudioPreferExclusive,
-            disabledReason: isAndroid ? null : unsupported,
-            onChanged: isAndroid ? cubit.setAaudioPreferExclusive : (v) {},
-          ),
-          settingsCardDivider(p),
           UsbDacSection(cubit: cubit, state: state),
           // Rarely-used controls behind Advanced disclosure
           _AdvancedDisclosure(
@@ -531,6 +521,16 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 disabledReason: isAndroid ? null : unsupported,
                 onChanged: !isAndroid ? (v) {} : cubit.setAaudioOutputEnabled,
               ),
+              if (isAndroid && state.aaudioOutputEnabled) ...[
+                settingsCardDivider(p),
+                SettingsSwitchTile(
+                  Icons.lock_outline_rounded,
+                  'AAudio Exclusive Mode',
+                  'Request exclusive AAudio sharing (requires AAudio Direct)',
+                  value: state.aaudioPreferExclusive,
+                  onChanged: cubit.setAaudioPreferExclusive,
+                ),
+              ],
               SettingSliderRow(
                 label: context.l10n.settingsAaudioBufferSize,
                 subtitle: context.l10n.settingsAaudioBufferSizeDesc,

@@ -135,6 +135,24 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     }
   }
 
+  String _buildActiveStreamingSubtitle(BuildContext context) {
+    final base = context.l10n.settingsUsbStreamingActive;
+    if (!_status.streamingActive || _status.streamingSampleRate <= 0) {
+      return base;
+    }
+    final khz = _status.streamingSampleRate / 1000.0;
+    final rateText = khz == khz.roundToDouble()
+        ? '${khz.round()} kHz'
+        : '${khz.toStringAsFixed(1)} kHz';
+    final parts = <String>[
+      base,
+      rateText,
+      if (_status.streamingBitDepth > 0) '${_status.streamingBitDepth}-bit',
+      if (_status.rateVerified) 'Clock verified',
+    ];
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_isAndroid || !_status.attached) return const SizedBox.shrink();
@@ -198,14 +216,16 @@ class _UsbDacSectionState extends State<UsbDacSection> {
         SettingsSwitchTile(
           Icons.lock_rounded,
           context.l10n.settingsExclusiveUsb,
-          _status.exclusiveActive
+          _status.exclusiveActive || _status.streamingActive
               ? context.l10n.settingsStreamingClaimed
               : context.l10n.settingsExclusiveUsbDesc,
-          value: _status.exclusiveActive,
-          disabledReason: _status.exclusiveSupported
-              ? null
-              : context.l10n.settingsRequiresUacDac,
-          onChanged: _status.exclusiveSupported
+          value: _status.exclusiveActive || _status.streamingActive,
+          disabledReason: _status.streamingActive
+              ? context.l10n.settingsStreamingClaimed
+              : (_status.exclusiveSupported
+                  ? null
+                  : context.l10n.settingsRequiresUacDac),
+          onChanged: (_status.exclusiveSupported && !_status.streamingActive)
               ? (v) async {
                   await _service.setExclusive(v);
                   await _refresh();
@@ -219,7 +239,7 @@ class _UsbDacSectionState extends State<UsbDacSection> {
             // The cubit owns the mode now: it may be satisfied by the platform's
             // exclusive mixer rather than Pulsr's own endpoint.
             widget.state.bitPerfectOutput
-                ? context.l10n.settingsUsbStreamingActive
+                ? _buildActiveStreamingSubtitle(context)
                 : context.l10n.settingsUsbStreamingDesc,
             value: widget.state.bitPerfectOutput,
             disabledReason:

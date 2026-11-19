@@ -1138,4 +1138,41 @@ public class FloatDspAudioSinkTest {
         fastProc.release();
         slowProc.release();
     }
+
+    @Test
+    public void transferPendingFromBypassPreservesTargetFrameEditorWithoutReTrimmingDelay()
+            throws Exception {
+        final boolean[] bitPerfect = {true};
+        NativeDspAudioProcessor bypassProc = new NativeDspAudioProcessor() {
+            @Override boolean isNativeAvailableForConfiguration() { return true; }
+            @Override boolean isBitPerfectNative() { return bitPerfect[0]; }
+            @Override boolean isUsbExclusiveActive() { return false; }
+        };
+        bypassProc.setFloatOutput(true);
+        FakeSink oldDelegate = new FakeSink();
+        FloatDspAudioSink oldWrapper = new FloatDspAudioSink(oldDelegate, bypassProc, true, false, true);
+        Format delayed = source(48000, 1, C.ENCODING_PCM_16BIT).buildUpon()
+                .setEncoderDelay(2).build();
+        oldWrapper.configure(delayed, 0, null);
+        assertEquals(C.ENCODING_PCM_16BIT, lastConfigured(oldDelegate).pcmEncoding);
+
+        // Transition out of integer bypass into float DSP replacement.
+        bitPerfect[0] = false;
+        FakeProcessor newProc = new FakeProcessor();
+        newProc.output = new AudioFormat(48000, 1, C.ENCODING_PCM_FLOAT);
+        FakeSink newDelegate = new FakeSink();
+        FloatDspAudioSink replacement = new FloatDspAudioSink(newDelegate, newProc, true, false, true);
+        oldWrapper.configurePendingReplacement(replacement, delayed, 0, null);
+        oldWrapper.transferPendingTo(replacement);
+
+        // First buffer on the replacement must NOT re-trim the 2-frame initial encoder delay.
+        ByteBuffer input = ByteBuffer.allocateDirect(6).order(ByteOrder.LITTLE_ENDIAN);
+        input.putShort((short) 1000).putShort((short) 2000).putShort((short) 3000).flip();
+        assertTrue(replacement.handleBuffer(input, 5000L, 1));
+        assertEquals("all 3 frames must reach the DSP without re-trimming initial encoder delay",
+                3, newProc.receivedFloats.size());
+
+        oldWrapper.reset();
+        bypassProc.release();
+    }
 }

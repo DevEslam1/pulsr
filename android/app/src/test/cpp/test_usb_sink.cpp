@@ -46,6 +46,38 @@ void operator delete[](void* p) noexcept { std::free(p); }
 void operator delete(void* p, std::size_t) noexcept { std::free(p); }
 void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
 
+// Identity addresses shared by the injected-reap regressions below. They are never
+// dereferenced: the sink only compares completion pointers for identity.
+static int gUsbUrbIdentityOut = 0;
+static int gUsbUrbIdentityIn = 0;
+static int gUsbStrangerUrb = 0;
+static int gReapScript = 0;
+
+// P2-4: a live usbfs endpoint whose DAC never returns a URB. Captureless, so it
+// converts to UsbAudioSink::UrbReap regardless of which thread runs the drain.
+int reapNever(int, void**) {
+    errno = EAGAIN;
+    return -1;
+}
+
+// P3-8: one unrecognized completion, then every URB this sink submitted. The
+// stray completion must not leave lastError_ = EPROTO latched afterwards.
+int reapScripted(int, void** urb) {
+    switch (gReapScript++) {
+        case 0: *urb = &gUsbStrangerUrb; return 0;
+        case 1: *urb = &gUsbUrbIdentityOut; return 0;
+        case 2: *urb = &gUsbUrbIdentityIn; return 0;
+        default: errno = EAGAIN; return -1;
+    }
+}
+
+// A queue that keeps reporting a completion this sink does not own (duplicate or
+// foreign pointer). It always "succeeds", so only the deadline can end the loop.
+int reapAlwaysForeign(int, void** urb) {
+    *urb = &gUsbStrangerUrb;
+    return 0;
+}
+
 using pulsr::UsbAudioSink;
 
 namespace pulsr {
@@ -117,6 +149,99 @@ struct UsbAudioSinkTestAccess {
         DspEngineRegistry::instance().unregisterEngine(probe.get());
         return cleared;
     }
+    // P2-2/P2-4: stage a stream whose drain failed - submitted OUT/IN identities,
+    // kernel-visible storage and a live fd that is about to be closed by Kotlin.
+    static bool stageOutstandingUrbs(UsbAudioSink& sink) {
+        sink.Close();
+        sink.urbs_ = {&gUsbUrbIdentityOut};
+        sink.urbOwned_ = {0};
+        sink.feedbackUrbs_ = {&gUsbUrbIdentityIn};
+        sink.feedbackOwned_ = {0};
+        sink.urbStorage_.assign(32, 0xAA);
+        sink.feedbackUrbStorage_.assign(32, 0xBB);
+        sink.urbRawDepth_.assign(1, 32);
+        sink.urbDeliveryEpoch_.assign(1, 7);
+        sink.ring_.assign(64, 0x11);
+        sink.ringRawDepth_.assign(8, 24);
+        sink.ringFrameMask_ = 7;
+        sink.ringRead_.store(0);
+        sink.ringWrite_.store(0);
+        sink.fd_ = 12;
+        sink.claimed_ = true;
+        sink.active_.store(true);
+        sink.exclusive_.store(true);
+        sink.running_.store(false);
+        sink.lastError_.store(0);
+        const auto accept = +[](int, void*) { return 0; };
+        return sink.submitAll(accept) && sink.submitUrb(&gUsbUrbIdentityIn, true, 0, accept);
+    }
+    static bool drainDeadlineRetainsOwnership(UsbAudioSink& sink) {
+        const bool staged = stageOutstandingUrbs(sink);
+        // reapNever never hands back a completion, so the bounded deadline must
+        // expire instead of freeing memory the kernel still owns.
+        const bool timedOut = !sink.drainUrbCompletions(0, reapNever);
+        const bool retained = timedOut && sink.GetLastError() == ETIMEDOUT &&
+            sink.IsExclusive() && sink.hasOutstandingUrbs() &&
+            !sink.urbStorage_.empty() && !sink.feedbackUrbStorage_.empty();
+        sink.Abandon(); // never leave kernel-visible pointers behind for later tests
+        return staged && retained;
+    }
+    static bool abandonRecoversCleanStart(UsbAudioSink& sink) {
+        // Pristine pre-Open contract: no claim, no fd, no kernel-visible storage,
+        // no exclusivity and no latched error from the teardown that just ran.
+        auto pristine = [&sink] {
+            return !sink.IsExclusive() && !sink.IsActive() &&
+                !sink.hasOutstandingUrbs() && sink.urbStorage_.empty() &&
+                sink.feedbackUrbStorage_.empty() && sink.ring_.empty() &&
+                sink.ringRawDepth_.empty() && sink.fd_ == -1 && !sink.claimed_ &&
+                sink.producerOwner_.load() == 0 && !sink.sinkDepthPublished_ &&
+                sink.GetLastError() == 0;
+        };
+        const bool staged = stageOutstandingUrbs(sink);
+        DspEngineRegistry::instance().setSinkBitDepth(24);
+        sink.sinkDepthPublished_ = true;
+        // Leave the sink in the state a failed Close() produces: outstanding
+        // URBs and a latched ETIMEDOUT that only Abandon() may clear.
+        const bool drainFailed = !sink.drainUrbCompletions(0, reapNever) &&
+            sink.GetLastError() == ETIMEDOUT && sink.IsExclusive();
+        sink.Abandon();
+        const bool clean = pristine();
+        // Idempotence: a second forced teardown must neither resurrect a claim,
+        // an fd, storage or a live error, nor wedge the next Open.
+        sink.Abandon();
+        const bool stillClean = pristine();
+        // The failed-drain gate must be gone: Open now reaches its normal path
+        // (this host has no usbfs, so it reports InvalidArgs) instead of
+        // ClaimFailed forever on a dead descriptor.
+        const bool reopened = sink.Open(12, 1, 1, 1, 48000, 2, 4, 32) ==
+            pulsr::UsbStreamResult::InvalidArgs;
+        sink.Close();
+        return staged && drainFailed && clean && stillClean && reopened;
+    }
+    static bool duplicateCompletionDrainIsBounded(UsbAudioSink& sink) {
+        const bool staged = stageOutstandingUrbs(sink);
+        // reapAlwaysForeign never hands back an URB markReaped owns, so only the
+        // deadline checked before each reap can terminate this drain.
+        const bool timedOut = !sink.drainUrbCompletions(20, reapAlwaysForeign);
+        const bool retained = timedOut && sink.GetLastError() == ETIMEDOUT &&
+            sink.IsExclusive() && sink.hasOutstandingUrbs() &&
+            !sink.urbStorage_.empty() && !sink.feedbackUrbStorage_.empty();
+        sink.Abandon();
+        return staged && retained;
+    }
+    static bool unknownCompletionClearsProtocolError(UsbAudioSink& sink) {
+        const bool staged = stageOutstandingUrbs(sink);
+        sink.lastError_.store(EPROTO); // stale error from an earlier stray completion
+        gReapScript = 0;
+        // A non-zero budget: the deadline is now consulted before every reap, so
+        // a 0 ms drain would (correctly) perform no reaps at all.
+        const bool drained = sink.drainUrbCompletions(1000, reapScripted);
+        const bool cleared = drained && !sink.hasOutstandingUrbs() &&
+            sink.GetLastError() == 0 && sink.IsExclusive() &&
+            !sink.urbStorage_.empty();
+        sink.Close();
+        return staged && cleared;
+    }
     static int completion(const void* urb, bool feedback) {
         return UsbAudioSink::completionError(urb, feedback, 2, 16);
     }
@@ -159,8 +284,10 @@ struct UsbAudioSinkTestAccess {
             return 0;
         }) && sink.urbOwned_[0] == 1 && sink.urbOwned_[1] == 0 && errno == EIO;
         sink.lastError_.store(errno);
-        sink.releaseResources(); // same rollback as Open after partial submit
-        const bool startupRetained = sink.IsExclusive() && !sink.IsActive() && closed(sink) &&
+        // fd_ is unusable here, so the drain cannot prove ownership returned:
+        // the rollback must refuse and keep every buffer alive.
+        const bool drainRefused = !sink.releaseResources(); // same rollback as Open after partial submit
+        const bool startupRetained = drainRefused && sink.IsExclusive() && !sink.IsActive() && closed(sink) &&
             sink.hasOutstandingUrbs() && sink.urbStorage_.data() == startupStorage &&
             sink.urbStorage_.size() == 32;
         const bool restartBlocked = sink.Open(10, 1, 1, 1, 48000, 2, 4, 32) == UsbStreamResult::ClaimFailed &&
@@ -170,8 +297,8 @@ struct UsbAudioSinkTestAccess {
         const bool notSubmitted = !sink.markReaped(&unsubmitted, &feedback, &index) && sink.hasOutstandingUrbs();
         const bool startupReturned = sink.markReaped(&out, &feedback, &index) && !feedback && index == 0 &&
             !sink.hasOutstandingUrbs() && sink.IsExclusive();
-        sink.Close();
-        const bool startupReleased = !sink.IsExclusive() && sink.urbStorage_.empty();
+        const bool closeDrained = sink.Close();
+        const bool startupReleased = closeDrained && !sink.IsExclusive() && sink.urbStorage_.empty();
 
         // Also preserve the independent OUT/IN identity regression, acquiring
         // both identities through production submission rather than owned_=1.
@@ -185,8 +312,8 @@ struct UsbAudioSinkTestAccess {
         const auto* inStorage = sink.feedbackUrbStorage_.data();
         const auto accept = +[](int, void*) { return 0; };
         const bool submitted = sink.submitAll(accept) && sink.submitUrb(&in, true, 0, accept);
-        sink.Close();
-        const bool retained = sink.IsExclusive() && sink.hasOutstandingUrbs() && sink.urbStorage_.data() == outStorage &&
+        const bool closeRefused = !sink.Close(); // undrained ownership must be reported
+        const bool retained = closeRefused && sink.IsExclusive() && sink.hasOutstandingUrbs() && sink.urbStorage_.data() == outStorage &&
             sink.feedbackUrbStorage_.data() == inStorage && sink.urbStorage_.size() == 32 &&
             sink.feedbackUrbStorage_.size() == 32;
         const bool unrecognized = !sink.markReaped(&unknown, &feedback, &index) && sink.hasOutstandingUrbs();
@@ -194,8 +321,9 @@ struct UsbAudioSinkTestAccess {
             sink.feedbackOwned_[0] == 1 && sink.hasOutstandingUrbs();
         const bool duplicate = !sink.markReaped(&out, &feedback, &index) && sink.feedbackOwned_[0] == 1;
         const bool inOnly = sink.markReaped(&in, &feedback, &index) && feedback && !sink.hasOutstandingUrbs();
-        sink.Close(); // only exact submitted identities authorize freeing storage
-        const bool released = !sink.IsExclusive() && sink.urbStorage_.empty() && sink.feedbackUrbStorage_.empty();
+        // Only exact submitted identities authorize freeing storage.
+        const bool closeAfterReap = sink.Close();
+        const bool released = closeAfterReap && !sink.IsExclusive() && sink.urbStorage_.empty() && sink.feedbackUrbStorage_.empty();
         return initiallyReleased && partialSubmit && startupRetained && restartBlocked && notSubmitted &&
             startupReturned && startupReleased && submitted && retained && unrecognized && outOnly && duplicate && inOnly && released;
     }
@@ -662,13 +790,14 @@ int main() {
               "WaitForWriteSpace must report -1 when requested frames exceed total ring capacity");
         check(Access::enter(sink, 101), "writer lease for close-drain test must admit");
         std::atomic<bool> closeReturned{false};
-        std::thread closer([&] { sink.Close(); closeReturned.store(true); });
+        std::atomic<bool> closeDrained{false};
+        std::thread closer([&] { closeDrained.store(sink.Close()); closeReturned.store(true); });
         while (!Access::closed(sink)) std::this_thread::yield();
         check(!closeReturned.load(), "Close must wait for admitted writer before freeing ring");
         Access::leave(sink);
         closer.join();
-        check(closeReturned.load() && sink.GetRawPcmBitDepth() == 0 && !sink.IsActive(),
-              "Close must drain writer and clear raw delivery status");
+        check(closeReturned.load() && closeDrained.load() && sink.GetRawPcmBitDepth() == 0 && !sink.IsActive(),
+              "Close must drain writer, report a successful bounded drain and clear raw delivery status");
         for (int trial = 0; trial < 32; ++trial) {
             Access::prepare(sink);
             std::atomic<int> ready{0};
@@ -695,6 +824,14 @@ int main() {
               "Open must reject valid bits exceeding wire width before usbfs calls");
         check(sink.Open(10, 1, 1, 1, 48000, 2, 4, 20) == pulsr::UsbStreamResult::InvalidArgs,
               "Open must reject unsupported valid depth before usbfs calls");
+        check(Access::drainDeadlineRetainsOwnership(sink),
+              "bounded drain must time out (ETIMEDOUT) and retain exclusive ownership when no completion arrives");
+        check(Access::duplicateCompletionDrainIsBounded(sink),
+              "bounded drain must end when every reap reports a foreign completion");
+        check(Access::abandonRecoversCleanStart(sink),
+              "Abandon must leak kernel-owned URBs, clear the error, withdraw publication and let the next Open start clean");
+        check(Access::unknownCompletionClearsProtocolError(sink),
+              "a stray completion must not leave EPROTO latched after a successful drain");
 
         // Ring occupancy across size_t wraparound + adaptive cadence steering.
         Access::setWrappedFill(sink, 38400); // 100.0 ms at 48 kHz / 2ch / 4B
@@ -704,15 +841,15 @@ int main() {
               "GetBufferedMs must survive unsigned size_t wraparound");
 
         int steeredLow = UsbAudioSink::SteerPacketRateForRingFill(48000, 48000, 100, 1000);
-        check(steeredLow < 48000 && steeredLow >= 47952,
-              "low ring fill must steer cadence gently downward within -0.1%");
+        check(steeredLow < 48000 && steeredLow >= 47520,
+              "low ring fill must steer cadence gently downward within -1%");
         for (int s = 0; s < 200; ++s) {
             steeredLow = UsbAudioSink::SteerPacketRateForRingFill(steeredLow, 48000, 0, 1000);
         }
-        check(steeredLow == 47952, "low-fill cadence steering must clamp at -0.1%");
+        check(steeredLow == 47520, "low-fill cadence steering must clamp at -1%");
         int steeredHigh = UsbAudioSink::SteerPacketRateForRingFill(48000, 48000, 900, 1000);
-        check(steeredHigh > 48000 && steeredHigh <= 48048,
-              "high ring fill must steer cadence gently upward within +0.1%");
+        check(steeredHigh > 48000 && steeredHigh <= 48480,
+              "high ring fill must steer cadence gently upward within +1%");
         check(UsbAudioSink::SteerPacketRateForRingFill(47980, 48000, 250, 1000) == 47980,
               "hysteresis zone must hold tuned cadence without chatter");
         int recovered = 47980;
@@ -720,6 +857,24 @@ int main() {
             recovered = UsbAudioSink::SteerPacketRateForRingFill(recovered, 48000, 500, 1000);
         }
         check(recovered == 48000, "centered deadband must relax back to nominal rate");
+
+        // Feedback-less DACs typically run 0.2-0.6% off the host clock. That
+        // drift must be steerable: under the old +/-0.1% (+/-48 Hz) window these
+        // corrections were clamped away and the ring could only gap-fill. Probe
+        // in the hysteresis band so the value is held, not re-centred.
+        const int twoPerMilleFast = 48000 + 48000 * 2 / 1000; // +96 Hz
+        const int twoPerMilleSlow = 48000 - 48000 * 2 / 1000; // -96 Hz
+        check(UsbAudioSink::SteerPacketRateForRingFill(twoPerMilleFast, 48000, 750, 1000) == twoPerMilleFast &&
+              UsbAudioSink::SteerPacketRateForRingFill(twoPerMilleSlow, 48000, 250, 1000) == twoPerMilleSlow,
+              "a 0.2% clock error must survive steering instead of saturating at +/-0.1%");
+        int saturatedFast = 48000;
+        int saturatedSlow = 48000;
+        for (int s = 0; s < 200; ++s) {
+            saturatedFast = UsbAudioSink::SteerPacketRateForRingFill(saturatedFast, 48000, 990, 1000);
+            saturatedSlow = UsbAudioSink::SteerPacketRateForRingFill(saturatedSlow, 48000, 10, 1000);
+        }
+        check(saturatedFast == 48480 && saturatedSlow == 47520,
+              "sustained ring error must be able to reach the full +/-1% steering range");
     }
 
     // ---- Completion validation: not every reaped OUT actually played -------

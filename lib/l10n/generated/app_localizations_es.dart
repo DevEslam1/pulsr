@@ -4122,6 +4122,56 @@ class AppLocalizationsEs extends AppLocalizations {
   String get bpChainInactive => 'Bit-Perfect armado pero inactivo';
 
   @override
+  String get bpChainNotRequested => 'Bit-Perfect desactivado • no medido';
+
+  @override
+  String get bpReasonSamplesModified => 'Muestras modificadas por DSP';
+
+  @override
+  String get bpReasonHalEffect => 'Efecto HAL activo';
+
+  @override
+  String get bpReasonSystemEffect => 'Efecto del sistema activo';
+
+  @override
+  String get bpReasonFloatConversion => 'Conversión a coma flotante';
+
+  @override
+  String get bpReasonRateUnknown => 'Frecuencia de salida desconocida';
+
+  @override
+  String get bpReasonRateNotVerified => 'Frecuencia de salida no verificada';
+
+  @override
+  String get bpReasonDepthUnknown => 'Profundidad de salida desconocida';
+
+  @override
+  String get bpReasonSourceDepthUnknown => 'Profundidad del origen desconocida';
+
+  @override
+  String get bpReasonSourceLossy =>
+      'Origen con pérdida • no se puede afirmar bit-perfect';
+
+  @override
+  String get bpReasonPrecisionNotPreserved =>
+      'Precisión del origen no preservada';
+
+  @override
+  String get bpReasonChannelsRemapped => 'El receptor reasignó los canales';
+
+  @override
+  String get bpReasonDopCarrier => 'Portadora DoP • bits de marca no medidos';
+
+  @override
+  String get bpReasonGainUnknown => 'Ganancia de software ilegible';
+
+  @override
+  String get bpReasonNotExclusive => 'Ruta no exclusiva';
+
+  @override
+  String get bpReasonUnknown => 'Sin verificar • motivo no disponible';
+
+  @override
   String bpMoreEffects(int count) {
     return '+$count efectos más';
   }
@@ -4131,10 +4181,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get bpDspCleanPath => 'Ninguno (Ruta limpia)';
-
-  @override
-  String get bpPlatformConversion =>
-      'Conversión de la plataforma • no medida por esta app';
 
   @override
   String get btAudioCodec => 'CODEC BLUETOOTH';

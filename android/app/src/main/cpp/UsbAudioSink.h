@@ -21,6 +21,9 @@
 // activated by the explicit "USB Bit-Perfect Streaming" action. Startup failure
 // restores HAL only after submitted USB ownership has been drained; a failed
 // drain retains buffers and HAL exclusivity until control teardown succeeds.
+// When that teardown is forced (the caller releases the interface and closes
+// the connection itself), Abandon() drops the dead stream for good and leaks
+// whatever the kernel might still write to, so the next Open starts clean.
 #ifndef PULSR_USB_AUDIO_SINK_H_
 #define PULSR_USB_AUDIO_SINK_H_
 
@@ -57,10 +60,38 @@ public:
     // fd: usbfs fd from UsbDeviceConnection.getFileDescriptor().
     // endpointAddress: isochronous OUT endpoint (bit 7 clear).
     // interfaceNumber/altSetting: the claimed AudioStreaming interface.
+    // alreadyConfigured: true when the caller (UsbExclusivePlugin) already
+    // claimed the interface, selected altSetting, and programmed/verified the
+    // DAC sample clock — skips redundant USBDEVFS_CLAIMINTERFACE and
+    // USBDEVFS_SETINTERFACE ioctls that reset the hardware clock on UAC1/UAC2
+    // DACs, and leaves kernel driver rebind order to the caller.
     UsbStreamResult Open(int fd, int endpointAddress, int interfaceNumber, int altSetting,
                          int sampleRate, int channels, int bytesPerSample,
-                         int validBitDepth = 0);
-    void Close();
+                         int validBitDepth = 0, bool alreadyConfigured = false);
+    // Stops the worker and tears the stream down. Returns false when submitted
+    // URBs could not be reaped inside the bounded drain window (lastError_ =
+    // ETIMEDOUT): URB storage, the claimed interface and HAL exclusivity are
+    // retained so no kernel-owned transfer is ever freed; the next Open then
+    // refuses to start rather than reusing a half-torn-down sink. Abandon() is
+    // the only escape from that state, and only after the caller has closed the
+    // connection itself.
+    bool Close();
+    // Forced teardown for a caller that already released the interface and
+    // closed the usbfs connection because Close() reported a failed drain.
+    // Nothing on that dead fd can ever be reaped, so this stops the worker,
+    // withdraws the sink-depth / direct-USB publication, deliberately leaks the
+    // URB headers and packet buffers the kernel may still write to, and returns
+    // the sink to its pristine pre-Open state: no outstanding URBs, fd_ = -1, no
+    // claim, exclusive_ = false and lastError_ cleared, so a completed forced
+    // teardown is never reported as a live fault. Without it every later Open
+    // would drain a dead fd and fail with ClaimFailed for the rest of the
+    // process. Safe to call more than once.
+    void Abandon();
+    // Re-attaches the kernel driver (snd-usb-audio) to interfaceNumber on fd
+    // via USBDEVFS_IOCTL(USBDEVFS_CONNECT). Must be called after releasing the
+    // interface; for USB audio devices, rebind AudioControl (interface 0) first
+    // so snd-usb-audio probes the card and claims its streaming interfaces.
+    static bool RebindKernelDriver(int fd, int interfaceNumber);
     bool IsActive() const;
     // HAL exclusivity lasts until control teardown drains USB ownership, even
     // if the worker self-exits. Faults must not silently leak to normal output.
@@ -78,9 +109,6 @@ public:
     // 1 when active & exclusive but full after `maxWaitMs`, or -1 when
     // inactive/closed/unbounded so callers can route through normal error handling.
     int WaitForWriteSpace(int frames, int maxWaitMs);
-
-    // Queries supported sample rates for the AudioStreaming interface using USBDEVFS_CONTROL.
-    static std::vector<int> QuerySupportedRates(int fd, int interfaceNumber);
 
     // Parses supported sample rates from raw configuration descriptors (UAC1 Format Type I).
     static std::vector<int> ParseSupportedRatesFromDescriptors(const uint8_t* desc, size_t len, int targetInterface = -1);
@@ -105,9 +133,11 @@ public:
                                               int endpointAddress, int usbSpeed);
     static int NextPacketFrames(uint64_t& accumulator, uint32_t ratePerSec,
                                 int intervalUs, int maxFramesPerPacket);
-    // Steers nominal packet cadence within +/-0.1% based on ring fill when the
+    // Steers nominal packet cadence within +/-1% based on ring fill when the
     // DAC exposes no async feedback IN endpoint, limiting clock-drift underruns
-    // or overruns without touching sample bits.
+    // or overruns without touching sample bits. That range must cover the real
+    // crystal error of cheap feedback-less DACs (0.2-0.6%): a +/-0.1% window
+    // saturates immediately and leaves the ring to gap-fill every ~80 s.
     static int SteerPacketRateForRingFill(int currentRatePerSec, int nominalRate,
                                           size_t occupiedBytes, size_t capacityBytes);
 
@@ -155,8 +185,24 @@ private:
     // Establishes startup exclusivity before submitting; injectable syscall for
     // host ownership regressions (production always uses usbfs).
     bool submitAll(UrbSubmit submit = submitUsbfsUrb);
-    void releaseResources();
-    bool drainUrbCompletions();
+    // False => USB ownership was not drained. Kernel-owned URB buffers, the
+    // claimed interface and exclusive_ all stay live for a later teardown.
+    bool releaseResources();
+    // Injectable non-blocking reap so the bounded-drain deadline is host
+    // testable. Production always reaps through reapUsbfsUrb.
+    using UrbReap = int (*)(int fd, void** urb);
+    // USBDEVFS_REAPURBNDELAY on Linux/Android. On other hosts there is no usbfs
+    // endpoint, so it answers exactly like an idle one: errno = EAGAIN, -1.
+    static int reapUsbfsUrb(int fd, void** urb);
+    // Bounded teardown: polls `reap` with a 1 ms backoff against a steady_clock
+    // deadline instead of blocking forever in USBDEVFS_REAPURB. The deadline is
+    // re-checked before every reap, so a queue that keeps reporting duplicate or
+    // foreign completions is bounded exactly like an idle one. On timeout it sets
+    // lastError_ = ETIMEDOUT and returns false, leaving every buffer and the
+    // interface claim in place. timeoutMs = 0 budgets no reaps at all, so it can
+    // only succeed when nothing is outstanding. The loop is not #if'd out, so
+    // host builds exercise the deadline itself.
+    bool drainUrbCompletions(int timeoutMs = 2000, UrbReap reap = reapUsbfsUrb);
     bool beginWrite(int64_t producerId);
     void endWrite();
     bool writeBlock(const float* floats, const uint8_t* pcm, int frames,
