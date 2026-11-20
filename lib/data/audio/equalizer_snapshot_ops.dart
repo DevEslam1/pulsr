@@ -520,6 +520,7 @@ extension EqualizerSnapshotOps on EqualizerManager {
         b('arbitraryEqEnabled', isArbitraryEqEnabled),
         eqString: s('arbitraryEqString', arbitraryEqString),
         linearPhase: b('arbitraryEqLinearPhase', arbitraryEqLinearPhase),
+        fromRestore: true,
       ),
     );
 

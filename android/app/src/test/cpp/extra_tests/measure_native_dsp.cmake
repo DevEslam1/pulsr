@@ -1,6 +1,6 @@
 # Build measure_native_dsp executable and wire into CTest (§8.7)
 add_executable(measure_native_dsp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../scripts/measure_native_dsp.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../../../scripts/measure_native_dsp.cpp
     ${DSP_SRCS}
 )
 

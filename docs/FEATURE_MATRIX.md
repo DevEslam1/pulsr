@@ -1,7 +1,7 @@
 # Pulsr Feature Matrix
 
 **Source:** Dart, Kotlin, C++ and Go source in this repository.
-**Last verified:** 2026-11-17.
+**Last verified:** 2026-11-20.
 **Purpose:** provide the current, source-backed capability list used by the README and website. Dated audit documents under `docs/` are snapshots and may describe older behaviour.
 
 > Counts below are constants read from source, not estimates. Where a capability is partial, experimental or delegated, it is stated explicitly.
@@ -12,7 +12,7 @@
 
 | Capability | Verified value | Source |
 |---|---|---|
-| Native DSP stages | 21 | `android/app/src/main/cpp/AudioDspEngine.h` (`DspStageMask`) |
+| Native DSP stages | 22 | `android/app/src/main/cpp/AudioDspEngine.h` (`DspStageMask`) |
 | Concurrent DSP engines | 16 | `AudioDspEngine.h` (`DspEngineRegistry::kMaxEngines`) |
 | Parametric EQ bands | 64 maximum | `DspParams.h`, `ParametricEQ.h` |
 | EQ band modes in UI | 10 / 32 / 64 | `lib/data/audio/equalizer_manager.dart` |
@@ -39,7 +39,7 @@
 | Party protocol frames | 13 frame types, 15 actions, 12 host-gated | `server/pulsr_party/protocol/protocol.go` |
 | Party room size | 2–10, default 5 | `server/pulsr_party/config.go`, `party.go` |
 | Locales | English, Arabic, Spanish | `lib/l10n/app_*.arb` |
-| Test files | 833 `*_test.dart` | `test/` |
+| Test files | 908 `*_test.dart` | `test/` |
 
 ---
 
@@ -50,7 +50,7 @@
 <!-- BEGIN GENERATED CAPABILITY MATRIX -->
 | Capability | This build |
 | :--- | :--- |
-| Native DSP stages | 21 |
+| Native DSP stages | 22 |
 | Parametric EQ bands | 64 |
 | Dynamic EQ bands | 8 |
 | Multiband compressor bands | 4 |
@@ -61,7 +61,7 @@
 | Highest PCM rate | 768000 Hz |
 | USB wire formats | s16_le / s24_3le / s32_le |
 | AAudio encodings | int16 / float / i24_packed / int32 |
-| Native DSD producer | not available |
+| Native DSD producer | available |
 <!-- END GENERATED CAPABILITY MATRIX -->
 
 ---
@@ -72,7 +72,7 @@
 - 10-band graphic, 32-band and 64-band parametric modes.
 - Eight biquad types: peaking, low/high shelf, low/high pass, notch, band-pass, all-pass.
 - Per-band gain ±15 dB, preamp ±15 dB, per-band solo and mute.
-- 1,024-node arbitrary-response graphic EQ with optional linear phase (1,024-tap FIR, 2,048 FFT).
+- 1,024-node arbitrary-response graphic EQ with optional linear phase (4,096-tap FIR, 8,192 FFT), used by the per-headphone AutoEQ FIR target.
 - Twelve bundled presets and a crest-aware recommended preamp.
 - 652 bundled five-band headphone profiles, device-name matching, online AutoEQ search and user imports.
 
@@ -92,7 +92,7 @@
 - Loudness contour: up to +10 dB at 100 Hz and +4 dB at 8 kHz.
 - Sub crossover: 60–150 Hz, Linkwitz-Riley 12/24 dB per octave.
 - Panner is balance/mono only; platform spatializer state is surfaced separately.
-- Channel manager for 2–8 channels with trim and up to 50 ms delay.
+- Channel manager for 2–8 channels with trim and up to 50 ms delay; explicit 3.0 (FL/FR/FC), 4.0 (FL/FR/BL/BR), 5.1 and 7.1 layouts in Android channel order. A true 2.1 is not offered because Android maps 3 channels to FL/FR/FC; use 5.1/7.1 for LFE.
 
 ### Reverb and convolution
 - Nine programs from Studio (0.35 s) to Cathedral (5.0 s) plus Custom IR.
@@ -107,7 +107,7 @@
 ### DSD and SACD
 - DSD64, DSD128, DSD256 and DSD512 decode to PCM at 44.1–768 kHz.
 - DoP v1.1 framing at 176.4/352.8/705.6 kHz; DSD512 has no DoP carrier and falls back.
-- Native DSD output is **not available** in this build. The UAC2 DSD alternate-setting probe, the `DSD_U32` sink path and the 1-bit packer are implemented and unit-tested, but no playback producer opens a DSD stream and pumps frames into it, so the transport resolver falls back to DoP or PCM with an explicit reason. DoP framing is likewise unverified on hardware (`dop_carrier_not_measured`).
+- Native DSD output is provided by a dedicated `NativeDsdSession` owned by the audio handler. It parses the DSF/DFF header once and streams payloads from disk (`NativeDsdFileSource`, no 150 MB in-memory cap), opens the probed exact-rate UAC2 DSD alternate setting, pumps 1-bit blocks with backpressure, reports position from flushed bytes and falls back to DoP/PCM on a failed open or xrun. Native DSD is offered only for local DSF/DFF files with the native output mode and the bit-perfect path active; DSF/DFF files without an exact tuple fall back. Hardware soak (DSD64/128/256) is still pending: no DSD-capable DAC was attached at the 2026-11-20 audit. DoP framing remains unverified on hardware (`dop_carrier_not_measured`).
 - SACD ISO indexing, TOC parsing and DSF extraction before playback.
 
 ### Playback
@@ -129,7 +129,7 @@
 - Bluetooth codec information and latency calibration, not codec switching.
 
 ### Bit-perfect verdicts
-- Eligible: FLAC, ALAC, WAV, AIFF, DSD/DSF/DFF and integer PCM prefixes. WavPack, APE and TTA are recognized by the policy but lack bundled decoders in this build.
+- Eligible: FLAC, WAV, AIFF, DSD/DSF/DFF and integer PCM prefixes. ALAC is eligible only when the device MediaCodec advertises `audio/alac`/`audio/x-alac`; no decoder is bundled. WavPack, APE and TTA are recognized by the policy but lack bundled decoders in this build.
 - Blocked: MP3, AAC, Opus, Vorbis, WMA, AC-3, live radio and Bluetooth-transcoded output.
 - Ambiguous containers (`.m4a`, `.mp4`, `.ogg`, `.oga`, `.mka`, `.webm`) are allowed but report `source_codec_unconfirmed`.
 - 32-bit float sources report `source_32bit_float_conversion_not_lossless`.
@@ -250,7 +250,7 @@
 - The native UAC2 direct sink is marked experimental in source.
 - APE, WMA, TTA, TAK, WavPack, MPC, MOD, IT, XM and S3M are recognized but not decodable in this build.
 - MQA is core unfold only; no authenticated render is claimed.
-- No blind A/B/X UI ships; `DspAbxHelper` is an unreferenced domain helper.
+- Blind ABX ships (`abx_screen.dart`): live native bypass, auto level matching, trial statistics and redacted JSON export. Measurement/FFT hardware provenance remains CLI-gated.
 - The party server is required for group listening; the default is overridable and self-hostable.
 
 ---

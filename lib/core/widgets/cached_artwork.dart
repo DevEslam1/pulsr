@@ -172,6 +172,9 @@ class CachedArtwork extends StatefulWidget {
   /// that has not been downloaded yet. Takes precedence over [id].
   final String? remoteUrl;
 
+  /// Stable key for a rotating remote URL (e.g. signed Subsonic cover art).
+  final String? cacheKeyOverride;
+
   final bool highQuality;
 
   /// Explicit decode dimensions. Defaults to [decodeDim] computed from widget.size.
@@ -194,6 +197,7 @@ class CachedArtwork extends StatefulWidget {
     this.fallbackIcon,
     this.customCache,
     this.remoteUrl,
+    this.cacheKeyOverride,
     this.highQuality = false,
     this.cacheWidth,
     this.cacheHeight,
@@ -259,7 +263,10 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
   ArtworkLruCache get _cache => widget.customCache ?? ArtworkLruCache();
 
-  String get _baseKey => widget.remoteUrl ?? '${widget.type.name}_${widget.id}';
+  String get _baseKey =>
+      widget.cacheKeyOverride ??
+      widget.remoteUrl ??
+      '${widget.type.name}_${widget.id}';
 
   String get _cacheKey => _isHighRes ? '${_baseKey}_hq' : _baseKey;
 
@@ -292,6 +299,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
     if (oldWidget.id != widget.id ||
         oldWidget.type != widget.type ||
         oldWidget.remoteUrl != widget.remoteUrl ||
+        oldWidget.cacheKeyOverride != widget.cacheKeyOverride ||
         oldWidget.highQuality != widget.highQuality ||
         oldWidget.size != widget.size ||
         oldWidget.albumId != widget.albumId) {

@@ -1,23 +1,23 @@
 # Pulsr — Native Audio Test Matrix
 
-**Date:** 2026-10-27
+**Date:** 2026-11-20
 **Scope:** multichannel channel management, DSD512, UAC2 hardware volume
 **Host:** Windows, Clang 20.1.3, CMake 4.x, Ninja; DSP sources compiled with the production `-O3 -std=c++20 -fno-strict-aliasing` flags.
 
-> **Status:** DSD512 and the multichannel trim/delay engine are implemented and host-tested. UAC2 hardware volume is **not implemented** here: it needs an Android USB host connection and a UAC2 DAC to verify control-transfer behaviour. The legacy composite `test_native_all` has one pre-existing platform-sensitive dither tolerance failure; every other host test is green.
+> **Status:** DSD512 and the multichannel trim/delay engine are implemented and host-tested. UAC2 hardware volume is implemented in the control plane (`UsbHardwareVolume`, GET_CUR `0x81`, GET_RANGE `0x82`, CS_MUTE) but still needs a UAC2 DAC to attest keys/display/quantization. The full host suite now builds and passes **48/48**, including the measurement harness and HRTF RT tests.
 
 ---
 
 ## 1. Host suite result
 
 ```text
-ctest --test-dir build/testNativeHost --output-on-failure
-13/14 tests passed
+ctest --test-dir build/verify --output-on-failure
+48/48 tests passed
 ```
 
 | Test | Result | Notes |
 |---|---|---|
-| `test_native_all` | **FAIL** | Legacy composite; stops at the dither max-deviation assertion (>2 LSB). Pre-existing; needs a separate dither audit, not a tolerance bump. |
+| `test_native_all` | pass | Legacy composite passes 100%, including HRTF control-publish/render-apply with 0 RT allocations. |
 | `test_dsp_stress` | pass | |
 | `test_bypass_transparency` | pass | |
 | `test_reverb_*` (3) | pass | |
@@ -67,7 +67,7 @@ What it does:
 | Disabled → bit-transparent | pass |
 | 8-channel buffer with 6-channel layout → ch6/7 untouched | pass |
 
-**Still required for a product 10/10:** JNI setter, Kotlin facade, Dart channel, settings UI, and a real 5.1/7.1 DAC loopback test. The engine and host proof exist; the control surface does not.
+**Still required for a product 10/10:** a real 5.1/7.1 DAC loopback test (speaker order, LFE, alignment). The engine, JNI/Kotlin/Dart control surface and host proof exist.
 
 ---
 
@@ -113,5 +113,5 @@ A correct implementation must read `GET_MIN/GET_MAX/GET_RES` first (0x81/0x82/0x
 
 - **DSD512 decode:** implemented and host-verified.
 - **Multichannel trim/delay engine:** implemented and host-verified; not yet reachable from the UI.
-- **UAC2 hardware volume:** not implemented; hardware-dependent.
-- **Native matrix:** 13/14 green; the remaining failure is the legacy composite's dither deviation (>2 LSB), not the new multichannel/DSD512 code. That needs a dedicated dither audit before this row can be called 10/10.
+- **UAC2 hardware volume:** implemented in the control plane; keys/display/mute/quantization still need a real UAC2 DAC.
+- **Native matrix:** 48/48 green on 2026-11-20, including the measurement harness, HRTF RT/prepared-quad tests and the legacy dither composite.

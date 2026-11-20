@@ -19,6 +19,7 @@ class AudioFormats {
     'oga',
     'aiff',
     'aif',
+    'alac',
   };
 
   /// Recognized extensions that require a native decoder this build does not

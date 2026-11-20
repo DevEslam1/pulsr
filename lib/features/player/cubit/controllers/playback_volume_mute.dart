@@ -36,6 +36,13 @@ class PlaybackVolumeMute {
         final clamped = volume.clamp(0.0, 1.0);
         _remember(clamped);
         try {
+          // A volume raise is an implicit unmute, including a DAC muted from
+          // Settings with CS_MUTE (the app volume itself never moved).
+          if (clamped > 0.001 &&
+              _audioHandler.usbHardwareVolumeOwned &&
+              (_muted || _audioHandler.usbHardwareMute == true)) {
+            await _audioHandler.setUsbHardwareMute(false);
+          }
           await _audioHandler.setVolume(clamped);
           _muted = clamped <= 0.001;
           final s = _getState();
@@ -58,6 +65,11 @@ class PlaybackVolumeMute {
           final current = _audioHandler.volume;
           final target = (current + delta).clamp(0.0, 1.0);
           _remember(target);
+          if (target > 0.001 &&
+              _audioHandler.usbHardwareVolumeOwned &&
+              (_muted || _audioHandler.usbHardwareMute == true)) {
+            await _audioHandler.setUsbHardwareMute(false);
+          }
           await _audioHandler.setVolume(target);
           _muted = target <= 0.001;
           final s = _getState();
@@ -79,6 +91,19 @@ class PlaybackVolumeMute {
   /// restores it. Exposed for the global keyboard-shortcut layer.
   Future<void> toggleMute() => _fifo.protect(() async {
         try {
+          // When the DAC's Feature Unit owns the level, use its CS_MUTE
+          // control instead of slamming software volume to zero. The app
+          // slider keeps its value; the DAC display shows the real mute.
+          if (_audioHandler.usbHardwareVolumeOwned) {
+            final target = !_muted;
+            if (await _audioHandler.setUsbHardwareMute(target)) {
+              _muted = target;
+              final s = _getState();
+              _emit(s.copyWith(
+                  playback: s.playback.copyWith(isMuted: _muted)));
+              return;
+            }
+          }
           if (_muted) {
             final targetVol = _volumeBeforeMute > 0.0 ? _volumeBeforeMute : 1.0;
             await _audioHandler.setVolume(targetVol);

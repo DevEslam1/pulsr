@@ -31,6 +31,8 @@ class UsbControlProtocolTest {
     private class Device(val version: Int) : UsbControlTransfer {
         val requests = mutableListOf<Request>()
         val values = mutableMapOf(0 to -1536, 1 to -1536, 2 to -1536)
+        val mutes = mutableMapOf(0 to false, 1 to false, 2 to false)
+        var uac2RangeSupported = true
         var shortRequest = -1
         var ignoreWrites = false
         var failChannel = -1
@@ -47,6 +49,18 @@ class UsbControlProtocolTest {
             fun put(offset: Int, raw: Int, bytes: Int = 2) {
                 repeat(bytes) { buffer[offset + it] = (raw shr (it * 8)).toByte() }
             }
+            // CS_MUTE (0x01) is a one-byte control; CS_VOLUME (0x02) is
+            // two bytes. The selector lives in wValue's high byte.
+            val cs = (value shr 8) and 0xFF
+            val muteChannel = value and 0xFF
+            if (buffer.size == 1 && cs == 0x01) {
+                if (type and 0x80 != 0) {
+                    put(0, if (mutes[muteChannel] == true) 1 else 0, 1)
+                } else {
+                    mutes[muteChannel] = buffer[0].toInt() != 0
+                }
+                return 1
+            }
             if (value == 0x100) {
                 if (type and 0x80 != 0) put(0, clockRate, buffer.size)
                 else if (acceptClockWrite) clockRate = buffer.indices.fold(0) { a, i -> a or ((buffer[i].toInt() and 255) shl (8 * i)) }
@@ -56,20 +70,29 @@ class UsbControlProtocolTest {
             if (channel == failChannel) return -1
             if (type == 0x21) {
                 if (!ignoreWrites) values[channel] = (((buffer[0].toInt() and 255) or ((buffer[1].toInt() and 255) shl 8)).toShort().toInt() + quantizationOffset)
-            } else when (request) {
-                0x01, 0x81 -> put(0, values.getValue(channel))
-                0x82 -> put(0, minRaw)
-                0x83 -> put(0, maxRaw)
-                0x84 -> put(0, resolution)
-                0x02 -> {
-                    put(0, rangeCount)
-                    if (buffer.size > 2) {
-                        put(2, minRaw); put(4, maxRaw); put(6, resolution)
-                        if (rangeCount == 2) {
-                            put(8, 256); put(10, 512); put(12, 256)
+            } else when {
+                request == 0x81 -> put(0, values.getValue(channel))
+                // UAC2 volume ranges are read with GET_RANGE (0x82); UAC1 uses
+                // the GET_MIN/MAX/RES triplet, where 0x82 is GET_MIN.
+                request == 0x82 && version == UsbAudioControlParser.UAC2 -> {
+                    if (!uac2RangeSupported) {
+                        // UAC2 firmware with no GET_RANGE: the first count read
+                        // returns the triplet-shaped GET_MIN value, which
+                        // fails the count bound and triggers GET_MIN/MAX/RES.
+                        put(0, minRaw)
+                    } else {
+                        put(0, rangeCount)
+                        if (buffer.size > 2) {
+                            put(2, minRaw); put(4, maxRaw); put(6, resolution)
+                            if (rangeCount == 2) {
+                                put(8, 256); put(10, 512); put(12, 256)
+                            }
                         }
                     }
                 }
+                request == 0x82 -> put(0, minRaw)
+                request == 0x83 -> put(0, maxRaw)
+                request == 0x84 -> put(0, resolution)
                 else -> return -1
             }
             return buffer.size
@@ -88,13 +111,13 @@ class UsbControlProtocolTest {
         assertTrue(control.refresh())
         assertEquals(-6.0, control.currentDb!!, 0.0)
         assertFalse(control.applied)
-        assertTrue(device.requests.contains(Request(0xA1, 2, 0x200, 0x302, 8)))
+        assertTrue(device.requests.contains(Request(0xA1, 0x82, 0x200, 0x302, 8)))
         assertTrue(control.setDb(-12.25))
         assertEquals(-13.0, control.currentDb!!, 0.0)
         assertTrue(control.applied)
         assertTrue(device.requests.contains(Request(0x21, 1, 0x200, 0x302, 2)))
         assertTrue(device.requests.contains(Request(0xA1, 0x81, 0x200, 0x302, 2)))
-        assertFalse(device.requests.any { it.request in 0x82..0x84 })
+        assertFalse(device.requests.any { it.request in 0x83..0x84 })
     }
 
     @Test fun volumeVerificationToleratesQuantizationRoundingWithinResolution() {
@@ -123,10 +146,67 @@ class UsbControlProtocolTest {
         assertTrue(device.requests.all { it.size == 2 })
     }
 
+    @Test fun hardwareMuteUsesCsMuteAndReadsBack() {
+        val device = Device(2)
+        val volume = UsbHardwareVolume(
+            2,
+            UsbAudioControlParser.FeatureUnitVolume(
+                3, 2, 2, false, listOf(1, 2),
+                muteOnMaster = false, writableMuteChannels = listOf(1, 2),
+            ),
+            device,
+        )
+        assertTrue(volume.hasMute)
+        assertEquals(false, volume.getMute())
+        assertTrue(volume.setMute(true))
+        assertEquals(true, volume.getMute())
+        assertTrue(volume.setMute(false))
+        assertEquals(false, volume.getMute())
+        // The MUTE selector (0x01) is used, never a volume write of zero.
+        assertTrue(device.requests.any { it.request == 0x01 && it.size == 1 })
+        assertTrue(device.requests.any { it.request == 0x81 && it.size == 1 })
+    }
+
+    @Test fun hardwareMuteIsUnavailableWithoutAMuteBit() {
+        val device = Device(2)
+        val volume = UsbHardwareVolume(
+            2,
+            UsbAudioControlParser.FeatureUnitVolume(3, 2, 2, false, listOf(1, 2)),
+            device,
+        )
+        assertFalse(volume.hasMute)
+        assertNull(volume.getMute())
+        assertFalse(volume.setMute(true))
+    }
+
+    @Test fun uac2RangeFallsBackToMinMaxRes() {
+        val device = Device(2)
+        device.uac2RangeSupported = false
+        val volume = volume(device)
+        assertTrue(volume.refresh())
+        assertEquals(-60.0, volume.minDb!!, 0.0)
+        assertEquals(0.0, volume.maxDb!!, 0.0)
+        assertEquals(-6.0, volume.currentDb!!, 0.0)
+        assertTrue(volume.setDb(-12.0))
+        assertTrue(volume.applied)
+        assertEquals(-12.0, volume.currentDb!!, 0.0)
+        assertTrue(device.requests.any { it.request == 0x82 })
+        assertTrue(device.requests.any { it.request == 0x83 })
+        assertTrue(device.requests.any { it.request == 0x84 })
+    }
+
+    @Test fun stepDbFollowsTheDacResolution() {
+        val device = Device(2)
+        val volume = volume(device)
+        assertTrue(volume.refresh())
+        // The fake reports a 256 Q8 (1 dB) resolution.
+        assertEquals(1.0, volume.stepDb, 0.0)
+    }
+
     @Test fun shortsAndFailedReadbackNeverProveApplication() {
         // Any short read fails the refresh that first populates it, for the
-        // CUR read (0x81) and for the RANGE read (2) alike.
-        for (request in listOf(0x81, 2)) {
+        // CUR read (0x81) and for the UAC2 RANGE read (0x82) alike.
+        for (request in listOf(0x81, 0x82)) {
             val device = Device(2)
             val control = volume(device)
             device.shortRequest = request
@@ -192,18 +272,19 @@ class UsbControlProtocolTest {
         val control = volume(device)
         assertTrue(control.refresh())
         assertEquals(2.0, control.maxDb!!, 0.0)
-        assertTrue(device.requests.any { it.request == 2 && it.size == 14 })
+        assertTrue(device.requests.any { it.request == 0x82 && it.size == 14 })
     }
 
     @Test fun clockMustReadBackExactlyEvenWhenFixed() {
         val device = Device(2)
         val clock = UsbAudioControlParser.ClockSource(5, 2, false)
         assertTrue(UsbAudioProtocol.setSampleRate(device, 2, clock, 1, 48000, false))
-        assertEquals(listOf(Request(0xA1, 1, 0x100, 0x502, 4)), device.requests)
+        assertEquals(listOf(Request(0xA1, 0x81, 0x100, 0x502, 4)), device.requests)
         assertFalse(UsbAudioProtocol.setSampleRate(device, 2, clock, 1, 96000, false))
         device.acceptClockWrite = false
         assertFalse(UsbAudioProtocol.setSampleRate(device, 2, clock.copy(frequencyProgrammable = true), 1, 96000, false))
-        device.shortRequest = 1
+        // The read-back is GET_CUR (0x81); a short read must fail verification.
+        device.shortRequest = 0x81
         assertFalse(UsbAudioProtocol.setSampleRate(device, 2, clock, 1, 48000, false))
     }
 
@@ -371,9 +452,9 @@ class UsbControlProtocolTest {
     @Test fun activeClockComesFromTheSelectorPinNotTheDescriptorOrder() {
         val device = PinDevice(2)
         assertEquals(clockEleven, UsbAudioProtocol.resolveActiveClock(device, selectorTopology()))
-        // GET_CUR(CX_CLOCK_SELECTOR_CONTROL): 0xA1 / 0x01 / wValue 0x0100 /
+        // GET_CUR(CX_CLOCK_SELECTOR_CONTROL): 0xA1 / 0x81 / wValue 0x0100 /
         // wIndex (selectorId shl 8) | acInterface / 1 byte.
-        assertEquals(listOf(Request(0xA1, 1, 0x100, 0x800, 1)), device.requests)
+        assertEquals(listOf(Request(0xA1, 0x81, 0x100, 0x800, 1)), device.requests)
     }
 
     @Test fun failedOrInvalidSelectorPinReadRefusesToGuessAClock() {
@@ -686,10 +767,10 @@ class UsbControlProtocolTest {
         assertEquals(2, device.selectorPin)
         // Then the rate on Clock Source 11, verified by read-back.
         assertTrue(device.requests.contains(Request(0x21, 1, 0x0100, 0x0B00, 4)))
-        assertTrue(device.requests.contains(Request(0xA1, 1, 0x0100, 0x0B00, 4)))
+        assertTrue(device.requests.contains(Request(0xA1, 0x81, 0x0100, 0x0B00, 4)))
         assertEquals(listOf(96000), device.rateWrites)
         // The fixed 44.1 kHz clock was only ever read, never written.
-        assertTrue(device.requests.contains(Request(0xA1, 1, 0x0100, 0x0A00, 4)))
+        assertTrue(device.requests.contains(Request(0xA1, 0x81, 0x0100, 0x0A00, 4)))
         assertFalse(device.requests.any { it.type == 0x21 && it.index == 0x0A00 })
     }
 
@@ -745,7 +826,7 @@ class UsbControlProtocolTest {
         assertTrue(device.requests.contains(Request(0x21, 1, 0x0100, 0x0B00, 4)))
         assertEquals(listOf(96000), device.rateWrites)
         // Validity was consulted afterwards, as a post-condition only.
-        assertTrue(device.requests.contains(Request(0xA1, 1, 0x0200, 0x0B00, 1)))
+        assertTrue(device.requests.contains(Request(0xA1, 0x81, 0x0200, 0x0B00, 1)))
         // The working pin is kept: no switch, no restore.
         assertTrue(device.pinWrites.isEmpty())
         assertEquals(2, device.selectorPin)
@@ -797,8 +878,8 @@ class UsbControlProtocolTest {
         assertTrue(UsbAudioProtocol.isClockValid(ValidityDevice(null), clock))
         val device = ValidityDevice(1)
         assertTrue(UsbAudioProtocol.isClockValid(device, clock))
-        // GET_CUR(CS_CLOCK_VALID_CONTROL): 0xA1 / 0x01 / 0x0200 / (11 shl 8), 1 byte.
-        assertEquals(listOf(Request(0xA1, 0x01, 0x0200, 0x0B00, 1)), device.requests)
+        // GET_CUR(CS_CLOCK_VALID_CONTROL): 0xA1 / 0x81 / 0x0200 / (11 shl 8), 1 byte.
+        assertEquals(listOf(Request(0xA1, 0x81, 0x0200, 0x0B00, 1)), device.requests)
         // A clock without a readable validity control is never queried at all.
         val quiet = ValidityDevice(0)
         assertTrue(UsbAudioProtocol.isClockValid(quiet, clock.copy(validityReadable = false)))
@@ -856,7 +937,7 @@ class UsbControlProtocolTest {
             fun put(offset: Int, raw: Int, bytes: Int) {
                 repeat(bytes) { buffer[offset + it] = (raw shr (it * 8)).toByte() }
             }
-            if (request == 0x02) {
+            if (request == 0x82) {
                 val ranges = subranges ?: return -1
                 if (buffer.size == 2) {
                     put(0, ranges.size, 2)
@@ -871,7 +952,7 @@ class UsbControlProtocolTest {
                 }
                 return buffer.size
             }
-            if (request == 0x01 && buffer.size == 4) {
+            if (request == 0x81 && buffer.size == 4) {
                 val rate = currentRate ?: return -1
                 put(0, rate, 4)
                 return 4
@@ -907,8 +988,8 @@ class UsbControlProtocolTest {
             UsbAudioProtocol.queryPlaybackRates(device, rangedParsed()),
         )
         // Count first (2 bytes), then 2 + 2*12 bytes of subrange payloads.
-        assertTrue(device.requests.contains(Request(0xA1, 0x02, 0x0100, 0x0B00, 2)))
-        assertTrue(device.requests.contains(Request(0xA1, 0x02, 0x0100, 0x0B00, 26)))
+        assertTrue(device.requests.contains(Request(0xA1, 0x82, 0x0100, 0x0B00, 2)))
+        assertTrue(device.requests.contains(Request(0xA1, 0x82, 0x0100, 0x0B00, 26)))
     }
 
     @Test fun uac2RateDiscoveryKeepsSingleValuedSubrangesExact() {

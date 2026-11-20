@@ -57,6 +57,15 @@ class _TestAudioHandler extends BaseAudioHandler
     _volumeSubject.add(_vol);
   }
 
+  @override
+  bool get usbHardwareVolumeOwned => false;
+
+  @override
+  bool? get usbHardwareMute => null;
+
+  @override
+  Future<bool> setUsbHardwareMute(bool muted) async => false;
+
   void emitHardwareVolume(double vol) {
     _vol = vol.clamp(0.0, 1.0);
     _volumeSubject.add(_vol);

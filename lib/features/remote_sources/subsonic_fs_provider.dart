@@ -117,6 +117,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
               name: artist.name,
               isDirectory: true,
               artworkUri: _coverArtUri(artist.coverArt),
+              artworkCacheKey: _coverArtCacheKey(artist.coverArt),
             ),
         ]);
       }
@@ -131,6 +132,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
               name: album.name,
               isDirectory: true,
               artworkUri: _coverArtUri(album.coverArt),
+              artworkCacheKey: _coverArtCacheKey(album.coverArt),
             ),
         ]);
       }
@@ -146,6 +148,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
               isDirectory: false,
               sizeBytes: song.sizeBytes,
               artworkUri: _coverArtUri(song.coverArt ?? album.coverArt),
+              artworkCacheKey: _coverArtCacheKey(song.coverArt ?? album.coverArt),
             ),
         ]);
       }
@@ -182,6 +185,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
           name: artist.name,
           isDirectory: true,
           artworkUri: _coverArtUri(artist.coverArt),
+          artworkCacheKey: _coverArtCacheKey(artist.coverArt),
         );
       }
       if (segments.length == 2 && segments.first == albumSegment) {
@@ -193,6 +197,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
           name: album.name,
           isDirectory: true,
           artworkUri: _coverArtUri(album.coverArt),
+          artworkCacheKey: _coverArtCacheKey(album.coverArt),
         );
       }
       if (segments.length == 4 &&
@@ -210,6 +215,7 @@ class SubsonicFsProvider implements RemoteFsProvider {
             isDirectory: false,
             sizeBytes: song.sizeBytes,
             artworkUri: _coverArtUri(song.coverArt ?? album.coverArt),
+            artworkCacheKey: _coverArtCacheKey(song.coverArt ?? album.coverArt),
           );
         }
         return null;
@@ -354,15 +360,21 @@ class SubsonicFsProvider implements RemoteFsProvider {
   Future<SubsonicSearchResult> search(
     String query, {
     int artistCount = 20,
+    int artistOffset = 0,
     int albumCount = 20,
+    int albumOffset = 0,
     int songCount = 50,
+    int songOffset = 0,
   }) async {
     try {
       return await _api.search3(
         query,
         artistCount: artistCount,
+        artistOffset: artistOffset,
         albumCount: albumCount,
+        albumOffset: albumOffset,
         songCount: songCount,
+        songOffset: songOffset,
       );
     } on SubsonicError catch (e, st) {
       throw _asRemoteError(e, st);
@@ -388,6 +400,9 @@ class SubsonicFsProvider implements RemoteFsProvider {
 
   String? _coverArtUri(String? coverArtId, {int? size}) =>
       getCoverArtUrl(coverArtId, size: size)?.toString();
+
+  String? _coverArtCacheKey(String? coverArtId, {int? size}) =>
+      getCoverArtCacheKey(coverArtId, size: size);
 
   /// Path of the artist with [id].
   static String artistPath(String id) => '$artistSegment/${_encodeId(id)}';

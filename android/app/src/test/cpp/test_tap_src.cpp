@@ -470,6 +470,8 @@ int main() {
 
         // Prepare 2x oversampling: 44.1 kHz input -> 88.2 kHz output
         engine->prepareTapResampler(44100.0, 88200.0, 2);
+        check(engine->activeOversampleFactor() == 2,
+              "active oversample factor is derived from the prepared tap");
 
         constexpr int frames = 2048;
         const auto input = sine(frames, 2, 44100.0, 1000.0);
@@ -493,6 +495,8 @@ int main() {
         engine->setOversampleMultiplier(4);
         engine->setOversampleKernel(2); // MinimumPhase
         engine->prepareTapResampler(44100.0, 176400.0, 2);
+        check(engine->activeOversampleFactor() == 4,
+              "active oversample factor follows a 4x tap reconfigure");
         std::vector<float> output4x(frames * 8 * 2);
         const int out4x = engine->resampleForTap(input.data(), frames, output4x.data(), frames * 8,
                                                  2, 44100.0, 176400.0);
@@ -502,6 +506,8 @@ int main() {
         engine->setOversampleMultiplier(8);
         engine->setOversampleKernel(3); // Apodizing
         engine->prepareTapResampler(44100.0, 352800.0, 2);
+        check(engine->activeOversampleFactor() == 8,
+              "active oversample factor follows an 8x tap reconfigure");
         std::vector<float> output8x(frames * 16 * 2);
         const int out8x = engine->resampleForTap(input.data(), frames, output8x.data(), frames * 16,
                                                  2, 44100.0, 352800.0);
@@ -529,6 +535,9 @@ int main() {
         engine->setPcmToDsdEnabled(false);
         check(engine->oversampleMultiplier() == 1, "oversampleMultiplier restored to 1");
         check(!engine->isPcmToDsdEnabled(), "PCM->DSD disabled restored");
+        engine->prepareTapResampler(44100.0, 44100.0, 2);
+        check(engine->activeOversampleFactor() == 1,
+              "a locked-rate tap reports no active oversampling");
     }
 
     if (gFailures != 0) {

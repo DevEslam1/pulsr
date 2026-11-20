@@ -266,8 +266,11 @@ class _FakeSubsonicProvider implements SubsonicFsProvider {
   Future<SubsonicSearchResult> search(
     String query, {
     int artistCount = 20,
+    int artistOffset = 0,
     int albumCount = 20,
+    int albumOffset = 0,
     int songCount = 50,
+    int songOffset = 0,
   }) async {
     searchCalls.add(query);
     return searchResults ?? const SubsonicSearchResult();

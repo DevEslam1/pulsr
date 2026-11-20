@@ -184,6 +184,7 @@ class AbxCubit extends Cubit<AbxState> {
     String? trackArtist,
     int? sourceSampleRate,
     int? sourceBitDepth,
+    String levelMatch = 'none',
     DateTime? exportedAt,
   }) {
     return AbxReport.fromSession(
@@ -195,6 +196,7 @@ class AbxCubit extends Cubit<AbxState> {
       trackArtist: trackArtist,
       sourceSampleRate: sourceSampleRate,
       sourceBitDepth: sourceBitDepth,
+      levelMatch: levelMatch,
       exportedAt: exportedAt,
     );
   }

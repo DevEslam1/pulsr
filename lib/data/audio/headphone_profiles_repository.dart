@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/headphone_profile.dart';
-import 'autoeq_fir_generator.dart';
 
 @lazySingleton
 class HeadphoneProfilesRepository {
@@ -17,32 +16,9 @@ class HeadphoneProfilesRepository {
 
   List<HeadphoneProfile> _profiles = [];
   bool _isLoaded = false;
-  final Map<String, List<double>> _firCache = {};
 
   List<HeadphoneProfile> get profiles => List.unmodifiable(_profiles);
   bool get isLoaded => _isLoaded;
-
-  /// Retrieves or synthesizes the FIR impulse response for [profile].
-  List<double> getFirForProfile(
-    HeadphoneProfile profile, {
-    bool linearPhase = false,
-    int taps = AutoEqFirGenerator.defaultTaps,
-    double sampleRate = AutoEqFirGenerator.defaultSampleRate,
-  }) {
-    final key =
-        '${profile.id}_${linearPhase ? 'lin' : 'min'}_${taps}_${sampleRate.round()}';
-    final cached = _firCache[key];
-    if (cached != null) return cached;
-
-    final fir = profile.generateImpulseResponse(
-      linearPhase: linearPhase,
-      taps: taps,
-      sampleRate: sampleRate,
-    );
-    final unmodifiable = List<double>.unmodifiable(fir);
-    _firCache[key] = unmodifiable;
-    return unmodifiable;
-  }
 
   Future<List<HeadphoneProfile>> loadProfiles() async {
     if (_isLoaded) return _profiles;

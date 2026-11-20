@@ -14,18 +14,16 @@ import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_quality_info.dart';
 import 'audio_effects_channel.dart';
 import 'dop_encoder.dart';
-import 'native_dsd_producer.dart';
 import 'sacd/sacd_limits.dart';
 import '../services/usb_exclusive_service.dart';
 
-/// Whether a native-DSD *producer* exists: something that opens a DSD_U32
-/// alternate setting on the USB sink and writes 1-bit frames to it.
+/// Whether the dedicated native-DSD session is available.
 ///
-/// Gated to false until Phase 2 hardware acceptance (Section 8.2 of plan_new.md).
-/// The UAC2 descriptor probe, DSD_U32 sink path, and bit packer exist, but
-/// direct native playback is not active until the dedicated pull session and
-/// hardware soak are verified on device.
-const bool kNativeDsdProducerAvailable = false;
+/// Native playback is owned by `PulsrAudioHandler` + `NativeDsdSession`, not
+/// by an ExoPlayer source: DSD cannot be represented as PCM and a silent WAV
+/// would only fake the timeline. The session still requires the DAC's probed
+/// exact-rate alternate setting; without it playback falls back to DoP/PCM.
+const bool kNativeDsdProducerAvailable = true;
 
 /// Thrown when a DSD (DSF/DFF) file is played on a platform/build with no
 /// native DSD decoder — most notably iOS, where the `decodeDsd` channel method
@@ -161,49 +159,6 @@ class DsdPcmStreamAudioSource extends StreamAudioSource {
   }
 }
 
-/// Streams direct Native DSD (DSD_U32) audio blocks to the USB DAC sink.
-class DsdNativeStreamAudioSource extends StreamAudioSource {
-  final NativeDsdProducer producer;
-  final Duration _trackDuration;
-
-  DsdNativeStreamAudioSource({
-    required this.producer,
-    required Duration duration,
-    super.tag,
-  }) : _trackDuration = duration;
-
-  @override
-  Duration? get duration => _trackDuration;
-
-  @override
-  Future<StreamAudioResponse> request([int? start, int? end]) async {
-    if (!producer.isRunning) {
-      unawaited(producer.startPumping());
-    }
-    final totalBytes =
-        math.max(44100 * 4, (_trackDuration.inMilliseconds * 44100 * 4) ~/ 1000);
-    final from = (start ?? 0).clamp(0, totalBytes);
-    final to = (end ?? totalBytes).clamp(from, totalBytes);
-
-    if (from > 0 && totalBytes > 0) {
-      final seekRatio = from / totalBytes;
-      final seekPos =
-          Duration(microseconds: (_trackDuration.inMicroseconds * seekRatio).round());
-      producer.seek(seekPos);
-    }
-
-    final chunk = Uint8List(to - from);
-    return StreamAudioResponse(
-      rangeRequestsSupported: true,
-      sourceLength: totalBytes,
-      contentLength: to - from,
-      offset: from,
-      contentType: 'audio/wav',
-      stream: Stream.value(chunk),
-    );
-  }
-}
-
 /// Helper for parsing Sony DSF and Philips/EA DFF audio files and feeding
 /// them into the native DSD-to-PCM decoder.
 class DsdDecoderHelper {
@@ -319,8 +274,6 @@ class DsdDecoderHelper {
     }
 
     final int dopSampleRate = DopEncoder.dopPcmSampleRate(dsdRate);
-    final bool useNativeDsd = forceNativeDsd &&
-        (dopCapabilities == null || dopCapabilities.canUseNativeDsd);
 
     // Reset transport flags until framing is verified
     if (updateGlobalState) {
@@ -328,35 +281,13 @@ class DsdDecoderHelper {
       AudioQualityInfo.dsdNativeActive = false;
     }
 
-    if (useNativeDsd) {
-      final tuple = dopCapabilities?.findTupleForRate(dsdRate);
-      if (tuple != null) {
-        final producer = NativeDsdProducer();
-        producer.prepare(
-          left: dsdL,
-          right: dsdR,
-          dsdRate: dsdRate,
-          msbFirst: bitOrder == 1,
-        );
-        final opened = await producer.openStream(tuple);
-        if (opened) {
-          if (updateGlobalState) {
-            AudioQualityInfo.dsdNativeActive = true;
-            AudioQualityInfo.dsdDopActive = false;
-          }
-          onTransportResolved?.call(false, true);
-          return DsdNativeStreamAudioSource(
-            producer: producer,
-            duration: producer.totalDuration,
-            tag: tag,
-          );
-        }
-      }
-      // Fall through to DoP/PCM on unsupported DAC or failed native start
-    }
+    // Native DSD never enters ExoPlayer: the handler's NativeDsdSession owns
+    // the DAC. If a caller still asks for native here, the honest fallback is
+    // DoP (then PCM), never a fabricated WAV source.
+    final bool wantNativeFallback = forceNativeDsd;
 
     final bool canFallbackToDop =
-        (forceDop || useNativeDsd) &&
+        (forceDop || wantNativeFallback) &&
         dopSampleRate > 0 &&
         (dopCapabilities == null || dopCapabilities.supportsRate(dsdRate));
 

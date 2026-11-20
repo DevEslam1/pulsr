@@ -69,6 +69,15 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
 
   @override
+  bool get usbHardwareVolumeOwned => false;
+
+  @override
+  bool? get usbHardwareMute => null;
+
+  @override
+  Future<bool> setUsbHardwareMute(bool muted) async => false;
+
+  @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }

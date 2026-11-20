@@ -11,6 +11,7 @@ import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../core/services/sound_dose_tracker_service.dart';
 import '../../core/telemetry/dsp_reliability_tracker.dart';
+import '../../domain/models/audio_channel_layout.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -35,6 +36,8 @@ part 'equalizer_preset_ops.dart';
 part 'equalizer_snapshot_ops.dart';
 part 'equalizer_effect_ops.dart';
 part 'equalizer_restore_ops.dart';
+part 'equalizer_multichannel_ops.dart';
+part 'equalizer_fir_ops.dart';
 
 /// Per-band Q for a graphic EQ, derived from the band spacing so adjacent
 /// peaking filters sum to (approximately) the drawn curve instead of piling up.
@@ -393,6 +396,10 @@ class EqualizerManager {
   HeadphoneProfile? selectedHeadphoneProfile;
   AutoEqCorrectionMode autoEqCorrectionMode = AutoEqCorrectionMode.peq;
 
+  /// Engine rate used to synthesize the AutoEQ FIR target; updated by
+  /// [syncNativeLatency]. The default matches the app working rate.
+  double nativeSampleRate = 48000.0;
+
   List<double> customFrequencies = List.from(EqPreset.centerFrequencies);
   List<double> custom32Frequencies = List.from(EqPreset.iso32BandFrequencies);
   List<double> custom64Frequencies = List.from(EqPreset.iso64Frequencies);
@@ -747,6 +754,7 @@ class EqualizerManager {
   }
 
   Future<void> _setBandModeCore(int count) async {
+    await _clearFirForManualEdit();
     if (count != 10 && count != 32 && count != 64) {
       ErrorLogger.log(
         'Rejected unsupported EQ band count $count (need 10, 32 or 64)',
@@ -832,12 +840,20 @@ class EqualizerManager {
   Future<void> _setEnabledCore(bool enabled) async {
     if (isEnabled == enabled) return;
     final previous = isEnabled;
+    final firMode = selectedHeadphoneProfile != null &&
+        (autoEqCorrectionMode == AutoEqCorrectionMode.firMinPhase ||
+            autoEqCorrectionMode == AutoEqCorrectionMode.firLinear);
     isEnabled = enabled;
     try {
       await _effectsChannel.setEqEnabled(enabled);
       await _effectsChannel.setNativeEqEnabled(enabled);
-      if (enabled) {
+      if (enabled && firMode) {
+        // Reload the FIR after the off toggle cleared its stage.
+        await _setHeadphoneProfileCore(selectedHeadphoneProfile);
+      } else if (enabled) {
         await _applyCurrentPresetCore();
+      } else if (firMode) {
+        await _disableFirCorrection(persist: false);
       }
       await _savePreferences();
       _syncPipeline();
@@ -865,20 +881,12 @@ class EqualizerManager {
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) =>
       setHeadphoneProfile(profile);
 
-  Future<void> setAutoEqCorrectionMode(AutoEqCorrectionMode mode) async {
-    if (autoEqCorrectionMode == mode) return;
-    autoEqCorrectionMode = mode;
-    _debouncedSavePreferences();
-    if (selectedHeadphoneProfile != null) {
-      await setHeadphoneProfile(selectedHeadphoneProfile);
-    }
-  }
-
   Future<void> setPreset(EqPreset preset) async {
     await _effectsLock.lock(() => _setPresetCore(preset));
   }
 
   Future<void> _setPresetCore(EqPreset preset) async {
+    await _clearFirForManualEdit();
     final hadHeadphoneProfile = selectedHeadphoneProfile != null;
     selectedHeadphoneProfile = null;
     final targetFreqs = activeFrequencies;
@@ -916,6 +924,7 @@ class EqualizerManager {
   Future<void> setBandGain(int index, double gain) async {
     if (index < 0 || index >= currentPreset.gains.length) return;
     if (!gain.isFinite) return;
+    await _clearFirForManualEdit();
     selectedHeadphoneProfile = null;
 
     final newGains = List<double>.from(currentPreset.gains);
@@ -1058,6 +1067,15 @@ class EqualizerManager {
 
   Future<void> _applyCurrentPresetCore() async {
     if (!isEnabled) return;
+    // The FIR stage owns the correction; re-pushing the profile's PEQ bands
+    // would double-correct and overwrite the manual EQ graph.
+    if (isFirCorrectionActive) {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setNativeEqEnabled(false);
+        await _effectsChannel.setEqEnabled(false);
+      }
+      return;
+    }
     final targetFreqs = activeFrequencies;
     if (PlatformCapabilities.isAndroid) {
       // Prefer bulk path — single generation publish, zero per-band JNI overhead.
@@ -1157,107 +1175,6 @@ class EqualizerManager {
     if (PlatformCapabilities.isAndroid) {
       final applied = await _effectsChannel.setVolumeBoost(milliBels);
       _recordEffectOutcome('volumeBoost', applied || volumeBoost <= 0.0);
-    }
-    _debouncedSavePreferences();
-  }
-
-  Future<void> setHeadphoneProfile(HeadphoneProfile? profile) async {
-    await _effectsLock.lock(() => _setHeadphoneProfileCore(profile));
-  }
-
-  Future<void> _setHeadphoneProfileCore(HeadphoneProfile? profile) async {
-    final prevPreset = currentPreset;
-    final prevProfile = selectedHeadphoneProfile;
-    try {
-      if (profile != null) {
-        final bool isParametric = profile.hasParametricFilters;
-        if (profile.gains.isEmpty && !isParametric) {
-          ErrorLogger.log(
-            'Headphone profile has empty gains — ignoring',
-            category: 'EqualizerManager',
-          );
-          return;
-        }
-        if (profile.gains.any((g) => !g.isFinite)) {
-          ErrorLogger.log(
-            'Headphone profile contains non-finite gains — ignoring',
-            category: 'EqualizerManager',
-          );
-          return;
-        }
-        final targetFreqs = activeFrequencies;
-        // Derive the display/fallback gain curve from the true filters when the
-        // profile carries them, so the graph and the legacy postEq mirror stay
-        // consistent with what the native parametric engine plays.
-        final sourceGains = isParametric
-            ? profile.gainsFromFilters(centers: targetFreqs)
-            : profile.gains;
-        final gains = sourceGains.length == targetFreqs.length
-            ? List<double>.from(sourceGains)
-            : EqPreset.interpolateGains(
-                sourceGains,
-                targetFrequencies: targetFreqs,
-              );
-        currentPreset = EqPreset(
-          name: profile.name,
-          gains: gains,
-          bassBoost: profile.bassBoost,
-        );
-        comparisonSlots[activeComparisonSlot] = currentPreset;
-        selectedHeadphoneProfile = profile;
-        if (autoEqCorrectionMode == AutoEqCorrectionMode.firMinPhase ||
-            autoEqCorrectionMode == AutoEqCorrectionMode.firLinear) {
-          final isLinear =
-              autoEqCorrectionMode == AutoEqCorrectionMode.firLinear;
-          final graphicEq = profile.toGraphicEqString();
-          await _effectsChannel.loadArbitraryEq(
-            eqString: graphicEq,
-            linearPhase: isLinear,
-          );
-          await _effectsChannel.setArbitraryEqEnabled(true);
-        } else if (isParametric) {
-          await _effectsChannel.setArbitraryEqEnabled(false);
-          final applied = await _applyParametricProfile(profile);
-          if (!applied) {
-            // Native PEQ unavailable: fall back to the graphic-gain path using
-            // the filter-derived curve so the correction still applies.
-            await _applyCurrentPresetCore();
-          }
-        } else {
-          await _effectsChannel.setArbitraryEqEnabled(false);
-          await _applyCurrentPresetCore();
-        }
-        await setBassBoost(profile.bassBoost);
-        // Prefer the filter-derived safe headroom; fall back to the stored
-        // preamp for legacy gain-curve profiles.
-        final preamp =
-            isParametric ? profile.computeSafePreamp() : profile.preampGain;
-        await setPreamp(preamp);
-      } else {
-        if (prevProfile == null) return;
-        selectedHeadphoneProfile = null;
-        await _effectsChannel.setArbitraryEqEnabled(false);
-        final targetFreqs = activeFrequencies;
-        currentPreset = EqPreset(
-          name: 'Flat',
-          gains: List<double>.filled(targetFreqs.length, 0.0),
-          bassBoost: 0.0,
-        );
-        comparisonSlots[activeComparisonSlot] = currentPreset;
-        await _applyCurrentPresetCore();
-        await setBassBoost(0.0);
-        await setPreamp(0.0);
-      }
-    } catch (e, st) {
-      currentPreset = prevPreset;
-      comparisonSlots[activeComparisonSlot] = prevPreset;
-      selectedHeadphoneProfile = prevProfile;
-      ErrorLogger.log(
-        'Failed to apply headphone profile',
-        error: e,
-        stackTrace: st,
-        category: 'EqualizerManager',
-      );
     }
     _debouncedSavePreferences();
   }
@@ -1458,7 +1375,12 @@ class EqualizerManager {
           true,
           eqString: arbitraryEqString.isNotEmpty ? arbitraryEqString : null,
           linearPhase: arbitraryEqLinearPhase,
+          fromRestore: true,
         );
+        if (isFirCorrectionActive) {
+          await _effectsChannel.setNativeEqEnabled(false);
+          await _effectsChannel.setEqEnabled(false);
+        }
       }
       if (_savedLiveProgEnabled &&
           !changed.contains(PrefsKeys.liveProgEnabled)) {
@@ -1777,122 +1699,6 @@ class EqualizerManager {
   }
 
   // --- MULTICHANNEL CHANNEL MANAGER ---
-
-  Future<void> setChannelManagerEnabled(bool enabled, {int? channelCount}) async {
-    final prevEnabled = isChannelManagerEnabled;
-    final prevCount = channelManagerChannelCount;
-    final targetCount = (channelCount ?? prevCount).clamp(2, 8);
-    try {
-      if (PlatformCapabilities.isAndroid) {
-        await _effectsChannel.setChannelManagerEnabled(enabled, channelCount: targetCount);
-      }
-      isChannelManagerEnabled = enabled;
-      channelManagerChannelCount = targetCount;
-      _debouncedSavePreferences();
-      _syncPipeline();
-    } catch (e, st) {
-      isChannelManagerEnabled = prevEnabled;
-      channelManagerChannelCount = prevCount;
-      ErrorLogger.log('Failed to set channel manager enabled',
-          error: e, stackTrace: st, category: 'EqualizerManager');
-      rethrow;
-    }
-  }
-
-  Future<void> setChannelManagerChannel(
-    int channel, {
-    double? trimDb,
-    double? delayMs,
-  }) async {
-    if (channel < 0 || channel >= 8) return;
-    final prevTrim = channelManagerTrimDb[channel];
-    final prevDelay = channelManagerDelayMs[channel];
-    final targetTrim = trimDb != null ? DspParamRanges.channelManagerTrimDb.clamp(trimDb) : prevTrim;
-    final targetDelay = delayMs != null ? DspParamRanges.channelManagerDelayMs.clamp(delayMs) : prevDelay;
-    try {
-      if (PlatformCapabilities.isAndroid) {
-        await _effectsChannel.setChannelManagerChannel(channel, trimDb: targetTrim, delayMs: targetDelay);
-      }
-      channelManagerTrimDb[channel] = targetTrim;
-      channelManagerDelayMs[channel] = targetDelay;
-      _debouncedSavePreferences();
-    } catch (e, st) {
-      channelManagerTrimDb[channel] = prevTrim;
-      channelManagerDelayMs[channel] = prevDelay;
-      ErrorLogger.log('Failed to set channel manager channel',
-          error: e, stackTrace: st, category: 'EqualizerManager');
-      rethrow;
-    }
-  }
-
-  // --- MULTICHANNEL LFE CROSSOVER ---
-
-  Future<void> setLfeCrossover(
-    bool enabled, {
-    double? crossoverHz,
-    double? lfeLowPassHz,
-    double? slopeDbPerOct,
-    double? lfeGainDb,
-    int? lfeChannelIndex,
-    bool? redirectBass,
-  }) async {
-    final prevEnabled = isLfeCrossoverEnabled;
-    final prevCrossover = lfeCrossoverHz;
-    final prevLp = this.lfeLowPassHz;
-    final prevSlope = lfeSlopeDbPerOct;
-    final prevGain = this.lfeGainDb;
-    final prevLfeCh = this.lfeChannelIndex;
-    final prevRedirect = lfeRedirectBass;
-
-    final targetCrossover = crossoverHz != null
-        ? DspParamRanges.lfeCrossoverHz.clamp(crossoverHz)
-        : prevCrossover;
-    final targetLp = lfeLowPassHz != null
-        ? DspParamRanges.lfeLowPassHz.clamp(lfeLowPassHz)
-        : prevLp;
-    final targetSlope = slopeDbPerOct != null
-        ? (slopeDbPerOct < 18.0 ? 12.0 : 24.0)
-        : prevSlope;
-    final targetGain = lfeGainDb != null
-        ? DspParamRanges.lfeGainDb.clamp(lfeGainDb)
-        : prevGain;
-    final targetLfeCh = (lfeChannelIndex ?? prevLfeCh).clamp(0, 7).toInt();
-    final targetRedirect = redirectBass ?? prevRedirect;
-
-    try {
-      if (PlatformCapabilities.isAndroid) {
-        await _effectsChannel.setLfeCrossoverParams(
-          crossoverHz: targetCrossover,
-          lfeLowPassHz: targetLp,
-          slopeDbPerOct: targetSlope,
-          lfeGainDb: targetGain,
-          lfeChannelIndex: targetLfeCh,
-          redirectBass: targetRedirect,
-        );
-        await _effectsChannel.setLfeCrossoverEnabled(enabled);
-      }
-      lfeCrossoverHz = targetCrossover;
-      lfeLowPassHz = targetLp;
-      lfeSlopeDbPerOct = targetSlope;
-      lfeGainDb = targetGain;
-      lfeChannelIndex = targetLfeCh;
-      lfeRedirectBass = targetRedirect;
-      isLfeCrossoverEnabled = enabled;
-      _debouncedSavePreferences();
-      _syncPipeline();
-    } catch (e, st) {
-      lfeCrossoverHz = prevCrossover;
-      lfeLowPassHz = prevLp;
-      lfeSlopeDbPerOct = prevSlope;
-      lfeGainDb = prevGain;
-      lfeChannelIndex = prevLfeCh;
-      lfeRedirectBass = prevRedirect;
-      isLfeCrossoverEnabled = prevEnabled;
-      ErrorLogger.log('Failed to set LFE crossover',
-          error: e, stackTrace: st, category: 'EqualizerManager');
-      rethrow;
-    }
-  }
 
   // --- LOW-POWER ROUTE ---
 
@@ -2330,6 +2136,10 @@ class EqualizerManager {
 
   Future<int> syncNativeLatency(double sampleRate,
       {OptimizedDspPipeline? dspPipeline, double? outputRate}) async {
+    final rate = (outputRate != null && outputRate > 0)
+        ? outputRate
+        : sampleRate;
+    if (rate.isFinite && rate > 0) nativeSampleRate = rate;
     if (!PlatformCapabilities.isAndroid) return 0;
     try {
       final frames = await _effectsChannel.getPipelineLatencyFrames();
@@ -2685,22 +2495,23 @@ class EqualizerManager {
       );
       futures.add(_effectsChannel.setLfeCrossoverEnabled(true));
     }
-    if (isChannelManagerEnabled) {
+    // Push the stored per-channel values even while the stage is disabled:
+    // otherwise a cold start with the manager off leaves the engine at zero,
+    // and re-enabling later would silently lose every trim/delay.
+    futures.add(
+      _effectsChannel.setChannelManagerEnabled(
+        isChannelManagerEnabled,
+        channelCount: channelManagerChannelCount,
+      ),
+    );
+    for (int ch = 0; ch < 8; ++ch) {
       futures.add(
-        _effectsChannel.setChannelManagerEnabled(
-          true,
-          channelCount: channelManagerChannelCount,
+        _effectsChannel.setChannelManagerChannel(
+          ch,
+          trimDb: channelManagerTrimDb[ch],
+          delayMs: channelManagerDelayMs[ch],
         ),
       );
-      for (int ch = 0; ch < 8; ++ch) {
-        futures.add(
-          _effectsChannel.setChannelManagerChannel(
-            ch,
-            trimDb: channelManagerTrimDb[ch],
-            delayMs: channelManagerDelayMs[ch],
-          ),
-        );
-      }
     }
     if (isDynamicEqEnabled) {
       futures.add(_pushDynamicEqConfig());

@@ -94,9 +94,28 @@ int main() {
         const double lfeLowRms = measureChannelRms(bufLow, 6, 3, kSteadyStart, kFrames);
         assert(satLowRms < inRms * 0.16 &&
                "LR4 80 Hz HPF must attenuate 30 Hz satellite energy by >16 dB");
-        // Power-sum scaling 1/sqrt(5) ~ 0.447; allow filter rolloff margin.
-        assert(lfeLowRms > inRms * 0.35 &&
+        // Constant-sum scaling 1/5 = 0.2; allow filter rolloff margin.
+        assert(lfeLowRms > inRms * 0.10 &&
                "30 Hz satellite bass must redirect into LFE channel");
+
+        // Coherent bass on every satellite must not be boosted (~1x one
+        // channel's level, never 1/sqrt(5) * 5 = 2.24x).
+        lfe.reset();
+        auto coherent = makeInterleavedSine(kFrames, 6, 0, 30.0, kSr, 0.1f);
+        for (int f = 0; f < kFrames; ++f) {
+            for (int ch : {1, 2, 4, 5}) {
+                coherent[static_cast<size_t>(f) * 6 + ch] =
+                    coherent[static_cast<size_t>(f) * 6 + 0];
+            }
+        }
+        const double coherentInRms =
+            measureChannelRms(coherent, 6, 0, kSteadyStart, kFrames);
+        lfe.processInterleaved(coherent.data(), kFrames, 6);
+        const double coherentLfeRms =
+            measureChannelRms(coherent, 6, 3, kSteadyStart, kFrames);
+        assert(coherentLfeRms > coherentInRms * 0.65 &&
+               coherentLfeRms < coherentInRms * 1.2 &&
+               "Coherent satellite bass must reach LFE at ~one channel level");
 
         // Midrange tone (1 kHz) on FL (ch 0): must pass flat on FL and stay silent on LFE.
         lfe.reset();
@@ -200,7 +219,9 @@ int main() {
         auto stream21 = makeInterleavedSine(kFrames, 3, 0, 30.0, kSr, 0.4f);
         engine->processInterleaved(stream21.data(), kFrames, 3);
         const double lfe21Rms = measureChannelRms(stream21, 3, 2, kSteadyStart, kFrames);
-        assert(lfe21Rms > 0.08 && "AudioDspEngine must run LfeCrossover on 3-channel audio");
+        // Constant-sum redirect (1/2 for 3 ch) plus LR4 rolloff: the direct
+        // engine path keeps working even though the UI no longer offers 2.1.
+        assert(lfe21Rms > 0.04 && "AudioDspEngine must run LfeCrossover on 3-channel audio");
     }
     std::cout << "  ✓ AudioDspEngine integration & sanitization verified." << std::endl;
     std::cout << "[PASS] LfeCrossover tests passed." << std::endl;

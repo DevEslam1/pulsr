@@ -254,8 +254,18 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
           nativeCapable: caps.canUseNativeDsd,
           dsdRateMultiple: rateMultiple,
         );
-        final wantDop = plan.isDop;
-        final wantNative = plan.isNative;
+        // Native is handled by NativeDsdSession before this resolver runs.
+        // Reaching here with a native plan means the session could not open,
+        // so use DoP (or PCM below) instead of pretending to play DSD.
+        final wantDop = plan.isDop || plan.isNative;
+        const wantNative = false;
+        if (plan.isNative) {
+          ErrorLogger.log(
+            'Native DSD session unavailable for "${song.title}"; '
+            'falling back to DoP/PCM',
+            category: 'Audio',
+          );
+        }
         if (plan.isFallback && plan.transport != DsdTransport.pcm) {
           ErrorLogger.log(
             'DSD transport fallback for "${song.title}": $plan',
@@ -454,6 +464,9 @@ mixin PulsrAudioStreaming on BaseAudioHandler {
       rate,
       [_playerA, _playerB, _prefetchPlayer],
     );
+    // Status is derived from the engine; refresh after every tap reconfigure
+    // so the quality sheet never reports a requested factor as active.
+    await AudioEffectsChannel().refreshActiveOversampleMultiplier();
   }
 
   /// Restores optional native playback quality without blocking initialization.

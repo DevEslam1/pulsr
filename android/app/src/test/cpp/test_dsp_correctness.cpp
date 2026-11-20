@@ -118,6 +118,54 @@ void runArbitraryEqResponseTest() {
     assert(r10k > 0.05);
     std::cout << "  ✓ Response: 100Hz=" << r100 << ", 1kHz=" << r1k
               << ", 10kHz=" << r10k << " (1k boosted)." << std::endl;
+
+    // The FIR must implement the requested nodes across the whole 20 Hz-20 kHz
+    // grid, not just "1 kHz is louder". 4096 taps are required for this.
+    assert(eq.loadGraphicEqString(
+        "GraphicEq: 20 -6; 100 -3; 1000 6; 10000 -2; 20000 0", false));
+    auto gainAt = [&](double freq) -> double {
+        const int frames = 32768;
+        std::vector<float> input(frames), output(frames);
+        for (int i = 0; i < frames; ++i) {
+            input[i] = 0.25f * std::sin(2.0f * static_cast<float>(M_PI) *
+                                        static_cast<float>(freq) *
+                                        static_cast<float>(i) / 48000.0f);
+        }
+        std::vector<float> stereo(frames * 2);
+        for (int i = 0; i < frames; ++i) {
+            stereo[static_cast<size_t>(i) * 2] = input[i];
+            stereo[static_cast<size_t>(i) * 2 + 1] = input[i];
+        }
+        eq.reset();
+        eq.processInterleaved(stereo.data(), frames, 2);
+        double sumIn = 0.0, sumOut = 0.0;
+        int count = 0;
+        for (int i = frames / 2; i < frames; ++i) {
+            const double x = input[i];
+            const double y = stereo[static_cast<size_t>(i) * 2];
+            if (!std::isfinite(y)) return 0.0;
+            sumIn += x * x;
+            sumOut += y * y;
+            ++count;
+        }
+        if (sumIn <= 0.0) return 0.0;
+        return 10.0 * std::log10(sumOut / sumIn);
+    };
+    const struct { double f; double gain; } nodes[] = {
+        {100.0, -3.0}, {1000.0, 6.0}, {10000.0, -2.0}
+    };
+    for (const auto& node : nodes) {
+        const double measured = gainAt(node.f);
+        assert(std::abs(measured - node.gain) < 0.5 &&
+               "FIR must implement the requested node gain within 0.5 dB");
+    }
+    // 20 Hz is the case the old 1024-tap kernel lost; require it to be within
+    // 1 dB of the requested -6 dB.
+    const double low = gainAt(20.0);
+    assert(std::abs(low + 6.0) < 1.0 &&
+           "4096-tap FIR must hold the 20 Hz AutoEQ correction within 1 dB");
+    std::cout << "  ✓ FIR response matches requested nodes (20 Hz included)."
+              << std::endl;
 }
 
 void runViperDdcConventionTest() {

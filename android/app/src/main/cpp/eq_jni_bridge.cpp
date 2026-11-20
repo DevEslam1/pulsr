@@ -582,6 +582,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeGetOversampleMultiplier(
     return static_cast<jint>(AudioDspEngine::instance().oversampleMultiplier());
 }
 
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetActiveOversampleMultiplier(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(DspEngineRegistry::instance().getActiveOversampleFactor());
+}
+
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetOversampleKernel(
         JNIEnv* /* env */, jobject /* thiz */, jint kernel) {
@@ -1524,8 +1530,30 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadHrtfSofa(
     std::string path(pathStr);
     env->ReleaseStringUTFChars(jPath, pathStr);
 
-    bool ok = AudioDspEngine::instance().hrtf().loadSofaFile(path);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    // §8.9: parse on this (platform) thread, then publish the immutable dataset
+    // through the parameter snapshot so every render engine adopts it and builds
+    // its own resampled quad on a control thread. Loading therefore never
+    // mutates a quad the render thread is convolving.
+    pulsr::HrtfBinaural& hrtf = AudioDspEngine::instance().hrtf();
+    if (!hrtf.loadSofaFile(path)) return JNI_FALSE;
+    auto dataset = hrtf.getDataset();
+    AudioDspEngine::instance().updateParams([dataset](DspParamSnapshot& snap) {
+        snap.hrtf.dataset = dataset;
+    });
+    return JNI_TRUE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeClearHrtfSofa(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    // Clear returns to the synthesized default on the control engine, then
+    // broadcasts "no dataset" so render engines do the same.
+    pulsr::HrtfBinaural& hrtf = AudioDspEngine::instance().hrtf();
+    if (!hrtf.clearDataset()) return JNI_FALSE;
+    AudioDspEngine::instance().updateParams([](DspParamSnapshot& snap) {
+        snap.hrtf.dataset.reset();
+    });
+    return JNI_TRUE;
 }
 
 JNIEXPORT jboolean JNICALL

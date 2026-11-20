@@ -43,6 +43,16 @@ extension _PulsrAudioLifecycleExt on PulsrAudioHandler {
     try {
       await saveCurrentPositionImmediate();
     } catch (_) {}
+    // Release the DSD alt setting only after the position is persisted; the
+    // session is the position source while it owns the DAC.
+    if (nativeDsdActive) {
+      try {
+        await stopNativeDsd(clearStatus: true);
+      } catch (e, st) {
+        ErrorLogger.log('Failed to stop native DSD during stop',
+            error: e, stackTrace: st, category: 'AudioHandler');
+      }
+    }
     unawaited(PositionCrashGuard.recordCleanShutdown());
     _gaplessLoaded = false;
     _gaplessTargetIndex = null;
@@ -115,7 +125,20 @@ extension _PulsrAudioLifecycleExt on PulsrAudioHandler {
     // Idempotency check first: a second call used to re-run the observer and
     // timer teardown before bailing out.
     if (_disposed) return;
+    try {
+      await stopNativeDsd(clearStatus: true);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to stop native DSD during dispose',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
     _disposed = true;
+    try {
+      await _castPlaybackHandoff?.dispose();
+    } catch (e, st) {
+      ErrorLogger.log('Cast playback handoff dispose failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
+    _castPlaybackHandoff = null;
     _headsetClickTimer?.cancel();
     _headsetClickTimer = null;
     _bufferRelaxTimer?.cancel();

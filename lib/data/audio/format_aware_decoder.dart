@@ -6,6 +6,7 @@ import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_quality_info.dart';
 import '../db/app_database.dart';
 import 'dsd_decoder_helper.dart';
+import 'decoder_runtime_probe.dart';
 import 'mqa_decoder_helper.dart';
 
 /// Routes audio playback to the optimal decode path per format.
@@ -14,11 +15,23 @@ class FormatAwareDecoder {
       resolveYtmStream;
   final Future<AudioSource> Function(SongsTableData song, MediaItem tag)?
       decodeDsdToPcm;
+  final DecoderRuntimeProbe? decoderProbe;
+  DecoderRuntimeProbe? _fallbackProbe;
 
-  const FormatAwareDecoder({
+  FormatAwareDecoder({
     required this.resolveYtmStream,
     this.decodeDsdToPcm,
+    this.decoderProbe,
   });
+
+  DecoderRuntimeProbe get _probe =>
+      decoderProbe ?? (_fallbackProbe ??= DecoderRuntimeProbe());
+
+  Future<bool> _alacAvailable(SongsTableData song) async {
+    final rate = song.sampleRate ?? 0;
+    if (await _probe.supports('audio/alac', sampleRate: rate)) return true;
+    return _probe.supports('audio/x-alac', sampleRate: rate);
+  }
 
   /// Decodes and wraps [song] into an optimal [AudioSource].
   Future<AudioSource> decodeForFormat(
@@ -84,6 +97,18 @@ class FormatAwareDecoder {
         onTransportResolved?.call(false, false);
         return AudioSource.uri(Uri.file(song.path), tag: tag);
       case 'alac':
+      case 'm4a':
+        final codec = (song.codec ?? '').toUpperCase();
+        final isAlac = ext == 'alac' || codec.contains('ALAC');
+        if (isAlac && !await _alacAvailable(song)) {
+          throw PlayerException(
+            9003,
+            'ALAC decoder is not available on this device for ${song.title}',
+            null,
+          );
+        }
+        onTransportResolved?.call(false, false);
+        return AudioSource.uri(Uri.file(song.path), tag: tag);
       case 'aiff':
         onTransportResolved?.call(false, false);
         return AudioSource.uri(Uri.file(song.path), tag: tag);
@@ -106,7 +131,6 @@ class FormatAwareDecoder {
       // 3. Compressed Standard Formats
       case 'mp3':
       case 'aac':
-      case 'm4a':
       case 'ogg':
       case 'opus':
       default:

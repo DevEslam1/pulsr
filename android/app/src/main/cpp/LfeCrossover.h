@@ -18,8 +18,9 @@
 //   1. High-passes each satellite channel (every channel != lfeChannelIndex) at
 //      crossoverHz using a Linkwitz-Riley 2nd-order (12 dB/oct) or 4th-order
 //      (24 dB/oct) filter when redirectBass is true.
-//   2. Low-passes the summed satellite bass (equal-power scaled by
-//      1/sqrt(satCount)) at crossoverHz and routes it into the LFE channel.
+//   2. Low-passes the summed satellite bass (constant-sum scaled by
+//      1/satCount, so coherent bass cannot be boosted) at crossoverHz and
+//      routes it into the LFE channel.
 //   3. Low-passes the dedicated LFE channel itself at lfeLowPassHz (bandwidth
 //      limit) and applies lfeGainDb trim (-12..+12 dB).
 //

@@ -195,6 +195,8 @@ class UsbExclusiveStatus {
   final int uacVersion;
   final String uacLabel;
   final bool hasVolumeControl;
+  final bool hasMuteControl;
+  final bool? hardwareMute;
   final bool exclusiveActive;
   final bool exclusiveSupported;
   final double? hardwareVolumeDb;
@@ -267,6 +269,8 @@ class UsbExclusiveStatus {
     this.uacVersion = 0,
     this.uacLabel = 'none',
     this.hasVolumeControl = false,
+    this.hasMuteControl = false,
+    this.hardwareMute,
     this.exclusiveActive = false,
     this.exclusiveSupported = false,
     this.hardwareVolumeDb,
@@ -310,6 +314,8 @@ class UsbExclusiveStatus {
     int? uacVersion,
     String? uacLabel,
     bool? hasVolumeControl,
+    bool? hasMuteControl,
+    bool? hardwareMute,
     bool? exclusiveActive,
     bool? exclusiveSupported,
     double? hardwareVolumeDb,
@@ -353,6 +359,8 @@ class UsbExclusiveStatus {
       uacVersion: uacVersion ?? this.uacVersion,
       uacLabel: uacLabel ?? this.uacLabel,
       hasVolumeControl: hasVolumeControl ?? this.hasVolumeControl,
+      hasMuteControl: hasMuteControl ?? this.hasMuteControl,
+      hardwareMute: hardwareMute ?? this.hardwareMute,
       exclusiveActive: exclusiveActive ?? this.exclusiveActive,
       exclusiveSupported: exclusiveSupported ?? this.exclusiveSupported,
       hardwareVolumeDb: hardwareVolumeDb ?? this.hardwareVolumeDb,
@@ -409,6 +417,10 @@ class UsbExclusiveStatus {
       uacVersion: i(map['uacVersion']) ?? 0,
       uacLabel: (map['uacLabel'] as String?) ?? 'none',
       hasVolumeControl: map['hasVolumeControl'] == true,
+      hasMuteControl: map['hasMuteControl'] == true,
+      hardwareMute: map['hardwareMute'] is bool
+          ? map['hardwareMute'] as bool
+          : null,
       exclusiveActive: map['exclusiveActive'] == true,
       exclusiveSupported: map['exclusiveSupported'] == true,
       hardwareVolumeDb: d(map['hardwareVolumeDb']),

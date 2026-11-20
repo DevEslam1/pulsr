@@ -66,7 +66,27 @@ class UsbAudioControlParserTest {
         assertEquals(0, vu.interfaceNumber)
         assertEquals(2, vu.channels)
         assertTrue(vu.volumeOnMaster)
+        assertTrue(vu.muteOnMaster)
+        assertTrue(result.hasMuteControl)
         assertEquals(1, result.streamingInterface)
+    }
+
+    @Test
+    fun uac2FeatureUnitSplitsMuteFromVolumeCapability() {
+        // Bits 3:2 = 11 (volume RW), bits 1:0 = 00 (no mute).
+        val volumeOnly = uac2Config().copyOf()
+        // Master and per-channel bmaControls low bytes: 14, 18, 22.
+        for (offset in intArrayOf(14, 18, 22)) volumeOnly[offset] = 0x0C
+        val noMute = UsbAudioControlParser.parse(volumeOnly)
+        assertTrue(noMute.hasVolumeControl)
+        assertTrue(!noMute.hasMuteControl)
+
+        // Bits 1:0 = 11 (mute RW), bits 3:2 = 00 (no volume).
+        val muteOnly = uac2Config().copyOf()
+        for (offset in intArrayOf(14, 18, 22)) muteOnly[offset] = 0x03
+        val mute = UsbAudioControlParser.parse(muteOnly)
+        assertTrue(!mute.hasVolumeControl)
+        assertTrue(mute.hasMuteControl)
     }
 
     private fun uac1Config(): ByteArray = byteArrayOf(
@@ -81,6 +101,8 @@ class UsbAudioControlParserTest {
         assertEquals(UsbAudioControlParser.UAC1, result.uacVersion)
         assertEquals(2, result.volumeUnit!!.channels)
         assertEquals(listOf(0, 1, 2), result.volumeUnit!!.writableChannels)
+        assertTrue(result.volumeUnit!!.muteOnMaster)
+        assertTrue(result.hasMuteControl)
     }
 
     @Test

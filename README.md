@@ -6,7 +6,7 @@
   ### Premium Offline-First Audiophile Player for Android
 
   <p align="center">
-    <strong>21-Stage Native C++ DSP • 10/32/64-Band EQ • 652 AutoEQ Profiles • DSD512 • 11 Player Themes • Pulsr Party • Quran Mode • Cast &amp; Remote Sources • Zero Telemetry</strong>
+    <strong>22-Stage Native C++ DSP • 10/32/64-Band EQ • 652 AutoEQ Profiles • DSD512 • 11 Player Themes • Pulsr Party • Quran Mode • Cast &amp; Remote Sources • Zero Telemetry</strong>
   </p>
 
   <p align="center">
@@ -35,7 +35,9 @@
 
 **Pulsr Music** is an offline-first audiophile player for Android, built with Flutter, Dart, BLoC and Drift SQLite. A native C++20 engine handles real-time DSP, while a small Go server powers synchronized group listening.
 
-It combines a 21-stage DSP chain, bit-perfect USB-DAC output, 11 Now Playing themes, karaoke with live pitch tracking, an offline 114-surah Quran Mode, DLNA casting and SMB/WebDAV/FTP remote sources. The **Pure** build is provably offline: the INTERNET permission is removed at manifest level. The optional **Plus** build adds YouTube Music behind a compile-time flag.
+It combines a 22-stage DSP chain, bit-perfect USB-DAC output, 11 Now Playing themes, karaoke with live pitch tracking, an offline 114-surah Quran Mode, DLNA casting and SMB/WebDAV/FTP remote sources. The **Pure** build is provably offline: the INTERNET permission is removed at manifest level. The optional **Plus** build adds YouTube Music behind a compile-time flag.
+
+> **Verification status (2026-11-20):** all §8 audio sections are code-complete and covered by host/unit/widget suites; device-only attestations (USB DSD/UAC2, multichannel DAC, Android FIR, Cast/UPnP receiver, ADC loopback, battery run) are still pending. No section is certified 10/10 without that hardware evidence.
 
 > This README summarizes the shipped surface. For the source-verified count-by-count inventory, see [docs/FEATURE_MATRIX.md](docs/FEATURE_MATRIX.md). For the complete Section 8 remediation and audit results, see [docs/PROOF_PACK_2026-11-20.md](docs/PROOF_PACK_2026-11-20.md) and [docs/FINAL_AUDIT_2026-11-20.md](docs/FINAL_AUDIT_2026-11-20.md). Dated audit documents are snapshots, not current promises — see [docs/README.md](docs/README.md).
 
@@ -45,7 +47,7 @@ It combines a 21-stage DSP chain, bit-perfect USB-DAC output, 11 Now Playing the
 
 | Area | Shipped capability |
 |---|---|
-| **DSP** | 21 native stages, 16 concurrent engines, 64-band parametric EQ, dedicated FIR stage, 8-band dynamic EQ, 4-band compressor, true-peak limiter, 9 reverb programs, crossfeed, saturation, bass management, 2–8 channel manager |
+| **DSP** | 22 native stages, 16 concurrent engines, 64-band parametric EQ, dedicated FIR stage, 8-band dynamic EQ, 4-band compressor, true-peak limiter, 9 reverb programs, crossfeed, saturation, bass management, 2–8 channel manager |
 | **Hi-Res** | DSD64–DSD512 decode to 768 kHz PCM, dedicated pull-session native DSD, DoP carriers, SACD ISO extraction, USB-DAC exclusive output with UAC2 volume, AAudio direct, 32-bit float path |
 | **Experience** | 11 Now Playing themes + Theme Studio, 8 visualizer styles + Milkdrop shader, karaoke pitch highway, synced lyrics, ambient mixer |
 | **Library** | Reactive Drift SQLite index, 8 views, tag/artwork editor, 16-field smart playlists, duplicate cleanup, CUE sheets, 3 queue slots, 500-station radio store |
@@ -62,7 +64,8 @@ The static landing page lives in [`website/`](website/) and opens directly in an
 
 - Interactive player cockpit with spectrum visualizer, seekbar and Aura palette switching.
 - 10/32/64-band EQ and AutoEQ sandbox with a live frequency-response curve.
-- New sections for **Pulsr Party**, **Quran Mode**, **Karaoke & Visuals**, and **Pro Audio / Chain of Custody**.
+- 22-stage DSP, 4,096-tap FIR, Remaster oversampling and HRTF/SOFA feature cards alongside the EQ and AutoEQ sandbox.
+- Sections for **Pulsr Party**, **Quran Mode**, **Karaoke & Visuals**, and **Pro Audio / Chain of Custody**.
 - DSP, themes, editions, library, integrations, comparison, downloads and FAQ.
 
 ```bash
@@ -76,34 +79,34 @@ npx serve website
 
 ### 🎧 1. Audio Engine & DSP
 
-- **21-stage native C++ chain** with a bit-perfect fast path, lock-free render handoff and 16 concurrent engines. A governor degrades stages by real-time factor and thermal level instead of glitching.
-- **Dedicated FIR Stage**: 100% wet per-headphone FIR correction stage (`STAGE_FIR`) separate from reverb, matching native PEQ within $\pm 0.1$ dB across 20 Hz – 20 kHz with automatic preamp headroom protection.
-- **10 / 32 / 64-band EQ**: 10-band graphic, 32-band and 64-band parametric modes; eight biquad filter types; ±15 dB bands; per-band solo/mute; 1,024-node arbitrary-response FIR EQ; 12 presets.
+- **22-stage native C++ chain** with a bit-perfect fast path, lock-free render handoff and 16 concurrent engines. A governor degrades stages by real-time factor and thermal level instead of glitching.
+- **Dedicated FIR Stage**: 100% wet per-headphone FIR correction stage (`STAGE_ARBITRARY_EQ`) separate from reverb, matching native PEQ within $\pm 0.1$ dB across 20 Hz – 20 kHz with automatic preamp headroom protection.
+- **10 / 32 / 64-band EQ**: 10-band graphic, 32-band and 64-band parametric modes; eight biquad filter types; ±15 dB bands; per-band solo/mute; 4,096-tap arbitrary-response FIR EQ; 12 presets.
 - **652 bundled AutoEQ profiles**: five-band compensation curves matched to the connected headphone by name, with online search, user imports and a computed preamp.
 - **Dynamics**: 8-band dynamic EQ, 4-band multiband compressor with Linkwitz-Riley crossovers, 4× oversampled true-peak lookahead limiter, dynamic bass and ReplayGain.
-- **Tone and space**: four crossfeed modes (BS2B, Chu Moy, Jan Meier, custom), 3-band stereo imager with bass mono, three harmonic-saturation models, loudness contour, sub crossover, and HRTF / SOFA spatializer with MIT KEMAR and SADIE II dataset support.
+- **Tone and space**: four crossfeed modes (BS2B, Chu Moy, Jan Meier, custom), 3-band stereo imager with bass mono, three harmonic-saturation models, loudness contour, sub crossover, and HRTF / SOFA spatializer with user-supplied SOFA/WAV HRIRs, inverse-distance interpolation, rate resampling and zero render-thread allocations (no HRIR dataset is bundled).
 - **Convolution reverb**: nine programs from Studio 0.35 s to Cathedral 5.0 s, custom impulse responses up to 2,000,000 samples / 10 s, wet/dry, predelay and damping.
-- **Voicing, Remaster and Scripting**: DAC Voicing (Sharp, Slow, Minimum-phase) with harmonic warmth; Remaster follow-rate upsampler (2×/4×/8×) with step-down (8-4-2-1); 5th-order sigma-delta PCM-to-DSD engine; ViPER-DDC `.vdc` profiles with up to 256 sections; LiveProg EEL/JSFX subset.
+- **Voicing, Remaster and Scripting**: DAC Voicing (Sharp, Slow, Minimum-phase) with harmonic warmth; Remaster follow-rate upsampler (2×/4×/8×) with step-down (8-4-2-1); PCM-to-DSD sigma-delta engine (offline engine path only; not wired to a playback sink); ViPER-DDC `.vdc` profiles with up to 256 sections; LiveProg EEL/JSFX subset.
 - **DSD and SACD**: Dedicated native USB DSD pull session (`NativeDsdSession`) without fake WAV timelines; DSD64–DSD512 to PCM up to 768 kHz; DoP carriers at 176.4/352.8/705.6 kHz; SACD ISO indexing and DSF extraction.
 - **Playback extras**: gapless preload, linear/exponential crossfade, Automix BPM/key analysis (40–240 BPM), A-B loop, per-track delay, bookmarks, silence skip and sleep timer.
 - **Ambient mixer**: nine loops (rain, fire, forest, ocean, wind, thunder, birds, café, white noise), up to four at once with independent volume.
 
 ### 🔌 2. Output, Bit-Perfect & Custody
 
-- **`PlaybackBackend` & Derived Status Architecture**: Modular playback seam (`LocalPCM`, `LocalDSD`, `Cast`, `UPnP`) mediated by a central `FeatureGate` and dynamic `OutputVerdict` derived from negotiated format and active stages. Status updates immediately mid-track and on route change.
+- **`PlaybackBackend` & Derived Status Architecture**: Modular playback seam (`LocalPCM`, `LocalDSD`, `Cast`, `UPnP`) with a central backend contract and dynamic `OutputVerdict` derived from negotiated format and active stages. Status updates immediately mid-track and on route change.
 - **Three output modes** in the vendored Media3 sink: `DEFAULT → FLOAT → AAUDIO`, with automatic fallback and re-prepare.
 - **AAudio direct**: 16-bit, float32, 24-bit packed and API 31+ exclusive 32-bit; maximum two channels; 150 ms default target buffer.
 - **USB-DAC exclusive & UAC2 standard volume**: UAC2 standard GET_CUR `0x81` / SET_CUR `0x01` compliance with hardware volume attenuation readback. Volume keys move the DAC attenuator only during active hardware-volume playback.
-- **True Low-Power Mode**: Distinct Battery Saver (degraded DSP complexity) and Low-Power Bypass (complete DSP thread bypass) modes, guarded by server-side interlocks refusing bypass when DSP is active, and reporting per-stage mAh/h battery telemetry (`stagePowerSpecs`).
+- **True Low-Power Mode**: Distinct Battery Saver (degraded DSP complexity) and Low-Power Bypass (complete DSP thread bypass) modes, guarded by a derived `dspActive` interlock that is cleared on engine release and refuses bypass while DSP/remaster/HRTF are active; per-stage mAh/h telemetry (`stagePowerSpecs`) includes remaster and HRTF. Native DSD and USB-exclusive endpoints are not bypassed.
 - **32-bit float DSP path** with TPDF requantization when a 16-bit sink boundary is required.
 - **Honest bit-perfect policy**:
-  - Lossless sources are eligible: FLAC, ALAC, WAV, AIFF, DSD/DSF/DFF and integer PCM. The policy also recognizes WavPack, APE and TTA, but this build does not bundle their decoders.
+  - Lossless sources are eligible: FLAC, WAV, AIFF, DSD/DSF/DFF and integer PCM. ALAC is eligible only when the device MediaCodec advertises `audio/alac`/`audio/x-alac`; no ALAC decoder is bundled. WavPack, APE and TTA are recognized by the policy but have no decoder in this build.
   - Lossy sources and live radio are blocked from a bit-perfect claim.
   - Ambiguous containers (`.m4a`, `.mp4`, `.ogg`, `.oga`, `.mka`, `.webm`) report `source_codec_unconfirmed` instead of pretending to be verified.
   - 32-bit float conversion reports `source_32bit_float_conversion_not_lossless`.
   - Bluetooth is blocked because it re-encodes.
 - **Chain of custody**: 4,096 frames × 2 channels hashed at input and output, with an exportable JSON certificate. `bitExactMeasured` is only reported when the digests match.
-- **Measurement Harness & Gates**: High-dynamic-range Kaiser window ($\beta=18.0$, $>150$ dB sidelobe suppression) FFT analysis, CCIF 19+20 kHz twin-tone IMD2/IMD3, identical-channel crosstalk detection, and committed proof pack ([docs/PROOF_PACK_2026-11-20.md](docs/PROOF_PACK_2026-11-20.md)).
+- **Measurement Harness & Gates**: High-dynamic-range Kaiser window ($\beta=18.0$, $>150$ dB sidelobe suppression) FFT analysis, CCIF 19+20 kHz twin-tone IMD2/IMD3, identical-channel crosstalk detection, and a host-level proof dossier ([docs/PROOF_PACK_2026-11-20.md](docs/PROOF_PACK_2026-11-20.md)). Hardware loopback and device attestations remain pending.
 - **Diagnostics**: 19 telemetry slots, xrun counters, thermal/RTF state, safe mode, self-test and a redacted support bundle.
 
 ### 💎 3. Aura Design & 11 Player Themes
@@ -237,7 +240,7 @@ Data
   DownloadRepository · collaborative audio controllers
         │
         ├── Native C++20 DSP engine (android/app/src/main/cpp)
-        │     AAudioSink · UsbAudioSink · 20-stage AudioDspEngine ·
+        │     AAudioSink · UsbAudioSink · 22-stage AudioDspEngine ·
         │     EQ / dynamics / reverb / DSD / custody
         │
         └── Go party server (server/pulsr_party)
@@ -268,7 +271,7 @@ Data
 pulsr/
 ├── android/
 │   └── app/src/main/
-│       ├── cpp/                 # C++20 DSP engine (20 stages, AAudio, USB, DSD, EQ, reverb)
+│       ├── cpp/                 # C++20 DSP engine (22 stages, AAudio, USB, DSD, EQ, reverb)
 │       └── kotlin/              # MethodChannel plugins (USB, visualizer, widgets, TTS, SMB)
 ├── assets/
 │   ├── app_icon/
@@ -333,7 +336,7 @@ Additional suites:
 
 | Gate | Command | Notes |
 |---|---|---|
-| Native DSP host suite | `./scripts/run_native_dsp_tests.sh` | DSD512, channel manager, DoP, limiter, stress; see `docs/NATIVE_AUDIO_MATRIX.md` for the current 13/14 result and its known dither-tolerance failure |
+| Native DSP host suite | `./scripts/run_native_dsp_tests.sh` | DSD512, channel manager, DoP, limiter, stress; see `docs/NATIVE_AUDIO_MATRIX.md` for the current 48/48 result |
 | Audio bridge smoke | `scripts/run_audio_bridge_smoke.ps1` | Windows host harnesses for JNI and sink transitions |
 | Playback smoke | `scripts/run_audio_playback_smoke.ps1` | Cold-start local playback, progress, pause and resume |
 | Party server | `cd server/pulsr_party && go test ./...` | Go unit tests |
@@ -448,11 +451,13 @@ These are deliberate, source-verified limits — not roadmap promises:
 - **AAudio is stereo-only.** More than two channels, non-default speed/pitch or silence skip suspend AAudio back to AudioTrack.
 - **Android system EQ/LoudnessEnhancer do not affect AAudio.** They are bound to the AudioTrack session.
 - **Sinc playback resampling is not user-enableable.** `hasSincResampler = false`; enabling returns `DSP_UNSUPPORTED`. Rate conversion happens in the tap-side SRC and the platform.
-- **The spatial panner is balance/mono**, not a binaural or HRTF renderer.
+- **The spatial panner is balance/mono**; HRTF is a separate `STAGE_HRTF` binaural stage with user-supplied SOFA/WAV HRIRs, not a platform spatializer claim.
 - **The native UAC2 sink is experimental** and marked as not validated against every DAC in source.
-- **APE, WMA, TTA, TAK, WavPack, MPC, MOD, IT, XM and S3M are recognized but not decodable** in this build. SACD ISO is supported through extraction to DSF.
+- **APE, WMA, TTA, TAK, WavPack, MPC, MOD, IT, XM and S3M are recognized but not decodable** in this build. SACD ISO is supported through extraction to DSF. ALAC playback depends on the device MediaCodec; no ALAC decoder is bundled.
+- **PCM→DSD is an offline engine path only**; it is not wired to a playback sink in this build.
+- **HRTF has no bundled HRIR dataset**; load a SOFA or WAV HRIR from the player EQ spatial tab.
 - **MQA is core unfold only**; no authenticated render is claimed.
-- **No blind A/B/X UI ships.** `DspAbxHelper` exists as an unreferenced domain helper.
+- **Blind ABX ships** in the player with live native bypass, automatic level matching and redacted JSON export. Measurement/FFT hardware provenance remains a CLI gate.
 - **Desktop and iOS are not shipped.** Their directories contain stock Flutter runners; all native integrations are Android.
 - **Pulsr Party needs a server.** The default endpoint is overridable and the Go server is self-hostable; room size is 2–10, default 5.
 

@@ -170,7 +170,9 @@ void main() {
       expect(find.textContaining('AAudio is limited to 2 channels on Android'), findsOneWidget);
       expect(find.text('LFE Crossover & Bass Management'), findsOneWidget);
       expect(find.text('Speaker Layout'), findsOneWidget);
-      expect(find.text('6 Channels'), findsOneWidget);
+      expect(find.text('5.1 (6 channels)'), findsOneWidget);
+      expect(find.text('2.1 (3 ch)'), findsNothing);
+      expect(find.text('3.0 (3 ch)'), findsOneWidget);
       expect(find.text('Satellite Crossover (HPF)'), findsOneWidget);
       expect(find.text('Subwoofer Low-Pass (LPF)'), findsOneWidget);
       expect(find.text('24 dB/oct (LR4)'), findsOneWidget);
@@ -190,13 +192,26 @@ void main() {
       await tester.tap(find.text('7.1 (8 ch)'));
       await tester.pumpAndSettle();
 
-      expect(find.text('8 Channels'), findsOneWidget);
-      expect(find.text('RL'), findsOneWidget);
-      expect(find.text('RR'), findsOneWidget);
+      expect(find.text('7.1 (8 channels)'), findsOneWidget);
+      expect(find.text('SL'), findsOneWidget);
+      expect(find.text('SR'), findsOneWidget);
 
       await tester.tap(find.text('LFE'));
       await tester.pumpAndSettle();
       expect(find.text('Low-Frequency Effects (LFE)'), findsOneWidget);
+    });
+
+    testWidgets('4.0 disables the LFE stage and persists the choice',
+        (tester) async {
+      await pumpCard(tester, settingsState: multichannelState);
+      await tester.tap(find.text('4.0 (4 ch)'));
+      await tester.pumpAndSettle();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt(PrefsKeys.channelManagerChannelCount), 4);
+      expect(prefs.getBool(PrefsKeys.lfeCrossoverEnabled), isFalse);
+      expect(prefs.getInt(PrefsKeys.lfeChannelIndex), 0);
+      expect(find.text('4.0 (4 channels)'), findsOneWidget);
     });
 
     testWidgets('adjusts slope chip between LR2 and LR4', (tester) async {

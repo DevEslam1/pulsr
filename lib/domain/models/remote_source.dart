@@ -366,6 +366,7 @@ class RemoteEntry {
     this.modifiedAt,
     this.etag,
     this.artworkUri,
+    this.artworkCacheKey,
   });
 
   /// Restores an entry from [toJson] output.
@@ -381,6 +382,7 @@ class RemoteEntry {
           : null,
       etag: json['etag'] as String?,
       artworkUri: json['artworkUri'] as String?,
+      artworkCacheKey: json['artworkCacheKey'] as String?,
     );
   }
 
@@ -405,6 +407,10 @@ class RemoteEntry {
   /// Optional artwork/cover art URI string for display in UI.
   final String? artworkUri;
 
+  /// Stable cache key for [artworkUri] when the URI itself rotates (signed
+  /// Subsonic cover URLs). Null keeps the URI/id as the cache key.
+  final String? artworkCacheKey;
+
   /// Serializes this entry for the cache index and provider channel payloads.
   Map<String, dynamic> toJson() => {
         'path': path,
@@ -414,6 +420,7 @@ class RemoteEntry {
         if (modifiedAt != null) 'modifiedAt': modifiedAt!.millisecondsSinceEpoch,
         if (etag != null) 'etag': etag,
         if (artworkUri != null) 'artworkUri': artworkUri,
+        if (artworkCacheKey != null) 'artworkCacheKey': artworkCacheKey,
       };
 
   /// Sorts folders before files, then by name ignoring case.

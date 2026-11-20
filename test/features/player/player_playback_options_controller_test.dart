@@ -22,6 +22,8 @@ import 'player_test_support.dart';
 class _MockAudioHandler extends Mock implements PulsrAudioHandler {
   _MockAudioHandler() {
     stubPlaybackRateHandler(this);
+    when(() => usbHardwareVolumeOwned).thenReturn(false);
+    when(() => usbHardwareMute).thenReturn(null);
   }
 }
 

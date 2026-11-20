@@ -196,17 +196,17 @@ class UsbExclusivePlugin(
             val device = owner.openedDevice ?: return false
             if (owner.usbManager?.hasPermission(device) != true) return false
             if (!owner.streaming) return false
+            val writable =
+                owner.parsedResult?.volumeUnit?.controlChannels?.isNotEmpty() == true
+            if (!writable) return false
+            // `ready` (ranges + current value readable) is enough for key
+            // ownership: the first key step applies and verifies the level.
+            // Requiring `applied` here made keys dead on every UAC2 DAC until
+            // some other path happened to set the volume.
             val hwVol = owner.hardwareVolume
-            if (hwVol != null) {
-                val writable = owner.parsedResult?.volumeUnit?.controlChannels?.isNotEmpty() == true
-                return writable && hwVol.applied
-            }
+            if (hwVol?.ready == true) return true
             val uac2Range = owner.uac2RangeSnapshot
-            if (uac2Range != null) {
-                val writable = owner.parsedResult?.volumeUnit?.controlChannels?.isNotEmpty() == true
-                return writable && uac2Range.channels.isNotEmpty()
-            }
-            return false
+            return uac2Range != null && uac2Range.channels.isNotEmpty()
         }
 
         internal fun stepHardwareVolume(stepUp: Boolean) {
@@ -267,6 +267,7 @@ class UsbExclusivePlugin(
 
     /** UAC2 GET_MIN/GET_MAX/GET_RES, read once per device. */
     private var uac2RangeSnapshot: Uac2RangeSnapshot? = null
+    private var uac2MuteCache: Boolean? = null
     private var uac2RangeDeviceId: Int = -1
 
     private var nativeLoaded = false
@@ -1531,6 +1532,8 @@ class UsbExclusivePlugin(
             "hardwareVolumeApplied" to (hardwareVolume?.applied == true),
             "minVolumeDb" to hardwareVolume?.minDb,
             "maxVolumeDb" to hardwareVolume?.maxDb,
+            "hasMuteControl" to parsed.hasMuteControl,
+            "hardwareMute" to uac2MuteCache,
             "interfaceNumber" to parsed.streamingInterface,
             "supportedRates" to rates,
             "lastError" to safeGetLastError(),
@@ -1598,6 +1601,8 @@ class UsbExclusivePlugin(
         "streamingChannels" to 0,
         "hardwareVolumeDb" to null,
         "hardwareVolumeApplied" to false,
+        "hasMuteControl" to false,
+        "hardwareMute" to null,
         "minVolumeDb" to null,
         "maxVolumeDb" to null,
         "interfaceNumber" to null,
@@ -1859,6 +1864,7 @@ class UsbExclusivePlugin(
 
     private fun clearUac2RangeCache() {
         uac2RangeSnapshot = null
+        uac2MuteCache = null
         uac2RangeDeviceId = -1
     }
 
@@ -1954,7 +1960,9 @@ class UsbExclusivePlugin(
             return null
         }
         val count = le16(header)
-        if (count !in 1..64) return null
+        // Bound only by the control-transfer payload, not an arbitrary small
+        // count: a DAC with several rate-dependent subranges is still valid.
+        if (count !in 1..1024) return null
         val data = ByteArray(2 + count * 6)
         if (uac2Transfer(conn, 0xA1, UAC_GET_RANGE, unit.unitId, interfaceNumber, channel, data) != data.size) {
             return null
@@ -2059,9 +2067,18 @@ class UsbExclusivePlugin(
             val conn = ensureConnection(device) ?: return null
             val parsed = parsedResult ?: return null
             val range = ensureUac2Range(conn, device, parsed) ?: return null
-            val channel = range.channels.firstOrNull() ?: return null
-            val q8 = uac2ReadQ8(conn, UAC_GET_CUR, range.unitId, range.interfaceNumber, channel)
-                ?: return null
+            if (range.channels.isEmpty()) return null
+            // Read every channel the Feature Unit exposes, not just the first:
+            // a per-channel DAC must not report channel 1 while channel 2 sits
+            // somewhere else. The loudest channel is the position shown.
+            var loudest = Int.MIN_VALUE
+            for (channel in range.channels) {
+                val read = uac2ReadQ8(
+                    conn, UAC_GET_CUR, range.unitId, range.interfaceNumber, channel,
+                ) ?: return null
+                if (read > loudest) loudest = read
+            }
+            val q8 = loudest
             mapOf(
                 "q8" to q8,
                 "db" to q8 / 256.0,
@@ -2083,6 +2100,17 @@ class UsbExclusivePlugin(
             val parsed = parsedResult ?: return false
             val range = ensureUac2Range(conn, device, parsed) ?: return false
             val target = uac2PositionToQ8(position, range)
+            // Use the same verified state owner as the dB path. Writing the
+            // parallel Q8 path directly left `hardwareVolume.applied` stale,
+            // so the handler restored software gain on top of the DAC
+            // attenuator (double attenuation) and key ownership stayed off.
+            val volume = hardwareVolume
+            if (volume != null) {
+                val ok = volume.setDb(target / 256.0)
+                buildStatus()
+                emitState()
+                if (ok && volume.applied) return true
+            }
             val payload = byteArrayOf(
                 (target and 0xFF).toByte(),
                 ((target shr 8) and 0xFF).toByte(),
@@ -2101,6 +2129,8 @@ class UsbExclusivePlugin(
                 )
                 if (readBack == null || (readBack - target) !in -1..1) return false
             }
+            buildStatus()
+            emitState()
             true
         } catch (_: Throwable) {
             false
@@ -2109,21 +2139,11 @@ class UsbExclusivePlugin(
 
     private fun getUac2HardwareMuteInternal(): Boolean? {
         return try {
-            val device = openedDevice ?: findAudioDevice() ?: return null
-            if (usbManager?.hasPermission(device) != true) return null
-            val conn = ensureConnection(device) ?: return null
-            val parsed = parsedResult ?: return null
-            val range = ensureUac2Range(conn, device, parsed) ?: return null
-            val channels = range.channels
-            if (channels.isEmpty()) return null
-            val req = UAC_GET_CUR
-            for (channel in channels) {
-                val data = ByteArray(1)
-                val ret = uac2TransferWithCs(conn, 0xA1, req, UAC_CS_MUTE, range.unitId, range.interfaceNumber, channel, data)
-                if (ret != 1) return null
-                if (data[0].toInt() == 0) return false
-            }
-            true
+            val volume = hardwareVolume
+            if (volume == null || !volume.hasMute) return null
+            val muted = volume.getMute()
+            uac2MuteCache = muted
+            muted
         } catch (_: Throwable) {
             null
         }
@@ -2131,31 +2151,15 @@ class UsbExclusivePlugin(
 
     private fun setUac2HardwareMuteInternal(muted: Boolean): Boolean {
         return try {
-            val device = openedDevice ?: findAudioDevice() ?: return false
-            if (usbManager?.hasPermission(device) != true) return false
-            val conn = ensureConnection(device) ?: return false
-            val parsed = parsedResult ?: return false
-            val range = ensureUac2Range(conn, device, parsed) ?: return false
-            val channels = range.channels
-            if (channels.isEmpty()) return false
-            val payload = byteArrayOf(if (muted) 1.toByte() else 0.toByte())
-            for (channel in channels) {
-                val sent = uac2TransferWithCs(
-                    conn, 0x21, UAC_SET_CUR, UAC_CS_MUTE, range.unitId, range.interfaceNumber, channel, payload,
-                )
-                if (sent != payload.size) return false
+            val volume = hardwareVolume
+            if (volume == null || !volume.hasMute) return false
+            val ok = volume.setMute(muted)
+            if (ok) {
+                uac2MuteCache = muted
+                buildStatus()
+                emitState()
             }
-            val getReq = UAC_GET_CUR
-            val expected = if (muted) 1 else 0
-            for (channel in channels) {
-                val data = ByteArray(1)
-                val ret = uac2TransferWithCs(
-                    conn, 0xA1, getReq, UAC_CS_MUTE, range.unitId, range.interfaceNumber, channel, data,
-                )
-                if (ret != 1) return false
-                if ((data[0].toInt() and 0xFF) != expected) return false
-            }
-            true
+            ok
         } catch (_: Throwable) {
             false
         }
@@ -2166,14 +2170,18 @@ class UsbExclusivePlugin(
             val volume = hardwareVolume
             if (volume != null && volume.ready) {
                 val cur = volume.currentDb ?: 0.0
-                val delta = if (stepUp) 1.0 else -1.0
+                val delta = if (stepUp) volume.stepDb else -volume.stepDb
+                // applyHardwareVolumeDb builds and emits status, so the Dart
+                // handler can move the app slider with the DAC's own keys.
                 applyHardwareVolumeDb(cur + delta)
                 return
             }
             val volMap = getUac2HardwareVolumeInternal()
             val curPos = (volMap?.get("position") as? Number)?.toDouble() ?: 0.5
-            val delta = if (stepUp) 0.02 else -0.02
-            setUac2HardwareVolumeInternal((curPos + delta).coerceIn(0.0, 1.0))
+            val step = 0.02
+            setUac2HardwareVolumeInternal(
+                (curPos + if (stepUp) step else -step).coerceIn(0.0, 1.0),
+            )
         } catch (_: Throwable) {}
     }
 

@@ -92,6 +92,8 @@ void main() {
     group('1.4 PlaybackVolumeMute FIFO & Concurrency', () {
       test('routes concurrent operations through FIFO and updates state', () async {
         final handler = MockAudioHandler();
+        when(() => handler.usbHardwareVolumeOwned).thenReturn(false);
+        when(() => handler.usbHardwareMute).thenReturn(null);
         var currentVol = 1.0;
         when(() => handler.volume).thenAnswer((_) => currentVol);
         final volumeCalls = <double>[];
@@ -126,6 +128,8 @@ void main() {
 
       test('toggleMute emits error on failure', () async {
         final handler = MockAudioHandler();
+        when(() => handler.usbHardwareVolumeOwned).thenReturn(false);
+        when(() => handler.usbHardwareMute).thenReturn(null);
         when(() => handler.volume).thenAnswer((_) => 0.7);
         when(() => handler.setVolume(any())).thenThrow(Exception('Native mute error'));
 

@@ -411,10 +411,21 @@ struct DacVoicingParamSet {
 };
 
 // HRTF / SOFA Binaural Virtualization
+// Defined in HrtfBinaural.h; shared through the snapshot so every render engine
+// can prepare its own resampled quad from the same immutable dataset.
+namespace pulsr {
+struct SofaDataset;
+}
+
 struct HrtfBinauralParamSet {
     bool enabled = false;
     double azimuthDeg = 30.0;
     double elevationDeg = 0.0;
+    // Parsed SOFA dataset (immutable after parse). Loading publishes a new
+    // pointer through the param snapshot instead of mutating state the render
+    // thread reads; each engine's HrtfBinaural prepares its quad on the control
+    // thread when it applies the snapshot.
+    std::shared_ptr<const pulsr::SofaDataset> dataset;
 };
 
 // Remaster: Reconstruction Filter & Output Oversampling (2x/4x/8x)

@@ -22,6 +22,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "AudioDspEngine.h"
 #include "HighQualityResampler.h"
@@ -124,7 +125,8 @@ void configureEngine(AudioDspEngine& engine, double sampleRate, int sinkBits,
         p.crossfeed.enabled = false;
         p.limiter.enabled = false;
         p.reverb.enabled = false;
-        p.panner.enabled = false;
+        p.panner.balance = 0.0;
+        p.panner.monoMix = false;
         p.saturation.enabled = false;
         p.stereoWidth.enabled = false;
         p.loudness.enabled = false;
@@ -231,68 +233,68 @@ int main(int argc, char** argv) {
 
     // 1. 16-bit THD+N (1 kHz @ -3 dBFS), dither off vs on
     {
-        AudioDspEngine engine;
+        auto engine = std::make_unique<AudioDspEngine>();
         auto bufOff = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus3dB, ampMinus3dB);
-        configureEngine(engine, kSampleRate, 16, false, false, 16);
-        runEngineBlocks(engine, bufOff, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 16, false, false, 16);
+        runEngineBlocks(*engine, bufOff, kTotalFrames);
         writePcmWav(outDir / "thd_16bit_dither_off.wav", bufOff, kSampleRate, kChannels, 16, false);
 
         auto bufOn = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus3dB, ampMinus3dB);
-        configureEngine(engine, kSampleRate, 16, false, true, 16);
-        runEngineBlocks(engine, bufOn, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 16, false, true, 16);
+        runEngineBlocks(*engine, bufOn, kTotalFrames);
         // Engine STAGE_DITHER already applied dither; useSinkQuantizerDither=false prevents double dither (§8.7).
         writePcmWav(outDir / "thd_16bit_dither_on.wav", bufOn, kSampleRate, kChannels, 16, false);
     }
 
     // 2. 16-bit low-level linearity (-60 dBFS 1 kHz), dither off vs on
     {
-        AudioDspEngine engine;
+        auto engine = std::make_unique<AudioDspEngine>();
         auto bufOff = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus60dB, ampMinus60dB);
-        configureEngine(engine, kSampleRate, 16, false, false, 16);
-        runEngineBlocks(engine, bufOff, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 16, false, false, 16);
+        runEngineBlocks(*engine, bufOff, kTotalFrames);
         writePcmWav(outDir / "quiet_16bit_dither_off.wav", bufOff, kSampleRate, kChannels, 16, false);
 
         auto bufOn = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus60dB, ampMinus60dB);
-        configureEngine(engine, kSampleRate, 16, false, true, 16);
-        runEngineBlocks(engine, bufOn, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 16, false, true, 16);
+        runEngineBlocks(*engine, bufOn, kTotalFrames);
         writePcmWav(outDir / "quiet_16bit_dither_on.wav", bufOn, kSampleRate, kChannels, 16, false);
     }
 
     // 3. 24-bit THD+N (1 kHz @ -3 dBFS), dither off vs on
     {
-        AudioDspEngine engine;
+        auto engine = std::make_unique<AudioDspEngine>();
         auto bufOff = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus3dB, ampMinus3dB);
-        configureEngine(engine, kSampleRate, 24, false, false, 24);
-        runEngineBlocks(engine, bufOff, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 24, false, false, 24);
+        runEngineBlocks(*engine, bufOff, kTotalFrames);
         writePcmWav(outDir / "thd_24bit_dither_off.wav", bufOff, kSampleRate, kChannels, 24, false);
 
         auto bufOn = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus3dB, ampMinus3dB);
-        configureEngine(engine, kSampleRate, 24, false, true, 24);
-        runEngineBlocks(engine, bufOn, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 24, false, true, 24);
+        runEngineBlocks(*engine, bufOn, kTotalFrames);
         writePcmWav(outDir / "thd_24bit_dither_on.wav", bufOn, kSampleRate, kChannels, 24, false);
     }
 
     // 4. Noise floor (digital zero) at 16-bit and 24-bit, dither off vs on
     {
-        AudioDspEngine engine;
+        auto engine = std::make_unique<AudioDspEngine>();
         std::vector<float> z16Off(static_cast<size_t>(kTotalFrames) * kChannels, 0.0f);
-        configureEngine(engine, kSampleRate, 16, false, false, 16);
-        runEngineBlocks(engine, z16Off, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 16, false, false, 16);
+        runEngineBlocks(*engine, z16Off, kTotalFrames);
         writePcmWav(outDir / "noise_floor_16bit_dither_off.wav", z16Off, kSampleRate, kChannels, 16, false);
 
         std::vector<float> z16On(static_cast<size_t>(kTotalFrames) * kChannels, 0.0f);
-        configureEngine(engine, kSampleRate, 16, false, true, 16);
-        runEngineBlocks(engine, z16On, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 16, false, true, 16);
+        runEngineBlocks(*engine, z16On, kTotalFrames);
         writePcmWav(outDir / "noise_floor_16bit_dither_on.wav", z16On, kSampleRate, kChannels, 16, false);
 
         std::vector<float> z24Off(static_cast<size_t>(kTotalFrames) * kChannels, 0.0f);
-        configureEngine(engine, kSampleRate, 24, false, false, 24);
-        runEngineBlocks(engine, z24Off, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 24, false, false, 24);
+        runEngineBlocks(*engine, z24Off, kTotalFrames);
         writePcmWav(outDir / "noise_floor_24bit_dither_off.wav", z24Off, kSampleRate, kChannels, 24, false);
 
         std::vector<float> z24On(static_cast<size_t>(kTotalFrames) * kChannels, 0.0f);
-        configureEngine(engine, kSampleRate, 24, false, true, 24);
-        runEngineBlocks(engine, z24On, kTotalFrames);
+        configureEngine(*engine, kSampleRate, 24, false, true, 24);
+        runEngineBlocks(*engine, z24On, kTotalFrames);
         writePcmWav(outDir / "noise_floor_24bit_dither_on.wav", z24On, kSampleRate, kChannels, 24, false);
     }
 
@@ -301,25 +303,25 @@ int main(int argc, char** argv) {
     std::string custodyInHash;
     std::string custodyOutHash;
     {
-        AudioDspEngine engine;
-        configureEngine(engine, kSampleRate, 24, true, false, 24);
+        auto engine = std::make_unique<AudioDspEngine>();
+        configureEngine(*engine, kSampleRate, 24, true, false, 24);
 
         auto imdBuf = makeSmpteImd(kTotalFrames, kSampleRate);
-        runEngineBlocks(engine, imdBuf, kTotalFrames);
+        runEngineBlocks(*engine, imdBuf, kTotalFrames);
         writePcmWav(outDir / "imd_smpte_24bit.wav", imdBuf, kSampleRate, kChannels, 24, false);
 
         auto ccifBuf = makeCcifImd(kTotalFrames, kSampleRate);
-        runEngineBlocks(engine, ccifBuf, kTotalFrames);
+        runEngineBlocks(*engine, ccifBuf, kTotalFrames);
         writePcmWav(outDir / "imd_ccif_24bit.wav", ccifBuf, kSampleRate, kChannels, 24, false);
 
         // CustodyVerifier proof over bit-perfect bypass window.
-        engine.custody().arm(4096, kSampleRate, true, false);
+        engine->custody().arm(4096, kSampleRate, true, false);
         auto xtalkBuf = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus1dB, 0.0);
-        runEngineBlocks(engine, xtalkBuf, kTotalFrames);
+        runEngineBlocks(*engine, xtalkBuf, kTotalFrames);
         writePcmWav(outDir / "crosstalk_1khz_l_only.wav", xtalkBuf, kSampleRate, kChannels, 24, false);
 
         CustodyVerifier::Window win{};
-        if (engine.custody().take(win) && win.frames > 0 && win.input != nullptr && win.output != nullptr) {
+        if (engine->custody().take(win) && win.frames > 0 && win.input != nullptr && win.output != nullptr) {
             const size_t n = static_cast<size_t>(win.frames) * CustodyVerifier::kChannels;
             const uint64_t inH = fnv1a64(win.input, n);
             const uint64_t outH = fnv1a64(win.output, n);
@@ -329,7 +331,7 @@ int main(int argc, char** argv) {
         }
 
         auto jitterBuf = makeStereoSine(kTotalFrames, kSampleRate, 12000.0, ampMinus3dB, ampMinus3dB);
-        runEngineBlocks(engine, jitterBuf, kTotalFrames);
+        runEngineBlocks(*engine, jitterBuf, kTotalFrames);
         writePcmWav(outDir / "jitter_12khz_24bit.wav", jitterBuf, kSampleRate, kChannels, 24, false);
     }
 

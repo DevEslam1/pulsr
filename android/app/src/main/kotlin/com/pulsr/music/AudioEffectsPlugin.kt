@@ -7,6 +7,7 @@ import android.content.IntentFilter
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.media.MediaCodecList
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
 import android.media.audiofx.DynamicsProcessing
@@ -149,6 +150,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var hrtfAzimuth = 30.0
     @Volatile private var hrtfElevation = 0.0
     @Volatile private var hrtfSofaPath: String? = null
+    // Reason for the most recent failed loadHrtfSofa. Exposed through
+    // getHrtfSofaLoadError so Dart can surface *why* the dataset was rejected
+    // without changing the loadHrtfSofa bool contract.
+    @Volatile private var hrtfSofaLastError: String? = null
 
     @Volatile private var isLimiterEnabled = false
     @Volatile private var limiterLookaheadMs = 3.0
@@ -640,6 +645,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeGetTapSrcQuality(): Int
     private external fun nativeSetOversampleMultiplier(multiplier: Int)
     private external fun nativeGetOversampleMultiplier(): Int
+    private external fun nativeGetActiveOversampleMultiplier(): Int
     private external fun nativeSetOversampleKernel(kernel: Int)
     private external fun nativeGetOversampleKernel(): Int
     private external fun nativeSetPcmToDsdEnabled(enabled: Boolean)
@@ -658,6 +664,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetHrtfAzimuth(azimuth: Double)
     private external fun nativeSetHrtfElevation(elevation: Double)
     private external fun nativeLoadHrtfSofa(path: String): Boolean
+    private external fun nativeClearHrtfSofa(): Boolean
     private external fun nativeLoadHrtfIr(
         ll: FloatArray, lr: FloatArray, rl: FloatArray, rr: FloatArray,
         taps: Int, sampleRate: Double
@@ -1051,12 +1058,45 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             StagePowerSpec(STAGE_MULTIBAND_COMPRESSOR, "multiband", "4-Band Multiband Compressor", 11.5, true),
             StagePowerSpec(STAGE_DYNAMIC_BASS, "dynamicBass", "Dynamic Bass", 6.5, false),
             StagePowerSpec(STAGE_VIPER_DDC, "viperDdc", "ViPER-DDC Correction", 5.0, false),
-            StagePowerSpec(STAGE_ARBITRARY_EQ, "arbitraryEq", "Arbitrary FIR EQ (1024-tap)", 14.0, true),
+            StagePowerSpec(STAGE_ARBITRARY_EQ, "arbitraryEq", "Arbitrary FIR EQ (4096-tap)", 14.0, true),
             StagePowerSpec(STAGE_LIVE_PROG, "liveProg", "LiveProg EEL VM", 15.0, true),
             StagePowerSpec(STAGE_HEADPHONE_SAFETY, "headphoneSafety", "Headphone Safety Limiter", 3.5, false),
             StagePowerSpec(STAGE_CHANNEL_MANAGER, "channelManager", "Channel Manager (${channelManagerChannelCount}ch)", chMgrWeight, false),
             StagePowerSpec(STAGE_DAC_VOICING, "dacVoicing", "DAC Voicing (4x OS)", 16.0, true),
+            // Remaster runs outside the stage bitmask; the drain estimator
+            // selects it by feature state instead of bit membership.
+            StagePowerSpec(0, "remaster", "Output Oversampling (Remaster)", 6.0, true),
+            StagePowerSpec(STAGE_HRTF, "hrtf", "HRTF Binaural Convolution", 9.0, true),
         )
+    }
+
+    private fun activeRemasterFactor(): Int {
+        if (!isNativeDspLoaded) return 1
+        return try {
+            nativeGetActiveOversampleMultiplier()
+        } catch (_: Exception) {
+            1
+        }
+    }
+
+    /** Single source of truth for "is the DSP chain audible right now?". */
+    private fun computeDspActive(): Boolean {
+        if (!isNativeDspLoaded || isBitPerfectBypassActive || isBypassCompareActive) {
+            return false
+        }
+        if (Integer.bitCount(activeDspStages) > 0) return true
+        return activeRemasterFactor() > 1 || isHrtfBinauralEnabled
+    }
+
+    /**
+     * Mirrors [computeDspActive] into the just_audio sink interlock. Must run
+     * on every transition that can change it, including engine release: the
+     * sink trusts this flag to choose the low-power integer PCM route.
+     */
+    private fun syncDspActiveRouting() {
+        try {
+            com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(computeDspActive())
+        } catch (_: Throwable) {}
     }
 
     private fun getDspBatteryDrainEstimate(): Map<String, Any?> {
@@ -1066,10 +1106,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         val stages = activeDspStages
         val activeCount = Integer.bitCount(stages)
-        val dspActive = isNativeDspLoaded && activeCount > 0 && !isBitPerfectBypassActive && !isBypassCompareActive
-        try {
-            com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(dspActive)
-        } catch (_: Throwable) {}
+        val dspActive = computeDspActive()
+        syncDspActiveRouting()
+        val remasterFactor = activeRemasterFactor()
 
         val lowPowerBypass = if (isNativeDspLoaded) {
             try { nativeIsLowPowerBypassed() } catch (_: Exception) { false }
@@ -1083,7 +1122,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         var dspDeltaMahPerHr = 0.0
 
         if (dspActive) {
-            val activeSpecs = stagePowerSpecs().filter { (stages and it.bit) != 0 }
+            val activeSpecs = stagePowerSpecs().filter { spec ->
+                when (spec.stageId) {
+                    "remaster" -> remasterFactor > 1
+                    "hrtf" -> isHrtfBinauralEnabled
+                    else -> (stages and spec.bit) != 0
+                }
+            }
             val baseSum = activeSpecs.sumOf { it.baseMahPerHr }
             val rtfLoadDelta = rtf.coerceAtLeast(0.0) * 25.0
             if (baseSum > 0.0) {
@@ -1122,6 +1167,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "lowPowerBypassActive" to lowPowerBypass,
             "activeStageCount" to activeCount,
             "activeStagesCount" to activeCount,
+            "effectiveStageCount" to if (dspActive) {
+                stagePowerSpecs().count { spec ->
+                    when (spec.stageId) {
+                        "remaster" -> remasterFactor > 1
+                        "hrtf" -> isHrtfBinauralEnabled
+                        else -> (stages and spec.bit) != 0
+                    }
+                }
+            } else 0,
+            "remasterFactor" to remasterFactor,
+            "hrtfActive" to isHrtfBinauralEnabled,
             "rollingRtf" to rtf,
             "baselineMahPerHour" to baselineMahPerHr,
             "estimatedMahPerHour" to ((totalDrainMahPerHr * 100.0).toInt() / 100.0),
@@ -1159,6 +1215,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if ((stages and STAGE_CHANNEL_MANAGER) != 0) activeStagesList.add("CHANNEL_MANAGER")
         if ((stages and STAGE_DAC_VOICING) != 0) activeStagesList.add("DAC_VOICING")
         if ((stages and STAGE_LFE_CROSSOVER) != 0) activeStagesList.add("LFE_CROSSOVER")
+        if ((stages and STAGE_HRTF) != 0) activeStagesList.add("HRTF")
 
         val rtf = if (isNativeDspLoaded) {
             try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
@@ -1299,6 +1356,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     try { nativeSetSincResamplerEnabled(false) } catch (_: Exception) {}
                     try { nativeSetBitPerfectParams(true, isDopActive) } catch (_: Exception) {}
                 }
+                syncDspActiveRouting()
                 return
             }
         var mask = 0
@@ -1341,6 +1399,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isHeadphoneSafetyEnabled) mask = mask or STAGE_HEADPHONE_SAFETY
         if (isChannelManagerEnabled) mask = mask or STAGE_CHANNEL_MANAGER
         if (isDacVoicingEnabled) mask = mask or STAGE_DAC_VOICING
+        // HRTF is a real stage bit: omitting it makes the native convolver
+        // bypass (bit-perfect/low-power semantics unchanged).
+        if (isHrtfBinauralEnabled) mask = mask or STAGE_HRTF
         // Dither is a standalone stage: it must run even with every other
         // effect off, so it is gated by its own bit rather than by chain gain.
         if (isDitherEnabled) mask = mask or STAGE_DITHER
@@ -1368,6 +1429,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 } catch (_: Exception) {}
             }
         }
+        syncDspActiveRouting()
     }
 }
 
@@ -1416,6 +1478,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_DAC_VOICING = 1 shl 19
         // Multichannel LFE bass management crossover (must mirror DspStageMask in AudioDspEngine.h)
         const val STAGE_LFE_CROSSOVER = 1 shl 20
+        // HRTF / SOFA binaural virtualization (must mirror DspStageMask in AudioDspEngine.h)
+        const val STAGE_HRTF = 1 shl 21
 
         /**
          * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
@@ -2213,6 +2277,29 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         context = null
     }
 
+    private fun platformHasDecoder(mime: String, sampleRate: Int): Boolean {
+        return try {
+            val infos = MediaCodecList(MediaCodecList.ALL_CODECS).codecInfos
+            infos.any { info ->
+                if (info.isEncoder || info.supportedTypes.none { it.equals(mime, ignoreCase = true) }) {
+                    return@any false
+                }
+                if (sampleRate <= 0) return@any true
+                try {
+                    val audio = info.getCapabilitiesForType(mime).audioCapabilities
+                    audio?.isSampleRateSupported(sampleRate) == true
+                } catch (e: Exception) {
+                    // A codec that advertises the MIME but refuses its own
+                    // capabilities cannot be promised for this track.
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "MediaCodec probe failed for $mime: ${e.message}")
+            false
+        }
+    }
+
     private fun releaseNativeDsp() {
         if (!isNativeDspLoaded) return
         persistWeeklyDose()
@@ -2251,6 +2338,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         safeCall(TAG, "nativeSetBitPerfectParams") { nativeSetBitPerfectParams(false, false) }
         safeCall(TAG, "nativeSetActiveStages") { nativeSetActiveStages(0) }
         safeCall(TAG, "nativeReset") { nativeReset() }
+        isHrtfBinauralEnabled = false
+        try {
+            com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(false)
+        } catch (_: Throwable) {}
     }
 
     private fun clearAllNativeDedupeCaches() {
@@ -2969,7 +3060,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setReverbCrossChannel", "loadImpulseResponse", "setCacheBudgetBytes",
                 "getAutoDegradedStages", "setStereoBalance", "setMonoMix",
                 "setSincResamplerEnabled", "setTapSrcQuality", "getTapSrcQuality",
+                "probeAudioDecoder",
                 "setOversampleMultiplier", "getOversampleMultiplier",
+                "getActiveOversampleMultiplier",
                 "setOversampleKernel", "getOversampleKernel",
                 "setPcmToDsdEnabled", "isPcmToDsdEnabled",
                 "setPcmToDsdRate", "getPcmToDsdRate",
@@ -3413,15 +3506,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 // HRTF / SOFA Binaural
                 "setHrtfBinauralEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
-                    isHrtfBinauralEnabled = enabled
-                    if (isNativeDspLoaded) {
-                        try {
-                            pushNativeHrtfBinauralEnabled(enabled)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeSetHrtfBinauralEnabled failed: ${e.message}")
-                        }
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
                     }
-                    result.success(true)
+                    try {
+                        pushNativeHrtfBinauralEnabled(enabled)
+                        isHrtfBinauralEnabled = enabled
+                        // STAGE_HRTF is a real mask bit now: rebuild the mask so
+                        // the native engine gates the convolver in/out with it.
+                        recalculateActiveStages()
+                        syncDspActiveRouting()
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetHrtfBinauralEnabled failed: ${e.message}")
+                        result.error("NATIVE_ERROR", e.message, null)
+                    }
                 }
 
                 "setHrtfAzimuth" -> {
@@ -3452,20 +3552,42 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "loadHrtfSofa" -> {
                     val path = call.argument<String>("path")
-                    if (path.isNullOrEmpty()) {
-                        result.error("invalid_argument", "Path cannot be null or empty", null)
+                    if (path == null) {
+                        hrtfSofaLastError = "Path cannot be null"
+                        result.error("invalid_argument", "Path cannot be null", null)
                         return
                     }
-                    hrtfSofaPath = path
-                    val ok = if (isNativeDspLoaded) {
+                    // Empty path = clear the custom dataset and return to the
+                    // synthesized default (used by the card's reset action).
+                    val clearing = path.isEmpty()
+                    var failReason: String? = null
+                    val ok = if (!isNativeDspLoaded) {
+                        failReason = "native audio engine is not loaded"
+                        false
+                    } else {
                         try {
-                            nativeLoadHrtfSofa(path)
+                            if (clearing) nativeClearHrtfSofa() else nativeLoadHrtfSofa(path)
                         } catch (e: Exception) {
-                            Log.w(TAG, "nativeLoadHrtfSofa failed: ${e.message}")
+                            Log.w(TAG, "loadHrtfSofa failed: ${e.message}")
+                            failReason = e.message ?: e.javaClass.simpleName
                             false
                         }
-                    } else false
+                    }
+                    hrtfSofaLastError = if (ok) null else {
+                        failReason ?: if (clearing) {
+                            "Failed to clear the HRTF dataset"
+                        } else {
+                            "Failed to parse the SOFA/HRIR dataset"
+                        }
+                    }
+                    if (ok) {
+                        hrtfSofaPath = if (clearing) null else path
+                    }
                     result.success(ok)
+                }
+
+                "getHrtfSofaLoadError" -> {
+                    result.success(hrtfSofaLastError)
                 }
 
                 "loadHrtfIr" -> {
@@ -3884,6 +4006,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetBypassCompare failed: ${e.message}")
                         }
                     }
+                    syncDspActiveRouting()
                     result.success(true)
                 }
 
@@ -3901,12 +4024,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     if (isNativeDspLoaded) {
                         try { nativeSetLowPowerEnabled(enabled) } catch (_: Exception) {}
                     }
-                    val stages = activeDspStages
-                    val activeCount = Integer.bitCount(stages)
-                    val dspActive = isNativeDspLoaded && activeCount > 0 && !isBitPerfectBypassActive && !isBypassCompareActive
-                    try {
-                        com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(dspActive)
-                    } catch (_: Throwable) {}
+                    syncDspActiveRouting()
                     result.success(true)
                 }
 
@@ -4170,6 +4288,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     )
                 }
+                "probeAudioDecoder" -> {
+                    val mime = call.argument<String>("mime")?.trim()?.lowercase()
+                    val sampleRate = call.argument<Int>("sampleRate") ?: 0
+                    if (mime.isNullOrEmpty()) {
+                        result.success(false)
+                        return
+                    }
+                    result.success(platformHasDecoder(mime, sampleRate))
+                }
 
                 // Remaster: Output Oversampling & Reconstruction Filter Suite
                 "setOversampleMultiplier" -> {
@@ -4182,6 +4309,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                     try {
                         nativeSetOversampleMultiplier(multiplier)
+                        syncDspActiveRouting()
                         result.success(true)
                     } catch (e: Exception) {
                         Log.w(TAG, "nativeSetOversampleMultiplier failed: ${e.message}")
@@ -4198,6 +4326,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             nativeGetOversampleMultiplier()
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeGetOversampleMultiplier failed: ${e.message}")
+                            1
+                        }
+                    )
+                }
+                "getActiveOversampleMultiplier" -> {
+                    if (!isNativeDspLoaded) {
+                        result.success(1)
+                        return
+                    }
+                    result.success(
+                        try {
+                            nativeGetActiveOversampleMultiplier()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetActiveOversampleMultiplier failed: ${e.message}")
                             1
                         }
                     )

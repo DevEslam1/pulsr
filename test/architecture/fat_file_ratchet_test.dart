@@ -38,7 +38,7 @@ void main() {
       'lib/data/audio/audio_handler.dart': 145000,
       'lib/features/player/cubit/player_cubit.dart': 50000,
       'lib/features/library/presentation/library_screen.dart': 88000,
-      'lib/data/audio/equalizer_manager.dart': 111213,
+      'lib/data/audio/equalizer_manager.dart': 104477,
       'lib/features/settings/cubit/settings_cubit.dart': 82500,
       // Remaining god-files from the 2026-10 gap register. Caps are pinned to
       // the current size so they can only shrink; extract a collaborator and

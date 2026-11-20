@@ -429,3 +429,100 @@ void runRtStagesZeroAllocTest() {
     }
 }
 
+// §8.9: the control-thread HRIR prepare/publish path must be safe to pair with
+// a per-block render apply while the user moves the angle slider or the engine
+// rate changes. The guarded region covers ONLY the render call: updateParams /
+// setAzimuth / setSampleRate legitimately allocate on the control thread, but
+// the render thread must claim the already-prepared slot without allocating.
+void runRtHrtfControlPublishTest() {
+    std::cout << "\n=== [RT 4/4] HRTF control-publish / render-apply (zero RT allocations) ===" << std::endl;
+
+    // 1) Direct HrtfBinaural: control publishes every few blocks, render applies.
+    {
+        pulsr::HrtfBinaural hrtf;
+        hrtf.setSampleRate(48000.0);
+        hrtf.setEnabled(true);
+        hrtf.setAzimuth(30.0);
+        hrtf.setElevation(0.0);
+
+        const int blockSize = 256;
+        std::vector<float> audio(blockSize * 2, 0.1f);
+        hrtf.processInterleaved(audio.data(), blockSize, 2); // warm-up / settle
+
+        uint64_t renderAllocs = 0;
+        for (int i = 0; i < 2000; ++i) {
+            if ((i % 8) == 0) {
+                g_rt_guard_enabled.store(false);
+                hrtf.setAzimuth(-60.0 + static_cast<double>((i / 8) % 13) * 10.0);
+                hrtf.setElevation(static_cast<double>(((i / 8) % 5) - 2) * 15.0);
+                if ((i % 512) == 0) {
+                    hrtf.setSampleRate((i % 1024) == 0 ? 44100.0 : 48000.0);
+                }
+            }
+            std::fill(audio.begin(), audio.end(), 0.1f);
+            g_rt_alloc_count.store(0);
+            g_rt_guard_enabled.store(true);
+            hrtf.processInterleaved(audio.data(), blockSize, 2);
+            g_rt_guard_enabled.store(false);
+            renderAllocs += g_rt_alloc_count.load();
+        }
+        assert(renderAllocs == 0);
+        for (float v : audio) {
+            assert(std::isfinite(v));
+        }
+        std::cout << "  ✓ HrtfBinaural apply/process after live angle+rate publishes: "
+                  << renderAllocs << " RT allocations." << std::endl;
+    }
+
+    // 2) Through the engine: updateParams publishes the new geometry, the next
+    //    processInterleaved() block claims it. Exactly the production path.
+    {
+        auto& engine = AudioDspEngine::instance();
+        engine.setSampleRate(48000.0);
+        engine.setActiveStages(0xFFFFFFFF);
+        // updateParams (not publishParams) so a generation left high by an
+        // earlier suite cannot filter this snapshot out.
+        engine.updateParams([](DspParamSnapshot& s) {
+            s.activeStages = 0xFFFFFFFF;
+            s.hrtf.enabled = true;
+            s.hrtf.azimuthDeg = 30.0;
+            s.hrtf.elevationDeg = 0.0;
+        });
+
+        const int blockSize = 256;
+        std::vector<float> audio(blockSize * 2, 0.05f);
+        engine.processInterleaved(audio.data(), blockSize, 2); // warm-up
+
+        uint64_t renderAllocs = 0;
+        for (int i = 0; i < 2000; ++i) {
+            if ((i % 16) == 0) {
+                g_rt_guard_enabled.store(false);
+                const double azimuth =
+                    -45.0 + static_cast<double>((i / 16) % 10) * 10.0;
+                engine.updateParams([azimuth](DspParamSnapshot& s) {
+                    s.hrtf.azimuthDeg = azimuth;
+                });
+            }
+            std::fill(audio.begin(), audio.end(), 0.05f);
+            g_rt_alloc_count.store(0);
+            g_rt_guard_enabled.store(true);
+            engine.processInterleaved(audio.data(), blockSize, 2);
+            g_rt_guard_enabled.store(false);
+            renderAllocs += g_rt_alloc_count.load();
+        }
+        assert(renderAllocs == 0);
+        for (float v : audio) {
+            assert(std::isfinite(v));
+        }
+        std::cout << "  ✓ Engine HRTF stage apply after per-block angle publishes: "
+                  << renderAllocs << " RT allocations." << std::endl;
+
+        // Leave the shared engine in its neutral state for later suites.
+        engine.updateParams([](DspParamSnapshot& s) {
+            s.hrtf.enabled = false;
+            s.hrtf.azimuthDeg = 30.0;
+            s.hrtf.elevationDeg = 0.0;
+        });
+    }
+}
+

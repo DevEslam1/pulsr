@@ -164,9 +164,30 @@ class _UsbDacSectionState extends State<UsbDacSection> {
       return;
     }
     final key = (status.deviceId, status.hasVolumeControl);
-    if (key == _uac2Key) return;
-    _uac2Key = key;
-    unawaited(_loadUac2Volume(status));
+    if (key != _uac2Key) {
+      _uac2Key = key;
+      unawaited(_loadUac2Volume(status));
+      return;
+    }
+    // Hardware keys / the front panel move the DAC without touching the app
+    // volume. Mirror the status reading into this slider.
+    final range = _uac2Range;
+    final db = status.hardwareVolumeDb;
+    if (range != null && db != null && _pendingUac2Position == null) {
+      final minDb = range.minQ8 / 256.0;
+      final maxDb = range.maxQ8 / 256.0;
+      if (maxDb > minDb) {
+        final position = ((db - minDb) / (maxDb - minDb)).clamp(0.0, 1.0);
+        if (_uac2Position == null || (_uac2Position! - position).abs() > 0.005) {
+          setState(() => _uac2Position = position);
+        }
+      }
+    }
+    if (status.hasMuteControl &&
+        status.hardwareMute != null &&
+        _uac2Muted != status.hardwareMute) {
+      setState(() => _uac2Muted = status.hardwareMute);
+    }
   }
 
   Future<void> _loadUac2Volume(UsbExclusiveStatus status) async {
@@ -371,13 +392,18 @@ class _UsbDacSectionState extends State<UsbDacSection> {
     final p = context.palette;
     final enabled = widget.state.usbHardwareVolumeEnabled;
     final uac2Range = _uac2Range;
+    final minDb = _status.minVolumeDb;
+    final maxDb = _status.maxVolumeDb;
+    final hasDbRange = minDb != null && maxDb != null;
     // A bridge-reported range proves a working attenuator even when the legacy
-    // status snapshot did not advertise one.
-    final hasHwVolume = _status.hasVolumeControl || uac2Range != null;
-    final minDb = _status.minVolumeDb ?? -60.0;
-    final maxDb = _status.maxVolumeDb ?? 0.0;
-    final currentDb =
-        (_pendingDb ?? _status.hardwareVolumeDb ?? maxDb).clamp(minDb, maxDb);
+    // status snapshot did not advertise one. Without a real range, no slider is
+    // shown: the old -60/0 fallback invented a scale the DAC never claimed.
+    final hasHwVolume =
+        uac2Range != null || (_status.hasVolumeControl && hasDbRange);
+    final currentDb = (minDb != null && maxDb != null)
+        ? (_pendingDb ?? _status.hardwareVolumeDb ?? maxDb)
+            .clamp(minDb, maxDb)
+        : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -401,7 +427,9 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                 AppSpacing.md, AppSpacing.xxs, AppSpacing.md, AppSpacing.xs),
             child: uac2Range != null
                 ? _buildUac2Volume(context)
-                : _buildDbVolume(context, currentDb, minDb, maxDb),
+                : (minDb != null && maxDb != null)
+                    ? _buildDbVolume(context, currentDb, minDb, maxDb)
+                    : const SizedBox.shrink(),
           ),
         SettingsSwitchTile(
           Icons.lock_rounded,
@@ -565,23 +593,28 @@ class _UsbDacSectionState extends State<UsbDacSection> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('${(position * 100).round()} %', style: textTheme.bodySmall),
-                const SizedBox(width: AppSpacing.xs),
-                IconButton(
-                  icon: Icon(
-                    _uac2Muted == true
-                        ? Icons.volume_off_rounded
-                        : Icons.volume_up_rounded,
-                    size: 18,
-                    color: _uac2Muted == true ? Theme.of(context).colorScheme.error : null,
+                if (_status.hasMuteControl) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  IconButton(
+                    icon: Icon(
+                      _uac2Muted == true
+                          ? Icons.volume_off_rounded
+                          : Icons.volume_up_rounded,
+                      size: 18,
+                      color: _uac2Muted == true
+                          ? Theme.of(context).colorScheme.error
+                          : null,
+                    ),
+                    tooltip: _uac2Muted == true ? 'Unmute DAC' : 'Mute DAC',
+                    onPressed: () =>
+                        unawaited(_toggleUac2Mute(!(_uac2Muted == true))),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
                   ),
-                  tooltip: _uac2Muted == true ? 'Unmute DAC' : 'Mute DAC',
-                  onPressed: () => unawaited(_toggleUac2Mute(!(_uac2Muted == true))),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: AppSpacing.minTouchTarget,
-                    minHeight: AppSpacing.minTouchTarget,
-                  ),
-                ),
+                ],
               ],
             ),
           ],

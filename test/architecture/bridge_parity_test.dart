@@ -10,14 +10,26 @@ void main() {
     expect(dartFile.existsSync(), isTrue, reason: 'Dart channel must exist');
     expect(kotlinFile.existsSync(), isTrue, reason: 'Kotlin plugin must exist');
 
-    final dartContent = dartFile.readAsStringSync();
+    // Bridge methods may live in parts of the channel library (extracted for
+    // the fat-file ratchet). Scrape the library and every declared part, not
+    // just the entry file, or extracted methods look like Kotlin-only handlers.
+    final dartContent = StringBuffer(dartFile.readAsStringSync());
+    final partRegex = RegExp(r"part\s+'([^']+)'");
+    for (final match in partRegex.allMatches(dartContent.toString())) {
+      final partPath =
+          File(dartFile.parent.path + Platform.pathSeparator + match.group(1)!);
+      expect(partPath.existsSync(), isTrue,
+          reason: 'declared part ${match.group(1)} must exist');
+      dartContent.writeln(partPath.readAsStringSync());
+    }
+    final dartSource = dartContent.toString();
     final kotlinContent = kotlinFile.readAsStringSync();
 
     // 1. Scrape Dart invoked methods
     final dartMethods = <String>{};
     final invokeSingle = RegExp(
         r"_channel\s*\.\s*(?:invokeMethod|invokeMapMethod|invokeListMethod)(?:<[^>]+>)?\s*\(\s*'([^']+)'");
-    for (final match in invokeSingle.allMatches(dartContent)) {
+    for (final match in invokeSingle.allMatches(dartSource)) {
       final name = match.group(1)!;
       if (name != 'method' && name != 'enabled' && name != 'gains') {
         dartMethods.add(name);
@@ -26,7 +38,7 @@ void main() {
 
     final invokeDouble = RegExp(
         r'_channel\s*\.\s*(?:invokeMethod|invokeMapMethod|invokeListMethod)(?:<[^>]+>)?\s*\(\s*"([^"]+)"');
-    for (final match in invokeDouble.allMatches(dartContent)) {
+    for (final match in invokeDouble.allMatches(dartSource)) {
       final name = match.group(1)!;
       if (name != 'method' && name != 'enabled' && name != 'gains') {
         dartMethods.add(name);
@@ -34,22 +46,22 @@ void main() {
     }
 
     final nativeSetterSingle = RegExp(r"_invokeNativeSetter\s*\(\s*'([^']+)'");
-    for (final match in nativeSetterSingle.allMatches(dartContent)) {
+    for (final match in nativeSetterSingle.allMatches(dartSource)) {
       dartMethods.add(match.group(1)!);
     }
 
     final nativeSetterDouble = RegExp(r'_invokeNativeSetter\s*\(\s*"([^"]+)"');
-    for (final match in nativeSetterDouble.allMatches(dartContent)) {
+    for (final match in nativeSetterDouble.allMatches(dartSource)) {
       dartMethods.add(match.group(1)!);
     }
 
     final grDbSingle = RegExp(r"_(?:readGrDb|readWorstGrDb)\s*\(\s*'([^']+)'");
-    for (final match in grDbSingle.allMatches(dartContent)) {
+    for (final match in grDbSingle.allMatches(dartSource)) {
       dartMethods.add(match.group(1)!);
     }
 
     final grDbDouble = RegExp(r'_(?:readGrDb|readWorstGrDb)\s*\(\s*"([^"]+)"');
-    for (final match in grDbDouble.allMatches(dartContent)) {
+    for (final match in grDbDouble.allMatches(dartSource)) {
       dartMethods.add(match.group(1)!);
     }
 
@@ -112,11 +124,11 @@ void main() {
 
     final dartCallbacks = <String>{};
     final dartCbSingle = RegExp(r"call\.method\s*==\s*'([^']+)'");
-    for (final m in dartCbSingle.allMatches(dartContent)) {
+    for (final m in dartCbSingle.allMatches(dartSource)) {
       dartCallbacks.add(m.group(1)!);
     }
     final dartCbDouble = RegExp(r'call\.method\s*==\s*"([^"]+)"');
-    for (final m in dartCbDouble.allMatches(dartContent)) {
+    for (final m in dartCbDouble.allMatches(dartSource)) {
       dartCallbacks.add(m.group(1)!);
     }
 

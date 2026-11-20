@@ -7,6 +7,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../data/audio/autoeq_parametric_parser.dart';
+import '../../../../data/audio/equalizer_manager.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -59,8 +60,13 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
 
   Future<void> _load() async {
     await _repo.loadProfiles();
+    AutoEqCorrectionMode loadedMode = _correctionMode;
+    if (getIt.isRegistered<EqualizerManager>()) {
+      loadedMode = getIt<EqualizerManager>().autoEqCorrectionMode;
+    }
     if (!mounted) return;
     setState(() {
+      _correctionMode = loadedMode;
       _categories = _repo.getCategories();
       _applyFilter();
       _isLoading = false;

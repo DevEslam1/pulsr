@@ -1293,6 +1293,7 @@ int main() {
     runRtAllocGuardTest();
     runRtPreparedPayloadTest();
     runRtStagesZeroAllocTest();
+    runRtHrtfControlPublishTest();
     runSampleRateChangeTest();
     runSnapshotRaceTest();
     runSyntheticIrCacheBudgetTest();

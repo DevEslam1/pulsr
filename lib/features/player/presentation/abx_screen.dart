@@ -58,6 +58,7 @@ class AbxScreen extends StatefulWidget {
 }
 
 class _AbxScreenState extends State<AbxScreen> {
+  static const double _autoGainMatchDb = -1000.0;
   late final AbxCubit _cubit;
   bool _exporting = false;
 
@@ -74,7 +75,10 @@ class _AbxScreenState extends State<AbxScreen> {
         : null;
     _cubit = AbxCubit(
       switchCondition: (bool bypass) async {
-        await handler?.setBypassCompare(bypass: bypass);
+        await handler?.setBypassCompare(
+          bypass: bypass,
+          gainCompensationDb: _autoGainMatchDb,
+        );
       },
       isReady: () => handler != null && _canRun(player.state),
       trials: widget.trials,
@@ -144,6 +148,7 @@ class _AbxScreenState extends State<AbxScreen> {
       trackArtist: song?.artist,
       sourceSampleRate: song?.sampleRate,
       sourceBitDepth: song?.bitDepth,
+      levelMatch: 'auto_native_loudness',
     );
   }
 

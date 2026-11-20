@@ -189,7 +189,7 @@ void main() {
       expect(selected.dsdRate, 128);
     });
 
-    test('falls back to available tuple if exact rate is missing', () {
+    test('never falls back to a mismatched tuple', () {
       const caps = DsdDacCapabilities(
         dsd64: true,
         dsd128: false,
@@ -199,9 +199,8 @@ void main() {
         nativeDsd: true,
         nativeAltSettings: [tupleFallback],
       );
-      final selected = NativeDsdProducer.selectProbedTuple(caps, 256);
-      expect(selected, isNotNull);
-      expect(selected!.altSetting, 3);
+      // A DSD64 tuple must not play a DSD256 file at one quarter of its rate.
+      expect(NativeDsdProducer.selectProbedTuple(caps, 256), isNull);
     });
   });
 
@@ -439,31 +438,4 @@ void main() {
     });
   });
 
-  group('DsdNativeStreamAudioSource', () {
-    test('satisfies stream audio requests and updates position', () async {
-      final service = FakeUsbExclusiveService();
-      final producer = NativeDsdProducer(service: service);
-      producer.prepare(
-        left: Uint8List.fromList(List.filled(100, 1)),
-        right: Uint8List.fromList(List.filled(100, 2)),
-        dsdRate: 64,
-      );
-
-      final source = DsdNativeStreamAudioSource(
-        producer: producer,
-        duration: const Duration(milliseconds: 500),
-      );
-
-      final response = await source.request(0, 1024);
-      expect(response.sourceLength, greaterThan(0));
-      expect(response.contentLength, 1024);
-      expect(response.contentType, 'audio/wav');
-      final data = await response.stream.first;
-      expect(data.length, 1024);
-      expect(service.writeDsdCallCount, greaterThan(0));
-      expect(producer.state, NativeDsdProducerState.completed);
-
-      await producer.stop();
-    });
-  });
 }

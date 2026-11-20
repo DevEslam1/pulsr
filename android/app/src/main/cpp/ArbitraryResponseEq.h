@@ -11,10 +11,11 @@
 
 class ArbitraryResponseEq {
 public:
-    // 1024 taps / 2048-pt FFT gives ~23 Hz bins for better sub-150 Hz accuracy
-    // than the old 512/1024. FIR_TAPS stays a multiple of 8 for the SIMD stride.
-    static constexpr int FIR_TAPS = 1024;
-    static constexpr int FFT_SIZE = FIR_TAPS * 2; // 2048
+    // 4096 taps / 8192-pt FFT: ~5.9 Hz bins at 48 kHz, enough for AutoEQ's
+    // low-frequency correction (the old 1024 taps gave ~47 Hz bins and lost
+    // several dB at 20 Hz). FIR_TAPS stays a multiple of 8 for the SIMD stride.
+    static constexpr int FIR_TAPS = 4096;
+    static constexpr int FFT_SIZE = FIR_TAPS * 2; // 8192
     static constexpr int MAX_NODES = 1024;
 
     ArbitraryResponseEq();

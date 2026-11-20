@@ -68,6 +68,10 @@ enum DspStageMask {
     STAGE_DAC_VOICING = 1 << 19,
     // Multichannel LFE bass management crossover (3..8 channels).
     STAGE_LFE_CROSSOVER = 1 << 20,
+    // HRTF / SOFA binaural virtualization. Gate it through the active-stage
+    // mask like every other stage so "all stages off" really means the HRTF
+    // convolver is out of the graph (and reports zero latency).
+    STAGE_HRTF = 1 << 21,
 };
 
 enum class DspPerformanceProfile {
@@ -299,6 +303,11 @@ public:
     void setOversampleKernel(int kernel);
     int oversampleKernel() const;
     bool isTapOversamplerEngaged() const { return tapUseOversampler_; }
+    /// Factor actually configured on this engine's tap, 1 when no oversampler
+    /// is engaged. Derived telemetry, safe to read from the control thread.
+    int activeOversampleFactor() const {
+        return activeOversampleFactor_.load(std::memory_order_relaxed);
+    }
 
     // ---- Remaster: Real-Time PCM -> DSD Modulator ----
     void setPcmToDsdEnabled(bool enabled);
@@ -493,6 +502,7 @@ private:
     // Remaster: Output oversampler and reconstruction filters
     pulsr::Oversampler tapOversampler_;
     bool tapUseOversampler_ = false;
+    std::atomic<int> activeOversampleFactor_{1};
     int oversampleMultiplier_ = 1;  // 1 = Off, 2 = 2x, 4 = 4x, 8 = 8x
     int oversampleKernel_ = 0;      // 0 = Sharp, 1 = Slow, 2 = MinimumPhase, 3 = Apodizing
 
@@ -687,6 +697,9 @@ public:
     // Control thread only: takes the registry lock.
     bool wasLastBlockBitPerfect();
     bool wasSafetySuppressed();
+    /// Oversampling factor on the engine that actually renders, or 1 when no
+    /// live engine has an oversampler engaged. Control thread only.
+    int getActiveOversampleFactor();
     double getAppliedSampleRate();
     uint64_t getLastAppliedGeneration();
     void setPerformanceProfile(DspPerformanceProfile profile);

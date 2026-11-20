@@ -83,7 +83,7 @@
   {
     "feature": "UPnP",
     "uiEntry": "DLNA screen",
-    "stateOwner": "UpnpControlPoint/Backend",
+    "stateOwner": "DlnaRendererService/Backend",
     "persistence": "session",
     "backendCall": "SOAP actions",
     "statusSource": "Remote state mirror",

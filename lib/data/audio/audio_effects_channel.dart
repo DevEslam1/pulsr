@@ -12,6 +12,8 @@ import '../../domain/models/dsp_debug_report.dart';
 import '../../domain/models/dsp_telemetry.dart';
 import '../../core/telemetry/dsp_reliability_tracker.dart';
 
+part 'audio_effects_channel_remaster_ext.dart';
+
 class AudioEffectsChannel {
   Future<bool> awaitControlUpdates() async {
     if (!PlatformCapabilities.isAndroid) return true;
@@ -1116,6 +1118,16 @@ class AudioEffectsChannel {
     try {
       final ok = await _channel.invokeMethod<bool>('loadHrtfSofa', {'path': path})
           .timeout(const Duration(seconds: 5));
+      if (ok != true) {
+        // Fetch the native reason once for the caller/log; the bool contract is
+        // unchanged so existing callers keep working.
+        final reason = await getHrtfSofaLoadError();
+        ErrorLogger.log(
+          'Failed to load HRTF SOFA file ($path)'
+          '${reason == null ? '' : ': $reason'}',
+          category: 'AudioEffectsChannel',
+        );
+      }
       return ok == true;
     } catch (e, st) {
       ErrorLogger.log(
@@ -1125,6 +1137,19 @@ class AudioEffectsChannel {
         category: 'AudioEffectsChannel',
       );
       return false;
+    }
+  }
+
+  /// Reason for the most recent rejected HRTF dataset load, or null when the
+  /// last load succeeded (or the platform does not report one).
+  Future<String?> getHrtfSofaLoadError() async {
+    if (!_isAndroid) return null;
+    try {
+      return await _channel
+          .invokeMethod<String>('getHrtfSofaLoadError')
+          .timeout(const Duration(seconds: 2));
+    } catch (_) {
+      return null;
     }
   }
 
@@ -1428,31 +1453,60 @@ class AudioEffectsChannel {
     }
   }
 
-  // --- REMASTER: OUTPUT OVERSAMPLING & RECONSTRUCTION FILTERS ---
-
   int _cachedOversampleMultiplier = 1;
+  int _activeOversampleMultiplier = 1;
   int _cachedOversampleKernel = 0;
   bool _cachedPcmToDsdEnabled = false;
   int _cachedPcmToDsdRate = 64;
   int _cachedPcmToDsdOrder = 5;
 
   int get currentOversampleMultiplier => _cachedOversampleMultiplier;
+
+  /// Factor the native tap actually configured on the active render engine.
+  /// This is derived state: it is 1 while bit-perfect disarms the tap, while a
+  /// DAC refuses the oversampled rate, or before the sink is rebuilt.
+  int get activeOversampleMultiplier => _activeOversampleMultiplier;
   int get currentOversampleKernel => _cachedOversampleKernel;
   bool get isPcmToDsdActive => _cachedPcmToDsdEnabled;
   int get currentPcmToDsdRate => _cachedPcmToDsdRate;
   int get currentPcmToDsdOrder => _cachedPcmToDsdOrder;
 
+  /// Refreshes [activeOversampleMultiplier] from the native engine.
+  Future<int> refreshActiveOversampleMultiplier() async {
+    if (!_isAndroid) {
+      _activeOversampleMultiplier = 1;
+      return 1;
+    }
+    try {
+      final mult = await _channel
+          .invokeMethod<int>('getActiveOversampleMultiplier')
+          .timeout(const Duration(seconds: 2));
+      _activeOversampleMultiplier =
+          (mult == 2 || mult == 4 || mult == 8) ? mult! : 1;
+      return _activeOversampleMultiplier;
+    } catch (e, st) {
+      ErrorLogger.log('getActiveOversampleMultiplier failed',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+      return _activeOversampleMultiplier;
+    }
+  }
+
   /// Remaster oversampling multiplier (1 = off, 2 = 2x, 4 = 4x, 8 = 8x).
+  ///
+  /// The cache is only updated after the native engine acknowledges the
+  /// request. A refused request leaves both the UI and the status on the last
+  /// state the engine actually has.
   Future<bool> setOversampleMultiplier(int multiplier) async {
     final valid = (multiplier == 2 || multiplier == 4 || multiplier == 8)
         ? multiplier
         : 1;
-    _cachedOversampleMultiplier = valid;
     if (!_isAndroid) return false;
     try {
       await _invokeNativeSetter('setOversampleMultiplier', {
         'multiplier': valid,
       });
+      _cachedOversampleMultiplier = valid;
+      if (valid == 1) _activeOversampleMultiplier = 1;
       return true;
     } on PlatformException {
       return false;
@@ -1479,12 +1533,12 @@ class AudioEffectsChannel {
   /// 0 = Sharp, 1 = Slow Roll-off, 2 = MinimumPhase, 3 = Apodizing.
   Future<bool> setOversampleKernel(int kernel) async {
     final valid = kernel.clamp(0, 3);
-    _cachedOversampleKernel = valid;
     if (!_isAndroid) return false;
     try {
       await _invokeNativeSetter('setOversampleKernel', {
         'kernel': valid,
       });
+      _cachedOversampleKernel = valid;
       return true;
     } on PlatformException {
       return false;
@@ -1504,99 +1558,6 @@ class AudioEffectsChannel {
       ErrorLogger.log('getOversampleKernel failed',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return _cachedOversampleKernel;
-    }
-  }
-
-  // --- REMASTER: REAL-TIME PCM -> DSD MODULATOR ---
-
-  Future<bool> setPcmToDsdEnabled(bool enabled) async {
-    _cachedPcmToDsdEnabled = enabled;
-    if (!_isAndroid) return false;
-    try {
-      await _invokeNativeSetter('setPcmToDsdEnabled', {
-        'enabled': enabled,
-      });
-      return true;
-    } on PlatformException {
-      return false;
-    }
-  }
-
-  Future<bool> isPcmToDsdEnabled() async {
-    if (!_isAndroid) return _cachedPcmToDsdEnabled;
-    try {
-      final enabled = await _channel
-          .invokeMethod<bool>('isPcmToDsdEnabled')
-          .timeout(const Duration(seconds: 2));
-      final res = enabled ?? false;
-      _cachedPcmToDsdEnabled = res;
-      return res;
-    } catch (e, st) {
-      ErrorLogger.log('isPcmToDsdEnabled failed',
-          error: e, stackTrace: st, category: 'AudioEffectsChannel');
-      return _cachedPcmToDsdEnabled;
-    }
-  }
-
-  /// DSD multiple: 64 (DSD64), 128 (DSD128), 256 (DSD256).
-  Future<bool> setPcmToDsdRate(int rate) async {
-    final valid = (rate == 128 || rate == 256) ? rate : 64;
-    _cachedPcmToDsdRate = valid;
-    if (!_isAndroid) return false;
-    try {
-      await _invokeNativeSetter('setPcmToDsdRate', {
-        'rate': valid,
-      });
-      return true;
-    } on PlatformException {
-      return false;
-    }
-  }
-
-  Future<int> getPcmToDsdRate() async {
-    if (!_isAndroid) return _cachedPcmToDsdRate;
-    try {
-      final rate = await _channel
-          .invokeMethod<int>('getPcmToDsdRate')
-          .timeout(const Duration(seconds: 2));
-      final res = (rate == 128 || rate == 256) ? rate! : 64;
-      _cachedPcmToDsdRate = res;
-      return res;
-    } catch (e, st) {
-      ErrorLogger.log('getPcmToDsdRate failed',
-          error: e, stackTrace: st, category: 'AudioEffectsChannel');
-      return _cachedPcmToDsdRate;
-    }
-  }
-
-  /// SDM loop order: 1..5.
-  Future<bool> setPcmToDsdOrder(int order) async {
-    final valid = order.clamp(1, 5);
-    _cachedPcmToDsdOrder = valid;
-    if (!_isAndroid) return false;
-    try {
-      await _invokeNativeSetter('setPcmToDsdOrder', {
-        'order': valid,
-      });
-      return true;
-    } on PlatformException {
-      return false;
-    }
-  }
-
-  Future<int> getPcmToDsdOrder() async {
-    if (!_isAndroid) return _cachedPcmToDsdOrder;
-    try {
-      final order = await _channel
-          .invokeMethod<int>('getPcmToDsdOrder')
-          .timeout(const Duration(seconds: 2));
-      final res = order?.clamp(1, 5) ?? 5;
-      _cachedPcmToDsdOrder = res;
-      return res;
-    } catch (e, st) {
-      ErrorLogger.log('getPcmToDsdOrder failed',
-          error: e, stackTrace: st, category: 'AudioEffectsChannel');
-      return _cachedPcmToDsdOrder;
     }
   }
 

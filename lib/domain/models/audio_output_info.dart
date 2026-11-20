@@ -215,6 +215,12 @@ class AudioOutputInfo {
   final int decodedPcmEncoding;
   final int decodedChannelCount;
 
+  /// Channels the sink actually opened on this route (0 when unprobed). This is
+  /// the truth for multichannel gating, not the decoder's source channel count:
+  /// a 6-channel file downmixed to a stereo route must not show the trim/LFE
+  /// card.
+  final int outputChannels;
+
   /// The rate the sink actually opened (not the file tag, not the target).
   /// 0 means the platform did not report it, which can never be a verified
   /// format match.
@@ -305,6 +311,7 @@ class AudioOutputInfo {
     this.decodedSampleRate = 0,
     this.decodedPcmEncoding = 0,
     this.decodedChannelCount = 2,
+    this.outputChannels = 0,
     this.sinkSampleRate = 0,
     this.sinkBitDepth = 0,
     this.sinkPcmEncoding = 0,
@@ -379,6 +386,7 @@ class AudioOutputInfo {
       decodedSampleRate: (map['decodedSampleRate'] as num?)?.toInt() ?? 0,
       decodedPcmEncoding: (map['decodedPcmEncoding'] as num?)?.toInt() ?? 0,
       decodedChannelCount: (map['decodedChannelCount'] as num?)?.toInt() ?? 2,
+      outputChannels: (map['outputChannels'] as num?)?.toInt() ?? 0,
       sinkSampleRate: (map['sinkSampleRate'] as num?)?.toInt() ?? 0,
       sinkBitDepth: (map['sinkBitDepth'] as num?)?.toInt() ?? 0,
       sinkPcmEncoding: (map['sinkPcmEncoding'] as num?)?.toInt() ?? 0,
@@ -559,6 +567,7 @@ class AudioOutputInfo {
     int? decodedSampleRate,
     int? decodedPcmEncoding,
     int? decodedChannelCount,
+    int? outputChannels,
     int? sinkSampleRate,
     int? sinkBitDepth,
     int? sinkPcmEncoding,
@@ -617,6 +626,7 @@ class AudioOutputInfo {
       decodedSampleRate: decodedSampleRate ?? this.decodedSampleRate,
       decodedPcmEncoding: decodedPcmEncoding ?? this.decodedPcmEncoding,
       decodedChannelCount: decodedChannelCount ?? this.decodedChannelCount,
+      outputChannels: outputChannels ?? this.outputChannels,
       sinkSampleRate: sinkSampleRate ?? this.sinkSampleRate,
       sinkBitDepth: sinkBitDepth ?? this.sinkBitDepth,
       sinkPcmEncoding: sinkPcmEncoding ?? this.sinkPcmEncoding,
@@ -738,6 +748,7 @@ class AudioOutputInfo {
         decodedBitDepth,
         decodedSampleRate,
         decodedPcmEncoding,
+        outputChannels,
         sinkSampleRate,
         sinkBitDepth,
         sinkPcmEncoding,
@@ -767,11 +778,30 @@ class AudioOutputInfo {
         Object.hashAll(supportedChannelMasks),
       ]);
 
-  /// True when the current device or the stream decoding pipeline supports > 2 channels.
-  bool get hasMultichannelOutput =>
-      supportedChannelCounts.any((c) => c > 2) ||
-      decodedChannelCount > 2 ||
-      availableDevices.any((d) => d.isCurrent && d.channelCounts.any((c) => c > 2));
+  /// Channel count to use for layout defaults when the sink did not publish
+  /// its own count but the route/source pair proves multichannel output.
+  int get effectiveOutputChannels {
+    if (outputChannels > 0) return outputChannels;
+    return hasMultichannelOutput ? decodedChannelCount : 0;
+  }
+
+  /// True only when the active route can actually carry >2 channels. A
+  /// multichannel source on a stereo route is downmixed and must not expose
+  /// per-channel trims or an LFE crossover for speakers that are not there.
+  bool get hasMultichannelOutput {
+    if (outputChannels > 2) return true;
+    if (outputChannels > 0) return false;
+    List<int>? currentChannels;
+    for (final device in availableDevices) {
+      if (device.isCurrent) {
+        currentChannels = device.channelCounts;
+        break;
+      }
+    }
+    final deviceChannels = currentChannels ?? supportedChannelCounts;
+    final routeSupportsMultichannel = deviceChannels.any((c) => c > 2);
+    return routeSupportsMultichannel && decodedChannelCount > 2;
+  }
 
   @override
   String toString() {

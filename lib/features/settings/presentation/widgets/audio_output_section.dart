@@ -181,6 +181,8 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
         !isBluetooth &&
         (dev?.activeDeviceType == 'wired' ||
             dev?.activeDeviceType == 'wired_headset');
+    final dsdModeAvailable =
+        isAndroid && (state.dsdDopSupported || (dev?.isUsb ?? false));
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -390,9 +392,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                     Icon(
                       Icons.album_rounded,
                       size: 20,
-                      color: (!isAndroid || !state.dsdDopSupported)
-                          ? p.textTertiary
-                          : p.accent,
+                      color: !dsdModeAvailable ? p.textTertiary : p.accent,
                     ),
                     const SizedBox(width: AppSpacing.s10),
                     Expanded(
@@ -415,7 +415,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                         AudioFeatureRegistry.dsdNative,
                         conflictReason: !isAndroid
                             ? unsupported
-                            : state.dsdDopSupported
+                            : dsdModeAvailable
                                 ? null
                                 : context.l10n.dsdDopRequiresUsbDac,
                       ),
@@ -426,7 +426,7 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                 Text(
                   !isAndroid
                       ? unsupported
-                      : state.dsdDopSupported
+                      : dsdModeAvailable
                           ? context.l10n.dsdOutputModeSubtitle
                           : context.l10n.dsdDopRequiresUsbDac,
                   style: TextStyle(
@@ -464,19 +464,30 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
                           ),
                         ),
                       ),
-                      // Native raw-DSD has no measured capability flag on
-                      // Android yet; offering it would silently fall back to
-                      // DoP/PCM, so only the transports that can be honoured
-                      // are exposed.
+                      // Native is offered on a USB DAC; the session probes
+                      // the exact-rate alt setting per track and falls back
+                      // to DoP/PCM when the device does not expose it.
+                      if (dsdModeAvailable)
+                        ButtonSegment(
+                          value: DsdOutputMode.native,
+                          label: Text(
+                            context.l10n.dsdOutputNative,
+                            style: const TextStyle(
+                              fontSize: AppFontSize.caption,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
                     ],
                     selected: {
-                      state.dsdOutputMode == DsdOutputMode.native
-                          ? DsdOutputMode.dop
-                          : state.dsdOutputMode,
+                      if (dsdModeAvailable)
+                        state.dsdOutputMode
+                      else if (state.dsdOutputMode == DsdOutputMode.native)
+                        DsdOutputMode.dop
+                      else
+                        state.dsdOutputMode,
                     },
-                    onSelectionChanged: (!isAndroid ||
-                            !(state.dsdDopSupported ||
-                                (state.currentOutputDevice?.isUsb ?? false)))
+                    onSelectionChanged: !dsdModeAvailable
                         ? null
                         : (selected) {
                             if (selected.isNotEmpty) {
@@ -880,10 +891,11 @@ class _LowPowerRouteCardState extends State<_LowPowerRouteCard> {
     try {
       if (getIt.isRegistered<PulsrAudioHandler>()) {
         await getIt<PulsrAudioHandler>().setLowPowerRoute(enabled);
-      } else {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool(PrefsKeys.lowPowerRouteEnabled, enabled);
       }
+      // Persist on both branches: with a live handler the previous code skipped
+      // the write, so the toggle reset after every restart.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(PrefsKeys.lowPowerRouteEnabled, enabled);
     } catch (_) {
       if (mounted) setState(() => _enabled = !enabled);
     } finally {
@@ -897,7 +909,7 @@ class _LowPowerRouteCardState extends State<_LowPowerRouteCard> {
     return SettingsSwitchTile(
       Icons.energy_savings_leaf_rounded,
       'True Low-Power Route',
-      'Completely bypasses 32-bit float DSP audio processing for eligible integer PCM playback to minimize battery drain.',
+      'Completely bypasses 32-bit float DSP audio processing for eligible integer PCM playback to minimize battery drain. Native DSD and USB-exclusive streams keep their own endpoint and are not bypassed.',
       value: _enabled,
       onChanged: _setEnabled,
     );

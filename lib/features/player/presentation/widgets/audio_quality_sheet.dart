@@ -673,7 +673,9 @@ class AudioQualitySheet extends StatelessWidget {
       transportSamplesModified: handler?.transportSamplesModified ?? true,
       softwareGain: handler?.effectiveSoftwareGain,
       isDsdDop: AudioQualityInfo.dsdDopActive,
-      oversamplingActive: AudioEffectsChannel().currentOversampleMultiplier > 1,
+      oversamplingActive:
+          AudioEffectsChannel().activeOversampleMultiplier > 1 &&
+              settings?.bitPerfectOutput != true,
       pcmToDsdActive: AudioEffectsChannel().isPcmToDsdActive,
     ));
     return verdict.state;

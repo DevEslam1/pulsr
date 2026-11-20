@@ -111,6 +111,10 @@ class AbxReport {
   final String? trackArtist;
   final int? sourceSampleRate;
   final int? sourceBitDepth;
+  /// How the two conditions were level-matched. `auto_native_loudness` means
+  /// the native engine measured the dry/wet loudness delta; `none` means the
+  /// listener could be comparing different levels.
+  final String levelMatch;
   final List<AbxTrial> trials;
 
   const AbxReport({
@@ -134,6 +138,7 @@ class AbxReport {
     required this.trackArtist,
     required this.sourceSampleRate,
     required this.sourceBitDepth,
+    this.levelMatch = 'none',
     required this.trials,
   }) : twoSidedPValue = twoSidedPValue ?? ((pValue * 2.0) > 1.0 ? 1.0 : (pValue * 2.0));
 
@@ -153,6 +158,7 @@ class AbxReport {
     DateTime? exportedAt,
     String conditionA = 'bypass',
     String conditionB = 'dsp',
+    String levelMatch = 'none',
     bool scrubPii = true,
   }) {
     if (!session.isComplete) {
@@ -201,6 +207,7 @@ class AbxReport {
       trackArtist: cleanArtist,
       sourceSampleRate: sourceSampleRate,
       sourceBitDepth: sourceBitDepth,
+      levelMatch: levelMatch,
       trials: List<AbxTrial>.unmodifiable(session.trials),
     );
   }
@@ -222,6 +229,7 @@ class AbxReport {
         'outputDevice': outputDevice.toJson(),
         'sampleRate': sampleRate,
         'codec': codec,
+        'levelMatch': levelMatch,
         'track': <String, dynamic>{
           'title': trackTitle,
           'artist': trackArtist,

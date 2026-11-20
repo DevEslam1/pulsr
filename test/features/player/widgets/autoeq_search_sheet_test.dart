@@ -31,6 +31,7 @@ void main() {
       category: 'Custom',
       gains: [0, 0, 0],
     ));
+    registerFallbackValue(AutoEqCorrectionMode.peq);
     SharedPreferences.setMockInitialValues({});
     // Load the real bundled AutoEQ dataset once, outside the fake-async zone.
     await HeadphoneProfilesRepository().loadProfiles();
@@ -44,6 +45,8 @@ void main() {
     when(() => cubit.state).thenAnswer((_) => currentState);
     when(() => cubit.stream)
         .thenAnswer((_) => const Stream<PlayerState>.empty());
+    when(() => cubit.setAutoEqCorrectionMode(any()))
+        .thenAnswer((_) async {});
     when(() => cubit.applyHeadphoneProfile(any()))
         .thenAnswer((invocation) async {
       final profile = invocation.positionalArguments[0] as HeadphoneProfile?;

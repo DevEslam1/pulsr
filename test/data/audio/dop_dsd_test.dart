@@ -215,11 +215,11 @@ void main() {
         nativeDac: true,
         nativeDsd: true,
       );
-      // DAC hardware proves native DSD alt settings exist, but the producer flag
-      // remains gated off until Phase 2 hardware soak acceptance.
+      // The DAC advertises native alt settings and the dedicated session is
+      // available; dispatch still requires an exact-rate tuple at open time.
       expect(nativeCapable.dacSupportsNativeDsd, isTrue);
-      expect(kNativeDsdProducerAvailable, isFalse);
-      expect(nativeCapable.canUseNativeDsd, isFalse);
+      expect(kNativeDsdProducerAvailable, isTrue);
+      expect(nativeCapable.canUseNativeDsd, isTrue);
 
       const dacWithoutNative = DsdDacCapabilities(
         dsd64: true,

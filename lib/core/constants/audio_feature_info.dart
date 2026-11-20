@@ -567,9 +567,9 @@ class AudioFeatureRegistry {
   static const arbitraryEq = AudioFeatureInfo(
     id: 'arbitraryEq',
     title: 'Arbitrary Response EQ (GraphicEq)',
-    subtitle: 'EqualizerAPO graphic response curve parser & 512-tap FIR filter',
+    subtitle: 'EqualizerAPO graphic response curve parser & 4096-tap FIR filter',
     description:
-        'Parses standard EqualizerAPO "GraphicEq: <freq> <gain>; ..." curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 512-tap windowed FIR impulse response for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.',
+        'Parses standard EqualizerAPO "GraphicEq: <freq> <gain>; ..." curve specifications. Computes log-frequency interpolated frequency response and synthesizes a 4096-tap windowed FIR impulse response at the engine sample rate for exact acoustic matching. Minimum-phase by default (zero extra delay); enable Linear-phase FIR for constant group delay and exact phase at the cost of pre-ringing. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
     conflictKey: 'bitPerfectBypass',
   );
@@ -589,7 +589,7 @@ class AudioFeatureRegistry {
     title: 'Multichannel Channel Manager',
     subtitle: 'Per-channel gain trim & alignment delay for surround layouts',
     description:
-        'Controls per-channel volume trim (-30 dB to +12 dB) and delay alignment (0 to 50 ms) across up to 8 surround channels (FL, FR, C, LFE, SL, SR, RL, RR). Active when outputting to multichannel devices via Pulsr 32-bit float AudioTrack path. Disabled during Bit-Perfect.',
+        'Controls per-channel volume trim (-30 dB to +12 dB) and delay alignment (0 to 50 ms) across up to 8 surround channels in Android channel order: FL, FR, FC, LFE, BL, BR, SL, SR. Active only when the sink actually opens more than 2 channels; AAudio is stereo-only, so surround uses the 32-bit float AudioTrack path. Android 3-channel audio is 3.0 (FL/FR/FC), not 2.1; use 5.1 or 7.1 for a dedicated LFE. Disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
     conflictKey: 'bitPerfectBypass',
   );

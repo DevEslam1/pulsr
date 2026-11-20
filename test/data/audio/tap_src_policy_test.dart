@@ -108,4 +108,68 @@ void main() {
       expect(kTapSrcMaxRate, 768000);
     });
   });
+
+  group('decideTapSrcTargetRate (Remaster)', () {
+    test('oversamples the source track rate, not the previous sink rate', () {
+      expect(
+        decideTapSrcTargetRate(
+          enabled: true,
+          nativeSampleRate: 48000,
+          bitPerfectActive: false,
+          isBluetooth: false,
+          deviceSampleRates: const [44100, 88200, 176400],
+          remasterMultiplier: 4,
+          trackSampleRate: 44100,
+        ),
+        176400,
+      );
+    });
+
+    test('steps down against the DAC rates without exceeding the tap window',
+        () {
+      expect(
+        decideTapSrcTargetRate(
+          enabled: true,
+          nativeSampleRate: 48000,
+          bitPerfectActive: false,
+          isBluetooth: false,
+          deviceSampleRates: const [44100, 88200, 176400],
+          remasterMultiplier: 8,
+          trackSampleRate: 44100,
+        ),
+        176400,
+      );
+    });
+
+    test('an unknown track rate converts nothing instead of using the mixer',
+        () {
+      expect(
+        decideTapSrcTargetRate(
+          enabled: true,
+          nativeSampleRate: 48000,
+          bitPerfectActive: false,
+          isBluetooth: false,
+          deviceSampleRates: const [48000, 96000],
+          remasterMultiplier: 2,
+          trackSampleRate: 0,
+        ),
+        0,
+      );
+    });
+
+    test('bit-perfect wins over a requested oversampling factor', () {
+      expect(
+        decideTapSrcTargetRate(
+          enabled: true,
+          nativeSampleRate: 48000,
+          bitPerfectActive: true,
+          isBluetooth: false,
+          deviceSampleRates: const [44100, 88200],
+          remasterMultiplier: 2,
+          trackSampleRate: 44100,
+        ),
+        0,
+      );
+    });
+  });
 }

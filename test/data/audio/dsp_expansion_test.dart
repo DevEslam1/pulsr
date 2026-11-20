@@ -43,8 +43,10 @@ void main() {
         DspStage.liveProg,
         DspStage.stereoWidth,
         DspStage.subCrossover,
+        DspStage.lfeCrossover,
         DspStage.dynamicBass,
         DspStage.loudnessContour,
+        DspStage.channelManager,
         DspStage.lookaheadLimiter,
         DspStage.volume,
       ];
@@ -71,8 +73,10 @@ void main() {
         isLiveProgEnabled: true,
         isStereoWidthEnabled: true,
         isSubCrossoverEnabled: true,
+        isLfeCrossoverEnabled: true,
         isDynamicBassEnabled: true,
         isLoudnessContourEnabled: true,
+        isChannelManagerEnabled: true,
         isLimiterEnabled: true,
       );
       expect(pipeline.getActiveStages(), OptimizedDspPipeline.pipelineOrder);

@@ -60,6 +60,7 @@ part 'eq_sheet_shell.dart';
 part 'eq_band_slider_column.dart';
 part 'eq_preset_carousel.dart';
 part 'eq_advanced_controls.dart';
+part 'remaster_control_card.dart';
 part 'eq_ab_compare_bar.dart';
 
 // Rebuild gate for the whole DSP sheet (F-01 / C-01 / H2).

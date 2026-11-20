@@ -56,6 +56,15 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   int? get currentAudioSessionId => null;
   @override
+  bool get usbHardwareVolumeOwned => false;
+
+  @override
+  bool? get usbHardwareMute => null;
+
+  @override
+  Future<bool> setUsbHardwareMute(bool muted) async => false;
+
+  @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
     setVolumeCallCount += 1;

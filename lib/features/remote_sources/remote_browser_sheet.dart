@@ -13,6 +13,8 @@ import '../../core/errors/app_error_base.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/widgets/pulsr_progress.dart';
+import '../../core/widgets/cached_artwork.dart';
+import '../../data/remote/subsonic_client.dart';
 import '../../domain/interfaces/remote_fs_provider.dart';
 import '../../domain/models/remote_source.dart';
 import 'remote_sources_strings.dart';
@@ -56,6 +58,12 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   List<RemoteEntry>? _searchResults;
   bool _searchLoading = false;
   String? _searchError;
+  String _searchQuery = '';
+  int _searchArtistOffset = 0;
+  int _searchAlbumOffset = 0;
+  int _searchSongOffset = 0;
+  bool _searchHasMore = false;
+  bool _searchLoadingMore = false;
   Timer? _debounceTimer;
   int _searchSequence = 0;
 
@@ -88,6 +96,8 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
         _searchResults = null;
         _searchLoading = false;
         _searchError = null;
+        _searchQuery = '';
+        _searchHasMore = false;
       });
       return;
     }
@@ -102,42 +112,17 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
     try {
       final results = await provider.search(trimmed);
       if (!mounted || currentSeq != _searchSequence) return;
-      final entries = <RemoteEntry>[];
-      for (final artist in results.artists) {
-        entries.add(RemoteEntry(
-          path: SubsonicFsProvider.artistPath(artist.id),
-          name: artist.name,
-          isDirectory: true,
-          artworkUri: provider.getCoverArtUrl(artist.coverArt, size: 160)?.toString(),
-        ));
-      }
-      for (final album in results.albums) {
-        final displayName = album.artist.isNotEmpty
-            ? '${album.name} • ${album.artist}'
-            : album.name;
-        entries.add(RemoteEntry(
-          path: SubsonicFsProvider.albumPath(album.id),
-          name: displayName,
-          isDirectory: true,
-          artworkUri: provider.getCoverArtUrl(album.coverArt, size: 160)?.toString(),
-        ));
-      }
-      for (final song in results.songs) {
-        final albumId = song.albumId ?? 'song';
-        final displayName = song.artist != null && song.artist!.isNotEmpty
-            ? '${song.title} • ${song.artist}'
-            : song.title;
-        entries.add(RemoteEntry(
-          path: SubsonicFsProvider.songPath(albumId, song.id),
-          name: displayName,
-          isDirectory: false,
-          sizeBytes: song.sizeBytes,
-          artworkUri: provider.getCoverArtUrl(song.coverArt, size: 160)?.toString(),
-        ));
-      }
+      final entries = _entriesFromSearch(provider, results);
 
       setState(() {
         _searchResults = entries;
+        _searchQuery = trimmed;
+        _searchArtistOffset = results.artists.length;
+        _searchAlbumOffset = results.albums.length;
+        _searchSongOffset = results.songs.length;
+        _searchHasMore = results.artists.length >= 20 ||
+            results.albums.length >= 20 ||
+            results.songs.length >= 50;
         _searchLoading = false;
       });
     } on AppError catch (e, st) {
@@ -167,6 +152,96 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
         _searchError = RemoteSourcesStrings.folderLoadFailed;
         _searchLoading = false;
       });
+    }
+  }
+
+  List<RemoteEntry> _entriesFromSearch(
+    SubsonicFsProvider provider,
+    SubsonicSearchResult results,
+  ) {
+    final entries = <RemoteEntry>[];
+    for (final artist in results.artists) {
+      entries.add(RemoteEntry(
+        path: SubsonicFsProvider.artistPath(artist.id),
+        name: artist.name,
+        isDirectory: true,
+        artworkUri:
+            provider.getCoverArtUrl(artist.coverArt, size: 160)?.toString(),
+        artworkCacheKey:
+            provider.getCoverArtCacheKey(artist.coverArt, size: 160),
+      ));
+    }
+    for (final album in results.albums) {
+      final displayName = album.artist.isNotEmpty
+          ? '${album.name} • ${album.artist}'
+          : album.name;
+      entries.add(RemoteEntry(
+        path: SubsonicFsProvider.albumPath(album.id),
+        name: displayName,
+        isDirectory: true,
+        artworkUri:
+            provider.getCoverArtUrl(album.coverArt, size: 160)?.toString(),
+        artworkCacheKey:
+            provider.getCoverArtCacheKey(album.coverArt, size: 160),
+      ));
+    }
+    for (final song in results.songs) {
+      final albumId = song.albumId ?? 'song';
+      final displayName = song.artist != null && song.artist!.isNotEmpty
+          ? '${song.title} • ${song.artist}'
+          : song.title;
+      entries.add(RemoteEntry(
+        path: SubsonicFsProvider.songPath(albumId, song.id),
+        name: displayName,
+        isDirectory: false,
+        sizeBytes: song.sizeBytes,
+        artworkUri:
+            provider.getCoverArtUrl(song.coverArt, size: 160)?.toString(),
+        artworkCacheKey:
+            provider.getCoverArtCacheKey(song.coverArt, size: 160),
+      ));
+    }
+    return entries;
+  }
+
+  Future<void> _loadMoreSearch() async {
+    final provider = widget.provider;
+    if (provider is! SubsonicFsProvider ||
+        _searchLoadingMore ||
+        !_searchHasMore ||
+        _searchQuery.isEmpty) {
+      return;
+    }
+    final currentSeq = _searchSequence;
+    setState(() => _searchLoadingMore = true);
+    try {
+      final results = await provider.search(
+        _searchQuery,
+        artistOffset: _searchArtistOffset,
+        albumOffset: _searchAlbumOffset,
+        songOffset: _searchSongOffset,
+      );
+      if (!mounted || currentSeq != _searchSequence) return;
+      final existing = _searchResults ?? const <RemoteEntry>[];
+      final seen = existing.map((e) => e.path).toSet();
+      final additions = _entriesFromSearch(provider, results)
+          .where((e) => seen.add(e.path))
+          .toList();
+      setState(() {
+        _searchResults = [...existing, ...additions];
+        _searchArtistOffset += results.artists.length;
+        _searchAlbumOffset += results.albums.length;
+        _searchSongOffset += results.songs.length;
+        _searchHasMore = additions.isNotEmpty &&
+            (results.artists.length >= 20 ||
+                results.albums.length >= 20 ||
+                results.songs.length >= 50);
+        _searchLoadingMore = false;
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Subsonic search page failed',
+          error: e, stackTrace: st, category: 'RemoteSources');
+      if (mounted) setState(() => _searchLoadingMore = false);
     }
   }
 
@@ -403,8 +478,22 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
           ),
         Expanded(
           child: ListView.builder(
-            itemCount: results.length,
+            itemCount: results.length + (_searchHasMore ? 1 : 0),
             itemBuilder: (context, index) {
+              if (index >= results.length) {
+                return Padding(
+                  padding: const EdgeInsetsDirectional.all(12),
+                  child: Center(
+                    child: TextButton(
+                      onPressed:
+                          _searchLoadingMore ? null : _loadMoreSearch,
+                      child: Text(_searchLoadingMore
+                          ? RemoteSourcesStrings.testing
+                          : RemoteSourcesStrings.loadMore),
+                    ),
+                  ),
+                );
+              }
               final entry = results[index];
               return _EntryTile(
                 entry: entry,
@@ -490,25 +579,15 @@ class _EntryTile extends StatelessWidget {
 
     Widget leadingWidget;
     if (artworkUri != null && artworkUri.isNotEmpty) {
-      leadingWidget = ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Image.network(
-            artworkUri,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Icon(
-              entry.isDirectory
-                  ? Icons.folder_outlined
-                  : Icons.audio_file_outlined,
-              color: entry.isDirectory ? palette.accent : palette.textSecondary,
-              semanticLabel: entry.isDirectory
-                  ? RemoteSourcesStrings.folderLabel
-                  : RemoteSourcesStrings.fileNameUnknown,
-            ),
-          ),
-        ),
+      leadingWidget = CachedArtwork(
+        id: 0,
+        remoteUrl: artworkUri,
+        cacheKeyOverride: entry.artworkCacheKey,
+        size: 40,
+        borderRadius: 4,
+        fallbackIcon: entry.isDirectory
+            ? Icons.folder_outlined
+            : Icons.audio_file_outlined,
       );
     } else {
       leadingWidget = Icon(

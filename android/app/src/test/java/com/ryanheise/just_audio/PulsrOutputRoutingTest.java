@@ -32,6 +32,7 @@ public class PulsrOutputRoutingTest {
         PulsrOutputRouting.unregister(playerA);
         PulsrOutputRouting.unregister(playerB);
         PulsrOutputRouting.select(null);
+        PulsrOutputRouting.setDspActive(false);
     }
 
     @Test
@@ -46,6 +47,16 @@ public class PulsrOutputRoutingTest {
 
         assertFalse(PulsrOutputRouting.select(null));
         verify(playerB, atLeastOnce()).setPreferredAudioDevice(null);
+    }
+
+    @Test
+    public void dspActiveInterlockCanBeClearedOnEngineRelease() {
+        PulsrOutputRouting.setDspActive(true);
+        assertTrue(PulsrOutputRouting.isDspActive());
+        // releaseNativeDsp() must clear this; a stale true keeps the sink off
+        // the low-power route after every stage has been released.
+        PulsrOutputRouting.setDspActive(false);
+        assertFalse(PulsrOutputRouting.isDspActive());
     }
 
     @Test

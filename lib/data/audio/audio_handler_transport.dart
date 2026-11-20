@@ -3,6 +3,7 @@ part of 'audio_handler.dart';
 mixin PulsrAudioTransport on BaseAudioHandler {
   @override
   Future<void> play() async {
+    if (playNativeDsdIfActive()) return;
     _resumePositionSaving();
     // A user/system-initiated play clears the becoming-noisy auto-resume
     // arming so only a becoming-noisy pause keeps it armed (item 2).
@@ -75,6 +76,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   @override
   Future<void> pause() async {
+    if (pauseNativeDsdIfActive()) return;
     if (_pendingPlaybackStart) _playGeneration++;
     _pendingPlaybackStart = false;
     // A deliberate pause invalidates any pending interruption snapshot so a
@@ -141,6 +143,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   Future<void> _performSeek(Duration position) async {
+    if (seekNativeDsdIfActive(position)) return;
     // Mid-fade seek: cancel() writes restoreVolume straight into the player,
     // so the raw user volume would drop the track's replay-gain normalisation
     // until the next load. Prefer the gain captured when the fade opened.
@@ -175,6 +178,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   @override
   Future<void> skipToNext() async {
+    if (nativeDsdActive) await prepareNativeDsdSkip();
     ErrorLogger.addBreadcrumb('Playback skipToNext', category: 'player');
     try {
       unawaited(PulsrHaptics.lightImpact());
@@ -314,6 +318,7 @@ mixin PulsrAudioTransport on BaseAudioHandler {
   }
 
   Future<void> _skipToPreviousImpl() async {
+    if (nativeDsdActive) await prepareNativeDsdSkip();
     ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
     try {
       unawaited(PulsrHaptics.lightImpact());
@@ -1026,6 +1031,12 @@ mixin PulsrAudioTransport on BaseAudioHandler {
 
   int get _playGeneration;
   set _playGeneration(int value);
+
+  bool get nativeDsdActive;
+  bool playNativeDsdIfActive();
+  bool pauseNativeDsdIfActive();
+  bool seekNativeDsdIfActive(Duration position);
+  Future<void> prepareNativeDsdSkip();
 
   AudioPlayer get _playerA;
 

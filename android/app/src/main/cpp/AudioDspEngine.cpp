@@ -308,6 +308,12 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.pcmToDsd.rate =
         (s.pcmToDsd.rate == 128 || s.pcmToDsd.rate == 256) ? s.pcmToDsd.rate : 64;
     s.pcmToDsd.order = clampInt(s.pcmToDsd.order, 1, 5);
+
+    // §8.9: HRTF geometry is sanitized here as well as in the JNI setters so a
+    // snapshot published by a test/restore path can never ask the control-side
+    // quad preparation for a non-finite angle.
+    s.hrtf.azimuthDeg = clampFinite(s.hrtf.azimuthDeg, -90.0, 90.0, 30.0);
+    s.hrtf.elevationDeg = clampFinite(s.hrtf.elevationDeg, -45.0, 45.0, 0.0);
 }
 
 } // namespace
@@ -409,6 +415,11 @@ void AudioDspEngine::applySampleRateLocked(double sampleRate) {
     // Pre-synthesize the Arbitrary EQ kernel for the new rate on the control
     // thread. applyParams only ever swaps an already-built kernel.
     ensureArbitraryEqPrepared(*updated);
+    // §8.9: an engine rate change also resamples the loaded HRIR here, never on
+    // the render thread.
+    hrtf_.setDataset(updated->hrtf.dataset);
+    hrtf_.prepare(updated->hrtf.azimuthDeg, updated->hrtf.elevationDeg,
+                  updated->sampleRate);
     swapCurrentLocked(std::const_pointer_cast<const DspParamSnapshot>(updated));
 }
 
@@ -659,6 +670,12 @@ bool DspEngineRegistry::isLowPowerBypassed() {
     std::lock_guard<std::mutex> lock(mutex_);
     AudioDspEngine* engine = selectActiveEngineLocked();
     return engine != nullptr && engine->isLowPowerBypassed();
+}
+
+int DspEngineRegistry::getActiveOversampleFactor() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    AudioDspEngine* engine = selectActiveEngineLocked();
+    return engine ? engine->activeOversampleFactor() : 1;
 }
 
 void DspEngineRegistry::unregisterEngine(AudioDspEngine* engine) {
@@ -978,6 +995,13 @@ void AudioDspEngine::updateParams(SnapshotMutator mutator) {
         updated->resetRequested = false; // Clear reset by default so reset() only fires once
         mutator(*updated);
         SanitizeSnapshot(*updated);
+        // §8.9: prepare the interpolated/resampled HRIR quad here, on the
+        // control thread, before the snapshot is published. The render thread
+        // only claims the already-built slot (applyPrepared), so an azimuth /
+        // elevation / sample-rate change can never allocate in process().
+        hrtf_.setDataset(updated->hrtf.dataset);
+        hrtf_.prepare(updated->hrtf.azimuthDeg, updated->hrtf.elevationDeg,
+                      updated->sampleRate);
         updated->generation = ++snapshotGeneration_;
         snap = std::const_pointer_cast<const DspParamSnapshot>(updated);
         swapCurrentLocked(snap);
@@ -1058,6 +1082,11 @@ void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snaps
         }
     }
     ensureArbitraryEqPrepared(*mutableSnap);
+    // §8.9: same control-thread HRIR preparation for snapshots arriving through
+    // publishParams/broadcast (restore, registry fan-out, tests).
+    hrtf_.setDataset(mutableSnap->hrtf.dataset);
+    hrtf_.prepare(mutableSnap->hrtf.azimuthDeg, mutableSnap->hrtf.elevationDeg,
+                  mutableSnap->sampleRate);
     if (mutableSnap->reverb.preparedIr && mutableSnap->reverb.preparedIr->numPartitions > 0) {
         reverb_.ensurePartitionCapacity(mutableSnap->reverb.preparedIr->numPartitions);
     }
@@ -1156,6 +1185,7 @@ int TapPhasesForQuality(int quality) {
 void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int channels) {
     // Called only by the serialized player configure/flush lifecycle. Do not
     // publish these fields through the independently changing DSP snapshot.
+    activeOversampleFactor_.store(1, std::memory_order_relaxed);
     tapChannels_ = 0;
     tapSrcEngaged_ = false;
     tapUseOversampler_ = false;
@@ -1196,6 +1226,7 @@ void AudioDspEngine::prepareTapResampler(double srcRate, double dstRate, int cha
         if (tapOversampler_.configure(channels, factor, kernel)) {
             tapOversampler_.reset();
             tapUseOversampler_ = true;
+            activeOversampleFactor_.store(factor, std::memory_order_relaxed);
             tapChannels_ = channels;
             tapChunkFrames_ = std::min(kTapInputFrames, 512);
             for (int ch = 0; ch < channels; ++ch) {
@@ -1980,9 +2011,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             snapshot->oversample.kernel != oversampleKernel_) {
             oversampleMultiplier_ = snapshot->oversample.multiplier;
             oversampleKernel_ = snapshot->oversample.kernel;
-            if (tapChannels_ > 0 && std::abs(tapSrcRate_ - tapDstRate_) >= 0.5) {
-                prepareTapResampler(tapSrcRate_, tapDstRate_, tapChannels_);
-            }
+            // Never rebuild the oversampler here: configure() allocates, and
+            // this branch runs on the render thread. The control-thread sink
+            // rebuild (prepareTapResampler) applies the new multiplier/kernel.
         }
 
         if (snapshot->pcmToDsd.enabled != pcmToDsdEnabled_ ||
@@ -2217,9 +2248,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
     channelManager_.setEnabled((stages & STAGE_CHANNEL_MANAGER) && snapshot->channelManager.enabled);
     dacVoicing_.setEnabled((stages & STAGE_DAC_VOICING) && snapshot->dacVoicing.enabled);
-    hrtf_.setEnabled(snapshot->hrtf.enabled);
-    hrtf_.setAzimuth(snapshot->hrtf.azimuthDeg);
-    hrtf_.setElevation(snapshot->hrtf.elevationDeg);
+    hrtf_.setEnabled((stages & STAGE_HRTF) && snapshot->hrtf.enabled);
+    // §8.9: the quad itself was already prepared on the control thread when the
+    // snapshot was published; this only claims the newest preallocated slot and
+    // is allocation-, lock- and log-free.
+    hrtf_.applyPrepared();
     // Hysteresis (on >1.001, off <1.0002) so a gain settling near the threshold
     // cannot flap the limiter and its latency.
     {
@@ -2263,6 +2296,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         ((stages & STAGE_DYNEQ) && snapshot->dynamicEq.enabled) ||
         (((stages & STAGE_SATURATION) || saturation_.isRamping()) && (snapshot->saturation.enabled || saturation_.isRamping())) ||
         (((stages & STAGE_DAC_VOICING) || dacVoicing_.isRamping()) && (snapshot->dacVoicing.enabled || dacVoicing_.isRamping())) ||
+        (((stages & STAGE_HRTF) != 0) && snapshot->hrtf.enabled) || hrtf_.isRamping() ||
         ((stages & STAGE_PANNER) && std::abs(snapshot->panner.balance) > 0.001) ||
         // Crossfeed and SubCrossover can sum channels above unity at low
         // frequencies; guard them too. The old heuristic omitted these, so their
@@ -2324,7 +2358,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         (((stages & STAGE_MULTIBAND_COMPRESSOR) != 0) && snapshot->multibandCompressor.enabled) || multibandCompressor_.isRamping() ||
         (((stages & STAGE_LIVE_PROG) != 0) && snapshot->liveProg.enabled) || liveProg_.isRamping() ||
         (((stages & STAGE_CHANNEL_MANAGER) != 0) && snapshot->channelManager.enabled) || channelManager_.isRamping() ||
-        (((stages & STAGE_DAC_VOICING) != 0) && snapshot->dacVoicing.enabled) || dacVoicing_.isRamping();
+        (((stages & STAGE_DAC_VOICING) != 0) && snapshot->dacVoicing.enabled) || dacVoicing_.isRamping() ||
+        (((stages & STAGE_HRTF) != 0) && snapshot->hrtf.enabled) || hrtf_.isRamping();
     const bool nonUnityGain = anyStageEnabled ||
                               (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) ||
                               (std::abs(startReplayGain - 1.0) > 1e-4) ||
@@ -2497,6 +2532,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // so a boosted surround channel is still caught by the brickwall.
         if ((stages & STAGE_CHANNEL_MANAGER) || channelManager_.isRamping()) {
             channelManager_.processInterleaved(buffer, frames, channels);
+            // Alignment delay is real pipeline latency: report it so lyrics,
+            // gapless hand-off and the custody report see the 0..50 ms.
+            blockLatency += channelManager_.getLatencyFrames();
         }
 
         // 9d. Opt-in DAC voicing (4x oversampled reconstruction character +

@@ -211,8 +211,12 @@ void LfeCrossover::processInterleaved(float* buffer, int frames, int channels) {
 
     const int lfeCh = lfeChannelIndex_;
     const int satCount = channels - 1;
+    // Constant-sum, not equal-power: a coherent bass note present on every
+    // satellite must arrive at one channel's level, not +10*log10(N-1) dB
+    // (+7 dB at 5.1, +9 dB at 7.1). Uncorrelated bass is correspondingly
+    // quieter; the LFE trim is the user's level control.
     const float satSumScale =
-        (satCount > 0) ? (1.0f / std::sqrt(static_cast<float>(satCount))) : 0.0f;
+        (satCount > 0) ? (1.0f / static_cast<float>(satCount)) : 0.0f;
     // LR2 (12 dB/oct) has a 180-degree phase shift between LP and HP at fc;
     // invert the redirected bass sum so LP + HP sums flat rather than nulling.
     const float redirectPolarity = cascade_ ? 1.0f : -1.0f;

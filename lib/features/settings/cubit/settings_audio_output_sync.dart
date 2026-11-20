@@ -204,16 +204,20 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
   /// target set, the PCM tap converts to the mixer rate at Ultra quality ahead
   /// of the chain, so the mixer becomes a 1:1 copy. A route whose rate cannot be
   /// verified keeps the historical platform path; this never throws.
-  Future<void> _syncTapSrcRate(AudioOutputInfo? info) async {
+  Future<void> _syncTapSrcRate(AudioOutputInfo? info,
+      {bool force = false}) async {
     if (_suppressTapSrcSync) return;
     if (!getIt.isRegistered<PulsrAudioHandler>()) return;
     // PROPERTY_OUTPUT_SAMPLE_RATE (`nativeSampleRate`) describes the primary
     // built-in/wired mixer, NOT USB DACs (whose HAL negotiates per-track rates)
-    // and NOT Bluetooth. Never pass `info.sampleRate`: that is the app's own
-    // AudioTrack rate, which previously fed a previous track's rate back as an
-    // SRC target and triggered mid-playback sink swaps / rate glitches.
+    // and NOT Bluetooth. The remaster target must use the *source* track rate:
+    // `info.sampleRate` is this app's AudioTrack rate, which already carries the
+    // previous oversampling factor and would compound 44.1 -> 176.4 -> 705.6
+    // across syncs.
     final isPrimaryOutput = info != null && !info.isUsbDac && !info.isBluetooth;
     final mixerRate = isPrimaryOutput ? (info.nativeSampleRate ?? 0) : 0;
+    final trackRate =
+        getIt<PulsrAudioHandler>().currentSong?.sampleRate ?? 0;
     final rate = decideTapSrcTargetRate(
       enabled: state.outputFormatNegotiationEnabled,
       nativeSampleRate: mixerRate,
@@ -223,12 +227,13 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
       isBluetooth: info?.isBluetooth ?? false,
       deviceSampleRates: info?.supportedSampleRates ?? const <int>[],
       remasterMultiplier: AudioEffectsChannel().currentOversampleMultiplier,
-      trackSampleRate: info?.sampleRate ?? 0,
+      trackSampleRate: trackRate,
     );
-    if (rate == _lastTapSrcTargetRate) return;
+    if (!force && rate == _lastTapSrcTargetRate) return;
     _lastTapSrcTargetRate = rate;
     try {
       await getIt<PulsrAudioHandler>().setTapSrcRate(rate);
+      await AudioEffectsChannel().refreshActiveOversampleMultiplier();
     } catch (e, st) {
       _lastTapSrcTargetRate = null;
       ErrorLogger.log('Failed to sync tap-side SRC rate ($rate)',
@@ -237,8 +242,10 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
   }
 
   /// Explicitly re-synchronizes the tap-side SRC rate against the active output
-  /// and remaster oversampling policy (§8.1).
-  Future<void> syncTapSrcRate() => _syncTapSrcRate(state.currentOutputDevice);
+  /// and remaster oversampling policy (§8.1). [force] re-applies an unchanged
+  /// target so a new reconstruction kernel is picked up by the sink rebuild.
+  Future<void> syncTapSrcRate({bool force = false}) =>
+      _syncTapSrcRate(state.currentOutputDevice, force: force);
 
   /// Dynamically raises the sink target buffer duration when streaming over a
   /// high-bitrate Bluetooth codec (LDAC 990kbps / aptX Lossless / LHDC) so the

@@ -268,7 +268,19 @@ extension EqualizerEffectOps on EqualizerManager {
       }
       if (PlatformCapabilities.isAndroid) {
         if (sofaPath != null && sofaPath != prevSofaPath) {
-          await _effectsChannel.loadHrtfSofa(sofaPath);
+          // §8.9: never claim success for a dataset the native engine rejected.
+          // An empty path is the explicit "clear dataset" request; the native
+          // side returns true only after restoring the synthesized default.
+          final loaded = await _effectsChannel.loadHrtfSofa(sofaPath);
+          if (!loaded) {
+            final reason = await _effectsChannel.getHrtfSofaLoadError();
+            throw StateError(
+              reason ??
+                  (sofaPath.isEmpty
+                      ? 'Failed to clear the HRTF dataset'
+                      : 'Failed to load HRTF dataset: ${sofaPath.split(RegExp(r'[/\\]')).last}'),
+            );
+          }
         }
         await _effectsChannel.setHrtfAzimuth(targetAzimuth);
         await _effectsChannel.setHrtfElevation(targetElevation);

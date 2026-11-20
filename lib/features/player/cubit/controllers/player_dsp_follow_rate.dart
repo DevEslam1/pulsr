@@ -42,7 +42,11 @@ extension PlayerDspFollowRate on PlayerDspController {
         // dither, balance, ReplayGain and DVC, so a dithered chain could be
         // recorded as a verified bit-perfect session.
         final dspSlice = _getState().dsp;
-        final oversampleMult = AudioEffectsChannel().currentOversampleMultiplier;
+        // Derived from the engine, not the request: bit-perfect, a refused DAC
+        // rate or a not-yet-rebuilt sink all leave the factor at 1.
+        await AudioEffectsChannel().refreshActiveOversampleMultiplier();
+        final oversampleMult =
+            AudioEffectsChannel().activeOversampleMultiplier;
         final pcmToDsd = AudioEffectsChannel().isPcmToDsdActive;
         final verdict = resolveLiveOutputVerdict(LiveOutputObservation(
           output: outputDevice,

@@ -31,6 +31,8 @@ void main() {
             return true;
           case 'getOversampleMultiplier':
             return 1;
+          case 'getActiveOversampleMultiplier':
+            return 2;
           case 'getOversampleKernel':
             return 0;
           case 'isPcmToDsdEnabled':
@@ -97,7 +99,7 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getInt(PrefsKeys.remasterOversampleMultiplier), 2);
     expect(
-      find.text('Oversampling 2x active · Not Bit-Perfect (reconstruction DSP in path)'),
+      find.text('Oversampling 2x requested · Not Bit-Perfect (reconstruction DSP in path)'),
       findsOneWidget,
     );
   });
@@ -131,7 +133,7 @@ void main() {
     expect(find.text('DSD Rate'), findsOneWidget);
     expect(find.text('SDM Order (1-5)'), findsOneWidget);
     expect(
-      find.text('PCM → DSD active · Not Bit-Perfect (1-bit sigma-delta modulation)'),
+      find.text('PCM → DSD requested · offline engine only, not on the playback route'),
       findsOneWidget,
     );
   });

@@ -19,6 +19,7 @@ import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
 import '../services/hires_audio_service.dart';
+import '../services/cast_playback_handoff.dart';
 import '../services/usb_exclusive_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
@@ -64,6 +65,8 @@ import 'triple_buffer_pipeline.dart';
 import 'dsd_decoder_helper.dart';
 import 'dsd_header_probe.dart';
 import 'dsd_transport_resolver.dart';
+import 'hires_dac_bridge.dart';
+import 'native_dsd_session.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../features/player/cubit/queue_slot_codec.dart';
 import '../../features/diagnostics/safe_mode_controller.dart';
@@ -92,10 +95,12 @@ import 'audio_handler_lifecycle_observer.dart';
 import 'headset_control_config.dart';
 import '../../core/utils/pulsr_haptics.dart';
 part 'audio_handler_dsp_bridge.dart';
+part 'audio_handler_native_dsd.dart';
 part 'audio_handler_sleep_bridge.dart';
 part 'audio_handler_session_wiring.dart';
 part 'audio_handler_streaming.dart';
 part 'audio_handler_queue_engine.dart';
+part 'audio_handler_queue_advance.dart';
 part 'audio_handler_transport.dart';
 part 'audio_handler_media_browser.dart';
 part 'audio_handler_playback_extras.dart';
@@ -108,9 +113,11 @@ class PulsrAudioHandler extends BaseAudioHandler
         QueueHandler,
         SeekHandler,
         PulsrAudioDspBridge,
+        PulsrAudioNativeDsd,
         PulsrAudioSleepBridge,
         PulsrAudioStreaming,
         PulsrAudioQueueEngine,
+        PulsrQueueAdvance,
         PulsrAudioTransport,
         PulsrAudioMediaBrowser,
         PulsrAudioPlaybackExtras {
@@ -258,10 +265,6 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   /// Returns playback position compensated for native and DSP pipeline latency.
   @override
-  Duration get compensatedPosition =>
-      _dspPipeline.getCompensatedPosition(_activePlayer.position);
-
-  @override
   final IMusicRepository _repository;
   @override
   final YtmService _ytmService;
@@ -295,6 +298,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   set _currentIndex(int value) => _queueStateMachine.setCurrentIndex(value);
 
+  @override
   bool get _queueDirty => _queueStateMachine.isQueueDirty;
   @override
   set _queueDirty(bool value) {
@@ -305,6 +309,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  @override
   int get _savedQueueIndex => _queueStateMachine.savedQueueIndex;
   @override
   set _savedQueueIndex(int value) =>
@@ -403,6 +408,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Timer? _crossfadeSwitchDebounce;
   AudioHandlerLifecycleObserver? _lifecycleObserver;
+  CastPlaybackHandoff? _castPlaybackHandoff;
   // Set when a restored YouTube session is left idle; play() resolves it lazily.
   @override
   Duration? _pendingLazyPosition;
@@ -420,6 +426,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   final AdaptiveBufferEngine _adaptiveBufferEngine = AdaptiveBufferEngine();
+  @override
   final OptimizedDspPipeline _dspPipeline = OptimizedDspPipeline();
   late final PlaybackAnalytics _playbackAnalytics;
   late final AudioMemoryManager _memoryManager;
@@ -437,6 +444,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _batterySaverForced = false;
   @override
   late final StreamPreResolver _streamPreResolver;
+  @override
   bool _disposed = false;
   bool get isDisposed => _disposed;
   Future<void> _dspTransitionTail = Future<void>.value();
@@ -581,9 +589,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   bool get _gaplessMode =>
       _gaplessEnabled &&
+      !_nativeDsdActive &&
       _crossfadeManager.duration <= Duration.zero &&
       !_crossfadeManager.automixEnabled;
 
+  @override
   final StreamController<SongsTableData> _onTrackChangedSubject =
       StreamController<SongsTableData>.broadcast();
   Stream<SongsTableData> get onTrackChanged => _onTrackChangedSubject.stream;
@@ -614,6 +624,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     return song.id == currentSong?.id && AudioQualityInfo.dsdDopActive;
   }
 
+  @override
   bool _isBitPerfectBypassEnabled() {
     final transport = _bitPerfectTransportBypass;
     if (transport != null) return transport;
@@ -669,6 +680,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _cueStartSeeked = false;
   bool _cueAdvanceTriggered = false;
 
+  @override
   late final PlaybackStateCoordinator _playbackStateCoordinator;
   late final PlaybackPositionPersister _positionPersister;
   Timer? _fadeInGuardTimer; // FIX-#12: tracked for disposal
@@ -806,38 +818,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       saveInterval: const Duration(seconds: 2),
       minDeltaMs: 0,
     );
-    _positionPersister = PlaybackPositionPersister(
-      repository: _repository,
-      readSnapshot: () {
-        if (_songs.isEmpty ||
-            _currentIndex < 0 ||
-            _currentIndex >= _songs.length) {
-          return null;
-        }
-        final currentSong = _songs[_currentIndex];
-        final isIdle = _activePlayer.processingState == ProcessingState.idle;
-        final posMs = (_pendingLazyPosition != null && isIdle)
-            ? _pendingLazyPosition!.inMilliseconds
-            : _activePlayer.position.inMilliseconds;
-        return PlaybackPositionSnapshot(
-          songId: currentSong.id,
-          queueIndex: _currentIndex,
-          positionMs: posMs,
-          queueIds: _songs.map((s) => s.id).toList(),
-          isIdle: isIdle,
-          queueDirty: _queueDirty,
-          savedQueueIndex: _savedQueueIndex,
-        );
-      },
-      readCurrentPositionMs: () => _activePlayer.position.inMilliseconds,
-      isDisposed: () => _disposed,
-      clearDirty: _playbackStateCoordinator.clearDirty,
-      markDirty: _playbackStateCoordinator.markPositionDirty,
-      onQueueSaved: (index) {
-        _queueDirty = false;
-        _savedQueueIndex = index;
-      },
-    );
+    _positionPersister = createPlaybackPositionPersister();
     _equalizerManager = EqualizerManager(
       loudnessEnhancerA: loudnessEnhancerA,
       loudnessEnhancerB: loudnessEnhancerB,
@@ -1600,6 +1581,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _externalHardwareVolumeSet = false;
   double _lastDirectUsbVolume = -1.0;
 
+  @override
   bool _isUsbHardwareVolumeEnabled() =>
       _usbHardwareVolumeOverride ??
       (_cachedPrefs?.getBool(PrefsKeys.usbHardwareVolumeEnabled) ?? false);
@@ -1737,6 +1719,20 @@ class PulsrAudioHandler extends BaseAudioHandler
         usb.permitted &&
         usb.streamingActive &&
         usb.hardwareVolumeApplied;
+  }
+
+  /// True while the DAC's own Feature Unit is the active attenuator. Used by
+  /// the mute layer to choose CS_MUTE over a software volume of zero.
+  bool get usbHardwareVolumeOwned => _hardwareVolumeOwnsOutput();
+
+  /// Last DAC CS_MUTE state, when the device exposed one.
+  bool? get usbHardwareMute => UsbExclusiveService().lastStatus.hardwareMute;
+
+  /// Mutes/unmutes the DAC's Feature Unit (CS_MUTE) when it is the active
+  /// attenuator. Returns false when the device has no mute control.
+  Future<bool> setUsbHardwareMute(bool muted) async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    return const HiresDacBridge().setUac2HardwareMute(muted);
   }
 
   void _syncVolumeControllerSettings() {
@@ -2326,6 +2322,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     AudioMemoryManager.adaptBudgetToSystemRam();
     await _initPrefs();
     _installSafeModeController();
+    _castPlaybackHandoff = CastPlaybackHandoff(
+      isLocalPlaying: () =>
+          _playerA.playing || _playerB.playing || _nativeDsdActive,
+      pauseLocal: pause,
+      resumeLocal: play,
+    )..start();
     // Restore the 24/32-bit float DSP path before any other player call so the
     // native sink is built with the persisted preference. Defaults ON so hi-res
     // sources are never truncated to 16-bit; 16-bit content is unaffected.
@@ -2557,11 +2559,33 @@ class PulsrAudioHandler extends BaseAudioHandler
         unawaited(_onDirectUsbStreamingStarted(status));
       }
       final owned = _hardwareVolumeOwnsOutput();
-      if (owned == _hardwareVolumeOwned) return;
+      final ownershipChanged = owned != _hardwareVolumeOwned;
       _hardwareVolumeOwned = owned;
-      // Ownership flip: re-run the whole gain path so software attenuation is
-      // restored the moment the DAC stops confirming the hardware level.
-      unawaited(setVolume(_volume));
+      // The DAC can move its own attenuator (volume keys, front panel, the
+      // Settings UAC2 slider). Mirror that level into the app slider without
+      // echoing it back into another SET_CUR.
+      final hwDb = status.hardwareVolumeDb;
+      final minDb = status.minVolumeDb;
+      final maxDb = status.maxVolumeDb;
+      if (owned &&
+          !_usbHwVolumeBusy &&
+          hwDb != null &&
+          minDb != null &&
+          maxDb != null) {
+        final linear = UsbHardwareVolumeCurve.linearFor(
+          hwDb,
+          minDb: minDb,
+          maxDb: maxDb,
+        );
+        if (linear.isFinite && (_volume - linear).abs() > 0.002) {
+          syncVolumeFromExternalHardwareDb(hwDb, minDb: minDb, maxDb: maxDb);
+        }
+      }
+      if (ownershipChanged) {
+        // Ownership flip: re-run the whole gain path so software attenuation
+        // is restored the moment the DAC stops confirming the hardware level.
+        unawaited(setVolume(_volume));
+      }
     }));
     unawaited(HeadsetControlConfig.load(_cachedPrefs).then((cfg) {
       _cachedHeadsetConfig = cfg;
@@ -2696,7 +2720,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         player.playbackEventStream.listen(
           (event) {
-            if (_disposed) return;
+            if (_disposed || _nativeDsdActive) return;
             if (isTargetActive()) {
               final isBuffering =
                   event.processingState == ProcessingState.buffering;
@@ -2727,7 +2751,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         player.durationStream.listen(
           (dur) {
-            if (_disposed) return;
+            if (_disposed || _nativeDsdActive) return;
             if (isTargetActive() && dur != null && dur > Duration.zero) {
               final current = mediaItem.value;
               if (current != null && current.duration != dur) {
@@ -2745,7 +2769,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         player.playerStateStream.listen(
           (state) async {
-            if (_disposed) return;
+            if (_disposed || _nativeDsdActive) return;
             if (isTargetActive()) {
               // Broadcast is driven solely by the playbackEventStream listener
               // above (C-5): playerStateStream is derived from the same event
@@ -2850,7 +2874,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         player.positionStream.listen(
           (pos) {
-            if (_disposed) return;
+            if (_disposed || _nativeDsdActive) return;
             if (isTargetActive()) {
               _playbackStateCoordinator.onPositionTick(
                 pos,

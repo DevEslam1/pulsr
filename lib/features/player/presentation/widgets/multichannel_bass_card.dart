@@ -15,6 +15,7 @@ import '../../../../core/utils/error_logger.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
+import '../../../../domain/models/audio_channel_layout.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 
@@ -39,28 +40,6 @@ class MultichannelBassCard extends StatefulWidget {
 }
 
 class _MultichannelBassCardState extends State<MultichannelBassCard> {
-  static const List<String> _channelFullNames = [
-    'Front Left (FL)',
-    'Front Right (FR)',
-    'Center (C)',
-    'Low-Frequency Effects (LFE)',
-    'Surround Left (SL)',
-    'Surround Right (SR)',
-    'Rear Left (RL)',
-    'Rear Right (RR)',
-  ];
-
-  static const List<String> _channelLabels = [
-    'FL',
-    'FR',
-    'C',
-    'LFE',
-    'SL',
-    'SR',
-    'RL',
-    'RR',
-  ];
-
   bool _channelManagerEnabled = false;
   int _channelCount = 6; // default 5.1
   int _selectedChannel = 0;
@@ -77,6 +56,18 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
 
   bool _loaded = false;
 
+  AudioChannelLayout? get _layout =>
+      AudioChannelLayout.fromChannelCount(_channelCount);
+
+  static List<double> _normalizeEight(List<double> raw) {
+    final out = List<double>.filled(8, 0.0);
+    final n = raw.length < 8 ? raw.length : 8;
+    for (int i = 0; i < n; ++i) {
+      if (raw[i].isFinite) out[i] = raw[i];
+    }
+    return out;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -88,9 +79,9 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
       if (getIt.isRegistered<EqualizerManager>()) {
         final eq = getIt<EqualizerManager>();
         _channelManagerEnabled = eq.isChannelManagerEnabled;
-        _channelCount = eq.channelManagerChannelCount;
-        _channelTrims = List<double>.from(eq.channelManagerTrimDb);
-        _channelDelays = List<double>.from(eq.channelManagerDelayMs);
+        _channelCount = eq.channelManagerChannelCount.clamp(2, 8);
+        _channelTrims = _normalizeEight(eq.channelManagerTrimDb);
+        _channelDelays = _normalizeEight(eq.channelManagerDelayMs);
         _lfeCrossoverEnabled = eq.isLfeCrossoverEnabled;
         _lfeCrossoverHz = eq.lfeCrossoverHz;
         _lfeLowPassHz = eq.lfeLowPassHz;
@@ -108,15 +99,21 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         final rawTrims = prefs.getString(PrefsKeys.channelManagerTrims);
         if (rawTrims != null) {
           try {
-            final list = (json.decode(rawTrims) as List).cast<num>();
-            _channelTrims = list.map((e) => e.toDouble()).toList();
+            final raw = json.decode(rawTrims);
+            if (raw is List) {
+              _channelTrims = _normalizeEight(
+                  raw.whereType<num>().map((e) => e.toDouble()).toList());
+            }
           } catch (_) {}
         }
         final rawDelays = prefs.getString(PrefsKeys.channelManagerDelays);
         if (rawDelays != null) {
           try {
-            final list = (json.decode(rawDelays) as List).cast<num>();
-            _channelDelays = list.map((e) => e.toDouble()).toList();
+            final raw = json.decode(rawDelays);
+            if (raw is List) {
+              _channelDelays = _normalizeEight(
+                  raw.whereType<num>().map((e) => e.toDouble()).toList());
+            }
           } catch (_) {}
         }
         _lfeCrossoverEnabled =
@@ -134,6 +131,30 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
     } catch (e, st) {
       ErrorLogger.log('Failed to restore multichannel bass settings',
           error: e, stackTrace: st);
+    }
+
+    // Derive the layout from the stored count, falling back to the route's
+    // real channel count when the stored value is stereo/unsupported. Never
+    // keep an LFE stage alive on a layout that has no LFE channel.
+    var layout = AudioChannelLayout.fromChannelCount(_channelCount);
+    if ((layout == null || layout.channelCount <= 2) &&
+        getIt.isRegistered<SettingsCubit>()) {
+      final outputChannels = getIt<SettingsCubit>()
+          .state
+          .currentOutputDevice
+          ?.effectiveOutputChannels;
+      final fromRoute = AudioChannelLayout.fromChannelCount(outputChannels);
+      if (fromRoute != null && fromRoute.channelCount > 2) {
+        layout = fromRoute;
+        _channelCount = fromRoute.channelCount;
+      }
+    }
+    if (layout != null) {
+      _lfeChannelIndex = layout.lfeIndex < 0 ? 0 : layout.lfeIndex;
+      if (!layout.hasLfe) _lfeCrossoverEnabled = false;
+    }
+    if (_selectedChannel >= _channelCount) {
+      _selectedChannel = _channelCount - 1;
     }
     if (mounted) setState(() => _loaded = true);
   }
@@ -155,54 +176,71 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
     }
   }
 
-  Future<void> _setChannelCount(int count) async {
-    final clamped = count.clamp(2, 8);
-    // Explicit layout model (§8.8):
-    // 2.1 (3 ch): LFE index = 2 (FL=0, FR=1, LFE=2)
-    // 4.0 (4 ch): no dedicated LFE channel
-    // 5.1 (6 ch): LFE index = 3 (FL=0, FR=1, C=2, LFE=3)
-    // 7.1 (8 ch): LFE index = 3 (FL=0, FR=1, C=2, LFE=3)
-    final autoLfeIndex = switch (clamped) {
-      3 => 2,
-      6 => 3,
-      8 => 3,
-      _ => 0,
-    };
-    final bool hasLfe = clamped == 3 || clamped == 6 || clamped == 8;
+  Future<void> _selectLayout(AudioChannelLayout layout) async {
+    if (!AudioChannelLayout.offered.contains(layout)) return;
+    final prevCount = _channelCount;
+    final prevLfeEnabled = _lfeCrossoverEnabled;
+    final prevLfeIndex = _lfeChannelIndex;
+    final prevSelected = _selectedChannel;
+    final targetLfeEnabled = layout.hasLfe ? _lfeCrossoverEnabled : false;
+    final targetLfeIndex = layout.lfeIndex < 0 ? 0 : layout.lfeIndex;
 
     setState(() {
-      _channelCount = clamped;
-      if (_selectedChannel >= clamped) {
-        _selectedChannel = clamped - 1;
-      }
-      if (hasLfe) {
-        _lfeChannelIndex = autoLfeIndex;
-      } else {
-        _lfeCrossoverEnabled = false;
+      _channelCount = layout.channelCount;
+      _lfeChannelIndex = targetLfeIndex;
+      _lfeCrossoverEnabled = targetLfeEnabled;
+      if (_selectedChannel >= _channelCount) {
+        _selectedChannel = _channelCount - 1;
       }
     });
     try {
       if (getIt.isRegistered<EqualizerManager>()) {
-        await getIt<EqualizerManager>().setChannelManagerEnabled(
-            _channelManagerEnabled,
-            channelCount: clamped);
-        if (hasLfe) {
-          await getIt<EqualizerManager>().setLfeCrossover(
-            _lfeCrossoverEnabled,
-            lfeChannelIndex: autoLfeIndex,
+        await getIt<EqualizerManager>().setChannelLayout(
+          layout,
+          enabled: _channelManagerEnabled,
+        );
+      } else {
+        // Fallback without the manager: push the layout, every channel value
+        // and the LFE stage as one decision.
+        final channel = AudioEffectsChannel();
+        await channel.setChannelManagerEnabled(
+          _channelManagerEnabled,
+          channelCount: layout.channelCount,
+        );
+        for (int ch = 0; ch < 8; ++ch) {
+          await channel.setChannelManagerChannel(
+            ch,
+            trimDb: _channelTrims[ch],
+            delayMs: _channelDelays[ch],
           );
         }
-      } else {
-        await AudioEffectsChannel().setChannelManagerEnabled(
-            _channelManagerEnabled,
-            channelCount: clamped);
+        await channel.setLfeCrossoverParams(
+          crossoverHz: _lfeCrossoverHz,
+          lfeLowPassHz: _lfeLowPassHz,
+          slopeDbPerOct: _lfeSlopeDbPerOct,
+          lfeGainDb: _lfeGainDb,
+          lfeChannelIndex: targetLfeIndex,
+          redirectBass: _lfeRedirectBass,
+        );
+        await channel.setLfeCrossoverEnabled(targetLfeEnabled);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt(PrefsKeys.channelManagerChannelCount, clamped);
-        if (hasLfe) {
-          await prefs.setInt(PrefsKeys.lfeChannelIndex, autoLfeIndex);
-        }
+        await prefs.setInt(
+            PrefsKeys.channelManagerChannelCount, layout.channelCount);
+        await prefs.setInt(PrefsKeys.lfeChannelIndex, targetLfeIndex);
+        await prefs.setBool(PrefsKeys.lfeCrossoverEnabled, targetLfeEnabled);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      if (mounted) {
+        setState(() {
+          _channelCount = prevCount;
+          _lfeCrossoverEnabled = prevLfeEnabled;
+          _lfeChannelIndex = prevLfeIndex;
+          _selectedChannel = prevSelected;
+        });
+      }
+      ErrorLogger.log('Failed to apply channel layout',
+          error: e, stackTrace: st);
+    }
   }
 
   Future<void> _setChannelParam(int channel,
@@ -467,7 +505,8 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   ),
                 ),
                 Text(
-                  '$_channelCount Channels',
+                  '${_layout?.displayName ?? '$_channelCount ch'} '
+                  '($_channelCount channels)',
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
@@ -481,11 +520,22 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               spacing: 6,
               runSpacing: 6,
               children: [
-                _buildLayoutChip(p, 3, '2.1 (3 ch)'),
-                _buildLayoutChip(p, 4, '4.0 (4 ch)'),
-                _buildLayoutChip(p, 6, '5.1 (6 ch)'),
-                _buildLayoutChip(p, 8, '7.1 (8 ch)'),
+                for (final layout in AudioChannelLayout.offered)
+                  _buildLayoutChip(
+                    p,
+                    layout,
+                    '${layout.displayName} (${layout.channelCount} ch)',
+                  ),
               ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              AudioChannelLayout.twoOnePlatformNote,
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                color: p.textTertiary,
+                height: 1.3,
+              ),
             ),
 
             const SizedBox(height: AppSpacing.md),
@@ -505,8 +555,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               child: Row(
                 children: List.generate(_channelCount, (i) {
                   final isSelected = i == _selectedChannel;
-                  final label =
-                      i < _channelLabels.length ? _channelLabels[i] : 'Ch $i';
+                  final label = _layout?.labelAt(i) ?? 'CH $i';
                   return Padding(
                     padding: const EdgeInsetsDirectional.only(end: 6),
                     child: ChoiceChip(
@@ -545,9 +594,8 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                       Icon(Icons.speaker_rounded, size: 16, color: p.accent),
                       const SizedBox(width: AppSpacing.xs),
                       Text(
-                        _selectedChannel < _channelFullNames.length
-                            ? _channelFullNames[_selectedChannel]
-                            : 'Channel $_selectedChannel',
+                        _layout?.fullNameAt(_selectedChannel) ??
+                            'Channel $_selectedChannel',
                         style: TextStyle(
                           fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w700,
@@ -801,8 +849,9 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
     );
   }
 
-  Widget _buildLayoutChip(PulsrPalette p, int count, String label) {
-    final isSelected = _channelCount == count;
+  Widget _buildLayoutChip(
+      PulsrPalette p, AudioChannelLayout layout, String label) {
+    final isSelected = _channelCount == layout.channelCount;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
@@ -813,7 +862,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         color: isSelected ? p.onAccent : p.textSecondary,
       ),
       onSelected: (val) {
-        if (val) _setChannelCount(count);
+        if (val) _selectLayout(layout);
       },
     );
   }

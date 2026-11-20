@@ -20,6 +20,7 @@ abstract final class RemoteSourcesStrings {
   static const String loadFailed =
       'The saved sources could not be read. They were kept on disk.';
   static const String retry = 'Retry';
+  static const String loadMore = 'Load more';
 
   // Row actions.
   static const String actionsTooltip = 'Source actions';

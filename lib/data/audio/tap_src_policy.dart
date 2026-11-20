@@ -71,8 +71,11 @@ int decideTapSrcTargetRate({
   // phone's mixer rate would be a conversion the Bluetooth path never needs. (§9)
   if (isBluetooth) return 0;
 
-  if (remasterMultiplier > 1 && trackSampleRate > 0) {
-    // Remaster oversampling takes precedence and steps down 8-4-2-1 (§8.1)
+  if (remasterMultiplier > 1) {
+    // Remaster oversampling takes precedence and steps down 8-4-2-1 (§8.1).
+    // An unknown track rate must not fall through to the mixer-rate branch:
+    // that would convert to the mixer rate while the UI says "oversampling".
+    if (trackSampleRate <= 0) return 0;
     return decideRemasterTargetRate(
       trackSampleRate: trackSampleRate,
       multiplier: remasterMultiplier,

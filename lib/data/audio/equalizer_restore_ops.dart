@@ -282,25 +282,32 @@ extension EqualizerRestoreOps on EqualizerManager {
       isChannelManagerEnabled =
           prefs.getBool(PrefsKeys.channelManagerEnabled) ?? false;
       channelManagerChannelCount =
-          prefs.getInt(PrefsKeys.channelManagerChannelCount) ?? 2;
+          (prefs.getInt(PrefsKeys.channelManagerChannelCount) ?? 2)
+              .clamp(2, 8);
+      List<double> normalizeEight(List<dynamic> raw) {
+        final out = List<double>.filled(8, 0.0);
+        final n = raw.length < 8 ? raw.length : 8;
+        for (int i = 0; i < n; ++i) {
+          final value = raw[i];
+          if (value is num && value.isFinite) {
+            out[i] = value.toDouble();
+          }
+        }
+        return out;
+      }
+
       final trimsJson = prefs.getString(PrefsKeys.channelManagerTrims);
       if (trimsJson != null) {
         try {
-          final list = (json.decode(trimsJson) as List)
-              .cast<num>()
-              .map((n) => n.toDouble())
-              .toList();
-          if (list.length == 8) channelManagerTrimDb = list;
+          final raw = json.decode(trimsJson);
+          if (raw is List) channelManagerTrimDb = normalizeEight(raw);
         } catch (_) {}
       }
       final delaysJson = prefs.getString(PrefsKeys.channelManagerDelays);
       if (delaysJson != null) {
         try {
-          final list = (json.decode(delaysJson) as List)
-              .cast<num>()
-              .map((n) => n.toDouble())
-              .toList();
-          if (list.length == 8) channelManagerDelayMs = list;
+          final raw = json.decode(delaysJson);
+          if (raw is List) channelManagerDelayMs = normalizeEight(raw);
         } catch (_) {}
       }
 
@@ -310,8 +317,21 @@ extension EqualizerRestoreOps on EqualizerManager {
       lfeLowPassHz = prefs.getDouble(PrefsKeys.lfeLowPassHz) ?? 120.0;
       lfeSlopeDbPerOct = prefs.getDouble(PrefsKeys.lfeSlopeDbPerOct) ?? 24.0;
       lfeGainDb = prefs.getDouble(PrefsKeys.lfeGainDb) ?? 0.0;
-      lfeChannelIndex = prefs.getInt(PrefsKeys.lfeChannelIndex) ?? 3;
+      lfeChannelIndex =
+          (prefs.getInt(PrefsKeys.lfeChannelIndex) ?? 3).clamp(0, 7);
       lfeRedirectBass = prefs.getBool(PrefsKeys.lfeRedirectBass) ?? true;
+      // Reconcile a stale LFE setting with the stored layout. 3.0/4.0 have no
+      // dedicated LFE channel; the old 2.1-as-3ch claim routed bass to FC.
+      final restoredLayout =
+          AudioChannelLayout.fromChannelCount(channelManagerChannelCount);
+      final hasDedicatedLfe =
+          restoredLayout?.hasLfe ?? (channelManagerChannelCount == 7);
+      if (!hasDedicatedLfe) {
+        isLfeCrossoverEnabled = false;
+        lfeChannelIndex = 0;
+      } else if (lfeChannelIndex >= channelManagerChannelCount) {
+        lfeChannelIndex = 3;
+      }
 
       isLowPowerRouteEnabled =
           prefs.getBool(PrefsKeys.lowPowerRouteEnabled) ?? false;

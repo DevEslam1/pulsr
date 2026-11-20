@@ -144,7 +144,7 @@ class AudioCapabilityMatrix {
   /// The matrix for this build. Verified field by field against the native and
   /// Kotlin sources by the architecture guard test.
   static const AudioCapabilityMatrix current = AudioCapabilityMatrix(
-    nativeDspStageCount: 21,
+    nativeDspStageCount: 22,
     nativeDspStages: <String>[
       'eq',
       'crossfeed',
@@ -167,6 +167,7 @@ class AudioCapabilityMatrix {
       'channel_manager',
       'dac_voicing',
       'lfe_crossover',
+      'hrtf',
     ],
     maxParametricEqBands: 64,
     maxDynamicEqBands: 8,
@@ -193,7 +194,7 @@ class AudioCapabilityMatrix {
       'int32': 4,
     },
     maxDsdBufferBytes: 8388608,
-    nativeDsdProducerAvailable: false,
+    nativeDsdProducerAvailable: true,
   );
 
   /// Markdown block embedded in `docs/FEATURE_MATRIX.md`.

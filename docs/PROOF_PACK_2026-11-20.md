@@ -13,39 +13,43 @@ Per §12 of the remediation plan, every capability is reported honestly with its
 
 | Lab Need | Target Purpose | Verification Status | Rig / Device & Firmware | Notes & Limitations |
 |---|---|---|---|---|
-| **OPPO Tablet + USB DAC** | Exclusive UAC2, volume, mute | **PASS** | OPPO Pad Neo (ColorOS 13.2 / Android 13) + FiiO KA3 (v1.0) | Exclusive USB endpoint open; GET_CUR `0x81` / SET_CUR `0x01` verified; volume attenuation readback verified; app volume key interception strictly gated to active playback. |
-| **DSD-Capable DAC** | Native DSD64/128/256, DoP fallback | **PASS** | FiiO KA3 / iFi Hip-DAC2 | Dedicated `NativeDsdSession` pull-renderer; honest carrier validation (DoP 176.4/352.8/705.6 kHz); `kNativeDsdProducerAvailable` flag verified; fallback policy to PCM enforced when hardware volume unavailable. |
-| **Multichannel USB DAC** | 5.1/7.1 LFE & trim/delay | **CODE-COMPLETE** | AAudio/AudioTrack Float Sink (Surround 5.1 / 7.1) | Explicit `AudioChannelLayout` model with strictly bounded LFE indices (index 3 for 5.1, index 3 for 7.1, -1 for 2.0/4.0); AAudio >2-channel limiter enforced; hardware release requires attached multichannel DAC verification. |
+| **OPPO Tablet + USB DAC** | Exclusive UAC2, volume, mute | **NOT RUN** | No USB DAC attached (wireless ADB offline on 2026-11-20) | Code-complete: verified `UsbHardwareVolume` state shared by handler/settings/keys; GET_CUR `0x81`/GET_RANGE `0x82`; CS_MUTE capability-gated; key steps emit status and feed back into the app volume; full-range dB mapping. Real DAC key/display, mute and quantization behavior remain unverified. |
+| **DSD-Capable DAC** | Native DSD64/128/256, DoP fallback | **NOT RUN** | No DSD-capable DAC attached (wireless ADB offline on 2026-11-20) | Dedicated `NativeDsdSession` (handler-owned backpressured pump, no ExoPlayer source); exact-rate tuple enforced; DoP/PCM fallback; first-block status. Hardware soak and DAC attestation remain open. |
+| **Multichannel USB DAC** | 5.1/7.1 LFE & trim/delay | **NOT RUN** | No multichannel DAC attached (wireless ADB offline on 2026-11-20) | Code-complete: `AudioChannelLayout` 3.0/4.0/5.1/7.1 in Android channel order; LFE index 3 for 5.1/7.1, none for 3.0/4.0; atomic layout + LFE enable/index push; sink-channel gating; constant-sum bass redirect; 0..50 ms delay reported in pipeline latency. Android 3-channel audio is 3.0 (FL/FR/FC), not 2.1. Hardware speaker order, LFE output and alignment remain unverified. |
 | **Cast Receiver** | Cast transport & duration | **CODE-COMPLETE** | Google Cast SDK v21.4.0 / Localhost Prebuffer Proxy | Transport controls (Play/Pause/Stop/Seek/Prev/Next) wired; `PendingResult` async awaiting; `setStreamDuration` propagated; eviction loop guaranteed monotonic progress; loopback-only bind. |
 | **UPnP / DLNA Renderer** | Control point acceptance | **CODE-COMPLETE** | AVTransport:1 / ContentDirectory:1 / SSDP Client | True LRU cache updating recency on hits (`UpnpDeviceDescriptionCache`); transport UI controls wired; single-flight coalescing; 300ms debounce & monotonic sequence guard on search. |
-| **ADC Loopback Analysis** | THD+N, IMD, Crosstalk, Jitter | **PASS** | Native DSP Engine (`measure_native_dsp`) + Kaiser FFT (`measure_fft.py`) | Kaiser window ($\beta=18.0$, $>150$ dB sidelobe suppression); CCIF 19+20 kHz twin-tone IMD analysis; crosstalk identical-channel detection reports `not_measurable` instead of false metrics; single dither pass enforced. |
-| **Codec Validation** | ALAC, FLAC, WavPack, Opus | **PASS** | `Mp4BoxParser` + Android MediaCodec / Extractor | Container-level `alac` magic cookie and channel layout parsed from MP4 atom headers; corrupted and truncated payloads rejected before sink; honest scan-time error flags. |
-| **SOFA HRTF Datasets** | Binaural spatialization | **PASS** | MIT KEMAR & SADIE II HRIR datasets | Zero-allocation real-time convolution engine; lock-free parameter snapshot updates; mutual exclusivity with BS2B crossfeed; `AppFontSize.caption` WCAG AA compliant UI. |
+| **ADC Loopback Analysis** | THD+N, IMD, Crosstalk, Jitter | **HOST/CLI ONLY** | Native DSP Engine (`measure_native_dsp`) + Kaiser FFT (`measure_fft.py`) | Kaiser window ($\beta=18.0$, $>150$ dB sidelobe suppression); CCIF 19+20 kHz twin-tone IMD analysis; crosstalk identical-channel detection reports `not_measurable` instead of false metrics; single dither pass enforced. |
+| **Codec Validation** | ALAC, FLAC, Opus | **CODE-COMPLETE** | `Mp4BoxParser` + Android MediaCodec probe | ALAC magic cookie/bit depth/sample rate parsed and corrupt payloads rejected; playback probes `audio/alac` + `audio/x-alac` and fails with a typed codec error when the platform has no decoder. No ALAC decoder is bundled; WavPack/APE/TTA remain not decodable. |
+| **SOFA HRTF Datasets** | Binaural spatialization | **CODE-COMPLETE** | User-supplied SOFA/WAV HRIR (none bundled) | Control-thread inverse-distance interpolation + rate resampling, immutable quad slots with atomic handoff, zero RT allocations in the render path, `STAGE_HRTF` gating and load-failure propagation. No HRIR dataset ships; binaural hardware pass not run. |
 
 ---
 
 ## 2. Feature-by-Feature Proof Dossier
 
 ### §8.1 Remaster (Oversampling, Sinc Filters, PCM-to-DSD)
-- **State Owner:** `RemasterCubit`, `AudioEffectsChannel`, `SettingsAudioOutputSync`.
-- **UI Entry:** Audio Settings -> Remaster Card & Sheet.
+- **State Owner:** `RemasterControlCard`, `AudioEffectsChannel`, `SettingsAudioOutputSync`, `AudioEffectsPlugin` (active oversample factor).
+- **UI Entry:** Player -> EQ -> Advanced -> Remaster Suite.
 - **Engine Route:** `AudioDspEngine` (`STAGE_RESAMPLE`, `STAGE_DITHER`), `TapSrcPolicy`.
 - **Measurement Evidence:**
   - Sine sweep and impulse response tests in `measure_native_dsp.cpp`.
   - Resampler tail draining verified to eliminate truncation transients.
-  - Sinc kernel stopband attenuation: Kaiser filter $> 120$ dB rejection, polyphase 48-tap interpolation.
-  - SdmModulator 5th-order sigma-delta PCM-to-DSD engine integrated into dedicated DSD session.
+  - Oversampler kernel stopband is tested at $>-90$ dB (`test_oversampler.cpp`); the documentation no longer claims $>120$ dB.
+  - SdmModulator PCM-to-DSD is an offline engine path only: no JNI/Dart playback route and no DSD-session integration yet.
 - **Verdict & Status Contract:** Remaster activation invalidates bit-perfect badge via `OutputVerdict.isBitPerfect = false`.
 
 ### §8.2 Native USB DSD Session
-- **State Owner:** `NativeDsdSession`, `PlaybackBackend` (`LocalDsdBackend`).
-- **Engine Route:** `UsbAudioSink.cpp`, `DopFramer.cpp`, `DsdDecoder.cpp`.
+- **State Owner:** `NativeDsdSession` (implements `PlaybackBackend`), driven by `PulsrAudioHandler`.
+- **Engine Route:** `UsbAudioSink.cpp`, `DopFramer.cpp`, DSD native packer.
 - **Verification Evidence:**
-  - Dedicated pull-renderer session (`native_dsd_session.dart`).
-  - No fake WAV headers or ExoPlayer timeline bypasses.
-  - Byte-accurate position reporting calculated directly from flushed DSD frames.
-  - DoP frame marker insertion: `0x05` / `0xFA` alternating markers verified at 176.4 kHz, 352.8 kHz, and 705.6 kHz.
-  - Hardware volume policy: falls back to PCM if DAC attenuator is unavailable; never performs lossy digital volume scaling on 1-bit DSD stream.
+  - Dedicated handler-owned session with a backpressured block pump (`native_dsd_session.dart`, `native_dsd_producer.dart`).
+  - File-backed streaming reader (`native_dsd_file_source.dart`): header parsed once, DSF blocks/DFF interleaved bytes read on demand, so full-length DSD64/128/256 tracks are not limited by the 150 MB PCM decode cap.
+  - No fake WAV source: the native path never enters ExoPlayer; the idle players' state is suppressed while the session owns the DAC.
+  - Exact-rate UAC2 tuple only; no first-tuple fallback. UAC2 GET_CUR is `0x81` for volume, clock, range and rate reads.
+  - Byte-accurate position from flushed DSD frames; pause keeps the alt setting fed with DSD silence.
+  - Transport, queue next/previous, completion and media-session position are delegated to the session; media session shows native DSD only after the first real block is accepted.
+  - Hardware volume policy: fixed volume with a visible notice unless USB hardware volume is enabled; never software-scales 1-bit DSD.
+  - DoP markers (`0x05`/`0xFA`) verified in unit tests at 176.4/352.8/705.6 kHz.
+  - Hardware acceptance: **NOT RUN**; no DSD-capable DAC attached. The flag is enabled only as a capability gate; the exact tuple probe still decides per device.
 
 ### §8.3 Decoder Hardening & ALAC Validation
 - **State Owner:** `Mp4BoxParser`, `MediaScannerService`.
@@ -73,12 +77,14 @@ Per §12 of the remediation plan, every capability is reported honestly with its
 
 ### §8.6 Per-Headphone Dedicated FIR
 - **State Owner:** `EqualizerManager`, `HeadphoneProfile`.
-- **Engine Route:** `AudioDspEngine` (`STAGE_FIR`), 100% wet convolution.
+- **Engine Route:** `AudioDspEngine` (`STAGE_ARBITRARY_EQ`), native 4096-tap FIR, 100% wet, independent from `STAGE_REVERB`.
 - **Verification Evidence:**
-  - Completely independent from Reverb stage (`STAGE_REVERB`).
-  - Preamp headroom protection automatically accounts for filter peak gain.
-  - Frequency response matches native PEQ within $\pm 0.1$ dB across 20 Hz – 20 kHz.
-  - Pipeline latency accurately reported and compensated.
+  - The FIR target is the profile's parametric curve, evaluated with the same RBJ shelf/peaking formulas and upper-octave HF decramping as `ParametricEQ.cpp`, at the engine sample rate.
+  - The native FIR synthesizer runs at engine rate with 4096 taps (8192-pt FFT); a C++ test verifies the requested node gains and the 20 Hz low-frequency correction.
+  - FIR state (target string, phase mode, enabled) is persisted and restored; switching to a preset/manual edit disables the FIR and resets the mode; the PEQ stage is disabled while FIR owns the correction.
+  - Headroom is baked into the target using the peak composite boost (not the sum of positives), bounded by the native ±30 dB node clamp; the PEQ preamp stays 0 in FIR mode.
+  - The dead Dart biquad-cascade generator and its circular round-trip test were removed; the native target path is the only FIR implementation.
+  - Android apply/restore, 44.1/96/192 parity, linear-phase AV sync and clipping null tests remain hardware-only.
 
 ### §8.7 Measurement Harness & Release Gate
 - **Harness Scripts:** `scripts/hil/measure_fft.py`, `scripts/measure_native_dsp.cpp`.
@@ -94,24 +100,25 @@ Per §12 of the remediation plan, every capability is reported honestly with its
 - **State Owner:** `MultichannelBassCard`, `ChannelManager.h/.cpp`.
 - **Engine Route:** `AudioTrackAudioSink.java`, Float PCM path.
 - **Verification Evidence:**
-  - Explicit channel layouts: 2.0, 2.1, 4.0, 5.1, 7.1 with validated LFE channel indices.
-  - UI hides trim/delay panel when channel count $\le 2$.
-  - Low-pass Linkwitz-Riley crossover (12/24 dB/oct) for LFE redirection.
-  - Delay lines up to 50 ms per channel persisted and restored across app launches.
+  - Explicit channel layouts: 3.0 (FL/FR/FC), 4.0 (FL/FR/BL/BR), 5.1 (LFE index 3), 7.1 (LFE index 3). A true 2.1 is not offered because Android's 3-channel mask is FL/FR/FC; use 5.1/7.1 for LFE.
+  - Layout selection pushes channel count, LFE enable and LFE index together; 3.0/4.0 force the LFE stage off, so a stale index cannot process RR/FC.
+  - UI shows the card only when the sink actually opens >2 channels (not merely because the source is 6-channel).
+  - Low-pass Linkwitz-Riley crossover (12/24 dB/oct) with constant-sum bass redirect (coherent bass cannot add +7/+9 dB).
+  - Delay lines up to 50 ms per channel persisted, restored and included in reported pipeline latency.
 
 ### §8.9 HRTF / SOFA Spatializer
 - **State Owner:** `HrtfBinauralCard`, `AudioDspEngine` (`STAGE_HRTF`).
 - **Verification Evidence:**
-  - Mutual exclusivity with crossfeed: activating HRTF automatically disengages BS2B crossfeed and vice versa.
-  - Zero real-time memory allocations on the audio render thread.
-  - Lock-free parameter snapshots and equal-power angular crossfades.
+  - HRTF is gated by `STAGE_HRTF`; it is bypassed by bit-perfect/low-power and is mutually exclusive with crossfeed in the UI.
+  - Zero real-time allocations in the render path (native RT test), with control-thread interpolation/resampling and atomic quad-slot handoff.
+  - Crossfades between prepared quads; stale old slots are released only at block boundaries.
   - Clean `context.select<PlayerCubit, bool>` reactive state wiring without rebuild storms.
 
 ### §8.10 True Low-Power Mode & Interlocks
-- **State Owner:** `LowPowerInterlock`, `EngineTelemetryPanel`.
+- **State Owner:** `AudioEffectsPlugin.computeDspActive/syncDspActiveRouting`, `PulsrOutputRouting`, `PulsrAudioSink`, `EngineTelemetryPanel`.
 - **Verification Evidence:**
   - Two distinct modes: Battery Saver (DSP stages degraded to low-complexity modes) and Low-Power Bypass (complete DSP bypass).
-  - Server-side interlock: Low-power bypass is strictly refused if EQ, Preamp, Remaster, or HRTF are active.
+  - Server-side interlock: `PulsrAudioSink` consults the derived `dspActive` flag; it is recomputed from active stages + active remaster factor + HRTF and cleared on engine release.
   - Telemetry payload: structured map with `stagePowerSpecs` rendering per-stage mAh/h battery consumption.
   - Isolated stage telemetry ensures an individual sensor fault cannot blank the inspector.
 

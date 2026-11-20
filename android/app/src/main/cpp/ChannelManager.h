@@ -45,6 +45,17 @@ public:
     bool canBoost(int channels) const;
     int getChannelCount() const { return params_.channelCount; }
 
+    /// Largest alignment delay currently applied, in samples. Used by the
+    /// engine's reported pipeline latency so 0..50 ms channel delays are not
+    /// invisible to lyrics/gapless compensation.
+    int getLatencyFrames() const {
+        int maxDelay = 0;
+        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+            if (delaySamples_[ch] > maxDelay) maxDelay = delaySamples_[ch];
+        }
+        return maxDelay;
+    }
+
 private:
     double sampleRate_ = 0.0;
     ChannelManagerParamSet params_{};

@@ -12,8 +12,20 @@ import sys
 import re
 from pathlib import Path
 
-def get_dart_invoked_methods(dart_file: Path) -> set[str]:
+def dart_library_sources(dart_file: Path) -> list[Path]:
+    """The channel entry file plus every declared part (extracted methods)."""
+    sources = [dart_file]
     content = dart_file.read_text(encoding="utf-8")
+    for part in re.findall(r"part\s+'([^']+)'", content):
+        candidate = dart_file.parent / part
+        if candidate.exists():
+            sources.append(candidate)
+    return sources
+
+
+def get_dart_invoked_methods(dart_file: Path) -> set[str]:
+    content = "\n".join(p.read_text(encoding="utf-8")
+                         for p in dart_library_sources(dart_file))
     methods = set()
     
     # 1. Direct _channel.invokeMethod / invokeMapMethod / invokeListMethod
@@ -33,7 +45,8 @@ def get_dart_invoked_methods(dart_file: Path) -> set[str]:
     return methods
 
 def get_dart_callbacks_handled(dart_file: Path) -> set[str]:
-    content = dart_file.read_text(encoding="utf-8")
+    content = "\n".join(p.read_text(encoding="utf-8")
+                         for p in dart_library_sources(dart_file))
     callbacks = set()
     for match in re.finditer(r"call\.method\s*==\s*['\"]([^'\"]+)['\"]", content):
         callbacks.add(match.group(1))

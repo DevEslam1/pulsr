@@ -112,10 +112,9 @@ void main() {
       expect(missing, isEmpty,
           reason: 'AudioFormats recognizes $missing but the tier table does '
               'not cover it');
-      // `alac` is a codec identifier (an ALAC stream can live inside .m4a),
-      // not a scanner extension, so it is the one allowed extra key.
+      // `alac` is now also a scanner extension, so it is not an extra key.
       final extra = registryKeys.difference(recognized);
-      expect(extra, <String>{'alac'},
+      expect(extra, isEmpty,
           reason: 'the tier table declares formats AudioFormats does not '
               'recognize: $extra');
     });

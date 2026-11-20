@@ -95,6 +95,15 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
     } catch (_) {}
   }
 
+  /// True when the manager actually adopted [path]. The cubit's
+  /// applyDspEffect swallows native failures and only rolls back the stored
+  /// dataset path, so the card cannot rely on an exception to detect a
+  /// rejected SOFA/HRIR file.
+  bool _hrtfDatasetAcknowledged(String path) {
+    if (!getIt.isRegistered<EqualizerManager>()) return true;
+    return getIt<EqualizerManager>().hrtfSofaPath == path;
+  }
+
   Future<void> _pickSofaFile(BuildContext context) async {
     try {
       final result = await FilePicker.pickFile(
@@ -112,7 +121,6 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
       }
 
       final path = file.path;
-      setState(() => _sofaPath = path);
 
       if (context.mounted) {
         await context.read<PlayerCubit>().setHrtfBinaural(
@@ -121,6 +129,15 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
               elevation: _elevation,
               sofaPath: path,
             );
+        // Success is defined by the manager adopting the path; a rejected file
+        // leaves the previous path in place. Only then adopt it locally and
+        // report success.
+        if (!_hrtfDatasetAcknowledged(path)) {
+          throw StateError('Native HRTF dataset load was rejected');
+        }
+        if (mounted) {
+          setState(() => _sofaPath = path);
+        }
         if (context.mounted) {
           PulsrToast.show(
             context,
@@ -142,17 +159,23 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
   }
 
   Future<void> _resetToDefault(BuildContext context) async {
-    setState(() {
-      _azimuth = 30.0;
-      _elevation = 0.0;
-      _sofaPath = null;
-    });
-    await context.read<PlayerCubit>().setHrtfBinaural(
-          _enabled,
-          azimuth: 30.0,
-          elevation: 0.0,
-          sofaPath: '',
-        );
+    try {
+      await context.read<PlayerCubit>().setHrtfBinaural(
+            _enabled,
+            azimuth: 30.0,
+            elevation: 0.0,
+            sofaPath: '',
+          );
+      if (_hrtfDatasetAcknowledged('') && mounted) {
+        setState(() {
+          _azimuth = 30.0;
+          _elevation = 0.0;
+          _sofaPath = null;
+        });
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to reset HRTF dataset', error: e, stackTrace: st);
+    }
   }
 
   @override

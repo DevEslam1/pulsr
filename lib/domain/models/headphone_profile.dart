@@ -1,7 +1,6 @@
 // lib/domain/models/headphone_profile.dart
 import 'dart:math' as math;
 
-import '../../data/audio/autoeq_fir_generator.dart';
 import '../../data/audio/eq_legacy_migration.dart';
 import 'eq_preset.dart';
 
@@ -124,21 +123,6 @@ class HeadphoneProfile {
   /// Whether this profile carries true parametric filters.
   bool get hasParametricFilters => filters.isNotEmpty;
 
-  /// Synthesizes an FIR impulse response (minimum-phase by default, or
-  /// linear-phase if [linearPhase] is true) for this headphone profile.
-  List<double> generateImpulseResponse({
-    int taps = AutoEqFirGenerator.defaultTaps,
-    double sampleRate = AutoEqFirGenerator.defaultSampleRate,
-    bool linearPhase = false,
-  }) {
-    return AutoEqFirGenerator.generateFir(
-      profile: this,
-      taps: taps,
-      sampleRate: sampleRate,
-      linearPhase: linearPhase,
-    );
-  }
-
   factory HeadphoneProfile.fromJson(Map<String, dynamic> json) {
     // Null-guard gains like every sibling field: a stored profile missing the
     // key must not throw and abort the whole profile load.
@@ -243,7 +227,11 @@ class HeadphoneProfile {
   /// frequencies between 20 Hz and 20,000 Hz. Used by the native FIR stage
   /// (ArbitraryResponseEq) to synthesize exact minimum/linear-phase FIR filters
   /// at the engine's exact sample rate without routing through reverb. (§8.6)
-  String toGraphicEqString({int numPoints = 128}) {
+  String toGraphicEqString({
+    int numPoints = 512,
+    double sampleRate = 48000.0,
+    double preampDb = 0.0,
+  }) {
     if (filters.isEmpty && gains.isNotEmpty) {
       final centers = gains.length == EqPreset.centerFrequencies.length
           ? EqPreset.centerFrequencies
@@ -253,7 +241,8 @@ class HeadphoneProfile {
             );
       final pairs = <String>[];
       for (int i = 0; i < gains.length; i++) {
-        pairs.add('${centers[i].toStringAsFixed(1)} ${gains[i].toStringAsFixed(2)}');
+        pairs.add('${centers[i].toStringAsFixed(1)} '
+            '${(gains[i] + preampDb).clamp(-30.0, 30.0).toStringAsFixed(2)}');
       }
       return 'GraphicEq: ${pairs.join("; ")}';
     }
@@ -268,7 +257,8 @@ class HeadphoneProfile {
     final pairs = <String>[];
     for (int i = 0; i < numPoints; i++) {
       final f = math.pow(10.0, minLog + i * step).toDouble();
-      final g = _compositeGainAt(f);
+      final g = (_compositeGainAt(f, sampleRate) + preampDb)
+          .clamp(-30.0, 30.0);
       pairs.add('${f.toStringAsFixed(1)} ${g.toStringAsFixed(2)}');
     }
     return 'GraphicEq: ${pairs.join("; ")}';
@@ -280,62 +270,96 @@ class HeadphoneProfile {
   /// understands gain curves.
   List<double> gainsFromFilters({
     List<double> centers = EqPreset.centerFrequencies,
+    double sampleRate = 48000.0,
   }) {
     if (filters.isEmpty) return List<double>.from(gains);
-    return [for (final c in centers) _compositeGainAt(c)];
+    return [for (final c in centers) _compositeGainAt(c, sampleRate)];
   }
 
-  /// Magnitude (dB) of the summed biquad filters at [freq], using the RBJ
-  /// audio-EQ-cookbook transfer functions (analog magnitude, no prewarp) so
-  /// the shape is stable and cheap to evaluate for display.
-  double _compositeGainAt(double freq) {
+  /// Magnitude (dB) of the summed biquad filters at [freq], using the same
+  /// RBJ coefficients and upper-octave HF decramping as ParametricEQ.cpp.
+  double _compositeGainAt(double freq, double sampleRate) {
     if (freq <= 0 || !freq.isFinite) return 0.0;
     var linear = 1.0;
     for (final f in filters) {
-      linear *= _biquadMagnitude(f, freq);
+      linear *= _biquadMagnitude(f, freq, sampleRate);
     }
     return 20.0 * (math.log(linear) / math.ln10);
   }
 
-  /// Reference sample rate used when evaluating filter curves for display.
-  /// AutoEQ corrections are defined against a 48 kHz working rate (the app's
-  /// capture/working rate), so magnitudes match across platforms.
-  static const double _curveSampleRate = 48000.0;
+  /// Safe FIR headroom: the negated peak composite boost (+ margin), not the
+  /// sum of every positive filter gain. Native FIR nodes clamp at ±30 dB, so
+  /// the result is bounded there.
+  double computeFirPreamp({
+    double sampleRate = 48000.0,
+    int points = 256,
+    double safetyMarginDb = 1.0,
+  }) {
+    if (filters.isEmpty) {
+      var maxGain = 0.0;
+      for (final g in gains) {
+        if (g.isFinite && g > maxGain) maxGain = g;
+      }
+      return maxGain > 0
+          ? (-(maxGain + safetyMarginDb)).clamp(-30.0, 0.0)
+          : 0.0;
+    }
+    final top = math.min(20000.0, sampleRate * 0.45);
+    if (top <= 20.0) return 0.0;
+    final minLog = math.log(20.0) / math.ln10;
+    final maxLog = math.log(top) / math.ln10;
+    var maxGain = 0.0;
+    for (int i = 0; i < points; ++i) {
+      final f = math.pow(10.0, minLog + (maxLog - minLog) * i / (points - 1))
+          .toDouble();
+      final g = _compositeGainAt(f, sampleRate);
+      if (g > maxGain) maxGain = g;
+    }
+    if (maxGain <= 0) return 0.0;
+    return (-(maxGain + safetyMarginDb)).clamp(-30.0, 0.0);
+  }
 
-  static double _biquadMagnitude(EqFilter filter, double freq) {
+  static double _biquadMagnitude(
+      EqFilter filter, double freq, double sampleRate) {
     final f0 = filter.frequency;
     if (f0 <= 0 || !f0.isFinite) return 1.0;
+    final f0Clamped = f0.clamp(10.0, sampleRate * 0.499).toDouble();
     final a = filter.gain.abs() <= 1e-9
         ? 1.0
         : math.pow(10.0, filter.gain / 40.0).toDouble();
-    final w0 = 2 * math.pi * f0 / _curveSampleRate;
-    final w = 2 * math.pi * freq / _curveSampleRate;
+    final w0 = 2 * math.pi * f0Clamped / sampleRate;
+    final w = 2 * math.pi * freq / sampleRate;
     if (w0 <= 0 || w0 >= math.pi) return 1.0;
     final cosw0 = math.cos(w0);
     final sinw0 = math.sin(w0);
+    final q = math.max(filter.q, 0.05);
+    var alpha = sinw0 / (2 * q);
+    if (filter.filterType == EqFilterType.peaking && w0 > 0.25 * math.pi) {
+      // ParametricEQ.cpp HF decramping: compensate bilinear Q compression in
+      // the upper octave. Shelves deliberately do not get this boost.
+      final t = ((w0 - 0.25 * math.pi) / (0.75 * math.pi)).clamp(0.0, 1.0);
+      alpha *= 1.0 + 0.65 * t * t;
+    }
+    final sqrtA = math.sqrt(a);
+    final twoSqrtAAlpha = 2 * sqrtA * alpha;
     if (filter.filterType == EqFilterType.lowShelf) {
-      final s = math.sqrt(a) / math.sqrt(math.max(filter.q, 0.1));
-      final alpha = sinw0 / 2 * math.sqrt((a + 1 / a) * (1 / s - 1) + 2);
-      final b0 = a * ((a + 1) - (a - 1) * cosw0 + 2 * math.sqrt(a) * alpha);
+      final b0 = a * ((a + 1) - (a - 1) * cosw0 + twoSqrtAAlpha);
       final b1 = 2 * a * ((a - 1) - (a + 1) * cosw0);
-      final b2 = a * ((a + 1) - (a - 1) * cosw0 - 2 * math.sqrt(a) * alpha);
-      final a0 = (a + 1) + (a - 1) * cosw0 + 2 * math.sqrt(a) * alpha;
+      final b2 = a * ((a + 1) - (a - 1) * cosw0 - twoSqrtAAlpha);
+      final a0 = (a + 1) + (a - 1) * cosw0 + twoSqrtAAlpha;
       final a1 = -2 * ((a - 1) + (a + 1) * cosw0);
-      final a2 = (a + 1) + (a - 1) * cosw0 - 2 * math.sqrt(a) * alpha;
+      final a2 = (a + 1) + (a - 1) * cosw0 - twoSqrtAAlpha;
       return _hMag(b0, b1, b2, a0, a1, a2, w);
     } else if (filter.filterType == EqFilterType.highShelf) {
-      final s = math.sqrt(a) / math.sqrt(math.max(filter.q, 0.1));
-      final alpha = sinw0 / 2 * math.sqrt((a + 1 / a) * (1 / s - 1) + 2);
-      final b0 = a * ((a + 1) + (a - 1) * cosw0 + 2 * math.sqrt(a) * alpha);
+      final b0 = a * ((a + 1) + (a - 1) * cosw0 + twoSqrtAAlpha);
       final b1 = -2 * a * ((a - 1) + (a + 1) * cosw0);
-      final b2 = a * ((a + 1) + (a - 1) * cosw0 - 2 * math.sqrt(a) * alpha);
-      final a0 = (a + 1) - (a - 1) * cosw0 + 2 * math.sqrt(a) * alpha;
+      final b2 = a * ((a + 1) + (a - 1) * cosw0 - twoSqrtAAlpha);
+      final a0 = (a + 1) - (a - 1) * cosw0 + twoSqrtAAlpha;
       final a1 = 2 * ((a - 1) - (a + 1) * cosw0);
-      final a2 = (a + 1) - (a - 1) * cosw0 - 2 * math.sqrt(a) * alpha;
+      final a2 = (a + 1) - (a - 1) * cosw0 - twoSqrtAAlpha;
       return _hMag(b0, b1, b2, a0, a1, a2, w);
     }
     // Peaking
-    final alpha = sinw0 / (2 * math.max(filter.q, 0.1));
     final b0 = 1 + alpha * a;
     final b1 = -2 * cosw0;
     final b2 = 1 - alpha * a;
