@@ -369,6 +369,13 @@ extension EqualizerRestoreOps on EqualizerManager {
       }
 
       final profileId = prefs.getString(PrefsKeys.eqHeadphoneProfileId);
+      final modeName = prefs.getString(PrefsKeys.eqHeadphoneCorrectionMode);
+      if (modeName != null) {
+        autoEqCorrectionMode = AutoEqCorrectionMode.values.firstWhere(
+          (m) => m.name == modeName,
+          orElse: () => AutoEqCorrectionMode.peq,
+        );
+      }
       if (profileId != null) {
         try {
           await HeadphoneProfilesRepository().loadProfiles();

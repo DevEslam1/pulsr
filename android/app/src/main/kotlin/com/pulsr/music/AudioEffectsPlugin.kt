@@ -57,6 +57,7 @@ data class DynamicsPresetConfig(
 class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private val nativeOnlyMethods = setOf(
         "setCrossfeedEnabled", "setCrossfeedParams", "setCrossfeedMode",
+        "setHrtfBinauralEnabled", "setHrtfAzimuth", "setHrtfElevation", "loadHrtfSofa", "loadHrtfIr", "getHrtfLatencyFrames",
         "setReverbEnabled", "setReverbPreset", "setReverbWetDry", "setReverbParams", "setReverbCrossChannel", "loadImpulseResponse",
         "setStereoBalance", "setMonoMix", "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
         "setStereoWidthEnabled", "setStereoWidthParams", "setLoudnessContourEnabled", "setLoudnessContourParams",
@@ -144,6 +145,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var crossfeedFeedDb = -9.0
     @Volatile private var crossfeedFcut = 650.0
     @Volatile private var crossfeedMode = 0
+    @Volatile private var isHrtfBinauralEnabled = false
+    @Volatile private var hrtfAzimuth = 30.0
+    @Volatile private var hrtfElevation = 0.0
+    @Volatile private var hrtfSofaPath: String? = null
 
     @Volatile private var isLimiterEnabled = false
     @Volatile private var limiterLookaheadMs = 3.0
@@ -629,6 +634,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetDacVoicingEnabled(enabled: Boolean)
     private external fun nativeSetDacVoicingParams(character: Int, voicingAmount: Double)
     private external fun nativeSetCrossfeedMode(mode: Int)
+    private external fun nativeSetHrtfBinauralEnabled(enabled: Boolean)
+    private external fun nativeSetHrtfAzimuth(azimuth: Double)
+    private external fun nativeSetHrtfElevation(elevation: Double)
+    private external fun nativeLoadHrtfSofa(path: String): Boolean
+    private external fun nativeLoadHrtfIr(
+        ll: FloatArray, lr: FloatArray, rl: FloatArray, rr: FloatArray,
+        taps: Int, sampleRate: Double
+    ): Boolean
+    private external fun nativeGetHrtfLatencyFrames(): Int
     private external fun nativeSetViperDdcEnabled(enabled: Boolean)
     private external fun nativeLoadViperDdc(ddcContent: String, profileName: String): Boolean
     private external fun nativeSetArbitraryEqEnabled(enabled: Boolean)
@@ -2215,6 +2229,21 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeCrossfeedMode = mode
     }
 
+    private fun pushNativeHrtfBinauralEnabled(enabled: Boolean) {
+        if (!isNativeDspLoaded) return
+        nativeSetHrtfBinauralEnabled(enabled)
+    }
+
+    private fun pushNativeHrtfAzimuth(azimuth: Double) {
+        if (!isNativeDspLoaded) return
+        nativeSetHrtfAzimuth(azimuth)
+    }
+
+    private fun pushNativeHrtfElevation(elevation: Double) {
+        if (!isNativeDspLoaded) return
+        nativeSetHrtfElevation(elevation)
+    }
+
     private fun pushNativeLimiterEnabled(enabled: Boolean) {
         if (!isNativeDspLoaded || lastNativeLimiterEnabled == enabled) return
         nativeSetLimiterEnabled(enabled)
@@ -3223,6 +3252,94 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     }
                     result.success(true)
+                }
+
+                // HRTF / SOFA Binaural
+                "setHrtfBinauralEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isHrtfBinauralEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            pushNativeHrtfBinauralEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetHrtfBinauralEnabled failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setHrtfAzimuth" -> {
+                    val azimuth = (call.argument<Number>("azimuth") ?: 30.0).toDouble().coerceIn(-90.0, 90.0)
+                    hrtfAzimuth = azimuth
+                    if (isNativeDspLoaded) {
+                        try {
+                            pushNativeHrtfAzimuth(azimuth)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetHrtfAzimuth failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setHrtfElevation" -> {
+                    val elevation = (call.argument<Number>("elevation") ?: 0.0).toDouble().coerceIn(-45.0, 45.0)
+                    hrtfElevation = elevation
+                    if (isNativeDspLoaded) {
+                        try {
+                            pushNativeHrtfElevation(elevation)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetHrtfElevation failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "loadHrtfSofa" -> {
+                    val path = call.argument<String>("path")
+                    if (path.isNullOrEmpty()) {
+                        result.error("invalid_argument", "Path cannot be null or empty", null)
+                        return
+                    }
+                    hrtfSofaPath = path
+                    val ok = if (isNativeDspLoaded) {
+                        try {
+                            nativeLoadHrtfSofa(path)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeLoadHrtfSofa failed: ${e.message}")
+                            false
+                        }
+                    } else false
+                    result.success(ok)
+                }
+
+                "loadHrtfIr" -> {
+                    val ll = (call.argument<List<Double>>("ll") ?: emptyList()).map { it.toFloat() }.toFloatArray()
+                    val lr = (call.argument<List<Double>>("lr") ?: emptyList()).map { it.toFloat() }.toFloatArray()
+                    val rl = (call.argument<List<Double>>("rl") ?: emptyList()).map { it.toFloat() }.toFloatArray()
+                    val rr = (call.argument<List<Double>>("rr") ?: emptyList()).map { it.toFloat() }.toFloatArray()
+                    val taps = call.argument<Int>("taps") ?: ll.size
+                    val sampleRate = (call.argument<Number>("sampleRate") ?: 48000.0).toDouble()
+
+                    val ok = if (isNativeDspLoaded && ll.isNotEmpty() && lr.isNotEmpty() && rl.isNotEmpty() && rr.isNotEmpty()) {
+                        try {
+                            nativeLoadHrtfIr(ll, lr, rl, rr, taps, sampleRate)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeLoadHrtfIr failed: ${e.message}")
+                            false
+                        }
+                    } else false
+                    result.success(ok)
+                }
+
+                "getHrtfLatencyFrames" -> {
+                    val frames = if (isNativeDspLoaded) {
+                        try {
+                            nativeGetHrtfLatencyFrames()
+                        } catch (e: Exception) {
+                            0
+                        }
+                    } else 0
+                    result.success(frames)
                 }
 
                 // Lookahead Brickwall Limiter

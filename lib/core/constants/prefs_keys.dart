@@ -15,6 +15,12 @@ class PrefsKeys {
   static const String eqDynamicsBypassed = 'eq_dynamics_bypassed';
   static const String eqSpatializerEnabled = 'eq_spatializer_enabled';
   static const String eqHeadphoneProfileId = 'eq_headphone_profile_id';
+  static const String eqHeadphoneCorrectionMode =
+      'eq_headphone_correction_mode';
+  static const String hrtfBinauralEnabled = 'eq_hrtf_binaural_enabled';
+  static const String hrtfAzimuth = 'eq_hrtf_azimuth';
+  static const String hrtfElevation = 'eq_hrtf_elevation';
+  static const String hrtfSofaPath = 'eq_hrtf_sofa_path';
   static const String eqCustomFrequencies = 'eq_custom_frequencies';
   static const String eq32BandMode = 'eq_32_band_mode';
   static const String eqBandCount = 'eq_band_count';

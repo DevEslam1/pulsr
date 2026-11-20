@@ -82,6 +82,7 @@ set(DSP_SRCS
     ${MAIN_CPP}/ArbitraryResponseEq.cpp
     ${MAIN_CPP}/LiveProg.cpp
     ${MAIN_CPP}/CustodyVerifier.cpp
+    ${MAIN_CPP}/HrtfBinaural.cpp
     ${MAIN_CPP}/AudioDspEngine.cpp
     ${MAIN_CPP}/UsbAudioSink.cpp
     ${MAIN_CPP}/UsbPullRenderer.cpp

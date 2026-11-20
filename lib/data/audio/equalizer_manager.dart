@@ -18,6 +18,7 @@ import '../../domain/models/quran_mode_profile.dart';
 import '../../domain/models/reverb_preset.dart';
 import 'async_lock.dart';
 import 'audio_effects_channel.dart';
+import 'autoeq_fir_generator.dart';
 import 'comparison_slot.dart';
 import 'dsp_param_ranges.dart';
 import 'dsp_warmup_scheduler.dart';
@@ -367,6 +368,7 @@ class EqualizerManager {
   bool get isVolumeBoostSupported => _effectsChannel.isVolumeBoostSupported;
 
   HeadphoneProfile? selectedHeadphoneProfile;
+  AutoEqCorrectionMode autoEqCorrectionMode = AutoEqCorrectionMode.peq;
 
   List<double> customFrequencies = List.from(EqPreset.centerFrequencies);
   List<double> custom32Frequencies = List.from(EqPreset.iso32BandFrequencies);
@@ -620,6 +622,7 @@ class EqualizerManager {
       PrefsKeys.dspPreference: dspPreference,
       PrefsKeys.ditherEnabled: isDitherEnabled,
       PrefsKeys.ditherTargetBitDepth: ditherTargetBitDepth,
+      PrefsKeys.eqHeadphoneCorrectionMode: autoEqCorrectionMode.name,
     };
   }
 
@@ -822,6 +825,15 @@ class EqualizerManager {
   Future<void> applyPreset(EqPreset preset) => setPreset(preset);
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) =>
       setHeadphoneProfile(profile);
+
+  Future<void> setAutoEqCorrectionMode(AutoEqCorrectionMode mode) async {
+    if (autoEqCorrectionMode == mode) return;
+    autoEqCorrectionMode = mode;
+    _debouncedSavePreferences();
+    if (selectedHeadphoneProfile != null) {
+      await setHeadphoneProfile(selectedHeadphoneProfile);
+    }
+  }
 
   Future<void> setPreset(EqPreset preset) async {
     await _effectsLock.lock(() => _setPresetCore(preset));
@@ -1154,9 +1166,17 @@ class EqualizerManager {
         );
         comparisonSlots[activeComparisonSlot] = currentPreset;
         selectedHeadphoneProfile = profile;
-        // Parametric profiles bypass the flat 10/32/64 graphic path and drive
-        // the native 64-band parametric EQ directly with real freq/Q/gain/type.
-        if (isParametric) {
+        if (autoEqCorrectionMode == AutoEqCorrectionMode.firMinPhase ||
+            autoEqCorrectionMode == AutoEqCorrectionMode.firLinear) {
+          final isLinear =
+              autoEqCorrectionMode == AutoEqCorrectionMode.firLinear;
+          final ir = AutoEqFirGenerator.generateFir(
+            profile: profile,
+            linearPhase: isLinear,
+            taps: 4096,
+          );
+          await loadCustomImpulseResponse(ir);
+        } else if (isParametric) {
           final applied = await _applyParametricProfile(profile);
           if (!applied) {
             // Native PEQ unavailable: fall back to the graphic-gain path using

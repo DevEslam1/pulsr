@@ -73,6 +73,7 @@ set(DSP_CORE_SOURCES
     ArbitraryResponseEq.cpp
     LiveProg.cpp
     CustodyVerifier.cpp
+    HrtfBinaural.cpp
     AudioDspEngine.cpp
     AAudioSink.cpp
     UsbAudioSink.cpp

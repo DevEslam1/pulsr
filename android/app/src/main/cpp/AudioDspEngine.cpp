@@ -293,6 +293,7 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     dynamicBass_.prepare(sampleRate);
     viperDdc_.setSampleRate(sampleRate);
     arbitraryEq_.setSampleRate(sampleRate, /*resynthesize=*/false);
+    hrtf_.setSampleRate(sampleRate);
     liveProg_.setSampleRate(sampleRate);
 }
 
@@ -1028,6 +1029,7 @@ void AudioDspEngine::resetInternal() {
     viperDdc_.reset();
     arbitraryEq_.reset();
     liveProg_.reset();
+    hrtf_.reset();
     safetyLimiter_.reset();
     channelManager_.reset();
     dacVoicing_.reset();
@@ -1814,6 +1816,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     liveProg_.setEnabled((stages & STAGE_LIVE_PROG) && snapshot->liveProg.enabled);
     channelManager_.setEnabled((stages & STAGE_CHANNEL_MANAGER) && snapshot->channelManager.enabled);
     dacVoicing_.setEnabled((stages & STAGE_DAC_VOICING) && snapshot->dacVoicing.enabled);
+    hrtf_.setEnabled(snapshot->hrtf.enabled);
+    hrtf_.setAzimuth(snapshot->hrtf.azimuthDeg);
+    hrtf_.setElevation(snapshot->hrtf.elevationDeg);
     // Hysteresis (on >1.001, off <1.0002) so a gain settling near the threshold
     // cannot flap the limiter and its latency.
     {
@@ -2001,6 +2006,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // 4. Crossfeed Stage (Stereo channels 0 and 1)
         if (((stages & STAGE_CROSSFEED) || (!(degraded & STAGE_CROSSFEED) && crossfeed_.isRamping())) && channels >= 2) {
             crossfeed_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 4b. HRTF / SOFA Binaural Virtualization Stage (Stereo channels 0 and 1)
+        if ((hrtf_.isEnabled() || hrtf_.isRamping()) && channels >= 2) {
+            hrtf_.processInterleaved(buffer, frames, channels);
+            if (hrtf_.isEnabled()) {
+                blockLatency += hrtf_.getLatencyFrames();
+            }
         }
 
         // 5. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing.

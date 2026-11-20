@@ -399,6 +399,13 @@ struct DacVoicingParamSet {
     double voicingAmount = 0.0; // 0..1 even-order (2nd-harmonic) warmth; 0 = none
 };
 
+// HRTF / SOFA Binaural Virtualization
+struct HrtfBinauralParamSet {
+    bool enabled = false;
+    double azimuthDeg = 30.0;
+    double elevationDeg = 0.0;
+};
+
 struct DspParamSnapshot {
     uint64_t generation = 0;
     double sampleRate = 48000.0;
@@ -428,5 +435,6 @@ struct DspParamSnapshot {
     HeadphoneSafetyParamSet headphoneSafety;
     BypassCompareParamSet bypassCompare;
     DacVoicingParamSet dacVoicing;
+    HrtfBinauralParamSet hrtf;
 };
 

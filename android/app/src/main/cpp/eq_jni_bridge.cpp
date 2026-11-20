@@ -1391,6 +1391,79 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadLiveProgCode(
 }
 
 JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetHrtfBinauralEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.hrtf.enabled = enabled;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetHrtfAzimuth(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble azimuth) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.hrtf.azimuthDeg = azimuth;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetHrtfElevation(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble elevation) {
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.hrtf.elevationDeg = elevation;
+    });
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadHrtfSofa(
+        JNIEnv* env, jobject /* thiz */, jstring jPath) {
+    if (!jPath) return JNI_FALSE;
+    const char* pathStr = env->GetStringUTFChars(jPath, nullptr);
+    if (!pathStr) return JNI_FALSE;
+    std::string path(pathStr);
+    env->ReleaseStringUTFChars(jPath, pathStr);
+
+    bool ok = AudioDspEngine::instance().hrtf().loadSofaFile(path);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadHrtfIr(
+        JNIEnv* env, jobject /* thiz */,
+        jfloatArray jLL, jfloatArray jLR, jfloatArray jRL, jfloatArray jRR,
+        jint taps, jdouble sampleRate) {
+    if (!jLL || !jLR || !jRL || !jRR || taps <= 0 || taps > pulsr::HrtfBinaural::MAX_HRIR_TAPS) {
+        return JNI_FALSE;
+    }
+    jfloat* pLL = env->GetFloatArrayElements(jLL, nullptr);
+    jfloat* pLR = env->GetFloatArrayElements(jLR, nullptr);
+    jfloat* pRL = env->GetFloatArrayElements(jRL, nullptr);
+    jfloat* pRR = env->GetFloatArrayElements(jRR, nullptr);
+    if (!pLL || !pLR || !pRL || !pRR) {
+        if (pLL) env->ReleaseFloatArrayElements(jLL, pLL, JNI_ABORT);
+        if (pLR) env->ReleaseFloatArrayElements(jLR, pLR, JNI_ABORT);
+        if (pRL) env->ReleaseFloatArrayElements(jRL, pRL, JNI_ABORT);
+        if (pRR) env->ReleaseFloatArrayElements(jRR, pRR, JNI_ABORT);
+        return JNI_FALSE;
+    }
+
+    bool ok = AudioDspEngine::instance().hrtf().loadCustomIr(
+        pLL, pLR, pRL, pRR, taps, sampleRate);
+
+    env->ReleaseFloatArrayElements(jLL, pLL, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jLR, pLR, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jRL, pRL, JNI_ABORT);
+    env->ReleaseFloatArrayElements(jRR, pRR, JNI_ABORT);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetHrtfLatencyFrames(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return AudioDspEngine::instance().hrtf().getLatencyFrames();
+}
+
+JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLiveProgSlider(
         JNIEnv* /* env */, jobject /* thiz */, jint index, jdouble value) {
     // Publish only; LiveProg::applyParams writes the sliders on the audio

@@ -23,6 +23,7 @@
 #include "ArbitraryResponseEq.h"
 #include "LiveProg.h"
 #include "CustodyVerifier.h"
+#include "HrtfBinaural.h"
 
 #include <vector>
 #include <memory>
@@ -176,6 +177,7 @@ public:
     ViperDdc& viperDdc() { return viperDdc_; }
     ArbitraryResponseEq& arbitraryEq() { return arbitraryEq_; }
     LiveProg& liveProg() { return liveProg_; }
+    pulsr::HrtfBinaural& hrtf() { return hrtf_; }
 
     // Measured chain-of-custody capture. Control threads arm/take windows; the
     // render thread only fills them (see CustodyVerifier.h).
@@ -534,6 +536,9 @@ private:
     // DAC voicing (4x oversampling stage) â€” carries getLatencyFrames() when
     // enabled; bit-exact passthrough when disabled and settled.
     DacVoicing dacVoicing_;
+
+    // HRTF / SOFA binaural virtualization
+    pulsr::HrtfBinaural hrtf_;
 
     // Measured bit-exactness capture (64 KB, allocated with the engine so the
     // render thread never allocates while filling a window).

@@ -39,6 +39,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
   List<String> _categories = const ['All'];
   bool _isLoading = true;
   bool _isImporting = false;
+  AutoEqCorrectionMode _correctionMode = AutoEqCorrectionMode.peq;
 
   @override
   void initState() {
@@ -161,6 +162,32 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
       content: Text(message),
       duration: duration,
     ));
+  }
+
+  Widget _buildModeChoice(
+      String title, AutoEqCorrectionMode mode, PulsrPalette p) {
+    final selected = _correctionMode == mode;
+    return ChoiceChip(
+      label: Text(
+        title,
+        style: TextStyle(
+          color: selected ? p.onAccent : p.textSecondary,
+          fontSize: AppFontSize.caption,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+        ),
+      ),
+      selected: selected,
+      selectedColor: p.primary,
+      backgroundColor: p.surfaceCard,
+      side: BorderSide(color: p.hairline),
+      showCheckmark: false,
+      visualDensity: VisualDensity.compact,
+      onSelected: (_) async {
+        PulsrHaptics.selectionClick();
+        setState(() => _correctionMode = mode);
+        await context.read<PlayerCubit>().setAutoEqCorrectionMode(mode);
+      },
+    );
   }
 
   @override
@@ -294,6 +321,19 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                     ),
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildModeChoice('PEQ (IIR)', AutoEqCorrectionMode.peq, p),
+                  const SizedBox(width: AppSpacing.xs),
+                  _buildModeChoice('FIR Min-Phase', AutoEqCorrectionMode.firMinPhase, p),
+                  const SizedBox(width: AppSpacing.xs),
+                  _buildModeChoice('FIR Linear-Phase', AutoEqCorrectionMode.firLinear, p),
+                ],
               ),
             ),
             const SizedBox(height: AppSpacing.xs),

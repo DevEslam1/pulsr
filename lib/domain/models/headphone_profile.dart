@@ -1,6 +1,7 @@
 // lib/domain/models/headphone_profile.dart
 import 'dart:math' as math;
 
+import '../../data/audio/autoeq_fir_generator.dart';
 import '../../data/audio/eq_legacy_migration.dart';
 import 'eq_preset.dart';
 
@@ -75,6 +76,18 @@ class EqFilterType {
   static const int allPass = 7;
 }
 
+/// Correction mode for AutoEQ headphone compensation.
+enum AutoEqCorrectionMode {
+  /// Native 64-band parametric IIR biquad filters (lowest CPU).
+  peq,
+
+  /// Minimum-phase FIR convolution (4096 taps, true acoustic phase, ~0 latency).
+  firMinPhase,
+
+  /// Linear-phase FIR convolution (4096 taps, constant group delay, zero phase distortion).
+  firLinear,
+}
+
 class HeadphoneProfile {
   final String id;
   final String name;
@@ -110,6 +123,21 @@ class HeadphoneProfile {
 
   /// Whether this profile carries true parametric filters.
   bool get hasParametricFilters => filters.isNotEmpty;
+
+  /// Synthesizes an FIR impulse response (minimum-phase by default, or
+  /// linear-phase if [linearPhase] is true) for this headphone profile.
+  List<double> generateImpulseResponse({
+    int taps = AutoEqFirGenerator.defaultTaps,
+    double sampleRate = AutoEqFirGenerator.defaultSampleRate,
+    bool linearPhase = false,
+  }) {
+    return AutoEqFirGenerator.generateFir(
+      profile: this,
+      taps: taps,
+      sampleRate: sampleRate,
+      linearPhase: linearPhase,
+    );
+  }
 
   factory HeadphoneProfile.fromJson(Map<String, dynamic> json) {
     // Null-guard gains like every sibling field: a stored profile missing the

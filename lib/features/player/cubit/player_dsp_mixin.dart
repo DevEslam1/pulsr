@@ -16,6 +16,9 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
       dspController.applyHeadphoneProfile(profile,
           isPerSongRestore: isPerSongRestore);
 
+  Future<void> setAutoEqCorrectionMode(AutoEqCorrectionMode mode) =>
+      dspController.setAutoEqCorrectionMode(mode);
+
   Future<void> setBandGain(int bandIndex, double gain) =>
       dspController.setBandGain(bandIndex, gain);
 

@@ -349,6 +349,7 @@ pulsr/
 - **`LoudnessContour.cpp / .h`**: ISO 226 equal-loudness contour compensation for low-volume listening.
 - **`SincResampler.cpp / .h`**: Legacy sinc interpolation resampler (delegated/unsupported in `AudioEffectsPlugin`: `hasSincResampler = false`, enable requests return `DSP_UNSUPPORTED`).
 - **`SpatialPanner.cpp / .h` & `StereoWidth.cpp / .h`**: Balance/mono panner (not HRTF) and M/S matrix stereo width expansion, including a 3-band imager.
+- **`HrtfBinaural.cpp / .h`**: SOFA / HRIR binaural virtualization engine featuring NetCDF-3 classic SOFA reader, WAV HRIR loader, and 4-path stereo-to-binaural partitioned FIR convolution.
 - **`ViperDdc.cpp / .h`**: Parser and convolver for ViPER4Android `.vdc` Device Dynamic Correction files.
 - **`LiveProg.cpp / .h`**: Embedded JSFX-compatible dynamic audio scripting engine.
 - **`DsdDecoder.cpp / .h`**: Converts 1-bit DSD (DSD64/DSD128/DSD256/DSD512) bitstreams into 24-bit/32-bit linear PCM.

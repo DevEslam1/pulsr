@@ -294,6 +294,10 @@ extension PlayerDspEqExtension on PlayerDspController {
 
   Future<bool> resetHeadphoneProfile() => applyHeadphoneProfile(null);
 
+  Future<void> setAutoEqCorrectionMode(AutoEqCorrectionMode mode) async {
+    await _audioHandler.setAutoEqCorrectionMode(mode);
+  }
+
   Future<void> setBandGain(int bandIndex, double gain) async {
     if (!gain.isFinite) return;
     final clamped = DspParamRanges.eqBandGainDb.clamp(gain);

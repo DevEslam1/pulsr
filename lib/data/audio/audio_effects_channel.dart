@@ -1026,6 +1026,112 @@ class AudioEffectsChannel {
     }
   }
 
+  // --- HRTF / SOFA BINAURAL VIRTUALIZATION ---
+
+  Future<void> setHrtfBinauralEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _invokeNativeSetter('setHrtfBinauralEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set HRTF binaural enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<void> setHrtfAzimuth(double azimuth) async {
+    if (!_isAndroid) return;
+    try {
+      await _invokeNativeSetter('setHrtfAzimuth', {'azimuth': azimuth})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set HRTF azimuth ($azimuth)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<void> setHrtfElevation(double elevation) async {
+    if (!_isAndroid) return;
+    try {
+      await _invokeNativeSetter('setHrtfElevation', {'elevation': elevation})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set HRTF elevation ($elevation)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+    }
+  }
+
+  Future<bool> loadHrtfSofa(String path) async {
+    if (!_isAndroid) return false;
+    try {
+      final ok = await _channel.invokeMethod<bool>('loadHrtfSofa', {'path': path})
+          .timeout(const Duration(seconds: 5));
+      return ok == true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to load HRTF SOFA file ($path)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  Future<bool> loadHrtfIr({
+    required List<double> ll,
+    required List<double> lr,
+    required List<double> rl,
+    required List<double> rr,
+    int? taps,
+    double sampleRate = 48000.0,
+  }) async {
+    if (!_isAndroid) return false;
+    try {
+      final ok = await _channel.invokeMethod<bool>('loadHrtfIr', {
+        'll': ll,
+        'lr': lr,
+        'rl': rl,
+        'rr': rr,
+        if (taps != null) 'taps': taps,
+        'sampleRate': sampleRate,
+      }).timeout(const Duration(seconds: 5));
+      return ok == true;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to load custom HRTF IR',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  Future<int> getHrtfLatencyFrames() async {
+    if (!_isAndroid) return 0;
+    try {
+      final frames = await _channel
+          .invokeMethod<int>('getHrtfLatencyFrames')
+          .timeout(const Duration(seconds: 3));
+      return frames ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   // --- LOOKAHEAD BRICKWALL LIMITER ---
 
   Future<void> setLimiterEnabled(bool enabled) async {

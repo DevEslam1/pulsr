@@ -22,6 +22,10 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   HeadphoneProfile? get selectedHeadphoneProfile =>
       _equalizerManager.selectedHeadphoneProfile;
+  AutoEqCorrectionMode get autoEqCorrectionMode =>
+      _equalizerManager.autoEqCorrectionMode;
+  Future<void> setAutoEqCorrectionMode(AutoEqCorrectionMode mode) =>
+      _equalizerManager.setAutoEqCorrectionMode(mode);
 
   Duration get crossfadeDuration => _crossfadeManager.duration;
 
