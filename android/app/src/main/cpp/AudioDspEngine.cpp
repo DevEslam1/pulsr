@@ -655,6 +655,12 @@ bool DspEngineRegistry::wasLastBlockBitPerfect() {
     return engine != nullptr && engine->wasLastBlockBitPerfect();
 }
 
+bool DspEngineRegistry::isLowPowerBypassed() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    AudioDspEngine* engine = selectActiveEngineLocked();
+    return engine != nullptr && engine->isLowPowerBypassed();
+}
+
 void DspEngineRegistry::unregisterEngine(AudioDspEngine* engine) {
     if (!engine) return;
     std::lock_guard<std::mutex> lock(mutex_);
@@ -820,6 +826,10 @@ void DspEngineRegistry::setBypassCompare(bool enabled, double gainCompensationDb
     // self-deadlock on the same thread, and the explicit fan-out below would be
     // redundant with that broadcast.
     AudioDspEngine::instance().setBypassCompare(enabled, gainCompensationDb);
+}
+
+void DspEngineRegistry::setLowPowerEnabled(bool enabled) {
+    AudioDspEngine::instance().setLowPowerEnabled(enabled);
 }
 
 void DspEngineRegistry::getTelemetry(double* outArray, int size) {
@@ -1271,6 +1281,12 @@ void AudioDspEngine::setPcmToDsdOrder(int order) {
     pcmToDsdOrder_ = clamped;
     updateParams([clamped](DspParamSnapshot& snap) {
         snap.pcmToDsd.order = clamped;
+    });
+}
+
+void AudioDspEngine::setLowPowerEnabled(bool enabled) {
+    updateParams([enabled](DspParamSnapshot& snap) {
+        snap.lowPower.enabled = enabled;
     });
 }
 
@@ -2051,6 +2067,30 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         if (applyTransportGain(buffer, frames, channels, transportGains)) {
             lastBlockBitPerfect_.store(false, std::memory_order_relaxed);
         }
+        lowPowerBypassed_.store(false, std::memory_order_relaxed);
+        return frames;
+    }
+
+    // Low-Power Interlocked Bypass: skips DSP cleanly ONLY when activeDspStages == 0,
+    // EQ and preamp are off, remaster is off, and HRTF is off.
+    const bool lowPowerInterlockOk = (snapshot->activeStages == 0) &&
+                                     !snapshot->eq.enabled &&
+                                     (std::abs(snapshot->eq.preampDb) < 0.001) &&
+                                     !snapshot->oversample.enabled &&
+                                     !snapshot->pcmToDsd.enabled &&
+                                     !snapshot->hrtf.enabled;
+    const bool lowPowerBypassed = snapshot->lowPower.enabled && lowPowerInterlockOk;
+    lowPowerBypassed_.store(lowPowerBypassed, std::memory_order_relaxed);
+    if (lowPowerBypassed) {
+        effectiveLatencyFrames_.store(0, std::memory_order_release);
+        limiterGrDb_.store(0.0f, std::memory_order_relaxed);
+        safetyAttenuationActive_.store(false, std::memory_order_relaxed);
+        limiter_.setProcessingActive(false);
+        safetySuppressed_.store(snapshot->headphoneSafety.enabled, std::memory_order_relaxed);
+        smoothedReplayGain_ = 1.0;
+        smoothedDirectVolume_ = 1.0;
+        smoothedDirectUsbVolume_ = 1.0;
+        applyTransportGain(buffer, frames, channels, transportGains);
         return frames;
     }
 

@@ -1056,7 +1056,7 @@ internal class UsbHardwareVolume(
     fun getMute(): Boolean? {
         val channels = unit.controlChannels
         if (channels.isEmpty()) return null
-        val req = if (version == 2) 0x01 else 0x81
+        val req = 0x81
         for (channel in channels) {
             val data = ByteArray(1)
             if (!transfer(req, channel, data, write = false, cs = 0x01)) return null
@@ -1072,7 +1072,7 @@ internal class UsbHardwareVolume(
         for (channel in channels) {
             if (!transfer(0x01, channel, payload, write = true, cs = 0x01)) return false
         }
-        val req = if (version == 2) 0x01 else 0x81
+        val req = 0x81
         val expected = if (muted) 1 else 0
         for (channel in channels) {
             val data = ByteArray(1)
@@ -1129,7 +1129,7 @@ internal class UsbHardwareVolume(
         for (channel in channels) {
             // Ranges are static for a connection; only the current value moves.
             val rs = ranges[channel] ?: readRanges(channel) ?: return fail()
-            val raw = read(if (version == 2) 0x01 else 0x81, channel) ?: return fail()
+            val raw = read(0x81, channel) ?: return fail()
             if (rs.none { raw in it.min..it.max }) return fail()
             discovered[channel] = rs
             values[channel] = raw
@@ -1197,19 +1197,28 @@ internal object UsbAudioProtocol {
         val length: Int,
     )
 
+    fun buildControlRequest(
+        write: Boolean,
+        cs: Int,
+        unitId: Int,
+        interfaceNumber: Int,
+        channel: Int,
+        length: Int,
+    ): ControlRequest {
+        val requestType = if (write) 0x21 else 0xA1
+        val request = if (write) 0x01 else 0x81  // SET_CUR = 0x01, GET_CUR = 0x81 on both UAC1 and UAC2
+        val value = (cs shl 8) or (channel and 0xFF)
+        val index = (unitId shl 8) or (interfaceNumber and 0xFF)
+        return ControlRequest(requestType, request, value, index, length)
+    }
+
     fun buildMuteRequest(
         write: Boolean,
         unitId: Int,
         interfaceNumber: Int,
         channel: Int,
         uacVersion: Int = 2,
-    ): ControlRequest {
-        val requestType = if (write) 0x21 else 0xA1
-        val request = if (write) 0x01 else (if (uacVersion == 1) 0x81 else 0x01)
-        val value = (CS_MUTE shl 8) or (channel and 0xFF)
-        val index = (unitId shl 8) or (interfaceNumber and 0xFF)
-        return ControlRequest(requestType, request, value, index, length = 1)
-    }
+    ): ControlRequest = buildControlRequest(write, CS_MUTE, unitId, interfaceNumber, channel, length = 1)
 
     fun buildVolumeRequest(
         write: Boolean,
@@ -1217,13 +1226,7 @@ internal object UsbAudioProtocol {
         interfaceNumber: Int,
         channel: Int,
         uacVersion: Int = 2,
-    ): ControlRequest {
-        val requestType = if (write) 0x21 else 0xA1
-        val request = if (write) 0x01 else (if (uacVersion == 1) 0x81 else 0x01)
-        val value = (CS_VOLUME shl 8) or (channel and 0xFF)
-        val index = (unitId shl 8) or (interfaceNumber and 0xFF)
-        return ControlRequest(requestType, request, value, index, length = 2)
-    }
+    ): ControlRequest = buildControlRequest(write, CS_VOLUME, unitId, interfaceNumber, channel, length = 2)
 
     /**
      * Valid bits per sample the native sink can actually pack into a subslot.

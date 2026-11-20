@@ -91,8 +91,19 @@ class AudioEffectsPluginDispatchTest {
 
         // DoP/Native DSD probe must never infer nativeDsd without kernel/raw DSD
         // support and must report dop=false with no USB DAC attached.
+        val dopLatch = CountDownLatch(1)
         val dopResult = mock(MethodChannel.Result::class.java)
+        doAnswer {
+            dopLatch.countDown()
+            null
+        }.`when`(dopResult).success(any())
         hires.onMethodCall(MethodCall("getDopCapabilities", null), dopResult)
+        val dopDeadline = System.currentTimeMillis() + 3000
+        while (dopLatch.count > 0 && System.currentTimeMillis() < dopDeadline) {
+            Shadows.shadowOf(Looper.getMainLooper()).idle()
+            dopLatch.await(20, TimeUnit.MILLISECONDS)
+        }
+        assertTrue(dopLatch.await(0, TimeUnit.MILLISECONDS))
         val dopCaptor = ArgumentCaptor.forClass(Map::class.java)
         verify(dopResult).success(dopCaptor.capture())
         val dopMap = dopCaptor.value

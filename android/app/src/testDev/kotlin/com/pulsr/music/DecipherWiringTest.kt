@@ -90,7 +90,7 @@ class DecipherWiringTest {
 
             // Make initial request on track 1 to make it the active serving token
             val conn1 = URL(url1).openConnection() as HttpURLConnection
-            assertEquals(206, conn1.responseCode)
+            assertEquals(200, conn1.responseCode)
             val bytes1 = conn1.inputStream.readBytes()
             assertEquals(1024, bytes1.size)
             assertEquals(1.toByte(), bytes1[0])

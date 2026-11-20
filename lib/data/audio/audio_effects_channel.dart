@@ -2917,8 +2917,43 @@ class AudioEffectsChannel {
 
   /// Typed wrapper around [getDspBatteryDrainEstimate].
   Future<DspBatteryEstimate> getDspBatteryEstimate() async {
-    final map = await getDspBatteryDrainEstimate();
-    return DspBatteryEstimate.fromMap(map);
+    try {
+      final map = await getDspBatteryDrainEstimate();
+      return DspBatteryEstimate.fromMap(map);
+    } catch (e, st) {
+      ErrorLogger.log(
+        'getDspBatteryEstimate failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return const DspBatteryEstimate();
+    }
+  }
+
+  /// Sets the native low-power bypass state.
+  Future<bool> setLowPowerRoute(bool enabled) async {
+    if (!_isAndroid) return false;
+    try {
+      final res = await _channel.invokeMethod<bool>(
+        'setLowPowerRoute',
+        {'enabled': enabled},
+      );
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Checks whether the native low-power bypass is currently active.
+  Future<bool> isLowPowerBypassed() async {
+    if (!_isAndroid) return false;
+    try {
+      final res = await _channel.invokeMethod<bool>('isLowPowerBypassed');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Retrieves the native engine custody report (sample rate, buffer size, active stages, latency, bit-exactness).

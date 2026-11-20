@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "kind": "abx_report",
+  "exportedAt": "2026-11-20T01:02:03.000Z",
+  "conditionA": "bypass",
+  "conditionB": "dsp",
+  "totalTrials": 12,
+  "answeredTrials": 12,
+  "correctCount": 12,
+  "proportionCorrect": 1.0,
+  "pValue": 0.000244140625,
+  "twoSidedPValue": 0.00048828125,
+  "confidence": 0.999755859375,
+  "verdict": "strong",
+  "outputDevice": {
+    "name": "FiiO KA17 [SERIAL_REDACTED]",
+    "type": "usb",
+    "isUsbDac": true,
+    "sampleRate": 96000,
+    "bitDepth": 24,
+    "isBitPerfectActive": false
+  },
+  "sampleRate": 96000,
+  "codec": "FLAC",
+  "track": {
+    "title": "Reference Track [PATH_REDACTED]",
+    "artist": "Studio Ensemble [URL_REDACTED]",
+    "codec": "FLAC",
+    "sourceSampleRate": 96000,
+    "sourceBitDepth": 24
+  },
+  "trials": [
+    {
+      "index": 0,
+      "trialNumber": 1,
+      "hiddenX": "a",
+      "answer": "a",
+      "correct": true
+    },
+    {
+      "index": 1,
+      "trialNumber": 2,
+      "hiddenX": "b",
+      "answer": "b",
+      "correct": true
+    },
+    {
+      "index": 2,
+      "trialNumber": 3,
+      "hiddenX": "a",
+      "answer": "a",
+      "correct": true
+    },
+    {
+      "index": 3,
+      "trialNumber": 4,
+      "hiddenX": "b",
+      "answer": "b",
+      "correct": true
+    },
+    {
+      "index": 4,
+      "trialNumber": 5,
+      "hiddenX": "a",
+      "answer": "a",
+      "correct": true
+    },
+    {
+      "index": 5,
+      "trialNumber": 6,
+      "hiddenX": "b",
+      "answer": "b",
+      "correct": true
+    },
+    {
+      "index": 6,
+      "trialNumber": 7,
+      "hiddenX": "a",
+      "answer": "a",
+      "correct": true
+    },
+    {
+      "index": 7,
+      "trialNumber": 8,
+      "hiddenX": "b",
+      "answer": "b",
+      "correct": true
+    },
+    {
+      "index": 8,
+      "trialNumber": 9,
+      "hiddenX": "a",
+      "answer": "a",
+      "correct": true
+    },
+    {
+      "index": 9,
+      "trialNumber": 10,
+      "hiddenX": "b",
+      "answer": "b",
+      "correct": true
+    },
+    {
+      "index": 10,
+      "trialNumber": 11,
+      "hiddenX": "a",
+      "answer": "a",
+      "correct": true
+    },
+    {
+      "index": 11,
+      "trialNumber": 12,
+      "hiddenX": "b",
+      "answer": "b",
+      "correct": true
+    }
+  ]
+}

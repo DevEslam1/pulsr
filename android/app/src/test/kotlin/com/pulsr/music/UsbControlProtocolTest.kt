@@ -93,8 +93,8 @@ class UsbControlProtocolTest {
         assertEquals(-13.0, control.currentDb!!, 0.0)
         assertTrue(control.applied)
         assertTrue(device.requests.contains(Request(0x21, 1, 0x200, 0x302, 2)))
-        assertTrue(device.requests.contains(Request(0xA1, 1, 0x200, 0x302, 2)))
-        assertFalse(device.requests.any { it.request in 0x81..0x84 })
+        assertTrue(device.requests.contains(Request(0xA1, 0x81, 0x200, 0x302, 2)))
+        assertFalse(device.requests.any { it.request in 0x82..0x84 })
     }
 
     @Test fun volumeVerificationToleratesQuantizationRoundingWithinResolution() {
@@ -125,8 +125,8 @@ class UsbControlProtocolTest {
 
     @Test fun shortsAndFailedReadbackNeverProveApplication() {
         // Any short read fails the refresh that first populates it, for the
-        // CUR read and for the RANGE read alike.
-        for (request in listOf(1, 2)) {
+        // CUR read (0x81) and for the RANGE read (2) alike.
+        for (request in listOf(0x81, 2)) {
             val device = Device(2)
             val control = volume(device)
             device.shortRequest = request
@@ -141,7 +141,7 @@ class UsbControlProtocolTest {
         val control = volume(device)
         assertTrue(control.refresh())
         assertTrue(control.setDb(-10.0))
-        device.shortRequest = 1
+        device.shortRequest = 0x81
         assertFalse(control.refresh())
         assertFalse(control.applied)
         assertFalse(control.ready)
@@ -1068,10 +1068,10 @@ class UsbControlProtocolTest {
         assertEquals((7 shl 8) or 1, muteSet.index)
         assertEquals(1, muteSet.length)
 
-        // Mute GET_CUR UAC2: bmRequestType = 0xA1, bRequest = 0x01
+        // Mute GET_CUR UAC2: bmRequestType = 0xA1, bRequest = 0x81
         val muteGetUac2 = UsbAudioProtocol.buildMuteRequest(write = false, unitId = 7, interfaceNumber = 1, channel = 0, uacVersion = 2)
         assertEquals(0xA1, muteGetUac2.requestType)
-        assertEquals(0x01, muteGetUac2.request)
+        assertEquals(0x81, muteGetUac2.request)
         assertEquals(0x0100, muteGetUac2.value)
         assertEquals((7 shl 8) or 1, muteGetUac2.index)
         assertEquals(1, muteGetUac2.length)
@@ -1087,5 +1087,13 @@ class UsbControlProtocolTest {
         assertEquals((0x02 shl 8) or 1, volSet.value)
         assertEquals((7 shl 8) or 1, volSet.index)
         assertEquals(2, volSet.length)
+
+        // Volume GET_CUR: bmRequestType = 0xA1, bRequest = 0x81, wLength = 2
+        val volGet = UsbAudioProtocol.buildVolumeRequest(write = false, unitId = 7, interfaceNumber = 1, channel = 1, uacVersion = 2)
+        assertEquals(0xA1, volGet.requestType)
+        assertEquals(0x81, volGet.request)
+        assertEquals((0x02 shl 8) or 1, volGet.value)
+        assertEquals((7 shl 8) or 1, volGet.index)
+        assertEquals(2, volGet.length)
     }
 }

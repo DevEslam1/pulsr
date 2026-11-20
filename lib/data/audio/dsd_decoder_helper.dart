@@ -21,11 +21,11 @@ import '../services/usb_exclusive_service.dart';
 /// Whether a native-DSD *producer* exists: something that opens a DSD_U32
 /// alternate setting on the USB sink and writes 1-bit frames to it.
 ///
-/// The end-to-end native DSD playback pipeline claims the probed alternate
-/// setting via [UsbExclusiveService.startDsdStreaming], feeds 1-bit frames
-/// via [NativeDsdProducer] with backpressure to the native sink, and provides
-/// transport mapping with automatic fallback to DoP on unsupported DACs.
-const bool kNativeDsdProducerAvailable = true;
+/// Gated to false until Phase 2 hardware acceptance (Section 8.2 of plan_new.md).
+/// The UAC2 descriptor probe, DSD_U32 sink path, and bit packer exist, but
+/// direct native playback is not active until the dedicated pull session and
+/// hardware soak are verified on device.
+const bool kNativeDsdProducerAvailable = false;
 
 /// Thrown when a DSD (DSF/DFF) file is played on a platform/build with no
 /// native DSD decoder — most notably iOS, where the `decodeDsd` channel method
@@ -104,6 +104,9 @@ class DsdDacCapabilities {
   /// of the carrier rates cannot carry DoP, so the UI must not enable it.
   bool get canUseDop => dop && (dsd64 || dsd128 || dsd256);
 
+  /// True when the DAC hardware itself advertises native DSD alternate settings.
+  bool get dacSupportsNativeDsd => nativeDac && nativeDsd;
+
   /// True when Direct Native DSD (raw bitstream without DoP encapsulation) is
   /// supported.
   ///
@@ -116,7 +119,7 @@ class DsdDacCapabilities {
   /// advertises DSD_U32 and a build that cannot feed it are both blockers, and
   /// today the second one is false for every build.
   bool get canUseNativeDsd =>
-      nativeDac && nativeDsd && kNativeDsdProducerAvailable;
+      dacSupportsNativeDsd && kNativeDsdProducerAvailable;
 
   /// Whether this device advertises the DoP carrier rate for [dsdRate]
   /// (the DSD multiple of 44.1 kHz: 64, 128 or 256). Rates above DSD256 have no

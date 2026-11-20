@@ -613,6 +613,19 @@ class UsbExclusiveService {
     }
   }
 
+  /// Sets whether USB DAC hardware volume control is enabled by user preference.
+  Future<bool> setUsbHardwareVolumeEnabled(bool enabled) async {
+    if (!_isAndroid) return false;
+    try {
+      final dynamic res = await _methodChannel
+          .invokeMethod<dynamic>('setUsbHardwareVolumeEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 2));
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Raw UAC2 isochronous streaming (experimental; unvalidated on hardware).
   Future<UsbStreamResult> startStreaming({
     int sampleRate = 48000,

@@ -53,18 +53,20 @@ class CastMediaServer {
     private val servedFiles = java.util.concurrent.ConcurrentHashMap<String, ServedFile>()
     private val proxiedStreams = java.util.concurrent.ConcurrentHashMap<String, ProxiedStream>()
     private val prebufferCache = java.util.concurrent.ConcurrentHashMap<String, ByteArray>()
-    private data class LegacyMedia(val path: String, val mime: String)
-    @Volatile private var legacyMedia: LegacyMedia? = null
     @Volatile private var currentlyServingToken: String? = null
     @Volatile private var port: Int = 0
 
     val isRunning: Boolean get() = running.get()
     val boundPort: Int get() = port
 
-    fun start(): Boolean {
+    fun start(bindToLoopbackOnly: Boolean = false): Boolean {
         if (running.get()) return true
         return try {
-            val ss = ServerSocket(0)
+            val ss = if (bindToLoopbackOnly) {
+                ServerSocket(0, 50, java.net.InetAddress.getByName("127.0.0.1"))
+            } else {
+                ServerSocket(0)
+            }
             serverSocket = ss
             port = ss.localPort
             workerPool = java.util.concurrent.Executors.newFixedThreadPool(4)
@@ -87,7 +89,6 @@ class CastMediaServer {
         thread = null
         try { workerPool?.shutdownNow() } catch (_: Exception) {}
         workerPool = null
-        legacyMedia = null
         currentlyServingToken = null
         servedFiles.clear()
         proxiedStreams.clear()
@@ -156,7 +157,6 @@ class CastMediaServer {
         val resolvedMime = mime?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
         val token = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
         servedFiles[token] = ServedFile(f.absolutePath, resolvedMime, now)
-        legacyMedia = LegacyMedia(f.absolutePath, resolvedMime)
         val host = localIpv4() ?: return null
         return "http://$host:$port/media/$token"
     }
@@ -173,9 +173,11 @@ class CastMediaServer {
             if (f.exists() && f.isFile) {
                 // Enforce max 4 prebuffer entries to prevent unbound native memory growth
                 val maxPrebufferEntries = 4
-                while (prebufferCache.size >= maxPrebufferEntries) {
-                    val oldestKey = servedFiles.entries.minByOrNull { it.value.timestampMs }?.key
-                        ?: prebufferCache.keys().toList().firstOrNull()
+                var evictionLoopCount = 0
+                while (prebufferCache.size >= maxPrebufferEntries && evictionLoopCount < 16) {
+                    evictionLoopCount++
+                    // Evict from prebufferCache's own oldest key to guarantee loop progress
+                    val oldestKey = prebufferCache.keys().toList().minByOrNull { servedFiles[it]?.timestampMs ?: 0L }
                     if (oldestKey != null) {
                         prebufferCache.remove(oldestKey)
                     } else {
@@ -263,7 +265,6 @@ class CastMediaServer {
 
         val resolvedFile: File?
         val resolvedMime: String
-        val legacy = legacyMedia
         if (target.startsWith("/media/")) {
             val token = target.removePrefix("/media/").trimEnd('/')
             val served = servedFiles[token]
@@ -274,15 +275,12 @@ class CastMediaServer {
                 resolvedMime = served.mime
             } else {
                 resolvedFile = null
-                resolvedMime = legacy?.mime ?: "application/octet-stream"
+                resolvedMime = "application/octet-stream"
             }
-        } else if (target == "/media") {
-            val path = legacy?.path
-            resolvedFile = if (path != null) File(path) else null
-            resolvedMime = legacy?.mime ?: "application/octet-stream"
         } else {
+            // No legacy /media fallback permitted: all requests must specify a valid, unexpired token
             resolvedFile = null
-            resolvedMime = legacy?.mime ?: "application/octet-stream"
+            resolvedMime = "application/octet-stream"
         }
 
         if (resolvedFile == null || !resolvedFile.exists()) {
@@ -293,26 +291,46 @@ class CastMediaServer {
 
         val file = resolvedFile
         val length = file.length()
+        val isRange = rangeHeader != null
+
+        // Validate range if client supplied Range header
+        if (isRange) {
+            val invalidRange = (rangeStart >= length && length > 0) ||
+                    (rangeStart < 0 && rangeEnd <= 0) ||
+                    (rangeStart >= 0 && rangeEnd >= 0 && rangeStart > rangeEnd)
+            if (invalidRange) {
+                val header = "HTTP/1.1 416 Range Not Satisfiable\r\n" +
+                        "Content-Range: bytes */$length\r\n" +
+                        "Content-Length: 0\r\n" +
+                        "Accept-Ranges: bytes\r\n" +
+                        "Connection: close\r\n\r\n"
+                out.write(header.toByteArray())
+                out.flush()
+                return
+            }
+        }
+
         val start: Long
         val end: Long
         if (rangeStart >= 0 && rangeStart < length) {
             start = rangeStart
             end = if (rangeEnd in start until length) rangeEnd else length - 1
         } else if (rangeStart < 0 && rangeEnd > 0) {
-            // Suffix range: bytes=-N (last N bytes of file) (Part 2)
+            // Suffix range: bytes=-N (last N bytes of file)
             val suffix = rangeEnd.coerceAtMost(length)
-            start = length - suffix
-            end = length - 1
+            start = (length - suffix).coerceAtLeast(0L)
+            end = (length - 1).coerceAtLeast(0L)
         } else {
             start = 0
-            end = length - 1
+            end = (length - 1).coerceAtLeast(0L)
         }
-        val contentLength = (end - start + 1).coerceAtLeast(0L)
+        val contentLength = if (length == 0L) 0L else (end - start + 1).coerceAtLeast(0L)
+        val statusLine = if (isRange) "206 Partial Content" else "200 OK"
         val header = buildString {
-            append("HTTP/1.1 206 Partial Content\r\n")
+            append("HTTP/1.1 $statusLine\r\n")
             append("Content-Type: $resolvedMime\r\n")
             append("Accept-Ranges: bytes\r\n")
-            if (length > 0) {
+            if (isRange && length > 0) {
                 append("Content-Range: bytes $start-$end/$length\r\n")
             }
             append("Content-Length: $contentLength\r\n")

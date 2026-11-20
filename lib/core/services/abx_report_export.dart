@@ -32,6 +32,57 @@ class AbxOutputDeviceInfo {
       };
 }
 
+/// Redaction utility to scrub personal identifiable information (paths, URLs,
+/// user names, serial numbers, UUIDs, MAC addresses) from ABX export strings.
+class AbxRedactor {
+  static final RegExp _windowsPathRegex = RegExp(
+    r'[a-zA-Z]:\\[^\s"<>|?*]+',
+    caseSensitive: false,
+  );
+
+  static final RegExp _unixPathRegex = RegExp(
+    r'(?:/(?:storage|Users|home|data|private|var|etc|usr|opt|media|mnt))/[^\s"<>|?*]+',
+    caseSensitive: false,
+  );
+
+  static final RegExp _urlRegex = RegExp(
+    r'(?:https?|ftp|file|smb)://[^\s"<>]+',
+    caseSensitive: false,
+  );
+
+  static final RegExp _uuidRegex = RegExp(
+    r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b',
+  );
+
+  static final RegExp _serialRegex = RegExp(
+    r'(?:SN|Serial|S/N|SerialNo|SerialNumber)[\s:=]+([A-Za-z0-9_-]+)',
+    caseSensitive: false,
+  );
+
+  static final RegExp _macRegex = RegExp(
+    r'\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b',
+  );
+
+  /// Scrubs all identified sensitive patterns (paths, URLs, serials, UUIDs, MACs)
+  /// from [text]. Returns null if [text] is null.
+  static String? redact(String? text) {
+    if (text == null) return null;
+    var scrubbed = text;
+    scrubbed = scrubbed.replaceAll(_urlRegex, '[URL_REDACTED]');
+    scrubbed = scrubbed.replaceAll(_windowsPathRegex, '[PATH_REDACTED]');
+    scrubbed = scrubbed.replaceAll(_unixPathRegex, '[PATH_REDACTED]');
+    scrubbed = scrubbed.replaceAll(_uuidRegex, '[UUID_REDACTED]');
+    scrubbed = scrubbed.replaceAllMapped(_serialRegex, (m) {
+      final whole = m.group(0)!;
+      final num = m.group(1)!;
+      final prefix = whole.substring(0, whole.indexOf(num));
+      return '$prefix[SERIAL_REDACTED]';
+    });
+    scrubbed = scrubbed.replaceAll(_macRegex, '[MAC_REDACTED]');
+    return scrubbed;
+  }
+}
+
 /// Structured, self-contained JSON report for a completed blind ABX session.
 ///
 /// Deliberately excludes local filesystem paths so exported reports can be
@@ -50,6 +101,7 @@ class AbxReport {
   final int correctCount;
   final double proportionCorrect;
   final double pValue;
+  final double twoSidedPValue;
   final double confidence;
   final String verdict;
   final AbxOutputDeviceInfo outputDevice;
@@ -72,6 +124,7 @@ class AbxReport {
     required this.correctCount,
     required this.proportionCorrect,
     required this.pValue,
+    double? twoSidedPValue,
     required this.confidence,
     required this.verdict,
     required this.outputDevice,
@@ -82,7 +135,7 @@ class AbxReport {
     required this.sourceSampleRate,
     required this.sourceBitDepth,
     required this.trials,
-  });
+  }) : twoSidedPValue = twoSidedPValue ?? ((pValue * 2.0) > 1.0 ? 1.0 : (pValue * 2.0));
 
   /// Builds an export report from a completed [AbxSession].
   ///
@@ -100,6 +153,7 @@ class AbxReport {
     DateTime? exportedAt,
     String conditionA = 'bypass',
     String conditionB = 'dsp',
+    bool scrubPii = true,
   }) {
     if (!session.isComplete) {
       throw StateError(
@@ -112,22 +166,39 @@ class AbxReport {
         : ((outputDevice.sampleRate != null && outputDevice.sampleRate! > 0)
             ? outputDevice.sampleRate
             : sourceSampleRate);
+
+    final cleanTitle = scrubPii ? AbxRedactor.redact(trackTitle) : trackTitle;
+    final cleanArtist = scrubPii ? AbxRedactor.redact(trackArtist) : trackArtist;
+    final cleanCondA = scrubPii ? (AbxRedactor.redact(conditionA) ?? conditionA) : conditionA;
+    final cleanCondB = scrubPii ? (AbxRedactor.redact(conditionB) ?? conditionB) : conditionB;
+    final cleanDevice = scrubPii
+        ? AbxOutputDeviceInfo(
+            name: AbxRedactor.redact(outputDevice.name) ?? outputDevice.name,
+            type: outputDevice.type,
+            isUsbDac: outputDevice.isUsbDac,
+            sampleRate: outputDevice.sampleRate,
+            bitDepth: outputDevice.bitDepth,
+            isBitPerfectActive: outputDevice.isBitPerfectActive,
+          )
+        : outputDevice;
+
     return AbxReport(
       exportedAt: (exportedAt ?? DateTime.now()).toUtc(),
-      conditionA: conditionA,
-      conditionB: conditionB,
+      conditionA: cleanCondA,
+      conditionB: cleanCondB,
       totalTrials: session.trialCount,
       answeredTrials: session.answeredCount,
       correctCount: session.correctCount,
       proportionCorrect: session.proportionCorrect,
       pValue: session.pValue,
+      twoSidedPValue: (session.pValue * 2.0).clamp(0.0, 1.0),
       confidence: session.confidence,
       verdict: session.verdictKey,
-      outputDevice: outputDevice,
+      outputDevice: cleanDevice,
       sampleRate: resolvedRate,
       codec: codec,
-      trackTitle: trackTitle,
-      trackArtist: trackArtist,
+      trackTitle: cleanTitle,
+      trackArtist: cleanArtist,
       sourceSampleRate: sourceSampleRate,
       sourceBitDepth: sourceBitDepth,
       trials: List<AbxTrial>.unmodifiable(session.trials),
@@ -145,6 +216,7 @@ class AbxReport {
         'correctCount': correctCount,
         'proportionCorrect': proportionCorrect,
         'pValue': pValue,
+        'twoSidedPValue': twoSidedPValue,
         'confidence': confidence,
         'verdict': verdict,
         'outputDevice': outputDevice.toJson(),

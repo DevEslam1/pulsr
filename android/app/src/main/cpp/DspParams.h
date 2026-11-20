@@ -431,6 +431,10 @@ struct PcmToDsdParamSet {
     int order = 5;      // 1..5 SDM filter order
 };
 
+struct LowPowerParamSet {
+    bool enabled = false;
+};
+
 struct DspParamSnapshot {
     uint64_t generation = 0;
     double sampleRate = 48000.0;
@@ -464,5 +468,6 @@ struct DspParamSnapshot {
     HrtfBinauralParamSet hrtf;
     OversampleParamSet oversample;
     PcmToDsdParamSet pcmToDsd;
+    LowPowerParamSet lowPower;
 };
 

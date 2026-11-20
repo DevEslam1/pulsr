@@ -327,6 +327,57 @@ int main() {
         check(bitIdentical(settled, input), "reverb must become bit-transparent after its fade");
     }
 
+    // Low-Power Interlock verification
+    {
+        auto engine = makeEngine();
+        auto snap = baseSnapshot();
+        snap->activeStages = 0;
+        snap->eq.enabled = false;
+        snap->eq.preampDb = 0.0;
+        snap->oversample.enabled = false;
+        snap->pcmToDsd.enabled = false;
+        snap->hrtf.enabled = false;
+        snap->lowPower.enabled = true;
+        engine->publishParams(snap);
+
+        const auto input = makeSignal(frames, channels);
+        auto work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(engine->isLowPowerBypassed(), "low power bypass must engage when all DSP stages are inactive");
+        check(bitIdentical(work, input), "low power bypass must produce bit-identical output");
+
+        // Interlock: EQ enabled must block low-power bypass
+        snap->eq.enabled = true;
+        engine->publishParams(snap);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(!engine->isLowPowerBypassed(), "low power bypass must not engage when EQ is enabled");
+
+        // Interlock: Preamp > 0 must block low-power bypass
+        snap->eq.enabled = false;
+        snap->eq.preampDb = 3.0;
+        engine->publishParams(snap);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(!engine->isLowPowerBypassed(), "low power bypass must not engage when preamp is non-zero");
+
+        // Interlock: Active stage must block low-power bypass
+        snap->eq.preampDb = 0.0;
+        snap->activeStages = STAGE_SATURATION;
+        engine->publishParams(snap);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(!engine->isLowPowerBypassed(), "low power bypass must not engage when activeStages > 0");
+
+        // Interlock: Oversampling must block low-power bypass
+        snap->activeStages = 0;
+        snap->oversample.enabled = true;
+        engine->publishParams(snap);
+        work = input;
+        engine->processInterleaved(work.data(), frames, channels);
+        check(!engine->isLowPowerBypassed(), "low power bypass must not engage when remaster/oversample is enabled");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " bypass transparency check(s) failed." << std::endl;
         return 1;

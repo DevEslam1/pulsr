@@ -268,6 +268,18 @@ public final class PulsrOutputRouting {
         return bitPerfectRequested;
     }
 
+    private static volatile boolean dspActive = false;
+
+    /** Records whether any DSP stage, EQ, preamp, or remaster is currently active. */
+    public static void setDspActive(boolean active) {
+        dspActive = active;
+    }
+
+    /** True while any DSP stage, EQ, preamp, or remaster is currently active. */
+    public static boolean isDspActive() {
+        return dspActive;
+    }
+
     /** Records the app-level DoP request mirrored onto AAudio sinks. */
     public static void setDopRequested(boolean requested) {
         dopRequested = requested;
@@ -330,8 +342,10 @@ public final class PulsrOutputRouting {
             }
             // During crossfade there is no unique active session. Unknown is
             // safer than mixing one player's decoder with another's output.
-            if (active != null) return new int[] {0, 0, 0};
-            active = sink;
+            if (!includePaused && active != null) return new int[] {0, 0, 0};
+            if (active == null) {
+                active = sink;
+            }
         }
         return active == null ? new int[] {0, 0, 0} : active.decodedPcmSnapshot();
     }

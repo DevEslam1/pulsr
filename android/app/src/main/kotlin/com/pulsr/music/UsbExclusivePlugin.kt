@@ -192,9 +192,21 @@ class UsbExclusivePlugin(
 
         internal fun isHardwareVolumeActive(): Boolean {
             val owner = probeHost ?: directOwner ?: return false
+            if (!owner.usbHardwareVolumeEnabled) return false
             val device = owner.openedDevice ?: return false
             if (owner.usbManager?.hasPermission(device) != true) return false
-            return (owner.hardwareVolume?.ready == true || owner.uac2RangeSnapshot != null)
+            if (!owner.streaming) return false
+            val hwVol = owner.hardwareVolume
+            if (hwVol != null) {
+                val writable = owner.parsedResult?.volumeUnit?.controlChannels?.isNotEmpty() == true
+                return writable && hwVol.applied
+            }
+            val uac2Range = owner.uac2RangeSnapshot
+            if (uac2Range != null) {
+                val writable = owner.parsedResult?.volumeUnit?.controlChannels?.isNotEmpty() == true
+                return writable && uac2Range.channels.isNotEmpty()
+            }
+            return false
         }
 
         internal fun stepHardwareVolume(stepUp: Boolean) {
@@ -250,6 +262,7 @@ class UsbExclusivePlugin(
     private var advertisedRates: List<Int> = emptyList()
 
     private var hardwareVolume: UsbHardwareVolume? = null
+    @Volatile var usbHardwareVolumeEnabled: Boolean = false
     private var lastVolumeRefreshAtMs = 0L
 
     /** UAC2 GET_MIN/GET_MAX/GET_RES, read once per device. */
@@ -932,10 +945,21 @@ class UsbExclusivePlugin(
                 }
                 "setHardwareVolume" -> {
                     val db = call.argument<Double>("db") ?: 0.0
-                    runAsync(call.method, result) { setHardwareVolumeInternal(db) }
+                    runAsync(call.method, result) {
+                        usbHardwareVolumeEnabled = true
+                        setHardwareVolumeInternal(db)
+                    }
                 }
                 "resetHardwareVolume" -> {
-                    runAsync(call.method, result) { resetHardwareVolumeInternal() }
+                    runAsync(call.method, result) {
+                        usbHardwareVolumeEnabled = false
+                        resetHardwareVolumeInternal()
+                    }
+                }
+                "setUsbHardwareVolumeEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    usbHardwareVolumeEnabled = enabled
+                    result.success(true)
                 }
                 "startStreaming" -> {
                     val sampleRate = call.argument<Int>("sampleRate") ?: 48000
@@ -2092,7 +2116,7 @@ class UsbExclusivePlugin(
             val range = ensureUac2Range(conn, device, parsed) ?: return null
             val channels = range.channels
             if (channels.isEmpty()) return null
-            val req = if (parsed.uacVersion == 1) UAC_GET_CUR else 0x01
+            val req = UAC_GET_CUR
             for (channel in channels) {
                 val data = ByteArray(1)
                 val ret = uac2TransferWithCs(conn, 0xA1, req, UAC_CS_MUTE, range.unitId, range.interfaceNumber, channel, data)
@@ -2121,7 +2145,7 @@ class UsbExclusivePlugin(
                 )
                 if (sent != payload.size) return false
             }
-            val getReq = if (parsed.uacVersion == 1) UAC_GET_CUR else 0x01
+            val getReq = UAC_GET_CUR
             val expected = if (muted) 1 else 0
             for (channel in channels) {
                 val data = ByteArray(1)

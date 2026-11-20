@@ -2013,18 +2013,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       if (enabled) {
         await _equalizerManager.degradeToEssentials();
-        await Future.wait([
-          _playerA.dspSetLowPowerRoute(true),
-          _playerB.dspSetLowPowerRoute(true),
-        ]);
       } else if (_batteryAwarePlayback.currentLevel ==
           BatteryOptimizationLevel.normal) {
         await _equalizerManager.restoreFromDegrade();
-        final lowPowerRoute = _equalizerManager.isLowPowerRouteEnabled;
-        await Future.wait([
-          _playerA.dspSetLowPowerRoute(lowPowerRoute),
-          _playerB.dspSetLowPowerRoute(lowPowerRoute),
-        ]);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to apply battery saver state',
@@ -2036,6 +2027,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setLowPowerRoute(bool enabled) async {
     await _equalizerManager.setLowPowerRoute(enabled);
+    await AudioEffectsChannel().setLowPowerRoute(enabled);
     await Future.wait([
       _playerA.dspSetLowPowerRoute(enabled),
       _playerB.dspSetLowPowerRoute(enabled),
@@ -2063,6 +2055,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Unit to 0 dB and restores Direct USB/software attenuation without a jump.
   Future<void> syncUsbHardwareVolumeState(bool enabled) async {
     _usbHardwareVolumeOverride = enabled;
+    if (PlatformCapabilities.isAndroid) {
+      await UsbExclusiveService().setUsbHardwareVolumeEnabled(enabled);
+    }
     if (!enabled) {
       _externalHardwareVolumeSet = false;
       if (PlatformCapabilities.isAndroid) {

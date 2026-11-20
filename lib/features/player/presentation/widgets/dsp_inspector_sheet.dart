@@ -127,12 +127,12 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
       }
       final channel = AudioEffectsChannel();
       final results = await Future.wait<Object?>([
-        channel.getDspDebugReport(),
-        channel.getPipelineLatencyFrames(),
-        channel.getLimiterGrDb(),
-        channel.getDynEqGrDb(),
-        channel.getMultibandGrDb(),
-        channel.getDspBatteryEstimate(),
+        channel.getDspDebugReport().catchError((_, __) => null),
+        channel.getPipelineLatencyFrames().catchError((_, __) => 0),
+        channel.getLimiterGrDb().catchError((_, __) => 0.0),
+        channel.getDynEqGrDb().catchError((_, __) => 0.0),
+        channel.getMultibandGrDb().catchError((_, __) => 0.0),
+        channel.getDspBatteryEstimate().catchError((_, __) => const DspBatteryEstimate()),
       ]);
       // getDspDebugReport() is nullable (non-Android / platform failure);
       // casting it to non-null used to throw and discard the latency sample

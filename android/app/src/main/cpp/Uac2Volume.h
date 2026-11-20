@@ -22,7 +22,7 @@
 //            wValue        = (0x01 << 8) | channel   // mute (CS_MUTE = 0x01)
 //                            (0x02 << 8) | channel   // volume (CS_VOLUME = 0x02)
 //            wIndex        = entity ID in high byte | interface number in low byte
-//   GET_CUR  bmRequestType = 0xA1, bRequest = 0x01 (UAC2) or 0x81 (UAC1)
+//   GET_CUR  bmRequestType = 0xA1, bRequest = 0x81 (UAC1 and UAC2)
 //   GET_MIN  bmRequestType = 0xA1, bRequest = 0x82
 //   GET_MAX  bmRequestType = 0xA1, bRequest = 0x83
 //   GET_RES  bmRequestType = 0xA1, bRequest = 0x84
@@ -56,11 +56,27 @@ struct UacControlRequest {
     uint16_t wLength = 0;
 };
 
+/// Builds a standard UAC control transfer request (SET_CUR = 0x01, GET_CUR = 0x81 on both UAC1 and UAC2).
+UacControlRequest BuildUacControlRequest(
+    bool write,
+    uint8_t controlSelector,
+    uint8_t unitId,
+    uint8_t interfaceNumber,
+    uint8_t channel,
+    uint16_t length,
+    int uacVersion = 2);
+
 /// Builds a SET_CUR control request for the Feature Unit CS_MUTE control.
 UacControlRequest BuildUacMuteSetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel);
 
 /// Builds a GET_CUR control request for the Feature Unit CS_MUTE control.
 UacControlRequest BuildUacMuteGetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel, int uacVersion = 2);
+
+/// Builds a SET_CUR control request for the Feature Unit CS_VOLUME control.
+UacControlRequest BuildUacVolumeSetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel);
+
+/// Builds a GET_CUR control request for the Feature Unit CS_VOLUME control.
+UacControlRequest BuildUacVolumeGetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel, int uacVersion = 2);
 
 /// Encodes a boolean mute state into the single-byte payload (0x01 = muted, 0x00 = unmuted).
 uint8_t EncodeUacMutePayload(bool muted);

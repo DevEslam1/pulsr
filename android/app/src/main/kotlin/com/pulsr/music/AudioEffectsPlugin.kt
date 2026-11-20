@@ -743,6 +743,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeTriggerStageAutoDegrade(stageBitmask: Int)
     private external fun nativeRecoverStageAutoDegrade(stageBitmask: Int)
     private external fun nativeSetBypassCompare(enabled: Boolean, gainCompensationDb: Double)
+    private external fun nativeSetLowPowerEnabled(enabled: Boolean)
+    private external fun nativeIsLowPowerBypassed(): Boolean
     private external fun nativeSetPerformanceProfile(profile: Int)
     private external fun nativeSetThermalLevel(level: Int)
     private external fun nativeSetReverbThreadingMode(mode: Int)
@@ -842,6 +844,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var rtfGovernorRunnable: Runnable? = null
     @Volatile private var isBypassCompareActive = false
     @Volatile private var bypassCompareGainCompensationDb = 0.0
+    @Volatile private var isLowPowerRouteRequested = false
 
     private fun startRtfGovernor() {
         if (rtfGovernorRunnable != null) return
@@ -1033,26 +1036,26 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val dynEqWeight = (2.5 + dynamicEqBandCount.coerceIn(1, MAX_DYNAMIC_EQ_BANDS) * 1.1)
         val chMgrWeight = 1.5 + channelManagerChannelCount.coerceIn(2, 8) * 0.4
         return listOf(
-            StagePowerSpec(STAGE_EQ, "EQUALIZER", "Parametric EQ ($eqBandCount-band)", eqWeight, eqBandCount >= 32),
-            StagePowerSpec(STAGE_CROSSFEED, "CROSSFEED", "Crossfeed", 3.5, false),
-            StagePowerSpec(STAGE_REVERB, "REVERB", "Convolution Reverb", 22.0, true),
-            StagePowerSpec(STAGE_PANNER, "PANNER", "Spatial Panner / Balance", 1.0, false),
-            StagePowerSpec(STAGE_LIMITER, "LIMITER", "Lookahead True-Peak Limiter", 5.5, false),
-            StagePowerSpec(STAGE_SATURATION, "SATURATION", "Harmonic Saturation (4x OS)", satWeight, true),
-            StagePowerSpec(STAGE_WIDTH, "STEREO_WIDTH", "Stereo Width", widthWeight, false),
-            StagePowerSpec(STAGE_LOUDNESS, "LOUDNESS_CONTOUR", "Loudness Contour", 2.5, false),
-            StagePowerSpec(STAGE_CROSSOVER, "SUB_CROSSOVER", "Subwoofer Crossover", 3.5, false),
-            StagePowerSpec(STAGE_LFE_CROSSOVER, "LFE_CROSSOVER", "LFE Bass Management", 5.0, false),
-            StagePowerSpec(STAGE_DYNEQ, "DYNAMIC_EQ", "Dynamic EQ ($dynamicEqBandCount-band)", dynEqWeight, true),
-            StagePowerSpec(STAGE_DITHER, "DITHER", "TPDF Dither & Noise Shaping", 1.5, false),
-            StagePowerSpec(STAGE_MULTIBAND_COMPRESSOR, "MULTIBAND_COMPRESSOR", "4-Band Multiband Compressor", 11.5, true),
-            StagePowerSpec(STAGE_DYNAMIC_BASS, "DYNAMIC_BASS", "Dynamic Bass", 6.5, false),
-            StagePowerSpec(STAGE_VIPER_DDC, "VIPER_DDC", "ViPER-DDC Correction", 5.0, false),
-            StagePowerSpec(STAGE_ARBITRARY_EQ, "ARBITRARY_EQ", "Arbitrary FIR EQ (1024-tap)", 14.0, true),
-            StagePowerSpec(STAGE_LIVE_PROG, "LIVE_PROG", "LiveProg EEL VM", 15.0, true),
-            StagePowerSpec(STAGE_HEADPHONE_SAFETY, "HEADPHONE_SAFETY", "Headphone Safety Limiter", 3.5, false),
-            StagePowerSpec(STAGE_CHANNEL_MANAGER, "CHANNEL_MANAGER", "Channel Manager (${channelManagerChannelCount}ch)", chMgrWeight, false),
-            StagePowerSpec(STAGE_DAC_VOICING, "DAC_VOICING", "DAC Voicing (4x OS)", 16.0, true),
+            StagePowerSpec(STAGE_EQ, "equalizer", "Parametric EQ ($eqBandCount-band)", eqWeight, eqBandCount >= 32),
+            StagePowerSpec(STAGE_CROSSFEED, "crossfeed", "Crossfeed", 3.5, false),
+            StagePowerSpec(STAGE_REVERB, "reverb", "Convolution Reverb", 22.0, true),
+            StagePowerSpec(STAGE_PANNER, "panner", "Spatial Panner / Balance", 1.0, false),
+            StagePowerSpec(STAGE_LIMITER, "limiter", "Lookahead True-Peak Limiter", 5.5, false),
+            StagePowerSpec(STAGE_SATURATION, "saturation", "Harmonic Saturation (4x OS)", satWeight, true),
+            StagePowerSpec(STAGE_WIDTH, "stereoWidth", "Stereo Width", widthWeight, false),
+            StagePowerSpec(STAGE_LOUDNESS, "loudnessContour", "Loudness Contour", 2.5, false),
+            StagePowerSpec(STAGE_CROSSOVER, "subCrossover", "Subwoofer Crossover", 3.5, false),
+            StagePowerSpec(STAGE_LFE_CROSSOVER, "lfeCrossover", "LFE Bass Management", 5.0, false),
+            StagePowerSpec(STAGE_DYNEQ, "dynamicEq", "Dynamic EQ ($dynamicEqBandCount-band)", dynEqWeight, true),
+            StagePowerSpec(STAGE_DITHER, "dither", "TPDF Dither & Noise Shaping", 1.5, false),
+            StagePowerSpec(STAGE_MULTIBAND_COMPRESSOR, "multiband", "4-Band Multiband Compressor", 11.5, true),
+            StagePowerSpec(STAGE_DYNAMIC_BASS, "dynamicBass", "Dynamic Bass", 6.5, false),
+            StagePowerSpec(STAGE_VIPER_DDC, "viperDdc", "ViPER-DDC Correction", 5.0, false),
+            StagePowerSpec(STAGE_ARBITRARY_EQ, "arbitraryEq", "Arbitrary FIR EQ (1024-tap)", 14.0, true),
+            StagePowerSpec(STAGE_LIVE_PROG, "liveProg", "LiveProg EEL VM", 15.0, true),
+            StagePowerSpec(STAGE_HEADPHONE_SAFETY, "headphoneSafety", "Headphone Safety Limiter", 3.5, false),
+            StagePowerSpec(STAGE_CHANNEL_MANAGER, "channelManager", "Channel Manager (${channelManagerChannelCount}ch)", chMgrWeight, false),
+            StagePowerSpec(STAGE_DAC_VOICING, "dacVoicing", "DAC Voicing (4x OS)", 16.0, true),
         )
     }
 
@@ -1064,6 +1067,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val stages = activeDspStages
         val activeCount = Integer.bitCount(stages)
         val dspActive = isNativeDspLoaded && activeCount > 0 && !isBitPerfectBypassActive && !isBypassCompareActive
+        try {
+            com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(dspActive)
+        } catch (_: Throwable) {}
+
+        val lowPowerBypass = if (isNativeDspLoaded) {
+            try { nativeIsLowPowerBypassed() } catch (_: Exception) { false }
+        } else {
+            isLowPowerRouteRequested && !dspActive
+        }
 
         val baselineMahPerHr = 75.0
         val stageBreakdown = mutableListOf<Map<String, Any?>>()
@@ -1107,7 +1119,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return mapOf(
             "isHeuristic" to true,
             "dspActive" to dspActive,
-            "lowPowerBypassActive" to (isBitPerfectBypassActive || !dspActive),
+            "lowPowerBypassActive" to lowPowerBypass,
             "activeStageCount" to activeCount,
             "activeStagesCount" to activeCount,
             "rollingRtf" to rtf,
@@ -2972,6 +2984,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers",
                 "setDynamicBassParams", "getTelemetry", "getLimiterGrDb", "getDynEqGrDb", "getMultibandGrDb", "getRollingRtf",
                 "getRtfGovernorStatus", "setRtfGovernorEnabled", "setBypassCompare",
+                "setLowPowerRoute", "isLowPowerBypassed",
                 "getThermalStatus", "getDspBatteryDrainEstimate", "getChainOfCustodyReport",
                 "armCustodyWindow", "collectCustodyWindow", "cancelCustodyWindow",
                 "getWeeklyDose", "resetWeeklyDose", "isSafetyAttenuationActive", "setHeadphoneSafetyParams",
@@ -3880,6 +3893,30 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "getDspBatteryDrainEstimate" -> {
                     result.success(getDspBatteryDrainEstimate())
+                }
+
+                "setLowPowerRoute" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isLowPowerRouteRequested = enabled
+                    if (isNativeDspLoaded) {
+                        try { nativeSetLowPowerEnabled(enabled) } catch (_: Exception) {}
+                    }
+                    val stages = activeDspStages
+                    val activeCount = Integer.bitCount(stages)
+                    val dspActive = isNativeDspLoaded && activeCount > 0 && !isBitPerfectBypassActive && !isBypassCompareActive
+                    try {
+                        com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(dspActive)
+                    } catch (_: Throwable) {}
+                    result.success(true)
+                }
+
+                "isLowPowerBypassed" -> {
+                    val bypassed = if (isNativeDspLoaded) {
+                        try { nativeIsLowPowerBypassed() } catch (_: Exception) { false }
+                    } else {
+                        isLowPowerRouteRequested && (activeDspStages == 0 && !isEqEnabled)
+                    }
+                    result.success(bypassed)
                 }
 
                 "getChainOfCustodyReport" -> {

@@ -297,9 +297,12 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
      */
     @Override
     public boolean reconfigureNow(long timeoutMs) {
-        final ExoPlayer player = playerSupplier.get();
-        if (released || player == null || format == null || currentInner == null) {
+        if (released || format == null || currentInner == null) {
             return false;
+        }
+        final ExoPlayer player = playerSupplier.get();
+        if (player == null) {
+            return reconfigureOnPlaybackThread();
         }
         final java.util.concurrent.CountDownLatch done =
                 new java.util.concurrent.CountDownLatch(1);
@@ -320,9 +323,14 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
 
     @Override
     public void reconfigureAsync(java.util.function.Consumer<Boolean> onComplete) {
-        final ExoPlayer player = playerSupplier.get();
-        if (released || player == null || format == null || currentInner == null) {
+        if (released || format == null || currentInner == null) {
             onComplete.accept(false);
+            return;
+        }
+        final ExoPlayer player = playerSupplier.get();
+        if (player == null) {
+            boolean applied = reconfigureOnPlaybackThread();
+            onComplete.accept(applied);
             return;
         }
         try {
@@ -359,7 +367,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     }
 
     private boolean shouldSkipDspProcessor(@Nullable Format inputFormat, Mode requested) {
-        return lowPowerRouteEnabled.get() && isLowPowerIntegerPcmEligible(inputFormat, requested);
+        return lowPowerRouteEnabled.get() && !PulsrOutputRouting.isDspActive() && isLowPowerIntegerPcmEligible(inputFormat, requested);
     }
 
     /** Runs on the playback thread; also directly callable from unit tests. */

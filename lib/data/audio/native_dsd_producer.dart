@@ -60,7 +60,7 @@ class NativeDsdProducer {
     DsdDacCapabilities caps,
     int dsdRate,
   ) {
-    if (!caps.canUseNativeDsd || caps.nativeAltSettings.isEmpty) {
+    if (!caps.dacSupportsNativeDsd || caps.nativeAltSettings.isEmpty) {
       return null;
     }
     for (final tuple in caps.nativeAltSettings) {

@@ -254,16 +254,29 @@ int main() {
         Check(setReq.wIndex == ((5 << 8) | 1), "SET_CUR wIndex has unitId 5 in high byte, iface 1 in low");
         Check(setReq.wLength == 1, "SET_CUR wLength is 1 byte");
 
-        // GET_CUR request for mute in UAC2: bRequest = 0x01
+        // GET_CUR request for mute in UAC2: bRequest = 0x81
         const auto getReqUac2 = pulsr::BuildUacMuteGetRequest(5, 1, 0, 2);
         Check(getReqUac2.bmRequestType == 0xA1, "GET_CUR bmRequestType is 0xA1");
-        Check(getReqUac2.bRequest == 0x01, "UAC2 GET_CUR bRequest is 0x01");
+        Check(getReqUac2.bRequest == 0x81, "UAC2 GET_CUR bRequest is 0x81");
         Check(getReqUac2.wValue == (0x01 << 8), "GET_CUR master channel wValue has ch 0 in low byte");
         Check(getReqUac2.wLength == 1, "GET_CUR wLength is 1 byte");
 
         // GET_CUR request for mute in UAC1: bRequest = 0x81
         const auto getReqUac1 = pulsr::BuildUacMuteGetRequest(5, 1, 1, 1);
         Check(getReqUac1.bRequest == 0x81, "UAC1 GET_CUR bRequest is 0x81");
+
+        // Volume SET_CUR and GET_CUR shared builder
+        const auto volSet = pulsr::BuildUacVolumeSetRequest(5, 1, 1);
+        Check(volSet.bmRequestType == 0x21, "Volume SET_CUR bmRequestType is 0x21");
+        Check(volSet.bRequest == 0x01, "Volume SET_CUR bRequest is 0x01");
+        Check(volSet.wValue == ((0x02 << 8) | 1), "Volume SET_CUR wValue has CS_VOLUME in high byte");
+        Check(volSet.wLength == 2, "Volume SET_CUR wLength is 2 bytes");
+
+        const auto volGetUac2 = pulsr::BuildUacVolumeGetRequest(5, 1, 1, 2);
+        Check(volGetUac2.bmRequestType == 0xA1, "Volume GET_CUR bmRequestType is 0xA1");
+        Check(volGetUac2.bRequest == 0x81, "Volume UAC2 GET_CUR bRequest is 0x81");
+        Check(volGetUac2.wValue == ((0x02 << 8) | 1), "Volume GET_CUR wValue has CS_VOLUME in high byte");
+        Check(volGetUac2.wLength == 2, "Volume GET_CUR wLength is 2 bytes");
 
         // Payload encoding and decoding
         Check(pulsr::EncodeUacMutePayload(true) == 0x01, "mute true encodes to 0x01");

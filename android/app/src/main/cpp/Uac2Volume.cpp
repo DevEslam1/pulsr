@@ -15,24 +15,37 @@ constexpr int kQ8Max = 32767;
 
 }  // namespace
 
-UacControlRequest BuildUacMuteSetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel) {
+UacControlRequest BuildUacControlRequest(
+    bool write,
+    uint8_t controlSelector,
+    uint8_t unitId,
+    uint8_t interfaceNumber,
+    uint8_t channel,
+    uint16_t length,
+    int /*uacVersion*/) {
     UacControlRequest req;
-    req.bmRequestType = 0x21;  // Host to device | Class | Interface
-    req.bRequest = 0x01;       // UAC_SET_CUR
-    req.wValue = static_cast<uint16_t>((static_cast<uint16_t>(kUacCsMute) << 8) | channel);
+    req.bmRequestType = write ? 0x21 : 0xA1;  // 0x21: Host to device | Class | Interface; 0xA1: Device to host
+    req.bRequest = write ? 0x01 : 0x81;       // SET_CUR = 0x01, GET_CUR = 0x81 on both UAC1 and UAC2
+    req.wValue = static_cast<uint16_t>((static_cast<uint16_t>(controlSelector) << 8) | channel);
     req.wIndex = static_cast<uint16_t>((static_cast<uint16_t>(unitId) << 8) | interfaceNumber);
-    req.wLength = 1;
+    req.wLength = length;
     return req;
 }
 
+UacControlRequest BuildUacMuteSetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel) {
+    return BuildUacControlRequest(true, kUacCsMute, unitId, interfaceNumber, channel, 1);
+}
+
 UacControlRequest BuildUacMuteGetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel, int uacVersion) {
-    UacControlRequest req;
-    req.bmRequestType = 0xA1;  // Device to host | Class | Interface
-    req.bRequest = (uacVersion == 1) ? 0x81 : 0x01;  // UAC1: 0x81, UAC2: 0x01
-    req.wValue = static_cast<uint16_t>((static_cast<uint16_t>(kUacCsMute) << 8) | channel);
-    req.wIndex = static_cast<uint16_t>((static_cast<uint16_t>(unitId) << 8) | interfaceNumber);
-    req.wLength = 1;
-    return req;
+    return BuildUacControlRequest(false, kUacCsMute, unitId, interfaceNumber, channel, 1, uacVersion);
+}
+
+UacControlRequest BuildUacVolumeSetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel) {
+    return BuildUacControlRequest(true, kUacCsVolume, unitId, interfaceNumber, channel, 2);
+}
+
+UacControlRequest BuildUacVolumeGetRequest(uint8_t unitId, uint8_t interfaceNumber, uint8_t channel, int uacVersion) {
+    return BuildUacControlRequest(false, kUacCsVolume, unitId, interfaceNumber, channel, 2, uacVersion);
 }
 
 uint8_t EncodeUacMutePayload(bool muted) {

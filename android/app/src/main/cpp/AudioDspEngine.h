@@ -308,6 +308,10 @@ public:
     void setPcmToDsdOrder(int order);
     int pcmToDsdOrder() const;
 
+    // ---- Low-Power Interlocked Bypass ----
+    void setLowPowerEnabled(bool enabled);
+    bool isLowPowerBypassed() const { return lowPowerBypassed_.load(std::memory_order_relaxed); }
+
     bool preparePcmToDsd(double pcmRate, int dsdMultiple, int order, int containerBits = 24);
     void resetPcmToDsd();
     void releasePcmToDsd();
@@ -387,6 +391,7 @@ private:
     std::atomic<int> sinkBitDepth_{0};
     std::atomic<int> effectiveLatencyFrames_{0};
     std::atomic<bool> limiterActive_{false};
+    std::atomic<bool> lowPowerBypassed_{false};
     // A reset is a command, not a replaceable parameter. Publications may
     // supersede its snapshot but cannot remove its acknowledgement token.
     std::atomic<uint64_t> resetRequestGeneration_{0};
@@ -667,6 +672,8 @@ public:
     void triggerStageAutoDegrade(uint32_t stageBitmask);
     void recoverStageAutoDegrade(uint32_t stageBitmask);
     void setBypassCompare(bool enabled, double gainCompensationDb);
+    void setLowPowerEnabled(bool enabled);
+    bool isLowPowerBypassed();
     void getTelemetry(double* outArray, int size);
     double getWeeklyDose();
     void resetWeeklyDose();

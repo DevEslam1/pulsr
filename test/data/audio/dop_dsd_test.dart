@@ -215,10 +215,11 @@ void main() {
         nativeDac: true,
         nativeDsd: true,
       );
-      // The DAC half is proven, and now NativeDsdProducer is wired end-to-end
-      // to open the UAC2 DSD alt setting and pump DSD_U32 frames.
-      expect(kNativeDsdProducerAvailable, isTrue);
-      expect(nativeCapable.canUseNativeDsd, isTrue);
+      // DAC hardware proves native DSD alt settings exist, but the producer flag
+      // remains gated off until Phase 2 hardware soak acceptance.
+      expect(nativeCapable.dacSupportsNativeDsd, isTrue);
+      expect(kNativeDsdProducerAvailable, isFalse);
+      expect(nativeCapable.canUseNativeDsd, isFalse);
 
       const dacWithoutNative = DsdDacCapabilities(
         dsd64: true,

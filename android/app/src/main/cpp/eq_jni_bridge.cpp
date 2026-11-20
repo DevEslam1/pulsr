@@ -784,6 +784,18 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBypassCompare(
     DspEngineRegistry::instance().setBypassCompare(enabled == JNI_TRUE, static_cast<double>(gainCompensationDb));
 }
 
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLowPowerEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    DspEngineRegistry::instance().setLowPowerEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeIsLowPowerBypassed(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return DspEngineRegistry::instance().isLowPowerBypassed() ? JNI_TRUE : JNI_FALSE;
+}
+
 
 JNIEXPORT jdouble JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetLimiterGrDb(
