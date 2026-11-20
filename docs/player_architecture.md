@@ -116,3 +116,56 @@ Queue persistence across application restarts is managed via `QueueSlotCodec` (`
   - Deciphers signatures and transforms `n`-throttling parameters reliably across YouTube player rewrites without regex fragility.
 - **Age-Gated (+18) Track Fallback**:
   - `InnertubeClient.resolveAgeGatedStream()` retries restricted content using the authenticated `WEB` client carrying the user's session cookies.
+
+---
+
+## 10. Modular PlaybackBackend, FeatureGate & OutputVerdict (§8 Remediation)
+
+To cleanly decouple the media queue and session coordinator from rendering pipelines across local and remote destinations, the player architecture introduces the `PlaybackBackend` seam:
+
+```
+PulsrAudioHandler (Queue, Session, MediaNotification, Lockscreen)
+       │
+       ▼
+FeatureGate (Rules, Precedence, Refusal Reasons)
+       │
+       ▼
+OutputVerdictController (Dynamically computes OutputVerdict)
+       │
+       ├───────────────────┬───────────────────┬───────────────────┐
+       ▼                   ▼                   ▼                   ▼
+ LocalPcmBackend     LocalDsdBackend      CastBackend        UpnpBackend
+(ExoPlayer A/B +    (Dedicated USB Pull  (Google Cast SDK  (DLNA AVTransport
+ Native C++ DSP)      NativeDsdSession)    Loopback Proxy)   Remote Renderer)
+```
+
+### 10.1 Backends
+1. **`LocalPcmBackend` (`lib/data/audio/playback_backend.dart`)**:
+   - Wraps the existing A/B ExoPlayer instances and native C++ DSP engine.
+   - Supports gapless, crossfade, ReplayGain, local DSP stages, and software volume.
+2. **`LocalDsdBackend` (`lib/data/audio/native_dsd_session.dart`)**:
+   - Dedicated pull-renderer session for 1-bit DSD audio streams (DSD64/128/256/512).
+   - Accurate byte-based position and duration reporting directly from flushed frames; eliminates fake WAV headers.
+   - Enforces fixed volume or hardware volume; strictly refuses PCM-domain software volume scaling on 1-bit streams.
+3. **`CastBackend` (`lib/data/services/cast_service.dart`)**:
+   - Streams media via localhost prebuffer HTTP server (`127.0.0.1`) to Google Cast receivers.
+   - Full transport control (Play, Pause, Stop, Seek, Next, Previous) with duration and position synchronization.
+4. **`UpnpBackend` (`lib/features/dlna/dlna_renderer_service.dart`)**:
+   - Controls DLNA/UPnP renderers via SOAP AVTransport actions.
+   - Backed by `UpnpDeviceDescriptionCache` operating on a true LRU cache policy.
+
+### 10.2 FeatureGate & Conflict Precedence
+- Centralized policy engine evaluating allowed/blocked actions per backend and route:
+  1. **Bit-perfect mode**: strictly blocks software volume, remastering, HRTF, crossfeed, and all DSP stages.
+  2. **Native DSD mode**: bypasses PCM DSP, crossfade, and ReplayGain. Requires hardware volume or fixed-volume mode.
+  3. **Remaster**: follow-rate integer upsampling (x2/x4/x8) and real-time PCM-to-DSD; mutually exclusive with bit-perfect.
+  4. **Low-power bypass**: mutually exclusive with any active DSP stage; server-side interlock rejects bypass when EQ/remaster/HRTF is enabled.
+  5. **Spatial exclusivity**: HRTF / SOFA binaural spatializer and BS2B crossfeed are mutually exclusive.
+
+### 10.3 OutputVerdict Derived Status
+- Replaces optimistic static flags with a single, immutable `OutputVerdict` computed dynamically from:
+  - Negotiated hardware sink format (sample rate, bit depth, encoding).
+  - Active backend capabilities.
+  - Active native DSP stage bitmask (`DspStageMask`).
+  - Actual DSD transport state and output route.
+- Recomputed on track transitions, route changes, engine recreation, and mid-track toggle events.

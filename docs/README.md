@@ -50,6 +50,9 @@ These are snapshots of a specific date. They intentionally document defects, lim
 | [`YTM_STACK_REVIEW_2026-10-27.md`](YTM_STACK_REVIEW_2026-10-27.md) | 2026-10-27 | InnerTube, NewPipe and PoToken review |
 | [`YTM_AGE_GATE_FIX_2026-10-30.md`](YTM_AGE_GATE_FIX_2026-10-30.md) | 2026-10-30 | Age-restricted track failure and fix |
 | [`SOUND_QUALITY_AUDIT_2026-11-09.md`](SOUND_QUALITY_AUDIT_2026-11-09.md) | 2026-11-09 | 16/24/32-bit and bit-perfect audit |
+| [`AUDIO_COMPETITIVE_REVIEW_2026-11-19.md`](AUDIO_COMPETITIVE_REVIEW_2026-11-19.md) | 2026-11-19 | Audiophile competitive review vs UAPP, Poweramp, Neutron, Onkyo |
+| [`PROOF_PACK_2026-11-20.md`](PROOF_PACK_2026-11-20.md) | 2026-11-20 | Proof pack per feature, hardware lab status, DAC models and limits |
+| [`FINAL_AUDIT_2026-11-20.md`](FINAL_AUDIT_2026-11-20.md) | 2026-11-20 | Section 8 final 10/10 audit against Section 4 and Section 16 sign-off |
 | [`player_architecture_audit.md`](player_architecture_audit.md) | Phase 0 | Pre-refactor player audit |
 
 The scorecard workbook [`pulsr_max_rate_scorecard_2026-10-26.xlsx`](pulsr_max_rate_scorecard_2026-10-26.xlsx) is the sortable companion to the 2026-10-26 dossier.

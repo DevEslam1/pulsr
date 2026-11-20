@@ -13,6 +13,7 @@
 migrate_working_dir/
 New folder/
 .kilo/
+.kotlin/
 # IntelliJ related
 *.iml
 *.ipr

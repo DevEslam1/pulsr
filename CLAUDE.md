@@ -43,9 +43,11 @@
 2. **State Management:** `flutter_bloc` (`Cubit` pattern) with `freezed` immutable states. Side effects and async guards are managed via functional programming concepts (`fpdart` / `Result<T>`).
 3. **Dependency Injection:** `get_it` + `injectable` (`lib/core/di/injection.dart`). All major services, repositories, and handlers are registered as lazy singletons or factories.
 4. **Local Database:** `drift` (SQLite ORM) with type-safe queries, streams, reactive tables, and automated schema migration.
-5. **Dual Audio Playback Pipelines & Bit-Perfect Source Policy:**
+5. **Dual Audio Playback Pipelines, Backend Seam & Bit-Perfect Policy:**
    - **ExoPlayer / Media3 (via vendored `just_audio`):** Standard playback with decoded PCM stream forwarded directly to `libpulsr_dsp`.
    - **Native Low-Latency AAudio / USB Exclusive Engine:** Directly buffers PCM audio from C++ sinks to hardware endpoints without Android audio flinger resampling.
+   - **Modular `PlaybackBackend` Seam:** Clean abstraction separating session/queue logic (`PulsrAudioHandler`) from physical rendering across `LocalPcmBackend`, `LocalDsdBackend` (dedicated USB DSD pull session), `CastBackend` (Google Cast receiver via loopback proxy), and `UpnpBackend` (DLNA AVTransport renderer).
+   - **Centralized `FeatureGate` & Derived `OutputVerdict`:** Enforces capability gating and conflict precedence (Bit-perfect blocks DSP; Native DSD blocks PCM DSP/software volume; Remaster invalidates bit-perfect; HRTF and Crossfeed are mutually exclusive). `OutputVerdict` dynamically derives playback status from negotiated sink format and active stages.
    - **Bit-Perfect Source Policy:**
      - **Lossless Sources:** True lossless codecs (FLAC, ALAC, WAV, AIFF, DSD, WavPack, APE, TTA, integer PCM prefixes like `pcm_s16le`, `pcm_s24le`) are eligible for verified Bit-Perfect output.
      - **Lossy Sources Blocked:** Compressed lossy formats (MP3, AAC, Ogg Vorbis, Opus, `pcm_alaw`, `pcm_mulaw`) and live radio streams are blocked from Bit-Perfect mode with explicit user-facing localization. Bit-Perfect mode guarantees bit-exact bitstream transmission, which cannot be truthfully claimed for lossy-compressed audio.

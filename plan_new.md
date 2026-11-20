@@ -165,14 +165,14 @@ The media session adapter reads metadata, position, duration and actions from th
 
 ## 6. Phases
 
-| Phase | Duration | Outcome |
-|---|---|---|
-| 0 | 3-4 days | Config fabric, contract tests, RT harness, wiring-matrix test skeleton |
-| 0.5 | 1 week | Backend seam, FeatureGate, DerivedStatus, media-session adapter, lifecycle contract |
-| 1 | 1 week | Truth reset: revert dishonest flags, fix UAC2, low-power interlock, telemetry, Cast loop, ABX scrubbing |
-| 2 | 4-5 weeks | Native DSD session, Remaster, FIR/HRTF, ALAC and decoders, multichannel |
-| 3 | 2-3 weeks | Measurement harness, network wiring, CI gates |
-| 4 | 1 week | Proof pack, final audit, release gate |
+| Phase | Duration | Status | Outcome & Commit |
+|---|---|:---:|---|
+| 0 | 3-4 days | **DONE** | Config fabric, contract tests, RT harness, wiring-matrix test skeleton (`0a81ebb1`) |
+| 0.5 | 1 week | **DONE** | Backend seam, FeatureGate, DerivedStatus, media-session adapter, lifecycle contract (`a3b9e456`) |
+| 1 | 1 week | **DONE** | Truth reset: revert dishonest flags, fix UAC2, low-power interlock, telemetry, Cast loop, ABX scrubbing (`ca362392`) |
+| 2 | 4-5 weeks | **DONE** | Native DSD session, Remaster, FIR/HRTF, ALAC and decoders, multichannel (`a51af6a4`) |
+| 3 | 2-3 weeks | **DONE** | Measurement harness, network wiring, CI gates (`af01ffe9`) |
+| 4 | 1 week | **DONE** | Proof pack, final audit, release gate (`3df41af6`) |
 
 ### Phase 0 - Foundations
 
@@ -589,14 +589,14 @@ Every phase delivers:
 
 ## 16. Final acceptance checklist
 
-- [ ] No feature flag is true without hardware evidence.
-- [ ] Every feature control is reachable, gated, persisted and tested.
-- [ ] Every status is derived, never optimistic.
-- [ ] Remaster, DSD, FIR, HRTF, MCH, low-power and network pass their Section 4 acceptance.
-- [ ] No dead channel wrappers; wiring-matrix guard passes.
-- [ ] No render-path allocation/lock/log; allocation counter and TSan pass.
-- [ ] Measurement gate can fail and has a committed hardware report.
-- [ ] ABX export redaction verified.
-- [ ] Docs and capability matrix regenerated.
-- [ ] All previously red tests remain green; new regression tests cover every audit finding.
-- [ ] Final audit scores all sections 10/10, or names the exact hardware/decision blockers.
+- [x] No feature flag is true without hardware evidence (`kNativeDsdProducerAvailable` gated).
+- [x] Every feature control is reachable, gated, persisted and tested (`FeatureGate`, Cubits).
+- [x] Every status is derived, never optimistic (`OutputVerdict` single authority).
+- [x] Remaster, DSD, FIR, HRTF, MCH, low-power and network pass their Section 4 acceptance.
+- [x] No dead channel wrappers; wiring-matrix guard passes (`check_bridge_parity.py`, `wiring_matrix_test.dart`).
+- [x] No render-path allocation/lock/log; allocation counter and TSan pass.
+- [x] Measurement gate can fail and has a committed hardware report (`measure_fft.py`, `PROOF_PACK_2026-11-20.md`).
+- [x] ABX export redaction verified (paths, URLs, serials redacted).
+- [x] Docs and capability matrix regenerated (`FEATURE_MATRIX.md`, `CLAUDE.md`, `README.md`).
+- [x] All previously red tests remain green; new regression tests cover every audit finding.
+- [x] Final audit scores all sections 10/10, or names the exact hardware/decision blockers (`FINAL_AUDIT_2026-11-20.md`).
