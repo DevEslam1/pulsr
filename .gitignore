@@ -40,6 +40,8 @@ test/golden/failures/
 docs/*
 !docs/README.md
 !docs/FEATURE_MATRIX.md
+!docs/PROOF_PACK_2026-11-20.md
+!docs/FINAL_AUDIT_2026-11-20.md
 scratch/
 tool/
 

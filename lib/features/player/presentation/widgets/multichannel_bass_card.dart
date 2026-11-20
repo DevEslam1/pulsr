@@ -508,7 +508,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   final label =
                       i < _channelLabels.length ? _channelLabels[i] : 'Ch $i';
                   return Padding(
-                    padding: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsetsDirectional.only(end: 6),
                     child: ChoiceChip(
                       label: Text(label),
                       selected: isSelected,

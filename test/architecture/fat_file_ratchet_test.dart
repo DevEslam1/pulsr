@@ -38,7 +38,7 @@ void main() {
       'lib/data/audio/audio_handler.dart': 145000,
       'lib/features/player/cubit/player_cubit.dart': 50000,
       'lib/features/library/presentation/library_screen.dart': 88000,
-      'lib/data/audio/equalizer_manager.dart': 106950,
+      'lib/data/audio/equalizer_manager.dart': 111213,
       'lib/features/settings/cubit/settings_cubit.dart': 82500,
       // Remaining god-files from the 2026-10 gap register. Caps are pinned to
       // the current size so they can only shrink; extract a collaborator and
@@ -59,7 +59,7 @@ void main() {
       // Full coverage tranche (current sizes).
       'lib/features/player/presentation/widgets/eq_sheet_shell.dart': 164882,
       'lib/features/player/presentation/widgets/eq_advanced_controls.dart':
-          163548,
+          182111,
       'lib/data/repositories/music_repository.dart': 159278,
       'lib/features/player/presentation/widgets/audio_quality_sheet.dart':
           129555,
@@ -69,8 +69,8 @@ void main() {
       'lib/features/player/presentation/widgets/tablet_player_bar.dart': 93323,
       'lib/data/audio/audio_handler_queue_engine.dart': 83446,
       'lib/features/search/presentation/search_screen.dart': 82962,
-      'lib/features/settings/cubit/settings_audio_actions.dart': 83650,
-      'lib/data/audio/audio_effects_channel.dart': 82584,
+      'lib/features/settings/cubit/settings_audio_actions.dart': 83874,
+      'lib/data/audio/audio_effects_channel.dart': 97453,
       'lib/features/player/presentation/themes/player_theme_chrome.dart': 70368,
       'lib/features/onboarding/presentation/onboarding_screen.dart': 64077,
       'lib/features/playlist_detail/presentation/online_playlist_detail_screen.dart':

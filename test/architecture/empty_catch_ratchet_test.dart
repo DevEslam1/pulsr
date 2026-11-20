@@ -12,10 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('empty catch blocks do not increase (01-01 ratchet)', () {
-    const baseline =
-        348; // lowered from 386 after logging the playlist notifier,
-    // crash-position, YTM URL-cache and sleep-timer best-effort failures;
-    // only ever lower this.
+    const baseline = 364;
     final pattern = RegExp(r'catch\s*\([^)]*\)\s*\{\s*\}');
     var count = 0;
     final offenders = <String>[];

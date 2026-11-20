@@ -332,6 +332,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear),
+                            tooltip: RemoteSourcesStrings.searchClear,
                             onPressed: () {
                               _searchController.clear();
                               _performSearch('');

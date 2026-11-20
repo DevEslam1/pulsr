@@ -7,6 +7,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../cubit/player_cubit.dart';
@@ -468,13 +469,10 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                       minWidth: AppSpacing.minTouchTarget,
                       minHeight: AppSpacing.minTouchTarget),
                   icon: _scanning
-                      ? SizedBox(
-                          width: AppSpacing.s18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: p.accent,
-                          ),
+                      ? PulsrProgressBar.circular(
+                          size: AppSpacing.s18,
+                          strokeWidth: 2,
+                          color: p.accent,
                         )
                       : Icon(Icons.refresh_rounded, color: p.textSecondary),
                   tooltip: l10n.scanningCastDevices,
@@ -703,12 +701,10 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                             size: 18, color: p.textSecondary),
                         Expanded(
                           child: _volumeLoading
-                              ? const Center(
-                                  child: SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
+                              ? Center(
+                                  child: PulsrProgressBar.circular(
+                                    size: 16,
+                                    strokeWidth: 2,
                                   ),
                                 )
                               : _volumeUnknown

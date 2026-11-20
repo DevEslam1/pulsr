@@ -576,9 +576,11 @@ class _UsbDacSectionState extends State<UsbDacSection> {
                   ),
                   tooltip: _uac2Muted == true ? 'Unmute DAC' : 'Mute DAC',
                   onPressed: () => unawaited(_toggleUac2Mute(!(_uac2Muted == true))),
-                  visualDensity: VisualDensity.compact,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                 ),
               ],
             ),

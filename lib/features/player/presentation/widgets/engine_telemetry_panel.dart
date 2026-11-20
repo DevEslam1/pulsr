@@ -348,7 +348,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
                 child: Text(
                   '$name: +${cost.toStringAsFixed(1)} mAh/h',
                   style: TextStyle(
-                    fontSize: 10,
+                    fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
                     color: p.textSecondary,
                     fontFeatures: const [FontFeature.tabularFigures()],

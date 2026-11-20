@@ -82,6 +82,7 @@ abstract final class RemoteSourcesStrings {
   static const String folderLabel = 'Folder';
   static const String searchLibrary = 'Search library';
   static const String searchHint = 'Search artists, albums, songs…';
+  static const String searchClear = 'Clear search';
   static const String noSearchResults = 'No results found.';
   static const String artistsHeader = 'Artists';
   static const String albumsHeader = 'Albums';

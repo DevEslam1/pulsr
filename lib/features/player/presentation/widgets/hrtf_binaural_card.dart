@@ -158,8 +158,9 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final cubit = context.watch<PlayerCubit>();
-    final isCrossfeedActive = cubit.state.isCrossfeedEnabled;
+    final isCrossfeedActive = context.select<PlayerCubit, bool>(
+      (c) => c.state.isCrossfeedEnabled,
+    );
     final isBlocked = widget.blockedReason != null || !widget.nativeAvailable;
 
     return Container(
