@@ -256,6 +256,99 @@ void main() {
       expect(probe.bitrateKbps, 4608);
       expect(probe.isHiRes, isTrue);
     });
+
+    test('extracts ALAC when wrapped in mp4a format entry (§8.3)', () {
+      final config = _makeAlacConfig(
+        bitDepth: 24,
+        sampleRate: 48000,
+        avgBitRate: 1536000,
+      );
+      final alacAtom = _makeAlacAtom(config, fullBox: true);
+      final sampleEntry = _makeAudioSampleEntry(
+        format: 'mp4a',
+        channels: 2,
+        sampleRate: 48000,
+        childBoxes: alacAtom,
+      );
+      final stsd = _makeStsd([sampleEntry]);
+      final mp4Bytes = _makeMp4AudioFile(stsdBox: stsd);
+
+      final probe = Mp4BoxParser.probeBytes(mp4Bytes);
+
+      expect(probe.hasAudioTrack, isTrue);
+      expect(probe.codec, 'ALAC');
+      expect(probe.isLossless, isTrue);
+      expect(probe.bitDepth, 24);
+      expect(probe.sampleRate, 48000);
+    });
+
+    test('extracts ALAC when wrapped in mp4a via wave atom (§8.3)', () {
+      final config = _makeAlacConfig(
+        bitDepth: 16,
+        sampleRate: 44100,
+        avgBitRate: 800000,
+      );
+      final alacAtom = _makeAlacAtom(config, fullBox: true);
+      final waveAtom = _box('wave', alacAtom);
+      final sampleEntry = _makeAudioSampleEntry(
+        format: 'mp4a',
+        channels: 2,
+        sampleRate: 44100,
+        childBoxes: waveAtom,
+      );
+      final stsd = _makeStsd([sampleEntry]);
+      final mp4Bytes = _makeMp4AudioFile(stsdBox: stsd);
+
+      final probe = Mp4BoxParser.probeBytes(mp4Bytes);
+
+      expect(probe.hasAudioTrack, isTrue);
+      expect(probe.codec, 'ALAC');
+      expect(probe.isLossless, isTrue);
+      expect(probe.bitDepth, 16);
+      expect(probe.sampleRate, 44100);
+    });
+
+    test('rejects ALAC with invalid bit depth (§8.3)', () {
+      final config = _makeAlacConfig(
+        bitDepth: 12, // Invalid bit depth (not 16/20/24/32)
+        sampleRate: 44100,
+      );
+      final alacAtom = _makeAlacAtom(config, fullBox: true);
+      final sampleEntry = _makeAudioSampleEntry(
+        format: 'alac',
+        channels: 2,
+        sampleRate: 44100,
+        sampleSize: 12,
+        childBoxes: alacAtom,
+      );
+      final stsd = _makeStsd([sampleEntry]);
+      final mp4Bytes = _makeMp4AudioFile(stsdBox: stsd);
+
+      final probe = Mp4BoxParser.probeBytes(mp4Bytes);
+
+      expect(probe.isRecognised, isFalse);
+    });
+
+    test('rejects ALAC with invalid sample rate (§8.3)', () {
+      final config = _makeAlacConfig(
+        bitDepth: 24,
+        sampleRate: 0, // Invalid sample rate (< 8000)
+      );
+      final alacAtom = _makeAlacAtom(config, fullBox: true);
+      final sampleEntry = _makeAudioSampleEntry(
+        format: 'alac',
+        channels: 2,
+        sampleRate: 0,
+        sampleSize: 24,
+        childBoxes: alacAtom,
+      );
+      final stsd = _makeStsd([sampleEntry]);
+      final mp4Bytes = _makeMp4AudioFile(stsdBox: stsd);
+
+      final probe = Mp4BoxParser.probeBytes(mp4Bytes);
+
+      expect(probe.isRecognised, isFalse);
+    });
   });
 
   group('AAC (mp4a) Probe', () {

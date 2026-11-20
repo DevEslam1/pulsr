@@ -107,8 +107,8 @@ void main() {
     await tester.pumpWidget(buildCard());
     await tester.pumpAndSettle();
 
-    // Tap Slow/NOS
-    await tester.tap(find.text('Slow/NOS'));
+    // Tap Slow Roll-off
+    await tester.tap(find.text('Slow Roll-off'));
     await tester.pumpAndSettle();
 
     final prefs = await SharedPreferences.getInstance();

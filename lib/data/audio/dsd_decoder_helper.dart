@@ -88,13 +88,11 @@ class DsdDacCapabilities {
   );
 
   /// Finds the probed alt setting tuple matching [dsdRate] (e.g. 64, 128, 256, 512).
+  /// Enforces exact tuple selection without first-tuple fallback (§8.2).
   DsdAltSettingTuple? findTupleForRate(int dsdRate) {
     if (nativeAltSettings.isEmpty || dsdRate <= 0) return null;
     for (final tuple in nativeAltSettings) {
       if (tuple.dsdRate == dsdRate) return tuple;
-    }
-    for (final tuple in nativeAltSettings) {
-      if (tuple.framesPerSecond > 0) return tuple;
     }
     return null;
   }

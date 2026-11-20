@@ -91,6 +91,19 @@ mixin PlayerDspControls on PulsrCubit<PlayerState> {
   Future<void> setCrossfeedMode(int mode) =>
       dspController.setCrossfeedMode(mode);
 
+  Future<void> setHrtfBinaural(
+    bool enabled, {
+    double? azimuth,
+    double? elevation,
+    String? sofaPath,
+  }) =>
+      dspController.setHrtfBinaural(
+        enabled,
+        azimuth: azimuth,
+        elevation: elevation,
+        sofaPath: sofaPath,
+      );
+
   Future<void> setLookaheadLimiter(bool enabled,
           {double? thresholdDb, double? releaseMs, double? lookaheadMs}) =>
       dspController.setLookaheadLimiter(enabled,

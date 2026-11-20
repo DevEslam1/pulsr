@@ -19,9 +19,12 @@ enum NativeDsdProducerState {
 /// to a UAC2 USB DAC in DSD_U32 native mode with backpressure handling.
 class NativeDsdProducer {
   final UsbExclusiveService usbService;
+  final Duration backpressureDelay;
 
-  NativeDsdProducer({UsbExclusiveService? service})
-      : usbService = service ?? UsbExclusiveService();
+  NativeDsdProducer({
+    UsbExclusiveService? service,
+    this.backpressureDelay = kBackpressureDelay,
+  }) : usbService = service ?? UsbExclusiveService();
 
   NativeDsdProducerState _state = NativeDsdProducerState.idle;
   NativeDsdProducerState get state => _state;
@@ -36,12 +39,14 @@ class NativeDsdProducer {
   int _sampleRate = 0;
   int _currentByteOffset = 0;
   int _totalBytes = 0;
+  int _xrunCount = 0;
   DsdAltSettingTuple? _activeTuple;
 
   DsdAltSettingTuple? get activeTuple => _activeTuple;
   int get dsdRate => _dsdRate;
   int get currentByteOffset => _currentByteOffset;
   int get totalBytes => _totalBytes;
+  int get xrunCount => _xrunCount;
 
   Completer<void>? _pauseCompleter;
   bool _stopRequested = false;
@@ -55,19 +60,29 @@ class NativeDsdProducer {
   /// Maximum consecutive backpressure retries before checking stream health.
   static const int kMaxBackpressureRetries = 200; // ~1 second
 
+  /// Maximum xruns / backpressure timeouts before halting for fallback (§8.2).
+  static const int kMaxXrunsBeforeFallback = 10;
+
+  /// DC-neutral DSD silence pattern: alternating 0x69 / 0x96 bytes (§8.2).
+  static Uint8List dsdSilenceBlock(int length) {
+    final block = Uint8List(length);
+    for (int i = 0; i < length; i++) {
+      block[i] = i.isEven ? 0x69 : 0x96;
+    }
+    return block;
+  }
+
   /// Selects the probed UAC2 DSD alternate setting tuple that matches [dsdRate].
+  /// Enforces exact tuple selection without first-tuple fallback (§8.2).
   static DsdAltSettingTuple? selectProbedTuple(
     DsdDacCapabilities caps,
     int dsdRate,
   ) {
-    if (!caps.dacSupportsNativeDsd || caps.nativeAltSettings.isEmpty) {
+    if (!caps.dacSupportsNativeDsd || caps.nativeAltSettings.isEmpty || dsdRate <= 0) {
       return null;
     }
     for (final tuple in caps.nativeAltSettings) {
       if (tuple.dsdRate == dsdRate) return tuple;
-    }
-    for (final tuple in caps.nativeAltSettings) {
-      if (tuple.framesPerSecond > 0) return tuple;
     }
     return null;
   }
@@ -102,6 +117,7 @@ class NativeDsdProducer {
     _sampleRate = (dsdRate > 0 ? dsdRate : 64) * 44100;
     _totalBytes = minLen;
     _currentByteOffset = 0;
+    _xrunCount = 0;
     _stopRequested = false;
     _state = NativeDsdProducerState.idle;
   }
@@ -135,13 +151,19 @@ class NativeDsdProducer {
         if (!written) {
           retries++;
           if (retries > kMaxBackpressureRetries) {
+            _xrunCount++;
+            if (_xrunCount >= kMaxXrunsBeforeFallback) {
+              _state = NativeDsdProducerState.stopped;
+              return;
+            }
             final active = await usbService.isDsdActive();
             if (!active) {
               _state = NativeDsdProducerState.stopped;
               return;
             }
+            retries = 0;
           }
-          await Future<void>.delayed(kBackpressureDelay);
+          await Future<void>.delayed(backpressureDelay);
         }
       }
 
@@ -157,10 +179,11 @@ class NativeDsdProducer {
     }
   }
 
-  /// Pauses pumping.
+  /// Pauses pumping and feeds the DC-neutral DSD silence pattern (§8.2).
   void pause() {
     if (_state == NativeDsdProducerState.streaming) {
       _state = NativeDsdProducerState.paused;
+      unawaited(usbService.writeDsd(dsdSilenceBlock(512), dsdSilenceBlock(512)));
     }
   }
 

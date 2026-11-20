@@ -41,6 +41,7 @@ import 'arbitrary_eq_sheet.dart';
 import 'live_prog_sheet.dart';
 import 'audio_quality_sheet.dart';
 import 'multichannel_bass_card.dart';
+import 'hrtf_binaural_card.dart';
 import '../../../../core/di/injection.dart';
 import '../../cubit/controllers/dsp_slice_descriptors.dart';
 import '../../../../core/constants/audio_feature_info.dart';

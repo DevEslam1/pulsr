@@ -102,6 +102,9 @@ class Mp4AudioProbeResult {
   /// Compatible brands listed in the 'ftyp' box.
   final List<String> compatibleBrands;
 
+  /// True when a valid, recognized audio track was parsed.
+  bool get isRecognised => hasAudioTrack && codecType != Mp4AudioCodec.none;
+
   /// True when this is an Apple Lossless track.
   bool get isAlac => codecType == Mp4AudioCodec.alac;
 
@@ -669,81 +672,140 @@ abstract final class Mp4BoxParser {
       return null;
     }
 
-    // Check for ALAC atom ('alac')
-    if (lowerFourcc == 'alac') {
-      int? alacBitDepth;
-      int? alacSampleRate;
-      int? alacChannels;
-      int? alacBitrateKbps;
+    // Inspect child atoms (alac, esds, fLaC/dfLa, wave/enda, dOps)
+    // Per §8.3: Inspect mp4a children, handle wave/enda, 64-bit child sizes,
+    // and validate ALACSpecificConfig fields (bit depth 16/20/24/32, sane rate/channels).
+    ({int bitDepth, int sampleRate, int channels, int? bitrateKbps})? alacConfig;
+    String? embeddedCodec;
+    bool malformedAlacSeen = false;
 
-      // Scan child atoms for 'alac' specific configuration
-      int subOffset = childOffset;
-      while (subOffset + 8 <= entryBytes.length) {
-        final subBoxSize = _readUint32(entryBytes, subOffset);
-        if (subBoxSize < 8 || subOffset + subBoxSize > entryBytes.length) break;
-        final subBoxType = _asciiString(entryBytes, subOffset + 4, 4);
+    int subOffset = childOffset;
+    while (subOffset + 8 <= entryBytes.length) {
+      int subBoxSize = _readUint32(entryBytes, subOffset);
+      int subHeaderSize = 8;
+      if (subBoxSize == 1) {
+        if (subOffset + 16 > entryBytes.length) break;
+        subBoxSize = _readUint64(entryBytes, subOffset + 8);
+        subHeaderSize = 16;
+      }
+      if (subBoxSize < subHeaderSize || subOffset + subBoxSize > entryBytes.length) break;
+      final subBoxType = _asciiString(entryBytes, subOffset + 4, 4);
 
-        if (subBoxType == 'alac') {
-          // Payload can be 36 bytes (4 bytes version/flags + 24 bytes config)
-          // or 32 bytes (24 bytes config without FullBox version/flags).
-          final payloadLength = subBoxSize - 8;
-          int configStart = subOffset + 8;
-          if (payloadLength >= 28) {
-            configStart += 4; // skip version & flags
-          }
-
-          if (configStart + 24 <= subOffset + subBoxSize &&
-              configStart + 24 <= entryBytes.length) {
-            // ALACSpecificConfig (24 bytes):
-            // 0..3: frameLength (uint32)
-            // 4: compatibleVersion (uint8)
-            // 5: bitDepth (uint8: 16, 20, 24, 32)
-            // 6: pb (uint8)
-            // 7: mb (uint8)
-            // 8: kb (uint8)
-            // 9: numChannels (uint8)
-            // 10..11: maxRun (uint16)
-            // 12..15: maxFrameBytes (uint32)
-            // 16..19: avgBitRate (uint32, in bps)
-            // 20..23: sampleRate (uint32, in Hz)
-            alacBitDepth = entryBytes[configStart + 5];
-            alacChannels = entryBytes[configStart + 9];
-            final avgBitrateBps = _readUint32(entryBytes, configStart + 16);
-            if (avgBitrateBps > 0) {
-              alacBitrateKbps = (avgBitrateBps / 1000).round();
-            }
-            final rate = _readUint32(entryBytes, configStart + 20);
-            if (rate > 0) {
-              alacSampleRate = rate;
-            }
-          }
+      if (subBoxType == 'alac') {
+        alacConfig = _parseAlacBox(entryBytes, subOffset + subHeaderSize, subOffset + subBoxSize);
+        if (alacConfig != null) {
+          break;
+        } else {
+          malformedAlacSeen = true;
           break;
         }
-        subOffset += subBoxSize;
+      } else if (subBoxType == 'wave') {
+        // QuickTime encapsulation: scan inside wave for alac / enda
+        int waveOffset = subOffset + subHeaderSize;
+        final waveEnd = subOffset + subBoxSize;
+        while (waveOffset + 8 <= waveEnd) {
+          int waveBoxSize = _readUint32(entryBytes, waveOffset);
+          int waveHeaderSize = 8;
+          if (waveBoxSize == 1) {
+            if (waveOffset + 16 > waveEnd) break;
+            waveBoxSize = _readUint64(entryBytes, waveOffset + 8);
+            waveHeaderSize = 16;
+          }
+          if (waveBoxSize < waveHeaderSize || waveOffset + waveBoxSize > waveEnd) break;
+          final waveBoxType = _asciiString(entryBytes, waveOffset + 4, 4);
+          if (waveBoxType == 'alac') {
+            alacConfig = _parseAlacBox(entryBytes, waveOffset + waveHeaderSize, waveOffset + waveBoxSize);
+            if (alacConfig != null) {
+              break;
+            } else {
+              malformedAlacSeen = true;
+              break;
+            }
+          }
+          waveOffset += waveBoxSize;
+        }
+        if (alacConfig != null || malformedAlacSeen) break;
+      } else if (subBoxType == 'fLaC' || subBoxType == 'dfLa') {
+        embeddedCodec = 'FLAC';
+      } else if (subBoxType == 'dOps') {
+        embeddedCodec = 'OPUS';
+      } else if (subBoxType == 'esds') {
+        embeddedCodec = 'AAC';
       }
+      subOffset += subBoxSize;
+    }
 
-      final resolvedBitDepth = (alacBitDepth != null && alacBitDepth > 0)
-          ? alacBitDepth
-          : (sampleSize > 0 ? sampleSize : 16);
-      final resolvedSampleRate = alacSampleRate ?? sampleRate;
-      final resolvedChannels = alacChannels ?? channels;
+    if (malformedAlacSeen) {
+      return Mp4AudioProbeResult.unrecognised;
+    }
 
+    if (alacConfig != null) {
       return Mp4AudioProbeResult(
         hasAudioTrack: true,
         codec: 'ALAC',
         codecType: Mp4AudioCodec.alac,
         isLossless: true,
-        bitDepth: resolvedBitDepth,
-        sampleRate: resolvedSampleRate,
-        channels: resolvedChannels > 0 ? resolvedChannels : 2,
-        bitrateKbps: alacBitrateKbps,
+        bitDepth: alacConfig.bitDepth,
+        sampleRate: alacConfig.sampleRate,
+        channels: alacConfig.channels,
+        bitrateKbps: alacConfig.bitrateKbps,
         fourcc: formatFourcc,
         majorBrand: majorBrand,
         compatibleBrands: compatibleBrands,
       );
     }
 
-    if (lowerFourcc == 'mp4a') {
+    if (embeddedCodec == 'FLAC' || lowerFourcc == 'flac') {
+      return Mp4AudioProbeResult(
+        hasAudioTrack: true,
+        codec: 'FLAC',
+        codecType: Mp4AudioCodec.flac,
+        isLossless: true,
+        bitDepth: sampleSize > 0 ? sampleSize : null,
+        sampleRate: sampleRate,
+        channels: channels > 0 ? channels : 2,
+        fourcc: formatFourcc,
+        majorBrand: majorBrand,
+        compatibleBrands: compatibleBrands,
+      );
+    }
+
+    if (embeddedCodec == 'OPUS' || lowerFourcc == 'opus') {
+      return Mp4AudioProbeResult(
+        hasAudioTrack: true,
+        codec: 'OPUS',
+        codecType: Mp4AudioCodec.opus,
+        isLossless: false,
+        bitDepth: null,
+        sampleRate: 48000,
+        channels: channels > 0 ? channels : 2,
+        fourcc: formatFourcc,
+        majorBrand: majorBrand,
+        compatibleBrands: compatibleBrands,
+      );
+    }
+
+    if (lowerFourcc == 'alac') {
+      // Direct alac fourcc without a valid parsed child config: validate sampleSize
+      if (sampleSize == 16 || sampleSize == 20 || sampleSize == 24 || sampleSize == 32) {
+        return Mp4AudioProbeResult(
+          hasAudioTrack: true,
+          codec: 'ALAC',
+          codecType: Mp4AudioCodec.alac,
+          isLossless: true,
+          bitDepth: sampleSize,
+          sampleRate: sampleRate,
+          channels: channels > 0 ? channels : 2,
+          fourcc: formatFourcc,
+          majorBrand: majorBrand,
+          compatibleBrands: compatibleBrands,
+        );
+      }
+      // Corrupt/invalid ALAC config
+      return Mp4AudioProbeResult.unrecognised;
+    }
+
+    if (lowerFourcc == 'mp4a' || embeddedCodec == 'AAC') {
       return Mp4AudioProbeResult(
         hasAudioTrack: true,
         codec: 'AAC',
@@ -753,21 +815,6 @@ abstract final class Mp4BoxParser {
         sampleRate: sampleRate,
         channels: channels > 0 ? channels : 2,
         bitrateKbps: null,
-        fourcc: formatFourcc,
-        majorBrand: majorBrand,
-        compatibleBrands: compatibleBrands,
-      );
-    }
-
-    if (lowerFourcc == 'flac') {
-      return Mp4AudioProbeResult(
-        hasAudioTrack: true,
-        codec: 'FLAC',
-        codecType: Mp4AudioCodec.flac,
-        isLossless: true,
-        bitDepth: sampleSize > 0 ? sampleSize : null,
-        sampleRate: sampleRate,
-        channels: channels > 0 ? channels : 2,
         fourcc: formatFourcc,
         majorBrand: majorBrand,
         compatibleBrands: compatibleBrands,
@@ -855,6 +902,66 @@ abstract final class Mp4BoxParser {
   static int _readUint16(Uint8List bytes, int offset) {
     if (offset + 2 > bytes.length) return 0;
     return (bytes[offset] << 8) | bytes[offset + 1];
+  }
+
+  static int _readUint64(Uint8List bytes, int offset) {
+    if (offset + 8 > bytes.length) return 0;
+    final b = ByteData.sublistView(bytes, offset, offset + 8);
+    return b.getUint64(0);
+  }
+
+  static ({int bitDepth, int sampleRate, int channels, int? bitrateKbps})? _parseAlacBox(
+    Uint8List entryBytes,
+    int boxPayloadStart,
+    int boxEnd,
+  ) {
+    final payloadLength = boxEnd - boxPayloadStart;
+    int configStart = boxPayloadStart;
+    if (payloadLength >= 28) {
+      configStart += 4; // skip version & flags
+    }
+    if (configStart + 24 > boxEnd || configStart + 24 > entryBytes.length) {
+      return null;
+    }
+
+    // ALACSpecificConfig (24 bytes):
+    // 0..3: frameLength (uint32)
+    // 4: compatibleVersion (uint8)
+    // 5: bitDepth (uint8: 16, 20, 24, 32)
+    // 6: pb (uint8)
+    // 7: mb (uint8)
+    // 8: kb (uint8)
+    // 9: numChannels (uint8)
+    // 10..11: maxRun (uint16)
+    // 12..15: maxFrameBytes (uint32)
+    // 16..19: avgBitRate (uint32, in bps)
+    // 20..23: sampleRate (uint32, in Hz)
+    final bitDepth = entryBytes[configStart + 5];
+    final channels = entryBytes[configStart + 9];
+    final avgBitrateBps = _readUint32(entryBytes, configStart + 16);
+    final rate = _readUint32(entryBytes, configStart + 20);
+
+    // Validate per §8.3:
+    // bit depth 16/20/24/32
+    if (bitDepth != 16 && bitDepth != 20 && bitDepth != 24 && bitDepth != 32) {
+      return null;
+    }
+    // sane channels: 1..8
+    if (channels < 1 || channels > 8) {
+      return null;
+    }
+    // sane sample rate: 8000..768000
+    if (rate < 8000 || rate > 768000) {
+      return null;
+    }
+
+    final bitrateKbps = avgBitrateBps > 0 ? (avgBitrateBps / 1000).round() : null;
+    return (
+      bitDepth: bitDepth,
+      sampleRate: rate,
+      channels: channels,
+      bitrateKbps: bitrateKbps,
+    );
   }
 
   static String _asciiString(Uint8List bytes, int offset, int length) {

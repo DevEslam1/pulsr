@@ -18,7 +18,6 @@ import '../../domain/models/quran_mode_profile.dart';
 import '../../domain/models/reverb_preset.dart';
 import 'async_lock.dart';
 import 'audio_effects_channel.dart';
-import 'autoeq_fir_generator.dart';
 import 'comparison_slot.dart';
 import 'dsp_param_ranges.dart';
 import 'dsp_warmup_scheduler.dart';
@@ -195,6 +194,12 @@ class EqualizerManager {
   double crossfeedFcut = 650.0; // 200 - 2000 Hz (Custom-mode cutoff)
   int crossfeedMode =
       0; // 0=Bs2bDefault, 1=Bs2bChuMoy, 2=Bs2bJanMeier, 3=Custom
+
+  // HRTF / 3D Binaural Spatializer (§8.9 & §9)
+  bool isHrtfEnabled = false;
+  double hrtfAzimuth = 30.0; // degrees, -90 to +90
+  double hrtfElevation = 0.0; // degrees, -45 to +45
+  String? hrtfSofaPath;
 
   bool isLimiterEnabled = false;
   double limiterThresholdDb = -0.2;
@@ -562,6 +567,10 @@ class EqualizerManager {
       PrefsKeys.crossfeedFeedDb: crossfeedFeedDb,
       PrefsKeys.crossfeedFcut: crossfeedFcut,
       PrefsKeys.crossfeedMode: crossfeedMode,
+      PrefsKeys.hrtfBinauralEnabled: isHrtfEnabled,
+      PrefsKeys.hrtfAzimuth: hrtfAzimuth,
+      PrefsKeys.hrtfElevation: hrtfElevation,
+      if (hrtfSofaPath != null) PrefsKeys.hrtfSofaPath: hrtfSofaPath!,
       PrefsKeys.lookaheadLimiterEnabled: isLimiterEnabled,
       PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
       PrefsKeys.lookaheadLimiterReleaseMs: limiterReleaseMs,
@@ -1200,13 +1209,14 @@ class EqualizerManager {
             autoEqCorrectionMode == AutoEqCorrectionMode.firLinear) {
           final isLinear =
               autoEqCorrectionMode == AutoEqCorrectionMode.firLinear;
-          final ir = AutoEqFirGenerator.generateFir(
-            profile: profile,
+          final graphicEq = profile.toGraphicEqString();
+          await _effectsChannel.loadArbitraryEq(
+            eqString: graphicEq,
             linearPhase: isLinear,
-            taps: 4096,
           );
-          await loadCustomImpulseResponse(ir);
+          await _effectsChannel.setArbitraryEqEnabled(true);
         } else if (isParametric) {
+          await _effectsChannel.setArbitraryEqEnabled(false);
           final applied = await _applyParametricProfile(profile);
           if (!applied) {
             // Native PEQ unavailable: fall back to the graphic-gain path using
@@ -1214,6 +1224,7 @@ class EqualizerManager {
             await _applyCurrentPresetCore();
           }
         } else {
+          await _effectsChannel.setArbitraryEqEnabled(false);
           await _applyCurrentPresetCore();
         }
         await setBassBoost(profile.bassBoost);
@@ -1225,6 +1236,7 @@ class EqualizerManager {
       } else {
         if (prevProfile == null) return;
         selectedHeadphoneProfile = null;
+        await _effectsChannel.setArbitraryEqEnabled(false);
         final targetFreqs = activeFrequencies;
         currentPreset = EqPreset(
           name: 'Flat',

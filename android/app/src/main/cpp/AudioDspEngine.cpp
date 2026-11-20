@@ -2859,7 +2859,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     // real delay the position tracker must know about when the tap converts
     // the source rate to the device rate ahead of this chain.
     if (tapSrcEngaged_) {
-        blockLatency += tapResampler_.latencyFrames();
+        if (tapUseOversampler_) {
+            blockLatency += tapOversampler_.latencyFrames();
+        } else {
+            blockLatency += tapResampler_.latencyFrames();
+        }
     }
     effectiveLatencyFrames_.store(blockLatency, std::memory_order_release);
 

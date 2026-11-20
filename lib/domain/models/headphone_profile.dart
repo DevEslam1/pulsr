@@ -238,6 +238,42 @@ class HeadphoneProfile {
     return -(positiveSum + safetyMarginDb);
   }
 
+  /// Formats this profile into an EqualizerAPO `GraphicEq: <freq> <gain>; ...`
+  /// curve specification evaluated across [numPoints] logarithmically spaced
+  /// frequencies between 20 Hz and 20,000 Hz. Used by the native FIR stage
+  /// (ArbitraryResponseEq) to synthesize exact minimum/linear-phase FIR filters
+  /// at the engine's exact sample rate without routing through reverb. (§8.6)
+  String toGraphicEqString({int numPoints = 128}) {
+    if (filters.isEmpty && gains.isNotEmpty) {
+      final centers = gains.length == EqPreset.centerFrequencies.length
+          ? EqPreset.centerFrequencies
+          : List.generate(
+              gains.length,
+              (i) => 20.0 * math.pow(1000.0, i / (gains.length - 1)).toDouble(),
+            );
+      final pairs = <String>[];
+      for (int i = 0; i < gains.length; i++) {
+        pairs.add('${centers[i].toStringAsFixed(1)} ${gains[i].toStringAsFixed(2)}');
+      }
+      return 'GraphicEq: ${pairs.join("; ")}';
+    }
+
+    if (filters.isEmpty) {
+      return 'GraphicEq: 20.0 0.00; 20000.0 0.00';
+    }
+
+    final minLog = math.log(20.0) / math.ln10;
+    final maxLog = math.log(20000.0) / math.ln10;
+    final step = (maxLog - minLog) / (numPoints - 1);
+    final pairs = <String>[];
+    for (int i = 0; i < numPoints; i++) {
+      final f = math.pow(10.0, minLog + i * step).toDouble();
+      final g = _compositeGainAt(f);
+      pairs.add('${f.toStringAsFixed(1)} ${g.toStringAsFixed(2)}');
+    }
+    return 'GraphicEq: ${pairs.join("; ")}';
+  }
+
   /// Expands the parametric filters onto the given ISO [centers] by evaluating
   /// the composite magnitude response of the filter sum at each center. Used to
   /// render a profile on the EQ graph and as a fallback when a consumer only

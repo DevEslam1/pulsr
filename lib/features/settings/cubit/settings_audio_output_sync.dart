@@ -217,15 +217,13 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
     final rate = decideTapSrcTargetRate(
       enabled: state.outputFormatNegotiationEnabled,
       nativeSampleRate: mixerRate,
-      // Decide from the REQUEST, not the polled echo: `isBitPerfectActive`
-      // reads false while paused and during the enable transition, which used
-      // to leave a resampler armed inside a bit-perfect session. Pulsr's own
-      // UAC2 sink is bit-perfect by construction and disarms it as well.
       bitPerfectActive: state.bitPerfectOutput ||
           _bitPerfectViaDirectStream ||
           (info?.isBitPerfectActive ?? false),
       isBluetooth: info?.isBluetooth ?? false,
       deviceSampleRates: info?.supportedSampleRates ?? const <int>[],
+      remasterMultiplier: AudioEffectsChannel().currentOversampleMultiplier,
+      trackSampleRate: info?.sampleRate ?? 0,
     );
     if (rate == _lastTapSrcTargetRate) return;
     _lastTapSrcTargetRate = rate;
@@ -237,6 +235,10 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
           error: e, stackTrace: st, category: 'Settings');
     }
   }
+
+  /// Explicitly re-synchronizes the tap-side SRC rate against the active output
+  /// and remaster oversampling policy (§8.1).
+  Future<void> syncTapSrcRate() => _syncTapSrcRate(state.currentOutputDevice);
 
   /// Dynamically raises the sink target buffer duration when streaming over a
   /// high-bitrate Bluetooth codec (LDAC 990kbps / aptX Lossless / LHDC) so the

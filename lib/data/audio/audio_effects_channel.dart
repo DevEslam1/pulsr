@@ -1476,7 +1476,7 @@ class AudioEffectsChannel {
   }
 
   /// Remaster reconstruction filter kernel:
-  /// 0 = Sharp, 1 = Slow/NOS, 2 = MinimumPhase, 3 = Apodizing.
+  /// 0 = Sharp, 1 = Slow Roll-off, 2 = MinimumPhase, 3 = Apodizing.
   Future<bool> setOversampleKernel(int kernel) async {
     final valid = kernel.clamp(0, 3);
     _cachedOversampleKernel = valid;

@@ -976,6 +976,14 @@ extension _EqAdvancedControls on _EqualizerSheetState {
           ),
           const SizedBox(height: AppSpacing.md),
 
+          // 1b. HRTF 3D Binaural Spatializer (§8.9 & §9)
+          HrtfBinauralCard(
+            blockedReason: dspBlocked,
+            nativeAvailable: _nativePcmEffectsAvailable,
+          ),
+
+          const SizedBox(height: AppSpacing.md),
+
           // 2. Lookahead Brickwall Limiter
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
@@ -3814,6 +3822,9 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.remasterOversampleMultiplier, multiplier);
+    if (getIt.isRegistered<SettingsCubit>()) {
+      unawaited(getIt<SettingsCubit>().syncTapSrcRate());
+    }
   }
 
   Future<void> _selectKernel(int kernel) async {
@@ -3885,7 +3896,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
       case 0:
         return 'Sharp';
       case 1:
-        return 'Slow/NOS';
+        return 'Slow Roll-off';
       case 2:
         return 'MinPhase';
       case 3:

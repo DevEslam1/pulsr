@@ -157,10 +157,28 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
 
   Future<void> _setChannelCount(int count) async {
     final clamped = count.clamp(2, 8);
+    // Explicit layout model (§8.8):
+    // 2.1 (3 ch): LFE index = 2 (FL=0, FR=1, LFE=2)
+    // 4.0 (4 ch): no dedicated LFE channel
+    // 5.1 (6 ch): LFE index = 3 (FL=0, FR=1, C=2, LFE=3)
+    // 7.1 (8 ch): LFE index = 3 (FL=0, FR=1, C=2, LFE=3)
+    final autoLfeIndex = switch (clamped) {
+      3 => 2,
+      6 => 3,
+      8 => 3,
+      _ => 0,
+    };
+    final bool hasLfe = clamped == 3 || clamped == 6 || clamped == 8;
+
     setState(() {
       _channelCount = clamped;
       if (_selectedChannel >= clamped) {
         _selectedChannel = clamped - 1;
+      }
+      if (hasLfe) {
+        _lfeChannelIndex = autoLfeIndex;
+      } else {
+        _lfeCrossoverEnabled = false;
       }
     });
     try {
@@ -168,12 +186,21 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
         await getIt<EqualizerManager>().setChannelManagerEnabled(
             _channelManagerEnabled,
             channelCount: clamped);
+        if (hasLfe) {
+          await getIt<EqualizerManager>().setLfeCrossover(
+            _lfeCrossoverEnabled,
+            lfeChannelIndex: autoLfeIndex,
+          );
+        }
       } else {
         await AudioEffectsChannel().setChannelManagerEnabled(
             _channelManagerEnabled,
             channelCount: clamped);
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt(PrefsKeys.channelManagerChannelCount, clamped);
+        if (hasLfe) {
+          await prefs.setInt(PrefsKeys.lfeChannelIndex, autoLfeIndex);
+        }
       }
     } catch (_) {}
   }

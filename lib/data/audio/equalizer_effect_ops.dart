@@ -192,6 +192,10 @@ extension EqualizerEffectOps on EqualizerManager {
         mode != null ? DspParamRanges.crossfeedMode.clamp(mode) : prevMode;
 
     try {
+      if (enabled && isHrtfEnabled) {
+        // §8.9 & §9: HRTF and Crossfeed are mutually exclusive.
+        await setHrtfBinaural(false);
+      }
       if (PlatformCapabilities.isAndroid) {
         await _effectsChannel.setCrossfeedParams(
           targetDelay,
@@ -235,6 +239,53 @@ extension EqualizerEffectOps on EqualizerManager {
     } catch (e, st) {
       crossfeedMode = prevMode;
       ErrorLogger.log('Failed to set crossfeed mode',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
+    }
+  }
+
+  /// Sets HRTF 3D binaural spatialization state, azimuth, elevation, and optional custom SOFA dataset (§8.9).
+  Future<void> setHrtfBinaural(
+    bool enabled, {
+    double? azimuth,
+    double? elevation,
+    String? sofaPath,
+  }) async {
+    final prevEnabled = isHrtfEnabled;
+    final prevAzimuth = hrtfAzimuth;
+    final prevElevation = hrtfElevation;
+    final prevSofaPath = hrtfSofaPath;
+
+    final targetAzimuth =
+        azimuth != null ? azimuth.clamp(-90.0, 90.0) : prevAzimuth;
+    final targetElevation =
+        elevation != null ? elevation.clamp(-45.0, 45.0) : prevElevation;
+
+    try {
+      if (enabled && isCrossfeedEnabled) {
+        // §8.9 & §9: HRTF and Crossfeed are mutually exclusive.
+        await setCrossfeed(false);
+      }
+      if (PlatformCapabilities.isAndroid) {
+        if (sofaPath != null && sofaPath != prevSofaPath) {
+          await _effectsChannel.loadHrtfSofa(sofaPath);
+        }
+        await _effectsChannel.setHrtfAzimuth(targetAzimuth);
+        await _effectsChannel.setHrtfElevation(targetElevation);
+        await _effectsChannel.setHrtfBinauralEnabled(enabled);
+      }
+      isHrtfEnabled = enabled;
+      hrtfAzimuth = targetAzimuth;
+      hrtfElevation = targetElevation;
+      if (sofaPath != null) hrtfSofaPath = sofaPath;
+      _debouncedSavePreferences();
+      _syncPipeline();
+    } catch (e, st) {
+      isHrtfEnabled = prevEnabled;
+      hrtfAzimuth = prevAzimuth;
+      hrtfElevation = prevElevation;
+      hrtfSofaPath = prevSofaPath;
+      ErrorLogger.log('Failed to set HRTF binaural',
           error: e, stackTrace: st, category: 'EqualizerManager');
       rethrow;
     }

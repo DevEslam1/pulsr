@@ -163,6 +163,11 @@ extension EqualizerRestoreOps on EqualizerManager {
       crossfeedMode = prefs.getInt(PrefsKeys.crossfeedMode) ?? 0;
       crossfeedFcut = prefs.getDouble(PrefsKeys.crossfeedFcut) ?? 650.0;
 
+      isHrtfEnabled = prefs.getBool(PrefsKeys.hrtfBinauralEnabled) ?? false;
+      hrtfAzimuth = prefs.getDouble(PrefsKeys.hrtfAzimuth) ?? 30.0;
+      hrtfElevation = prefs.getDouble(PrefsKeys.hrtfElevation) ?? 0.0;
+      hrtfSofaPath = prefs.getString(PrefsKeys.hrtfSofaPath);
+
       isLimiterEnabled =
           prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ?? false;
       limiterThresholdDb =
@@ -492,6 +497,15 @@ extension EqualizerRestoreOps on EqualizerManager {
       }
       pendingFutures
           .add(_effectsChannel.setCrossfeedEnabled(isCrossfeedEnabled));
+
+      if (isHrtfEnabled) {
+        if (hrtfSofaPath != null && hrtfSofaPath!.isNotEmpty) {
+          pendingFutures.add(_effectsChannel.loadHrtfSofa(hrtfSofaPath!));
+        }
+        pendingFutures.add(_effectsChannel.setHrtfAzimuth(hrtfAzimuth));
+        pendingFutures.add(_effectsChannel.setHrtfElevation(hrtfElevation));
+        pendingFutures.add(_effectsChannel.setHrtfBinauralEnabled(true));
+      }
 
       if (isLimiterEnabled) {
         pendingFutures.add(

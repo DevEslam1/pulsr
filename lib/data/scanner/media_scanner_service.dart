@@ -704,7 +704,7 @@ class MediaScannerService {
             bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
         codec: (codec != null && codec.isNotEmpty)
             ? codec
-            : path.split('.').last.split('?').first.trim().toUpperCase(),
+            : 'UNKNOWN',
         loudnessRange: lraVal,
       );
     } catch (e, stack) {
@@ -737,18 +737,22 @@ class MediaScannerService {
         final res = await _repository.getAllSongs();
         final songs = res.fold((_) => <SongsTableData>[], (s) => s);
         final pendingSongs = songs.where((song) {
-          if (song.codec != null &&
-              song.codec!.isNotEmpty &&
-              song.sampleRate != null &&
-              song.sampleRate! > 0) {
-            return false;
-          }
           if (song.path.isEmpty ||
               song.path.startsWith('http') ||
               song.path.startsWith('ytmusic://')) {
             return false;
           }
-          return true;
+          final c = song.codec?.toUpperCase();
+          final isExtensionGuessed = c == null ||
+              c.isEmpty ||
+              c == 'M4A' ||
+              c == 'MP4' ||
+              c == 'M4B' ||
+              c == 'M4P' ||
+              c == 'UNKNOWN';
+          if (isExtensionGuessed) return true;
+          if (song.sampleRate == null || song.sampleRate! <= 0) return true;
+          return false;
         }).toList();
 
         final updates = <({
@@ -823,7 +827,6 @@ class MediaScannerService {
                 }
               }
 
-              final path = song.path;
               updates.add((
                 songId: song.id,
                 path: song.path,
@@ -834,13 +837,7 @@ class MediaScannerService {
                     bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
                 codec: (codec != null && codec.isNotEmpty)
                     ? codec
-                    : path
-                        .split('.')
-                        .last
-                        .split('?')
-                        .first
-                        .trim()
-                        .toUpperCase(),
+                    : 'UNKNOWN',
                 loudnessRange: lraVal,
               ));
             }

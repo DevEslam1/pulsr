@@ -226,6 +226,24 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
   Future<void> setCrossfeedMode(int mode) =>
       _equalizerManager.setCrossfeedMode(mode);
 
+  bool get isHrtfEnabled => _equalizerManager.isHrtfEnabled;
+  double get hrtfAzimuth => _equalizerManager.hrtfAzimuth;
+  double get hrtfElevation => _equalizerManager.hrtfElevation;
+  String? get hrtfSofaPath => _equalizerManager.hrtfSofaPath;
+
+  Future<void> setHrtfBinaural(
+    bool enabled, {
+    double? azimuth,
+    double? elevation,
+    String? sofaPath,
+  }) =>
+      _equalizerManager.setHrtfBinaural(
+        enabled,
+        azimuth: azimuth,
+        elevation: elevation,
+        sofaPath: sofaPath,
+      );
+
   bool get isLimiterEnabled => _equalizerManager.isLimiterEnabled;
 
   double get limiterThresholdDb => _equalizerManager.limiterThresholdDb;

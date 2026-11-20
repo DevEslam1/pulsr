@@ -463,6 +463,10 @@ class UsbExclusiveService {
   factory UsbExclusiveService() => _instance;
   UsbExclusiveService._internal();
 
+  /// Visible for testing to allow creating mocks/fakes.
+  @visibleForTesting
+  UsbExclusiveService.forTest();
+
   final StreamController<UsbExclusiveStatus> _controller =
       StreamController<UsbExclusiveStatus>.broadcast();
   StreamSubscription<dynamic>? _subscription;

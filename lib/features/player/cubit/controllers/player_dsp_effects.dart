@@ -632,6 +632,28 @@ extension PlayerDspEffectsExtension on PlayerDspController {
     );
   }
 
+  /// Toggles and configures HRTF 3D binaural spatialization (§8.9).
+  Future<void> setHrtfBinaural(
+    bool enabled, {
+    double? azimuth,
+    double? elevation,
+    String? sofaPath,
+  }) {
+    return applyDspEffect(
+      featureName: 'HRTF Spatializer',
+      guardCondition: enabled,
+      updateDsp: (dsp) => dsp.copyWith(
+        isCrossfeedEnabled: enabled ? false : dsp.isCrossfeedEnabled,
+      ),
+      applyAudioHandler: () => _audioHandler.setHrtfBinaural(
+        enabled,
+        azimuth: azimuth,
+        elevation: elevation,
+        sofaPath: sofaPath,
+      ),
+    );
+  }
+
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) {
     final clampedThresh = thresholdDb != null

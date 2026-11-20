@@ -15,11 +15,42 @@
 const int kTapSrcMinRate = 8000;
 const int kTapSrcMaxRate = 768000;
 
+/// Computes the oversampled rate for [trackSampleRate] and [multiplier] (2, 4, 8),
+/// bounded by [deviceSampleRates] with step-down (8 -> 4 -> 2 -> 1) (§8.1).
+int decideRemasterTargetRate({
+  required int trackSampleRate,
+  required int multiplier,
+  required List<int> deviceSampleRates,
+  int maxPcmRate = kTapSrcMaxRate,
+}) {
+  if (trackSampleRate <= 0 || multiplier <= 1) return trackSampleRate;
+  final factors = switch (multiplier) {
+    >= 8 => const [8, 4, 2, 1],
+    >= 4 => const [4, 2, 1],
+    >= 2 => const [2, 1],
+    _ => const [1],
+  };
+
+  for (final factor in factors) {
+    if (factor == 1) return trackSampleRate;
+    final candidate = trackSampleRate * factor;
+    if (candidate > maxPcmRate) continue;
+    if (deviceSampleRates.isEmpty || deviceSampleRates.contains(candidate)) {
+      return candidate;
+    }
+  }
+  return trackSampleRate;
+}
+
 /// Returns the mixer rate the tap should target, or 0 for "convert nothing".
 ///
 /// The target is the platform's native mixer rate ([nativeSampleRate], from
 /// `AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE`) — NOT the app's own AudioTrack
 /// rate, which is the track rate whenever the mixer is the one resampling.
+///
+/// When Remaster oversampling is active ([remasterMultiplier] > 1), it overrides
+/// the platform mixer rate and steps down (8 -> 4 -> 2 -> 1) against the DAC's
+/// advertised sample rates (§8.1).
 ///
 /// Every guard below exists because a wrong target is not a silent failure: the
 /// sink would be opened at a rate the hardware does not use and the track plays
@@ -30,14 +61,25 @@ int decideTapSrcTargetRate({
   required bool bitPerfectActive,
   required bool isBluetooth,
   required List<int> deviceSampleRates,
+  int remasterMultiplier = 1,
+  int trackSampleRate = 0,
 }) {
-  if (!enabled) return 0;
   // Bit-perfect promises sample-identical output; resampled bytes cannot keep
-  // that promise. (The native processor guards this too, on the same basis.)
+  // that promise. (§8.1 & §9)
   if (bitPerfectActive) return 0;
   // The A2DP link owns its own rate and codec-alignment path; converting to the
-  // phone's mixer rate would be a conversion the Bluetooth path never needs.
+  // phone's mixer rate would be a conversion the Bluetooth path never needs. (§9)
   if (isBluetooth) return 0;
+
+  if (remasterMultiplier > 1 && trackSampleRate > 0) {
+    // Remaster oversampling takes precedence and steps down 8-4-2-1 (§8.1)
+    return decideRemasterTargetRate(
+      trackSampleRate: trackSampleRate,
+      multiplier: remasterMultiplier,
+      deviceSampleRates: deviceSampleRates,
+    );
+  }
+  if (!enabled) return 0;
   if (nativeSampleRate < kTapSrcMinRate || nativeSampleRate > kTapSrcMaxRate) {
     return 0;
   }
