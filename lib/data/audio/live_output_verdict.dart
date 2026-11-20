@@ -123,7 +123,13 @@ class LiveOutputVerdict {
     required this.sourceLossy,
     required this.sourceCodecUnconfirmed,
   });
+
+  bool get isBitPerfect => state.isVerified;
+  bool get isDirectUsb => directUsbActive;
+  bool get isLossy => sourceLossy;
 }
+
+typedef OutputVerdict = LiveOutputVerdict;
 
 /// Folds [observation] into the single fail-closed [BitPerfectState].
 LiveOutputVerdict resolveLiveOutputVerdict(LiveOutputObservation observation) {
