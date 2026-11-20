@@ -617,6 +617,43 @@ void main() {
     });
   });
 
+  group('getCoverArtCacheKey', () {
+    test('produces stable key without ephemeral auth salt or token', () {
+      final client1 = _client(_FakeHttpClient((_) async => _textResponse('')), salt: 'salt1');
+      final client2 = _client(_FakeHttpClient((_) async => _textResponse('')), salt: 'salt2');
+
+      final key1 = client1.getCoverArtCacheKey('cov-album-1', size: 300);
+      final key2 = client2.getCoverArtCacheKey('cov-album-1', size: 300);
+
+      expect(key1, key2);
+      expect(key1, 'subsonic://music.example.com/rest/getCoverArt?id=cov-album-1&size=300');
+      expect(key1, isNot(contains('salt')));
+      expect(key1, isNot(contains('token')));
+      expect(key1, isNot(contains(_password)));
+    });
+
+    test('omits size parameter when not supplied or non-positive', () {
+      final client = _client(_FakeHttpClient((_) async => _textResponse('')));
+      expect(
+        client.getCoverArtCacheKey('cov-1'),
+        'subsonic://music.example.com/rest/getCoverArt?id=cov-1',
+      );
+      expect(
+        client.getCoverArtCacheKey('cov-1', size: 0),
+        'subsonic://music.example.com/rest/getCoverArt?id=cov-1',
+      );
+      expect(
+        client.getCoverArtCacheKey('cov-1', size: -1),
+        'subsonic://music.example.com/rest/getCoverArt?id=cov-1',
+      );
+    });
+
+    test('returns empty string on blank cover art id', () {
+      final client = _client(_FakeHttpClient((_) async => _textResponse('')));
+      expect(client.getCoverArtCacheKey('   '), isEmpty);
+    });
+  });
+
   group('search3', () {
     test('returns artists, albums and songs from searchResult3', () async {
       final fake = _FakeHttpClient((request) async {

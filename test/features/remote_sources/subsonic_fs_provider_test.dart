@@ -400,5 +400,13 @@ void main() {
       expect(provider.getCoverArtUrl(null), isNull);
       expect(provider.getCoverArtUrl('   '), isNull);
     });
+
+    test('getCoverArtCacheKey returns stable cache key and null for blank', () {
+      final provider = _provider(_library());
+      expect(provider.getCoverArtCacheKey('cov-homo', size: 200),
+          'subsonic://music.example.com/rest/getCoverArt?id=cov-homo&size=200');
+      expect(provider.getCoverArtCacheKey(null), isNull);
+      expect(provider.getCoverArtCacheKey('   '), isNull);
+    });
   });
 }

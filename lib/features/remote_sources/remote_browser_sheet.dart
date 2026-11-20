@@ -5,6 +5,8 @@
 // Loads one directory at a time through the provider it is handed, keeps a
 // breadcrumb of the path, and reports a file tap to [onPlay]. It never closes
 // the provider: the screen that created it owns that lifetime.
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/errors/app_error_base.dart';
@@ -54,6 +56,8 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   List<RemoteEntry>? _searchResults;
   bool _searchLoading = false;
   String? _searchError;
+  Timer? _debounceTimer;
+  int _searchSequence = 0;
 
   @override
   void initState() {
@@ -63,11 +67,21 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  void _onSearchChanged(String query) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+      _performSearch(query);
+    });
+  }
+
   Future<void> _performSearch(String query) async {
+    _debounceTimer?.cancel();
+    final currentSeq = ++_searchSequence;
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
       setState(() {
@@ -87,14 +101,14 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
 
     try {
       final results = await provider.search(trimmed);
-      if (!mounted) return;
+      if (!mounted || currentSeq != _searchSequence) return;
       final entries = <RemoteEntry>[];
       for (final artist in results.artists) {
         entries.add(RemoteEntry(
           path: SubsonicFsProvider.artistPath(artist.id),
           name: artist.name,
           isDirectory: true,
-          artworkUri: provider.getCoverArtUrl(artist.coverArt)?.toString(),
+          artworkUri: provider.getCoverArtUrl(artist.coverArt, size: 160)?.toString(),
         ));
       }
       for (final album in results.albums) {
@@ -105,7 +119,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
           path: SubsonicFsProvider.albumPath(album.id),
           name: displayName,
           isDirectory: true,
-          artworkUri: provider.getCoverArtUrl(album.coverArt)?.toString(),
+          artworkUri: provider.getCoverArtUrl(album.coverArt, size: 160)?.toString(),
         ));
       }
       for (final song in results.songs) {
@@ -118,7 +132,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
           name: displayName,
           isDirectory: false,
           sizeBytes: song.sizeBytes,
-          artworkUri: provider.getCoverArtUrl(song.coverArt)?.toString(),
+          artworkUri: provider.getCoverArtUrl(song.coverArt, size: 160)?.toString(),
         ));
       }
 
@@ -127,6 +141,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
         _searchLoading = false;
       });
     } on AppError catch (e, st) {
+      if (!mounted || currentSeq != _searchSequence) return;
       ErrorLogger.log(
         'Subsonic search failed: ${e.code}',
         error: e,
@@ -328,7 +343,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  onChanged: _performSearch,
+                  onChanged: _onSearchChanged,
                   onSubmitted: _performSearch,
                 ),
               )

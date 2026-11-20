@@ -315,6 +315,8 @@ class CastService {
     String album = '',
     String? artwork,
     String mime = 'audio/mpeg',
+    int? durationMs,
+    Duration? duration,
   }) async {
     if (!_isAndroid) {
       return const CastResult(success: false, error: 'unsupported_platform');
@@ -326,6 +328,7 @@ class CastService {
         message: 'A local file path is required to cast.',
       );
     }
+    final resolvedDurationMs = duration?.inMilliseconds ?? durationMs;
     try {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
         'castLocalFile',
@@ -336,6 +339,8 @@ class CastService {
           'album': album,
           'artwork': artwork,
           'mime': mime,
+          if (resolvedDurationMs != null && resolvedDurationMs > 0)
+            'durationMs': resolvedDurationMs,
         },
       );
       return _parseResult(res);
@@ -353,6 +358,8 @@ class CastService {
     String album = '',
     String? artwork,
     String mime = 'audio/mpeg',
+    int? durationMs,
+    Duration? duration,
   }) async {
     if (!_isAndroid) {
       return const CastResult(success: false, error: 'unsupported_platform');
@@ -368,6 +375,7 @@ class CastService {
         message: 'A valid http(s) stream URL is required to cast.',
       );
     }
+    final resolvedDurationMs = duration?.inMilliseconds ?? durationMs;
     try {
       final dynamic res = await _sessionChannel.invokeMethod<dynamic>(
         'castUrl',
@@ -378,6 +386,8 @@ class CastService {
           'album': album,
           'artwork': artwork,
           'mime': mime,
+          if (resolvedDurationMs != null && resolvedDurationMs > 0)
+            'durationMs': resolvedDurationMs,
         },
       );
       return _parseResult(res);

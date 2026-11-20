@@ -179,6 +179,8 @@ void main() {
 
     expect(find.byType(TextField), findsOneWidget);
     await tester.enterText(find.byType(TextField), 'radiohead');
+    // Advance past the 300ms search debounce timer
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
 
     expect(find.text('Radiohead'), findsOneWidget);
@@ -191,6 +193,48 @@ void main() {
     expect(played, hasLength(1));
     expect(played.single.name, 'Idioteque • Radiohead');
   });
+
+  testWidgets('Subsonic search debounces typing and discards rapid keystrokes',
+      (tester) async {
+    final subsonicSource = RemoteSource(
+      id: 'subsonic-1',
+      kind: RemoteSourceKind.subsonic,
+      displayName: 'Navidrome',
+      host: 'music.example.com',
+      port: 443,
+      rootPath: '/',
+      createdAt: DateTime.utc(2026),
+    );
+
+    final fakeSubsonic = _FakeSubsonicProvider(subsonicSource);
+    await _pumpSheet(
+      tester,
+      RemoteBrowserSheet(
+        source: subsonicSource,
+        provider: fakeSubsonic,
+      ),
+    );
+
+    await tester.tap(find.byTooltip(RemoteSourcesStrings.searchLibrary));
+    await tester.pumpAndSettle();
+
+    // Type partial queries rapidly
+    await tester.enterText(find.byType(TextField), 'r');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.enterText(find.byType(TextField), 'rad');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.enterText(find.byType(TextField), 'radio');
+    await tester.pump(const Duration(milliseconds: 100));
+
+    // Debounce window (300ms) has not elapsed since 'radio'
+    expect(fakeSubsonic.searchCalls, isEmpty);
+
+    // Now advance past 300ms
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+
+    expect(fakeSubsonic.searchCalls, ['radio']);
+  });
 }
 
 class _FakeSubsonicProvider implements SubsonicFsProvider {
@@ -200,6 +244,7 @@ class _FakeSubsonicProvider implements SubsonicFsProvider {
   final RemoteSource source;
 
   final SubsonicSearchResult? searchResults;
+  final List<String> searchCalls = [];
 
   @override
   Future<List<RemoteEntry>> list(String path) async => const [];
@@ -223,10 +268,16 @@ class _FakeSubsonicProvider implements SubsonicFsProvider {
     int artistCount = 20,
     int albumCount = 20,
     int songCount = 50,
-  }) async =>
-      searchResults ?? const SubsonicSearchResult();
+  }) async {
+    searchCalls.add(query);
+    return searchResults ?? const SubsonicSearchResult();
+  }
 
   @override
   Uri? getCoverArtUrl(String? coverArtId, {int? size}) =>
       coverArtId != null ? Uri.parse('http://127.0.0.1/art/$coverArtId') : null;
+
+  @override
+  String? getCoverArtCacheKey(String? coverArtId, {int? size}) =>
+      coverArtId != null ? 'subsonic://music.example.com/art/$coverArtId' : null;
 }

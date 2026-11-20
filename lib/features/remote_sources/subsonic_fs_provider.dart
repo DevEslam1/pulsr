@@ -379,6 +379,13 @@ class SubsonicFsProvider implements RemoteFsProvider {
     }
   }
 
+  /// Canonical, stable cache key for cover art that does NOT rotate with ephemeral
+  /// salts or tokens (§8.5), enabling persistent image caching.
+  String? getCoverArtCacheKey(String? coverArtId, {int? size}) {
+    if (coverArtId == null || coverArtId.trim().isEmpty) return null;
+    return _api.getCoverArtCacheKey(coverArtId, size: size);
+  }
+
   String? _coverArtUri(String? coverArtId, {int? size}) =>
       getCoverArtUrl(coverArtId, size: size)?.toString();
 

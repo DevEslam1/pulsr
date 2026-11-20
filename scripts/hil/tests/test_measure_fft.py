@@ -88,8 +88,14 @@ def test_offline_reference_matrix_produces_full_report():
         assert "noise_floor_16bit_dither_on" in case_ids
         assert "noise_floor_24bit_dither_on" in case_ids
         assert "imd_smpte_24bit" in case_ids
+        assert "imd_ccif_24bit" in case_ids
         assert "crosstalk_1khz" in case_ids
         assert "jitter_12khz" in case_ids
+
+        # Verify CCIF 19k+20k twin tone produces measurable carrier and IMD
+        ccif_m = case_ids["imd_ccif_24bit"]["metrics"]
+        assert ccif_m["mode"] == "ccif_19k_20k"
+        assert ccif_m["imdDb"] < -100.0
 
         # Verify dither on 16-bit linearizes quantization distortion
         thd_off = case_ids["thd_16bit_dither_off"]["metrics"]["thdDb"]
@@ -154,6 +160,29 @@ def test_single_wav_crosstalk():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def test_crosstalk_identical_channels_reports_not_measurable():
+    tmp = _tempdir()
+    try:
+        wav_path = os.path.join(tmp, "dual_mono.wav")
+        # Both L and R driven with 1 kHz sine at -3 dBFS -> identical dual-mono
+        _write_stereo_sine_wav(wav_path, freq_l=1000.0, freq_r=1000.0, rate=48000, duration_s=0.5)
+
+        json_path = os.path.join(tmp, "xtalk_dual.json")
+        code = measure_fft.main(["--wav", wav_path, "--mode", "crosstalk", "--json-out", json_path])
+        assert code == hc.EXIT_OK
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert len(data["cases"]) == 1
+        metrics = data["cases"][0]["metrics"]
+        assert metrics["status"] == "not_measurable"
+        assert metrics["reason"] == "identical_or_dual_driven_channels"
+        assert metrics["crosstalkDb"] is None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 def test_hardware_loopback_without_device_reports_blocked():
     tmp = _tempdir()
     try:
@@ -164,6 +193,35 @@ def test_hardware_loopback_without_device_reports_blocked():
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         assert data["status"] == "blocked"
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def test_threshold_failure_derives_status_fail_and_exits_nonzero():
+    tmp = _tempdir()
+    try:
+        # Create a 16-bit sine wav with severe distortion / noise (amp -60 dBFS analyzed as 16-bit THD)
+        wav_path = os.path.join(tmp, "distorted.wav")
+        _write_sine_wav(wav_path, freq=1000.0, rate=48000, duration_s=0.5, amp_dbfs=-60.0)
+
+        # Force analysis as thd_16bit_dither_off in a suite
+        # Put it in a capture dir named thd_16bit_dither_off.wav
+        capture_dir = os.path.join(tmp, "captures")
+        os.makedirs(capture_dir, exist_ok=True)
+        shutil.copy(wav_path, os.path.join(capture_dir, "thd_16bit_dither_off.wav"))
+
+        json_path = os.path.join(tmp, "failed_report.json")
+        code = measure_fft.main(["--capture-dir", capture_dir, "--json-out", json_path])
+        assert code == hc.EXIT_FAIL, f"Expected EXIT_FAIL, got {code}"
+
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        assert data["status"] == "fail"
+        assert data["counts"]["fail"] >= 1
+        case = next(c for c in data["cases"] if c["id"] == "thd_16bit_dither_off")
+        assert case["status"] == "fail"
+        assert "failed threshold" in case["reason"]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

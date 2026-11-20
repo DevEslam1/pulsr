@@ -178,6 +178,21 @@ std::vector<float> makeSmpteImd(int frames, double sampleRate) {
     return buf;
 }
 
+std::vector<float> makeCcifImd(int frames, double sampleRate) {
+    // CCIF twin-tone IMD (§8.7): 19 kHz + 20 kHz 1:1 at -3 dBFS combined peak.
+    const double peakScale = std::pow(10.0, -3.0 / 20.0);
+    const double amp = peakScale * 0.5;
+    std::vector<float> buf(static_cast<size_t>(frames) * kChannels, 0.0f);
+    for (int i = 0; i < frames; ++i) {
+        const double v =
+            amp * std::sin(kTwoPi * 19000.0 * i / sampleRate) +
+            amp * std::sin(kTwoPi * 20000.0 * i / sampleRate);
+        buf[i * 2] = static_cast<float>(v);
+        buf[i * 2 + 1] = static_cast<float>(v);
+    }
+    return buf;
+}
+
 uint64_t fnv1a64(const float* data, size_t count) {
     uint64_t hash = 14695981039346656037ULL;
     const uint8_t* bytes = reinterpret_cast<const uint8_t*>(data);
@@ -225,7 +240,8 @@ int main(int argc, char** argv) {
         auto bufOn = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus3dB, ampMinus3dB);
         configureEngine(engine, kSampleRate, 16, false, true, 16);
         runEngineBlocks(engine, bufOn, kTotalFrames);
-        writePcmWav(outDir / "thd_16bit_dither_on.wav", bufOn, kSampleRate, kChannels, 16, true);
+        // Engine STAGE_DITHER already applied dither; useSinkQuantizerDither=false prevents double dither (§8.7).
+        writePcmWav(outDir / "thd_16bit_dither_on.wav", bufOn, kSampleRate, kChannels, 16, false);
     }
 
     // 2. 16-bit low-level linearity (-60 dBFS 1 kHz), dither off vs on
@@ -239,7 +255,7 @@ int main(int argc, char** argv) {
         auto bufOn = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus60dB, ampMinus60dB);
         configureEngine(engine, kSampleRate, 16, false, true, 16);
         runEngineBlocks(engine, bufOn, kTotalFrames);
-        writePcmWav(outDir / "quiet_16bit_dither_on.wav", bufOn, kSampleRate, kChannels, 16, true);
+        writePcmWav(outDir / "quiet_16bit_dither_on.wav", bufOn, kSampleRate, kChannels, 16, false);
     }
 
     // 3. 24-bit THD+N (1 kHz @ -3 dBFS), dither off vs on
@@ -252,7 +268,8 @@ int main(int argc, char** argv) {
 
         auto bufOn = makeStereoSine(kTotalFrames, kSampleRate, 1000.0, ampMinus3dB, ampMinus3dB);
         configureEngine(engine, kSampleRate, 24, false, true, 24);
-        runEngineBlocks(engine, bufOn, kSampleRate, kChannels, 24, true);
+        runEngineBlocks(engine, bufOn, kTotalFrames);
+        writePcmWav(outDir / "thd_24bit_dither_on.wav", bufOn, kSampleRate, kChannels, 24, false);
     }
 
     // 4. Noise floor (digital zero) at 16-bit and 24-bit, dither off vs on
@@ -266,7 +283,7 @@ int main(int argc, char** argv) {
         std::vector<float> z16On(static_cast<size_t>(kTotalFrames) * kChannels, 0.0f);
         configureEngine(engine, kSampleRate, 16, false, true, 16);
         runEngineBlocks(engine, z16On, kTotalFrames);
-        writePcmWav(outDir / "noise_floor_16bit_dither_on.wav", z16On, kSampleRate, kChannels, 16, true);
+        writePcmWav(outDir / "noise_floor_16bit_dither_on.wav", z16On, kSampleRate, kChannels, 16, false);
 
         std::vector<float> z24Off(static_cast<size_t>(kTotalFrames) * kChannels, 0.0f);
         configureEngine(engine, kSampleRate, 24, false, false, 24);
@@ -276,10 +293,10 @@ int main(int argc, char** argv) {
         std::vector<float> z24On(static_cast<size_t>(kTotalFrames) * kChannels, 0.0f);
         configureEngine(engine, kSampleRate, 24, false, true, 24);
         runEngineBlocks(engine, z24On, kTotalFrames);
-        writePcmWav(outDir / "noise_floor_24bit_dither_on.wav", z24On, kSampleRate, kChannels, 24, true);
+        writePcmWav(outDir / "noise_floor_24bit_dither_on.wav", z24On, kSampleRate, kChannels, 24, false);
     }
 
-    // 5. SMPTE IMD (60 Hz + 7 kHz) & Stereo Crosstalk (1 kHz L-only) & Jitter carrier (12 kHz)
+    // 5. SMPTE IMD (60 Hz + 7 kHz) & CCIF (19 kHz + 20 kHz) & Stereo Crosstalk (1 kHz L-only) & Jitter carrier (12 kHz)
     bool custodyBitExact = false;
     std::string custodyInHash;
     std::string custodyOutHash;
@@ -290,6 +307,10 @@ int main(int argc, char** argv) {
         auto imdBuf = makeSmpteImd(kTotalFrames, kSampleRate);
         runEngineBlocks(engine, imdBuf, kTotalFrames);
         writePcmWav(outDir / "imd_smpte_24bit.wav", imdBuf, kSampleRate, kChannels, 24, false);
+
+        auto ccifBuf = makeCcifImd(kTotalFrames, kSampleRate);
+        runEngineBlocks(engine, ccifBuf, kTotalFrames);
+        writePcmWav(outDir / "imd_ccif_24bit.wav", ccifBuf, kSampleRate, kChannels, 24, false);
 
         // CustodyVerifier proof over bit-perfect bypass window.
         engine.custody().arm(4096, kSampleRate, true, false);
@@ -327,13 +348,22 @@ int main(int argc, char** argv) {
         pulsr::HighQualityResampler resampler;
         resampler.configure(kChannels, 512, 2048,
                             static_cast<double>(inRate), static_cast<double>(outRate));
-        const int maxOut = static_cast<int>(std::ceil(inFrames * (static_cast<double>(outRate) / inRate))) + 1024;
+        const int maxOut = static_cast<int>(std::ceil(inFrames * (static_cast<double>(outRate) / inRate))) + 2048;
         std::vector<float> outL(maxOut, 0.0f);
         std::vector<float> outR(maxOut, 0.0f);
         const float* inPtrs[2] = {inL.data(), inR.data()};
         float* outPtrs[2] = {outL.data(), outR.data()};
         int consumed = 0;
-        const int produced = resampler.process(inPtrs, inFrames, outPtrs, maxOut, consumed);
+        int produced = resampler.process(inPtrs, inFrames, outPtrs, maxOut, consumed);
+
+        // Drain the resampler tail (§8.7) with silence to recover full latency window
+        std::vector<float> drainIn(512, 0.0f);
+        const float* drainPtrs[2] = {drainIn.data(), drainIn.data()};
+        int drainConsumed = 0;
+        float* tailPtrs[2] = {outL.data() + produced, outR.data() + produced};
+        const int tailProduced = resampler.process(drainPtrs, 512, tailPtrs, maxOut - produced, drainConsumed);
+        produced += tailProduced;
+
         // Trim initial kernel warm-up (512 frames) so steady-state THD+N is measured cleanly.
         const int skip = std::min(512, produced / 4);
         const int keep = std::max(0, produced - skip);

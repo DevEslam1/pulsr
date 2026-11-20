@@ -70,6 +70,8 @@ class UpnpDeviceDescriptionCache {
     final now = _clock();
     final cached = _xmlCache[location];
     if (cached != null && cached.isFresh(ttl, now)) {
+      // True LRU: update recency sequence on hit (§8.5)
+      _xmlCache[location] = _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
       return cached.value;
     }
 
@@ -101,6 +103,7 @@ class UpnpDeviceDescriptionCache {
     final now = _clock();
     final cached = _deviceCache[location];
     if (cached != null && cached.isFresh(ttl, now)) {
+      _deviceCache[location] = _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
       return cached.value;
     }
 
@@ -139,6 +142,7 @@ class UpnpDeviceDescriptionCache {
     final now = _clock();
     final cached = _serverCache[location];
     if (cached != null && cached.isFresh(ttl, now)) {
+      _serverCache[location] = _CacheEntry(cached.value, cached.cachedAt, ++_sequence);
       return cached.value;
     }
 

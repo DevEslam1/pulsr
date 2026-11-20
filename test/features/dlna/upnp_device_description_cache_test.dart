@@ -162,6 +162,26 @@ void main() {
       expect(cache.contains(u3), isTrue);
     });
 
+    test('accessing entry updates recency and protects it from LRU eviction', () async {
+      final cache = UpnpDeviceDescriptionCache(maxEntries: 2);
+      final u1 = Uri.parse('http://1.1.1.1/d.xml');
+      final u2 = Uri.parse('http://1.1.1.2/d.xml');
+      final u3 = Uri.parse('http://1.1.1.3/d.xml');
+
+      cache.putXml(u1, _rendererXml);
+      cache.putXml(u2, _serverXml);
+
+      // Read u1 to update its recency (making u2 the least recently used)
+      final desc = await cache.getOrFetchDeviceDescription(u1);
+      expect(desc, isNotNull);
+
+      // Inserting u3 should now evict u2 (the LRU entry), NOT u1
+      cache.putXml(u3, 'xml3');
+      expect(cache.contains(u1), isTrue);
+      expect(cache.contains(u2), isFalse);
+      expect(cache.contains(u3), isTrue);
+    });
+
     test('rejects responses exceeding maxDescriptionBytes', () async {
       final oversized = 'x' * (UpnpDeviceDescriptionCache.maxDescriptionBytes + 1);
       final client = _CountingClient((_) async => _xmlResponse(oversized));

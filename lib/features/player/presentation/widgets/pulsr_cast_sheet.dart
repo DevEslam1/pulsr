@@ -610,6 +610,91 @@ class _PulsrCastSheetState extends State<PulsrCastSheet> {
                                 const TextStyle(fontWeight: FontWeight.w600)),
                       ),
                     ),
+                    if (_session.title != null || _session.playing || _session.paused) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.xs),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: AppRadii.r12All,
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Column(
+                          children: [
+                            if (_session.title != null) ...[
+                              Text(
+                                _session.title!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: AppFontSize.body,
+                                  color: p.textPrimary,
+                                ),
+                              ),
+                              if (_session.artist != null)
+                                Text(
+                                  _session.artist!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: AppFontSize.label,
+                                    color: p.textSecondary,
+                                  ),
+                                ),
+                              const SizedBox(height: AppSpacing.xxs),
+                            ],
+                            if (_session.durationMs > 0)
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  trackHeight: 3,
+                                ),
+                                child: Slider(
+                                  value: _session.positionMs.toDouble().clamp(0.0, _session.durationMs.toDouble()),
+                                  max: _session.durationMs.toDouble(),
+                                  activeColor: p.accent,
+                                  onChanged: (v) => _service.seek(Duration(milliseconds: v.round())),
+                                ),
+                              ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Previous',
+                                  icon: const Icon(Icons.skip_previous_rounded),
+                                  onPressed: _busy ? null : () => _service.previous(),
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                IconButton(
+                                  tooltip: _session.playing ? 'Pause' : 'Play',
+                                  iconSize: 36,
+                                  color: p.accent,
+                                  icon: Icon(_session.playing
+                                      ? Icons.pause_circle_filled_rounded
+                                      : Icons.play_circle_filled_rounded),
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _session.playing ? _service.pause() : _service.play(),
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                IconButton(
+                                  tooltip: 'Stop',
+                                  icon: const Icon(Icons.stop_rounded),
+                                  onPressed: _busy ? null : () => _service.stop(),
+                                ),
+                                const SizedBox(width: AppSpacing.xs),
+                                IconButton(
+                                  tooltip: 'Next',
+                                  icon: const Icon(Icons.skip_next_rounded),
+                                  onPressed: _busy ? null : () => _service.next(),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: AppSpacing.sm),
                     // AUDIT-FIX: Loading indicator and unknown tooltip on volume slider
                     Row(

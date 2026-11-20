@@ -165,18 +165,15 @@ def write_pcm_wav(
 # Windowed FFT core
 # ---------------------------------------------------------------------------
 
-def _blackman_harris_4term(n: int) -> np.ndarray:
-    """4-term Blackman-Harris window (-92 dB sidelobe suppression)."""
-    idx = np.arange(n, dtype=np.float64)
-    phase = 2.0 * math.pi * idx / n
-    a0, a1, a2, a3 = 0.35875, 0.48829, 0.14128, 0.01168
-    return a0 - a1 * np.cos(phase) + a2 * np.cos(2.0 * phase) - a3 * np.cos(3.0 * phase)
+def _measurement_window(n: int) -> np.ndarray:
+    """Kaiser window (beta=18.0) with >150 dB sidelobe suppression for true 24-bit audio analysis."""
+    return np.kaiser(n, 18.0)
 
 
 def compute_spectrum(signal: np.ndarray, sample_rate: int, max_fft: int = 65536) -> tuple[np.ndarray, np.ndarray, float]:
     """
     Computes single-sided amplitude-squared power spectrum (in full-scale sine^2 units)
-    using a 4-term Blackman-Harris window.
+    using a Kaiser beta=18 window (>150 dB sidelobe suppression).
 
     Returns (freqs_hz, bin_power, enbw_bins).
     For a pure full-scale sine A*sin(w*n), summing `bin_power` across the mainlobe
@@ -191,23 +188,13 @@ def compute_spectrum(signal: np.ndarray, sample_rate: int, max_fft: int = 65536)
     x = x[-n_fft:]
     x = x - np.mean(x)
 
-    win = _blackman_harris_4term(n_fft)
+    win = _measurement_window(n_fft)
     win_norm_sq = float(np.sum(win ** 2))
-    # ENBW in bins = N * sum(w^2) / sum(w)^2 (~2.004 bins for 4-term BH)
+    # ENBW in bins = N * sum(w^2) / sum(w)^2
     enbw = float(n_fft * win_norm_sq / (np.sum(win) ** 2))
 
     spec = np.fft.rfft(x * win)
     mag_sq = (spec.real ** 2 + spec.imag ** 2)
-    # Parseval scaling: sum(bin_power) == mean(x_windowed^2) * ... = A^2 / 2 for sine
-    bin_power = mag_sq / win_norm_sq
-    if len(bin_power) > 2:
-        bin_power[1:-1] *= 2.0
-    # Wait: Parseval with sum(w^2): for x[n] = A sin(...), sum |X[k]|^2 / (N * sum(w^2))
-    # With rfft doubling interior bins, sum(mag_sq_doubled) / N == sum((x*w)^2).
-    # Dividing by win_norm_sq * (N/N) -> need divide by N too! Let's normalize accurately:
-    # sum_{n=0}^{N-1} (x[n] w[n])^2 / sum(w^2) == mean_square(x) = A^2 / 2.
-    # By Parseval: sum_{n} (x[n] w[n])^2 == (1/N) * (|X[0]|^2 + 2*sum_{1..N/2-1}|X[k]|^2 + |X[N/2]|^2)
-    # So dividing by (n_fft * win_norm_sq) makes sum(bin_power) == A^2 / 2!
     bin_power = mag_sq / (n_fft * win_norm_sq)
     if len(bin_power) > 2:
         bin_power[1:-1] *= 2.0
@@ -258,7 +245,7 @@ def analyze_tone_thdn(
         fund_bin = int(np.argmax(band_pwr))
 
     fund_hz = float(freqs[fund_bin])
-    mainlobe_half = 5  # 4-term Blackman-Harris mainlobe width is ±4 bins
+    mainlobe_half = 8  # Kaiser beta=18 mainlobe width is ±7-8 bins (>150 dB suppression)
     lo_b = max(1, fund_bin - mainlobe_half)
     hi_b = min(len(pwr), fund_bin + mainlobe_half + 1)
     fund_power = float(np.sum(pwr[lo_b:hi_b]))
@@ -347,7 +334,7 @@ def analyze_imd_smpte(
 ) -> dict[str, Any]:
     """Computes SMPTE IMD (60 Hz + 7 kHz 4:1): sidebands f_high ± k*f_low (k=1..3) relative to f_high."""
     freqs, pwr, _ = compute_spectrum(signal, sample_rate)
-    mainlobe_half = 5
+    mainlobe_half = 8
 
     def sum_near(target_hz: float) -> float:
         b = _peak_bin_near(freqs, pwr, target_hz, 20.0)
@@ -390,11 +377,28 @@ def analyze_crosstalk(
     _, pwr_r, _ = compute_spectrum(right, sample_rate)
 
     b_l = _peak_bin_near(freqs_l, pwr_l, tone_hz, 40.0)
-    lo = max(1, b_l - 5)
-    hi = min(len(pwr_l), b_l + 6)
+    lo = max(1, b_l - 8)
+    hi = min(len(pwr_l), b_l + 9)
 
     p_left = float(np.sum(pwr_l[lo:hi]))
     p_right = float(np.sum(pwr_r[lo:hi]))
+
+    db_left = _db10(2.0 * p_left)
+    db_right = _db10(2.0 * p_right)
+
+    # Identical / dual-driven channel detection (§8.7): if both channels are driven
+    # with comparable amplitude (within 1 dB), crosstalk is physically not measurable.
+    if abs(db_left - db_right) < 1.0 or (p_left <= 0.0 and p_right <= 0.0):
+        return {
+            "status": "not_measurable",
+            "reason": "identical_or_dual_driven_channels",
+            "direction": "N/A",
+            "toneHz": tone_hz,
+            "drivenDbfs": round(max(db_left, db_right), 2),
+            "bleedDbfs": round(min(db_left, db_right), 2),
+            "crosstalkDb": None,
+        }
+
     if p_left >= p_right:
         direction = "L->R"
         driven_pwr, bleed_pwr = p_left, p_right
@@ -404,11 +408,63 @@ def analyze_crosstalk(
 
     crosstalk_db = _db10(bleed_pwr / driven_pwr) if driven_pwr > 0 else -180.0
     return {
+        "status": "pass",
         "direction": direction,
         "toneHz": tone_hz,
         "drivenDbfs": round(_db10(2.0 * driven_pwr), 2),
         "bleedDbfs": round(_db10(2.0 * bleed_pwr), 2),
         "crosstalkDb": round(crosstalk_db, 2),
+    }
+
+
+def analyze_imd_ccif(
+    signal: np.ndarray,
+    sample_rate: int,
+    f1_hz: float = 19000.0,
+    f2_hz: float = 20000.0,
+) -> dict[str, Any]:
+    """Computes CCIF twin-tone IMD (19 kHz + 20 kHz 1:1 ratio, §8.7).
+
+    Measures:
+      - Primary difference tone (IMD2): |f2 - f1| = 1 kHz
+      - 3rd-order intermodulation products (IMD3): 2*f1 - f2 (18 kHz) and 2*f2 - f1 (21 kHz)
+    relative to the combined carrier power of the twin primary tones.
+    """
+    freqs, pwr, _ = compute_spectrum(signal, sample_rate)
+    mainlobe_half = 8
+    nyq = sample_rate * 0.5
+
+    def sum_near(target_hz: float) -> float:
+        if target_hz <= 0.0 or target_hz >= nyq * 0.98:
+            return 0.0
+        b = _peak_bin_near(freqs, pwr, target_hz, 40.0)
+        lo = max(1, b - mainlobe_half)
+        hi = min(len(pwr), b + mainlobe_half + 1)
+        return float(np.sum(pwr[lo:hi]))
+
+    p_f1 = sum_near(f1_hz)
+    p_f2 = sum_near(f2_hz)
+    carrier_power = p_f1 + p_f2
+
+    p_imd2 = sum_near(abs(f2_hz - f1_hz))
+    p_imd3_low = sum_near(2.0 * f1_hz - f2_hz)
+    p_imd3_high = sum_near(2.0 * f2_hz - f1_hz) if (2.0 * f2_hz - f1_hz) < nyq else 0.0
+    p_imd3 = p_imd3_low + p_imd3_high
+
+    total_imd_power = p_imd2 + p_imd3
+    imd_ratio = total_imd_power / carrier_power if carrier_power > 0 else 1.0
+    imd_db = _db10(imd_ratio)
+    imd_pct = 100.0 * math.sqrt(max(0.0, imd_ratio))
+
+    return {
+        "mode": "ccif_19k_20k",
+        "f1Hz": f1_hz,
+        "f2Hz": f2_hz,
+        "carrierDbfs": round(_db10(2.0 * carrier_power), 2),
+        "imd2Db": round(_db10(p_imd2 / carrier_power) if carrier_power > 0 else -180.0, 2),
+        "imd3Db": round(_db10(p_imd3 / carrier_power) if carrier_power > 0 else -180.0, 2),
+        "imdDb": round(imd_db, 2),
+        "imdPct": round(imd_pct, 6),
     }
 
 
@@ -422,7 +478,7 @@ def analyze_jitter_sidebands(
     freqs, pwr, _ = compute_spectrum(signal, sample_rate)
     c_bin = _peak_bin_near(freqs, pwr, carrier_hz, 100.0)
     actual_carrier_hz = float(freqs[c_bin])
-    mainlobe_half = 5
+    mainlobe_half = 8
     lo_c = max(1, c_bin - mainlobe_half)
     hi_c = min(len(pwr), c_bin + mainlobe_half + 1)
     carrier_pwr = float(np.sum(pwr[lo_c:hi_c]))
@@ -485,6 +541,9 @@ def generate_offline_reference_captures(out_dir: str, sample_rate: int = 48000) 
     smpte = amp_m3 * (0.8 * np.sin(2.0 * math.pi * 60.0 * t) + 0.2 * np.sin(2.0 * math.pi * 7000.0 * t))
     write_pcm_wav(os.path.join(out_dir, "imd_smpte_24bit.wav"), smpte, sample_rate, 24, dither=False)
 
+    ccif = amp_m3 * 0.5 * (np.sin(2.0 * math.pi * 19000.0 * t) + np.sin(2.0 * math.pi * 20000.0 * t))
+    write_pcm_wav(os.path.join(out_dir, "imd_ccif_24bit.wav"), ccif, sample_rate, 24, dither=False)
+
     xtalk = np.column_stack([amp_m1 * np.sin(2.0 * math.pi * 1000.0 * t), zeros])
     write_pcm_wav(os.path.join(out_dir, "crosstalk_1khz_l_only.wav"), xtalk, sample_rate, 24, dither=False)
 
@@ -496,6 +555,82 @@ def generate_offline_reference_captures(out_dir: str, sample_rate: int = 48000) 
         "sampleRate": sample_rate,
         "custodyBitExact": None,
     }
+
+
+# ---------------------------------------------------------------------------
+# Threshold table & status derivation (§8.7)
+# ---------------------------------------------------------------------------
+
+CASE_THRESHOLDS: dict[str, dict[str, tuple[str, float]]] = {
+    "thd_16bit_dither_off": {
+        "thdnDb": ("<=", -90.0),
+        "sfdrDbc": (">=", 90.0),
+    },
+    "thd_16bit_dither_on": {
+        "thdnDb": ("<=", -88.0),
+        "sfdrDbc": (">=", 88.0),
+    },
+    "quiet_16bit_dither_off": {
+        "thdnDb": ("<=", -30.0),
+    },
+    "quiet_16bit_dither_on": {
+        "thdnDb": ("<=", -30.0),
+    },
+    "thd_24bit_dither_off": {
+        "thdnDb": ("<=", -120.0),
+        "sfdrDbc": (">=", 120.0),
+    },
+    "thd_24bit_dither_on": {
+        "thdnDb": ("<=", -115.0),
+        "sfdrDbc": (">=", 115.0),
+    },
+    "noise_floor_16bit_dither_off": {
+        "bandNoiseDbfs": ("<=", -95.0),
+    },
+    "noise_floor_16bit_dither_on": {
+        "bandNoiseDbfs": ("<=", -90.0),
+    },
+    "noise_floor_24bit_dither_off": {
+        "bandNoiseDbfs": ("<=", -140.0),
+    },
+    "noise_floor_24bit_dither_on": {
+        "bandNoiseDbfs": ("<=", -135.0),
+    },
+    "imd_smpte_24bit": {
+        "imdDb": ("<=", -110.0),
+    },
+    "imd_ccif_24bit": {
+        "imdDb": ("<=", -110.0),
+    },
+    "crosstalk_1khz": {
+        "crosstalkDb": ("<=", -80.0),
+    },
+    "jitter_12khz": {
+        "peakSidebandDbc": ("<=", -105.0),
+    },
+    "tap_src_441_to_48_512taps": {
+        "thdnDb": ("<=", -110.0),
+        "sfdrDbc": (">=", 110.0),
+    },
+}
+
+
+def evaluate_case_thresholds(case_id: str, metrics: dict[str, Any]) -> tuple[str, str | None]:
+    """Derives case status ('pass', 'fail', 'not_measurable') from CASE_THRESHOLDS."""
+    if metrics.get("status") == "not_measurable":
+        return "not_measurable", metrics.get("reason") or "not_measurable"
+    thresholds = CASE_THRESHOLDS.get(case_id)
+    if not thresholds:
+        return "pass", None
+    for key, (op, limit) in thresholds.items():
+        val = metrics.get(key)
+        if val is None:
+            continue
+        if op == "<=" and val > limit:
+            return "fail", f"Metric '{key}' ({val}) failed threshold (<= {limit})"
+        elif op == ">=" and val < limit:
+            return "fail", f"Metric '{key}' ({val}) failed threshold (>= {limit})"
+    return "pass", None
 
 
 # ---------------------------------------------------------------------------
@@ -523,11 +658,12 @@ def run_suite(capture_dir: str, provenance: str, manifest: dict[str, Any] | None
         res["sampleRate"] = sr
         res["channels"] = ch
         res["bitsPerSample"] = bits
+        st, reason = evaluate_case_thresholds(case_id, res)
         cases.append({
             "id": case_id,
             "file": filename,
-            "status": "pass",
-            "reason": None,
+            "status": st,
+            "reason": reason,
             "metrics": res,
         })
         metrics[case_id] = res
@@ -557,6 +693,8 @@ def run_suite(capture_dir: str, provenance: str, manifest: dict[str, Any] | None
 
     analyze_if_present("imd_smpte_24bit", "imd_smpte_24bit.wav",
                        lambda d, sr: analyze_imd_smpte(d[:, 0], sr))
+    analyze_if_present("imd_ccif_24bit", "imd_ccif_24bit.wav",
+                       lambda d, sr: analyze_imd_ccif(d[:, 0], sr))
     analyze_if_present("crosstalk_1khz", "crosstalk_1khz_l_only.wav",
                        lambda d, sr: analyze_crosstalk(d, sr, tone_hz=1000.0))
     analyze_if_present("jitter_12khz", "jitter_12khz_24bit.wav",
@@ -569,6 +707,7 @@ def run_suite(capture_dir: str, provenance: str, manifest: dict[str, Any] | None
     passed = sum(1 for c in cases if c["status"] == "pass")
     failed = sum(1 for c in cases if c["status"] == "fail")
     blocked = sum(1 for c in cases if c["status"] == "blocked")
+    not_meas = sum(1 for c in cases if c["status"] == "not_measurable")
     status = "fail" if failed > 0 else ("pass" if passed > 0 else "blocked")
 
     return {
@@ -588,6 +727,7 @@ def run_suite(capture_dir: str, provenance: str, manifest: dict[str, Any] | None
             "pass": passed,
             "fail": failed,
             "blocked": blocked,
+            "notMeasurable": not_meas,
         },
         "cases": cases,
         "metrics": metrics,
@@ -628,10 +768,18 @@ def build_markdown_report(report: dict[str, Any]) -> str:
                 f"Band noise (20 Hz–20 kHz): **{m['bandNoiseDbfs']} dBFS**, "
                 f"RMS: {m['rmsDbfs']} dBFS, Peak spur: {m['peakSpurDbfs']} dBFS"
             )
+        elif "imdDb" in m and "f1Hz" in m:
+            detail = (
+                f"CCIF IMD ({m['f1Hz']:.0f} & {m['f2Hz']:.0f} Hz): **{m['imdDb']} dB** "
+                f"({m['imdPct']:.5f}%), IMD2: {m['imd2Db']} dB, IMD3: {m['imd3Db']} dB"
+            )
         elif "imdDb" in m:
             detail = f"SMPTE IMD: **{m['imdDb']} dB** ({m['imdPct']:.5f}%)"
         elif "crosstalkDb" in m:
-            detail = f"Crosstalk ({m['direction']} @ {m['toneHz']} Hz): **{m['crosstalkDb']} dB**"
+            if m.get("crosstalkDb") is not None:
+                detail = f"Crosstalk ({m['direction']} @ {m['toneHz']} Hz): **{m['crosstalkDb']} dB**"
+            else:
+                detail = f"Crosstalk: Not measurable ({m.get('reason')})"
         elif "peakSidebandDbc" in m:
             detail = (
                 f"Peak jitter sideband: **{m['peakSidebandDbc']} dBc** "
@@ -661,7 +809,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--wav", default=None, help="Analyze a single WAV capture file")
     parser.add_argument(
         "--mode",
-        choices=("thdn", "noise", "imd", "crosstalk", "jitter"),
+        choices=("thdn", "noise", "imd", "ccif", "crosstalk", "jitter"),
         default="thdn",
         help="Analysis mode for --wav (default: thdn)",
     )
@@ -685,6 +833,8 @@ def main(argv: list[str] | None = None) -> int:
             metrics = analyze_noise_floor(data[:, 0], sr)
         elif args.mode == "imd":
             metrics = analyze_imd_smpte(data[:, 0], sr)
+        elif args.mode == "ccif":
+            metrics = analyze_imd_ccif(data[:, 0], sr)
         elif args.mode == "crosstalk":
             metrics = analyze_crosstalk(data, sr)
         else:

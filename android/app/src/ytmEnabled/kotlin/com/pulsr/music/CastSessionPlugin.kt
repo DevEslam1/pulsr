@@ -277,7 +277,7 @@ class CastSessionPlugin(
                 "setPlaybackState" -> {
                     val action = call.argument<String>("action")
                     val positionMs = call.argument<Number>("positionMs")?.toLong()
-                    result.success(setPlaybackState(action, positionMs))
+                    handlePlaybackState(action, positionMs, result)
                 }
                 "getVolume" -> {
                     val session = currentSession()
@@ -430,6 +430,7 @@ class CastSessionPlugin(
                 album = call.argument<String>("album") ?: "",
                 artwork = call.argument<String>("artwork"),
                 mime = call.argument<String>("mime") ?: "audio/mpeg",
+                durationMs = call.argument<Number>("durationMs")?.toLong(),
             )
             try {
                 val pending = client.load(info, true)
@@ -494,6 +495,7 @@ class CastSessionPlugin(
                     album = raw["album"] as? String ?: "",
                     artwork = raw["artwork"] as? String,
                     mime = mime,
+                    durationMs = (raw["durationMs"] as? Number)?.toLong(),
                 )
                 queueItems.add(MediaQueueItem.Builder(mediaInfo).build())
             }
@@ -532,6 +534,7 @@ class CastSessionPlugin(
         album: String,
         artwork: String?,
         mime: String,
+        durationMs: Long? = null,
     ): MediaInfo {
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
             putString(MediaMetadata.KEY_TITLE, title)
@@ -545,11 +548,14 @@ class CastSessionPlugin(
                 )
             }
         }
-        return MediaInfo.Builder(url)
+        val builder = MediaInfo.Builder(url)
             .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
             .setContentType(mime)
             .setMetadata(metadata)
-            .build()
+        if (durationMs != null && durationMs > 0L) {
+            builder.setStreamDuration(durationMs)
+        }
+        return builder.build()
     }
 
     private fun awaitMediaResult(
@@ -587,11 +593,18 @@ class CastSessionPlugin(
         }
     }
 
-    private fun setPlaybackState(action: String?, positionMs: Long?): Map<String, Any?> {
+    private fun handlePlaybackState(
+        action: String?,
+        positionMs: Long?,
+        result: MethodChannel.Result,
+    ) {
         val client = currentSession()?.remoteMediaClient
-            ?: return notConfigured("no active Cast session")
-        return try {
-            when (action) {
+        if (client == null) {
+            result.success(notConfigured("no active Cast session"))
+            return
+        }
+        try {
+            val pending = when (action) {
                 "play" -> client.play()
                 "pause" -> client.pause()
                 "stop" -> client.stop()
@@ -601,12 +614,15 @@ class CastSessionPlugin(
                     val pos = (positionMs ?: 0L).coerceAtLeast(0L)
                     client.seek(MediaSeekOptions.Builder().setPosition(pos).build())
                 }
-                else -> return notConfigured("unknown action")
+                else -> {
+                    result.success(notConfigured("unknown action: $action"))
+                    return
+                }
             }
-            mapOf("success" to true)
+            awaitMediaResult(pending, result)
         } catch (e: Exception) {
             lastError = e.message
-            notConfigured("control failed: ${e.message}")
+            result.success(notConfigured("control failed: ${e.message}"))
         }
     }
 

@@ -352,6 +352,8 @@ class _DlnaScreenState extends State<DlnaScreen> {
           onPause: () => unawaited(_service.pause()),
           onResume: () => unawaited(_service.resume()),
           onStop: () => unawaited(_service.stop()),
+          onNext: () => unawaited(_service.next()),
+          onPrevious: () => unawaited(_service.previous()),
         ),
       ]);
     }
@@ -529,6 +531,8 @@ class _NowPlayingCard extends StatelessWidget {
     required this.onPause,
     required this.onResume,
     required this.onStop,
+    this.onNext,
+    this.onPrevious,
   });
 
   final String title;
@@ -544,6 +548,8 @@ class _NowPlayingCard extends StatelessWidget {
   final VoidCallback onPause;
   final VoidCallback onResume;
   final VoidCallback onStop;
+  final VoidCallback? onNext;
+  final VoidCallback? onPrevious;
 
   @override
   Widget build(BuildContext context) {
@@ -636,6 +642,20 @@ class _NowPlayingCard extends StatelessWidget {
             children: <Widget>[
               Semantics(
                 button: true,
+                label: 'Previous',
+                child: IconButton(
+                  onPressed: onPrevious,
+                  tooltip: 'Previous',
+                  icon: const Icon(Icons.skip_previous_rounded),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    foregroundColor: palette.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Semantics(
+                button: true,
                 label: paused ? DlnaStrings.resume : DlnaStrings.pause,
                 child: IconButton(
                   onPressed: canPause
@@ -654,7 +674,7 @@ class _NowPlayingCard extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpacing.xs),
               Semantics(
                 button: true,
                 label: DlnaStrings.stop,
@@ -662,6 +682,20 @@ class _NowPlayingCard extends StatelessWidget {
                   onPressed: onStop,
                   tooltip: DlnaStrings.stop,
                   icon: const Icon(Icons.stop_rounded),
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    foregroundColor: palette.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Semantics(
+                button: true,
+                label: 'Next',
+                child: IconButton(
+                  onPressed: onNext,
+                  tooltip: 'Next',
+                  icon: const Icon(Icons.skip_next_rounded),
                   style: IconButton.styleFrom(
                     minimumSize: const Size(48, 48),
                     foregroundColor: palette.textPrimary,

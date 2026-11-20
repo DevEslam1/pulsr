@@ -528,6 +528,16 @@ final class SubsonicClient {
     return signed.uri;
   }
 
+  /// Returns a canonical, stable cache key for cover art that does NOT change
+  /// with each salt/token rotation (§8.5), enabling persistent image caches.
+  String getCoverArtCacheKey(String coverArtId, {int? size}) {
+    final id = coverArtId.trim();
+    if (id.isEmpty) return '';
+    final sizeSegment = size != null && size > 0 ? '&size=$size' : '';
+    final portSegment = _baseUrl.hasPort ? ':${_baseUrl.port}' : '';
+    return 'subsonic://${_baseUrl.host}$portSegment$_basePath/rest/getCoverArt?id=$id$sizeSegment';
+  }
+
   /// Searches the server for artists, albums and songs matching [query]
   /// via Subsonic `search3`.
   Future<SubsonicSearchResult> search3(
