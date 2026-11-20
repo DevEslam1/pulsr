@@ -151,6 +151,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     private volatile boolean aaudioOutputEnabled = false;
     private volatile boolean aaudioPreferExclusive = true;
     private volatile int aaudioTargetBufferMs = 150;
+    // Pulsr fork: true low-power route. Skips NativeDspAudioProcessor instantiation
+    // completely for eligible integer PCM, routing straight to DefaultAudioSink.
+    private volatile boolean lowPowerRouteEnabled = false;
     private volatile boolean disposed = false;
     private int aaudioRequestGeneration = 0;
     // Pulsr fork: the enable probe repeats on every request (toggle, buffer or
@@ -796,6 +799,23 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 return;
             }
 
+            // Pulsr fork: true low-power route preference.
+            if ("dspSetLowPowerRoute".equals(call.method)) {
+                Boolean requested = call.argument("enabled");
+                boolean enabled = requested != null && requested;
+                result.success(applyLowPowerRoute(enabled));
+                return;
+            }
+
+            if ("dspIsLowPowerBypassed".equals(call.method)) {
+                if (sinkWrapper instanceof PulsrAudioSink) {
+                    result.success(((PulsrAudioSink) sinkWrapper).isLowPowerBypassActiveForTelemetry());
+                } else {
+                    result.success(false);
+                }
+                return;
+            }
+
             // Pulsr fork: tap-side SRC target rate (device output rate). Handled
             // before initialization like dspSetFloatOutput; 0 disables. Takes
             // effect on the processor's next configure (rate changes mid-stream
@@ -1367,6 +1387,15 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         return effective == enabled;
     }
 
+    private boolean applyLowPowerRoute(boolean enabled) {
+        boolean changed = lowPowerRouteEnabled != enabled;
+        lowPowerRouteEnabled = enabled;
+        if (changed && sinkWrapper != null) {
+            sinkWrapper.requestModeChange(true);
+        }
+        return true;
+    }
+
     private void applyShuffleOrder(ShuffleOrder order) {
         outputShuffleOrder = order;
         player.setShuffleOrder(order);
@@ -1383,6 +1412,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                     () -> aaudioPreferExclusive,
                     () -> aaudioTargetBufferMs,
                     () -> floatOutputEnabled,
+                    () -> lowPowerRouteEnabled,
                     () -> player,
                     this::onActiveDspProcessorChanged,
                     new PulsrAudioSink.FallbackListener() {

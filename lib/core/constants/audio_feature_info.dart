@@ -583,6 +583,26 @@ class AudioFeatureRegistry {
     conflictsWith: 'Bit-Perfect bypass',
     conflictKey: 'bitPerfectBypass',
   );
+
+  static const channelManager = AudioFeatureInfo(
+    id: 'channelManager',
+    title: 'Multichannel Channel Manager',
+    subtitle: 'Per-channel gain trim & alignment delay for surround layouts',
+    description:
+        'Controls per-channel volume trim (-30 dB to +12 dB) and delay alignment (0 to 50 ms) across up to 8 surround channels (FL, FR, C, LFE, SL, SR, RL, RR). Active when outputting to multichannel devices via Pulsr 32-bit float AudioTrack path. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
+  );
+
+  static const lfeCrossover = AudioFeatureInfo(
+    id: 'lfeCrossover',
+    title: 'LFE Crossover & Bass Management',
+    subtitle: 'Linkwitz-Riley satellite HPF & dedicated subwoofer LFE crossover',
+    description:
+        'Applies 2nd/4th order Linkwitz-Riley high-pass filtering (40–200 Hz) to satellite channels, redirects low-frequency content into the dedicated LFE channel, and applies a low-pass filter (60–250 Hz) and gain trim (-12 to +12 dB) to the LFE subwoofer output. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+    conflictKey: 'bitPerfectBypass',
+  );
 }
 
 enum AudioSourceCodecState {

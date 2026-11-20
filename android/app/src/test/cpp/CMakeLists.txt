@@ -73,6 +73,7 @@ set(DSP_SRCS
     ${MAIN_CPP}/StereoWidth.cpp
     ${MAIN_CPP}/LoudnessContour.cpp
     ${MAIN_CPP}/SubCrossover.cpp
+    ${MAIN_CPP}/LfeCrossover.cpp
     ${MAIN_CPP}/ChannelManager.cpp
     ${MAIN_CPP}/DacVoicing.cpp
     ${MAIN_CPP}/DynamicEQ.cpp

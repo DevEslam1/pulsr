@@ -14,9 +14,11 @@ enum DspStage {
   liveProg('Live Programmable DSP', 0.1),
   stereoWidth('Stereo Width', 0.0),
   subCrossover('Sub Crossover (Bass Redirection)', 0.0),
+  lfeCrossover('LFE Crossover (Multichannel Bass Mgmt)', 0.0),
   dynamicBass('Dynamic Bass', 0.0),
-  lookaheadLimiter('Lookahead Limiter', 0.08),
   loudnessContour('Loudness Contour', 0.0),
+  channelManager('Channel Manager (Trim & Delay)', 0.0),
+  lookaheadLimiter('Lookahead Limiter', 0.08),
   volume('Volume & ReplayGain', 0.01);
 
   final String label;
@@ -39,6 +41,8 @@ class OptimizedDspPipeline {
   bool liveProgEnabled = false;
   bool stereoWidthEnabled = false;
   bool subCrossoverEnabled = false;
+  bool lfeCrossoverEnabled = false;
+  bool channelManagerEnabled = false;
   bool dynamicBassEnabled = false;
   bool loudnessContourEnabled = false;
   bool limiterEnabled = false;
@@ -82,8 +86,10 @@ class OptimizedDspPipeline {
     DspStage.liveProg,
     DspStage.stereoWidth,
     DspStage.subCrossover,
+    DspStage.lfeCrossover,
     DspStage.dynamicBass,
     DspStage.loudnessContour,
+    DspStage.channelManager,
     DspStage.lookaheadLimiter,
     DspStage.volume,
   ];
@@ -116,12 +122,16 @@ class OptimizedDspPipeline {
           return stereoWidthEnabled;
         case DspStage.subCrossover:
           return subCrossoverEnabled;
+        case DspStage.lfeCrossover:
+          return lfeCrossoverEnabled;
         case DspStage.dynamicBass:
           return dynamicBassEnabled;
         case DspStage.lookaheadLimiter:
           return limiterEnabled;
         case DspStage.loudnessContour:
           return loudnessContourEnabled;
+        case DspStage.channelManager:
+          return channelManagerEnabled;
         case DspStage.volume:
           return true; // Always applied at the output stage
       }
@@ -183,6 +193,8 @@ class OptimizedDspPipeline {
     bool? isLiveProgEnabled,
     bool? isStereoWidthEnabled,
     bool? isSubCrossoverEnabled,
+    bool? isLfeCrossoverEnabled,
+    bool? isChannelManagerEnabled,
     bool? isDynamicBassEnabled,
     bool? isLoudnessContourEnabled,
     bool? isLimiterEnabled,
@@ -208,6 +220,12 @@ class OptimizedDspPipeline {
     if (isStereoWidthEnabled != null) stereoWidthEnabled = isStereoWidthEnabled;
     if (isSubCrossoverEnabled != null) {
       subCrossoverEnabled = isSubCrossoverEnabled;
+    }
+    if (isLfeCrossoverEnabled != null) {
+      lfeCrossoverEnabled = isLfeCrossoverEnabled;
+    }
+    if (isChannelManagerEnabled != null) {
+      channelManagerEnabled = isChannelManagerEnabled;
     }
     if (isDynamicBassEnabled != null) dynamicBassEnabled = isDynamicBassEnabled;
     if (isLoudnessContourEnabled != null) {

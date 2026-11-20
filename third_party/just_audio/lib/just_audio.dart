@@ -104,6 +104,9 @@ class AudioPlayer {
   /// the native player when it is (re)created, so the sink is built with the
   /// right encodings. Default `false` = historical 16-bit path.
   bool _floatOutputEnabled = false;
+  // Pulsr fork: true low-power bit-perfect route preference.
+  bool _lowPowerRouteEnabled = false;
+  bool get lowPowerRouteEnabled => _lowPowerRouteEnabled;
   // Pulsr fork: remembered AAudio Direct output preference, replayed on
   // every platform activation before the native sink is built.
   bool _aaudioOutputEnabled = false;
@@ -1416,6 +1419,42 @@ class AudioPlayer {
     }
   }
 
+  /// Pulsr fork: true low-power route. Skips NativeDspAudioProcessor instantiation
+  /// entirely for eligible integer PCM, saving DSP thread scheduling and CPU cycles.
+  Future<bool> dspSetLowPowerRoute(bool enabled) async {
+    if (_disposed) return false;
+    try {
+      final channel = _activeControlChannel;
+      if (!_active || channel == null) {
+        _lowPowerRouteEnabled = enabled;
+        return true;
+      }
+      if (!_isAndroid()) return false;
+      final accepted = await channel
+              .invokeMethod<bool>('dspSetLowPowerRoute', {'enabled': enabled}) ??
+          false;
+      if (accepted) _lowPowerRouteEnabled = enabled;
+      return accepted;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('dspSetLowPowerRoute failed: $e');
+      }
+      return false;
+    }
+  }
+
+  /// Pulsr fork: queries whether the low-power route bypass is currently active.
+  Future<bool> dspIsLowPowerBypassed() async {
+    if (_disposed || !_active) return false;
+    try {
+      final channel = _activeControlChannel;
+      if (channel == null || !_isAndroid()) return false;
+      return await channel.invokeMethod<bool>('dspIsLowPowerBypassed') ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Pulsr fork: rebuilds the native sink with the current output policies.
   ///
   /// The integer Bit-Perfect bypass is latched when the sink is configured, so
@@ -2121,6 +2160,10 @@ class AudioPlayer {
           if (_tapSrcTargetRate > 0) {
             await control.invokeMethod<bool>(
                 'dspSetTapSrcRate', {'rate': _tapSrcTargetRate});
+          }
+          if (_lowPowerRouteEnabled) {
+            await control.invokeMethod<bool>(
+                'dspSetLowPowerRoute', {'enabled': _lowPowerRouteEnabled});
           }
           String? reason;
           if (_aaudioOutputEnabled && !aaudioAccepted) {

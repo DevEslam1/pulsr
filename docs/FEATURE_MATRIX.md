@@ -12,7 +12,7 @@
 
 | Capability | Verified value | Source |
 |---|---|---|
-| Native DSP stages | 20 | `android/app/src/main/cpp/AudioDspEngine.h` (`DspStageMask`) |
+| Native DSP stages | 21 | `android/app/src/main/cpp/AudioDspEngine.h` (`DspStageMask`) |
 | Concurrent DSP engines | 16 | `AudioDspEngine.h` (`DspEngineRegistry::kMaxEngines`) |
 | Parametric EQ bands | 64 maximum | `DspParams.h`, `ParametricEQ.h` |
 | EQ band modes in UI | 10 / 32 / 64 | `lib/data/audio/equalizer_manager.dart` |
@@ -50,7 +50,7 @@
 <!-- BEGIN GENERATED CAPABILITY MATRIX -->
 | Capability | This build |
 | :--- | :--- |
-| Native DSP stages | 20 |
+| Native DSP stages | 21 |
 | Parametric EQ bands | 64 |
 | Dynamic EQ bands | 8 |
 | Multiband compressor bands | 4 |

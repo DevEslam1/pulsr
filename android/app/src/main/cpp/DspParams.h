@@ -185,6 +185,17 @@ struct ChannelManagerParamSet {
     float delayMs[8] = {};
 };
 
+// Multichannel LFE Bass Management Crossover (3..8 channels).
+struct LfeCrossoverParamSet {
+    bool enabled = false;
+    double crossoverHz = 80.0;    // 40..200 Hz (satellite HPF + redirected LPF)
+    double lfeLowPassHz = 120.0;  // 60..250 Hz (LPF on dedicated LFE channel)
+    double slopeDbPerOct = 24.0;  // 12 or 24 (LR2 / LR4)
+    double lfeGainDb = 0.0;       // -12..+12 dB
+    int lfeChannelIndex = 3;      // 0..7 (default 3 = SMPTE 5.1/7.1 LFE)
+    bool redirectBass = true;     // high-pass satellites and redirect low bass to LFE
+};
+
 struct DynamicEqBandParam {
     double frequency = 1000.0;
     double q = 2.0;
@@ -422,6 +433,7 @@ struct DspParamSnapshot {
     LoudnessContourParamSet loudness;
     SubCrossoverParamSet subCrossover;
   ChannelManagerParamSet channelManager;
+    LfeCrossoverParamSet lfeCrossover;
     DynamicEqParamSet dynamicEq;
     MultibandCompressorParamSet multibandCompressor;
     DynamicBassParamSet dynamicBass;

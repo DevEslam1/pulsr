@@ -61,7 +61,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         "setReverbEnabled", "setReverbPreset", "setReverbWetDry", "setReverbParams", "setReverbCrossChannel", "loadImpulseResponse",
         "setStereoBalance", "setMonoMix", "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
         "setStereoWidthEnabled", "setStereoWidthParams", "setLoudnessContourEnabled", "setLoudnessContourParams",
-        "setSubCrossoverEnabled", "setSubCrossoverParams", "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
+        "setSubCrossoverEnabled", "setSubCrossoverParams", "setLfeCrossoverEnabled", "setLfeCrossoverParams", "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
         "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers", "setDynamicBassParams",
         "setViperDdcEnabled", "loadViperDdc", "setArbitraryEqEnabled", "loadArbitraryEq",
         "setLiveProgEnabled", "loadLiveProgCode", "setLiveProgSlider", "setHeadphoneSafetyParams",
@@ -204,6 +204,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var subCrossoverGain = 0.8
     @Volatile private var subCrossoverBassMono = false
     @Volatile private var subCrossoverAntiPop = true
+
+    @Volatile private var isLfeCrossoverEnabled = false
+    @Volatile private var lfeCrossoverHz = 80.0
+    @Volatile private var lfeLowPassHz = 120.0
+    @Volatile private var lfeSlopeDbPerOct = 24.0
+    @Volatile private var lfeGainDb = 0.0
+    @Volatile private var lfeChannelIndex = 3
+    @Volatile private var lfeRedirectBass = true
 
     @Volatile private var isDynamicEqEnabled = false
     @Volatile private var dynamicEqBandCount = 1
@@ -572,6 +580,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     @Volatile private var lastNativeLoudnessParams: String? = null
     @Volatile private var lastNativeSubCrossoverEnabled: Boolean? = null
     @Volatile private var lastNativeSubCrossoverParams: String? = null
+    @Volatile private var lastNativeLfeCrossoverEnabled: Boolean? = null
+    @Volatile private var lastNativeLfeCrossoverParams: String? = null
     @Volatile private var lastNativeDynamicEqEnabled: Boolean? = null
     private val lastNativeDynamicEqBands = java.util.concurrent.ConcurrentHashMap<Int, String>()
     @Volatile private var lastNativeMultibandCompressorEnabled: Boolean? = null
@@ -670,6 +680,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetSubCrossoverEnabled(enabled: Boolean)
     private external fun nativeSetSubCrossoverParams(
         cornerHz: Double, slopeDbPerOct: Double, subGain: Double, bassMono: Boolean, antiPop: Boolean
+    )
+    private external fun nativeSetLfeCrossoverEnabled(enabled: Boolean)
+    private external fun nativeSetLfeCrossoverParams(
+        crossoverHz: Double, lfeLowPassHz: Double, slopeDbPerOct: Double,
+        lfeGainDb: Double, lfeChannelIndex: Int, redirectBass: Boolean
     )
     private external fun nativeSetDynamicEqEnabled(enabled: Boolean)
     private external fun nativeSetDynamicEqBandCount(count: Int)
@@ -999,19 +1014,79 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    private data class StagePowerSpec(
+        val bit: Int,
+        val stageId: String,
+        val name: String,
+        val baseMahPerHr: Double,
+        val isHeavy: Boolean,
+    )
+
+    private fun stagePowerSpecs(): List<StagePowerSpec> {
+        val eqWeight = when {
+            eqBandCount >= 64 -> 11.0
+            eqBandCount >= 32 -> 7.5
+            else -> 4.0
+        }
+        val widthWeight = if (stereoWidthMultiband) 4.5 else 3.0
+        val satWeight = if (saturationMultiband) 15.0 else 11.0
+        val dynEqWeight = (2.5 + dynamicEqBandCount.coerceIn(1, MAX_DYNAMIC_EQ_BANDS) * 1.1)
+        val chMgrWeight = 1.5 + channelManagerChannelCount.coerceIn(2, 8) * 0.4
+        return listOf(
+            StagePowerSpec(STAGE_EQ, "EQUALIZER", "Parametric EQ ($eqBandCount-band)", eqWeight, eqBandCount >= 32),
+            StagePowerSpec(STAGE_CROSSFEED, "CROSSFEED", "Crossfeed", 3.5, false),
+            StagePowerSpec(STAGE_REVERB, "REVERB", "Convolution Reverb", 22.0, true),
+            StagePowerSpec(STAGE_PANNER, "PANNER", "Spatial Panner / Balance", 1.0, false),
+            StagePowerSpec(STAGE_LIMITER, "LIMITER", "Lookahead True-Peak Limiter", 5.5, false),
+            StagePowerSpec(STAGE_SATURATION, "SATURATION", "Harmonic Saturation (4x OS)", satWeight, true),
+            StagePowerSpec(STAGE_WIDTH, "STEREO_WIDTH", "Stereo Width", widthWeight, false),
+            StagePowerSpec(STAGE_LOUDNESS, "LOUDNESS_CONTOUR", "Loudness Contour", 2.5, false),
+            StagePowerSpec(STAGE_CROSSOVER, "SUB_CROSSOVER", "Subwoofer Crossover", 3.5, false),
+            StagePowerSpec(STAGE_LFE_CROSSOVER, "LFE_CROSSOVER", "LFE Bass Management", 5.0, false),
+            StagePowerSpec(STAGE_DYNEQ, "DYNAMIC_EQ", "Dynamic EQ ($dynamicEqBandCount-band)", dynEqWeight, true),
+            StagePowerSpec(STAGE_DITHER, "DITHER", "TPDF Dither & Noise Shaping", 1.5, false),
+            StagePowerSpec(STAGE_MULTIBAND_COMPRESSOR, "MULTIBAND_COMPRESSOR", "4-Band Multiband Compressor", 11.5, true),
+            StagePowerSpec(STAGE_DYNAMIC_BASS, "DYNAMIC_BASS", "Dynamic Bass", 6.5, false),
+            StagePowerSpec(STAGE_VIPER_DDC, "VIPER_DDC", "ViPER-DDC Correction", 5.0, false),
+            StagePowerSpec(STAGE_ARBITRARY_EQ, "ARBITRARY_EQ", "Arbitrary FIR EQ (1024-tap)", 14.0, true),
+            StagePowerSpec(STAGE_LIVE_PROG, "LIVE_PROG", "LiveProg EEL VM", 15.0, true),
+            StagePowerSpec(STAGE_HEADPHONE_SAFETY, "HEADPHONE_SAFETY", "Headphone Safety Limiter", 3.5, false),
+            StagePowerSpec(STAGE_CHANNEL_MANAGER, "CHANNEL_MANAGER", "Channel Manager (${channelManagerChannelCount}ch)", chMgrWeight, false),
+            StagePowerSpec(STAGE_DAC_VOICING, "DAC_VOICING", "DAC Voicing (4x OS)", 16.0, true),
+        )
+    }
+
     private fun getDspBatteryDrainEstimate(): Map<String, Any?> {
         val rtf = if (isNativeDspLoaded) {
             try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
         } else 0.0
 
-        val activeCount = Integer.bitCount(activeDspStages)
+        val stages = activeDspStages
+        val activeCount = Integer.bitCount(stages)
         val dspActive = isNativeDspLoaded && activeCount > 0 && !isBitPerfectBypassActive && !isBypassCompareActive
 
         val baselineMahPerHr = 75.0
-        val dspDeltaMahPerHr = if (dspActive) {
-            (activeCount * 8.5) + (rtf * 40.0)
-        } else {
-            0.0
+        val stageBreakdown = mutableListOf<Map<String, Any?>>()
+        var dspDeltaMahPerHr = 0.0
+
+        if (dspActive) {
+            val activeSpecs = stagePowerSpecs().filter { (stages and it.bit) != 0 }
+            val baseSum = activeSpecs.sumOf { it.baseMahPerHr }
+            val rtfLoadDelta = rtf.coerceAtLeast(0.0) * 25.0
+            if (baseSum > 0.0) {
+                dspDeltaMahPerHr = baseSum + rtfLoadDelta
+                for (spec in activeSpecs.sortedByDescending { it.baseMahPerHr }) {
+                    val stageMah = spec.baseMahPerHr + rtfLoadDelta * (spec.baseMahPerHr / baseSum)
+                    val sharePct = (stageMah / dspDeltaMahPerHr) * 100.0
+                    stageBreakdown.add(mapOf(
+                        "stageId" to spec.stageId,
+                        "name" to spec.name,
+                        "mahPerHour" to ((stageMah * 100.0).toInt() / 100.0),
+                        "sharePercent" to ((sharePct * 10.0).toInt() / 10.0),
+                        "isHeavy" to spec.isHeavy,
+                    ))
+                }
+            }
         }
         val totalDrainMahPerHr = baselineMahPerHr + dspDeltaMahPerHr
 
@@ -1029,11 +1104,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return mapOf(
             "isHeuristic" to true,
             "dspActive" to dspActive,
+            "lowPowerBypassActive" to (isBitPerfectBypassActive || !dspActive),
             "activeStagesCount" to activeCount,
             "rollingRtf" to rtf,
             "baselineMahPerHour" to baselineMahPerHr,
-            "estimatedMahPerHour" to totalDrainMahPerHr,
-            "dspDeltaMahPerHour" to dspDeltaMahPerHr,
+            "estimatedMahPerHour" to ((totalDrainMahPerHr * 100.0).toInt() / 100.0),
+            "dspDeltaMahPerHour" to ((dspDeltaMahPerHr * 100.0).toInt() / 100.0),
+            "stageBreakdown" to stageBreakdown,
             "thermalStatus" to currentThermalStatus,
             "thermalStatusName" to thermalName,
             "proactivelyDegradedStages" to proactivelyDegradedStages
@@ -1063,6 +1140,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if ((stages and STAGE_HEADPHONE_SAFETY) != 0) activeStagesList.add("HEADPHONE_SAFETY")
         if ((stages and STAGE_CHANNEL_MANAGER) != 0) activeStagesList.add("CHANNEL_MANAGER")
         if ((stages and STAGE_DAC_VOICING) != 0) activeStagesList.add("DAC_VOICING")
+        if ((stages and STAGE_LFE_CROSSOVER) != 0) activeStagesList.add("LFE_CROSSOVER")
 
         val rtf = if (isNativeDspLoaded) {
             try { nativeGetRollingRtf() } catch (_: Exception) { 0.0 }
@@ -1235,6 +1313,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // Loudness contour needs both a non-zero intensity and a known volume-stage value
         if (isLoudnessContourEnabled && loudnessIntensity > 0.001) mask = mask or STAGE_LOUDNESS
         if (isSubCrossoverEnabled) mask = mask or STAGE_CROSSOVER
+        if (isLfeCrossoverEnabled) mask = mask or STAGE_LFE_CROSSOVER
         if (isDynamicEqEnabled && dynamicEqBandCount > 0) mask = mask or STAGE_DYNEQ
         if (isMultibandCompressorEnabled || isDynamicsPresetNativeActive) mask = mask or STAGE_MULTIBAND_COMPRESSOR
         if (isDynamicBassEnabled && dynamicBassStrength > 0.001) mask = mask or STAGE_DYNAMIC_BASS
@@ -1317,6 +1396,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_CHANNEL_MANAGER = 1 shl 18
         // DAC voicing (must mirror DspStageMask in AudioDspEngine.h)
         const val STAGE_DAC_VOICING = 1 shl 19
+        // Multichannel LFE bass management crossover (must mirror DspStageMask in AudioDspEngine.h)
+        const val STAGE_LFE_CROSSOVER = 1 shl 20
 
         /**
          * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
@@ -2091,6 +2172,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeLoudnessParams = null
         lastNativeSubCrossoverEnabled = null
         lastNativeSubCrossoverParams = null
+        lastNativeLfeCrossoverEnabled = null
+        lastNativeLfeCrossoverParams = null
         lastNativeDynamicEqEnabled = null
         lastNativeDynamicEqBands.clear()
         lastNativeMultibandCompressorEnabled = null
@@ -2124,6 +2207,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         safeCall(TAG, "nativeSetStereoWidthEnabled") { nativeSetStereoWidthEnabled(false) }
         safeCall(TAG, "nativeSetLoudnessContourEnabled") { nativeSetLoudnessContourEnabled(false) }
         safeCall(TAG, "nativeSetSubCrossoverEnabled") { nativeSetSubCrossoverEnabled(false) }
+        safeCall(TAG, "nativeSetLfeCrossoverEnabled") { nativeSetLfeCrossoverEnabled(false) }
         safeCall(TAG, "nativeSetDynamicEqEnabled") { nativeSetDynamicEqEnabled(false) }
         safeCall(TAG, "nativeSetMultibandCompressorEnabled") { nativeSetMultibandCompressorEnabled(false) }
         safeCall(TAG, "nativeSetDynamicBassParams") {
@@ -2178,6 +2262,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeLoudnessParams = null
         lastNativeSubCrossoverEnabled = null
         lastNativeSubCrossoverParams = null
+        lastNativeLfeCrossoverEnabled = null
+        lastNativeLfeCrossoverParams = null
         lastNativeDynamicEqEnabled = null
         lastNativeDynamicEqBands.clear()
         lastNativeMultibandCompressorEnabled = null
@@ -2428,6 +2514,34 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    private fun pushNativeLfeCrossoverEnabled(enabled: Boolean) {
+        if (!isNativeDspLoaded || lastNativeLfeCrossoverEnabled == enabled) return
+        nativeSetLfeCrossoverEnabled(enabled)
+        lastNativeLfeCrossoverEnabled = enabled
+    }
+
+    private fun pushNativeLfeCrossoverParams(
+        crossoverHz: Double,
+        lfeLowPassHz: Double,
+        slopeDbPerOct: Double,
+        lfeGainDb: Double,
+        lfeChannelIndex: Int,
+        redirectBass: Boolean,
+    ) {
+        if (!isNativeDspLoaded) return
+        val key = String.format(
+            java.util.Locale.US,
+            "%.1f:%.1f:%.1f:%.2f:%d:%b",
+            crossoverHz, lfeLowPassHz, slopeDbPerOct, lfeGainDb, lfeChannelIndex, redirectBass,
+        )
+        if (lastNativeLfeCrossoverParams != key) {
+            nativeSetLfeCrossoverParams(
+                crossoverHz, lfeLowPassHz, slopeDbPerOct, lfeGainDb, lfeChannelIndex, redirectBass,
+            )
+            lastNativeLfeCrossoverParams = key
+        }
+    }
+
     private fun pushNativeDynamicEqEnabled(enabled: Boolean) {
         if (!isNativeDspLoaded || lastNativeDynamicEqEnabled == enabled) return
         nativeSetDynamicEqEnabled(enabled)
@@ -2607,6 +2721,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 subCrossoverBassMono, subCrossoverAntiPop,
             )
             pushNativeSubCrossoverEnabled(isSubCrossoverEnabled)
+        }
+        safeCall(TAG, "restoreLfeCrossover") {
+            pushNativeLfeCrossoverParams(
+                lfeCrossoverHz, lfeLowPassHz, lfeSlopeDbPerOct,
+                lfeGainDb, lfeChannelIndex, lfeRedirectBass,
+            )
+            pushNativeLfeCrossoverEnabled(isLfeCrossoverEnabled)
         }
         safeCall(TAG, "restoreDynamicEq") {
             nativeSetDynamicEqBandCount(dynamicEqBandCount)
@@ -2840,6 +2961,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setStereoWidthEnabled", "setStereoWidthParams",
                 "setLoudnessContourEnabled", "setLoudnessContourParams",
                 "setSubCrossoverEnabled", "setSubCrossoverParams",
+                "setLfeCrossoverEnabled", "setLfeCrossoverParams", "getLfeCrossoverState",
                 "setDynamicEqEnabled", "setDynamicEqBandCount", "setDynamicEqBand",
                 "setMultibandCompressorEnabled", "setMultibandCompressorBand", "setMultibandCompressorCrossovers",
                 "setDynamicBassParams", "getTelemetry", "getLimiterGrDb", "getDynEqGrDb", "getMultibandGrDb", "getRollingRtf",
@@ -2847,7 +2969,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "getThermalStatus", "getDspBatteryDrainEstimate", "getChainOfCustodyReport",
                 "armCustodyWindow", "collectCustodyWindow", "cancelCustodyWindow",
                 "getWeeklyDose", "resetWeeklyDose", "isSafetyAttenuationActive", "setHeadphoneSafetyParams",
-                "setChannelManagerEnabled", "setChannelManagerChannel" -> {
+                "setChannelManagerEnabled", "setChannelManagerChannel", "getChannelManagerState" -> {
                     synchronized(stateLock) {
                         handleNativeDspCall(call, result)
                     }
@@ -3903,8 +4025,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         result.error("INVALID_ARGUMENT", "Channel index out of range [0..7]: $channel", null)
                         return
                     }
-                    val trimDb = clamp((call.argument<Number>("trimDb"))?.toDouble() ?: 0.0, -30.0, 12.0)
-                    val delayMs = clamp((call.argument<Number>("delayMs"))?.toDouble() ?: 0.0, 0.0, 50.0)
+                    val trimDb = DspParamRanges.channelManagerTrimDb.clamp(
+                        (call.argument<Number>("trimDb"))?.toDouble() ?: 0.0,
+                    )
+                    val delayMs = DspParamRanges.channelManagerDelayMs.clamp(
+                        (call.argument<Number>("delayMs"))?.toDouble() ?: 0.0,
+                    )
                     channelManagerChannelSnapshots[channel] = ChannelManagerChannelSnapshot(trimDb, delayMs)
                     if (isNativeDspLoaded) {
                         try {
@@ -3916,6 +4042,24 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     }
                     result.success(true)
+                }
+
+                "getChannelManagerState" -> {
+                    val channels = (0..7).map { ch ->
+                        val snap = channelManagerChannelSnapshots[ch]
+                        mapOf(
+                            "channel" to ch,
+                            "trimDb" to (snap?.trimDb ?: 0.0),
+                            "delayMs" to (snap?.delayMs ?: 0.0),
+                        )
+                    }
+                    result.success(
+                        mapOf(
+                            "enabled" to isChannelManagerEnabled,
+                            "channelCount" to channelManagerChannelCount,
+                            "channels" to channels,
+                        ),
+                    )
                 }
 
                 // Stereo Balance & Mono Mix — native SpatialPanner. Constant-power
@@ -4364,6 +4508,73 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     }
                     result.success(true)
+                }
+
+                // ---- Multichannel LFE Bass Management Crossover (3..8 ch) ----
+                "setLfeCrossoverEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isLfeCrossoverEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            pushNativeLfeCrossoverEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetLfeCrossoverEnabled failed: ${e.message}")
+                            result.error("NATIVE_ERROR", e.message, null)
+                            return
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setLfeCrossoverParams" -> {
+                    val rawCrossoverHz = (call.argument<Number>("crossoverHz"))?.toDouble() ?: 80.0
+                    val rawLfeLowPassHz = (call.argument<Number>("lfeLowPassHz"))?.toDouble() ?: 120.0
+                    val rawSlope = (call.argument<Number>("slopeDbPerOct"))?.toDouble() ?: 24.0
+                    val rawLfeGainDb = (call.argument<Number>("lfeGainDb"))?.toDouble() ?: 0.0
+                    val lfeCh = ((call.argument<Number>("lfeChannelIndex"))?.toInt() ?: 3).coerceIn(0, 7)
+                    val redirectBass = call.argument<Boolean>("redirectBass") ?: true
+                    if (!rawCrossoverHz.isFinite() || !rawLfeLowPassHz.isFinite() ||
+                        !rawSlope.isFinite() || !rawLfeGainDb.isFinite()) {
+                        result.error("INVALID_ARGUMENT", "LFE crossover parameters must be finite", null)
+                        return
+                    }
+                    val crossoverHz = DspParamRanges.lfeCrossoverHz.clamp(rawCrossoverHz)
+                    val lfeLpHz = DspParamRanges.lfeLowPassHz.clamp(rawLfeLowPassHz)
+                    val slopeDbPerOct = if (rawSlope < 18.0) 12.0 else 24.0
+                    val gainDb = DspParamRanges.lfeGainDb.clamp(rawLfeGainDb)
+                    lfeCrossoverHz = crossoverHz
+                    lfeLowPassHz = lfeLpHz
+                    lfeSlopeDbPerOct = slopeDbPerOct
+                    lfeGainDb = gainDb
+                    lfeChannelIndex = lfeCh
+                    lfeRedirectBass = redirectBass
+                    if (isNativeDspLoaded) {
+                        try {
+                            pushNativeLfeCrossoverParams(
+                                crossoverHz, lfeLpHz, slopeDbPerOct, gainDb, lfeCh, redirectBass,
+                            )
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetLfeCrossoverParams failed: ${e.message}")
+                            result.error("NATIVE_ERROR", e.message, null)
+                            return
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "getLfeCrossoverState" -> {
+                    result.success(
+                        mapOf(
+                            "enabled" to isLfeCrossoverEnabled,
+                            "crossoverHz" to lfeCrossoverHz,
+                            "lfeLowPassHz" to lfeLowPassHz,
+                            "slopeDbPerOct" to lfeSlopeDbPerOct,
+                            "lfeGainDb" to lfeGainDb,
+                            "lfeChannelIndex" to lfeChannelIndex,
+                            "redirectBass" to lfeRedirectBass,
+                        ),
+                    )
                 }
 
                 // ---- Phase 1 DSP expansion: Dynamic EQ ----
@@ -5518,6 +5729,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isChannelManagerEnabled) "$channelManagerChannelCount channels" else "Disabled"
         ))
 
+        // 24. Multichannel LFE Bass Management (Native C++)
+        val lfeActive = isLfeCrossoverEnabled && !isBitPerfectBypassActive
+        if (lfeActive) activeNames.add("LFE Crossover (${lfeCrossoverHz.toInt()}Hz / LPF ${lfeLowPassHz.toInt()}Hz)")
+        stagesList.add(buildDspStage(
+            name = "LFE Bass Management",
+            category = "Native C++ Engine",
+            isSupported = isNativeDspLoaded,
+            isEnabled = isLfeCrossoverEnabled,
+            isBypassed = isBitPerfectBypassActive,
+            isDegraded = ((autoDegraded and STAGE_LFE_CROSSOVER) != 0),
+            parameters = mapOf(
+                "crossoverHz" to lfeCrossoverHz,
+                "lfeLowPassHz" to lfeLowPassHz,
+                "slopeDbPerOct" to lfeSlopeDbPerOct,
+                "lfeGainDb" to lfeGainDb,
+                "lfeChannelIndex" to lfeChannelIndex,
+                "redirectBass" to lfeRedirectBass,
+            ),
+            statusDescription = if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLfeCrossoverEnabled) "${lfeCrossoverHz.toInt()} Hz / LFE ch $lfeChannelIndex" else "Disabled"
+        ))
+
         val nativeAppliedSampleRate = if (isNativeDspLoaded) {
             try { nativeGetAppliedSampleRate() } catch (_: Exception) { 0.0 }
         } else 0.0
@@ -6555,6 +6787,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeLoudnessParams = null
         lastNativeSubCrossoverEnabled = null
         lastNativeSubCrossoverParams = null
+        lastNativeLfeCrossoverEnabled = null
+        lastNativeLfeCrossoverParams = null
         lastNativeDynamicEqEnabled = null
         lastNativeDynamicEqBands.clear()
         lastNativeMultibandCompressorEnabled = null

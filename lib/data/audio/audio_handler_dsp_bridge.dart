@@ -405,6 +405,51 @@ mixin PulsrAudioDspBridge on BaseAudioHandler {
 
   bool get subCrossoverAntiPop => _equalizerManager.subCrossoverAntiPop;
 
+  // Multichannel Channel Manager
+  bool get isChannelManagerEnabled => _equalizerManager.isChannelManagerEnabled;
+  int get channelManagerChannelCount => _equalizerManager.channelManagerChannelCount;
+  List<double> get channelManagerTrimDb => _equalizerManager.channelManagerTrimDb;
+  List<double> get channelManagerDelayMs => _equalizerManager.channelManagerDelayMs;
+
+  Future<void> setChannelManagerEnabled(bool enabled, {int? channelCount}) =>
+      _equalizerManager.setChannelManagerEnabled(enabled, channelCount: channelCount);
+
+  Future<void> setChannelManagerChannel(int channel, {double? trimDb, double? delayMs}) =>
+      _equalizerManager.setChannelManagerChannel(channel, trimDb: trimDb, delayMs: delayMs);
+
+  // Multichannel LFE Crossover
+  bool get isLfeCrossoverEnabled => _equalizerManager.isLfeCrossoverEnabled;
+  double get lfeCrossoverHz => _equalizerManager.lfeCrossoverHz;
+  double get lfeLowPassHz => _equalizerManager.lfeLowPassHz;
+  double get lfeSlopeDbPerOct => _equalizerManager.lfeSlopeDbPerOct;
+  double get lfeGainDb => _equalizerManager.lfeGainDb;
+  int get lfeChannelIndex => _equalizerManager.lfeChannelIndex;
+  bool get lfeRedirectBass => _equalizerManager.lfeRedirectBass;
+
+  Future<void> setLfeCrossover(
+    bool enabled, {
+    double? crossoverHz,
+    double? lfeLowPassHz,
+    double? slopeDbPerOct,
+    double? lfeGainDb,
+    int? lfeChannelIndex,
+    bool? redirectBass,
+  }) =>
+      _equalizerManager.setLfeCrossover(
+        enabled,
+        crossoverHz: crossoverHz,
+        lfeLowPassHz: lfeLowPassHz,
+        slopeDbPerOct: slopeDbPerOct,
+        lfeGainDb: lfeGainDb,
+        lfeChannelIndex: lfeChannelIndex,
+        redirectBass: redirectBass,
+      );
+
+  // Low-power route
+  bool get isLowPowerRouteEnabled => _equalizerManager.isLowPowerRouteEnabled;
+  Future<void> setLowPowerRoute(bool enabled) =>
+      _equalizerManager.setLowPowerRoute(enabled);
+
   bool get isMultibandCompressorEnabled =>
       _equalizerManager.isMultibandCompressorEnabled;
 

@@ -115,10 +115,35 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
     s.channelManager.channelCount = clampInt(s.channelManager.channelCount, 2, ChannelManager::MAX_CHANNELS);
     for (int ch = 0; ch < ChannelManager::MAX_CHANNELS; ++ch) {
         s.channelManager.trimDb[ch] =
-            static_cast<float>(clampFinite(s.channelManager.trimDb[ch], -30.0, 12.0, 0.0));
+            static_cast<float>(clampFinite(s.channelManager.trimDb[ch],
+                                           dsp::ranges::kChannelManagerTrimDb.min,
+                                           dsp::ranges::kChannelManagerTrimDb.max,
+                                           dsp::ranges::kChannelManagerTrimDb.fallback));
         s.channelManager.delayMs[ch] =
-            static_cast<float>(clampFinite(s.channelManager.delayMs[ch], 0.0, 50.0, 0.0));
+            static_cast<float>(clampFinite(s.channelManager.delayMs[ch],
+                                           dsp::ranges::kChannelManagerDelayMs.min,
+                                           dsp::ranges::kChannelManagerDelayMs.max,
+                                           dsp::ranges::kChannelManagerDelayMs.fallback));
     }
+
+    s.lfeCrossover.crossoverHz = clampFinite(s.lfeCrossover.crossoverHz,
+                                             dsp::ranges::kLfeCrossoverHz.min,
+                                             dsp::ranges::kLfeCrossoverHz.max,
+                                             dsp::ranges::kLfeCrossoverHz.fallback);
+    s.lfeCrossover.lfeLowPassHz = clampFinite(s.lfeCrossover.lfeLowPassHz,
+                                              dsp::ranges::kLfeLowPassHz.min,
+                                              dsp::ranges::kLfeLowPassHz.max,
+                                              dsp::ranges::kLfeLowPassHz.fallback);
+    s.lfeCrossover.slopeDbPerOct =
+        (!std::isfinite(s.lfeCrossover.slopeDbPerOct) || s.lfeCrossover.slopeDbPerOct >= 18.0)
+            ? 24.0
+            : 12.0;
+    s.lfeCrossover.lfeGainDb = clampFinite(s.lfeCrossover.lfeGainDb,
+                                           dsp::ranges::kLfeGainDb.min,
+                                           dsp::ranges::kLfeGainDb.max,
+                                           dsp::ranges::kLfeGainDb.fallback);
+    s.lfeCrossover.lfeChannelIndex =
+        clampInt(s.lfeCrossover.lfeChannelIndex, 0, LfeCrossover::MAX_CHANNELS - 1);
 
     s.dacVoicing.character = clampInt(s.dacVoicing.character, 0, 2);
     s.dacVoicing.voicingAmount = clampFinite(s.dacVoicing.voicingAmount, 0.0, 1.0, 0.0);
@@ -242,6 +267,33 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
                                             dsp::ranges::kDirectUsbGain.max,
                                             dsp::ranges::kDirectUsbGain.fallback);
 
+    s.lfeCrossover.crossoverHz = clampFinite(s.lfeCrossover.crossoverHz,
+                                             dsp::ranges::kLfeCrossoverHz.min,
+                                             dsp::ranges::kLfeCrossoverHz.max,
+                                             dsp::ranges::kLfeCrossoverHz.fallback);
+    s.lfeCrossover.lfeLowPassHz = clampFinite(s.lfeCrossover.lfeLowPassHz,
+                                              dsp::ranges::kLfeLowPassHz.min,
+                                              dsp::ranges::kLfeLowPassHz.max,
+                                              dsp::ranges::kLfeLowPassHz.fallback);
+    s.lfeCrossover.slopeDbPerOct = (!std::isfinite(s.lfeCrossover.slopeDbPerOct) || s.lfeCrossover.slopeDbPerOct >= 18.0) ? 24.0 : 12.0;
+    s.lfeCrossover.lfeGainDb = clampFinite(s.lfeCrossover.lfeGainDb,
+                                           dsp::ranges::kLfeGainDb.min,
+                                           dsp::ranges::kLfeGainDb.max,
+                                           dsp::ranges::kLfeGainDb.fallback);
+    s.lfeCrossover.lfeChannelIndex = clampInt(s.lfeCrossover.lfeChannelIndex, 0, LfeCrossover::MAX_CHANNELS - 1);
+
+    s.channelManager.channelCount = clampInt(s.channelManager.channelCount, 2, ChannelManager::MAX_CHANNELS);
+    for (int i = 0; i < ChannelManager::MAX_CHANNELS; ++i) {
+        s.channelManager.trimDb[i] = clampFinite(s.channelManager.trimDb[i],
+                                                 dsp::ranges::kChannelManagerTrimDb.min,
+                                                 dsp::ranges::kChannelManagerTrimDb.max,
+                                                 dsp::ranges::kChannelManagerTrimDb.fallback);
+        s.channelManager.delayMs[i] = clampFinite(s.channelManager.delayMs[i],
+                                                  dsp::ranges::kChannelManagerDelayMs.min,
+                                                  dsp::ranges::kChannelManagerDelayMs.max,
+                                                  dsp::ranges::kChannelManagerDelayMs.fallback);
+    }
+
     s.bypassCompare.gainCompensationLinear =
         clampFinite(s.bypassCompare.gainCompensationLinear, 0.001, 16.0, 1.0);
     s.bypassCompare.gainCompensationDb =
@@ -286,6 +338,7 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     stereoWidth_.setSampleRate(sampleRate);
     loudnessContour_.setSampleRate(sampleRate);
     subCrossover_.setSampleRate(sampleRate);
+    lfeCrossover_.setSampleRate(sampleRate);
     channelManager_.setSampleRate(sampleRate);
     dacVoicing_.setSampleRate(sampleRate);
     dynamicEq_.setSampleRate(sampleRate);
@@ -1025,6 +1078,7 @@ void AudioDspEngine::resetInternal() {
     stereoWidth_.reset();
     loudnessContour_.reset();
     subCrossover_.reset();
+    lfeCrossover_.reset();
     dynamicEq_.reset();
     multibandCompressor_.reset();
     dynamicBass_.reset();
@@ -1807,6 +1861,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             stereoWidth_.setSampleRate(sr);
             loudnessContour_.setSampleRate(sr);
             subCrossover_.setSampleRate(sr);
+            lfeCrossover_.setSampleRate(sr);
             channelManager_.setSampleRate(sr);
             dacVoicing_.setSampleRate(sr);
             dynamicEq_.setSampleRate(sr);
@@ -1839,6 +1894,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             loudnessContour_.applyParams(loudnessParams);
         }
         subCrossover_.applyParams(snapshot->subCrossover);
+        lfeCrossover_.applyParams(snapshot->lfeCrossover);
         channelManager_.applyParams(snapshot->channelManager);
         dacVoicing_.applyParams(snapshot->dacVoicing);
         dynamicEq_.applyParams(snapshot->dynamicEq);
@@ -2057,6 +2113,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
     crossfeed_.setEnabled((stages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled);
     stereoWidth_.setEnabled((stages & STAGE_WIDTH) && snapshot->stereoWidth.enabled);
     subCrossover_.setEnabled((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled);
+    lfeCrossover_.setEnabled((stages & STAGE_LFE_CROSSOVER) && snapshot->lfeCrossover.enabled);
     dynamicBass_.setEnabled((stages & STAGE_DYNAMIC_BASS) && snapshot->dynamicBass.enabled);
     loudnessContour_.setEnabled((stages & STAGE_LOUDNESS) && snapshot->loudness.enabled);
     reverb_.setEnabled((stages & STAGE_REVERB) && snapshot->reverb.enabled);
@@ -2119,6 +2176,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         // boosts could reach the final hard clamp and click when toggling.
         ((stages & STAGE_CROSSFEED) && snapshot->crossfeed.enabled) ||
         ((stages & STAGE_CROSSOVER) && snapshot->subCrossover.enabled) ||
+        (((stages & STAGE_LFE_CROSSOVER) || lfeCrossover_.isRamping()) &&
+         channels >= LfeCrossover::MIN_MULTICHANNEL &&
+         (snapshot->lfeCrossover.enabled || lfeCrossover_.isRamping())) ||
         // DVC boost (> 1.0 / > 0 dB) must be guarded by lookahead limiter to prevent DAC clipping
         (snapshot->directVolume.enabled && (snapshot->directVolume.gainLinear > 1.001 || smoothedDirectVolume_ > 1.001));
     // The lookahead limiter runs only when the chain can boost above unity (or
@@ -2160,6 +2220,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         (((stages & STAGE_PANNER) != 0) && (snapshot->panner.monoMix || std::abs(snapshot->panner.balance) > 0.001)) || panner_.isRamping() ||
         (((stages & STAGE_WIDTH) != 0) && snapshot->stereoWidth.enabled) || stereoWidth_.isRamping() ||
         (((stages & STAGE_CROSSOVER) != 0) && snapshot->subCrossover.enabled) || subCrossover_.isRamping() ||
+        ((((stages & STAGE_LFE_CROSSOVER) != 0) && snapshot->lfeCrossover.enabled &&
+          channels >= LfeCrossover::MIN_MULTICHANNEL) || lfeCrossover_.isRamping()) ||
         (((stages & STAGE_DYNAMIC_BASS) != 0) && snapshot->dynamicBass.enabled) || dynamicBass_.isRamping() ||
         (((stages & STAGE_LOUDNESS) != 0) && snapshot->loudness.enabled) || loudnessContour_.isRamping() ||
         (((stages & STAGE_REVERB) != 0) && snapshot->reverb.enabled) || reverb_.isRamping() ||
@@ -2328,6 +2390,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
             // leaving the bit-perfect bypass resumes from the gain the chain
             // last applied instead of re-ramping from unity.
             lastAppliedDirectVolume_ = smoothedDirectVolume_;
+        }
+
+        // 9b-bis. Multichannel LFE Bass Management Crossover (3-8 channels).
+        // Runs before ChannelManager so per-channel trim/delay and the limiter
+        // act on the crossed-over satellite and LFE feeds.
+        if (((stages & STAGE_LFE_CROSSOVER) || (!(degraded & STAGE_LFE_CROSSOVER) && lfeCrossover_.isRamping())) &&
+            channels >= LfeCrossover::MIN_MULTICHANNEL) {
+            lfeCrossover_.processInterleaved(buffer, frames, channels);
         }
 
         // 9c. Multichannel trim/delay (2-8 channels). Runs before the limiter

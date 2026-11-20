@@ -1663,6 +1663,13 @@ extension _EqAdvancedControls on _EqualizerSheetState {
           _buildSubCrossoverCard(context, state, cubit, dspBlocked, p),
           const SizedBox(height: AppSpacing.md),
 
+          // 5b. Multichannel Speaker Alignment & LFE Bass Management (P2-11)
+          MultichannelBassCard(
+            blockedReason: dspBlocked,
+            nativeAvailable: _nativePcmEffectsAvailable,
+          ),
+          const SizedBox(height: AppSpacing.md),
+
           // Dynamic Bass (Dynamic System / ViPER4Android parity)
           _buildDynamicBassCard(context, state, cubit, dspBlocked, p),
           const SizedBox(height: AppSpacing.md),

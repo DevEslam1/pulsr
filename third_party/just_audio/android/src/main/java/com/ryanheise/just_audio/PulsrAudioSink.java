@@ -82,14 +82,23 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         @Nullable final DefaultAudioSink defaultSink;
         @Nullable final AAudioAudioSink nativeSink;
         @Nullable final NativeDspAudioProcessor processor;
+        final boolean lowPowerBypassed;
 
         Inner(AudioSink sink, @Nullable DefaultAudioSink defaultSink,
               @Nullable AAudioAudioSink nativeSink,
               @Nullable NativeDspAudioProcessor processor) {
+            this(sink, defaultSink, nativeSink, processor, false);
+        }
+
+        Inner(AudioSink sink, @Nullable DefaultAudioSink defaultSink,
+              @Nullable AAudioAudioSink nativeSink,
+              @Nullable NativeDspAudioProcessor processor,
+              boolean lowPowerBypassed) {
             this.sink = sink;
             this.defaultSink = defaultSink;
             this.nativeSink = nativeSink;
             this.processor = processor;
+            this.lowPowerBypassed = lowPowerBypassed;
         }
     }
 
@@ -98,6 +107,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     private final BooleanFlag preferExclusive;
     private final IntFlag targetBufferMs;
     private final BooleanFlag floatEnabled;
+    private final BooleanFlag lowPowerRouteEnabled;
     private final PlayerSupplier playerSupplier;
     private final ProcessorListener processorListener;
     private final FallbackListener fallbackListener;
@@ -163,6 +173,11 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                 && ((FloatDspAudioSink) current.sink).isBitPerfectIntegerBypassActive();
     }
 
+    boolean isLowPowerBypassActiveForTelemetry() {
+        final Inner current = currentInner;
+        return current != null && current.lowPowerBypassed;
+    }
+
     /**
      * True when {@code sink} is this wrapper's live inner backend (AudioTrack -
      * DEFAULT/FLOAT - or AAudio). Used by routing telemetry to attribute the
@@ -185,23 +200,41 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     @Nullable private volatile Inner currentInner;
     @Nullable private Mode mode;
     @Nullable private volatile AudioSink inner;
+    private boolean currentInnerSkippedForLowPower = false;
 
     PulsrAudioSink(Context context, BooleanFlag aaudioEnabled, BooleanFlag preferExclusive,
             IntFlag targetBufferMs, BooleanFlag floatEnabled, PlayerSupplier playerSupplier,
             ProcessorListener processorListener, FallbackListener fallbackListener) {
         this(context, aaudioEnabled, preferExclusive, targetBufferMs, floatEnabled,
-                playerSupplier, processorListener, fallbackListener, null);
+                () -> false, playerSupplier, processorListener, fallbackListener, null);
+    }
+
+    PulsrAudioSink(Context context, BooleanFlag aaudioEnabled, BooleanFlag preferExclusive,
+            IntFlag targetBufferMs, BooleanFlag floatEnabled, BooleanFlag lowPowerRouteEnabled,
+            PlayerSupplier playerSupplier, ProcessorListener processorListener,
+            FallbackListener fallbackListener) {
+        this(context, aaudioEnabled, preferExclusive, targetBufferMs, floatEnabled,
+                lowPowerRouteEnabled, playerSupplier, processorListener, fallbackListener, null);
     }
 
     PulsrAudioSink(Context context, BooleanFlag aaudioEnabled, BooleanFlag preferExclusive,
             IntFlag targetBufferMs, BooleanFlag floatEnabled, PlayerSupplier playerSupplier,
             ProcessorListener processorListener, FallbackListener fallbackListener,
             @Nullable InnerFactory innerFactory) {
+        this(context, aaudioEnabled, preferExclusive, targetBufferMs, floatEnabled,
+                () -> false, playerSupplier, processorListener, fallbackListener, innerFactory);
+    }
+
+    PulsrAudioSink(Context context, BooleanFlag aaudioEnabled, BooleanFlag preferExclusive,
+            IntFlag targetBufferMs, BooleanFlag floatEnabled, BooleanFlag lowPowerRouteEnabled,
+            PlayerSupplier playerSupplier, ProcessorListener processorListener,
+            FallbackListener fallbackListener, @Nullable InnerFactory innerFactory) {
         this.context = context;
         this.aaudioEnabled = aaudioEnabled;
         this.preferExclusive = preferExclusive;
         this.targetBufferMs = targetBufferMs;
         this.floatEnabled = floatEnabled;
+        this.lowPowerRouteEnabled = lowPowerRouteEnabled != null ? lowPowerRouteEnabled : () -> false;
         this.playerSupplier = playerSupplier;
         this.processorListener = processorListener;
         this.fallbackListener = fallbackListener;
@@ -319,6 +352,16 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         return true;
     }
 
+    static boolean isLowPowerIntegerPcmEligible(@Nullable Format inputFormat, Mode requested) {
+        if (inputFormat == null || requested == Mode.AAUDIO) return false;
+        return inputFormat.pcmEncoding == C.ENCODING_PCM_16BIT
+                || (inputFormat.pcmEncoding == C.ENCODING_PCM_24BIT && requested == Mode.FLOAT);
+    }
+
+    private boolean shouldSkipDspProcessor(@Nullable Format inputFormat, Mode requested) {
+        return lowPowerRouteEnabled.get() && isLowPowerIntegerPcmEligible(inputFormat, requested);
+    }
+
     /** Runs on the playback thread; also directly callable from unit tests. */
     void applyPendingMode(boolean force) {
         if (!aaudioEnabled.get()) {
@@ -331,9 +374,14 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             return;
         }
         final Mode desired = desiredMode();
-        if (force || desired != mode) {
+        Mode effectiveDesired = desired;
+        if (effectiveDesired == Mode.AAUDIO && !aaudioSupportsFormatDirectly(format)) {
+            effectiveDesired = (floatEnabled.get() && !precisionFallback) ? Mode.FLOAT : Mode.DEFAULT;
+        }
+        final boolean wantLowPowerSkip = shouldSkipDspProcessor(format, effectiveDesired);
+        if (force || effectiveDesired != mode || wantLowPowerSkip != currentInnerSkippedForLowPower) {
             try {
-                swapTo(desired, true, true);
+                swapTo(effectiveDesired, true, true);
             } catch (ConfigurationException | RuntimeException e) {
                 // A message target must never throw into the playback thread.
                 notifySinkError(e);
@@ -465,7 +513,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         if (desired == Mode.AAUDIO && !aaudioSupportsFormatDirectly(inputFormat)) {
             desired = (floatEnabled.get() && !precisionFallback) ? Mode.FLOAT : Mode.DEFAULT;
         }
-        if (currentInner == null || mode != desired) {
+        final boolean wantLowPowerSkip = shouldSkipDspProcessor(inputFormat, desired);
+        if (currentInner == null || mode != desired || wantLowPowerSkip != currentInnerSkippedForLowPower) {
             swapTo(desired, false, false);
         } else {
             inner.configure(inputFormat, specifiedBufferSize, this.outputChannels);
@@ -827,6 +876,7 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
         currentInner = candidate;
         inner = candidate.sink;
         mode = appliedMode;
+        currentInnerSkippedForLowPower = candidate.lowPowerBypassed;
         if (processorListener != null) {
             processorListener.onActiveProcessorChanged(
                     appliedMode == Mode.AAUDIO ? null : candidate.processor);
@@ -997,10 +1047,18 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
             PulsrOutputRouting.observe(nativeSink);
             return new Inner(nativeSink, null, nativeSink, null);
         }
-        // Own the high-resolution path even for DEFAULT: Media3's stock
-        // converter discards PCM24/32 low bytes before custom DSP can see them.
-        NativeDspAudioProcessor processor = new NativeDspAudioProcessor();
-        processor.setFloatOutput(true);
+        // True low-power bit-perfect route: skip instantiating NativeDspAudioProcessor
+        // (and its native AudioDspEngine) completely for eligible integer PCM.
+        final boolean skipDspProcessor = shouldSkipDspProcessor(format, requested);
+        final NativeDspAudioProcessor processor;
+        if (skipDspProcessor) {
+            processor = null;
+        } else {
+            // Own the high-resolution path even for DEFAULT: Media3's stock
+            // converter discards PCM24/32 low bytes before custom DSP can see them.
+            processor = new NativeDspAudioProcessor();
+            processor.setFloatOutput(true);
+        }
         // Scale Media3 AudioTrack PCM buffer durations from the requested
         // targetBufferMs so high-bitrate Bluetooth codecs (LDAC 990 / aptX
         // Lossless / LHDC) and hi-res PCM streams avoid buffer underruns.
@@ -1025,8 +1083,8 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
                 .build();
         PulsrOutputRouting.observe(defaultSink, outputProvider);
         AudioSink outer = new FloatDspAudioSink(
-                defaultSink, processor, true, requested == Mode.DEFAULT, true);
-        return new Inner(outer, defaultSink, null, processor);
+                defaultSink, processor, true, requested == Mode.DEFAULT, true, skipDspProcessor);
+        return new Inner(outer, defaultSink, null, processor, skipDspProcessor);
     }
 
     private void releaseInner(Inner holder) {

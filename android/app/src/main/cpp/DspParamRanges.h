@@ -78,6 +78,13 @@ inline constexpr Range kLimiterReleaseMs{1.0, 1000.0, 50.0};
 inline constexpr Range kSubCrossoverCornerHz{60.0, 150.0, 80.0};
 inline constexpr Range kSubCrossoverGain{0.0, 1.0, 0.8};
 
+// --- Multichannel LFE crossover & ChannelManager ---------------------------
+inline constexpr Range kLfeCrossoverHz{40.0, 200.0, 80.0};
+inline constexpr Range kLfeLowPassHz{60.0, 250.0, 120.0};
+inline constexpr Range kLfeGainDb{-12.0, 12.0, 0.0};
+inline constexpr Range kChannelManagerTrimDb{-30.0, 12.0, 0.0};
+inline constexpr Range kChannelManagerDelayMs{0.0, 50.0, 0.0};
+
 // --- Dynamic EQ -----------------------------------------------------------
 // Q: 20 is the agreed maximum (UI + Kotlin). The sanitizer's historical 100 was
 // unreachable and produced numerically fragile biquads near Nyquist.

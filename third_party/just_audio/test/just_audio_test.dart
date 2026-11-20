@@ -1734,6 +1734,9 @@ void runTests() {
     );
     expect(player.aaudioOutputActive, equals(false));
     expect(await player.dspSetTapSrcRate(48000), equals(true));
+    expect(await player.dspSetLowPowerRoute(true), equals(true));
+    expect(player.lowPowerRouteEnabled, equals(true));
+    expect(await player.dspIsLowPowerBypassed(), equals(false));
     expect(await player.dspSetGainCurve([1.0, 0.5]), equals(false));
     expect(await player.dspClearGainCurve(), equals(false));
     expect(await player.dspSetTransitionMuted(true), equals(false));
@@ -1763,6 +1766,8 @@ void runTests() {
     expect(await player.dspSetTransitionMuted(true), equals(false));
     expect(await player.dspGetTransitionGain(), isNull);
     expect(await player.dspSetFloatOutput(true), equals(false));
+    expect(await player.dspSetLowPowerRoute(true), equals(false));
+    expect(await player.dspIsLowPowerBypassed(), equals(false));
     expect(await player.dspSetTapSrcRate(48000), equals(false));
     expect(await player.dspSetAaudioOutput(true), equals(false));
     expect(channelCalls, isEmpty);

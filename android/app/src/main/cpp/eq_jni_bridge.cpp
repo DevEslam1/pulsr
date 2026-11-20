@@ -1020,6 +1020,33 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSubCrossoverParams(
     });
 }
 
+// ---- Multichannel LFE Bass Management Crossover (3..8 channels) ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLfeCrossoverEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    const bool on = (enabled == JNI_TRUE);
+    AudioDspEngine::instance().updateParams([on](DspParamSnapshot& snap) {
+        snap.lfeCrossover.enabled = on;
+    });
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLfeCrossoverParams(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble crossoverHz, jdouble lfeLowPassHz,
+        jdouble slopeDbPerOct, jdouble lfeGainDb, jint lfeChannelIndex, jboolean redirectBass) {
+    const bool redirect = (redirectBass == JNI_TRUE);
+    const int lfeCh = static_cast<int>(lfeChannelIndex);
+    AudioDspEngine::instance().updateParams([=](DspParamSnapshot& snap) {
+        snap.lfeCrossover.crossoverHz = crossoverHz;
+        snap.lfeCrossover.lfeLowPassHz = lfeLowPassHz;
+        snap.lfeCrossover.slopeDbPerOct = slopeDbPerOct;
+        snap.lfeCrossover.lfeGainDb = lfeGainDb;
+        snap.lfeCrossover.lfeChannelIndex = lfeCh;
+        snap.lfeCrossover.redirectBass = redirect;
+    });
+}
+
 // ---- Phase 1 DSP expansion: Dynamic EQ (Cut & Boost modes, Peaking/Shelves) ----
 
 JNIEXPORT void JNICALL

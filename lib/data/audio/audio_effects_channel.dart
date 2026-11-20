@@ -7,6 +7,7 @@ import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_effects_config.dart';
+import '../../domain/models/dsp_battery_estimate.dart';
 import '../../domain/models/dsp_debug_report.dart';
 import '../../domain/models/dsp_telemetry.dart';
 import '../../core/telemetry/dsp_reliability_tracker.dart';
@@ -1764,6 +1765,128 @@ class AudioEffectsChannel {
     }
   }
 
+  // --- MULTICHANNEL CHANNEL MANAGER & LFE CROSSOVER ---
+
+  Future<void> setChannelManagerEnabled(bool enabled, {int channelCount = 2}) async {
+    if (!_isAndroid) return;
+    try {
+      await _invokeNativeSetter('setChannelManagerEnabled', {
+        'enabled': enabled,
+        'channelCount': channelCount,
+      }).timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set channel manager enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> setChannelManagerChannel(
+    int channel, {
+    double trimDb = 0.0,
+    double delayMs = 0.0,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _invokeNativeSetter('setChannelManagerChannel', {
+        'channel': channel,
+        'trimDb': trimDb,
+        'delayMs': delayMs,
+      }).timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set channel manager channel ($channel)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getChannelManagerState() async {
+    if (!_isAndroid) return null;
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>('getChannelManagerState')
+          .timeout(const Duration(seconds: 3));
+      return res;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to get channel manager state',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return null;
+    }
+  }
+
+  Future<void> setLfeCrossoverEnabled(bool enabled) async {
+    if (!_isAndroid) return;
+    try {
+      await _invokeNativeSetter('setLfeCrossoverEnabled', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set LFE crossover enabled ($enabled)',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> setLfeCrossoverParams({
+    double crossoverHz = 80.0,
+    double lfeLowPassHz = 120.0,
+    double slopeDbPerOct = 24.0,
+    double lfeGainDb = 0.0,
+    int lfeChannelIndex = 3,
+    bool redirectBass = true,
+  }) async {
+    if (!_isAndroid) return;
+    try {
+      await _invokeNativeSetter('setLfeCrossoverParams', {
+        'crossoverHz': crossoverHz,
+        'lfeLowPassHz': lfeLowPassHz,
+        'slopeDbPerOct': slopeDbPerOct,
+        'lfeGainDb': lfeGainDb,
+        'lfeChannelIndex': lfeChannelIndex,
+        'redirectBass': redirectBass,
+      }).timeout(const Duration(seconds: 3));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set LFE crossover params',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getLfeCrossoverState() async {
+    if (!_isAndroid) return null;
+    try {
+      final res = await _channel.invokeMapMethod<String, dynamic>('getLfeCrossoverState')
+          .timeout(const Duration(seconds: 3));
+      return res;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to get LFE crossover state',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return null;
+    }
+  }
+
   // --- PHASE 1 DSP EXPANSION: DYNAMIC EQ ---
 
   Future<void> setDynamicEqEnabled(bool enabled) async {
@@ -2737,6 +2860,12 @@ class AudioEffectsChannel {
       );
       return const {};
     }
+  }
+
+  /// Typed wrapper around [getDspBatteryDrainEstimate].
+  Future<DspBatteryEstimate> getDspBatteryEstimate() async {
+    final map = await getDspBatteryDrainEstimate();
+    return DspBatteryEstimate.fromMap(map);
   }
 
   /// Retrieves the native engine custody report (sample rate, buffer size, active stages, latency, bit-exactness).

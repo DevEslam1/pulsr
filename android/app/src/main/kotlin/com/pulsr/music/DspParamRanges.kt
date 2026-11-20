@@ -71,6 +71,13 @@ internal object DspParamRanges {
     val subCrossoverCornerHz = Range(60.0, 150.0, 80.0)
     val subCrossoverGain = Range(0.0, 1.0, 0.8)
 
+    // --- Multichannel LFE crossover & ChannelManager -----------------------
+    val lfeCrossoverHz = Range(40.0, 200.0, 80.0)
+    val lfeLowPassHz = Range(60.0, 250.0, 120.0)
+    val lfeGainDb = Range(-12.0, 12.0, 0.0)
+    val channelManagerTrimDb = Range(-30.0, 12.0, 0.0)
+    val channelManagerDelayMs = Range(0.0, 50.0, 0.0)
+
     // --- Dynamic EQ --------------------------------------------------------
     val dynamicEqFrequencyHz = Range(20.0, 20000.0, 1000.0)
     val dynamicEqQ = Range(0.1, 20.0, 2.0)
@@ -121,6 +128,11 @@ internal object DspParamRanges {
         "multibandMakeupGainDb" to multibandMakeupGainDb,
         "subCrossoverCornerHz" to subCrossoverCornerHz,
         "subCrossoverGain" to subCrossoverGain,
+        "lfeCrossoverHz" to lfeCrossoverHz,
+        "lfeLowPassHz" to lfeLowPassHz,
+        "lfeGainDb" to lfeGainDb,
+        "channelManagerTrimDb" to channelManagerTrimDb,
+        "channelManagerDelayMs" to channelManagerDelayMs,
         "dynamicEqFrequencyHz" to dynamicEqFrequencyHz,
         "dynamicEqQ" to dynamicEqQ,
         "dynamicEqThresholdDb" to dynamicEqThresholdDb,

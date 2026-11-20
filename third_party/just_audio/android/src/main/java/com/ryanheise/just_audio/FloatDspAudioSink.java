@@ -53,6 +53,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     private final boolean forceFloatForPcm16;
     private final boolean pcm16Boundary;
     private final boolean allowBitPerfectIntegerBypass;
+    private final boolean lowPowerIntegerBypass;
     // Read by PulsrAudioSink/PulsrOutputRouting telemetry off the playback
     // thread, written by configure() on it.
     private volatile boolean bypassedForBitPerfect;
@@ -232,11 +233,19 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
     FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor,
             boolean forceFloatForPcm16, boolean pcm16Boundary,
             boolean allowBitPerfectIntegerBypass) {
+        this(delegate, processor, forceFloatForPcm16, pcm16Boundary,
+                allowBitPerfectIntegerBypass, false);
+    }
+
+    FloatDspAudioSink(AudioSink delegate, NativeDspAudioProcessor processor,
+            boolean forceFloatForPcm16, boolean pcm16Boundary,
+            boolean allowBitPerfectIntegerBypass, boolean lowPowerIntegerBypass) {
         super(delegate);
         this.processor = processor;
         this.forceFloatForPcm16 = forceFloatForPcm16;
         this.pcm16Boundary = pcm16Boundary;
         this.allowBitPerfectIntegerBypass = allowBitPerfectIntegerBypass;
+        this.lowPowerIntegerBypass = lowPowerIntegerBypass;
         if (this.processor != null) {
             this.processor.setFloatOutput(true);
         }
@@ -393,11 +402,13 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
      * so the samples stay lossless.
      */
     private boolean integerBypassWanted(int encoding) {
+        final boolean eligibleEncoding = encoding == C.ENCODING_PCM_16BIT
+                || (encoding == C.ENCODING_PCM_24BIT && !pcm16Boundary);
+        if (!eligibleEncoding) return false;
+        if (lowPowerIntegerBypass) return true;
         return allowBitPerfectIntegerBypass
                 && processor != null
-                && processor.canBypassFloatPath()
-                && (encoding == C.ENCODING_PCM_16BIT
-                        || (encoding == C.ENCODING_PCM_24BIT && !pcm16Boundary));
+                && processor.canBypassFloatPath();
     }
 
     @Override

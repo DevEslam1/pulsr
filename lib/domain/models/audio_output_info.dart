@@ -213,6 +213,7 @@ class AudioOutputInfo {
   final int decodedBitDepth;
   final int decodedSampleRate;
   final int decodedPcmEncoding;
+  final int decodedChannelCount;
 
   /// The rate the sink actually opened (not the file tag, not the target).
   /// 0 means the platform did not report it, which can never be a verified
@@ -303,6 +304,7 @@ class AudioOutputInfo {
     this.decodedBitDepth = 0,
     this.decodedSampleRate = 0,
     this.decodedPcmEncoding = 0,
+    this.decodedChannelCount = 2,
     this.sinkSampleRate = 0,
     this.sinkBitDepth = 0,
     this.sinkPcmEncoding = 0,
@@ -376,6 +378,7 @@ class AudioOutputInfo {
       decodedBitDepth: (map['decodedBitDepth'] as num?)?.toInt() ?? 0,
       decodedSampleRate: (map['decodedSampleRate'] as num?)?.toInt() ?? 0,
       decodedPcmEncoding: (map['decodedPcmEncoding'] as num?)?.toInt() ?? 0,
+      decodedChannelCount: (map['decodedChannelCount'] as num?)?.toInt() ?? 2,
       sinkSampleRate: (map['sinkSampleRate'] as num?)?.toInt() ?? 0,
       sinkBitDepth: (map['sinkBitDepth'] as num?)?.toInt() ?? 0,
       sinkPcmEncoding: (map['sinkPcmEncoding'] as num?)?.toInt() ?? 0,
@@ -499,6 +502,7 @@ class AudioOutputInfo {
       'decodedBitDepth': decodedBitDepth,
       'decodedSampleRate': decodedSampleRate,
       'decodedPcmEncoding': decodedPcmEncoding,
+      'decodedChannelCount': decodedChannelCount,
       'sinkSampleRate': sinkSampleRate,
       'sinkBitDepth': sinkBitDepth,
       'sinkPcmEncoding': sinkPcmEncoding,
@@ -554,6 +558,7 @@ class AudioOutputInfo {
     int? decodedBitDepth,
     int? decodedSampleRate,
     int? decodedPcmEncoding,
+    int? decodedChannelCount,
     int? sinkSampleRate,
     int? sinkBitDepth,
     int? sinkPcmEncoding,
@@ -611,6 +616,7 @@ class AudioOutputInfo {
       decodedBitDepth: decodedBitDepth ?? this.decodedBitDepth,
       decodedSampleRate: decodedSampleRate ?? this.decodedSampleRate,
       decodedPcmEncoding: decodedPcmEncoding ?? this.decodedPcmEncoding,
+      decodedChannelCount: decodedChannelCount ?? this.decodedChannelCount,
       sinkSampleRate: sinkSampleRate ?? this.sinkSampleRate,
       sinkBitDepth: sinkBitDepth ?? this.sinkBitDepth,
       sinkPcmEncoding: sinkPcmEncoding ?? this.sinkPcmEncoding,
@@ -760,6 +766,12 @@ class AudioOutputInfo {
         Object.hashAll(supportedChannelCounts),
         Object.hashAll(supportedChannelMasks),
       ]);
+
+  /// True when the current device or the stream decoding pipeline supports > 2 channels.
+  bool get hasMultichannelOutput =>
+      supportedChannelCounts.any((c) => c > 2) ||
+      decodedChannelCount > 2 ||
+      availableDevices.any((d) => d.isCurrent && d.channelCounts.any((c) => c > 2));
 
   @override
   String toString() {

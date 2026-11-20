@@ -342,6 +342,7 @@ pulsr/
 - **`Crossfeed.cpp / .h`**: Bauer-style headphone crossfeed filter reducing extreme stereo channel separation fatigue.
 - **`HarmonicSaturation.cpp / .h`**: Soft-clipping even/odd harmonic generator adding analog tape/tube warmth.
 - **`SubCrossover.cpp / .h`**: Linkwitz-Riley low-pass and high-pass frequency split for dedicated subwoofer management.
+- **`LfeCrossover.cpp / .h`**: Multichannel (3–8 ch) LFE bass-management crossover with LR2/LR4 satellite high-pass, redirected bass sum into LFE, dedicated LFE low-pass, and LFE trim.
 - **`ConvolutionReverb.cpp / .h`**: Frequency-domain FFT-based fast convolution engine for realistic acoustic impulse responses (IR).
 - **`LookaheadLimiter.cpp / .h`**: Brickwall peak limiter with lookahead window to prevent digital clipping distortion.
 - **`MultibandCompressor.cpp / .h`**: 4-band audio compressor with independent threshold, ratio, attack, and release parameters.

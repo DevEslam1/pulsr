@@ -257,6 +257,24 @@ class EqualizerManager {
   bool subCrossoverBassMono = false;
   bool subCrossoverAntiPop = true;
 
+  // Multichannel Channel Manager (per-channel trim & delay)
+  bool isChannelManagerEnabled = false;
+  int channelManagerChannelCount = 2; // 2..8
+  List<double> channelManagerTrimDb = List<double>.filled(8, 0.0);
+  List<double> channelManagerDelayMs = List<double>.filled(8, 0.0);
+
+  // Multichannel LFE Bass Management Crossover (3..8 ch)
+  bool isLfeCrossoverEnabled = false;
+  double lfeCrossoverHz = 80.0; // 40 - 200 Hz
+  double lfeLowPassHz = 120.0; // 60 - 250 Hz
+  double lfeSlopeDbPerOct = 24.0; // 12 or 24 dB/oct
+  double lfeGainDb = 0.0; // -12 .. +12 dB
+  int lfeChannelIndex = 3; // 0..7 (default 3 in 5.1/7.1)
+  bool lfeRedirectBass = true;
+
+  // Low-power bit-perfect route
+  bool isLowPowerRouteEnabled = false;
+
   bool isDynamicEqEnabled = false;
   List<DynamicEqBandConfig> dynamicEqBands = const [DynamicEqBandConfig()];
 
@@ -589,6 +607,18 @@ class EqualizerManager {
       PrefsKeys.subCrossoverGain: subCrossoverGain,
       PrefsKeys.subCrossoverBassMono: subCrossoverBassMono,
       PrefsKeys.subCrossoverAntiPop: subCrossoverAntiPop,
+      PrefsKeys.channelManagerEnabled: isChannelManagerEnabled,
+      PrefsKeys.channelManagerChannelCount: channelManagerChannelCount,
+      PrefsKeys.channelManagerTrims: json.encode(channelManagerTrimDb),
+      PrefsKeys.channelManagerDelays: json.encode(channelManagerDelayMs),
+      PrefsKeys.lfeCrossoverEnabled: isLfeCrossoverEnabled,
+      PrefsKeys.lfeCrossoverHz: lfeCrossoverHz,
+      PrefsKeys.lfeLowPassHz: lfeLowPassHz,
+      PrefsKeys.lfeSlopeDbPerOct: lfeSlopeDbPerOct,
+      PrefsKeys.lfeGainDb: lfeGainDb,
+      PrefsKeys.lfeChannelIndex: lfeChannelIndex,
+      PrefsKeys.lfeRedirectBass: lfeRedirectBass,
+      PrefsKeys.lowPowerRouteEnabled: isLowPowerRouteEnabled,
       PrefsKeys.dynamicEqEnabled: isDynamicEqEnabled,
       PrefsKeys.dynamicEqBands: json.encode(
         dynamicEqBands.map((b) => b.toJson()).toList(),
@@ -1273,6 +1303,8 @@ class EqualizerManager {
   bool _savedViperDdcEnabled = false;
   bool _savedArbitraryEqEnabled = false;
   bool _savedLiveProgEnabled = false;
+  bool _savedChannelManagerEnabled = false;
+  bool _savedLfeCrossoverEnabled = false;
   DynamicsPreset _savedDynamicsPreset = DynamicsPreset.off;
 
   /// A snapshot recall that arrived while battery-degraded. Held here (an
@@ -1314,6 +1346,8 @@ class EqualizerManager {
     _savedViperDdcEnabled = isViperDdcEnabled;
     _savedArbitraryEqEnabled = isArbitraryEqEnabled;
     _savedLiveProgEnabled = isLiveProgEnabled;
+    _savedChannelManagerEnabled = isChannelManagerEnabled;
+    _savedLfeCrossoverEnabled = isLfeCrossoverEnabled;
 
     try {
       if (_savedReverbEnabled) await setReverb(false);
@@ -1322,6 +1356,8 @@ class EqualizerManager {
       if (_savedStereoWidthEnabled) await setStereoWidth(false);
       if (_savedLoudnessContourEnabled) await setLoudnessContour(false);
       if (_savedSubCrossoverEnabled) await setSubCrossover(false);
+      if (_savedLfeCrossoverEnabled) await setLfeCrossover(false);
+      if (_savedChannelManagerEnabled) await setChannelManagerEnabled(false);
       if (_savedDynamicEqEnabled) await setDynamicEq(false);
       if (_savedDynamicsEnabled) {
         await setDynamicsPreset(dynamicsPreset, enabled: false);
@@ -1376,6 +1412,14 @@ class EqualizerManager {
       if (_savedSubCrossoverEnabled &&
           !changed.contains(PrefsKeys.subCrossoverEnabled)) {
         await setSubCrossover(true);
+      }
+      if (_savedLfeCrossoverEnabled &&
+          !changed.contains(PrefsKeys.lfeCrossoverEnabled)) {
+        await setLfeCrossover(true);
+      }
+      if (_savedChannelManagerEnabled &&
+          !changed.contains(PrefsKeys.channelManagerEnabled)) {
+        await setChannelManagerEnabled(true);
       }
       if (_savedDynamicEqEnabled &&
           !changed.contains(PrefsKeys.dynamicEqEnabled)) {
@@ -1718,6 +1762,131 @@ class EqualizerManager {
           error: e, stackTrace: st, category: 'EqualizerManager');
       rethrow;
     }
+  }
+
+  // --- MULTICHANNEL CHANNEL MANAGER ---
+
+  Future<void> setChannelManagerEnabled(bool enabled, {int? channelCount}) async {
+    final prevEnabled = isChannelManagerEnabled;
+    final prevCount = channelManagerChannelCount;
+    final targetCount = (channelCount ?? prevCount).clamp(2, 8);
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setChannelManagerEnabled(enabled, channelCount: targetCount);
+      }
+      isChannelManagerEnabled = enabled;
+      channelManagerChannelCount = targetCount;
+      _debouncedSavePreferences();
+      _syncPipeline();
+    } catch (e, st) {
+      isChannelManagerEnabled = prevEnabled;
+      channelManagerChannelCount = prevCount;
+      ErrorLogger.log('Failed to set channel manager enabled',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
+    }
+  }
+
+  Future<void> setChannelManagerChannel(
+    int channel, {
+    double? trimDb,
+    double? delayMs,
+  }) async {
+    if (channel < 0 || channel >= 8) return;
+    final prevTrim = channelManagerTrimDb[channel];
+    final prevDelay = channelManagerDelayMs[channel];
+    final targetTrim = trimDb != null ? DspParamRanges.channelManagerTrimDb.clamp(trimDb) : prevTrim;
+    final targetDelay = delayMs != null ? DspParamRanges.channelManagerDelayMs.clamp(delayMs) : prevDelay;
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setChannelManagerChannel(channel, trimDb: targetTrim, delayMs: targetDelay);
+      }
+      channelManagerTrimDb[channel] = targetTrim;
+      channelManagerDelayMs[channel] = targetDelay;
+      _debouncedSavePreferences();
+    } catch (e, st) {
+      channelManagerTrimDb[channel] = prevTrim;
+      channelManagerDelayMs[channel] = prevDelay;
+      ErrorLogger.log('Failed to set channel manager channel',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
+    }
+  }
+
+  // --- MULTICHANNEL LFE CROSSOVER ---
+
+  Future<void> setLfeCrossover(
+    bool enabled, {
+    double? crossoverHz,
+    double? lfeLowPassHz,
+    double? slopeDbPerOct,
+    double? lfeGainDb,
+    int? lfeChannelIndex,
+    bool? redirectBass,
+  }) async {
+    final prevEnabled = isLfeCrossoverEnabled;
+    final prevCrossover = lfeCrossoverHz;
+    final prevLp = this.lfeLowPassHz;
+    final prevSlope = lfeSlopeDbPerOct;
+    final prevGain = this.lfeGainDb;
+    final prevLfeCh = this.lfeChannelIndex;
+    final prevRedirect = lfeRedirectBass;
+
+    final targetCrossover = crossoverHz != null
+        ? DspParamRanges.lfeCrossoverHz.clamp(crossoverHz)
+        : prevCrossover;
+    final targetLp = lfeLowPassHz != null
+        ? DspParamRanges.lfeLowPassHz.clamp(lfeLowPassHz)
+        : prevLp;
+    final targetSlope = slopeDbPerOct != null
+        ? (slopeDbPerOct < 18.0 ? 12.0 : 24.0)
+        : prevSlope;
+    final targetGain = lfeGainDb != null
+        ? DspParamRanges.lfeGainDb.clamp(lfeGainDb)
+        : prevGain;
+    final targetLfeCh = (lfeChannelIndex ?? prevLfeCh).clamp(0, 7).toInt();
+    final targetRedirect = redirectBass ?? prevRedirect;
+
+    try {
+      if (PlatformCapabilities.isAndroid) {
+        await _effectsChannel.setLfeCrossoverParams(
+          crossoverHz: targetCrossover,
+          lfeLowPassHz: targetLp,
+          slopeDbPerOct: targetSlope,
+          lfeGainDb: targetGain,
+          lfeChannelIndex: targetLfeCh,
+          redirectBass: targetRedirect,
+        );
+        await _effectsChannel.setLfeCrossoverEnabled(enabled);
+      }
+      lfeCrossoverHz = targetCrossover;
+      lfeLowPassHz = targetLp;
+      lfeSlopeDbPerOct = targetSlope;
+      lfeGainDb = targetGain;
+      lfeChannelIndex = targetLfeCh;
+      lfeRedirectBass = targetRedirect;
+      isLfeCrossoverEnabled = enabled;
+      _debouncedSavePreferences();
+      _syncPipeline();
+    } catch (e, st) {
+      lfeCrossoverHz = prevCrossover;
+      lfeLowPassHz = prevLp;
+      lfeSlopeDbPerOct = prevSlope;
+      lfeGainDb = prevGain;
+      lfeChannelIndex = prevLfeCh;
+      lfeRedirectBass = prevRedirect;
+      isLfeCrossoverEnabled = prevEnabled;
+      ErrorLogger.log('Failed to set LFE crossover',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+      rethrow;
+    }
+  }
+
+  // --- LOW-POWER ROUTE ---
+
+  Future<void> setLowPowerRoute(bool enabled) async {
+    isLowPowerRouteEnabled = enabled;
+    _debouncedSavePreferences();
   }
 
   Future<void> setDynamicEq(bool enabled) async {
@@ -2130,6 +2299,8 @@ class EqualizerManager {
       isLiveProgEnabled: isLiveProgEnabled,
       isStereoWidthEnabled: isStereoWidthEnabled,
       isSubCrossoverEnabled: isSubCrossoverEnabled,
+      isLfeCrossoverEnabled: isLfeCrossoverEnabled,
+      isChannelManagerEnabled: isChannelManagerEnabled,
       isDynamicBassEnabled: isDynamicBassEnabled,
       isLoudnessContourEnabled: isLoudnessContourEnabled,
       isLimiterEnabled: isLimiterEnabled,
@@ -2488,6 +2659,36 @@ class EqualizerManager {
         ),
       );
       futures.add(_effectsChannel.setSubCrossoverEnabled(true));
+    }
+    if (isLfeCrossoverEnabled) {
+      futures.add(
+        _effectsChannel.setLfeCrossoverParams(
+          crossoverHz: lfeCrossoverHz,
+          lfeLowPassHz: lfeLowPassHz,
+          slopeDbPerOct: lfeSlopeDbPerOct,
+          lfeGainDb: lfeGainDb,
+          lfeChannelIndex: lfeChannelIndex,
+          redirectBass: lfeRedirectBass,
+        ),
+      );
+      futures.add(_effectsChannel.setLfeCrossoverEnabled(true));
+    }
+    if (isChannelManagerEnabled) {
+      futures.add(
+        _effectsChannel.setChannelManagerEnabled(
+          true,
+          channelCount: channelManagerChannelCount,
+        ),
+      );
+      for (int ch = 0; ch < 8; ++ch) {
+        futures.add(
+          _effectsChannel.setChannelManagerChannel(
+            ch,
+            trimDb: channelManagerTrimDb[ch],
+            delayMs: channelManagerDelayMs[ch],
+          ),
+        );
+      }
     }
     if (isDynamicEqEnabled) {
       futures.add(_pushDynamicEqConfig());

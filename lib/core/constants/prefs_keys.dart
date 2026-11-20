@@ -151,6 +151,25 @@ class PrefsKeys {
   static const String subCrossoverGain = 'setting_sub_crossover_gain';
   static const String subCrossoverBassMono = 'setting_sub_crossover_bass_mono';
   static const String subCrossoverAntiPop = 'setting_sub_crossover_anti_pop';
+
+  // Multichannel Channel Manager
+  static const String channelManagerEnabled = 'setting_channel_manager_enabled';
+  static const String channelManagerChannelCount =
+      'setting_channel_manager_channel_count';
+  static const String channelManagerTrims = 'setting_channel_manager_trims';
+  static const String channelManagerDelays = 'setting_channel_manager_delays';
+
+  // Multichannel LFE Crossover
+  static const String lfeCrossoverEnabled = 'setting_lfe_crossover_enabled';
+  static const String lfeCrossoverHz = 'setting_lfe_crossover_hz';
+  static const String lfeLowPassHz = 'setting_lfe_low_pass_hz';
+  static const String lfeSlopeDbPerOct = 'setting_lfe_slope_db_per_oct';
+  static const String lfeGainDb = 'setting_lfe_gain_db';
+  static const String lfeChannelIndex = 'setting_lfe_channel_index';
+  static const String lfeRedirectBass = 'setting_lfe_redirect_bass';
+
+  // Low-power bit-perfect route
+  static const String lowPowerRouteEnabled = 'setting_low_power_route_enabled';
   static const String dynamicEqEnabled = 'setting_dynamic_eq_enabled';
   static const String dynamicEqBands = 'setting_dynamic_eq_bands';
   static const String reverbCrossChannel = 'setting_reverb_cross_channel';

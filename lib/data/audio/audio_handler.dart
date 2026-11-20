@@ -2013,14 +2013,33 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       if (enabled) {
         await _equalizerManager.degradeToEssentials();
+        await Future.wait([
+          _playerA.dspSetLowPowerRoute(true),
+          _playerB.dspSetLowPowerRoute(true),
+        ]);
       } else if (_batteryAwarePlayback.currentLevel ==
           BatteryOptimizationLevel.normal) {
         await _equalizerManager.restoreFromDegrade();
+        final lowPowerRoute = _equalizerManager.isLowPowerRouteEnabled;
+        await Future.wait([
+          _playerA.dspSetLowPowerRoute(lowPowerRoute),
+          _playerB.dspSetLowPowerRoute(lowPowerRoute),
+        ]);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to apply battery saver state',
           error: e, stackTrace: st, category: 'AudioHandler');
     }
+  }
+
+  /// Sets the true low-power route on both players and persists the preference.
+  @override
+  Future<void> setLowPowerRoute(bool enabled) async {
+    await _equalizerManager.setLowPowerRoute(enabled);
+    await Future.wait([
+      _playerA.dspSetLowPowerRoute(enabled),
+      _playerB.dspSetLowPowerRoute(enabled),
+    ]);
   }
 
   /// Re-applies the stored override after the equalizer has loaded its own

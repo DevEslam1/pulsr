@@ -757,6 +757,8 @@ class DeviceAdaptiveOutputSection extends StatelessWidget {
         if (isAndroid) ...[
           settingsCardDivider(p),
           const _BatterySaverCard(),
+          settingsCardDivider(p),
+          const _LowPowerRouteCard(),
         ],
       ],
     );
@@ -832,6 +834,70 @@ class _BatterySaverCardState extends State<_BatterySaverCard> {
       Icons.battery_alert_rounded,
       context.l10n.settingsBatterySaverTitle,
       context.l10n.settingsBatterySaverDesc,
+      value: _enabled,
+      onChanged: _setEnabled,
+    );
+  }
+}
+
+class _LowPowerRouteCard extends StatefulWidget {
+  const _LowPowerRouteCard();
+
+  @override
+  State<_LowPowerRouteCard> createState() => _LowPowerRouteCardState();
+}
+
+class _LowPowerRouteCardState extends State<_LowPowerRouteCard> {
+  bool _enabled = false;
+  bool _loaded = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restore());
+  }
+
+  Future<void> _restore() async {
+    var enabled = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      enabled = prefs.getBool(PrefsKeys.lowPowerRouteEnabled) ?? false;
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _enabled = enabled;
+      _loaded = true;
+    });
+  }
+
+  Future<void> _setEnabled(bool enabled) async {
+    if (_busy) return;
+    setState(() {
+      _enabled = enabled;
+      _busy = true;
+    });
+    try {
+      if (getIt.isRegistered<PulsrAudioHandler>()) {
+        await getIt<PulsrAudioHandler>().setLowPowerRoute(enabled);
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(PrefsKeys.lowPowerRouteEnabled, enabled);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _enabled = !enabled);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) return const SizedBox.shrink();
+    return SettingsSwitchTile(
+      Icons.energy_savings_leaf_rounded,
+      'True Low-Power Route',
+      'Completely bypasses 32-bit float DSP audio processing for eligible integer PCM playback to minimize battery drain.',
       value: _enabled,
       onChanged: _setEnabled,
     );

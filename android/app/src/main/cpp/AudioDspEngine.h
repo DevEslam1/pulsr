@@ -19,6 +19,7 @@
 #include "LoudnessContour.h"
 #include "SubCrossover.h"
 #include "ChannelManager.h"
+#include "LfeCrossover.h"
 #include "DacVoicing.h"
 #include "DynamicEQ.h"
 #include "MultibandCompressor.h"
@@ -65,6 +66,8 @@ enum DspStageMask {
     // harmonic warmth). Adds latency when enabled, so it reports like other
     // delaying stages rather than the zero-latency Phase 1 group.
     STAGE_DAC_VOICING = 1 << 19,
+    // Multichannel LFE bass management crossover (3..8 channels).
+    STAGE_LFE_CROSSOVER = 1 << 20,
 };
 
 enum class DspPerformanceProfile {
@@ -174,6 +177,7 @@ public:
     LoudnessContour& loudnessContour() { return loudnessContour_; }
     SubCrossover& subCrossover() { return subCrossover_; }
   ChannelManager& channelManager() { return channelManager_; }
+    LfeCrossover& lfeCrossover() { return lfeCrossover_; }
     DacVoicing& dacVoicing() { return dacVoicing_; }
     DynamicEQ& dynamicEq() { return dynamicEq_; }
     MultibandCompressor& multibandCompressor() { return multibandCompressor_; }
@@ -574,6 +578,7 @@ private:
     LoudnessContour loudnessContour_;
     SubCrossover subCrossover_;
   ChannelManager channelManager_;
+    LfeCrossover lfeCrossover_;
     DynamicEQ dynamicEq_;
     MultibandCompressor multibandCompressor_;
     DynamicBass dynamicBass_;

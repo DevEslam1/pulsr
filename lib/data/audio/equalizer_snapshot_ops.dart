@@ -126,6 +126,19 @@ extension EqualizerSnapshotOps on EqualizerManager {
       'subCrossoverGain': subCrossoverGain,
       'subCrossoverBassMono': subCrossoverBassMono,
       'subCrossoverAntiPop': subCrossoverAntiPop,
+      // Channel Manager
+      'channelManagerEnabled': isChannelManagerEnabled,
+      'channelManagerChannelCount': channelManagerChannelCount,
+      'channelManagerTrimDb': List<double>.from(channelManagerTrimDb),
+      'channelManagerDelayMs': List<double>.from(channelManagerDelayMs),
+      // LFE Crossover
+      'lfeCrossoverEnabled': isLfeCrossoverEnabled,
+      'lfeCrossoverHz': lfeCrossoverHz,
+      'lfeLowPassHz': lfeLowPassHz,
+      'lfeSlopeDbPerOct': lfeSlopeDbPerOct,
+      'lfeGainDb': lfeGainDb,
+      'lfeChannelIndex': lfeChannelIndex,
+      'lfeRedirectBass': lfeRedirectBass,
       // Dynamic EQ
       'dynamicEqEnabled': isDynamicEqEnabled,
       'dynamicEqBands': dynamicEqBands.map((b) => b.toJson()).toList(),
@@ -391,6 +404,44 @@ extension EqualizerSnapshotOps on EqualizerManager {
       bassMono: b('subCrossoverBassMono', subCrossoverBassMono),
       antiPop: b('subCrossoverAntiPop', subCrossoverAntiPop),
     );
+
+    // Multichannel Channel Manager
+    if (m.containsKey('channelManagerEnabled')) {
+      final trims = (m['channelManagerTrimDb'] as List?)
+          ?.cast<num>()
+          .map((n) => n.toDouble())
+          .toList();
+      final delays = (m['channelManagerDelayMs'] as List?)
+          ?.cast<num>()
+          .map((n) => n.toDouble())
+          .toList();
+      if (trims != null && trims.length == 8) channelManagerTrimDb = trims;
+      if (delays != null && delays.length == 8) channelManagerDelayMs = delays;
+      await setChannelManagerEnabled(
+        b('channelManagerEnabled', isChannelManagerEnabled),
+        channelCount: (m['channelManagerChannelCount'] as num?)?.toInt() ?? channelManagerChannelCount,
+      );
+      for (int ch = 0; ch < 8; ++ch) {
+        await setChannelManagerChannel(
+          ch,
+          trimDb: channelManagerTrimDb[ch],
+          delayMs: channelManagerDelayMs[ch],
+        );
+      }
+    }
+
+    // Multichannel LFE Crossover
+    if (m.containsKey('lfeCrossoverEnabled')) {
+      await setLfeCrossover(
+        b('lfeCrossoverEnabled', isLfeCrossoverEnabled),
+        crossoverHz: d('lfeCrossoverHz', lfeCrossoverHz),
+        lfeLowPassHz: d('lfeLowPassHz', lfeLowPassHz),
+        slopeDbPerOct: d('lfeSlopeDbPerOct', lfeSlopeDbPerOct),
+        lfeGainDb: d('lfeGainDb', lfeGainDb),
+        lfeChannelIndex: (m['lfeChannelIndex'] as num?)?.toInt() ?? lfeChannelIndex,
+        redirectBass: b('lfeRedirectBass', lfeRedirectBass),
+      );
+    }
 
     // Dynamic EQ — set bands before the enable flag so the stage comes up
     // configured (setDynamicEqBand only pushes while the stage is enabled).

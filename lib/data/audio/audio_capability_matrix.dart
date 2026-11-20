@@ -144,7 +144,7 @@ class AudioCapabilityMatrix {
   /// The matrix for this build. Verified field by field against the native and
   /// Kotlin sources by the architecture guard test.
   static const AudioCapabilityMatrix current = AudioCapabilityMatrix(
-    nativeDspStageCount: 20,
+    nativeDspStageCount: 21,
     nativeDspStages: <String>[
       'eq',
       'crossfeed',
@@ -166,6 +166,7 @@ class AudioCapabilityMatrix {
       'headphone_safety',
       'channel_manager',
       'dac_voicing',
+      'lfe_crossover',
     ],
     maxParametricEqBands: 64,
     maxDynamicEqBands: 8,

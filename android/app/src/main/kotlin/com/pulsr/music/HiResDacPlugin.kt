@@ -2352,6 +2352,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["pcmEncoding"] = stream[2]
         result["decodedBitDepth"] = decodedDepth
         result["decodedSampleRate"] = decoded[1]
+        result["decodedChannelCount"] = decoded[2]
         // decodedPcmEncoding is published with the sink truth fields above, read
         // from the same routing snapshot that attributes it to this stream.
         result["isBitPerfectActive"] = finalIsBitPerfectActive

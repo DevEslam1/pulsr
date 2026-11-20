@@ -102,4 +102,20 @@ void main() {
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool(PrefsKeys.batterySaverEnabled), isFalse);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('true low-power route is off by default and persists when enabled',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    await pumpSection(tester);
+
+    expect(find.text('True Low-Power Route'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('True Low-Power Route'));
+    await tester.tap(find.text('True Low-Power Route'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(PrefsKeys.lowPowerRouteEnabled), isTrue);
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 }

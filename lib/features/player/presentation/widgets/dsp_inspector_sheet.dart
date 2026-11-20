@@ -17,6 +17,7 @@ import '../../../../data/audio/audio_handler.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/services/usb_exclusive_service.dart';
 import '../../../../domain/models/audio_quality_info.dart';
+import '../../../../domain/models/dsp_battery_estimate.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/services/output_path_verdict.dart';
@@ -71,6 +72,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
   double _limiterGrDb = 0;
   double _dynEqGrDb = 0;
   double _multibandGrDb = 0;
+  DspBatteryEstimate? _batteryEstimate;
   Timer? _autoRefreshTimer;
   bool _refreshInFlight = false;
 
@@ -130,6 +132,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
         channel.getLimiterGrDb(),
         channel.getDynEqGrDb(),
         channel.getMultibandGrDb(),
+        channel.getDspBatteryEstimate(),
       ]);
       // getDspDebugReport() is nullable (non-Android / platform failure);
       // casting it to non-null used to throw and discard the latency sample
@@ -143,6 +146,7 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
           _limiterGrDb = results[2] as double? ?? 0;
           _dynEqGrDb = results[3] as double? ?? 0;
           _multibandGrDb = results[4] as double? ?? 0;
+          _batteryEstimate = results[5] as DspBatteryEstimate?;
           _isLoading = false;
         });
       }
@@ -890,6 +894,14 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                 'DSP BYPASS',
                 isBypassed ? 'BYPASSED' : 'OFF',
                 isHighlight: isBypassed,
+              ),
+              _buildStatChip(
+                p,
+                'DSP POWER',
+                _batteryEstimate?.lowPowerBypassActive == true
+                    ? '0.0 mAh/h (LOW-POWER)'
+                    : '~${(_batteryEstimate?.estimatedMahPerHour ?? 0.0).toStringAsFixed(1)} mAh/h',
+                isHighlight: _batteryEstimate?.lowPowerBypassActive == true,
               ),
               if (rep?.hasOemAudio == true)
                 _buildStatChip(

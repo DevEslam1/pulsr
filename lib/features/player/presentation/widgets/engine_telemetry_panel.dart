@@ -1,11 +1,15 @@
 // lib/features/player/presentation/widgets/engine_telemetry_panel.dart
+import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../data/audio/audio_effects_channel.dart';
+import '../../../../domain/models/dsp_battery_estimate.dart';
 import '../../../../domain/models/dsp_telemetry.dart';
 import '../../cubit/dsp_telemetry_cubit.dart';
 
@@ -25,6 +29,8 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
   late bool _isExpanded;
   late final DspTelemetryCubit _cubit;
   bool _ownsCubit = false;
+  Timer? _batteryTimer;
+  DspBatteryEstimate? _batteryEstimate;
 
   @override
   void initState() {
@@ -41,7 +47,29 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
 
     if (_isExpanded) {
       _cubit.subscribe();
+      _startBatteryPolling();
     }
+  }
+
+  void _startBatteryPolling() {
+    _batteryTimer?.cancel();
+    _fetchBattery();
+    _batteryTimer =
+        Timer.periodic(const Duration(seconds: 1), (_) => _fetchBattery());
+  }
+
+  void _stopBatteryPolling() {
+    _batteryTimer?.cancel();
+    _batteryTimer = null;
+  }
+
+  void _fetchBattery() async {
+    try {
+      final est = await AudioEffectsChannel().getDspBatteryEstimate();
+      if (mounted) {
+        setState(() => _batteryEstimate = est);
+      }
+    } catch (_) {}
   }
 
   DspTelemetryCubit? _tryReadCubit(BuildContext ctx) {
@@ -54,6 +82,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
 
   @override
   void dispose() {
+    _stopBatteryPolling();
     if (_isExpanded) {
       _cubit.unsubscribe();
     }
@@ -68,8 +97,10 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
       _isExpanded = !_isExpanded;
       if (_isExpanded) {
         _cubit.subscribe();
+        _startBatteryPolling();
       } else {
         _cubit.unsubscribe();
+        _stopBatteryPolling();
       }
     });
   }
@@ -205,8 +236,139 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel> {
           const SizedBox(height: AppSpacing.sm),
           _buildDynEqMeter(context, p, telemetry.dynEqGrDb),
           const SizedBox(height: AppSpacing.xs),
+          _buildPowerDrainSection(context, p, _batteryEstimate),
         ],
       ),
+    );
+  }
+
+  Widget _buildPowerDrainSection(
+      BuildContext context, PulsrPalette p, DspBatteryEstimate? est) {
+    final isBypassed = est?.lowPowerBypassActive ?? false;
+    final mah = est?.estimatedMahPerHour ?? 0.0;
+    final breakdown = est?.stageBreakdown ?? const <String, double>{};
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 16, color: p.hairline),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isBypassed
+                      ? Icons.bolt_rounded
+                      : Icons.battery_charging_full_rounded,
+                  size: 16,
+                  color: isBypassed ? AppColors.dacGold : p.accent,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  'DSP Power Consumption',
+                  style: TextStyle(
+                    fontSize: AppFontSize.caption,
+                    fontWeight: FontWeight.w700,
+                    color: p.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isBypassed
+                    ? AppColors.dacGold.withValues(alpha: 0.15)
+                    : (mah > 10.0
+                        ? p.warning.withValues(alpha: 0.15)
+                        : p.accent.withValues(alpha: 0.15)),
+                borderRadius: AppRadii.r4All,
+                border: Border.all(
+                  color: isBypassed
+                      ? AppColors.dacGold.withValues(alpha: 0.4)
+                      : (mah > 10.0
+                          ? p.warning.withValues(alpha: 0.4)
+                          : p.accent.withValues(alpha: 0.3)),
+                ),
+              ),
+              child: Text(
+                isBypassed
+                    ? '⚡ 0.0 mAh/h (Integer Low-Power)'
+                    : '~${mah.toStringAsFixed(1)} mAh/h',
+                style: TextStyle(
+                  fontSize: AppFontSize.caption,
+                  fontWeight: FontWeight.w800,
+                  color: isBypassed
+                      ? AppColors.dacGold
+                      : (mah > 10.0 ? p.warning : p.accent),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        if (isBypassed)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'True low-power integer route active: float DSP processor is completely bypassed for bit-perfect integer PCM.',
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                color: p.textTertiary,
+                height: 1.25,
+              ),
+            ),
+          )
+        else if (breakdown.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+            child: Text(
+              'Active DSP stage drain breakdown:',
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                color: p.textSecondary,
+              ),
+            ),
+          ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: breakdown.entries.map((entry) {
+              final name = DspBatteryEstimate.stageDisplayName(entry.key);
+              final cost = entry.value;
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainerHigh,
+                  borderRadius: AppRadii.r4All,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Text(
+                  '$name: +${cost.toStringAsFixed(1)} mAh/h',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: p.textSecondary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              'All DSP stages idle (~0.0 mAh/h).',
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                color: p.textTertiary,
+              ),
+            ),
+          ),
+      ],
     );
   }
 

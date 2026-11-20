@@ -185,6 +185,18 @@ abstract final class DspParamRanges {
     return value < 18.0 ? 12.0 : 24.0;
   }
 
+  // --- Multichannel LFE crossover & ChannelManager ---------------------------
+  static const DspRange lfeCrossoverHz =
+      DspRange(40.0, 200.0, defaultValue: 80.0);
+  static const DspRange lfeLowPassHz =
+      DspRange(60.0, 250.0, defaultValue: 120.0);
+  static const DspRange lfeGainDb =
+      DspRange(-12.0, 12.0, defaultValue: 0.0);
+  static const DspRange channelManagerTrimDb =
+      DspRange(-30.0, 12.0, defaultValue: 0.0);
+  static const DspRange channelManagerDelayMs =
+      DspRange(0.0, 50.0, defaultValue: 0.0);
+
   // --- Multiband compressor crossovers (DspParams.h MultibandCompressorParamSet)
   static const DspRange multibandCompressorF0 =
       DspRange(40.0, 500.0, defaultValue: 160.0);

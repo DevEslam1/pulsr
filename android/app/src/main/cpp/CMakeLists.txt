@@ -64,6 +64,7 @@ set(DSP_CORE_SOURCES
     StereoWidth.cpp
     LoudnessContour.cpp
     SubCrossover.cpp
+    LfeCrossover.cpp
     ChannelManager.cpp
     DacVoicing.cpp
     DynamicEQ.cpp

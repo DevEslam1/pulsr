@@ -274,6 +274,43 @@ extension EqualizerRestoreOps on EqualizerManager {
       subCrossoverAntiPop =
           prefs.getBool(PrefsKeys.subCrossoverAntiPop) ?? true;
 
+      isChannelManagerEnabled =
+          prefs.getBool(PrefsKeys.channelManagerEnabled) ?? false;
+      channelManagerChannelCount =
+          prefs.getInt(PrefsKeys.channelManagerChannelCount) ?? 2;
+      final trimsJson = prefs.getString(PrefsKeys.channelManagerTrims);
+      if (trimsJson != null) {
+        try {
+          final list = (json.decode(trimsJson) as List)
+              .cast<num>()
+              .map((n) => n.toDouble())
+              .toList();
+          if (list.length == 8) channelManagerTrimDb = list;
+        } catch (_) {}
+      }
+      final delaysJson = prefs.getString(PrefsKeys.channelManagerDelays);
+      if (delaysJson != null) {
+        try {
+          final list = (json.decode(delaysJson) as List)
+              .cast<num>()
+              .map((n) => n.toDouble())
+              .toList();
+          if (list.length == 8) channelManagerDelayMs = list;
+        } catch (_) {}
+      }
+
+      isLfeCrossoverEnabled =
+          prefs.getBool(PrefsKeys.lfeCrossoverEnabled) ?? false;
+      lfeCrossoverHz = prefs.getDouble(PrefsKeys.lfeCrossoverHz) ?? 80.0;
+      lfeLowPassHz = prefs.getDouble(PrefsKeys.lfeLowPassHz) ?? 120.0;
+      lfeSlopeDbPerOct = prefs.getDouble(PrefsKeys.lfeSlopeDbPerOct) ?? 24.0;
+      lfeGainDb = prefs.getDouble(PrefsKeys.lfeGainDb) ?? 0.0;
+      lfeChannelIndex = prefs.getInt(PrefsKeys.lfeChannelIndex) ?? 3;
+      lfeRedirectBass = prefs.getBool(PrefsKeys.lfeRedirectBass) ?? true;
+
+      isLowPowerRouteEnabled =
+          prefs.getBool(PrefsKeys.lowPowerRouteEnabled) ?? false;
+
       isDynamicEqEnabled = prefs.getBool(PrefsKeys.dynamicEqEnabled) ?? false;
       reverbCrossChannel = prefs.getDouble(PrefsKeys.reverbCrossChannel) ?? 0.0;
 
@@ -547,6 +584,39 @@ extension EqualizerRestoreOps on EqualizerManager {
       }
       pendingFutures
           .add(_effectsChannel.setSubCrossoverEnabled(isSubCrossoverEnabled));
+
+      if (isLfeCrossoverEnabled) {
+        pendingFutures.add(
+          _effectsChannel.setLfeCrossoverParams(
+            crossoverHz: lfeCrossoverHz,
+            lfeLowPassHz: lfeLowPassHz,
+            slopeDbPerOct: lfeSlopeDbPerOct,
+            lfeGainDb: lfeGainDb,
+            lfeChannelIndex: lfeChannelIndex,
+            redirectBass: lfeRedirectBass,
+          ),
+        );
+      }
+      pendingFutures
+          .add(_effectsChannel.setLfeCrossoverEnabled(isLfeCrossoverEnabled));
+
+      if (isChannelManagerEnabled) {
+        pendingFutures.add(
+          _effectsChannel.setChannelManagerEnabled(
+            true,
+            channelCount: channelManagerChannelCount,
+          ),
+        );
+        for (int ch = 0; ch < 8; ++ch) {
+          pendingFutures.add(
+            _effectsChannel.setChannelManagerChannel(
+              ch,
+              trimDb: channelManagerTrimDb[ch],
+              delayMs: channelManagerDelayMs[ch],
+            ),
+          );
+        }
+      }
 
       if (isDynamicEqEnabled) {
         pendingFutures.add(_pushDynamicEqConfig());
