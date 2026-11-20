@@ -88,6 +88,8 @@ set(DSP_SRCS
     ${MAIN_CPP}/UsbPullRenderer.cpp
     ${MAIN_CPP}/UsbAsrcClockSync.cpp
     ${MAIN_CPP}/UsbPcmProducer.cpp
+    ${MAIN_CPP}/Oversampler.cpp
+    ${MAIN_CPP}/SdmModulator.cpp
 )
 
 include_directories(${MAIN_CPP})

@@ -69,6 +69,8 @@ class LiveOutputObservation {
   final double? softwareGain;
 
   final bool isDsdDop;
+  final bool oversamplingActive;
+  final bool pcmToDsdActive;
 
   const LiveOutputObservation({
     required this.output,
@@ -94,6 +96,8 @@ class LiveOutputObservation {
     this.transportSamplesModified = false,
     this.softwareGain,
     this.isDsdDop = false,
+    this.oversamplingActive = false,
+    this.pcmToDsdActive = false,
   });
 }
 
@@ -186,6 +190,8 @@ LiveOutputVerdict resolveLiveOutputVerdict(LiveOutputObservation observation) {
     channelsAltered: direct && observation.channelMismatchFrames > 0,
     rateVerified: !direct || observation.rateVerified,
     isDsdDop: observation.isDsdDop,
+    oversamplingActive: observation.oversamplingActive,
+    pcmToDsdActive: observation.pcmToDsdActive,
     sourceLossy: observation.isRadioSource ||
         codecState == AudioSourceCodecState.lossy,
     sourceCodecUnconfirmed: codecState == AudioSourceCodecState.unknown,

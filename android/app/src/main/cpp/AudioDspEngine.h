@@ -8,6 +8,10 @@
 #include "ConvolutionReverb.h"
 #include "SincResampler.h"
 #include "HighQualityResampler.h"
+#include "Oversampler.h"
+#include "SdmModulator.h"
+#include "DopFramer.h"
+#include "DsdNativePacker.h"
 #include "DsdDecoder.h"
 #include "SpatialPanner.h"
 #include "HarmonicSaturation.h"
@@ -285,6 +289,31 @@ public:
     void setTapSrcQuality(int quality);
     int tapSrcQuality() const { return tapSrcQuality_; }
 
+    // ---- Remaster: Reconstruction Filter & Output Oversampling ----
+    void setOversampleMultiplier(int multiplier);
+    int oversampleMultiplier() const { return oversampleMultiplier_; }
+    void setOversampleKernel(int kernel);
+    int oversampleKernel() const { return oversampleKernel_; }
+    bool isTapOversamplerEngaged() const { return tapUseOversampler_; }
+
+    // ---- Remaster: Real-Time PCM -> DSD Modulator ----
+    void setPcmToDsdEnabled(bool enabled);
+    bool isPcmToDsdEnabled() const { return pcmToDsdEnabled_; }
+    void setPcmToDsdRate(int rate);
+    int pcmToDsdRate() const { return pcmToDsdRate_; }
+    void setPcmToDsdOrder(int order);
+    int pcmToDsdOrder() const { return pcmToDsdOrder_; }
+
+    bool preparePcmToDsd(double pcmRate, int dsdMultiple, int order, int containerBits = 24);
+    void resetPcmToDsd();
+    void releasePcmToDsd();
+    int convertPcmToDsdDoP(const float* inInterleaved, int inFrames,
+                           uint8_t* outDop, int maxOutBytes, int containerBits,
+                           int& consumedFrames);
+    int convertPcmToDsdNative(const float* inInterleaved, int inFrames,
+                             uint8_t* outDsd, int maxOutBytes, int bytesPerSample,
+                             int& consumedFrames);
+
     void reset();
     void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
@@ -451,6 +480,25 @@ private:
     static constexpr int kTapOutputFrames = 4096;
     std::vector<float> tapPlaneIn_[kTapMaxChannels];
     std::vector<float> tapPlaneOut_[kTapMaxChannels];
+
+    // Remaster: Output oversampler and reconstruction filters
+    pulsr::Oversampler tapOversampler_;
+    bool tapUseOversampler_ = false;
+    int oversampleMultiplier_ = 1;  // 1 = Off, 2 = 2x, 4 = 4x, 8 = 8x
+    int oversampleKernel_ = 0;      // 0 = Sharp, 1 = Slow, 2 = MinimumPhase, 3 = Apodizing
+
+    // Remaster: Real-Time PCM -> DSD modulator
+    pulsr::SdmModulator sdmModulator_;
+    bool pcmToDsdEnabled_ = false;
+    int pcmToDsdRate_ = 64;         // 64, 128, 256
+    int pcmToDsdOrder_ = 5;        // 1..5
+    int pcmToDsdContainerBits_ = 24;
+    double pcmToDsdInputRate_ = 0.0;
+    uint8_t dopMarker_ = pulsr::kDopMarkerA;
+    std::vector<uint8_t> sdmDsdBufL_;
+    std::vector<uint8_t> sdmDsdBufR_;
+    std::vector<float> pcmDsdInL_;
+    std::vector<float> pcmDsdInR_;
 
     SpatialPanner panner_;
     DsdDecoder dsdDecoder_;

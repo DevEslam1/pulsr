@@ -70,6 +70,12 @@ enum OutputFormatReason {
 
   /// The user explicitly asked for a rate below the track's native rate.
   userRequestedBelowTrack,
+
+  /// Remaster output oversampling multiplier honoured.
+  oversampled,
+
+  /// Remaster output oversampling requested rate exceeds device caps; stepped down.
+  oversampleRateLimited,
 }
 
 /// Inputs for [negotiateOutputFormat].
@@ -86,11 +92,15 @@ class OutputFormatRequest {
   /// Explicit user target depth; 0 means "auto" (follow the track/caps).
   final int requestedBitDepth;
 
+  /// Remaster oversampling multiplier (1 = off, 2 = 2x, 4 = 4x, 8 = 8x).
+  final int oversampleMultiplier;
+
   const OutputFormatRequest({
     this.trackSampleRate = 0,
     this.trackBitDepth = 0,
     this.requestedSampleRate = 0,
     this.requestedBitDepth = 0,
+    this.oversampleMultiplier = 1,
   });
 }
 
@@ -168,11 +178,48 @@ OutputFormatDecision negotiateOutputFormat({
   if (maxDepth != 16 && maxDepth != 24 && maxDepth != 32) maxDepth = 16;
 
   final desiredRate = explicitRate > 0 ? explicitRate : trackRate;
+  final oversample = (request.oversampleMultiplier == 2 ||
+          request.oversampleMultiplier == 4 ||
+          request.oversampleMultiplier == 8)
+      ? request.oversampleMultiplier
+      : 1;
+
   int chosenRate;
   OutputFormatReason reason;
   if (desiredRate <= 0) {
     chosenRate = rates.last;
     reason = OutputFormatReason.autoDeviceDefault;
+  } else if (oversample > 1 && explicitRate <= 0 && trackRate > 0) {
+    final oversampleTarget = trackRate * oversample;
+    if (rates.contains(oversampleTarget)) {
+      chosenRate = oversampleTarget;
+      reason = OutputFormatReason.oversampled;
+    } else {
+      // Find highest supported power-of-two multiplier at or below the request
+      int? steppedRate;
+      var candidate = oversample ~/ 2;
+      while (candidate >= 2) {
+        final r = trackRate * candidate;
+        if (rates.contains(r)) {
+          steppedRate = r;
+          break;
+        }
+        candidate ~/= 2;
+      }
+      if (steppedRate != null) {
+        chosenRate = steppedRate;
+        reason = OutputFormatReason.oversampleRateLimited;
+      } else {
+        final atOrBelow = rates.where((r) => r <= oversampleTarget).toList();
+        if (atOrBelow.isNotEmpty) {
+          chosenRate = atOrBelow.last;
+          reason = OutputFormatReason.oversampleRateLimited;
+        } else {
+          chosenRate = rates.first;
+          reason = OutputFormatReason.deviceFloorLimited;
+        }
+      }
+    }
   } else if (rates.contains(desiredRate)) {
     chosenRate = desiredRate;
     if (explicitRate > 0) {

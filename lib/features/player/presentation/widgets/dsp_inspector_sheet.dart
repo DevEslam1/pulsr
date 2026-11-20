@@ -838,6 +838,9 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         handler?.transportSamplesModified ?? true,
                     softwareGain: handler?.effectiveSoftwareGain,
                     isDsdDop: AudioQualityInfo.dsdDopActive,
+                    oversamplingActive:
+                        AudioEffectsChannel().currentOversampleMultiplier > 1,
+                    pcmToDsdActive: AudioEffectsChannel().isPcmToDsdActive,
                   ));
                   final v = OutputPathVerdict.of(currentOutputDevice,
                       dspActive: isDspActive || isEqEnabled,

@@ -353,6 +353,18 @@ class PrefsKeys {
   // [dsdOutputMode] is 'dop' on a DoP-capable USB DAC.
   static const String dopContainerBits = 'setting_dop_container_bits';
 
+  // Remaster suite: Output oversampling (PCM), reconstruction filter kernel, and PCM->DSD
+  static const String remasterOversampleMultiplier =
+      'setting_remaster_oversample_multiplier';
+  static const String remasterFilterKernel =
+      'setting_remaster_filter_kernel';
+  static const String remasterPcmToDsdEnabled =
+      'setting_remaster_pcm_to_dsd_enabled';
+  static const String remasterPcmToDsdRate =
+      'setting_remaster_pcm_to_dsd_rate';
+  static const String remasterPcmToDsdOrder =
+      'setting_remaster_pcm_to_dsd_order';
+
   // Smart Audio: 'auto' adapts AutoEQ + output quality to the connected device
   // and track; 'manual' leaves the user's explicit choices untouched.
   static const String smartAudioMode = 'setting_smart_audio_mode';

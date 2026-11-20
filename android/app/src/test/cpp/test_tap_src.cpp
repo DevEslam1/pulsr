@@ -455,6 +455,82 @@ int main() {
               "sub-Hz configuration changes must prepare the requested ratio and kernel exactly");
     }
 
+    {
+        // Remaster oversampling & reconstruction filters (P1-5):
+        // 2x / 4x / 8x oversampling through AudioDspEngine with reconstruction
+        // filter kernels (Sharp, Slow/NOS, MinimumPhase, Apodizing).
+        auto engine = std::make_unique<AudioDspEngine>();
+        check(engine->oversampleMultiplier() == 1, "default oversample multiplier is 1 (off)");
+        check(engine->oversampleKernel() == 0, "default oversample kernel is 0 (Sharp)");
+
+        engine->setOversampleMultiplier(2);
+        check(engine->oversampleMultiplier() == 2, "setOversampleMultiplier(2) stored");
+        engine->setOversampleKernel(1);
+        check(engine->oversampleKernel() == 1, "setOversampleKernel(1) stored");
+
+        // Prepare 2x oversampling: 44.1 kHz input -> 88.2 kHz output
+        engine->prepareTapResampler(44100.0, 88200.0, 2);
+
+        constexpr int frames = 2048;
+        const auto input = sine(frames, 2, 44100.0, 1000.0);
+        const int outCap = frames * 4;
+        std::vector<float> output(outCap * 2);
+
+        gTapRtAllocs.store(0);
+        gTapRtGuard.store(true);
+        const int outFrames = engine->resampleForTap(input.data(), frames, output.data(), outCap,
+                                                     2, 44100.0, 88200.0);
+        gTapRtGuard.store(false);
+
+        check(gTapRtAllocs.load() == 0, "resampleForTap oversampling must allocate zero heap blocks in RT");
+        check(outFrames == frames * 2, "2x oversampling must produce exactly 2x frame count");
+
+        // Verify that 1000 Hz tone is preserved after 2x oversampling
+        const double mag = toneMagnitude(output, outFrames, 2, 88200.0, 1000.0, 64);
+        check(std::abs(mag - 0.5) < 0.05, "1000 Hz tone magnitude preserved after 2x reconstruction");
+
+        // Test 4x oversampling
+        engine->setOversampleMultiplier(4);
+        engine->setOversampleKernel(2); // MinimumPhase
+        engine->prepareTapResampler(44100.0, 176400.0, 2);
+        std::vector<float> output4x(frames * 8 * 2);
+        const int out4x = engine->resampleForTap(input.data(), frames, output4x.data(), frames * 8,
+                                                 2, 44100.0, 176400.0);
+        check(out4x == frames * 4, "4x oversampling must produce exactly 4x frame count");
+
+        // Test 8x oversampling
+        engine->setOversampleMultiplier(8);
+        engine->setOversampleKernel(3); // Apodizing
+        engine->prepareTapResampler(44100.0, 352800.0, 2);
+        std::vector<float> output8x(frames * 16 * 2);
+        const int out8x = engine->resampleForTap(input.data(), frames, output8x.data(), frames * 16,
+                                                 2, 44100.0, 352800.0);
+        check(out8x == frames * 8, "8x oversampling must produce exactly 8x frame count");
+
+        // Test PCM->DSD configuration & backpressure
+        check(!engine->isPcmToDsdEnabled(), "PCM->DSD disabled by default");
+        engine->setPcmToDsdEnabled(true);
+        check(engine->isPcmToDsdEnabled(), "PCM->DSD enabled");
+        engine->setPcmToDsdRate(128);
+        check(engine->pcmToDsdRate() == 128, "PCM->DSD rate is 128");
+        engine->setPcmToDsdOrder(4);
+        check(engine->pcmToDsdOrder() == 4, "PCM->DSD order is 4");
+        engine->preparePcmToDsd(44100.0, 128, 4, 24);
+
+        // Convert PCM block to DoP frames
+        std::vector<uint8_t> dopBytes(frames * 8);
+        int consumed = 0;
+        const int dopCount = engine->convertPcmToDsdDoP(input.data(), frames, dopBytes.data(),
+                                                        static_cast<int>(dopBytes.size()), 24, consumed);
+        check(dopCount > 0 && consumed > 0, "convertPcmToDsdDoP emitted framed DoP frames");
+
+        // Reverting oversampling restores normal tap state
+        engine->setOversampleMultiplier(1);
+        engine->setPcmToDsdEnabled(false);
+        check(engine->oversampleMultiplier() == 1, "oversampleMultiplier restored to 1");
+        check(!engine->isPcmToDsdEnabled(), "PCM->DSD disabled restored");
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " tap SRC check(s) failed." << std::endl;
         return 1;

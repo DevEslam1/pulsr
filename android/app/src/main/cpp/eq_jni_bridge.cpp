@@ -569,6 +569,68 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeGetTapSrcQuality(
     return static_cast<jint>(AudioDspEngine::instance().tapSrcQuality());
 }
 
+// Remaster: Output Oversampling & Reconstruction Filter Suite
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetOversampleMultiplier(
+        JNIEnv* /* env */, jobject /* thiz */, jint multiplier) {
+    AudioDspEngine::instance().setOversampleMultiplier(static_cast<int>(multiplier));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetOversampleMultiplier(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(AudioDspEngine::instance().oversampleMultiplier());
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetOversampleKernel(
+        JNIEnv* /* env */, jobject /* thiz */, jint kernel) {
+    AudioDspEngine::instance().setOversampleKernel(static_cast<int>(kernel));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetOversampleKernel(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(AudioDspEngine::instance().oversampleKernel());
+}
+
+// Remaster: Real-Time PCM -> DSD Modulator
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetPcmToDsdEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    AudioDspEngine::instance().setPcmToDsdEnabled(enabled == JNI_TRUE);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeIsPcmToDsdEnabled(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return AudioDspEngine::instance().isPcmToDsdEnabled() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetPcmToDsdRate(
+        JNIEnv* /* env */, jobject /* thiz */, jint rate) {
+    AudioDspEngine::instance().setPcmToDsdRate(static_cast<int>(rate));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetPcmToDsdRate(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(AudioDspEngine::instance().pcmToDsdRate());
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetPcmToDsdOrder(
+        JNIEnv* /* env */, jobject /* thiz */, jint order) {
+    AudioDspEngine::instance().setPcmToDsdOrder(static_cast<int>(order));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetPcmToDsdOrder(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(AudioDspEngine::instance().pcmToDsdOrder());
+}
+
 JNIEXPORT jfloatArray JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         JNIEnv* env, jobject /* thiz */,

@@ -13,6 +13,7 @@ import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../data/audio/bit_perfect_chain.dart';
+import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/live_output_verdict.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/bit_perfect_state.dart';
@@ -672,6 +673,8 @@ class AudioQualitySheet extends StatelessWidget {
       transportSamplesModified: handler?.transportSamplesModified ?? true,
       softwareGain: handler?.effectiveSoftwareGain,
       isDsdDop: AudioQualityInfo.dsdDopActive,
+      oversamplingActive: AudioEffectsChannel().currentOversampleMultiplier > 1,
+      pcmToDsdActive: AudioEffectsChannel().isPcmToDsdActive,
     ));
     return verdict.state;
   }

@@ -80,6 +80,8 @@ set(DSP_CORE_SOURCES
     UsbPullRenderer.cpp
     UsbAsrcClockSync.cpp
     UsbPcmProducer.cpp
+    Oversampler.cpp
+    SdmModulator.cpp
 )
 
 set(JNI_BRIDGE_SOURCES

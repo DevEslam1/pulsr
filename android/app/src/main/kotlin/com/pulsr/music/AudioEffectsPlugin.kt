@@ -628,6 +628,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // rebuilds it on the control thread; the audio callback never reallocates.
     private external fun nativeSetTapSrcQuality(quality: Int)
     private external fun nativeGetTapSrcQuality(): Int
+    private external fun nativeSetOversampleMultiplier(multiplier: Int)
+    private external fun nativeGetOversampleMultiplier(): Int
+    private external fun nativeSetOversampleKernel(kernel: Int)
+    private external fun nativeGetOversampleKernel(): Int
+    private external fun nativeSetPcmToDsdEnabled(enabled: Boolean)
+    private external fun nativeIsPcmToDsdEnabled(): Boolean
+    private external fun nativeSetPcmToDsdRate(rate: Int)
+    private external fun nativeGetPcmToDsdRate(): Int
+    private external fun nativeSetPcmToDsdOrder(order: Int)
+    private external fun nativeGetPcmToDsdOrder(): Int
     private external fun nativeSetSaturationEnabled(enabled: Boolean)
     private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double, mode: Int, multiband: Boolean)
     private external fun nativeSetSaturationMultiband(multiband: Boolean)
@@ -2820,6 +2830,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setReverbCrossChannel", "loadImpulseResponse", "setCacheBudgetBytes",
                 "getAutoDegradedStages", "setStereoBalance", "setMonoMix",
                 "setSincResamplerEnabled", "setTapSrcQuality", "getTapSrcQuality",
+                "setOversampleMultiplier", "getOversampleMultiplier",
+                "setOversampleKernel", "getOversampleKernel",
+                "setPcmToDsdEnabled", "isPcmToDsdEnabled",
+                "setPcmToDsdRate", "getPcmToDsdRate",
+                "setPcmToDsdOrder", "getPcmToDsdOrder",
                 "setSaturationEnabled", "setSaturationParams", "setSaturationMultiband",
                 "setDacVoicingEnabled", "setDacVoicingParams",
                 "setStereoWidthEnabled", "setStereoWidthParams",
@@ -3965,6 +3980,152 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         } catch (e: Exception) {
                             Log.w(TAG, "nativeGetTapSrcQuality failed: ${e.message}")
                             null
+                        }
+                    )
+                }
+
+                // Remaster: Output Oversampling & Reconstruction Filter Suite
+                "setOversampleMultiplier" -> {
+                    val multiplier = (call.argument<Int>("multiplier") ?: 1).let {
+                        if (it == 2 || it == 4 || it == 8) it else 1
+                    }
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    try {
+                        nativeSetOversampleMultiplier(multiplier)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetOversampleMultiplier failed: ${e.message}")
+                        result.error("NATIVE_ERROR", e.message, null)
+                    }
+                }
+                "getOversampleMultiplier" -> {
+                    if (!isNativeDspLoaded) {
+                        result.success(1)
+                        return
+                    }
+                    result.success(
+                        try {
+                            nativeGetOversampleMultiplier()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetOversampleMultiplier failed: ${e.message}")
+                            1
+                        }
+                    )
+                }
+                "setOversampleKernel" -> {
+                    val kernel = (call.argument<Int>("kernel") ?: 0).coerceIn(0, 3)
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    try {
+                        nativeSetOversampleKernel(kernel)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetOversampleKernel failed: ${e.message}")
+                        result.error("NATIVE_ERROR", e.message, null)
+                    }
+                }
+                "getOversampleKernel" -> {
+                    if (!isNativeDspLoaded) {
+                        result.success(0)
+                        return
+                    }
+                    result.success(
+                        try {
+                            nativeGetOversampleKernel()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetOversampleKernel failed: ${e.message}")
+                            0
+                        }
+                    )
+                }
+                "setPcmToDsdEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    try {
+                        nativeSetPcmToDsdEnabled(enabled)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetPcmToDsdEnabled failed: ${e.message}")
+                        result.error("NATIVE_ERROR", e.message, null)
+                    }
+                }
+                "isPcmToDsdEnabled" -> {
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    result.success(
+                        try {
+                            nativeIsPcmToDsdEnabled()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeIsPcmToDsdEnabled failed: ${e.message}")
+                            false
+                        }
+                    )
+                }
+                "setPcmToDsdRate" -> {
+                    val rate = (call.argument<Int>("rate") ?: 64).let {
+                        if (it == 128 || it == 256) it else 64
+                    }
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    try {
+                        nativeSetPcmToDsdRate(rate)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetPcmToDsdRate failed: ${e.message}")
+                        result.error("NATIVE_ERROR", e.message, null)
+                    }
+                }
+                "getPcmToDsdRate" -> {
+                    if (!isNativeDspLoaded) {
+                        result.success(64)
+                        return
+                    }
+                    result.success(
+                        try {
+                            nativeGetPcmToDsdRate()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetPcmToDsdRate failed: ${e.message}")
+                            64
+                        }
+                    )
+                }
+                "setPcmToDsdOrder" -> {
+                    val order = (call.argument<Int>("order") ?: 5).coerceIn(1, 5)
+                    if (!isNativeDspLoaded) {
+                        result.success(false)
+                        return
+                    }
+                    try {
+                        nativeSetPcmToDsdOrder(order)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "nativeSetPcmToDsdOrder failed: ${e.message}")
+                        result.error("NATIVE_ERROR", e.message, null)
+                    }
+                }
+                "getPcmToDsdOrder" -> {
+                    if (!isNativeDspLoaded) {
+                        result.success(5)
+                        return
+                    }
+                    result.success(
+                        try {
+                            nativeGetPcmToDsdOrder()
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetPcmToDsdOrder failed: ${e.message}")
+                            5
                         }
                     )
                 }
