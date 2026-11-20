@@ -298,6 +298,16 @@ void SanitizeSnapshot(DspParamSnapshot& s) {
         clampFinite(s.bypassCompare.gainCompensationLinear, 0.001, 16.0, 1.0);
     s.bypassCompare.gainCompensationDb =
         clampFinite(s.bypassCompare.gainCompensationDb, -60.0, 24.0, 0.0);
+
+    s.oversample.multiplier =
+        (s.oversample.multiplier == 2 || s.oversample.multiplier == 4 || s.oversample.multiplier == 8)
+            ? s.oversample.multiplier : 1;
+    s.oversample.kernel = clampInt(s.oversample.kernel, 0, 3);
+    s.oversample.enabled = (s.oversample.multiplier > 1);
+
+    s.pcmToDsd.rate =
+        (s.pcmToDsd.rate == 128 || s.pcmToDsd.rate == 256) ? s.pcmToDsd.rate : 64;
+    s.pcmToDsd.order = clampInt(s.pcmToDsd.order, 1, 5);
 }
 
 } // namespace
@@ -1226,46 +1236,67 @@ void AudioDspEngine::setTapSrcQuality(int quality) {
 
 void AudioDspEngine::setOversampleMultiplier(int multiplier) {
     const int clamped = (multiplier == 2 || multiplier == 4 || multiplier == 8) ? multiplier : 1;
-    if (clamped == oversampleMultiplier_) return;
     oversampleMultiplier_ = clamped;
-    if (tapChannels_ > 0 && std::abs(tapSrcRate_ - tapDstRate_) >= 0.5) {
-        prepareTapResampler(tapSrcRate_, tapDstRate_, tapChannels_);
-    }
+    updateParams([clamped](DspParamSnapshot& snap) {
+        snap.oversample.multiplier = clamped;
+        snap.oversample.enabled = (clamped > 1);
+    });
 }
 
 void AudioDspEngine::setOversampleKernel(int kernel) {
     const int clamped = kernel < 0 ? 0 : (kernel > 3 ? 3 : kernel);
-    if (clamped == oversampleKernel_) return;
     oversampleKernel_ = clamped;
-    if (tapChannels_ > 0 && std::abs(tapSrcRate_ - tapDstRate_) >= 0.5) {
-        prepareTapResampler(tapSrcRate_, tapDstRate_, tapChannels_);
-    }
+    updateParams([clamped](DspParamSnapshot& snap) {
+        snap.oversample.kernel = clamped;
+    });
 }
 
 void AudioDspEngine::setPcmToDsdEnabled(bool enabled) {
-    if (pcmToDsdEnabled_ == enabled) return;
     pcmToDsdEnabled_ = enabled;
-    if (!enabled) {
-        releasePcmToDsd();
-    }
+    updateParams([enabled](DspParamSnapshot& snap) {
+        snap.pcmToDsd.enabled = enabled;
+    });
 }
 
 void AudioDspEngine::setPcmToDsdRate(int rate) {
     const int clamped = (rate == 128 || rate == 256) ? rate : 64;
-    if (clamped == pcmToDsdRate_) return;
     pcmToDsdRate_ = clamped;
-    if (pcmToDsdEnabled_ && pcmToDsdInputRate_ > 0.0) {
-        preparePcmToDsd(pcmToDsdInputRate_, pcmToDsdRate_, pcmToDsdOrder_, pcmToDsdContainerBits_);
-    }
+    updateParams([clamped](DspParamSnapshot& snap) {
+        snap.pcmToDsd.rate = clamped;
+    });
 }
 
 void AudioDspEngine::setPcmToDsdOrder(int order) {
     const int clamped = std::clamp(order, 1, 5);
-    if (clamped == pcmToDsdOrder_) return;
     pcmToDsdOrder_ = clamped;
-    if (pcmToDsdEnabled_ && pcmToDsdInputRate_ > 0.0) {
-        preparePcmToDsd(pcmToDsdInputRate_, pcmToDsdRate_, pcmToDsdOrder_, pcmToDsdContainerBits_);
-    }
+    updateParams([clamped](DspParamSnapshot& snap) {
+        snap.pcmToDsd.order = clamped;
+    });
+}
+
+int AudioDspEngine::oversampleMultiplier() const {
+    auto snap = getParams();
+    return snap ? snap->oversample.multiplier : oversampleMultiplier_;
+}
+
+int AudioDspEngine::oversampleKernel() const {
+    auto snap = getParams();
+    return snap ? snap->oversample.kernel : oversampleKernel_;
+}
+
+bool AudioDspEngine::isPcmToDsdEnabled() const {
+    auto snap = getParams();
+    return snap ? snap->pcmToDsd.enabled : pcmToDsdEnabled_;
+}
+
+int AudioDspEngine::pcmToDsdRate() const {
+    auto snap = getParams();
+    return snap ? snap->pcmToDsd.rate : pcmToDsdRate_;
+}
+
+int AudioDspEngine::pcmToDsdOrder() const {
+    auto snap = getParams();
+    return snap ? snap->pcmToDsd.order : pcmToDsdOrder_;
 }
 
 bool AudioDspEngine::preparePcmToDsd(double pcmRate, int dsdMultiple, int order, int containerBits) {
@@ -1927,6 +1958,28 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels,
         if (snapshot->headphoneSafety.enabled != lastSafetyEnabled_) {
             safetyLimiter_.setEnabled(snapshot->headphoneSafety.enabled);
             lastSafetyEnabled_ = snapshot->headphoneSafety.enabled;
+        }
+
+        if (snapshot->oversample.multiplier != oversampleMultiplier_ ||
+            snapshot->oversample.kernel != oversampleKernel_) {
+            oversampleMultiplier_ = snapshot->oversample.multiplier;
+            oversampleKernel_ = snapshot->oversample.kernel;
+            if (tapChannels_ > 0 && std::abs(tapSrcRate_ - tapDstRate_) >= 0.5) {
+                prepareTapResampler(tapSrcRate_, tapDstRate_, tapChannels_);
+            }
+        }
+
+        if (snapshot->pcmToDsd.enabled != pcmToDsdEnabled_ ||
+            snapshot->pcmToDsd.rate != pcmToDsdRate_ ||
+            snapshot->pcmToDsd.order != pcmToDsdOrder_) {
+            pcmToDsdEnabled_ = snapshot->pcmToDsd.enabled;
+            pcmToDsdRate_ = snapshot->pcmToDsd.rate;
+            pcmToDsdOrder_ = snapshot->pcmToDsd.order;
+            if (!pcmToDsdEnabled_) {
+                releasePcmToDsd();
+            } else if (pcmToDsdInputRate_ > 0.0) {
+                preparePcmToDsd(pcmToDsdInputRate_, pcmToDsdRate_, pcmToDsdOrder_, pcmToDsdContainerBits_);
+            }
         }
 
         lastAppliedGeneration_.store(snapshot->generation);

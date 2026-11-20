@@ -1,0 +1,51 @@
+{
+  "isHeuristic": true,
+  "dspActive": true,
+  "lowPowerBypassActive": false,
+  "activeStageCount": 3,
+  "activeStagesCount": 3,
+  "rollingRtf": 0.042,
+  "baselineMahPerHour": 75.0,
+  "estimatedMahPerHour": 93.5,
+  "dspDeltaMahPerHour": 18.5,
+  "stageBreakdown": {
+    "reverb": 12.0,
+    "saturation": 3.5,
+    "equalizer": 3.0
+  },
+  "stageBreakdownList": [
+    {
+      "stageId": "reverb",
+      "name": "Convolution Reverb",
+      "mahPerHour": 12.0,
+      "sharePercent": 64.9,
+      "isHeavy": true
+    },
+    {
+      "stageId": "saturation",
+      "name": "Harmonic Saturation",
+      "mahPerHour": 3.5,
+      "sharePercent": 18.9,
+      "isHeavy": false
+    },
+    {
+      "stageId": "equalizer",
+      "name": "Parametric Equalizer",
+      "mahPerHour": 3.0,
+      "sharePercent": 16.2,
+      "isHeavy": false
+    }
+  ],
+  "stagePowerSpecs": {
+    "reverb": 12.0,
+    "saturation": 3.5,
+    "equalizer": 3.0,
+    "limiter": 2.0,
+    "crossfeed": 1.5,
+    "resampler": 8.0,
+    "hrtf": 14.0
+  },
+  "thermalStatus": 0,
+  "thermalStatusName": "NONE",
+  "proactivelyDegradedStages": 0
+}

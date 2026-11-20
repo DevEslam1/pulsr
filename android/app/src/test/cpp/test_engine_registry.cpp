@@ -197,6 +197,47 @@ int main() {
         check(true, "multi-renderer concurrent hazard & retire overflow completed safely");
     }
 
+    {
+        // Phase 0 Config fabric: Full parameter snapshot replay and live broadcast
+        // across DspEngineRegistry engines (remaster oversampler, PCM-to-DSD, etc.).
+        auto& tmpl = AudioDspEngine::instance();
+        tmpl.setOversampleMultiplier(4);
+        tmpl.setOversampleKernel(2);
+        tmpl.setPcmToDsdEnabled(true);
+        tmpl.setPcmToDsdRate(128);
+        tmpl.setPcmToDsdOrder(4);
+
+        auto engine = std::make_unique<AudioDspEngine>();
+        const int64_t handle = handleOf(engine.get());
+        check(registry.registerEngine(engine.get()), "register engine for config replay test");
+
+        auto snap = engine->getParams();
+        check(snap != nullptr, "registered engine received parameter snapshot");
+        if (snap) {
+            check(snap->oversample.multiplier == 4, "registered engine replayed oversample multiplier");
+            check(snap->oversample.kernel == 2, "registered engine replayed oversample kernel");
+            check(snap->pcmToDsd.enabled == true, "registered engine replayed pcmToDsd enabled");
+            check(snap->pcmToDsd.rate == 128, "registered engine replayed pcmToDsd rate");
+            check(snap->pcmToDsd.order == 4, "registered engine replayed pcmToDsd order");
+        }
+
+        // Live broadcast check: modifying template broadcasts to registered engine
+        tmpl.setOversampleMultiplier(8);
+        tmpl.setPcmToDsdRate(256);
+        auto updatedSnap = engine->getParams();
+        check(updatedSnap != nullptr, "registered engine received updated snapshot");
+        if (updatedSnap) {
+            check(updatedSnap->oversample.multiplier == 8, "broadcast reached registered engine (oversample 8x)");
+            check(updatedSnap->pcmToDsd.rate == 256, "broadcast reached registered engine (pcmToDsd 256)");
+        }
+
+        // Clean up
+        const int slot = registry.beginTeardown(handle);
+        registry.waitForRenderers(slot);
+        registry.unregisterEngine(engine.get());
+        registry.finishTeardown(slot);
+    }
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " registry check(s) failed." << std::endl;
         return 1;

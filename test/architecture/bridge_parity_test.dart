@@ -3,11 +3,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('Bridge Parity: Dart AudioEffectsChannel vs Kotlin AudioEffectsPlugin',
-      () {
+  test('Bridge Parity: Dart AudioEffectsChannel vs Kotlin AudioEffectsPlugin', () {
     final dartFile = File('lib/data/audio/audio_effects_channel.dart');
-    final kotlinFile = File(
-        'android/app/src/main/kotlin/com/pulsr/music/AudioEffectsPlugin.kt');
+    final kotlinFile = File('android/app/src/main/kotlin/com/pulsr/music/AudioEffectsPlugin.kt');
 
     expect(dartFile.existsSync(), isTrue, reason: 'Dart channel must exist');
     expect(kotlinFile.existsSync(), isTrue, reason: 'Kotlin plugin must exist');
@@ -17,18 +15,18 @@ void main() {
 
     // 1. Scrape Dart invoked methods
     final dartMethods = <String>{};
-    final invokeMethodSingle =
-        RegExp(r"_channel\s*\.\s*invokeMethod(?:<[^>]+>)?\s*\(\s*'([^']+)'");
-    for (final match in invokeMethodSingle.allMatches(dartContent)) {
+    final invokeSingle = RegExp(
+        r"_channel\s*\.\s*(?:invokeMethod|invokeMapMethod|invokeListMethod)(?:<[^>]+>)?\s*\(\s*'([^']+)'");
+    for (final match in invokeSingle.allMatches(dartContent)) {
       final name = match.group(1)!;
       if (name != 'method' && name != 'enabled' && name != 'gains') {
         dartMethods.add(name);
       }
     }
 
-    final invokeMethodDouble =
-        RegExp(r'_channel\s*\.\s*invokeMethod(?:<[^>]+>)?\s*\(\s*"([^"]+)"');
-    for (final match in invokeMethodDouble.allMatches(dartContent)) {
+    final invokeDouble = RegExp(
+        r'_channel\s*\.\s*(?:invokeMethod|invokeMapMethod|invokeListMethod)(?:<[^>]+>)?\s*\(\s*"([^"]+)"');
+    for (final match in invokeDouble.allMatches(dartContent)) {
       final name = match.group(1)!;
       if (name != 'method' && name != 'enabled' && name != 'gains') {
         dartMethods.add(name);
@@ -45,25 +43,61 @@ void main() {
       dartMethods.add(match.group(1)!);
     }
 
-    // 2. Scrape Kotlin handled methods
+    final grDbSingle = RegExp(r"_(?:readGrDb|readWorstGrDb)\s*\(\s*'([^']+)'");
+    for (final match in grDbSingle.allMatches(dartContent)) {
+      dartMethods.add(match.group(1)!);
+    }
+
+    final grDbDouble = RegExp(r'_(?:readGrDb|readWorstGrDb)\s*\(\s*"([^"]+)"');
+    for (final match in grDbDouble.allMatches(dartContent)) {
+      dartMethods.add(match.group(1)!);
+    }
+
+    // 2. Scrape Kotlin handled methods inside when (call.method) blocks
     final kotlinMethods = <String>{};
+    bool inMethodSwitch = false;
+    int braceDepth = 0;
+    int switchDepth = 0;
+
     final lines = kotlinContent.split('\n');
     for (final line in lines) {
       final trimmed = line.trim();
-      if (trimmed.contains('->')) {
-        final prefix = trimmed.split('->').first;
-        final quotedRegex = RegExp(r'"([a-zA-Z0-9_]+)"');
-        for (final m in quotedRegex.allMatches(prefix)) {
-          kotlinMethods.add(m.group(1)!);
+      if (trimmed.contains('when (call.method)') || trimmed.contains('when(call.method)')) {
+        inMethodSwitch = true;
+        switchDepth = braceDepth;
+      }
+
+      final codePart = trimmed.split('//').first;
+      final openCount = '{'.allMatches(codePart).length;
+      final closeCount = '}'.allMatches(codePart).length;
+
+      if (inMethodSwitch) {
+        final isTop = (braceDepth == switchDepth + 1) ||
+            (openCount > 0 && (braceDepth + openCount - closeCount) == switchDepth + 1);
+        if (isTop) {
+          if (codePart.contains('->')) {
+            final prefix = codePart.split('->').first;
+            final quotedRegex = RegExp(r'"([a-zA-Z0-9_]+)"');
+            for (final m in quotedRegex.allMatches(prefix)) {
+              kotlinMethods.add(m.group(1)!);
+            }
+          } else if (codePart.startsWith('"') && codePart.endsWith('",')) {
+            final quotedRegex = RegExp(r'"([a-zA-Z0-9_]+)"');
+            for (final m in quotedRegex.allMatches(codePart)) {
+              kotlinMethods.add(m.group(1)!);
+            }
+          }
         }
-      } else if (trimmed.startsWith('"') && trimmed.endsWith('",')) {
-        final quotedRegex = RegExp(r'"([a-zA-Z0-9_]+)"');
-        for (final m in quotedRegex.allMatches(trimmed)) {
-          kotlinMethods.add(m.group(1)!);
-        }
-      } else if (trimmed.contains('call.method == "')) {
+      }
+
+      braceDepth += openCount - closeCount;
+      if (inMethodSwitch && braceDepth <= switchDepth) {
+        inMethodSwitch = false;
+      }
+
+      if (codePart.contains('call.method == "')) {
         final quotedRegex = RegExp(r'call\.method\s*==\s*"([a-zA-Z0-9_]+)"');
-        for (final m in quotedRegex.allMatches(trimmed)) {
+        for (final m in quotedRegex.allMatches(codePart)) {
           kotlinMethods.add(m.group(1)!);
         }
       }
@@ -87,13 +121,14 @@ void main() {
     }
 
     final missingInKotlin = dartMethods.difference(kotlinMethods);
+    final uncalledInKotlin = kotlinMethods.difference(dartMethods);
     final missingCallbacksInDart = kotlinCallbacks.difference(dartCallbacks);
 
     expect(missingInKotlin, isEmpty,
-        reason:
-            'Dart invokes methods that have no Kotlin handler: $missingInKotlin');
+        reason: 'Dart invokes methods that have no Kotlin handler: $missingInKotlin');
+    expect(uncalledInKotlin, isEmpty,
+        reason: 'Kotlin handlers have no Dart caller: $uncalledInKotlin');
     expect(missingCallbacksInDart, isEmpty,
-        reason:
-            'Kotlin invokes callbacks that have no Dart handler: $missingCallbacksInDart');
+        reason: 'Kotlin invokes callbacks that have no Dart handler: $missingCallbacksInDart');
   });
 }

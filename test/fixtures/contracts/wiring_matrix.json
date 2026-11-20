@@ -1,0 +1,128 @@
+[
+  {
+    "feature": "Native DSD",
+    "uiEntry": "USB DAC section",
+    "stateOwner": "NativeDsdController",
+    "persistence": "prefs dsd mode",
+    "backendCall": "LocalDSD session",
+    "statusSource": "OutputVerdict after first accepted block",
+    "acceptanceTest": "Device soak"
+  },
+  {
+    "feature": "DoP",
+    "uiEntry": "USB DAC section",
+    "stateOwner": "DsdDecoderHelper",
+    "persistence": "prefs dsd mode",
+    "backendCall": "LocalPCM + DoP framer",
+    "statusSource": "Negotiated format",
+    "acceptanceTest": "Device + capture"
+  },
+  {
+    "feature": "Remaster",
+    "uiEntry": "RemasterControlCard",
+    "stateOwner": "EqualizerManager/DspConfig",
+    "persistence": "oversample prefs",
+    "backendCall": "Config snapshot + sink reopen",
+    "statusSource": "OutputVerdict not-bit-perfect",
+    "acceptanceTest": "Measurement + device"
+  },
+  {
+    "feature": "PCM-to-DSD",
+    "uiEntry": "Remaster card",
+    "stateOwner": "NativeDsdController",
+    "persistence": "prefs mode",
+    "backendCall": "LocalDSD session",
+    "statusSource": "OutputVerdict",
+    "acceptanceTest": "Device soak"
+  },
+  {
+    "feature": "FIR",
+    "uiEntry": "AutoEQ sheet",
+    "stateOwner": "HeadphoneProfilesRepository",
+    "persistence": "profile prefs/DB",
+    "backendCall": "FIR stage",
+    "statusSource": "Stage telemetry + verdict",
+    "acceptanceTest": "Native response test"
+  },
+  {
+    "feature": "HRTF",
+    "uiEntry": "Audio settings",
+    "stateOwner": "EqualizerManager",
+    "persistence": "prefs",
+    "backendCall": "HRTF stage",
+    "statusSource": "Stage telemetry",
+    "acceptanceTest": "SOFA fixtures + TSan"
+  },
+  {
+    "feature": "MCH/LFE",
+    "uiEntry": "Multichannel card",
+    "stateOwner": "ChannelManager",
+    "persistence": "prefs",
+    "backendCall": "LFE/channel stages",
+    "statusSource": "Output channel info",
+    "acceptanceTest": "C++ + device"
+  },
+  {
+    "feature": "Low-power",
+    "uiEntry": "Battery saver card",
+    "stateOwner": "PlaybackController",
+    "persistence": "prefs mode",
+    "backendCall": "Backend bypass flag + gate",
+    "statusSource": "dspIsLowPowerBypassed",
+    "acceptanceTest": "Device journey"
+  },
+  {
+    "feature": "Cast",
+    "uiEntry": "Cast sheet/settings",
+    "stateOwner": "CastService/Backend",
+    "persistence": "session",
+    "backendCall": "Cast backend",
+    "statusSource": "Remote state mirror",
+    "acceptanceTest": "Receiver test"
+  },
+  {
+    "feature": "UPnP",
+    "uiEntry": "DLNA screen",
+    "stateOwner": "UpnpControlPoint/Backend",
+    "persistence": "session",
+    "backendCall": "SOAP actions",
+    "statusSource": "Remote state mirror",
+    "acceptanceTest": "Renderer test"
+  },
+  {
+    "feature": "ABX export",
+    "uiEntry": "ABX screen",
+    "stateOwner": "AbxCubit",
+    "persistence": "none",
+    "backendCall": "file/share",
+    "statusSource": "Session report",
+    "acceptanceTest": "Redaction fixture"
+  },
+  {
+    "feature": "ALAC probe",
+    "uiEntry": "Library scan",
+    "stateOwner": "MediaScanner",
+    "persistence": "DB migration",
+    "backendCall": "container parse",
+    "statusSource": "Codec/rate/depth",
+    "acceptanceTest": "Real fixtures"
+  },
+  {
+    "feature": "Decoders",
+    "uiEntry": "Library/playback",
+    "stateOwner": "Decoder registry",
+    "persistence": "capability matrix",
+    "backendCall": "decoder bridge",
+    "statusSource": "Playability status",
+    "acceptanceTest": "Fixture matrix"
+  },
+  {
+    "feature": "Measurement",
+    "uiEntry": "release/CI",
+    "stateOwner": "harness",
+    "persistence": "artifacts",
+    "backendCall": "native binary",
+    "statusSource": "thresholds",
+    "acceptanceTest": "Hardware gate"
+  }
+]

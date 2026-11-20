@@ -295,18 +295,18 @@ public:
 
     // ---- Remaster: Reconstruction Filter & Output Oversampling ----
     void setOversampleMultiplier(int multiplier);
-    int oversampleMultiplier() const { return oversampleMultiplier_; }
+    int oversampleMultiplier() const;
     void setOversampleKernel(int kernel);
-    int oversampleKernel() const { return oversampleKernel_; }
+    int oversampleKernel() const;
     bool isTapOversamplerEngaged() const { return tapUseOversampler_; }
 
     // ---- Remaster: Real-Time PCM -> DSD Modulator ----
     void setPcmToDsdEnabled(bool enabled);
-    bool isPcmToDsdEnabled() const { return pcmToDsdEnabled_; }
+    bool isPcmToDsdEnabled() const;
     void setPcmToDsdRate(int rate);
-    int pcmToDsdRate() const { return pcmToDsdRate_; }
+    int pcmToDsdRate() const;
     void setPcmToDsdOrder(int order);
-    int pcmToDsdOrder() const { return pcmToDsdOrder_; }
+    int pcmToDsdOrder() const;
 
     bool preparePcmToDsd(double pcmRate, int dsdMultiple, int order, int containerBits = 24);
     void resetPcmToDsd();

@@ -184,6 +184,26 @@ class AudioEffectsChannel {
   bool get isHardwareOffloadSupported => _isHardwareOffloadSupported;
   bool get isPcmDspAttached => _isPcmDspAttached;
 
+  Future<bool> isVolumeBoostSupportedLive() async {
+    if (!_isAndroid) return false;
+    return await _channel.invokeMethod<bool>('isVolumeBoostSupported') ?? false;
+  }
+
+  Future<bool> isBassBoostSupportedLive() async {
+    if (!_isAndroid) return false;
+    return await _channel.invokeMethod<bool>('isBassBoostSupported') ?? false;
+  }
+
+  Future<bool> isVirtualizerSupportedLive() async {
+    if (!_isAndroid) return false;
+    return await _channel.invokeMethod<bool>('isVirtualizerSupported') ?? false;
+  }
+
+  Future<bool> isDynamicsSupportedLive() async {
+    if (!_isAndroid) return false;
+    return await _channel.invokeMethod<bool>('isDynamicsSupported') ?? false;
+  }
+
   /// Whether the native C++ DSP chain is in ExoPlayer's audible path.
   bool get hasPcmDspPath => _hasPcmDspPath;
   // The playback processor cannot emit a variable number of output frames;
@@ -921,6 +941,23 @@ class AudioEffectsChannel {
         stackTrace: st,
         category: 'AudioEffectsChannel',
       );
+    }
+  }
+
+  /// Live rolling RTF query from the native DSP engine.
+  Future<double> getRollingRtf() async {
+    if (!_isAndroid) return 0.0;
+    try {
+      final res = await _channel.invokeMethod<num>('getRollingRtf');
+      return res?.toDouble() ?? 0.0;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'getRollingRtf failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return 0.0;
     }
   }
 
@@ -2308,6 +2345,22 @@ class AudioEffectsChannel {
     }
   }
 
+  Future<String> getDspPreference() async {
+    if (!_isAndroid) return 'default';
+    try {
+      final res = await _channel.invokeMethod<String>('getDspPreference');
+      return res ?? 'default';
+    } catch (e, st) {
+      ErrorLogger.log(
+        'getDspPreference failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return 'default';
+    }
+  }
+
   // --- DITHER (TPDF) + BIT-PERFECT SNAPSHOT ---
 
   /// True when the native dither stage accepted the params. Dither is skipped
@@ -2988,6 +3041,39 @@ class AudioEffectsChannel {
       return res ?? true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// Whether hardware audio offload is allowed given active DSP and DVC state.
+  Future<bool> isOffloadAllowed() async {
+    if (!_isAndroid) return false;
+    try {
+      return await _channel.invokeMethod<bool>('isOffloadAllowed') ?? false;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'isOffloadAllowed failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return false;
+    }
+  }
+
+  /// Configures multi-output routing mode.
+  Future<String> setMultiOutputRoute(String mode) async {
+    if (!_isAndroid) return 'unsupported';
+    try {
+      final res = await _channel.invokeMethod<String>('setMultiOutputRoute', {'mode': mode});
+      return res ?? 'unsupported';
+    } catch (e, st) {
+      ErrorLogger.log(
+        'setMultiOutputRoute failed',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return 'unsupported';
     }
   }
 }

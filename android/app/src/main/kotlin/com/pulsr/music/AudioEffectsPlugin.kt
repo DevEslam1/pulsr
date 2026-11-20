@@ -1067,6 +1067,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         val baselineMahPerHr = 75.0
         val stageBreakdown = mutableListOf<Map<String, Any?>>()
+        val stageBreakdownMap = mutableMapOf<String, Double>()
         var dspDeltaMahPerHr = 0.0
 
         if (dspActive) {
@@ -1078,10 +1079,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 for (spec in activeSpecs.sortedByDescending { it.baseMahPerHr }) {
                     val stageMah = spec.baseMahPerHr + rtfLoadDelta * (spec.baseMahPerHr / baseSum)
                     val sharePct = (stageMah / dspDeltaMahPerHr) * 100.0
+                    val roundedMah = ((stageMah * 100.0).toInt() / 100.0)
+                    stageBreakdownMap[spec.stageId] = roundedMah
                     stageBreakdown.add(mapOf(
                         "stageId" to spec.stageId,
                         "name" to spec.name,
-                        "mahPerHour" to ((stageMah * 100.0).toInt() / 100.0),
+                        "mahPerHour" to roundedMah,
                         "sharePercent" to ((sharePct * 10.0).toInt() / 10.0),
                         "isHeavy" to spec.isHeavy,
                     ))
@@ -1105,12 +1108,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "isHeuristic" to true,
             "dspActive" to dspActive,
             "lowPowerBypassActive" to (isBitPerfectBypassActive || !dspActive),
+            "activeStageCount" to activeCount,
             "activeStagesCount" to activeCount,
             "rollingRtf" to rtf,
             "baselineMahPerHour" to baselineMahPerHr,
             "estimatedMahPerHour" to ((totalDrainMahPerHr * 100.0).toInt() / 100.0),
             "dspDeltaMahPerHour" to ((dspDeltaMahPerHr * 100.0).toInt() / 100.0),
-            "stageBreakdown" to stageBreakdown,
+            "stageBreakdown" to stageBreakdownMap,
+            "stageBreakdownList" to stageBreakdown,
+            "stagePowerSpecs" to stagePowerSpecs().associate { it.stageId to it.baseMahPerHr },
             "thermalStatus" to currentThermalStatus,
             "thermalStatusName" to thermalName,
             "proactivelyDegradedStages" to proactivelyDegradedStages

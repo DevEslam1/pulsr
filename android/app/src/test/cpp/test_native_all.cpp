@@ -1292,6 +1292,7 @@ int main() {
     runDspStressTest();
     runRtAllocGuardTest();
     runRtPreparedPayloadTest();
+    runRtStagesZeroAllocTest();
     runSampleRateChangeTest();
     runSnapshotRaceTest();
     runSyntheticIrCacheBudgetTest();

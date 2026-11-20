@@ -417,6 +417,20 @@ struct HrtfBinauralParamSet {
     double elevationDeg = 0.0;
 };
 
+// Remaster: Reconstruction Filter & Output Oversampling (2x/4x/8x)
+struct OversampleParamSet {
+    bool enabled = false;
+    int multiplier = 1; // 1 = off, 2 = 2x, 4 = 4x, 8 = 8x
+    int kernel = 0;     // 0 = Sharp, 1 = Slow, 2 = MinimumPhase, 3 = Apodizing
+};
+
+// Remaster: Real-Time PCM -> DSD Modulator (SDM 1st-5th order)
+struct PcmToDsdParamSet {
+    bool enabled = false;
+    int rate = 64;      // 64 (DSD64), 128 (DSD128), 256 (DSD256)
+    int order = 5;      // 1..5 SDM filter order
+};
+
 struct DspParamSnapshot {
     uint64_t generation = 0;
     double sampleRate = 48000.0;
@@ -432,7 +446,7 @@ struct DspParamSnapshot {
     StereoWidthParamSet stereoWidth;
     LoudnessContourParamSet loudness;
     SubCrossoverParamSet subCrossover;
-  ChannelManagerParamSet channelManager;
+    ChannelManagerParamSet channelManager;
     LfeCrossoverParamSet lfeCrossover;
     DynamicEqParamSet dynamicEq;
     MultibandCompressorParamSet multibandCompressor;
@@ -448,5 +462,7 @@ struct DspParamSnapshot {
     BypassCompareParamSet bypassCompare;
     DacVoicingParamSet dacVoicing;
     HrtfBinauralParamSet hrtf;
+    OversampleParamSet oversample;
+    PcmToDsdParamSet pcmToDsd;
 };
 

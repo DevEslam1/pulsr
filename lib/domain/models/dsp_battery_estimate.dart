@@ -15,14 +15,38 @@ class DspBatteryEstimate {
     this.stagePowerSpecs = const {},
   });
 
-  factory DspBatteryEstimate.fromMap(Map<String, dynamic> map) {
-    final breakdownRaw = map['stageBreakdown'] as Map?;
+  factory DspBatteryEstimate.fromMap(Map<dynamic, dynamic> map) {
     final breakdown = <String, double>{};
-    if (breakdownRaw != null) {
+    final breakdownRaw = map['stageBreakdown'];
+    if (breakdownRaw is Map) {
       breakdownRaw.forEach((k, v) {
         if (v is num) breakdown[k.toString()] = v.toDouble();
       });
+    } else if (breakdownRaw is List) {
+      for (final item in breakdownRaw) {
+        if (item is Map) {
+          final key = (item['stageId'] ?? item['stage'] ?? item['name'])?.toString();
+          final val = item['mahPerHour'] ?? item['cost'];
+          if (key != null && val is num) {
+            breakdown[key] = val.toDouble();
+          }
+        }
+      }
     }
+
+    final breakdownListRaw = map['stageBreakdownList'];
+    if (breakdown.isEmpty && breakdownListRaw is List) {
+      for (final item in breakdownListRaw) {
+        if (item is Map) {
+          final key = (item['stageId'] ?? item['stage'] ?? item['name'])?.toString();
+          final val = item['mahPerHour'] ?? item['cost'];
+          if (key != null && val is num) {
+            breakdown[key] = val.toDouble();
+          }
+        }
+      }
+    }
+
     final specsRaw = map['stagePowerSpecs'] as Map?;
     final specs = <String, double>{};
     if (specsRaw != null) {
@@ -30,12 +54,15 @@ class DspBatteryEstimate {
         if (v is num) specs[k.toString()] = v.toDouble();
       });
     }
+
+    final rawCount = map['activeStageCount'] ?? map['activeStagesCount'];
+
     return DspBatteryEstimate(
       estimatedMahPerHour:
           (map['estimatedMahPerHour'] as num?)?.toDouble() ?? 0.0,
       lowPowerBypassActive: map['lowPowerBypassActive'] as bool? ?? false,
       activeStageCount:
-          (map['activeStageCount'] as num?)?.toInt() ?? breakdown.length,
+          (rawCount as num?)?.toInt() ?? breakdown.length,
       stageBreakdown: breakdown,
       stagePowerSpecs: specs,
     );

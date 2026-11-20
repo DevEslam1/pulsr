@@ -1,6 +1,10 @@
 // android/app/src/test/cpp/test_rt_alloc.cpp
 #include "../../main/cpp/AudioDspEngine.h"
 #include "../../main/cpp/UsbGapFader.h"
+#include "../../main/cpp/HrtfBinaural.h"
+#include "../../main/cpp/LfeCrossover.h"
+#include "../../main/cpp/Oversampler.h"
+#include "../../main/cpp/SdmModulator.h"
 #include <iostream>
 #include <vector>
 #include <cassert>
@@ -294,5 +298,134 @@ void runRtPreparedPayloadTest() {
     std::cout << "  ✓ Prepared payload re-application allocated 0 times on the audio thread." << std::endl;
 
     engine.setActiveStages(0xFFFFFFFF);
+}
+
+void runRtStagesZeroAllocTest() {
+    std::cout << "\n=== [RT 3/3] Zero-allocation guard for HRTF, LFE, Oversampler, and SDM Modulator ===" << std::endl;
+    const int blockSize = 512;
+
+    // 1. HRTF Binaural
+    {
+        pulsr::HrtfBinaural hrtf;
+        hrtf.setSampleRate(48000.0);
+        hrtf.setEnabled(true);
+        hrtf.setAzimuth(30.0);
+        hrtf.setElevation(0.0);
+
+        std::vector<float> audio(blockSize * 2, 0.1f);
+        // Warm-up
+        hrtf.processInterleaved(audio.data(), blockSize, 2);
+
+        g_rt_alloc_count.store(0);
+        g_rt_guard_enabled.store(true);
+        for (int i = 0; i < 1000; ++i) {
+            for (int k = 0; k < blockSize * 2; ++k) {
+                audio[k] = 0.05f * ((k + i) % 7);
+            }
+            hrtf.processInterleaved(audio.data(), blockSize, 2);
+        }
+        g_rt_guard_enabled.store(false);
+
+        assert(g_rt_alloc_count.load() == 0);
+        for (int i = 0; i < blockSize * 2; ++i) {
+            assert(std::isfinite(audio[i]));
+        }
+        std::cout << "  ✓ HrtfBinaural processInterleaved: 0 allocations across 1000 blocks." << std::endl;
+    }
+
+    // 2. LFE Crossover
+    {
+        LfeCrossover lfe;
+        lfe.setSampleRate(48000.0);
+        lfe.configure(80.0, 120.0, 24.0, 0.0, 3, true);
+        lfe.setEnabled(true);
+
+        const int mchChannels = 6;
+        std::vector<float> mchAudio(blockSize * mchChannels, 0.05f);
+        // Warm-up
+        lfe.processInterleaved(mchAudio.data(), blockSize, mchChannels);
+
+        g_rt_alloc_count.store(0);
+        g_rt_guard_enabled.store(true);
+        for (int i = 0; i < 1000; ++i) {
+            for (int k = 0; k < blockSize * mchChannels; ++k) {
+                mchAudio[k] = 0.02f * ((k + i) % 5);
+            }
+            lfe.processInterleaved(mchAudio.data(), blockSize, mchChannels);
+        }
+        g_rt_guard_enabled.store(false);
+
+        assert(g_rt_alloc_count.load() == 0);
+        for (int i = 0; i < blockSize * mchChannels; ++i) {
+            assert(std::isfinite(mchAudio[i]));
+        }
+        std::cout << "  ✓ LfeCrossover processInterleaved: 0 allocations across 1000 blocks." << std::endl;
+    }
+
+    // 3. Oversampler
+    {
+        pulsr::Oversampler os;
+        bool configured = os.configure(2, 4, pulsr::OversampleKernel::Sharp);
+        assert(configured);
+
+        std::vector<float> inL(blockSize, 0.1f);
+        std::vector<float> inR(blockSize, -0.1f);
+        std::vector<float> outL(blockSize * 4, 0.0f);
+        std::vector<float> outR(blockSize * 4, 0.0f);
+
+        const float* inPtrs[2] = {inL.data(), inR.data()};
+        float* outPtrs[2] = {outL.data(), outR.data()};
+
+        // Warm-up
+        os.process(inPtrs, outPtrs, blockSize);
+
+        g_rt_alloc_count.store(0);
+        g_rt_guard_enabled.store(true);
+        for (int i = 0; i < 1000; ++i) {
+            inL[0] = 0.03f * (i % 6);
+            inR[0] = -0.03f * (i % 6);
+            int written = os.process(inPtrs, outPtrs, blockSize);
+            assert(written == blockSize * 4);
+        }
+        g_rt_guard_enabled.store(false);
+
+        assert(g_rt_alloc_count.load() == 0);
+        for (int i = 0; i < blockSize * 4; ++i) {
+            assert(std::isfinite(outL[i]));
+            assert(std::isfinite(outR[i]));
+        }
+        std::cout << "  ✓ Oversampler process: 0 allocations across 1000 blocks." << std::endl;
+    }
+
+    // 4. SdmModulator
+    {
+        pulsr::SdmModulator sdm;
+        bool configured = sdm.configure(44100.0, 64, 4);
+        assert(configured);
+
+        std::vector<float> inL(blockSize, 0.1f);
+        std::vector<float> inR(blockSize, -0.1f);
+        const float* inPtrs[2] = {inL.data(), inR.data()};
+
+        const int outCap = blockSize * 64 / 8; // 4096 bytes per channel
+        std::vector<uint8_t> outL(outCap, 0);
+        std::vector<uint8_t> outR(outCap, 0);
+
+        // Warm-up
+        sdm.process(inPtrs, blockSize, outL.data(), outR.data(), outCap);
+
+        g_rt_alloc_count.store(0);
+        g_rt_guard_enabled.store(true);
+        for (int i = 0; i < 1000; ++i) {
+            inL[0] = 0.02f * (i % 8);
+            inR[0] = -0.02f * (i % 8);
+            int bytesWritten = sdm.process(inPtrs, blockSize, outL.data(), outR.data(), outCap);
+            assert(bytesWritten == outCap);
+        }
+        g_rt_guard_enabled.store(false);
+
+        assert(g_rt_alloc_count.load() == 0);
+        std::cout << "  ✓ SdmModulator process: 0 allocations across 1000 blocks." << std::endl;
+    }
 }
 
