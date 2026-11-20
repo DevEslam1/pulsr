@@ -18,7 +18,7 @@ import '../output_format_negotiation.dart';
 ///    user setting or a test stub). Preserved for full backward compatibility.
 ///  * [route]: used only when [targetBufferMs] is `null`. Selects a sensible
 ///    default per output route:
-///      - [OutputRoute.wired] / [OutputRoute.speaker] → **8 ms** (USB-C DAC)
+///      - [OutputRoute.wired] / [OutputRoute.speaker] → **120 ms** (Wired / USB DAC safe headroom)
 ///      - [OutputRoute.bluetooth]                      → **150 ms** (A2DP jitter)
 Future<bool> pushAaudioOutputToPlayers(
   bool enabled, {
@@ -36,7 +36,7 @@ Future<bool> pushAaudioOutputToPlayers(
 }) async {
   // Explicit override wins; fall back to route-derived default.
   final int bufferMs =
-      targetBufferMs ?? (route == OutputRoute.bluetooth ? 150 : 8);
+      targetBufferMs ?? (route == OutputRoute.bluetooth ? 150 : 120);
 
   var applied = true;
   for (final player in players) {

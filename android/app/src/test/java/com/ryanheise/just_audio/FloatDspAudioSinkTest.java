@@ -1162,7 +1162,7 @@ public class FloatDspAudioSinkTest {
         newProc.output = new AudioFormat(48000, 1, C.ENCODING_PCM_FLOAT);
         FakeSink newDelegate = new FakeSink();
         FloatDspAudioSink replacement = new FloatDspAudioSink(newDelegate, newProc, true, false, true);
-        oldWrapper.configurePendingReplacement(replacement, delayed, 0, null);
+        oldWrapper.configurePendingReplacement(replacement);
         oldWrapper.transferPendingTo(replacement);
 
         // First buffer on the replacement must NOT re-trim the 2-frame initial encoder delay.

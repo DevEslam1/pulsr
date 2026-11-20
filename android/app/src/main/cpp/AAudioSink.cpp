@@ -279,10 +279,11 @@ bool AAudioSink::OpenLocked(const Config& config, std::string* error,
     }
     if (config_.preferExclusive || config_.bitPerfect) {
         // Prefer LOW_LATENCY for wired/short bursts unless a deep buffer is
-        // requested (>= 180 ms); fall back to PERFORMANCE_MODE_NONE in
+        // requested (>= 50 ms); fall back to PERFORMANCE_MODE_NONE in
         // EXCLUSIVE so DACs/HALs that only grant exclusive mode on NONE still
         // receive a bit-perfect stream.
-        const bool preferDeepExclusive = config_.targetBufferMs >= 180;
+        const bool preferDeepExclusive =
+            ShouldPreferDeepBuffer(config_.targetBufferMs, config_.lowLatency);
         if ((!preferDeepExclusive &&
              TryOpen(AAUDIO_SHARING_MODE_EXCLUSIVE, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
                      recoverPrevFramesWritten, recoverPrevWrittenBase)) ||
@@ -350,9 +351,10 @@ bool AAudioSink::RecoverDisconnected() {
     // the original open silently changes latency and exclusivity, and the old
     // ladder had no EXCLUSIVE+NONE rung even though Open() does: a HAL that only
     // grants exclusive mode on PERFORMANCE_MODE_NONE could open but never
-    // recover. NONE comes first for a deep buffer (>= 180 ms target), exactly
+    // recover. NONE comes first for a deep buffer (>= 50 ms target), exactly
     // as in Open().
-    const bool preferDeepExclusive = config_.targetBufferMs >= 180;
+    const bool preferDeepExclusive =
+        ShouldPreferDeepBuffer(config_.targetBufferMs, config_.lowLatency);
     const bool recovered = recovery_.attempt([&]() {
         if (requireExclusive) {
             const bool exclusiveOk =
@@ -645,7 +647,19 @@ int32_t AAudioSink::Write(const uint8_t* data, int32_t sizeBytes) {
     (void)XRunDelta();
 
     const int32_t framesWritten = totalFrames - framesLeft;
-    return framesWritten > 0 ? (framesWritten * bytesPerFrame_) : (framesLeft == 0 ? sizeBytes : -1);
+    if (framesWritten > 0) {
+        return framesWritten * bytesPerFrame_;
+    }
+    if (framesLeft == 0) {
+        return sizeBytes;
+    }
+    if (recovery_.isDisconnected() ||
+        lastWriteResult_.load(std::memory_order_relaxed) != AAUDIO_OK) {
+        return -1;
+    }
+    // A write timeout with 0 frames written is not a fatal failure: return 0 so
+    // the caller can yield and retry the buffer without triggering a Media3 WriteException.
+    return 0;
 }
 
 void AAudioSink::Play() {

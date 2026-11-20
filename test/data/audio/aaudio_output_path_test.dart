@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/collaborators/aaudio_output_controller.dart';
+import 'package:pulsr/data/audio/output_format_negotiation.dart';
 
 class _Player extends Mock implements AudioPlayer {}
 
@@ -43,5 +44,35 @@ void main() {
         false);
     verify(() => players[2].dspSetAaudioOutput(true,
         preferExclusive: false, targetBufferMs: 50)).called(1);
+  });
+
+  test('wired route defaults to 120 ms buffer when targetBufferMs is omitted',
+      () async {
+    final player = _Player();
+    when(() => player.dspSetAaudioOutput(true,
+        preferExclusive: true,
+        targetBufferMs: 120)).thenAnswer((_) async => true);
+
+    expect(
+        await pushAaudioOutputToPlayers(true,
+            route: OutputRoute.wired, players: [player]),
+        true);
+    verify(() => player.dspSetAaudioOutput(true,
+        preferExclusive: true, targetBufferMs: 120)).called(1);
+  });
+
+  test('bluetooth route defaults to 150 ms buffer when targetBufferMs is omitted',
+      () async {
+    final player = _Player();
+    when(() => player.dspSetAaudioOutput(true,
+        preferExclusive: true,
+        targetBufferMs: 150)).thenAnswer((_) async => true);
+
+    expect(
+        await pushAaudioOutputToPlayers(true,
+            route: OutputRoute.bluetooth, players: [player]),
+        true);
+    verify(() => player.dspSetAaudioOutput(true,
+        preferExclusive: true, targetBufferMs: 150)).called(1);
   });
 }

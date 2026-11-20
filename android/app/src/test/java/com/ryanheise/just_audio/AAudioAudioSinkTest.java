@@ -131,6 +131,38 @@ public class AAudioAudioSinkTest {
     }
 
     @Test
+    public void zeroByteWriteReturnsFalseWithoutThrowingWriteException()
+            throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = 0;
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16(), 0, null);
+        final ByteBuffer buffer = ByteBuffer.allocateDirect(1000);
+
+        final boolean consumed = sink.handleBuffer(buffer, 0, 0);
+
+        assertFalse(consumed);
+        assertEquals(0, buffer.position());
+    }
+
+    @Test
+    public void negativeWriteThrowsRecoverableWriteException() throws Exception {
+        final FakeBridge bridge = new FakeBridge();
+        bridge.writeResult = -1;
+        final AAudioAudioSink sink = newSink(bridge);
+        sink.configure(pcm16(), 0, null);
+        final ByteBuffer buffer = ByteBuffer.allocateDirect(1000);
+
+        try {
+            sink.handleBuffer(buffer, 0, 0);
+            org.junit.Assert.fail("negative write must throw WriteException");
+        } catch (AudioSink.WriteException e) {
+            assertTrue(e.isRecoverable);
+            assertEquals(-1, e.errorCode);
+        }
+    }
+
+    @Test
     public void exclusiveRejectsInt32BelowApi31RatherThanClaimingExactFloatConversion() throws Exception {
         AAudioAudioSink sink = new AAudioAudioSink(true, 50);
         FakeBridge bridge = new FakeBridge();

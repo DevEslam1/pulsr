@@ -197,6 +197,21 @@ int main() {
     check(pulsr::ComputeStreamCapacityFrames(48000, 0) == 0,
           "non-positive targetBufferMs leaves builder capacity unset");
 
+    // Deep buffering preference: music playback buffer targets >= 50 ms must
+    // prefer PERFORMANCE_MODE_NONE to avoid 8-16 ms MMAP starvation under Java GC.
+    check(pulsr::ShouldPreferDeepBuffer(120, true),
+          "120 ms target must prefer deep exclusive buffer to prevent MMAP starvation");
+    check(pulsr::ShouldPreferDeepBuffer(150, true),
+          "150 ms target must prefer deep exclusive buffer");
+    check(pulsr::ShouldPreferDeepBuffer(50, true),
+          "50 ms target is the threshold for deep exclusive buffer");
+    check(!pulsr::ShouldPreferDeepBuffer(24, true),
+          "24 ms low-latency target may use low-latency exclusive MMAP buffer");
+    check(!pulsr::ShouldPreferDeepBuffer(8, true),
+          "8 ms low-latency target may use low-latency exclusive MMAP buffer");
+    check(pulsr::ShouldPreferDeepBuffer(8, false),
+          "lowLatency=false must always prefer deep buffer regardless of target");
+
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " AAudioSink support check(s) failed." << std::endl;
         return 1;

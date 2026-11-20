@@ -263,4 +263,18 @@ inline int32_t ComputeInitialBufferFrames(int32_t burst, int32_t capacity,
     return desired;
 }
 
+// Determines whether an exclusive AAudio stream should prefer PERFORMANCE_MODE_NONE
+// (deep buffering) over PERFORMANCE_MODE_LOW_LATENCY.
+//
+// In Android AAudio, EXCLUSIVE + LOW_LATENCY forces the hardware MMAP endpoint,
+// which locks buffer capacity to 2-4 bursts (8-16 ms) and disables adaptive
+// expansion on XRuns. For non-realtime Java writers (Media3/ExoPlayer), an
+// 8-16 ms MMAP buffer inevitably starves during GC pauses or thread scheduling jitter.
+// Music playback targets >= 50 ms require PERFORMANCE_MODE_NONE to obtain deep
+// kernel ring buffering and full capacity headroom.
+inline bool ShouldPreferDeepBuffer(int32_t targetBufferMs, bool lowLatency) {
+    if (!lowLatency) return true;
+    return targetBufferMs >= 50;
+}
+
 }  // namespace pulsr
