@@ -100,9 +100,7 @@ class PulsrChip extends StatelessWidget {
       button: true,
       selected: selected,
       label: label,
-      // The visible chip text is inside the child; exclude it so the label is
-      // not announced on top of itself.
-      excludeSemantics: true,
+      explicitChildNodes: onDeleted != null,
       child: PulsrPressable(
         onTap: onTap,
         hapticStyle: PulsrHapticStyle.selection,
@@ -182,31 +180,32 @@ class PulsrChip extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // AnimatedSize with a collapsed (reduced-motion) duration
-                  // re-dirties itself inside its own layout pass and trips the
-                  // framework's mutation assertion, so animate only when motion
-                  // is actually available.
-                  if (context.motionEnabled)
-                    AnimatedSize(
-                      duration: context.motionMs(200),
-                      curve: Curves.easeOutCubic,
-                      child: leadingSlot,
-                    )
-                  else
-                    leadingSlot,
+                  Semantics(
+                    excludeSemantics: true,
+                    child: context.motionEnabled
+                        ? AnimatedSize(
+                            duration: context.motionMs(200),
+                            curve: Curves.easeOutCubic,
+                            child: leadingSlot,
+                          )
+                        : leadingSlot,
+                  ),
                   Flexible(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'Manrope',
-                        fontSize: AppFontSize.label,
-                        fontWeight:
-                            selected ? FontWeight.w800 : FontWeight.w600,
-                        letterSpacing: AppTracking.label,
-                        color: textColor,
-                        height: 1.1,
+                    child: Semantics(
+                      excludeSemantics: true,
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'Manrope',
+                          fontSize: AppFontSize.label,
+                          fontWeight:
+                              selected ? FontWeight.w800 : FontWeight.w600,
+                          letterSpacing: AppTracking.label,
+                          color: textColor,
+                          height: 1.1,
+                        ),
                       ),
                     ),
                   ),

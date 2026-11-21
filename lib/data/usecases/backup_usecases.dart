@@ -1,5 +1,6 @@
 // lib/data/usecases/backup_usecases.dart
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -169,6 +170,25 @@ class ExportBackupUseCase {
       'autoThemeByTime': prefs.getBool('setting_auto_theme_by_time') ?? false,
       'themeScheduleStart': prefs.getInt('setting_theme_schedule_start'),
       'themeScheduleEnd': prefs.getInt('setting_theme_schedule_end'),
+      // Backup v5 keys
+      if (prefs.getString('usb_quirks_v1') != null)
+        'usb_quirks_v1': prefs.getString('usb_quirks_v1'),
+      if (prefs.getString('audio_profile_default_id') != null)
+        'audio_profile_default_id': prefs.getString('audio_profile_default_id'),
+      if (prefs.getString('remote_sources_v1') != null)
+        'remote_sources_v1': prefs.getString('remote_sources_v1'),
+      if (prefs.getBool('assistant_suggestions_enabled') != null)
+        'assistant_suggestions_enabled':
+            prefs.getBool('assistant_suggestions_enabled'),
+      if (prefs.getString('setting_bt_latency_by_device') != null)
+        'setting_bt_latency_by_device':
+            prefs.getString('setting_bt_latency_by_device'),
+      if (prefs.getBool('setting_auto_device_profiles_enabled') != null)
+        'setting_auto_device_profiles_enabled':
+            prefs.getBool('setting_auto_device_profiles_enabled'),
+      for (final k in prefs.getKeys())
+        if (k.startsWith('announce_') || k.startsWith('sysbeh_'))
+          if (prefs.get(k) != null) k: prefs.get(k),
     };
 
     // 4. Play History (paths, count, lastPlayed)
@@ -361,13 +381,28 @@ class ExportBackupUseCase {
     }
 
     final backupPayload = {
-      'version': 4,
+      'version': 5,
       'exportedAt': DateTime.now().toIso8601String(),
       'favorites': favoritePaths,
       'playlists': playlistsData,
       'settings': settingsMap,
       'playHistory': historyData,
       'excludedFolders': excludedFolders,
+      if (prefs.getString('usb_quirks_v1') != null)
+        'usb_quirks_v1': prefs.getString('usb_quirks_v1'),
+      if (prefs.getString('audio_profile_default_id') != null)
+        'audio_profile_default_id': prefs.getString('audio_profile_default_id'),
+      if (prefs.getString('remote_sources_v1') != null)
+        'remote_sources_v1': prefs.getString('remote_sources_v1'),
+      if (prefs.getBool('assistant_suggestions_enabled') != null)
+        'assistant_suggestions_enabled':
+            prefs.getBool('assistant_suggestions_enabled'),
+      if (prefs.getString('setting_bt_latency_by_device') != null)
+        'setting_bt_latency_by_device':
+            prefs.getString('setting_bt_latency_by_device'),
+      if (prefs.getBool('setting_auto_device_profiles_enabled') != null)
+        'setting_auto_device_profiles_enabled':
+            prefs.getBool('setting_auto_device_profiles_enabled'),
       if (customEqProfilesData != null)
         'customEqProfiles': customEqProfilesData,
       if (automationRulesData != null) 'automationRules': automationRulesData,
@@ -403,23 +438,19 @@ class ImportBackupUseCase {
 
   ImportBackupUseCase(this._repository, this._db);
 
-  Future<ImportResult> executeFromFile(Object file) async {
-    if (file is! String) {
-      try {
-        final len = await (file as dynamic).length();
-        if (len > maxBackupSizeBytes) {
-          throw const FormatException(
-              'Backup file exceeds maximum allowed size of 10 MB');
-        }
-        final content = await (file as dynamic).readAsString();
-        return await execute(content,
-            knownByteLength: (len is int) ? len : null);
-      } catch (e) {
-        if (e is FormatException) rethrow;
-        throw FormatException('Failed reading backup file: $e');
+  Future<ImportResult> executeFromFile(File file) async {
+    try {
+      final len = await file.length();
+      if (len > maxBackupSizeBytes) {
+        throw const FormatException(
+            'Backup file exceeds maximum allowed size of 10 MB');
       }
+      final content = await file.readAsString();
+      return await execute(content, knownByteLength: len);
+    } catch (e) {
+      if (e is FormatException) rethrow;
+      throw FormatException('Failed reading backup file: $e');
     }
-    return execute(file);
   }
 
   Future<ImportResult> execute(String jsonString,
@@ -653,6 +684,10 @@ class ImportBackupUseCase {
     int restoredPlaylistsCount = 0;
     if (data['playlists'] != null && data['playlists'] is List) {
       final playlistsList = data['playlists'] as List;
+      final existingPlaylistsRes = await _repository.getPlaylists();
+      final existingList = existingPlaylistsRes.fold(
+          (l) => <PlaylistsTableData>[], (r) => r.toList());
+
       for (final item in playlistsList) {
         if (item is Map<String, dynamic> && item.containsKey('name')) {
           await _db.transaction(() async {
@@ -668,9 +703,6 @@ class ImportBackupUseCase {
                 ? (item['songPaths'] as List).whereType<String>().toList()
                 : <String>[];
 
-            final existingPlaylistsRes = await _repository.getPlaylists();
-            final existingList = existingPlaylistsRes.fold(
-                (l) => <PlaylistsTableData>[], (r) => r);
             final existing = existingList
                 .where((p) =>
                     p.name.toLowerCase().trim() == name.toLowerCase().trim())
@@ -693,6 +725,17 @@ class ImportBackupUseCase {
                 (f) => null,
                 (id) => id,
               );
+              if (playlistId != null) {
+                final now = DateTime.now();
+                existingList.add(PlaylistsTableData(
+                  id: playlistId,
+                  name: name,
+                  createdAt: now,
+                  updatedAt: now,
+                  isSmart: isSmart,
+                  smartCriteria: smartCriteria,
+                ));
+              }
             }
 
             if (playlistId != null) {
@@ -730,6 +773,7 @@ class ImportBackupUseCase {
       if (settings.containsKey('gaplessPlayback')) {
         await prefs.setBool(
             'setting_gapless', settings['gaplessPlayback'] == true);
+        restoredSettingsCount++;
       }
       if (settings.containsKey('crossfadeSeconds')) {
         final raw = settings['crossfadeSeconds'];
@@ -737,6 +781,7 @@ class ImportBackupUseCase {
             ? raw.toDouble()
             : double.tryParse(raw?.toString() ?? '0') ?? 0.0;
         await prefs.setDouble('setting_crossfade', val);
+        restoredSettingsCount++;
       }
       if (settings.containsKey('minDurationSec')) {
         final raw = settings['minDurationSec'];
@@ -744,77 +789,94 @@ class ImportBackupUseCase {
             ? raw.toInt()
             : int.tryParse(raw?.toString() ?? '30') ?? 30;
         await prefs.setInt('setting_min_duration', val);
+        restoredSettingsCount++;
       }
       if (settings.containsKey('dynamicThemingEnabled')) {
         await prefs.setBool(
             'setting_dynamic_theme', settings['dynamicThemingEnabled'] == true);
+        restoredSettingsCount++;
       }
       if (settings['themeColorSource'] is String) {
         await prefs.setString('setting_theme_color_source',
             settings['themeColorSource'] as String);
+        restoredSettingsCount++;
       }
       if (settings.containsKey('resumeAfterInterruption')) {
         await prefs.setBool('setting_resume_after_interruption',
             settings['resumeAfterInterruption'] == true);
+        restoredSettingsCount++;
       }
       if (settings.containsKey('themeMode')) {
         final rawThemeMode = settings['themeMode'];
         await prefs.setString('setting_theme_mode',
             rawThemeMode is String ? rawThemeMode : 'dark');
+        restoredSettingsCount++;
       }
       if (settings.containsKey('customAccentColorValue')) {
         final rawAccent = settings['customAccentColorValue'];
         await prefs.setInt('setting_custom_accent',
             rawAccent is num ? rawAccent.toInt() : 0xFF9B9EF5);
+        restoredSettingsCount++;
       }
       if (settings.containsKey('playerSliderStyle')) {
         final rawSliderStyle = settings['playerSliderStyle'];
         await prefs.setString('setting_player_slider_style',
             rawSliderStyle is String ? rawSliderStyle : 'normal');
+        restoredSettingsCount++;
       }
       if (settings.containsKey('appButtonStyle')) {
         final rawButtonStyle = settings['appButtonStyle'];
         await prefs.setString('setting_app_button_style',
             rawButtonStyle is String ? rawButtonStyle : 'rectangular');
+        restoredSettingsCount++;
       }
       if (settings.containsKey('playerThemeMode')) {
         final rawPlayerTheme = settings['playerThemeMode'];
         await prefs.setString('setting_player_theme_mode',
             rawPlayerTheme is String ? rawPlayerTheme : 'classic');
+        restoredSettingsCount++;
       }
       if (settings.containsKey('visualizerStyle')) {
         final rawVisualizer = settings['visualizerStyle'];
         await prefs.setString('setting_visualizer_style',
             rawVisualizer is String ? rawVisualizer : 'bar');
+        restoredSettingsCount++;
       }
       // Restore extended settings with validation
       if (settings['replayGainMode'] is String) {
         await prefs.setString(
             'setting_replay_gain_mode', settings['replayGainMode']);
+        restoredSettingsCount++;
       }
       if (settings['replayGainPreampWithRg'] is num) {
         await prefs.setDouble('setting_replay_gain_preamp_with_rg',
             (settings['replayGainPreampWithRg'] as num).toDouble());
+        restoredSettingsCount++;
       }
       if (settings['replayGainPreampWithoutRg'] is num) {
         await prefs.setDouble('setting_replay_gain_preamp_without_rg',
             (settings['replayGainPreampWithoutRg'] as num).toDouble());
+        restoredSettingsCount++;
       }
       if (settings['wifiOnlyMode'] is bool) {
         await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode']);
+        restoredSettingsCount++;
       }
       if (settings['offlineOnlyMode'] is bool) {
         await prefs.setBool(
             'setting_offline_only_mode', settings['offlineOnlyMode']);
+        restoredSettingsCount++;
       }
       if (settings['bitPerfectMode'] is bool) {
         await prefs.setBool(
             PrefsKeys.bitPerfectOutput, settings['bitPerfectMode']);
+        restoredSettingsCount++;
       }
       // Appearance & accessibility keys restored in the same pass, so a backup
       // is a complete snapshot rather than a partial one.
       if (settings['languageCode'] is String) {
         await prefs.setString(PrefsKeys.languageCode, settings['languageCode']);
+        restoredSettingsCount++;
       }
       for (final entry in <String, String>{
         'highContrast': 'setting_high_contrast',
@@ -828,14 +890,20 @@ class ImportBackupUseCase {
         'autoThemeByTime': 'setting_auto_theme_by_time',
       }.entries) {
         final value = settings[entry.key];
-        if (value is bool) await prefs.setBool(entry.value, value);
+        if (value is bool) {
+          await prefs.setBool(entry.value, value);
+          restoredSettingsCount++;
+        }
       }
       for (final entry in <String, String>{
         'liquidGlassTint': PrefsKeys.liquidGlassTint,
         'customThemeRadius': 'setting_custom_theme_radius',
       }.entries) {
         final value = settings[entry.key];
-        if (value is num) await prefs.setDouble(entry.value, value.toDouble());
+        if (value is num) {
+          await prefs.setDouble(entry.value, value.toDouble());
+          restoredSettingsCount++;
+        }
       }
       for (final entry in <String, String>{
         'visualDensityMode': PrefsKeys.visualDensityMode,
@@ -846,64 +914,199 @@ class ImportBackupUseCase {
         'dockStackMode': PrefsKeys.dockStackMode,
       }.entries) {
         final value = settings[entry.key];
-        if (value is String) await prefs.setString(entry.value, value);
+        if (value is String) {
+          await prefs.setString(entry.value, value);
+          restoredSettingsCount++;
+        }
       }
       for (final entry in <String, String>{
         'themeScheduleStart': 'setting_theme_schedule_start',
         'themeScheduleEnd': 'setting_theme_schedule_end',
       }.entries) {
         final value = settings[entry.key];
-        if (value is int) await prefs.setInt(entry.value, value);
+        if (value is int) {
+          await prefs.setInt(entry.value, value);
+          restoredSettingsCount++;
+        }
       }
       if (settings['dspPreference'] is String) {
         await prefs.setString(
             'setting_dsp_preference', settings['dspPreference']);
+        restoredSettingsCount++;
       }
       if (settings['streamingQuality'] is String) {
         await prefs.setString(
             'setting_streaming_quality', settings['streamingQuality']);
+        restoredSettingsCount++;
       }
       if (settings['downloadQuality'] is String) {
         await prefs.setString(
             'setting_download_quality', settings['downloadQuality']);
+        restoredSettingsCount++;
       }
       if (settings['isLosslessMode'] is bool) {
         await prefs.setBool('setting_lossless', settings['isLosslessMode']);
+        restoredSettingsCount++;
       }
       if (settings['eqEnabled'] is bool) {
         await prefs.setBool(PrefsKeys.eqEnabled, settings['eqEnabled']);
+        restoredSettingsCount++;
       }
       if (settings['eqGains'] is String) {
         await prefs.setString(PrefsKeys.eqGains, settings['eqGains']);
+        restoredSettingsCount++;
       }
       if (settings['eqPreset'] is String) {
         await prefs.setString(PrefsKeys.eqPresetName, settings['eqPreset']);
+        restoredSettingsCount++;
       }
       if (settings['eqPreamp'] is num) {
         await prefs.setDouble(
             PrefsKeys.eqPreamp, (settings['eqPreamp'] as num).toDouble());
+        restoredSettingsCount++;
       }
       if (settings['eqBandCount'] is int) {
         await prefs.setInt(PrefsKeys.eqBandCount, settings['eqBandCount']);
+        restoredSettingsCount++;
       }
       if (settings['eqCustomFrequencies'] is String) {
         await prefs.setString(
             PrefsKeys.eqCustomFrequencies, settings['eqCustomFrequencies']);
+        restoredSettingsCount++;
       }
       if (settings['eqCustom32Frequencies'] is String) {
         await prefs.setString(
             PrefsKeys.eqCustom32Frequencies, settings['eqCustom32Frequencies']);
+        restoredSettingsCount++;
       }
       if (settings['eqCustom64Frequencies'] is String) {
         await prefs.setString(
             PrefsKeys.eqCustom64Frequencies, settings['eqCustom64Frequencies']);
+        restoredSettingsCount++;
       }
       if (settings['playbackSpeed'] is num) {
         await prefs.setDouble('setting_playback_speed',
             (settings['playbackSpeed'] as num).toDouble());
+        restoredSettingsCount++;
       }
 
-      restoredSettingsCount = settings.length;
+      // Restore v5 announce_* and sysbeh_* settings from settings map
+      for (final entry in settings.entries) {
+        final k = entry.key;
+        final v = entry.value;
+        if (k.startsWith('announce_') || k.startsWith('sysbeh_')) {
+          if (v is bool) {
+            await prefs.setBool(k, v);
+            restoredSettingsCount++;
+          } else if (v is int) {
+            await prefs.setInt(k, v);
+            restoredSettingsCount++;
+          } else if (v is double) {
+            await prefs.setDouble(k, v);
+            restoredSettingsCount++;
+          } else if (v is String) {
+            await prefs.setString(k, v);
+            restoredSettingsCount++;
+          } else if (v is List<String>) {
+            await prefs.setStringList(k, v);
+            restoredSettingsCount++;
+          } else if (v is List) {
+            await prefs.setStringList(k, v.map((e) => e.toString()).toList());
+            restoredSettingsCount++;
+          }
+        }
+      }
+    }
+
+    // Restore v5 keys from top-level data or settings map
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsMap = (data['settings'] is Map<String, dynamic>)
+          ? data['settings'] as Map<String, dynamic>
+          : const <String, dynamic>{};
+
+      final usbQuirks = data['usb_quirks_v1'] ?? settingsMap['usb_quirks_v1'];
+      if (usbQuirks is String && usbQuirks.trim().isNotEmpty) {
+        try {
+          jsonDecode(usbQuirks);
+          await prefs.setString('usb_quirks_v1', usbQuirks);
+          restoredSettingsCount++;
+        } catch (_) {}
+      }
+
+      final audioProfDefault = data['audio_profile_default_id'] ??
+          settingsMap['audio_profile_default_id'];
+      if (audioProfDefault is String && audioProfDefault.isNotEmpty) {
+        await prefs.setString('audio_profile_default_id', audioProfDefault);
+        restoredSettingsCount++;
+      }
+
+      final remoteSources =
+          data['remote_sources_v1'] ?? settingsMap['remote_sources_v1'];
+      if (remoteSources is String && remoteSources.trim().isNotEmpty) {
+        try {
+          jsonDecode(remoteSources);
+          await prefs.setString('remote_sources_v1', remoteSources);
+          restoredSettingsCount++;
+        } catch (_) {}
+      }
+
+      final assistantSuggestions = data['assistant_suggestions_enabled'] ??
+          settingsMap['assistant_suggestions_enabled'];
+      if (assistantSuggestions is bool) {
+        await prefs.setBool(
+            'assistant_suggestions_enabled', assistantSuggestions);
+        restoredSettingsCount++;
+      }
+
+      final btLatency = data['setting_bt_latency_by_device'] ??
+          settingsMap['setting_bt_latency_by_device'];
+      if (btLatency is String && btLatency.trim().isNotEmpty) {
+        try {
+          jsonDecode(btLatency);
+          await prefs.setString('setting_bt_latency_by_device', btLatency);
+          restoredSettingsCount++;
+        } catch (_) {}
+      }
+
+      final autoDeviceProfiles =
+          data['setting_auto_device_profiles_enabled'] ??
+              settingsMap['setting_auto_device_profiles_enabled'];
+      if (autoDeviceProfiles is bool) {
+        await prefs.setBool(
+            'setting_auto_device_profiles_enabled', autoDeviceProfiles);
+        restoredSettingsCount++;
+      }
+
+      for (final entry in data.entries) {
+        final k = entry.key;
+        final v = entry.value;
+        if ((k.startsWith('announce_') || k.startsWith('sysbeh_')) &&
+            !settingsMap.containsKey(k)) {
+          if (v is bool) {
+            await prefs.setBool(k, v);
+            restoredSettingsCount++;
+          } else if (v is int) {
+            await prefs.setInt(k, v);
+            restoredSettingsCount++;
+          } else if (v is double) {
+            await prefs.setDouble(k, v);
+            restoredSettingsCount++;
+          } else if (v is String) {
+            await prefs.setString(k, v);
+            restoredSettingsCount++;
+          } else if (v is List<String>) {
+            await prefs.setStringList(k, v);
+            restoredSettingsCount++;
+          } else if (v is List) {
+            await prefs.setStringList(k, v.map((e) => e.toString()).toList());
+            restoredSettingsCount++;
+          }
+        }
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed restoring v5 settings keys',
+          error: e, stackTrace: st, category: 'Backup');
     }
 
     // 4. Restore Play History (Batched Transactions of 100)
@@ -1109,8 +1312,14 @@ class ImportBackupUseCase {
         'settingsProfiles': 'setting_custom_profiles',
       }.entries) {
         final v = data[e.key];
-        if (v is String && v.isNotEmpty) {
-          await prefs.setString(e.value, v);
+        if (v is String && v.trim().isNotEmpty) {
+          try {
+            jsonDecode(v);
+            await prefs.setString(e.value, v);
+          } catch (err, st) {
+            ErrorLogger.log('Corrupted v2 blob for ${e.key}',
+                error: err, stackTrace: st, category: 'Backup');
+          }
         }
       }
     } catch (e, st) {
@@ -1227,7 +1436,7 @@ class ImportBackupUseCase {
       throw const FormatException(
           'Invalid backup version: missing or malformed version field');
     }
-    if (version > 4) {
+    if (version > 5) {
       throw FormatException(
           'Unsupported backup version: $version. Please update Pulsr.');
     }

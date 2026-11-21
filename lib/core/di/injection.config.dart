@@ -165,8 +165,6 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i179.PlaylistSuggestionsService());
     gh.lazySingleton<_i197.SmartAudioService>(() => _i197.SmartAudioService());
     gh.lazySingleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());
-    gh.lazySingleton<_i169.YtmClientVersionResolver>(
-        () => _i169.YtmClientVersionResolver());
     gh.lazySingleton<_i1004.YtmSearchCache>(() => _i1004.YtmSearchCache());
     gh.lazySingleton<_i391.YtmService>(
       () => _i391.YtmService(),
@@ -204,10 +202,13 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i452.MetadataSearchService(gh<_i519.Client>()),
       dispose: (i) => i.dispose(),
     );
-    gh.lazySingleton<_i629.ScrobblerService>(() => _i629.ScrobblerService(
-          gh<_i519.Client>(),
-          gh<_i558.FlutterSecureStorage>(),
-        ));
+    gh.lazySingleton<_i629.ScrobblerService>(
+      () => _i629.ScrobblerService(
+        gh<_i519.Client>(),
+        gh<_i558.FlutterSecureStorage>(),
+      ),
+      dispose: (i) => i.dispose(),
+    );
     gh.lazySingleton<_i6.AutomationTriggerService>(
       () => _i6.AutomationTriggerService(
         rulesService: gh<_i281.AutomationRulesService>(),
@@ -223,7 +224,9 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i627.MusicRepository(gh<_i682.AppDatabase>()));
     gh.lazySingleton<_i880.QuranRepository>(() => _i992.QuranRepositoryImpl());
     gh.lazySingleton<_i621.LrclibService>(
-        () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
+      () => _i621.LrclibService(client: gh<_i497.HttpClient>()),
+      dispose: (i) => i.dispose(),
+    );
     gh.singleton<_i483.MediaScannerService>(
         () => _i483.MediaScannerService(gh<_i320.IMusicRepository>()));
     gh.singleton<_i1066.ExportBackupUseCase>(
@@ -271,15 +274,22 @@ extension GetItInjectableX on _i174.GetIt {
       dispose: (i) => i.dispose(),
     );
     gh.lazySingleton<_i417.MissingArtworkService>(
-        () => _i417.MissingArtworkService(gh<_i519.Client>()));
-    gh.lazySingleton<_i912.SponsorBlockService>(
-        () => _i912.SponsorBlockService(gh<_i519.Client>()));
-    gh.lazySingleton<_i593.DownloadService>(() =>
-        _i593.DownloadService(lyricsRepository: gh<_i133.LyricsRepository>()));
-    gh.lazySingleton<_i631.YtmAccountService>(
-      () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()),
+      () => _i417.MissingArtworkService(gh<_i519.Client>()),
       dispose: (i) => i.dispose(),
     );
+    gh.lazySingleton<_i912.SponsorBlockService>(
+      () => _i912.SponsorBlockService(gh<_i519.Client>()),
+      dispose: (i) => i.dispose(),
+    );
+    gh.lazySingleton<_i593.DownloadService>(() =>
+        _i593.DownloadService(lyricsRepository: gh<_i133.LyricsRepository>()));
+    gh.lazySingleton<_i169.YtmClientVersionResolver>(
+        () => _i169.YtmClientVersionResolver(gh<_i519.Client>()));
+    gh.singleton<_i41.SettingsCubit>(() => _i41.SettingsCubit(
+          scannerService: gh<_i483.MediaScannerService>(),
+          hiResAudioService: gh<_i451.HiResAudioService>(),
+          secureStorage: gh<_i558.FlutterSecureStorage>(),
+        ));
     gh.factory<_i1046.PlayerDependencies>(() => _i1046.PlayerDependencies(
           settingsCubit: gh<_i41.SettingsCubit>(),
           widgetService: gh<_i42.WidgetService>(),
@@ -325,11 +335,6 @@ extension GetItInjectableX on _i174.GetIt {
           searchUseCase: gh<_i644.SearchMusicUseCase>(),
           folderUseCases: gh<_i1017.FolderUseCases>(),
         ));
-    gh.singleton<_i41.SettingsCubit>(() => _i41.SettingsCubit(
-          scannerService: gh<_i483.MediaScannerService>(),
-          hiResAudioService: gh<_i451.HiResAudioService>(),
-          secureStorage: gh<_i558.FlutterSecureStorage>(),
-        ));
     gh.factory<_i633.LibraryCubit>(() => _i633.LibraryCubit(
           getSongsUseCase: gh<_i168.GetSongsUseCase>(),
           getAlbumsUseCase: gh<_i496.GetAlbumsUseCase>(),
@@ -364,6 +369,10 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i902.ResumeDownloadUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i19.RetryDownloadUseCase>(
         () => _i19.RetryDownloadUseCase(gh<_i783.IDownloadRepository>()));
+    gh.lazySingleton<_i631.YtmAccountService>(
+      () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()),
+      dispose: (i) => i.dispose(),
+    );
     gh.singleton<_i752.DownloadsCubit>(() => _i752.DownloadsCubit(
           gh<_i634.QueueDownloadUseCase>(),
           gh<_i308.PauseDownloadUseCase>(),

@@ -316,6 +316,34 @@ void main() {
       expect(directRoute.hardwareSummary, contains('Direct PCM'));
       expect(directRoute.hardwareSummary, isNot(contains('Bit-Perfect')));
     });
+
+    test('computes hardwareChannels from output effectiveOutputChannels and decodedChannelCount', () {
+      final multiOutput = _usbDacOutput.copyWith(outputChannels: 6);
+      final path6 = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: multiOutput,
+      );
+      expect(path6.hardwareChannels, 6);
+
+      final fallbackOutput = _usbDacOutput.copyWith(outputChannels: 0, decodedChannelCount: 8);
+      final pathFallback = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: fallbackOutput,
+      );
+      expect(pathFallback.hardwareChannels, 8);
+
+      final nullOutput = AudioSignalPath.fromOutputInfo(
+        sourceCodec: 'FLAC',
+        sourceSampleRate: 96000,
+        sourceBitDepth: 24,
+        output: null,
+      );
+      expect(nullOutput.hardwareChannels, 2);
+    });
   });
 
   group('AudioSessionRecord signal-path serialization', () {

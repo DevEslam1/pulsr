@@ -166,202 +166,222 @@ class _SongTileState extends State<SongTile> {
                     child: ClipRect(
                       child: Row(
                         children: [
-                          // Active playback vertical pill indicator (when no artwork is shown or in indexed lists)
-                          if (isActive &&
-                              !showArtworkInTile &&
-                              !isTileMicro) ...[
-                            Container(
-                              width: 3.5,
-                              height: 22,
-                              margin: const EdgeInsetsDirectional.only(
-                                  end: AppSpacing.xs),
-                              decoration: BoxDecoration(
-                                color: p.accent,
-                                borderRadius: AppRadii.full,
-                              ),
-                            ),
-                          ],
-                          if (showIndex)
-                            SizedBox(
-                              width: isCompact ? 24 : 32,
-                              child: Center(
-                                child: isActive && !showArtworkInTile
-                                    ? NowPlayingIndicator(
-                                        color: p.accent, isPlaying: isPlaying)
-                                    : Text(
-                                        '${widget.index! + 1}',
+                          Expanded(
+                            child: Semantics(
+                              label: context.l10n
+                                  .songByArtist(song.title, song.artist),
+                              selected: isActive || widget.selected,
+                              button: true,
+                              excludeSemantics: true,
+                              child: PulsrPressable(
+                                pressedScale: 0.985,
+                                focusBorderRadius: AppRadii.r16All,
+                                onTap: widget.onTap,
+                                onLongPress: widget.onLongPress,
+                                child: Row(
+                                  children: [
+                                    // Active playback vertical pill indicator (when no artwork is shown or in indexed lists)
+                                    if (isActive &&
+                                        !showArtworkInTile &&
+                                        !isTileMicro) ...[
+                                      Container(
+                                        width: 3.5,
+                                        height: 22,
+                                        margin: const EdgeInsetsDirectional.only(
+                                            end: AppSpacing.xs),
+                                        decoration: BoxDecoration(
+                                          color: p.accent,
+                                          borderRadius: AppRadii.full,
+                                        ),
+                                      ),
+                                    ],
+                                    if (showIndex)
+                                      SizedBox(
+                                        width: isCompact ? 24 : 32,
+                                        child: Center(
+                                          child: isActive && !showArtworkInTile
+                                              ? NowPlayingIndicator(
+                                                  color: p.accent,
+                                                  isPlaying: isPlaying)
+                                              : Text(
+                                                  '${widget.index! + 1}',
+                                                  style: TextStyle(
+                                                    color: isActive
+                                                        ? p.accent
+                                                        : p.textTertiary,
+                                                    fontWeight: isActive
+                                                        ? FontWeight.w800
+                                                        : FontWeight.w700,
+                                                    fontSize: isCompact
+                                                        ? AppFontSize.label
+                                                        : AppFontSize.bodySmall,
+                                                    fontFeatures: const [
+                                                      FontFeature.tabularFigures()
+                                                    ],
+                                                  ),
+                                                ),
+                                        ),
+                                      ),
+                                    if (showArtworkInTile) ...[
+                                      SizedBox(
+                                        width: effectiveArtwork,
+                                        height: effectiveArtwork,
+                                        child: widget.selected
+                                            ? Container(
+                                                decoration: BoxDecoration(
+                                                  color: p.accent,
+                                                  borderRadius:
+                                                      AppRadii.circular(artRadius),
+                                                ),
+                                                child: Icon(
+                                                  Icons.check_rounded,
+                                                  color: p.onAccent,
+                                                  size: effectiveArtwork > 36 ? 22 : 18,
+                                                ),
+                                              )
+                                            : DecoratedBox(
+                                                position: DecorationPosition.foreground,
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      AppRadii.circular(artRadius),
+                                                  border: Border.all(
+                                                    color: isActive
+                                                        ? p.accent.withValues(alpha: 0.65)
+                                                        : AppColors.specularAt(
+                                                            p.isDark ? 0.10 : 0.06),
+                                                    width: isActive ? 1.4 : 0.8,
+                                                  ),
+                                                ),
+                                                child: Stack(
+                                                  fit: StackFit.expand,
+                                                  children: [
+                                                    CachedArtwork(
+                                                      id: song.id,
+                                                      remoteUrl: song.remoteArtworkUrl ??
+                                                          song.artworkUri,
+                                                      albumId: song.albumId,
+                                                      type: ArtworkType.AUDIO,
+                                                      size: effectiveArtwork,
+                                                      borderRadius: artRadius,
+                                                    ),
+                                                    if (isActive)
+                                                      Container(
+                                                        decoration: BoxDecoration(
+                                                          color: AppColors.scrimAt(0.52),
+                                                          borderRadius: AppRadii.circular(
+                                                              artRadius),
+                                                        ),
+                                                        child: Center(
+                                                          child: NowPlayingIndicator(
+                                                            color: p.accent,
+                                                            isPlaying: isPlaying,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                      ),
+                                      SizedBox(width: spacingArtwork),
+                                    ],
+                                    Expanded(
+                                      child: LayoutBuilder(
+                                        builder: (context, textConstraints) {
+                                          final content = SizedBox(
+                                            width: textConstraints.maxWidth,
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  song.title,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color:
+                                                    isActive ? p.accent : p.textPrimary,
+                                                fontWeight: isActive
+                                                    ? FontWeight.w800
+                                                    : FontWeight.w600,
+                                                letterSpacing: AppTracking.title,
+                                                fontSize: isCompact || isTileNarrow
+                                                    ? AppFontSize.bodySmall
+                                                    : AppFontSize.body,
+                                              ),
+                                            ),
+                                            const SizedBox(height: AppSpacing.s2),
+                                            Row(
+                                              children: [
+                                                if (isDownloadedTrack) ...[
+                                                  Icon(
+                                                    Icons.download_done_rounded,
+                                                    size: isCompact ? 12 : 13,
+                                                    color: p.accent,
+                                                  ),
+                                                  const SizedBox(width: AppSpacing.xxs),
+                                                ],
+                                                Expanded(
+                                                  child: Text(
+                                                    widget.subtitleOverride ??
+                                                        song.artist,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      color: isActive
+                                                          ? p.textPrimary
+                                                              .withValues(alpha: 0.78)
+                                                          : p.textSecondary,
+                                                      fontWeight: FontWeight.w500,
+                                                      fontSize: AppFontSize.label,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                              ],
+                                            ),
+                                          );
+                                          // FittedBox cancels the user's text-size
+                                          // setting by shrinking the row back down. Above
+                                          // 1.3x let the text lay out at its real size and
+                                          // ellipsize instead.
+                                          return MediaQuery.textScalerOf(context)
+                                                      .scale(1) >
+                                                  1.3
+                                              ? content
+                                              : FittedBox(
+                                                  fit: BoxFit.scaleDown,
+                                                  alignment:
+                                                      AlignmentDirectional.centerStart,
+                                                  child: content,
+                                                );
+                                        },
+                                      ),
+                                    ),
+                                    if (showDurationInTile) ...[
+                                      const SizedBox(width: AppSpacing.xs),
+                                      Text(
+                                        Formatters.formatDurationMs(song.durationMs),
                                         style: TextStyle(
                                           color: isActive
-                                              ? p.accent
+                                              ? p.accent.withValues(alpha: 0.85)
                                               : p.textTertiary,
-                                          fontWeight: isActive
-                                              ? FontWeight.w800
-                                              : FontWeight.w700,
                                           fontSize: isCompact
-                                              ? AppFontSize.label
-                                              : AppFontSize.bodySmall,
+                                              ? AppFontSize.caption
+                                              : AppFontSize.label,
+                                          fontWeight: FontWeight.w600,
                                           fontFeatures: const [
                                             FontFeature.tabularFigures()
                                           ],
                                         ),
                                       ),
+                                    ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          if (showArtworkInTile) ...[
-                            SizedBox(
-                              width: effectiveArtwork,
-                              height: effectiveArtwork,
-                              child: widget.selected
-                                  ? Container(
-                                      decoration: BoxDecoration(
-                                        color: p.accent,
-                                        borderRadius:
-                                            AppRadii.circular(artRadius),
-                                      ),
-                                      child: Icon(
-                                        Icons.check_rounded,
-                                        color: p.onAccent,
-                                        size: effectiveArtwork > 36 ? 22 : 18,
-                                      ),
-                                    )
-                                  : DecoratedBox(
-                                      position: DecorationPosition.foreground,
-                                      decoration: BoxDecoration(
-                                        borderRadius:
-                                            AppRadii.circular(artRadius),
-                                        border: Border.all(
-                                          color: isActive
-                                              ? p.accent.withValues(alpha: 0.65)
-                                              : AppColors.specularAt(
-                                                  p.isDark ? 0.10 : 0.06),
-                                          width: isActive ? 1.4 : 0.8,
-                                        ),
-                                      ),
-                                      child: Stack(
-                                        fit: StackFit.expand,
-                                        children: [
-                                          CachedArtwork(
-                                            id: song.id,
-                                            remoteUrl: song.remoteArtworkUrl ??
-                                                song.artworkUri,
-                                            albumId: song.albumId,
-                                            type: ArtworkType.AUDIO,
-                                            size: effectiveArtwork,
-                                            borderRadius: artRadius,
-                                          ),
-                                          if (isActive)
-                                            Container(
-                                              decoration: BoxDecoration(
-                                                color: AppColors.scrimAt(0.52),
-                                                borderRadius: AppRadii.circular(
-                                                    artRadius),
-                                              ),
-                                              child: Center(
-                                                child: NowPlayingIndicator(
-                                                  color: p.accent,
-                                                  isPlaying: isPlaying,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-                            SizedBox(width: spacingArtwork),
-                          ],
-                          Expanded(
-                            child: LayoutBuilder(
-                              builder: (context, textConstraints) {
-                                final content = SizedBox(
-                                  width: textConstraints.maxWidth,
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        song.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color:
-                                          isActive ? p.accent : p.textPrimary,
-                                      fontWeight: isActive
-                                          ? FontWeight.w800
-                                          : FontWeight.w600,
-                                      letterSpacing: AppTracking.title,
-                                      fontSize: isCompact || isTileNarrow
-                                          ? AppFontSize.bodySmall
-                                          : AppFontSize.body,
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.s2),
-                                  Row(
-                                    children: [
-                                      if (isDownloadedTrack) ...[
-                                        Icon(
-                                          Icons.download_done_rounded,
-                                          size: isCompact ? 12 : 13,
-                                          color: p.accent,
-                                        ),
-                                        const SizedBox(width: AppSpacing.xxs),
-                                      ],
-                                      Expanded(
-                                        child: Text(
-                                          widget.subtitleOverride ??
-                                              song.artist,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: isActive
-                                                ? p.textPrimary
-                                                    .withValues(alpha: 0.78)
-                                                : p.textSecondary,
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: AppFontSize.label,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                    ],
-                                  ),
-                                );
-                                // FittedBox cancels the user's text-size
-                                // setting by shrinking the row back down. Above
-                                // 1.3x let the text lay out at its real size and
-                                // ellipsize instead.
-                                return MediaQuery.textScalerOf(context)
-                                            .scale(1) >
-                                        1.3
-                                    ? content
-                                    : FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment:
-                                            AlignmentDirectional.centerStart,
-                                        child: content,
-                                      );
-                              },
                             ),
                           ),
-                          if (showDurationInTile) ...[
-                            const SizedBox(width: AppSpacing.xs),
-                            Text(
-                              Formatters.formatDurationMs(song.durationMs),
-                              style: TextStyle(
-                                color: isActive
-                                    ? p.accent.withValues(alpha: 0.85)
-                                    : p.textTertiary,
-                                fontSize: isCompact
-                                    ? AppFontSize.caption
-                                    : AppFontSize.label,
-                                fontWeight: FontWeight.w600,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures()
-                                ],
-                              ),
-                            ),
-                          ],
                           if (showTrailingInTile) ...[
                             if (widget.trailing != null)
                               RepaintBoundary(child: widget.trailing!),
@@ -391,27 +411,13 @@ class _SongTileState extends State<SongTile> {
               ),
         );
 
-        final tile = Semantics(
-          label: context.l10n.songByArtist(song.title, song.artist),
-          selected: isActive || widget.selected,
-          button: true,
-          // The title and artist are painted inside the row; without exclusion
-          // the node would announce "title, title, artist".
-          excludeSemantics: true,
-          child: MouseRegion(
-            onEnter: (_) => setState(() => _hovered = true),
-            onExit: (_) => setState(() => _hovered = false),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
-              child: PulsrPressable(
-                pressedScale: 0.985,
-                focusBorderRadius: AppRadii.r16All,
-                onTap: widget.onTap,
-                onLongPress: widget.onLongPress,
-                child: materialRow,
-              ),
-            ),
+        final tile = MouseRegion(
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs, vertical: AppSpacing.s2),
+            child: materialRow,
           ),
         );
 

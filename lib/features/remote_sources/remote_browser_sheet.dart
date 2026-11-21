@@ -66,6 +66,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   bool _searchLoadingMore = false;
   Timer? _debounceTimer;
   int _searchSequence = 0;
+  int _loadSequence = 0;
 
   @override
   void initState() {
@@ -81,6 +82,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   }
 
   void _onSearchChanged(String query) {
+    setState(() {});
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
       _performSearch(query);
@@ -246,6 +248,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
   }
 
   Future<void> _load(String path, {String? label}) async {
+    final currentSeq = ++_loadSequence;
     setState(() {
       _path = path;
       _updateCrumbs(path, label);
@@ -255,12 +258,13 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
     });
     try {
       final entries = await widget.provider.list(path);
-      if (!mounted) return;
+      if (!mounted || currentSeq != _loadSequence) return;
       setState(() {
         _entries = entries;
         _loading = false;
       });
     } on AppError catch (e, st) {
+      if (!mounted || currentSeq != _loadSequence) return;
       ErrorLogger.log(
         'Remote folder could not be listed: ${e.code}',
         error: e,
@@ -275,6 +279,7 @@ class _RemoteBrowserSheetState extends State<RemoteBrowserSheet> {
         _loading = false;
       });
     } catch (e, st) {
+      if (!mounted || currentSeq != _loadSequence) return;
       ErrorLogger.log(
         'Remote folder could not be listed',
         error: e,

@@ -83,7 +83,7 @@ class DownloadService {
             .fetchLyricsLrc(
               title: title,
               artist: artist,
-              album: album,
+              album: (album?.trim().isEmpty ?? true) ? null : album,
               durationMs: durationMs,
               videoId: videoId,
             )
@@ -106,7 +106,9 @@ class DownloadService {
         filePath: filePath,
         title: title,
         artist: artist,
-        album: album ?? (title.isNotEmpty ? title : 'Unknown Album'),
+        album: (album?.trim().isEmpty ?? true)
+            ? (title.isNotEmpty ? title : 'Unknown Album')
+            : album!,
         trackNumber: trackNumber ?? 1,
         genre: genre,
         year: year,
@@ -222,8 +224,10 @@ class DownloadService {
     if (audioFilePath.startsWith('content:')) return;
     try {
       final lrcPath = '${p.withoutExtension(audioFilePath)}.lrc';
-      final lrcFile = File(lrcPath);
-      await lrcFile.writeAsString(lrcContent, flush: true);
+      final tempPath = '$lrcPath.tmp_${DateTime.now().microsecondsSinceEpoch}';
+      final tempFile = File(tempPath);
+      await tempFile.writeAsString(lrcContent, flush: true);
+      await tempFile.rename(lrcPath);
       ErrorLogger.addBreadcrumb(
         'Saved sidecar .lrc at $lrcPath',
         category: 'DownloadService',

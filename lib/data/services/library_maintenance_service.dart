@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
 
 import '../../core/constants/audio_formats.dart';
 import '../../core/utils/error_logger.dart';
@@ -125,6 +126,15 @@ class LibraryMaintenanceService {
         ErrorLogger.log('Failed to delete partial artifact "$suffix"',
             error: e, stackTrace: st, category: 'LibraryMaintenance');
       }
+    }
+
+    // Sibling sidecar lyrics file (.lrc)
+    try {
+      final lrc = File('${p.withoutExtension(file.path)}.lrc');
+      if (await lrc.exists()) await lrc.delete();
+    } catch (e, st) {
+      ErrorLogger.log('Failed to delete sibling sidecar .lrc',
+          error: e, stackTrace: st, category: 'LibraryMaintenance');
     }
   }
 }

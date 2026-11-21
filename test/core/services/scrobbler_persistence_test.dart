@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
@@ -16,6 +17,7 @@ void main() {
     mockClient = MockHttpClient();
     scrobblerService = ScrobblerService(mockClient);
     registerFallbackValue(Uri.parse('https://example.com'));
+    registerFallbackValue(http.Request('POST', Uri.parse('https://example.com')));
   });
 
   group('Scrobbler Persistence & Session Recovery Tests', () {
@@ -52,6 +54,14 @@ void main() {
         'setting_custom_scrobbler_url': 'https://webhook.site/scrobble',
       });
 
+      when(() => mockClient.send(any())).thenAnswer((invocation) async {
+        final request = invocation.positionalArguments.first as http.BaseRequest;
+        return http.StreamedResponse(
+          Stream.value(utf8.encode('{"status":"ok"}')),
+          200,
+          request: request,
+        );
+      });
       when(() => mockClient.post(
             any(),
             headers: any(named: 'headers'),
@@ -60,11 +70,11 @@ void main() {
 
       await scrobblerService.checkPendingScrobble();
 
-      verify(() => mockClient.post(
+      verify(() => mockClient.send(any(that: isA<http.Request>().having(
+            (r) => r.url,
+            'url',
             Uri.parse('https://webhook.site/scrobble'),
-            headers: any(named: 'headers'),
-            body: any(named: 'body'),
-          )).called(1);
+          )))).called(1);
 
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getInt('scrobbler_last_song'), isNull);

@@ -135,7 +135,7 @@ void main() {
 
     expect(bundle.app['appVersion'], '9.9.9');
     expect(bundle.app['buildMode'], 'debug');
-    expect(bundle.dspStages.length, 10);
+    expect(bundle.dspStages.length, 18);
     final equalizer =
         bundle.dspStages.firstWhere((stage) => stage['stage'] == 'equalizer');
     expect(equalizer['enabled'], isTrue);
@@ -143,6 +143,9 @@ void main() {
     final dither =
         bundle.dspStages.firstWhere((stage) => stage['stage'] == 'dither');
     expect(dither['enabled'], isFalse);
+    final loudness = bundle.dspStages
+        .firstWhere((stage) => stage['stage'] == 'loudness_contour');
+    expect(loudness['enabled'], isFalse);
     expect(bundle.enabledDspStageCount, 1);
   });
 
@@ -346,5 +349,24 @@ void main() {
     await service.cleanupExport();
 
     expect(await temp.exists(), isFalse);
+  });
+
+  test('redacts JSON-quoted credentials, unquoted pairs, and private IPs', () {
+    const input =
+        '{"token": "secret123", "password":"xyz", "username":"admin", "host":"192.168.1.100", "gateway":"10.0.0.1", "ipv6":"::1"} and token=secret456';
+    final redacted = DiagnosticsBundleService.redactText(input);
+
+    expect(redacted.contains('secret123'), isFalse);
+    expect(redacted.contains('xyz'), isFalse);
+    expect(redacted.contains('admin'), isFalse);
+    expect(redacted.contains('secret456'), isFalse);
+    expect(redacted.contains('192.168.1.100'), isFalse);
+    expect(redacted.contains('10.0.0.1'), isFalse);
+    expect(redacted.contains('::1'), isFalse);
+    expect(redacted, contains('"token": "[REDACTED_SECRET]"'));
+    expect(redacted, contains('"password": "[REDACTED_SECRET]"'));
+    expect(redacted, contains('"username":"[REDACTED_SECRET]"'));
+    expect(redacted, contains('token=[REDACTED_SECRET]'));
+    expect(redacted, contains('[REDACTED_IP]'));
   });
 }

@@ -9,6 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/db/app_database.dart';
 import '../../l10n/generated/app_localizations.dart';
+import '../config/app_config.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 
 /// All available ambient sound effects.
@@ -603,7 +605,7 @@ class AmbientSoundService extends ChangeNotifier {
     _initialized = true;
     unawaited(_listenForDucking());
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await prefsProvider();
 
       _masterVolume = (prefs.getDouble(_keyMaster) ?? 1.0).clamp(0.0, 1.0);
       _allowDuringQuran = prefs.getBool(_keyAllowQuran) ?? false;
@@ -728,13 +730,19 @@ class AmbientSoundService extends ChangeNotifier {
           AudioSource.asset(effect.assetPath),
           AudioSource.asset(effect.assetPath),
         ]);
-      } catch (_) {
-        if (effect.remoteUrl.isNotEmpty) {
-          await player.setAudioSources([
-            AudioSource.uri(Uri.parse(effect.remoteUrl)),
-            AudioSource.uri(Uri.parse(effect.remoteUrl)),
-          ]);
+      } catch (assetError) {
+        bool offline = false;
+        try {
+          final prefs = await prefsProvider();
+          offline = prefs.getBool(PrefsKeys.offlineOnlyMode) == true;
+        } catch (_) {}
+        if (!AppConfig.isCloudSyncAllowed || offline || effect.remoteUrl.isEmpty) {
+          rethrow;
         }
+        await player.setAudioSources([
+          AudioSource.uri(Uri.parse(effect.remoteUrl)),
+          AudioSource.uri(Uri.parse(effect.remoteUrl)),
+        ]);
       }
 
       if (stale()) {

@@ -34,11 +34,12 @@ void main() {
     expect(added2, 0);
   });
 
-  test('13 backup v4 schema accepts version 4, rejects 5', () {
-    ImportBackupUseCase.validateSchema({'version': 4, 'favorites': []});
-    expect(() => ImportBackupUseCase.validateSchema({'version': 5}),
+  test('13 backup v5 schema accepts version 5, rejects 6', () {
+    ImportBackupUseCase.validateSchema({'version': 5, 'favorites': []});
+    expect(() => ImportBackupUseCase.validateSchema({'version': 6}),
         throwsFormatException);
-    // v3 still accepted (backwards compatible).
+    // v4 and v3 still accepted (backwards compatible).
+    ImportBackupUseCase.validateSchema({'version': 4, 'favorites': []});
     ImportBackupUseCase.validateSchema({'version': 3, 'favorites': []});
   });
 

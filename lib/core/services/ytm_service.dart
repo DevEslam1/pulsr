@@ -12,6 +12,7 @@ import 'package:injectable/injectable.dart';
 import '../constants/channels.dart';
 import '../constants/embedded_browser_ua.dart';
 import '../di/injection.dart';
+import '../network/remote_target_policy.dart';
 import '../utils/ytm_locale.dart';
 import 'ytm_account_service.dart';
 import 'ytm_browse_service.dart';
@@ -527,8 +528,10 @@ class YtmService {
   /// override must never disturb startup.
   Future<bool> refreshClientCapabilitiesFrom(String url) async {
     try {
-      final response =
-          await http.get(Uri.parse(url)).timeout(const Duration(seconds: 8));
+      if (!RemoteTargetPolicy.isAllowed(url, requireHttps: true)) return false;
+      final response = await _httpClient
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 8));
       if (response.statusCode < 200 || response.statusCode >= 300) return false;
       // The native parser rejects anything unreasonable, but a 64 KB cap keeps a
       // misconfigured URL from becoming a memory problem on the startup path.
@@ -1273,7 +1276,7 @@ class YtmService {
               // putStream, not put: the entry keeps the real container, MIME and
               // bitrate. put() alone let a later cache hit rebuild the stream by
               // guessing them from the URL, which wrote Opus bytes into a .m4a.
-              urlCache?.putStream(directStream, quality: quality);
+              urlCache?.putStream(directStream, quality: cacheQuality);
               _noteResolveSuccess(videoId: videoId);
               recordLoudness(videoId, directStream.loudnessDb);
               return directStream;

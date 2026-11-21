@@ -303,13 +303,14 @@ class FileIntentHandler {
             .fold<List<SongsTableData>>((_) => const [], (r) => r);
         if (recent.isEmpty) return const <int>[];
         final albumId = recent.first.albumId;
-        if (albumId == null) {
-          return recent.map((song) => song.id).toList();
+        if (albumId != null) {
+          final albumSongs = (await _repository.getAlbumSongs(albumId))
+              .fold<List<SongsTableData>>((_) => const [], (r) => r);
+          if (albumSongs.isNotEmpty) {
+            return albumSongs.map((song) => song.id).toList();
+          }
         }
-        return recent
-            .where((song) => song.albumId == albumId)
-            .map((song) => song.id)
-            .toList();
+        return recent.map((song) => song.id).toList();
       },
     );
 
@@ -326,14 +327,23 @@ class FileIntentHandler {
     if (resolution is! AssistantPlayPlan || resolution.songIds.isEmpty) {
       return false;
     }
-    final songs = (await _repository
+    final rawSongs = (await _repository
             .getSongsByIds(resolution.songIds)
             .timeout(voiceSearchTimeout))
         .fold<List<SongsTableData>>((_) => const [], (r) => r);
-    if (songs.isEmpty) return false;
+    if (rawSongs.isEmpty) return false;
+    final songMap = {for (final s in rawSongs) s.id: s};
+    final orderedSongs = <SongsTableData>[];
+    for (final id in resolution.songIds) {
+      final s = songMap[id];
+      if (s != null) {
+        orderedSongs.add(s);
+      }
+    }
+    if (orderedSongs.isEmpty) return false;
     final queue = resolution.shuffle
-        ? (List<SongsTableData>.from(songs)..shuffle())
-        : songs;
+        ? (List<SongsTableData>.from(orderedSongs)..shuffle())
+        : orderedSongs;
     final index = resolution.startIndex.clamp(0, queue.length - 1);
     await _playerCubit.playSong(
       queue[index],
@@ -570,9 +580,11 @@ class FileIntentHandler {
               final content = await file.readAsString();
               final proxies = ProxyEntry.parseList(content);
               if (proxies.isNotEmpty) {
-                final navCtx = rootNavigatorKey.currentContext;
-                if (navCtx != null && navCtx.mounted) {
-                  navCtx.push('/proxy-settings', extra: content);
+                if (!AppConfig.isPure) {
+                  final navCtx = rootNavigatorKey.currentContext;
+                  if (navCtx != null && navCtx.mounted) {
+                    navCtx.push('/proxy-settings', extra: content);
+                  }
                 }
                 return null;
               }
@@ -583,9 +595,11 @@ class FileIntentHandler {
         } else {
           final parsedProxies = ProxyEntry.parseList(uriOrPath);
           if (parsedProxies.isNotEmpty) {
-            final navCtx = rootNavigatorKey.currentContext;
-            if (navCtx != null && navCtx.mounted) {
-              navCtx.push('/proxy-settings', extra: uriOrPath);
+            if (!AppConfig.isPure) {
+              final navCtx = rootNavigatorKey.currentContext;
+              if (navCtx != null && navCtx.mounted) {
+                navCtx.push('/proxy-settings', extra: uriOrPath);
+              }
             }
             return null;
           }

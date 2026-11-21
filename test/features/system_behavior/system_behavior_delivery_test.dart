@@ -94,6 +94,32 @@ void main() {
       expect(port.pauseCount, 1);
     });
 
+    test('focus gain re-claims USB when focus loss released it', () async {
+      final port = RecordingPlaybackPort(volume: 0.5);
+      final settings = await loadSettings(
+        fadeOutOnPauseMs: 0,
+        usbReleaseOnFocusLoss: UsbReleaseOnFocusLoss.transient,
+      );
+      final service = buildService(
+        settings: settings,
+        port: port,
+        usbRelease: (bool enabled) async {
+          port.calls.add('usb:$enabled');
+          return true;
+        },
+      );
+      addTearDown(service.dispose);
+
+      final delivered = await service.handleAudioFocusLoss(permanent: false);
+      expect(delivered, isTrue);
+      expect(port.calls, contains('usb:false'));
+
+      final resumed = await service.handleAudioFocusGain();
+      expect(resumed, isTrue);
+      expect(port.calls, contains('usb:true'));
+      expect(port.calls.indexOf('usb:true'), lessThan(port.calls.lastIndexOf('play')));
+    });
+
     test('duck-vs-pause honours the notification policy', () async {
       final pausingPort = RecordingPlaybackPort(volume: 0.5);
       final pausing = buildService(

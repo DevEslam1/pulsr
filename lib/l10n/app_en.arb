@@ -212,6 +212,7 @@
   "customDurationMinutes": "Custom duration (minutes).",
   "partialBatchDetected": "Partial batch detected",
   "somethingWentWrong": "Something went wrong",
+  "errorBoundarySubtitle": "An unexpected error occurred while displaying this content.",
   "saveSearch": "Save Search",
   "savedSearches": "Saved Searches",
   "appTitle": "Pulsr Music",

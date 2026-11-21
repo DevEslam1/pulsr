@@ -193,10 +193,13 @@ class EmaPitchSmoother {
       }
       // Hold last pitch briefly across unvoiced gaps
       if (_smoothedFreq != null && _smoothedMidi != null) {
+        final noteIndex = (_smoothedMidi!.round() % 12 + 12) % 12;
+        final octave = (_smoothedMidi!.round() ~/ 12) - 1;
+        final noteStr = '${YinPitchDetector._noteNames[noteIndex]}$octave';
         return PitchResult(
           frequencyHz: _smoothedFreq!,
           midiNote: _smoothedMidi!,
-          noteName: raw.noteName,
+          noteName: noteStr,
           probability: raw.probability * 0.5,
           isVoiced: true,
         );

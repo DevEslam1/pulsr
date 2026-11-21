@@ -80,6 +80,13 @@ class PulsrToast {
     double? bottomOffset,
     int? maxLines,
   }) {
+    final effectiveAction = action ??
+        ((actionLabel != null && onActionPressed != null)
+            ? PulsrToastAction(label: actionLabel, onPressed: onActionPressed)
+            : (actionLabel != null
+                ? PulsrToastAction(label: actionLabel, onPressed: () {})
+                : null));
+
     // A failure cascade (network drop, bot block) fires the *same* message
     // once per retry/skip, and each event used to tear the banner down and
     // re-insert it — one visible "banner show" plus a heavy haptic and error
@@ -92,7 +99,11 @@ class PulsrToast {
         activeState != null &&
         activeState.mounted &&
         !activeState.isDismissing &&
-        activeState.widget.message == message) {
+        activeState.widget.message == message &&
+        activeState.widget.title == title &&
+        activeState.widget.isError == isError &&
+        activeState.widget.isSuccess == isSuccess &&
+        activeState.widget.action?.label == effectiveAction?.label) {
       activeState.refresh();
       return;
     }
@@ -125,13 +136,6 @@ class PulsrToast {
         Overlay.maybeOf(context, rootOverlay: true);
     if (overlayState == null) return;
     final p = context.palette;
-
-    final effectiveAction = action ??
-        ((actionLabel != null && onActionPressed != null)
-            ? PulsrToastAction(label: actionLabel, onPressed: onActionPressed)
-            : (actionLabel != null
-                ? PulsrToastAction(label: actionLabel, onPressed: () {})
-                : null));
 
     late OverlayEntry entry;
     entry = OverlayEntry(
@@ -585,7 +589,7 @@ class _ToastWidgetState extends State<_ToastWidget>
                                           ],
                                           Text(
                                             widget.message,
-                                            maxLines: 2,
+                                            maxLines: widget.maxLines ?? 2,
                                             overflow: TextOverflow.ellipsis,
                                             style: TextStyle(
                                               color: widget.title != null

@@ -146,6 +146,8 @@ void main() {
 
       final content = exporter.generatePlsContent(songs);
       expect(content, contains('NumberOfEntries=2'));
+      expect(content, contains('Length1=180'));
+      expect(content, contains('Length2=180'));
 
       final paths = importer.parsePlsContent(content);
       expect(paths, ['/music/a.mp3', 'C:\\Music\\B & <live>.flac']);
@@ -264,6 +266,64 @@ void main() {
       expect(importResult.totalExtractedPaths, 2);
       expect(importResult.matchedTrackCount, 2);
       expect(repo.addedSongIds, [99, 99]);
+    });
+
+    test('resolves distinct CUE chapters via #EXTVLCOPT:start-time', () async {
+      final discPath = '${tempDir.path}/album.flac';
+      final cue1 = SongsTableData(
+        id: 101,
+        title: 'Chapter 1',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 60000,
+        path: discPath,
+        cueStartMs: 0,
+        cueEndMs: 60000,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        source: SongSource.local,
+        isDownloaded: false,
+      );
+      final cue2 = SongsTableData(
+        id: 102,
+        title: 'Chapter 2',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 90000,
+        path: discPath,
+        cueStartMs: 60000,
+        cueEndMs: 150000,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+        source: SongSource.local,
+        isDownloaded: false,
+      );
+      final repo = _FakeRepository([cue1, cue2]);
+      final useCase = PlaylistImportUseCase(repo);
+
+      final m3uFile = File('${tempDir.path}/cue_playlist.m3u');
+      await m3uFile.writeAsString(
+        '#EXTM3U\n'
+        '#EXTINF:60,Artist - Chapter 1\n'
+        '#EXTVLCOPT:start-time=0.000\n'
+        '$discPath\n'
+        '#EXTINF:90,Artist - Chapter 2\n'
+        '#EXTVLCOPT:start-time=60.000\n'
+        '$discPath\n',
+      );
+
+      final result = await useCase.importPlaylistFromFile(
+        filePath: m3uFile.path,
+        playlistName: 'CUE Playlist',
+      );
+
+      final importResult = result.getOrElse((_) => throw StateError('failed'));
+      expect(importResult.matchedTrackCount, 2);
+      expect(repo.addedSongIds, [101, 102]);
     });
   });
 }

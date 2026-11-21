@@ -170,6 +170,20 @@ void main() {
   });
 
   group('Custom IR File Parser Tests', () {
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir = await Directory.systemTemp.createTemp('pulsr_dop_test_');
+    });
+
+    tearDown(() async {
+      try {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      } catch (_) {}
+    });
+
     test(
         'IrFileParser parses and converts 16-bit PCM WAV into float range [-1.0, 1.0]',
         () async {
@@ -200,7 +214,7 @@ void main() {
       wavBytes.add(dataLen.buffer.asUint8List());
       wavBytes.add(pcmBytes);
 
-      final tempFile = File('/test_ir_16bit_.wav');
+      final tempFile = File('${tempDir.path}/test_ir_16bit_.wav');
       await tempFile.writeAsBytes(wavBytes.toBytes());
 
       try {
@@ -220,7 +234,7 @@ void main() {
     });
 
     test('IrFileParser throws FormatException on invalid WAV header', () async {
-      final tempFile = File('/invalid_.wav');
+      final tempFile = File('${tempDir.path}/invalid_.wav');
       await tempFile.writeAsBytes([0x00, 0x01, 0x02, 0x03]);
 
       try {

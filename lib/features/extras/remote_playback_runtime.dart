@@ -55,7 +55,7 @@ class RemotePlaybackRuntime {
       source,
       await credentials.read(source.id),
     );
-    server.registerProvider(provider);
+    await server.registerProvider(provider);
     await cache.pin(source.id, path);
     return server.uriFor(source, path);
   }

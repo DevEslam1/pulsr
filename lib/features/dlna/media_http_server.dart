@@ -363,6 +363,13 @@ class MediaHttpServer {
     }
 
     final source = entry.source;
+    if (source.isFile) {
+      final file = File(source.filePath!);
+      if (!await file.exists()) {
+        await _writeEmpty(request.response, HttpStatus.notFound);
+        return;
+      }
+    }
     final bytes = source.isFile ? null : await source._bytes();
     final size = source.isFile
         ? await File(source.filePath!).length()

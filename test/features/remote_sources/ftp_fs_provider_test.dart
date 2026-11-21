@@ -614,5 +614,22 @@ void main() {
       );
       expect(server.commands, isNot(contains('RETR')));
     });
+
+    test('serializes concurrent list and stat operations through transfer lock',
+        () async {
+      await start(_FakeFtpServer());
+
+      final results = await Future.wait([
+        provider.list(''),
+        provider.stat('song.mp3'),
+        provider.list(''),
+        provider.stat('song.mp3'),
+      ]);
+
+      expect((results[0] as List<RemoteEntry>).length, 2);
+      expect((results[1] as RemoteEntry?)?.sizeBytes, 4);
+      expect((results[2] as List<RemoteEntry>).length, 2);
+      expect((results[3] as RemoteEntry?)?.sizeBytes, 4);
+    });
   });
 }

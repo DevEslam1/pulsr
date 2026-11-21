@@ -79,15 +79,20 @@ abstract final class AssistantIntentBootstrap {
             if (albumId == null) {
               return recent.map((song) => song.id).toList();
             }
-            return recent
-                .where((song) => song.albumId == albumId)
-                .map((song) => song.id)
-                .toList();
+            return _songIdsOf(await repository.getAlbumSongs(albumId));
           },
         ),
         playPlan: (plan) async {
-          final songs = (await repository.getSongsByIds(plan.songIds))
+          final fetched = (await repository.getSongsByIds(plan.songIds))
               .fold<List<SongsTableData>>((_) => const [], (r) => r);
+          if (fetched.isEmpty) return;
+          final songMap = <int, SongsTableData>{
+            for (final s in fetched) s.id: s,
+          };
+          final songs = plan.songIds
+              .map((id) => songMap[id])
+              .whereType<SongsTableData>()
+              .toList();
           if (songs.isEmpty) return;
           final queue = plan.shuffle
               ? (List<SongsTableData>.from(songs)..shuffle())

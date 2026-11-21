@@ -101,6 +101,43 @@ void main() {
       expect(find.byIcon(Icons.search_off_rounded), findsOneWidget);
     });
 
+    testWidgets(
+        'Command palette contains all new navigation items (Radio, DLNA, Diagnostics, Audio Profiles, Podcasts)',
+        (tester) async {
+      await tester.pumpWidget(
+        _buildHarness(
+          playerCubit: mockCubit,
+          child: const CommandPaletteSheet(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Search for Radio
+      await tester.enterText(find.byType(PulsrSearchField), 'radio');
+      await tester.pumpAndSettle();
+      expect(find.text('Radio'), findsOneWidget);
+
+      // Search for DLNA
+      await tester.enterText(find.byType(PulsrSearchField), 'dlna');
+      await tester.pumpAndSettle();
+      expect(find.text('DLNA / UPnP Cast'), findsOneWidget);
+
+      // Search for Diagnostics
+      await tester.enterText(find.byType(PulsrSearchField), 'diagnostics');
+      await tester.pumpAndSettle();
+      expect(find.text('Diagnostics'), findsOneWidget);
+
+      // Search for Audio Profiles
+      await tester.enterText(find.byType(PulsrSearchField), 'audio profiles');
+      await tester.pumpAndSettle();
+      expect(find.text('Audio Profiles'), findsOneWidget);
+
+      // Search for Podcasts
+      await tester.enterText(find.byType(PulsrSearchField), 'podcasts');
+      await tester.pumpAndSettle();
+      expect(find.text('Podcasts & Audiobooks'), findsOneWidget);
+    });
+
     testWidgets('Keyboard arrow navigation and Escape dismissal work cleanly',
         (tester) async {
       bool popped = false;

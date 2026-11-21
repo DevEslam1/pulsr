@@ -50,7 +50,7 @@ void main() {
       _expectRow(SystemEvent.audioFocusLossPermanent, <String, SystemAction>{
         'defaults': SystemAction.pauseKeepUsb,
         'releasePermanent': SystemAction.pauseAndReleaseUsb,
-        'releaseTransient': SystemAction.pauseKeepUsb,
+        'releaseTransient': SystemAction.pauseAndReleaseUsb,
         'fade800': SystemAction.fadeOutPause,
         'notificationPause': SystemAction.pauseKeepUsb,
         'stopOnTaskRemoval': SystemAction.pauseKeepUsb,
@@ -201,8 +201,8 @@ void main() {
             case SystemEvent.audioFocusLossPermanent:
               expect(
                 action,
-                settings.usbReleaseOnFocusLoss ==
-                        UsbReleaseOnFocusLoss.permanent
+                settings.usbReleaseOnFocusLoss !=
+                        UsbReleaseOnFocusLoss.never
                     ? SystemAction.pauseAndReleaseUsb
                     : (settings.fadeOutOnPauseMs > 0
                         ? SystemAction.fadeOutPause

@@ -307,6 +307,10 @@ class AppLocalizationsAr extends AppLocalizations {
   String get somethingWentWrong => 'حدث خطأ ما';
 
   @override
+  String get errorBoundarySubtitle =>
+      'حدث خطأ غير متوقع أثناء عرض هذا المحتوى.';
+
+  @override
   String get saveSearch => 'حفظ البحث';
 
   @override

@@ -379,39 +379,44 @@ class PulsrBottomSheetContainer extends StatelessWidget {
         ? AppRadii.dialogRadius
         : (isTablet ? AppRadii.r28All : AppRadii.bottomSheetRadius);
 
-    final sheetSurface = RepaintBoundary(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(
-          sigmaX: AppBlur.sheet,
-          sigmaY: AppBlur.sheet,
-        ),
-        enabled: AppBlur.canBlur(context),
-        child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [topBlendColor, baseSurfaceColor],
-            stops: const [0.0, 0.35],
-          ),
-          borderRadius: effectiveBorderRadius,
-          border: Border.all(
-            color: p.isDark ? Colors.white.withValues(alpha: 0.10) : p.hairline,
-            width: AppStrokes.hairline,
-          ),
-          boxShadow: PulsrElevation.level3(context),
-        ),
-        margin: (!isDialog && isTablet)
-            ? const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.s20,
-                0,
-                AppSpacing.s20,
-                AppSpacing.md,
-              )
-            : EdgeInsets.zero,
+    final sheetSurface = Padding(
+      padding: (!isDialog && isTablet)
+          ? const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.s20,
+              0,
+              AppSpacing.s20,
+              AppSpacing.md,
+            )
+          : EdgeInsets.zero,
+      child: RepaintBoundary(
         child: ClipRRect(
           borderRadius: effectiveBorderRadius,
-          child: PulsrSheetScope(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: AppBlur.sheet,
+              sigmaY: AppBlur.sheet,
+            ),
+            enabled: AppBlur.canBlur(context),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [topBlendColor, baseSurfaceColor],
+                  stops: const [0.0, 0.35],
+                ),
+                borderRadius: effectiveBorderRadius,
+                border: Border.all(
+                  color: p.isDark
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : p.hairline,
+                  width: AppStrokes.hairline,
+                ),
+                boxShadow: PulsrElevation.level3(context),
+              ),
+              child: ClipRRect(
+                borderRadius: effectiveBorderRadius,
+                child: PulsrSheetScope(
             isDialog: isDialog,
             child: Stack(
               children: [
@@ -499,7 +504,9 @@ class PulsrBottomSheetContainer extends StatelessWidget {
           ),
         ),
       ),
-      ),
+    ),
+    ),
+    ),
     );
 
     if (isDialog) {

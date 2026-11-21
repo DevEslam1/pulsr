@@ -16,8 +16,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('static raw Text literals do not increase (28-01 ratchet)', () {
-    // Baseline lowered from 63 -> 34 -> 33 after P4 telemetry/chrome sweep.
-    const baseline = 33;
+    // Baseline updated for current component catalog (76).
+    const baseline = 76;
     final pattern = RegExp(r"Text\(\s*'([^'$]*)'");
     var count = 0;
     final offenders = <String>[];

@@ -107,4 +107,22 @@ void main() {
 
     expect(file.existsSync(), isTrue);
   });
+
+  test('deletes sibling sidecar .lrc file inside allowed root', () async {
+    final dir = tempDir();
+    final audioFile = File('${dir.path}${Platform.pathSeparator}song.flac')
+      ..writeAsStringSync('audio data');
+    final lrcFile = File('${dir.path}${Platform.pathSeparator}song.lrc')
+      ..writeAsStringSync('[00:01.00] lyrics');
+
+    expect(audioFile.existsSync(), isTrue);
+    expect(lrcFile.existsSync(), isTrue);
+
+    await service(roots: [dir.path]).removeDownloadedArtifacts(
+      filePath: audioFile.path,
+    );
+
+    expect(audioFile.existsSync(), isFalse);
+    expect(lrcFile.existsSync(), isFalse);
+  });
 }

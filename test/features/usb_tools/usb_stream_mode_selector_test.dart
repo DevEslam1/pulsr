@@ -132,4 +132,34 @@ void main() {
     await tester.pumpAndSettle();
     expect(selected, UsbStreamMode.bestEffort);
   });
+
+  testWidgets('external selected change updates displayed value', (tester) async {
+    await pump(
+      tester,
+      usb: status(streaming: false, domain: UsbClockDomain.unknown),
+      selected: UsbStreamMode.bitPerfectPull,
+      streamingActive: false,
+      onChanged: (_) {},
+    );
+    expect(
+      tester.state<FormFieldState<UsbStreamMode>>(
+        find.byKey(const ValueKey<String>('usb-stream-mode-dropdown')),
+      ).value,
+      UsbStreamMode.bitPerfectPull,
+    );
+
+    await pump(
+      tester,
+      usb: status(streaming: false, domain: UsbClockDomain.unknown),
+      selected: UsbStreamMode.bestEffort,
+      streamingActive: false,
+      onChanged: (_) {},
+    );
+    expect(
+      tester.state<FormFieldState<UsbStreamMode>>(
+        find.byKey(const ValueKey<String>('usb-stream-mode-dropdown')),
+      ).value,
+      UsbStreamMode.bestEffort,
+    );
+  });
 }

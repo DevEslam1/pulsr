@@ -288,12 +288,22 @@ class AudioQualityInfo {
       codecName = 'Direct Stream Digital';
       tier = AudioQualityTier.hiResLossless;
       tierLabel = 'Ultra Hi-Res DSD';
-      shortBadgeLabel = dsdDopActive ? 'DSD → DoP' : 'DSD • HI-RES';
-      description = dsdDopActive
-          ? 'DSD → DoP: 1-bit High Density Studio Master framed as DSD over PCM '
-              '(0x05/0xFA markers) for a compatible USB DAC — no PCM conversion.'
-          : 'DSD → PCM: 1-bit High Density Studio Master decoded to PCM. '
-              'DoP output is off, or no compatible USB DAC is connected.';
+      if (dsdNativeActive) {
+        shortBadgeLabel = 'DSD • NATIVE';
+        description =
+            'Direct Native DSD: 1-bit High Density Studio Master streamed as raw '
+            'DSD bitstream to a compatible USB DAC — no DoP framing or PCM conversion.';
+      } else if (dsdDopActive) {
+        shortBadgeLabel = 'DSD → DoP';
+        description =
+            'DSD → DoP: 1-bit High Density Studio Master framed as DSD over PCM '
+            '(0x05/0xFA markers) for a compatible USB DAC — no PCM conversion.';
+      } else {
+        shortBadgeLabel = 'DSD • HI-RES';
+        description =
+            'DSD → PCM: 1-bit High Density Studio Master decoded to PCM. '
+            'DoP output is off, or no compatible USB DAC is connected.';
+      }
       badgeColor = AppColors.amberDeep;
       icon = Icons.stars_rounded;
       sampleRate =

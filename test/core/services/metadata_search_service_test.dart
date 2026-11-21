@@ -149,6 +149,97 @@ void main() {
       expect(tempDir.listSync(), isEmpty);
     });
 
+    test('searchMetadata uses AppConfig.appVersion in MusicBrainz User-Agent',
+        () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      String? capturedUserAgent;
+
+      final mockClient = MockClient((request) async {
+        if (request.url.host == 'itunes.apple.com') {
+          return http.Response(jsonEncode({'resultCount': 0, 'results': []}), 200);
+        }
+        if (request.url.host == 'musicbrainz.org') {
+          capturedUserAgent = request.headers['User-Agent'];
+          return http.Response(jsonEncode({'recordings': []}), 200);
+        }
+        return http.Response('Not Found', 404);
+      });
+
+      final service = MetadataSearchService(mockClient);
+      await service.searchMetadata(title: 'Test Title');
+
+      expect(capturedUserAgent, contains('Pulsr/'));
+      expect(capturedUserAgent, contains('( https://pulsr.music )'));
+    });
+
+    test('downloadArtworkToTemp rejects redirects pointing to private host',
+        () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+
+      final redirectClient = _StreamedMockClient((request) async {
+        if (request.url.toString() == 'https://example.com/art.jpg') {
+          return http.StreamedResponse(
+            const Stream.empty(),
+            302,
+            headers: {'location': 'http://127.0.0.1/private.jpg'},
+          );
+        }
+        return http.StreamedResponse(
+          Stream.fromIterable([Uint8List(100)]),
+          200,
+        );
+      });
+
+      final service = MetadataSearchService(redirectClient);
+      final result =
+          await service.downloadArtworkToTemp('https://example.com/art.jpg');
+      expect(result, isNull);
+    });
+
+    test('downloadArtworkToTemp follows safe redirect up to 3 hops',
+        () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      SharedPreferences.setMockInitialValues({});
+      final tempDir = Directory.systemTemp.createTempSync('ms_art_redir');
+      addTearDown(() => tempDir.deleteSync(recursive: true));
+      const pathProviderChannel =
+          MethodChannel('plugins.flutter.io/path_provider');
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(pathProviderChannel, (call) async {
+        if (call.method == 'getTemporaryDirectory') return tempDir.path;
+        return null;
+      });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(pathProviderChannel, null);
+      });
+
+      final redirectClient = _StreamedMockClient((request) async {
+        if (request.url.toString() == 'https://example.com/art.jpg') {
+          return http.StreamedResponse(
+            const Stream.empty(),
+            302,
+            headers: {'location': 'https://example.com/final.jpg'},
+          );
+        }
+        if (request.url.toString() == 'https://example.com/final.jpg') {
+          return http.StreamedResponse(
+            Stream.fromIterable([Uint8List(100)]),
+            200,
+          );
+        }
+        return http.StreamedResponse(const Stream.empty(), 404);
+      });
+
+      final service = MetadataSearchService(redirectClient);
+      final result =
+          await service.downloadArtworkToTemp('https://example.com/art.jpg');
+      expect(result, isNotNull);
+      expect(File(result!).existsSync(), isTrue);
+    });
+
     test('dispose does not close an injected http.Client', () {
       final client = _StreamedMockClient(
         (_) async => http.StreamedResponse(const Stream.empty(), 200),

@@ -511,6 +511,7 @@ class AudioOutputInfo {
       'decodedSampleRate': decodedSampleRate,
       'decodedPcmEncoding': decodedPcmEncoding,
       'decodedChannelCount': decodedChannelCount,
+      'outputChannels': outputChannels,
       'sinkSampleRate': sinkSampleRate,
       'sinkBitDepth': sinkBitDepth,
       'sinkPcmEncoding': sinkPcmEncoding,
@@ -694,6 +695,8 @@ class AudioOutputInfo {
           decodedBitDepth == other.decodedBitDepth &&
           decodedSampleRate == other.decodedSampleRate &&
           decodedPcmEncoding == other.decodedPcmEncoding &&
+          decodedChannelCount == other.decodedChannelCount &&
+          outputChannels == other.outputChannels &&
           sinkSampleRate == other.sinkSampleRate &&
           sinkBitDepth == other.sinkBitDepth &&
           sinkPcmEncoding == other.sinkPcmEncoding &&
@@ -748,6 +751,7 @@ class AudioOutputInfo {
         decodedBitDepth,
         decodedSampleRate,
         decodedPcmEncoding,
+        decodedChannelCount,
         outputChannels,
         sinkSampleRate,
         sinkBitDepth,

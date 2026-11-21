@@ -2,6 +2,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/pulsr_slider.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart'
+    show PlayerSliderStyle;
 
 Widget _wrap(Widget child) => MaterialApp(
       theme: AuraTheme.darkTheme,
@@ -96,6 +98,26 @@ void main() {
       await tester.drag(find.byType(PulsrSlider), const Offset(500, 0));
       await tester.pumpAndSettle();
       expect(currentVal, closeTo(100.0, 0.01));
+    });
+
+    testWidgets(
+        'renders non-wavy when sliderStyle is PlayerSliderStyle.normal even if isWavy is true',
+        (tester) async {
+      await tester.pumpWidget(_wrap(
+        PulsrSlider(
+          value: 0.5,
+          isWavy: true,
+          sliderStyle: PlayerSliderStyle.normal,
+          onChanged: (_) {},
+        ),
+      ));
+
+      expect(find.byType(PulsrSlider), findsOneWidget);
+      final customPaint = tester.widgetList<CustomPaint>(find.descendant(
+        of: find.byType(PulsrSlider),
+        matching: find.byType(CustomPaint),
+      ));
+      expect(customPaint, isNotEmpty);
     });
   });
 }

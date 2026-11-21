@@ -42,6 +42,7 @@ class SpotifyImportResult {
   final int totalTracks;
   final List<YtmTrack> resolvedTracks;
   final List<SpotifyImportTrack> unmatchedTracks;
+  final bool truncated;
 
   const SpotifyImportResult({
     required this.playlistId,
@@ -49,6 +50,7 @@ class SpotifyImportResult {
     required this.totalTracks,
     required this.resolvedTracks,
     required this.unmatchedTracks,
+    this.truncated = false,
   });
 
   int get matchedCount => resolvedTracks.length;
@@ -68,6 +70,7 @@ class SpotifyImporterService {
       '19ff1327c29e99c208c86d7a9d8f1929cfdf3d3202a0ff4253c821f1901aa94d';
 
   final http.Client _httpClient;
+  final bool _ownsHttpClient;
   final YtmService? _ytmService;
   final PlaylistUseCases? _playlistUseCases;
   final AppDatabase? _db;
@@ -78,9 +81,16 @@ class SpotifyImporterService {
     PlaylistUseCases? playlistUseCases,
     AppDatabase? db,
   })  : _httpClient = httpClient ?? http.Client(),
+        _ownsHttpClient = httpClient == null,
         _ytmService = ytmService,
         _playlistUseCases = playlistUseCases,
         _db = db;
+
+  void dispose() {
+    if (_ownsHttpClient) {
+      _httpClient.close();
+    }
+  }
 
   YtmService get _effectiveYtmService =>
       _ytmService ??
@@ -130,8 +140,8 @@ class SpotifyImporterService {
   }
 
   /// Fetches track listing and metadata from Spotify's public embed page and oEmbed.
-  Future<({String title, List<SpotifyImportTrack> tracks})> fetchPlaylistTracks(
-      String playlistId) async {
+  Future<({String title, List<SpotifyImportTrack> tracks, bool truncated})>
+      fetchPlaylistTracks(String playlistId) async {
     final embedUrl =
         Uri.parse('https://open.spotify.com/embed/playlist/$playlistId');
     http.Response response;
@@ -231,20 +241,25 @@ class SpotifyImporterService {
 
     playlistTitle ??= 'Imported Spotify Playlist';
 
+    var isTruncated = false;
     // Page remaining tracks if playlist has 100+ tracks and access token was provided
-    if (tracks.length >= _embedTrackLimit &&
-        accessToken != null &&
-        accessToken.isNotEmpty) {
-      try {
-        final remaining = await _fetchRemainingTracks(
-          playlistId: playlistId,
-          token: accessToken,
-          startOffset: tracks.length,
-        );
-        tracks.addAll(remaining);
-      } catch (e) {
-        ErrorLogger.log('Could not fetch remaining Spotify tracks: $e',
-            category: 'SpotifyImporter');
+    if (tracks.length >= _embedTrackLimit) {
+      if (accessToken != null && accessToken.isNotEmpty) {
+        try {
+          final res = await _fetchRemainingTracks(
+            playlistId: playlistId,
+            token: accessToken,
+            startOffset: tracks.length,
+          );
+          tracks.addAll(res.tracks);
+          if (res.truncated) isTruncated = true;
+        } catch (e) {
+          isTruncated = true;
+          ErrorLogger.log('Could not fetch remaining Spotify tracks: $e',
+              category: 'SpotifyImporter');
+        }
+      } else {
+        isTruncated = true;
       }
     }
 
@@ -253,11 +268,12 @@ class SpotifyImporterService {
           'No tracks found in Spotify playlist. Ensure the playlist is public.');
     }
 
-    return (title: playlistTitle, tracks: tracks);
+    return (title: playlistTitle, tracks: tracks, truncated: isTruncated);
   }
 
   /// Paginates remaining tracks via Spotify Partner Pathfinder API.
-  Future<List<SpotifyImportTrack>> _fetchRemainingTracks({
+  Future<({List<SpotifyImportTrack> tracks, bool truncated})>
+      _fetchRemainingTracks({
     required String playlistId,
     required String token,
     required int startOffset,
@@ -265,6 +281,7 @@ class SpotifyImporterService {
     final out = <SpotifyImportTrack>[];
     var offset = startOffset;
     const pageSize = 100;
+    var truncated = false;
 
     while (true) {
       final variables = jsonEncode({
@@ -293,7 +310,10 @@ class SpotifyImporterService {
         'Accept': 'application/json',
       }).timeout(const Duration(seconds: 10));
 
-      if (resp.statusCode != 200) break;
+      if (resp.statusCode != 200) {
+        truncated = true;
+        break;
+      }
 
       final data = jsonDecode(resp.body) as Map<String, dynamic>;
       final playlistV2 = data['data']?['playlistV2'] as Map<String, dynamic>?;
@@ -327,7 +347,7 @@ class SpotifyImporterService {
       if (total == null || offset >= total) break;
     }
 
-    return out;
+    return (tracks: out, truncated: truncated);
   }
 
   /// Resolves Spotify tracks to YouTube Music tracks with bounded concurrency.
@@ -383,42 +403,72 @@ class SpotifyImporterService {
     final targetTitle = target.title.toLowerCase().trim();
     final targetArtist = target.artist.toLowerCase().trim();
 
+    bool artistMatches(String cArtist) {
+      if (targetArtist.isEmpty) return true;
+      if (cArtist.isEmpty) return false;
+      if (cArtist.contains(targetArtist) || targetArtist.contains(cArtist)) {
+        return true;
+      }
+      final targetTokens = targetArtist
+          .split(RegExp(r'[,&/\s]+'))
+          .where((t) => t.length >= 2)
+          .toSet();
+      final cTokens = cArtist
+          .split(RegExp(r'[,&/\s]+'))
+          .where((t) => t.length >= 2)
+          .toSet();
+      return targetTokens.any(cTokens.contains);
+    }
+
     // 1. Exact match on title and artist contains
     for (final c in candidates) {
       final cTitle = c.title.toLowerCase().trim();
       final cArtist = c.artist.toLowerCase().trim();
-      if (cTitle == targetTitle &&
-          (targetArtist.isEmpty ||
-              cArtist.contains(targetArtist) ||
-              targetArtist.contains(cArtist))) {
+      if (cTitle == targetTitle && artistMatches(cArtist)) {
         return c;
       }
     }
 
-    // 2. Title contains / contained
+    // 2. Title contains / contained - requires artist similarity when targetArtist is non-empty
     for (final c in candidates) {
       final cTitle = c.title.toLowerCase().trim();
-      if (cTitle.contains(targetTitle) || targetTitle.contains(cTitle)) {
+      final cArtist = c.artist.toLowerCase().trim();
+      final titleMatch =
+          cTitle.contains(targetTitle) || targetTitle.contains(cTitle);
+      if (titleMatch && (targetArtist.isEmpty || artistMatches(cArtist))) {
         return c;
       }
     }
 
-    // 3. Fallback to first search hit
-    // 3. Fallback to first search hit only when significant token overlap exists
-    final targetTokens = targetTitle
+    // 3. Fallback only when significant token overlap exists
+    final targetTitleTokens = targetTitle
         .split(RegExp(r'\s+'))
         .where((t) => t.length >= 3)
         .toSet();
-    if (targetTokens.isNotEmpty) {
+
+    if (targetArtist.isNotEmpty) {
       for (final c in candidates) {
-        final cLower = '${c.title} ${c.artist}'.toLowerCase();
-        if (targetTokens.any(cLower.contains)) {
+        final cTitle = c.title.toLowerCase();
+        final cArtist = c.artist.toLowerCase();
+        final titleOverlaps = targetTitleTokens.isEmpty ||
+            targetTitleTokens.any(cTitle.contains);
+        if (titleOverlaps && artistMatches(cArtist)) {
           return c;
         }
       }
       return null;
+    } else {
+      if (targetTitleTokens.isNotEmpty) {
+        for (final c in candidates) {
+          final cLower = '${c.title} ${c.artist}'.toLowerCase();
+          if (targetTitleTokens.any(cLower.contains)) {
+            return c;
+          }
+        }
+        return null;
+      }
+      return candidates.first;
     }
-    return candidates.first;
   }
 
   /// Executes full import flow:
@@ -496,9 +546,16 @@ class SpotifyImporterService {
 
     // Add songs to the playlist
     if (songIds.isNotEmpty) {
-      await _effectivePlaylistUseCases.addSongsToPlaylist(
+      final addRes = await _effectivePlaylistUseCases.addSongsToPlaylist(
         createdPlaylistId,
         songIds,
+      );
+      addRes.fold(
+        (f) => ErrorLogger.log(
+          'Failed to add songs to imported playlist: ${f.message}',
+          category: 'SpotifyImporter',
+        ),
+        (_) => null,
       );
     }
 
@@ -508,6 +565,7 @@ class SpotifyImporterService {
       totalTracks: playlistData.tracks.length,
       resolvedTracks: matchResult.resolved,
       unmatchedTracks: matchResult.unmatched,
+      truncated: playlistData.truncated,
     );
   }
 

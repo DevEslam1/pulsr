@@ -95,8 +95,8 @@ SystemAction decide(SystemEvent event, SystemBehaviorSettingsSnapshot settings) 
     case SystemEvent.audioFocusLossPermanent:
       return _pauseActionFor(
         settings,
-        releaseUsb: settings.usbReleaseOnFocusLoss ==
-            UsbReleaseOnFocusLoss.permanent,
+        releaseUsb: settings.usbReleaseOnFocusLoss !=
+            UsbReleaseOnFocusLoss.never,
       );
     case SystemEvent.audioFocusLossTransient:
       return _pauseActionFor(

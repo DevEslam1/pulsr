@@ -6,9 +6,13 @@ import 'package:material_ui/material_ui.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../bloc/base_cubit.dart';
+import '../config/app_config.dart';
 import '../constants/app_colors.dart';
+import '../constants/prefs_keys.dart';
+import '../network/remote_target_policy.dart';
 import '../services/artwork_cache_manager.dart';
 import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
@@ -206,7 +210,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
         } else if (!remoteArtworkUrl.startsWith('http://') &&
             !remoteArtworkUrl.startsWith('https://')) {
           final localFile = File(remoteArtworkUrl);
-          if (localFile.existsSync()) {
+          if (await localFile.exists()) {
             imageProvider = FileImage(localFile);
           }
         }
@@ -225,8 +229,17 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
                 remoteArtworkUrl,
                 width: 220,
                 height: 220);
-            imageProvider =
-                ResizeImage(NetworkImage(lowResUrl), width: 128, height: 128);
+            bool offline = false;
+            try {
+              final prefs = await SharedPreferences.getInstance();
+              offline = prefs.getBool(PrefsKeys.offlineOnlyMode) == true;
+            } catch (_) {}
+            if (AppConfig.isCloudSyncAllowed &&
+                !offline &&
+                RemoteTargetPolicy.isAllowed(lowResUrl)) {
+              imageProvider =
+                  ResizeImage(NetworkImage(lowResUrl), width: 128, height: 128);
+            }
           }
         }
       } else {

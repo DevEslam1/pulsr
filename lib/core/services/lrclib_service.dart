@@ -27,7 +27,7 @@ class _TrackCandidate {
 }
 
 @lazySingleton
-class LrclibService {
+class LrclibService implements LrclibLyricsClient {
   static const Duration _requestTimeout = Duration(seconds: 3);
 
   final HttpClient _client;
@@ -41,12 +41,14 @@ class LrclibService {
               ..maxConnectionsPerHost = 6),
         _ownsClient = client == null;
 
+  @disposeMethod
   void dispose() {
     if (_ownsClient) {
       _client.close(force: false);
     }
   }
 
+  @override
   Future<LyricsResult?> fetchLyrics({
     required String trackName,
     required String artistName,
@@ -301,7 +303,7 @@ class LrclibService {
     return (() async {
       final request = await _client.getUrl(uri);
       request.headers.set(HttpHeaders.userAgentHeader,
-          'PulsrMusic/1.0.0 (https://github.com/pulsr)');
+          'PulsrMusic/${AppConfig.appVersion} (https://github.com/pulsr)');
       final response = await request.close();
 
       if (response.statusCode == 200) {

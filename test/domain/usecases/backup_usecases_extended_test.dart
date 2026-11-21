@@ -1,5 +1,6 @@
 // test/domain/usecases/backup_usecases_extended_test.dart
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -10,16 +11,18 @@ import 'package:pulsr/data/repositories/music_repository.dart';
 import 'package:pulsr/data/usecases/backup_usecases.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _FakeFile {
+class _FakeFile extends Fake implements File {
   final int fileLength;
   final String contents;
   final bool throwOnRead;
 
   _FakeFile(this.fileLength, this.contents, {this.throwOnRead = false});
 
+  @override
   Future<int> length() async => fileLength;
 
-  Future<String> readAsString() async {
+  @override
+  Future<String> readAsString({Encoding encoding = utf8}) async {
     if (throwOnRead) throw StateError('cannot read');
     return contents;
   }
@@ -113,7 +116,7 @@ void main() {
       final exported = await exportUseCase.execute();
       final decoded = jsonDecode(exported) as Map<String, dynamic>;
 
-      expect(decoded['version'], 4);
+      expect(decoded['version'], 5);
       expect(decoded['favorites'], contains('/music/Downloaded.mp3'));
       expect(decoded['downloads'], isA<List>());
       expect((decoded['downloads'] as List).first['remoteId'], 'vid1');
@@ -522,6 +525,60 @@ void main() {
           songs.singleWhere((s) => s.cueStartMs == 1000).isFavorite, isFalse);
       final queue = await db.select(db.queueItemsTable).get();
       expect(queue.single.songId, 2);
+    });
+
+    test('v5 round-trip exports and imports v5 keys', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('usb_quirks_v1', '{"deviceA":{"sampleRate":48000}}');
+      await prefs.setString('audio_profile_default_id', 'profile_123');
+      await prefs.setString('remote_sources_v1', '{"sources":[]}');
+      await prefs.setBool('assistant_suggestions_enabled', true);
+      await prefs.setString('setting_bt_latency_by_device', '{"mac1":120}');
+      await prefs.setBool('setting_auto_device_profiles_enabled', true);
+      await prefs.setBool('announce_enabled', true);
+      await prefs.setInt('announce_delay_ms', 500);
+      await prefs.setBool('sysbeh_resume_after_call', true);
+
+      final exported = await exportUseCase.execute();
+      final decoded = jsonDecode(exported) as Map<String, dynamic>;
+      expect(decoded['version'], 5);
+      expect(decoded['usb_quirks_v1'], '{"deviceA":{"sampleRate":48000}}');
+      expect(decoded['audio_profile_default_id'], 'profile_123');
+      expect(decoded['remote_sources_v1'], '{"sources":[]}');
+      expect(decoded['assistant_suggestions_enabled'], true);
+      expect(decoded['setting_bt_latency_by_device'], '{"mac1":120}');
+      expect(decoded['setting_auto_device_profiles_enabled'], true);
+
+      await prefs.clear();
+
+      final result = await importUseCase.execute(exported);
+      expect(result.restoredSettingsCount, greaterThan(0));
+      expect(prefs.getString('usb_quirks_v1'), '{"deviceA":{"sampleRate":48000}}');
+      expect(prefs.getString('audio_profile_default_id'), 'profile_123');
+      expect(prefs.getString('remote_sources_v1'), '{"sources":[]}');
+      expect(prefs.getBool('assistant_suggestions_enabled'), true);
+      expect(prefs.getString('setting_bt_latency_by_device'), '{"mac1":120}');
+      expect(prefs.getBool('setting_auto_device_profiles_enabled'), true);
+      expect(prefs.getBool('announce_enabled'), true);
+      expect(prefs.getInt('announce_delay_ms'), 500);
+      expect(prefs.getBool('sysbeh_resume_after_call'), true);
+    });
+
+    test('corrupt v2 raw blobs are rejected and not saved to prefs', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+
+      final payload = {
+        'version': 5,
+        'dspSnapshots': '{invalid-json',
+        'deviceProfiles': '{"valid":true}',
+        'settingsProfiles': 'not valid json at all',
+      };
+
+      await importUseCase.execute(jsonEncode(payload));
+      expect(prefs.containsKey('dsp_snapshot_store_v1'), isFalse);
+      expect(prefs.containsKey('setting_custom_profiles'), isFalse);
+      expect(prefs.getString('setting_device_profile_links'), '{"valid":true}');
     });
   });
 }

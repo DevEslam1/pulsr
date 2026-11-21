@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/error_logger.dart';
 
 @immutable
 class DspReliabilityCounters {
@@ -153,11 +154,16 @@ class DspReliabilityTracker {
   }
 
   DspReliabilityCounters _counters = const DspReliabilityCounters.zero();
-  final StreamController<DspReliabilityCounters> _streamController =
+  StreamController<DspReliabilityCounters> _streamController =
       StreamController<DspReliabilityCounters>.broadcast();
 
   DspReliabilityCounters get counters => _counters;
-  Stream<DspReliabilityCounters> get stream => _streamController.stream;
+  Stream<DspReliabilityCounters> get stream {
+    if (_streamController.isClosed) {
+      _streamController = StreamController<DspReliabilityCounters>.broadcast();
+    }
+    return _streamController.stream;
+  }
   bool get isInitialized => _initialized;
 
   bool _initialized = false;
@@ -188,9 +194,10 @@ class DspReliabilityTracker {
       _counters = const DspReliabilityCounters.zero();
     } finally {
       _initialized = true;
-      if (!_streamController.isClosed) {
-        _streamController.add(_counters);
+      if (_streamController.isClosed) {
+        _streamController = StreamController<DspReliabilityCounters>.broadcast();
       }
+      _streamController.add(_counters);
     }
   }
 
@@ -206,7 +213,7 @@ class DspReliabilityTracker {
   /// Sanitizes sensitive information (paths, credentials, tokens) from error strings.
   static String redactErrorMessage(String? raw) {
     if (raw == null || raw.trim().isEmpty) return '';
-    return raw
+    var redacted = raw
         .replaceAll(
             RegExp(r'(/data/user/\d+/[^"\s\\]+)'), '[REDACTED_APP_PATH]')
         .replaceAll(RegExp(r'(/storage/emulated/\d+/[^"\s\\]+)'),
@@ -216,8 +223,9 @@ class DspReliabilityTracker {
         .replaceAllMapped(
             RegExp(r'(key|token|secret|password|auth|bearer)=[^&\s]+',
                 caseSensitive: false),
-            (m) => '${m[1]}=[REDACTED]')
-        .trim();
+            (m) => '${m[1]}=[REDACTED]');
+    redacted = ErrorLogger.redactPii(redacted);
+    return redacted.replaceAll('=[REDACTED_TOKEN]', '=[REDACTED]').trim();
   }
 
   void recordNativeSetterRejection(String method, [dynamic error]) {
@@ -288,9 +296,10 @@ class DspReliabilityTracker {
   }
 
   Future<void> _notifyAndSave() {
-    if (!_streamController.isClosed) {
-      _streamController.add(_counters);
+    if (_streamController.isClosed) {
+      _streamController = StreamController<DspReliabilityCounters>.broadcast();
     }
+    _streamController.add(_counters);
     _saveChain = _saveChain.then((_) => _saveToPrefs());
     return _saveChain;
   }
@@ -298,6 +307,9 @@ class DspReliabilityTracker {
   void dispose() {
     if (!_streamController.isClosed) {
       _streamController.close();
+    }
+    if (_instance == this) {
+      _instance = null;
     }
   }
 }

@@ -491,7 +491,8 @@ class _PulsrSliderPainter extends CustomPainter {
 
     // 2. Active foreground progress track (from 0 to thumb)
     final activeEnd =
-        (thumbX - (isWavy ? 0.0 : thumbRadius * 0.35)).clamp(0.0, size.width);
+        (thumbX - (style == PlayerSliderStyle.wavy ? 0.0 : thumbRadius * 0.35))
+            .clamp(0.0, size.width);
     if (activeEnd > 0.5) {
       final activePaint = Paint()
         ..shader = LinearGradient(
@@ -507,7 +508,7 @@ class _PulsrSliderPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round;
 
-      if (!isWavy || thumbX < 16.0) {
+      if (style != PlayerSliderStyle.wavy || thumbX < 16.0) {
         final lineGlowPaint = Paint()
           ..color = activeColor.withValues(alpha: 0.16 + (0.16 * expandFactor))
           ..style = PaintingStyle.stroke
@@ -571,7 +572,9 @@ class _PulsrSliderPainter extends CustomPainter {
         final tickX = (i / divisions!) * size.width;
         if (tickX > inactiveStart + 4 && tickX < size.width - 4) {
           canvas.drawCircle(Offset(tickX, centerY), 1.4, inactiveTickPaint);
-        } else if (!isWavy && tickX > 4 && tickX < thumbX - thumbRadius - 4) {
+        } else if (style != PlayerSliderStyle.wavy &&
+            tickX > 4 &&
+            tickX < thumbX - thumbRadius - 4) {
           canvas.drawCircle(Offset(tickX, centerY), 1.3, activeTickPaint);
         }
       }

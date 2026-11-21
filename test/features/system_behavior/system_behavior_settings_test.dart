@@ -259,4 +259,15 @@ void main() {
     expect(settings.volumeStepPercent, 9);
     expect(settings.isLoaded, isTrue);
   });
+
+  test('resumeAfterCall getter reflects live shared preferences overlay', () async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.resumeAfterInterruption, true);
+    final SystemBehaviorSettings settings = SystemBehaviorSettings();
+    await settings.load();
+    expect(settings.resumeAfterCall, isTrue);
+
+    await prefs.setBool(PrefsKeys.resumeAfterInterruption, false);
+    expect(settings.resumeAfterCall, isFalse);
+  });
 }

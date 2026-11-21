@@ -51,10 +51,6 @@ void main() {
     await handler!.pause();
     await Future<void>.delayed(const Duration(seconds: 3));
 
-    // ignore: avoid_print
-    print('after-pause title=${handler!.mediaItem.value?.title} '
-        'bb=${handler!.playbackState.value.playing} '
-        'fakes=${platform.players.values.map((p) => p.playing).toList()}');
     expect(platform.players.values.any((p) => p.playing), isFalse,
         reason: 'a pause must never be undone by an in-flight crossfade');
   }, timeout: const Timeout(Duration(seconds: 40)));

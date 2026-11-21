@@ -24,6 +24,11 @@ void main() {
               'stationuuid': 'uuid-1234',
             },
             {
+              'name': 'Radio with Private Favicon',
+              'url_resolved': 'https://stream.example/safe',
+              'favicon': 'http://192.168.1.1/art.png',
+            },
+            {
               'name': 'Private',
               'url_resolved': 'http://192.168.1.5/stream',
             },
@@ -46,15 +51,18 @@ void main() {
         tag: 'smooth',
       );
 
-      expect(stations, hasLength(1));
-      expect(stations.single.name, 'Jazz FM');
-      expect(stations.single.url, 'https://stream.example/jazz');
-      expect(stations.single.genre, 'jazz');
-      expect(stations.single.artworkUrl, 'https://art.example/jazz.png');
-      expect(stations.single.bitrate, 320);
-      expect(stations.single.codec, 'MP3');
-      expect(stations.single.stationUuid, 'uuid-1234');
-      expect(stations.single.qualityLabel, '320 kbps MP3');
+      expect(stations, hasLength(2));
+      expect(stations[0].name, 'Jazz FM');
+      expect(stations[0].url, 'https://stream.example/jazz');
+      expect(stations[0].genre, 'jazz');
+      expect(stations[0].artworkUrl, 'https://art.example/jazz.png');
+      expect(stations[0].bitrate, 320);
+      expect(stations[0].codec, 'MP3');
+      expect(stations[0].stationUuid, 'uuid-1234');
+      expect(stations[0].qualityLabel, '320 kbps MP3');
+
+      expect(stations[1].name, 'Radio with Private Favicon');
+      expect(stations[1].artworkUrl, isNull);
 
       final params = requested.single.queryParameters;
       expect(params['name'], 'jazz');
@@ -170,6 +178,64 @@ void main() {
           isFalse,
         );
         expect(networkCalls, 0);
+      });
+
+      test('rejects 302 redirect pointing to private IP', () async {
+        final client = MockClient((request) async {
+          if (request.url.toString() == 'https://stream.example/redirect') {
+            return http.Response('', 302, headers: {
+              'location': 'http://192.168.1.1/secret.mp3',
+            });
+          }
+          return http.Response('', 200);
+        });
+
+        final service = RadioBrowserService(client: client);
+        expect(await service.isReachable('https://stream.example/redirect'), isFalse);
+      });
+
+      test('follows 302 redirect pointing to safe public stream', () async {
+        final client = MockClient((request) async {
+          if (request.url.toString() == 'https://stream.example/redirect') {
+            return http.Response('', 302, headers: {
+              'location': 'https://stream.example/target.mp3',
+            });
+          }
+          if (request.url.toString() == 'https://stream.example/target.mp3') {
+            return http.Response('', 200);
+          }
+          return http.Response('', 404);
+        });
+
+        final service = RadioBrowserService(client: client);
+        expect(await service.isReachable('https://stream.example/redirect'), isTrue);
+      });
+
+      test('rejects 302 without location header', () async {
+        final client = MockClient((request) async {
+          return http.Response('', 302);
+        });
+
+        final service = RadioBrowserService(client: client);
+        expect(await service.isReachable('https://stream.example/live'), isFalse);
+      });
+
+      test('uses AppConfig.appVersion in User-Agent header', () async {
+        String? capturedUserAgent;
+        final client = MockClient((request) async {
+          capturedUserAgent = request.headers['User-Agent'];
+          return http.Response('', 200);
+        });
+
+        final service = RadioBrowserService(client: client);
+        await service.isReachable('https://stream.example/live');
+        expect(capturedUserAgent, contains('Pulsr/'));
+        expect(capturedUserAgent, contains('(radio directory)'));
+      });
+
+      test('dispose closes owned client without throwing', () {
+        final service = RadioBrowserService();
+        expect(() => service.dispose(), returnsNormally);
       });
     });
 

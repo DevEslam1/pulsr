@@ -55,6 +55,14 @@ class YtmClientVersionResolver {
   static const Duration _maxStaleTtl = Duration(days: 30);
   static const String _prefKeySts = 'ytm_cached_sts';
 
+  final http.Client? _injectedClient;
+
+  YtmClientVersionResolver([this._injectedClient]);
+
+  http.Client? _debugClient;
+  @visibleForTesting
+  set debugHttpClient(http.Client? client) => _debugClient = client;
+
   late String _clientVersion = fallbackClientVersion;
   String _apiKey = fallbackApiKey;
   int? _sts;
@@ -143,11 +151,15 @@ class YtmClientVersionResolver {
     }
   }
 
-  Future<void> refresh() async {
+  Future<void> refresh({http.Client? client}) async {
+    final clientToUse =
+        client ?? _debugClient ?? _injectedClient ?? http.Client();
+    final shouldClose =
+        client == null && _debugClient == null && _injectedClient == null;
     try {
       http.Response? response;
       try {
-        response = await http.get(
+        response = await clientToUse.get(
           Uri.parse('https://music.youtube.com'),
           headers: {
             'User-Agent': EmbeddedBrowserUa.desktop,
@@ -156,7 +168,7 @@ class YtmClientVersionResolver {
         ).timeout(const Duration(seconds: 15));
       } catch (_) {
         try {
-          response = await http.get(
+          response = await clientToUse.get(
             Uri.parse('https://www.youtube.com'),
             headers: {
               'User-Agent': EmbeddedBrowserUa.desktop,
@@ -223,6 +235,10 @@ class YtmClientVersionResolver {
     } catch (e) {
       debugPrint(
           '[YTM_VERSION] Dynamic client version fetch failed (using cached/fallback): $e');
+    } finally {
+      if (shouldClose) {
+        clientToUse.close();
+      }
     }
   }
 }

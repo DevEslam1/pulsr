@@ -209,6 +209,34 @@ void main() {
               .exists(),
           isFalse);
     });
+
+    test('endSession() immediately followed by readAll() captures final session without race', () async {
+      log = buildLog();
+      await log.startSession(trackId: 'race_1', trackTitle: 'Race Track 1');
+      // Fire endSession and readAll back-to-back
+      final endFuture = log.endSession();
+      final records = await log.readAll();
+      await endFuture;
+
+      expect(records, hasLength(1));
+      expect(records.single.trackId, 'race_1');
+      expect(records.single.endedAt, isNotNull);
+    });
+
+    test('endSession() immediately followed by clear() flushes and deletes cleanly', () async {
+      log = buildLog();
+      await log.startSession(trackId: 'race_2', trackTitle: 'Race Track 2');
+      final endFuture = log.endSession();
+      final clearFuture = log.clear();
+      await Future.wait([endFuture, clearFuture]);
+
+      final records = await log.readAll();
+      expect(records, isEmpty);
+      expect(
+        await File('${tempDir.path}/${AudioSessionLog.defaultFileName}').exists(),
+        isFalse,
+      );
+    });
   });
 
   group('route classification', () {

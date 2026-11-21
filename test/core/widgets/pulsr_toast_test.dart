@@ -121,5 +121,32 @@ void main() {
 
       expect(find.text('Duplicate alert'), findsNothing);
     });
+
+    testWidgets('honors custom maxLines parameter', (tester) async {
+      await tester.pumpWidget(_wrap(
+        Builder(
+          builder: (context) {
+            return ElevatedButton(
+              onPressed: () {
+                PulsrToast.show(
+                  context,
+                  message: 'Line 1\nLine 2\nLine 3\nLine 4',
+                  maxLines: 4,
+                  duration: const Duration(seconds: 2),
+                );
+              },
+              child: const Text('Show Multi-line Toast'),
+            );
+          },
+        ),
+      ));
+
+      await tester.tap(find.text('Show Multi-line Toast'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final textWidget = tester.widget<Text>(find.text('Line 1\nLine 2\nLine 3\nLine 4'));
+      expect(textWidget.maxLines, 4);
+    });
   });
 }

@@ -34,6 +34,7 @@ class WebDavFsProvider implements RemoteFsProvider {
   })  : _username = username ?? source.username,
         _password = password,
         _timeout = timeout,
+        _ownsClient = httpClient == null,
         _client = httpClient ??
             (HttpClient()..connectionTimeout = const Duration(seconds: 20));
 
@@ -45,6 +46,7 @@ class WebDavFsProvider implements RemoteFsProvider {
   final RemoteSource source;
 
   final HttpClient _client;
+  final bool _ownsClient;
   final String? _username;
   final String? _password;
   final Duration _timeout;
@@ -181,12 +183,14 @@ class WebDavFsProvider implements RemoteFsProvider {
     }
   }
 
-  /// Releases the underlying HttpClient.
+  /// Releases the underlying HttpClient if owned.
   @override
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    _client.close(force: true);
+    if (_ownsClient) {
+      _client.close(force: true);
+    }
   }
 
   /// Parses a WebDAV `multistatus` document into entries relative to [rootPath].

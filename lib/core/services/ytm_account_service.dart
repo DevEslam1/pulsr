@@ -1073,7 +1073,7 @@ class YtmAccountService {
       // Refresh cookies from native CookieManager if needed
       final rawNative = await getNativeCookiesFromDomains();
       final nativeCookies =
-          rawNative == null ? null : normalizeCookieHeader(rawNative);
+          rawNative == null ? null : scopeCookiesForYouTube(rawNative);
       if (nativeCookies != null &&
           nativeCookies.isNotEmpty &&
           looksLikeSignedInCookies(nativeCookies)) {
@@ -1385,7 +1385,7 @@ class YtmAccountService {
     try {
       final rawNative = await getNativeCookiesFromDomains();
       final nativeCookies =
-          rawNative == null ? null : normalizeCookieHeader(rawNative);
+          rawNative == null ? null : scopeCookiesForYouTube(rawNative);
       if (nativeCookies != null &&
           nativeCookies.isNotEmpty &&
           looksLikeSignedInCookies(nativeCookies)) {
@@ -1819,7 +1819,9 @@ class YtmAccountService {
   Future<List<YtmTrack>> fetchHomeRecommendations({int maxTracks = 50}) async {
     if (!isLoggedIn) return [];
 
-    final nativeCookies = await getNativeCookiesFromDomains();
+    final rawNative = await getNativeCookiesFromDomains();
+    final nativeCookies =
+        rawNative == null ? null : scopeCookiesForYouTube(rawNative);
     if (nativeCookies != null &&
         nativeCookies.isNotEmpty &&
         looksLikeSignedInCookies(nativeCookies)) {
@@ -2085,7 +2087,7 @@ class YtmAccountService {
     // together and only awaited afterwards: queued back-to-back they put up to
     // 5 s of pure waiting in front of the first /player request on a cold
     // start, which is exactly the budget the cold bucket does not have.
-    final sessionWarm = (_dataSyncId == null && isLoggedIn)
+    final sessionWarm = (_dataSyncId == null && isAuthenticated)
         ? _warmSession().timeout(const Duration(seconds: 3), onTimeout: () {})
         : Future<void>.value();
     // Warm the native BotGuard attestation once so both the account-bound and

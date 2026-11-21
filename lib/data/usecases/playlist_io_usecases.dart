@@ -97,6 +97,7 @@ class PlaylistExportUseCase {
           song.title.trim().isNotEmpty ? song.title.trim() : 'Unknown Track';
       buffer.writeln('File$index=${song.path}');
       buffer.writeln('Title$index=$artist - $title');
+      buffer.writeln('Length$index=${(song.durationMs / 1000).round()}');
     }
     buffer.writeln('NumberOfEntries=$index');
     buffer.writeln('Version=2');
@@ -170,13 +171,27 @@ class PlaylistImportUseCase {
   List<String> parseM3uContent(String content) {
     final lines = content.split(RegExp(r'\r?\n'));
     final paths = <String>[];
+    double? pendingStartTime;
 
     for (final line in lines) {
       final trimmed = line.trim();
-      if (trimmed.isEmpty || trimmed.startsWith('#')) {
+      if (trimmed.isEmpty) continue;
+      if (trimmed.startsWith('#EXTVLCOPT:start-time=')) {
+        final secStr =
+            trimmed.substring('#EXTVLCOPT:start-time='.length).trim();
+        pendingStartTime = double.tryParse(secStr);
         continue;
       }
-      paths.add(trimmed);
+      if (trimmed.startsWith('#')) {
+        continue;
+      }
+      if (pendingStartTime != null) {
+        final startMs = (pendingStartTime * 1000).round();
+        paths.add('$trimmed#pulsr_cue=$startMs');
+        pendingStartTime = null;
+      } else {
+        paths.add(trimmed);
+      }
     }
 
     return paths;
@@ -387,6 +402,20 @@ class PlaylistImportUseCase {
 
       for (final rawPath in rawPaths) {
         String path = rawPath;
+        int? targetCueStartMs;
+        if (path.contains('#pulsr_cue=')) {
+          final idx = path.indexOf('#pulsr_cue=');
+          targetCueStartMs =
+              int.tryParse(path.substring(idx + '#pulsr_cue='.length));
+          path = path.substring(0, idx);
+        } else if (path.contains('#EXTVLCOPT:start-time=')) {
+          final idx = path.indexOf('#EXTVLCOPT:start-time=');
+          final sec = double.tryParse(
+              path.substring(idx + '#EXTVLCOPT:start-time='.length));
+          if (sec != null) targetCueStartMs = (sec * 1000).round();
+          path = path.substring(0, idx);
+        }
+
         // Strip URI schemes if present (file:///)
         if (path.startsWith('file://')) {
           try {
@@ -403,18 +432,27 @@ class PlaylistImportUseCase {
         }
         path = path.replaceAll('\\', '/');
 
-        SongsTableData? matchedSong = exactMap[path];
+        final normPath = path.toLowerCase();
+        final filename = path.split('/').last.toLowerCase();
 
-        if (matchedSong == null) {
-          final normPath = path.replaceAll('\\', '/').toLowerCase();
-          matchedSong = normalizedMap[normPath];
+        SongsTableData? matchedSong;
+        if (targetCueStartMs != null) {
+          for (final song in allSongs) {
+            if (song.cueStartMs != null &&
+                (song.cueStartMs! - targetCueStartMs).abs() <= 500) {
+              final songNorm = song.path.replaceAll('\\', '/').toLowerCase();
+              if (song.path == path ||
+                  songNorm == normPath ||
+                  songNorm.split('/').last == filename) {
+                matchedSong = song;
+                break;
+              }
+            }
+          }
         }
 
-        if (matchedSong == null) {
-          final filename =
-              path.replaceAll('\\', '/').split('/').last.toLowerCase();
-          matchedSong = filenameMap[filename];
-        }
+        matchedSong ??=
+            exactMap[path] ?? normalizedMap[normPath] ?? filenameMap[filename];
 
         if (matchedSong != null) {
           matchedSongIds.add(matchedSong.id);

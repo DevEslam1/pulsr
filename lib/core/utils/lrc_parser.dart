@@ -10,6 +10,16 @@ import '../../domain/models/lyrics_line.dart';
 import '../constants/channels.dart';
 import 'error_logger.dart';
 
+/// Client interface for online LRCLIB lyrics lookups.
+abstract interface class LrclibLyricsClient {
+  Future<LyricsResult?> fetchLyrics({
+    required String trackName,
+    required String artistName,
+    String? albumName,
+    int? durationSeconds,
+  });
+}
+
 class LrcParser {
   static const MethodChannel _lyricsChannel =
       MethodChannel(PulsrChannels.lyrics);
@@ -628,6 +638,21 @@ class LrcParser {
     } catch (_) {}
   }
 
+  static void _putMemCache(String key, LyricsResult? result) {
+    if (_lyricsCache.length >= _maxCacheSize) {
+      final evictedKey = _lyricsCache.keys.first;
+      _lyricsCache.remove(evictedKey);
+      _negativeCacheTimes.remove(evictedKey);
+    }
+    _lyricsCache[key] = result;
+    if (result == null) {
+      _negativeCacheTimes[key] = DateTime.now();
+    } else {
+      _negativeCacheTimes.remove(key);
+      unawaited(_writeToDiskCache(key, result));
+    }
+  }
+
   /// Manually cache a resolved lyrics result (e.g. from LRCLIB or YTM).
   static void cacheLyricsResult(
     LyricsResult? result, {
@@ -636,26 +661,9 @@ class LrcParser {
   }) {
     final cacheKey = songId != null ? 'song_$songId' : path;
     if (cacheKey == null) return;
-    if (_lyricsCache.length >= _maxCacheSize) {
-      final evictedKey = _lyricsCache.keys.first;
-      _lyricsCache.remove(evictedKey);
-      _negativeCacheTimes.remove(evictedKey);
-    }
-    _lyricsCache[cacheKey] = result;
-    if (result == null) {
-      _negativeCacheTimes[cacheKey] = DateTime.now();
-    } else {
-      _negativeCacheTimes.remove(cacheKey);
-      unawaited(_writeToDiskCache(cacheKey, result));
-    }
+    _putMemCache(cacheKey, result);
     if (songId != null && path != null && path.isNotEmpty) {
-      _lyricsCache[path] = result;
-      if (result == null) {
-        _negativeCacheTimes[path] = DateTime.now();
-      } else {
-        _negativeCacheTimes.remove(path);
-        unawaited(_writeToDiskCache(path, result));
-      }
+      _putMemCache(path, result);
     }
   }
 
@@ -677,7 +685,7 @@ class LrcParser {
     String? artist,
     String? album,
     int? durationSec,
-    Object? lrclibService,
+    LrclibLyricsClient? lrclibService,
   }) async {
     final cacheKey = songId != null ? 'song_$songId' : audioFilePath;
     if (hasCachedLyrics(songId: songId, path: audioFilePath)) {
@@ -710,11 +718,16 @@ class LrcParser {
     String? artist,
     String? album,
     int? durationSec,
-    Object? lrclibService,
+    LrclibLyricsClient? lrclibService,
   }) async {
     // Check persistent disk cache before external searching or network lookups
     final diskCached = await _readFromDiskCache(cacheKey);
     if (diskCached != null) {
+      if (_lyricsCache.length >= _maxCacheSize) {
+        final evictedKey = _lyricsCache.keys.first;
+        _lyricsCache.remove(evictedKey);
+        _negativeCacheTimes.remove(evictedKey);
+      }
       _lyricsCache[cacheKey] = diskCached;
       return diskCached;
     }
@@ -766,7 +779,7 @@ class LrcParser {
         artist.isNotEmpty) {
       try {
         if (lrclibService != null) {
-          resolved = await (lrclibService as dynamic).fetchLyrics(
+          resolved = await lrclibService.fetchLyrics(
             trackName: trackTitle,
             artistName: artist,
             albumName: album,
@@ -795,18 +808,7 @@ class LrcParser {
         _negativeCacheTimes
             .removeWhere((_, t) => now.difference(t) > _negativeCacheTtl);
       }
-      if (_lyricsCache.length >= _maxCacheSize) {
-        final evictedKey = _lyricsCache.keys.first;
-        _lyricsCache.remove(evictedKey);
-        _negativeCacheTimes.remove(evictedKey);
-      }
-      _lyricsCache[cacheKey] = resolved;
-      if (resolved == null) {
-        _negativeCacheTimes[cacheKey] = DateTime.now();
-      } else {
-        _negativeCacheTimes.remove(cacheKey);
-        unawaited(_writeToDiskCache(cacheKey, resolved));
-      }
+      _putMemCache(cacheKey, resolved);
     }
 
     return resolved;

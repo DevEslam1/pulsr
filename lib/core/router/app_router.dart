@@ -291,6 +291,8 @@ GoRouter createRouter(MediaScannerService scannerService,
         const purePaths = {
           '/radio',
           '/proxy-settings',
+          '/party',
+          '/scrobble-stats',
         };
         if (purePaths.any(
             (p) => state.uri.path == p || state.uri.path.startsWith('$p/'))) {

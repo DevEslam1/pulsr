@@ -175,6 +175,7 @@
   "customDurationMinutes": "مدة مخصصة (بالدقائق).",
   "partialBatchDetected": "تم اكتشاف دفعة جزئية",
   "somethingWentWrong": "حدث خطأ ما",
+  "errorBoundarySubtitle": "حدث خطأ غير متوقع أثناء عرض هذا المحتوى.",
   "saveSearch": "حفظ البحث",
   "savedSearches": "عمليات البحث المحفوظة",
   "appTitle": "بولسر للموسيقى",

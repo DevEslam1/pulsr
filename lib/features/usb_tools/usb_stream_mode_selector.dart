@@ -123,32 +123,35 @@ class UsbStreamModeSelector extends StatelessWidget {
             style: TextStyle(color: p.textSecondary, fontSize: AppFontSize.caption),
           ),
           const SizedBox(height: AppSpacing.sm),
-          DropdownButtonFormField<UsbStreamMode>(
-            key: const ValueKey<String>('usb-stream-mode-dropdown'),
-            initialValue: selected,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              isDense: true,
-              border: OutlineInputBorder(),
+          KeyedSubtree(
+            key: ValueKey<UsbStreamMode>(selected),
+            child: DropdownButtonFormField<UsbStreamMode>(
+              key: const ValueKey<String>('usb-stream-mode-dropdown'),
+              initialValue: selected,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+              ),
+              items: UsbStreamMode.values.map((mode) {
+                final reason = _disabledReason(mode);
+                return DropdownMenuItem<UsbStreamMode>(
+                  value: mode,
+                  enabled: enabled && reason == null,
+                  child: Text(
+                    reason == null ? _label(mode) : '${_label(mode)} — $reason',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+              onChanged: enabled
+                  ? (mode) {
+                      if (mode == null || !_available(mode)) return;
+                      onChanged!(mode);
+                    }
+                  : null,
             ),
-            items: UsbStreamMode.values.map((mode) {
-              final reason = _disabledReason(mode);
-              return DropdownMenuItem<UsbStreamMode>(
-                value: mode,
-                enabled: enabled && reason == null,
-                child: Text(
-                  reason == null ? _label(mode) : '${_label(mode)} — $reason',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              );
-            }).toList(),
-            onChanged: enabled
-                ? (mode) {
-                    if (mode == null || !_available(mode)) return;
-                    onChanged!(mode);
-                  }
-                : null,
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(

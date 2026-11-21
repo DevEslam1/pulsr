@@ -29,6 +29,7 @@ class YtmRateLimiter {
   static const String _keyBackoffUntil = 'ytm_rate_limiter_backoff_until';
 
   SharedPreferences? _prefs;
+  Timer? _persistDebounceTimer;
 
   // Native YTM pacing bucket
   static const int _maxTokens = 8;
@@ -75,7 +76,21 @@ class YtmRateLimiter {
     } catch (_) {}
   }
 
-  void _persist() {
+  void _persist({bool immediate = false}) {
+    if (immediate) {
+      _persistDebounceTimer?.cancel();
+      _persistDebounceTimer = null;
+      _writeToPrefs();
+      return;
+    }
+    _persistDebounceTimer?.cancel();
+    _persistDebounceTimer = Timer(const Duration(seconds: 1), () {
+      _persistDebounceTimer = null;
+      _writeToPrefs();
+    });
+  }
+
+  void _writeToPrefs() {
     if (_prefs != null) {
       _prefs!.setDouble(_keyTokens, _tokens).catchError((_) => false);
       _prefs!
@@ -125,6 +140,8 @@ class YtmRateLimiter {
     // can no longer be delivered.
     shared._nativeMutex = AsyncMutex();
 
+    shared._persistDebounceTimer?.cancel();
+    shared._persistDebounceTimer = null;
     shared._tokens = _maxTokens.toDouble();
     shared._lastRefill = clock.now();
     shared._backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
@@ -141,7 +158,7 @@ class YtmRateLimiter {
     _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _adaptiveMultiplier = 1;
     _inFlightRequests.clear();
-    _persist();
+    _persist(immediate: true);
   }
 
   /// Acquires a permit before making a native YTM request.
@@ -210,7 +227,7 @@ class YtmRateLimiter {
       if (base.inSeconds > 30) base = const Duration(seconds: 30);
       _backoffUntil = now.add(base + jitter);
     }
-    _persist();
+    _persist(immediate: true);
   }
 
   /// Upper bound on any `Retry-After` we honour, for the same reason a browser

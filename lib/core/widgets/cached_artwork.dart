@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../config/app_config.dart';
 import '../di/injection.dart';
 import '../motion/pulsr_motion.dart';
 import '../network/remote_target_policy.dart';
@@ -253,10 +254,6 @@ class _CachedArtworkState extends State<CachedArtwork> {
   /// De-dupes concurrent cold-cache fetches: multiple widgets requesting the
   /// same resolved cache key share a single underlying bytes fetch instead of
   /// each issuing its own remote/device query.
-  // NOTE: _inFlight deduplication was removed — sharing a Future caused all
-  // widgets to get null when the first fetch failed (e.g. slow network on
-  // initial load), leaving every card stuck with a placeholder permanently.
-  // Direct per-widget fetches are simpler and more reliable.
 
   bool get _isHighRes =>
       widget.highQuality || (widget.size.isFinite && widget.size > 250);
@@ -373,6 +370,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
       } catch (_) {}
     }
 
+    if (!AppConfig.isCloudSyncAllowed) return null;
+
     final targetUrl = highQuality
         ? CachedArtwork.upgradeToHighResArtwork(url)
         : (lowQuality
@@ -415,7 +414,13 @@ class _CachedArtworkState extends State<CachedArtwork> {
         bool resolved = false;
         for (final candidate in fallbackUrls) {
           final candidateUri = Uri.tryParse(candidate);
-          if (candidateUri == null) continue;
+          if (candidateUri == null ||
+              !RemoteTargetPolicy.isAllowed(
+                candidate,
+                allowedHostSuffixes: RemoteHostAllowlist.instance.hosts,
+              )) {
+            continue;
+          }
           HttpClientRequest? fallbackReq;
           try {
             fallbackReq = await getIt<HttpClient>()
@@ -531,9 +536,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
       }
     }
 
-    // 3. Fetch remote or query local storage (each widget fetches independently
-    //    — no shared in-flight Future — so a single failure does not block
-    //    every other card on screen from eventually loading its artwork).
+    // 3. Fetch remote (de-duped across concurrent cold-cache callers via
+    //    _inFlightFetches) or query local storage via OnAudioQuery.
     final remoteUrl = widget.remoteUrl;
     final isThumbnail = !isHq && widget.size <= 220;
 

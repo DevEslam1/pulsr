@@ -88,6 +88,11 @@ class AppHttpOverrides extends HttpOverrides {
 
   /// Stops the local loopback HTTP-to-SOCKS5 proxy bridge if running.
   Future<void> stopSocks5Bridge() async {
+    if (_socks5BridgeStarting != null) {
+      try {
+        await _socks5BridgeStarting;
+      } catch (_) {}
+    }
     final server = _socks5BridgeServer;
     _socks5BridgeServer = null;
     if (server != null) {
@@ -133,37 +138,64 @@ class AppHttpOverrides extends HttpOverrides {
     };
 
     // Dynamic proxy authentication credentials
-    final authAttempts = <String, int>{};
-    client.authenticateProxy = (host, port, scheme, realm) async {
-      final targetHost = _config.host.trim().toLowerCase();
-      final targetPort = _config.port;
-      if (_config.enabled &&
-          _config.hasAuth &&
-          host.toLowerCase() == targetHost &&
-          port == targetPort) {
-        final authKey = '$host:$port:${realm ?? ''}';
-        final attempts = authAttempts[authKey] ?? 0;
-        if (attempts >= 1) {
-          // Already attempted and rejected (407 retry loop); do not retry
-          return false;
-        }
-        authAttempts[authKey] = attempts + 1;
-        client.addProxyCredentials(
-          host,
-          port,
-          realm ?? '',
-          HttpClientBasicCredentials(_config.username, _config.password),
-        );
-        return true;
-      }
-      return false;
-    };
+    client.authenticateProxy = createProxyAuthenticator(
+      configProvider: () => _config,
+      onAddCredentials: client.addProxyCredentials,
+    );
 
     // Default resilient timeouts
     client.connectionTimeout = const Duration(seconds: 15);
     client.idleTimeout = const Duration(seconds: 90);
 
     return client;
+  }
+
+  /// Factory creating the dynamic proxy authentication handler for [HttpClient].
+  ///
+  /// Holds an internal attempt cache keyed on proxy host, port, realm, username,
+  /// and password hash. Clears attempts whenever credentials change so updating
+  /// credentials in Settings works immediately on long-lived [HttpClient]s.
+  @visibleForTesting
+  static Future<bool> Function(String host, int port, String scheme, String? realm)
+      createProxyAuthenticator({
+    required ProxyConfig Function() configProvider,
+    void Function(String host, int port, String realm, HttpClientBasicCredentials credentials)?
+        onAddCredentials,
+  }) {
+    final authAttempts = <String, int>{};
+    String? lastCreds;
+    return (host, port, scheme, realm) async {
+      final config = configProvider();
+      final currentCreds =
+          '${config.username}:${config.password.hashCode}';
+      if (lastCreds != currentCreds) {
+        authAttempts.clear();
+        lastCreds = currentCreds;
+      }
+      final targetHost = config.host.trim().toLowerCase();
+      final targetPort = config.port;
+      if (config.enabled &&
+          config.hasAuth &&
+          host.toLowerCase() == targetHost &&
+          port == targetPort) {
+        final authKey =
+            '$host:$port:${realm ?? ''}:${config.username}:${config.password.hashCode}';
+        final attempts = authAttempts[authKey] ?? 0;
+        if (attempts >= 1) {
+          // Already attempted and rejected (407 retry loop); do not retry
+          return false;
+        }
+        authAttempts[authKey] = attempts + 1;
+        onAddCredentials?.call(
+          host,
+          port,
+          realm ?? '',
+          HttpClientBasicCredentials(config.username, config.password),
+        );
+        return true;
+      }
+      return false;
+    };
   }
 
   /// Classifies a probe response into the `(success, error)` pair returned by
@@ -220,6 +252,7 @@ class AppHttpOverrides extends HttpOverrides {
         testConfig: testConfig,
         uri: Uri.parse(testUrl),
         timeout: timeout,
+        configToTest: configToTest,
       );
     }
 
@@ -304,6 +337,7 @@ class AppHttpOverrides extends HttpOverrides {
     required ProxyConfig testConfig,
     required Uri uri,
     required Duration timeout,
+    ProxyConfig? configToTest,
   }) async {
     if (!testConfig.isValid) {
       return (
@@ -313,13 +347,20 @@ class AppHttpOverrides extends HttpOverrides {
       );
     }
 
-    // Try native Android MethodChannel if available
-    if (!kIsWeb && Platform.isAndroid) {
+    // Try native Android MethodChannel if available, unless testing a different config
+    if (!kIsWeb &&
+        Platform.isAndroid &&
+        (configToTest == null || configToTest == _config)) {
       try {
         final result = await const MethodChannel(PulsrChannels.proxy)
             .invokeMethod<Map<dynamic, dynamic>>('testProxy', {
           'testUrl': uri.toString(),
           'timeoutMs': timeout.inMilliseconds,
+          'host': testConfig.host,
+          'port': testConfig.port,
+          'username': testConfig.username,
+          'password': testConfig.password,
+          'type': testConfig.type.name,
         });
         if (result != null) {
           final success = result['success'] as bool? ?? false;
@@ -483,12 +524,29 @@ class AppHttpOverrides extends HttpOverrides {
       final httpVersion = requestLineParts[2];
 
       if (method == 'CONNECT') {
-        final colonIdx = requestTarget.lastIndexOf(':');
-        final targetHost =
-            colonIdx > 0 ? requestTarget.substring(0, colonIdx) : requestTarget;
-        final targetPort = colonIdx > 0
-            ? (int.tryParse(requestTarget.substring(colonIdx + 1)) ?? 443)
-            : 443;
+        var targetHost = requestTarget;
+        var targetPort = 443;
+        if (requestTarget.startsWith('[')) {
+          final closeBracket = requestTarget.indexOf(']');
+          if (closeBracket != -1) {
+            targetHost = requestTarget.substring(1, closeBracket);
+            final colonIdx = requestTarget.indexOf(':', closeBracket);
+            if (colonIdx != -1) {
+              targetPort =
+                  int.tryParse(requestTarget.substring(colonIdx + 1)) ?? 443;
+            }
+          }
+        } else {
+          final colonIdx = requestTarget.lastIndexOf(':');
+          targetHost =
+              colonIdx > 0 ? requestTarget.substring(0, colonIdx) : requestTarget;
+          targetPort = colonIdx > 0
+              ? (int.tryParse(requestTarget.substring(colonIdx + 1)) ?? 443)
+              : 443;
+        }
+        if (targetHost.startsWith('[') && targetHost.endsWith(']')) {
+          targetHost = targetHost.substring(1, targetHost.length - 1);
+        }
 
         final tunnel = await _openSocks5Tunnel(
           proxyConfig: _config,
@@ -641,28 +699,68 @@ class _SocketByteReader {
   int _waitCount = 0;
   bool _waitHeaderEnd = false;
   Socket? _forwardTarget;
+  bool _flushing = false;
+  final List<Uint8List> _chunkQueue = [];
   bool _isDone = false;
   Object? _error;
   StackTrace? _errorStack;
 
   int get _availableBytes => _buffer.length - _offset;
 
+  void _destroyTarget(Socket target) {
+    _sub?.cancel();
+    _sub = null;
+    _chunkQueue.clear();
+    try {
+      target.destroy();
+    } catch (_) {}
+  }
+
+  void _forwardChunk(Socket target, List<int> chunk) {
+    _chunkQueue.add(chunk is Uint8List ? chunk : Uint8List.fromList(chunk));
+    _drainQueue(target);
+  }
+
+  void _drainQueue(Socket target) {
+    if (_flushing || _chunkQueue.isEmpty) return;
+    _flushing = true;
+    _sub?.pause();
+
+    void pump() {
+      if (_chunkQueue.isEmpty) {
+        _flushing = false;
+        if (!_isDone) {
+          _sub?.resume();
+        } else {
+          target
+              .flush()
+              .then((_) => target.close())
+              .catchError((_) => _destroyTarget(target));
+        }
+        return;
+      }
+      final nextChunk = _chunkQueue.removeAt(0);
+      try {
+        target.add(nextChunk);
+        target.flush().then((_) {
+          pump();
+        }).catchError((_) {
+          _destroyTarget(target);
+        });
+      } catch (_) {
+        _destroyTarget(target);
+      }
+    }
+
+    pump();
+  }
+
   _SocketByteReader(this._stream) {
     _sub = _stream.listen(
       (chunk) {
         final target = _forwardTarget;
         if (target != null) {
-          try {
-            target.add(chunk);
-            _sub?.pause();
-            target.flush().then((_) {
-              _sub?.resume();
-            }).catchError((_) {
-              target.destroy();
-            });
-          } catch (_) {
-            target.destroy();
-          }
+          _forwardChunk(target, chunk);
           return;
         }
         _buffer.addAll(chunk);
@@ -691,7 +789,7 @@ class _SocketByteReader {
       onError: (e, st) {
         final target = _forwardTarget;
         if (target != null) {
-          target.destroy();
+          _destroyTarget(target);
           return;
         }
         _error = e;
@@ -705,10 +803,13 @@ class _SocketByteReader {
       onDone: () {
         final target = _forwardTarget;
         if (target != null) {
-          target
-              .flush()
-              .then((_) => target.close())
-              .catchError((_) => target.destroy());
+          _isDone = true;
+          if (!_flushing) {
+            target
+                .flush()
+                .then((_) => target.close())
+                .catchError((_) => _destroyTarget(target));
+          }
           return;
         }
         _isDone = true;
@@ -781,31 +882,18 @@ class _SocketByteReader {
   }
 
   void forwardTo(Socket target) {
+    _forwardTarget = target;
     if (_availableBytes > 0) {
       final remaining = _buffer.sublist(_offset);
       _buffer.clear();
       _offset = 0;
-      try {
-        target.add(remaining);
-        _sub?.pause();
-        target.flush().then((_) {
-          _sub?.resume();
-        }).catchError((_) {
-          target.destroy();
-        });
-      } catch (_) {
-        target.destroy();
-        return;
-      }
-    }
-    if (_isDone) {
+      _forwardChunk(target, remaining);
+    } else if (_isDone) {
       target
           .flush()
           .then((_) => target.close())
-          .catchError((_) => target.destroy());
-      return;
+          .catchError((_) => _destroyTarget(target));
     }
-    _forwardTarget = target;
   }
 
   void _compactBufferIfNeeded() {
@@ -862,6 +950,7 @@ class _SocketByteReader {
   }
 
   Future<void> cancel() async {
+    _chunkQueue.clear();
     await _sub?.cancel();
     _sub = null;
   }

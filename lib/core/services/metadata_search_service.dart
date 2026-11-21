@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../constants/prefs_keys.dart';
+import '../network/remote_target_policy.dart';
 import '../utils/error_logger.dart';
 
 class OnlineTrackMetadata {
@@ -154,7 +155,7 @@ class MetadataSearchService {
           'limit': '8',
         });
         final response = await _httpClient.get(uri, headers: {
-          'User-Agent': 'Pulsr/1.0 ( https://pulsr.music )',
+          'User-Agent': 'Pulsr/${AppConfig.appVersion} ( https://pulsr.music )',
           'Accept': 'application/json',
         }).timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
@@ -217,17 +218,57 @@ class MetadataSearchService {
   Future<String?> downloadArtworkToTemp(String url) async {
     if (!AppConfig.isCloudSyncAllowed) return null;
     try {
-      final uri = Uri.tryParse(url);
-      if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return null;
+    } catch (_) {}
+
+    if (!RemoteTargetPolicy.isAllowed(url)) return null;
+
+    try {
+      final initialUri = Uri.tryParse(url);
+      if (initialUri == null ||
+          (initialUri.scheme != 'http' && initialUri.scheme != 'https')) {
         return null;
       }
-      final streamed = await _httpClient
-          .send(http.Request('GET', uri))
-          .timeout(const Duration(seconds: 12));
+      var currentUri = initialUri;
+      final isSafe = await RemoteTargetPolicy.isSafeHost(currentUri.host);
+      if (!isSafe) return null;
+
+      http.StreamedResponse? streamed;
+      for (var redirectCount = 0; redirectCount <= 3; redirectCount++) {
+        final request = http.Request('GET', currentUri)
+          ..headers['User-Agent'] = 'Pulsr/${AppConfig.appVersion}'
+          ..followRedirects = false;
+        final response = await _httpClient
+            .send(request)
+            .timeout(const Duration(seconds: 12));
+
+        final status = response.statusCode;
+        if (status >= 300 &&
+            status < 400 &&
+            response.headers.containsKey('location')) {
+          await response.stream.listen((_) {}, onError: (_) {}).cancel();
+          if (redirectCount == 3) return null;
+          final location = response.headers['location']!;
+          final nextUri = currentUri.resolve(location);
+          final nextUrl = nextUri.toString();
+          if (!RemoteTargetPolicy.isAllowed(nextUrl)) return null;
+          final nextSafe = await RemoteTargetPolicy.isSafeHost(nextUri.host);
+          if (!nextSafe) return null;
+          currentUri = nextUri;
+          continue;
+        }
+
+        streamed = response;
+        break;
+      }
+
+      if (streamed == null) return null;
+
       final contentLength = streamed.contentLength;
       if (streamed.statusCode != 200 ||
           (contentLength != null && contentLength > _maxArtworkBytes)) {
-        await streamed.stream.listen(null).cancel();
+        await streamed.stream.listen((_) {}, onError: (_) {}).cancel();
         return null;
       }
 

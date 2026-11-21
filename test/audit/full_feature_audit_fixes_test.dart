@@ -146,20 +146,20 @@ void main() {
       expect(MusicRepository.toFtsQuery('*** --- """ ^^^'), isNull);
     });
 
-    // 6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 5
+    // 6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 6
     test(
-        '6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 5',
+        '6. ImportBackupUseCase.validateSchema throws FormatException with unsupported version message for version: 6',
         () {
       expect(
-        () => ImportBackupUseCase.validateSchema({'version': 5}),
+        () => ImportBackupUseCase.validateSchema({'version': 6}),
         throwsA(isA<FormatException>().having(
           (e) => e.message,
           'message',
-          equals('Unsupported backup version: 5. Please update Pulsr.'),
+          equals('Unsupported backup version: 6. Please update Pulsr.'),
         )),
       );
 
-      // Valid versions (1..4) do not throw version error
+      // Valid versions (1..5) do not throw version error
       expect(() => ImportBackupUseCase.validateSchema({'version': 1}),
           returnsNormally);
       expect(() => ImportBackupUseCase.validateSchema({'version': 2}),
@@ -167,6 +167,8 @@ void main() {
       expect(() => ImportBackupUseCase.validateSchema({'version': 3}),
           returnsNormally);
       expect(() => ImportBackupUseCase.validateSchema({'version': 4}),
+          returnsNormally);
+      expect(() => ImportBackupUseCase.validateSchema({'version': 5}),
           returnsNormally);
     });
 

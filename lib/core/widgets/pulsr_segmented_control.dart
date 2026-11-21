@@ -218,9 +218,9 @@ class PulsrSegmentedControl extends StatelessWidget {
               Expanded(
                 child: _SegmentButton(
                   segment: segments[i],
-                  isSelected: selectedIndex == i,
+                  isSelected: clampedIndex == i,
                   onTap: () {
-                    if (selectedIndex != i) {
+                    if (clampedIndex != i) {
                       PulsrHaptics.selectionClick();
                       onChanged(i);
                     }
@@ -386,6 +386,7 @@ class _SegmentButton extends StatelessWidget {
     return Semantics(
       selected: isSelected,
       button: true,
+      inMutuallyExclusiveGroup: true,
       label: segment.label,
       onTap: onTap,
       excludeSemantics: true,

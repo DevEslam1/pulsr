@@ -70,6 +70,38 @@ void main() {
       final profiles = await service.getProfiles();
       expect(profiles.any((p) => p.id == 'profile_custom_1'), isFalse);
     });
+
+    test('SettingsProfile.fromJson null-guards id and name', () {
+      final p = SettingsProfile.fromJson(<String, dynamic>{});
+      expect(p.id, '');
+      expect(p.name, 'Custom Profile');
+    });
+
+    test('SettingsProfile copyWith, ==, hashCode works properly', () {
+      const p1 = SettingsProfile(
+        id: 'p1',
+        name: 'Profile 1',
+        type: ProfileType.custom,
+      );
+      final p2 = p1.copyWith(name: 'Profile 2');
+      expect(p1, isNot(equals(p2)));
+      expect(p1.hashCode, isNot(equals(p2.hashCode)));
+
+      final p3 = p2.copyWith(name: 'Profile 1');
+      expect(p1, equals(p3));
+      expect(p1.hashCode, equals(p3.hashCode));
+    });
+
+    test('getProfiles skips malformed entries individually without wiping profiles', () async {
+      SharedPreferences.setMockInitialValues({
+        'setting_custom_profiles': '[{"id":"valid_1","name":"Valid 1"}, {"corrupt":true}, 12345, {"id":"valid_2","name":"Valid 2"}]',
+      });
+      final service = SettingsProfilesService();
+      final profiles = await service.getProfiles();
+      expect(profiles.length, 2);
+      expect(profiles[0].id, 'valid_1');
+      expect(profiles[1].id, 'valid_2');
+    });
   });
 
   group('ThemeSchedulerService', () {

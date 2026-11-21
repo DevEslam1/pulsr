@@ -80,6 +80,7 @@ class PulsrDialogHelper {
     String? confirmLabel,
     String? cancelLabel,
     bool isDestructive = false,
+    bool useRootNavigator = true,
   }) {
     final confirm = confirmLabel ?? context.l10n.confirm;
     final cancel = cancelLabel ?? context.l10n.cancel;
@@ -87,77 +88,79 @@ class PulsrDialogHelper {
     final activeTone =
         isDestructive ? Theme.of(context).colorScheme.error : p.accent;
 
-    return showPulsrDialog<bool>(
+    return showCustomDialog<bool>(
       context,
-      icon: icon != null
-          ? Icon(
-              icon,
-              size: 26,
-              color: activeTone,
-            )
-          : null,
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w800,
-          fontSize: AppFontSize.title,
+      useRootNavigator: useRootNavigator,
+      builder: (ctx) => PulsrDialog(
+        icon: icon != null
+            ? Icon(
+                icon,
+                size: 26,
+                color: activeTone,
+              )
+            : null,
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.w800,
+            fontSize: AppFontSize.title,
+          ),
         ),
+        content: Text(
+          message,
+          style: TextStyle(
+            color: p.textSecondary,
+            fontSize: AppFontSize.body,
+            height: 1.45,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: p.textSecondary,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r12All,
+              ),
+            ),
+            child: Text(
+              cancel,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          FilledButton(
+            onPressed: () {
+              // Feedback follows the action's role, not the button's English
+              // label: a localized "حذف"/"Löschen" must still feel destructive.
+              if (isDestructive) {
+                PulsrHaptics.heavyImpact();
+              } else {
+                PulsrHaptics.selectionClick();
+              }
+              Navigator.of(ctx).pop(true);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: isDestructive ? p.error : p.accent,
+              foregroundColor: isDestructive ? Colors.white : p.onAccent,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.s20,
+                vertical: AppSpacing.sm,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r12All,
+              ),
+            ),
+            child: Text(
+              confirm,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
       ),
-      content: Text(
-        message,
-        style: TextStyle(
-          color: p.textSecondary,
-          fontSize: AppFontSize.body,
-          height: 1.45,
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () =>
-              Navigator.of(context, rootNavigator: true).pop(false),
-          style: TextButton.styleFrom(
-            foregroundColor: p.textSecondary,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadii.r12All,
-            ),
-          ),
-          child: Text(
-            cancel,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        ),
-        FilledButton(
-          onPressed: () {
-            // Feedback follows the action's role, not the button's English
-            // label: a localized "حذف"/"Löschen" must still feel destructive.
-            if (isDestructive) {
-              PulsrHaptics.heavyImpact();
-            } else {
-              PulsrHaptics.selectionClick();
-            }
-            Navigator.of(context, rootNavigator: true).pop(true);
-          },
-          style: FilledButton.styleFrom(
-            backgroundColor: isDestructive ? p.error : p.accent,
-            foregroundColor: isDestructive ? Colors.white : p.onAccent,
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s20,
-              vertical: AppSpacing.sm,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadii.r12All,
-            ),
-          ),
-          child: Text(
-            confirm,
-            style: const TextStyle(fontWeight: FontWeight.w800),
-          ),
-        ),
-      ],
     );
   }
 
@@ -172,9 +175,11 @@ class PulsrDialogHelper {
     String? confirmLabel,
     String? cancelLabel,
     TextInputType keyboardType = TextInputType.text,
+    bool useRootNavigator = true,
   }) {
     return showCustomDialog<String>(
       context,
+      useRootNavigator: useRootNavigator,
       builder: (_) => _PulsrInputDialog(
         title: title,
         message: message,
@@ -242,7 +247,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
       PulsrHaptics.lightImpact();
-      Navigator.of(context, rootNavigator: true).pop(text);
+      Navigator.of(context).pop(text);
     }
   }
 
@@ -329,7 +334,7 @@ class _PulsrInputDialogState extends State<_PulsrInputDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context, rootNavigator: true).pop(null),
+          onPressed: () => Navigator.of(context).pop(null),
           style: TextButton.styleFrom(
             foregroundColor: p.textSecondary,
             padding: const EdgeInsets.symmetric(

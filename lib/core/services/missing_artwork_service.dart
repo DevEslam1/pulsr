@@ -46,6 +46,7 @@ class MissingArtworkService {
       : _client = client ?? http.Client(),
         _ownsClient = client == null;
 
+  @disposeMethod
   void dispose() {
     if (_ownsClient) {
       _client.close();

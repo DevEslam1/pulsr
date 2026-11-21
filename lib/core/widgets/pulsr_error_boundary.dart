@@ -1,5 +1,6 @@
 // lib/core/widgets/pulsr_error_boundary.dart
 import 'package:material_ui/material_ui.dart';
+import '../../l10n/generated/app_localizations.dart';
 import '../theme/aura_theme.dart';
 import '../utils/error_logger.dart';
 import 'pulsr_empty_state.dart';
@@ -153,13 +154,17 @@ class _PulsrErrorBoundaryState extends State<PulsrErrorBoundary> {
         break;
     }
 
+    final l10n = AppLocalizations.of(context);
     return PulsrEmptyState(
       icon: effectiveIcon,
       iconColor: effectiveColor,
-      title: widget.fallbackTitle ?? 'Something went wrong',
+      title: widget.fallbackTitle ??
+          l10n?.somethingWentWrong ??
+          'Something went wrong',
       subtitle: widget.fallbackSubtitle ??
+          l10n?.errorBoundarySubtitle ??
           'An unexpected error occurred while displaying this content.',
-      primaryActionLabel: 'Try Again',
+      primaryActionLabel: l10n?.tryAgain ?? 'Try Again',
       primaryActionIcon: Icons.refresh_rounded,
       onPrimaryAction: _retry,
     );

@@ -309,7 +309,7 @@ class SystemBehaviorSettings extends ChangeNotifier {
   int get volumeStepPercent => _snapshot.volumeStepPercent;
 
   /// Whether playback resumes when a call or another interruption ends.
-  bool get resumeAfterCall => _snapshot.resumeAfterCall;
+  bool get resumeAfterCall => snapshot.resumeAfterCall;
 
   /// Reads every key. Safe to call more than once; missing or unparseable
   /// values keep their defaults or are clamped into range.
@@ -497,6 +497,7 @@ class SystemBehaviorSettings extends ChangeNotifier {
     notifyListeners();
     try {
       final SharedPreferences prefs = await SharedPreferences.getInstance();
+      _prefs = prefs;
       await persist(prefs);
     } catch (e, st) {
       ErrorLogger.log(

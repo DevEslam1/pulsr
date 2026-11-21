@@ -74,7 +74,7 @@ void main() {
   });
 
   testWidgets(
-      'watch keeps skeleton on empty list then renders when matching id arrives',
+      'watch renders notFoundMessage when emission lacks target id then renders when matching id arrives',
       (tester) async {
     final controller = StreamController<Result<List<String>>>();
     addTearDown(controller.close);
@@ -90,21 +90,33 @@ void main() {
       ),
     );
 
-    // Emit an empty list first: must keep skeleton (not "Not found") and stay subscribed.
+    // Emit an empty list first: renders notFoundMessage (not infinite skeleton) and stays subscribed.
     controller.add(const Right(<String>[]));
     await tester.pump();
-    expect(find.text('Not found'), findsNothing);
+    expect(find.text('Not found'), findsOneWidget);
+    expect(find.textContaining('Loaded:'), findsNothing);
+
+    // Emit a list without the target ID: also renders notFoundMessage.
+    controller.add(const Right(<String>['other1', 'other2']));
+    await tester.pump();
+    expect(find.text('Not found'), findsOneWidget);
     expect(find.textContaining('Loaded:'), findsNothing);
 
     // Emit a list containing the matching id: builder must render.
     controller.add(const Right(<String>['other', 'target:v1']));
     await tester.pump();
+    await tester.pump();
+    for (final text in find.byType(Text).evaluate()) {
+      print('FOUND TEXT: ${(text.widget as Text).data}');
+    }
     expect(find.text('Loaded: target:v1'), findsOneWidget);
+    expect(find.text('Not found'), findsNothing);
 
     // Later emission updates the entity in place.
     controller.add(const Right(<String>['target:v2']));
     await tester.pump();
     expect(find.text('Loaded: target:v2'), findsOneWidget);
+    expect(find.text('Not found'), findsNothing);
 
     // Flush the skeleton shimmer's delayed timers before teardown.
     await tester.pump(const Duration(seconds: 1));

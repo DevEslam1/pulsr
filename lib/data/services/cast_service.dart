@@ -147,8 +147,8 @@ class CastService {
   static const String receiverAppId =
       String.fromEnvironment('CAST_RECEIVER_APP_ID');
 
-  static final CastService _instance = CastService._internal();
-  factory CastService() => _instance;
+  static CastService? _instance;
+  factory CastService() => _instance ??= CastService._internal();
   CastService._internal();
 
   // ---- mDNS fallback ----
@@ -604,5 +604,11 @@ class CastService {
     if (!_devices.isClosed) _devices.close();
     if (!_routes.isClosed) _routes.close();
     if (!_session.isClosed) _session.close();
+    try {
+      _sessionStatusNotifier.dispose();
+    } catch (_) {}
+    if (identical(_instance, this)) {
+      _instance = null;
+    }
   }
 }

@@ -235,6 +235,10 @@ class AudioSignalPath {
       driverPath: driver,
       hardwareSampleRate: hwRate,
       hardwareBitDepth: hwDepth,
+      hardwareChannels: output?.effectiveOutputChannels != null &&
+              output!.effectiveOutputChannels > 0
+          ? output.effectiveOutputChannels
+          : (output?.decodedChannelCount ?? 2),
       isBitPerfect: bitPerfect,
       isDirectPath: direct,
       hardwareSummary: hwText,

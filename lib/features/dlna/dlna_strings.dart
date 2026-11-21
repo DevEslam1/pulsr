@@ -49,6 +49,12 @@ abstract final class DlnaStrings {
   /// Pause control label and tooltip.
   static const String pause = 'Pause';
 
+  /// Previous control label and tooltip.
+  static const String previous = 'Previous';
+
+  /// Next control label and tooltip.
+  static const String next = 'Next';
+
   /// Resume control label and tooltip.
   static const String resume = 'Resume';
 

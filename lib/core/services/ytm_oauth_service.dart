@@ -123,6 +123,10 @@ class YtmOAuthService {
   /// before a request to guarantee validity.
   String? get accessToken => _accessToken;
 
+  void dispose() {
+    _client.close();
+  }
+
   Future<void> init() {
     if (_initialized) return Future.value();
     // Memoize the in-flight load so concurrent callers share it, but allow a

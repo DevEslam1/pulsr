@@ -141,6 +141,8 @@ class _PulsrPressableState extends State<PulsrPressable>
     if (context.motionEnabled &&
         (_controller.isAnimating || _controller.value > 0)) {
       _controller.reverse();
+    } else if (!context.motionEnabled && _controller.value > 0) {
+      _controller.value = 0.0;
     }
   }
 

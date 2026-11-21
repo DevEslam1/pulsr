@@ -304,6 +304,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get somethingWentWrong => 'Something went wrong';
 
   @override
+  String get errorBoundarySubtitle =>
+      'An unexpected error occurred while displaying this content.';
+
+  @override
   String get saveSearch => 'Save Search';
 
   @override

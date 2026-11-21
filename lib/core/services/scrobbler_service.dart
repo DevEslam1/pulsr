@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 import '../constants/channels.dart';
 import '../constants/prefs_keys.dart';
+import '../network/remote_target_policy.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 
@@ -15,11 +16,13 @@ import '../utils/ytm_rate_limiter.dart';
 class ScrobblerService {
   static const MethodChannel _channel = MethodChannel(PulsrChannels.scrobbler);
   final http.Client _httpClient;
+  final bool _ownsClient;
   final FlutterSecureStorage _secureStorage;
 
   ScrobblerService(
       [http.Client? httpClient, FlutterSecureStorage? secureStorage])
       : _httpClient = httpClient ?? http.Client(),
+        _ownsClient = httpClient == null,
         _secureStorage = secureStorage ??
             const FlutterSecureStorage(
               aOptions: AndroidOptions(
@@ -29,6 +32,13 @@ class ScrobblerService {
                 accessibility: KeychainAccessibility.first_unlock,
               ),
             );
+
+  @disposeMethod
+  void dispose() {
+    if (_ownsClient) {
+      _httpClient.close();
+    }
+  }
 
   static const String keyLastFmApiKey = 'setting_lastfm_api_key';
   static const String keyLastFmSecret = 'setting_lastfm_secret';
@@ -59,7 +69,7 @@ class ScrobblerService {
         // Single credential store (defect 23-01): best-effort wipe of any
         // leftover plaintext copy whenever the secure copy is authoritative.
         try {
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = await _getPrefs();
           await prefs.remove(legacyKey);
         } catch (_) {
           ErrorLogger.addBreadcrumb('Legacy credential wipe skipped',
@@ -72,7 +82,7 @@ class ScrobblerService {
           category: 'Scrobbler');
     }
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final legacyVal = prefs.getString(legacyKey)?.trim();
       if (legacyVal != null && legacyVal.isNotEmpty) {
         try {
@@ -338,7 +348,7 @@ class ScrobblerService {
         );
 
         try {
-          final prefs = await SharedPreferences.getInstance();
+          final prefs = await _getPrefs();
           await prefs.setInt('last_scrobbled_id', id);
           await prefs.setInt(
               'last_scrobble_time', DateTime.now().millisecondsSinceEpoch);
@@ -361,7 +371,7 @@ class ScrobblerService {
     required String album,
     required int durationSec,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _getPrefs();
     if (!AppConfig.isCloudSyncAllowed ||
         prefs.getBool(PrefsKeys.offlineOnlyMode) == true) {
       return;
@@ -473,6 +483,61 @@ class ScrobblerService {
     return false;
   }
 
+  Future<bool> _postWebhookSafe(
+    Uri uri, {
+    required Map<String, String> headers,
+    required String body,
+    int maxAttempts = 3,
+  }) async {
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        var currentUri = uri;
+        bool retryable = false;
+        for (var redirectCount = 0; redirectCount <= 3; redirectCount++) {
+          final request = http.Request('POST', currentUri)
+            ..headers.addAll(headers)
+            ..body = body
+            ..followRedirects = false;
+          final response = await _httpClient
+              .send(request)
+              .timeout(const Duration(seconds: 10));
+
+          final status = response.statusCode;
+          await response.stream.listen((_) {}, onError: (_) {}).cancel();
+
+          if (status >= 300 &&
+              status < 400 &&
+              response.headers.containsKey('location')) {
+            if (redirectCount == 3) return false;
+            final location = response.headers['location']!;
+            final nextUri = currentUri.resolve(location);
+            final nextUrl = nextUri.toString();
+            if (!RemoteTargetPolicy.isAllowed(nextUrl)) return false;
+            final isSafe = await RemoteTargetPolicy.isSafeHost(nextUri.host);
+            if (!isSafe) return false;
+            currentUri = nextUri;
+            continue;
+          }
+
+          if (status >= 200 && status < 300) {
+            return true;
+          } else if (status == 429 || status >= 500) {
+            retryable = true;
+            break;
+          } else {
+            return false;
+          }
+        }
+        if (!retryable || attempt == maxAttempts) return false;
+        await Future.delayed(Duration(milliseconds: 500 * attempt));
+      } catch (e) {
+        if (attempt == maxAttempts) return false;
+        await Future.delayed(Duration(milliseconds: 250 * attempt));
+      }
+    }
+    return false;
+  }
+
   Future<void> _enqueueOfflineScrobble({
     required String artist,
     required String track,
@@ -482,7 +547,7 @@ class ScrobblerService {
     List<String>? services,
   }) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final queueJson = prefs.getString(_keyOfflineQueue);
       final list = <Map<String, dynamic>>[];
       if (queueJson != null && queueJson.isNotEmpty) {
@@ -536,7 +601,7 @@ class ScrobblerService {
     required DateTime timestamp,
     String? artworkUrl,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _getPrefs();
     // Offline-only mode (and Pure builds, which have no network): queue
     // locally, never hit the network.
     if (!AppConfig.isCloudSyncAllowed ||
@@ -562,6 +627,7 @@ class ScrobblerService {
 
     final pending = <String>{};
     bool anyServiceEnabled = false;
+    bool anySuccess = false;
 
     // 1. Last.fm Scrobble
     if (prefs.getBool(keyLastFmEnabled) == true) {
@@ -599,6 +665,7 @@ class ScrobblerService {
             body: params,
           );
           if (ok) {
+            anySuccess = true;
             _recordServiceScrobble('lastfm');
           } else {
             pending.add('lastfm');
@@ -631,6 +698,7 @@ class ScrobblerService {
             body: params,
           );
           if (ok) {
+            anySuccess = true;
             _recordServiceScrobble('librefm');
           } else {
             pending.add('librefm');
@@ -646,24 +714,30 @@ class ScrobblerService {
         pending.add('webhook');
       } else {
         final webhookUrl = prefs.getString(keyCustomWebhookUrl);
-        if (webhookUrl != null && webhookUrl.isNotEmpty) {
-          final ok = await _postWithRetry(
-            Uri.parse(webhookUrl),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'event': 'scrobble',
-              'artist': artist,
-              'track': track,
-              'album': album,
-              'durationSec': durationSec,
-              'timestamp': timestamp.toIso8601String(),
-              'artworkUrl': artworkUrl,
-            }),
-          );
-          if (ok) {
-            _recordServiceScrobble('webhook');
-          } else {
-            pending.add('webhook');
+        if (webhookUrl != null &&
+            webhookUrl.isNotEmpty &&
+            RemoteTargetPolicy.isAllowed(webhookUrl)) {
+          final uri = Uri.tryParse(webhookUrl);
+          if (uri != null && await RemoteTargetPolicy.isSafeHost(uri.host)) {
+            final ok = await _postWebhookSafe(
+              uri,
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'event': 'scrobble',
+                'artist': artist,
+                'track': track,
+                'album': album,
+                'durationSec': durationSec,
+                'timestamp': timestamp.toIso8601String(),
+                'artworkUrl': artworkUrl,
+              }),
+            );
+            if (ok) {
+              anySuccess = true;
+              _recordServiceScrobble('webhook');
+            } else {
+              pending.add('webhook');
+            }
           }
         }
       }
@@ -706,6 +780,7 @@ class ScrobblerService {
             body: jsonEncode(payload),
           );
           if (ok) {
+            anySuccess = true;
             _recordServiceScrobble('listenbrainz');
           } else {
             pending.add('listenbrainz');
@@ -732,7 +807,7 @@ class ScrobblerService {
       await prefs.setString('last_scrobble_key', dedupKey);
       await prefs.setInt('last_scrobble_time', now);
       await prefs.setInt('last_scrobbled_timestamp', now);
-      if (pending.isEmpty) {
+      if (anySuccess && pending.isEmpty) {
         await _recordSuccessfulScrobble(
             prefs, timestamp.millisecondsSinceEpoch);
       }
@@ -784,7 +859,7 @@ class ScrobblerService {
     if (_isFlushing) return;
     _isFlushing = true;
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       // Offline-only mode (and Pure builds): keep the queue stored, never hit
       // the network.
       if (!AppConfig.isCloudSyncAllowed ||
@@ -906,7 +981,7 @@ class ScrobblerService {
     required DateTime timestamp,
     List<String>? requestedServices,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _getPrefs();
 
     final dedupKey = '${artist}_$track';
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -989,22 +1064,27 @@ class ScrobblerService {
 
     if (wants('webhook') && prefs.getBool(keyCustomWebhookEnabled) == true) {
       final webhookUrl = prefs.getString(keyCustomWebhookUrl);
-      if (webhookUrl != null && webhookUrl.isNotEmpty) {
-        if (await _postWithRetry(
-          Uri.parse(webhookUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'event': 'scrobble',
-            'artist': artist,
-            'track': track,
-            'album': album,
-            'durationSec': durationSec,
-            'timestamp': timestamp.toIso8601String(),
-          }),
-        )) {
-          anySuccess = true;
-        } else {
-          pending.add('webhook');
+      if (webhookUrl != null &&
+          webhookUrl.isNotEmpty &&
+          RemoteTargetPolicy.isAllowed(webhookUrl)) {
+        final uri = Uri.tryParse(webhookUrl);
+        if (uri != null && await RemoteTargetPolicy.isSafeHost(uri.host)) {
+          if (await _postWebhookSafe(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'event': 'scrobble',
+              'artist': artist,
+              'track': track,
+              'album': album,
+              'durationSec': durationSec,
+              'timestamp': timestamp.toIso8601String(),
+            }),
+          )) {
+            anySuccess = true;
+          } else {
+            pending.add('webhook');
+          }
         }
       }
     }

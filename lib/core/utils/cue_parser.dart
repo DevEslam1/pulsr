@@ -370,6 +370,8 @@ class CueParser {
       var offset = 4;
       final sb = StringBuffer();
 
+      final effectiveRate = sampleRate > 0 ? sampleRate : 44100;
+
       for (int i = 0; i < numPoints; i++) {
         if (offset + 24 > bytes.length) break;
         // sample offset is at offset + 20
@@ -380,7 +382,7 @@ class CueParser {
         offset += 24;
 
         final trackNum = i + 1;
-        final totalFrames = ((sampleOffset / sampleRate) * 75.0).round();
+        final totalFrames = ((sampleOffset / effectiveRate) * 75.0).round();
         final minutes = totalFrames ~/ (75 * 60);
         final seconds = (totalFrames % (75 * 60)) ~/ 75;
         final frames = totalFrames % 75;

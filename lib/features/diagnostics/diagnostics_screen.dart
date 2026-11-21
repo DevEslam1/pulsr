@@ -313,6 +313,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         if (_busy) const LinearProgressIndicator(minHeight: 2),
         _A11yButton(
           label: DiagnosticsStrings.exportAction,
+          enabled: !_busy,
           child: FilledButton.icon(
             onPressed: _busy ? null : _exportBundle,
             icon: const Icon(Icons.ios_share_rounded),
@@ -322,6 +323,7 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         const SizedBox(height: AppSpacing.xs),
         _A11yButton(
           label: DiagnosticsStrings.selfTestAction,
+          enabled: !_busy,
           child: OutlinedButton.icon(
             onPressed: _busy ? null : _runSelfTest,
             icon: const Icon(Icons.check_circle_outline_rounded),
@@ -520,6 +522,7 @@ class _SafeModeCard extends StatelessWidget {
           label: active
               ? DiagnosticsStrings.safeModeExit
               : DiagnosticsStrings.safeModeEnter,
+          enabled: !busy,
           child: OutlinedButton.icon(
             onPressed: busy ? null : (active ? onExit : onEnter),
             icon: Icon(
@@ -667,10 +670,15 @@ class _Row extends StatelessWidget {
 
 /// Exposes one explicit accessibility label per control.
 class _A11yButton extends StatelessWidget {
-  const _A11yButton({required this.label, required this.child});
+  const _A11yButton({
+    required this.label,
+    required this.child,
+    this.enabled = true,
+  });
 
   final String label;
   final Widget child;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -678,6 +686,7 @@ class _A11yButton extends StatelessWidget {
       container: true,
       button: true,
       label: label,
+      enabled: enabled,
       excludeSemantics: true,
       child: child,
     );

@@ -494,6 +494,7 @@ class _Header extends StatelessWidget {
               Expanded(
                 child: _A11yButton(
                   label: AudioProfileStrings.captureAction,
+                  enabled: !busy,
                   child: FilledButton.icon(
                     onPressed: busy ? null : onCapture,
                     icon: const Icon(Icons.add_rounded),
@@ -505,6 +506,7 @@ class _Header extends StatelessWidget {
               Expanded(
                 child: _A11yButton(
                   label: AudioProfileStrings.importAction,
+                  enabled: !busy,
                   child: OutlinedButton.icon(
                     onPressed: busy ? null : onImport,
                     icon: const Icon(Icons.file_open_rounded),
@@ -602,6 +604,7 @@ class _ProfileCard extends StatelessWidget {
             children: <Widget>[
               _A11yButton(
                 label: AudioProfileStrings.applyTooltip,
+                enabled: !busy,
                 child: IconButton(
                   tooltip: AudioProfileStrings.applyTooltip,
                   onPressed: busy ? null : onApply,
@@ -613,6 +616,7 @@ class _ProfileCard extends StatelessWidget {
               ),
               _A11yButton(
                 label: AudioProfileStrings.shareTooltip,
+                enabled: !busy,
                 child: IconButton(
                   tooltip: AudioProfileStrings.shareTooltip,
                   onPressed: busy ? null : onShare,
@@ -621,6 +625,7 @@ class _ProfileCard extends StatelessWidget {
               ),
               _A11yButton(
                 label: AudioProfileStrings.deleteTooltip,
+                enabled: !busy,
                 child: IconButton(
                   tooltip: AudioProfileStrings.deleteTooltip,
                   onPressed: busy ? null : onDelete,
@@ -637,10 +642,15 @@ class _ProfileCard extends StatelessWidget {
 
 /// Exposes one explicit accessibility label per control.
 class _A11yButton extends StatelessWidget {
-  const _A11yButton({required this.label, required this.child});
+  const _A11yButton({
+    required this.label,
+    required this.child,
+    this.enabled = true,
+  });
 
   final String label;
   final Widget child;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -648,6 +658,7 @@ class _A11yButton extends StatelessWidget {
       container: true,
       button: true,
       label: label,
+      enabled: enabled,
       excludeSemantics: true,
       child: child,
     );

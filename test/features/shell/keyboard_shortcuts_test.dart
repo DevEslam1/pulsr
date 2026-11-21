@@ -30,6 +30,22 @@ void main() {
     );
   }
 
+  Widget buildArrowScope({bool withTextField = false}) {
+    return MaterialApp(
+      home: PlayerArrowShortcutScope(
+        onSeekForward: () => hit('seekForward'),
+        onSeekBackward: () => hit('seekBackward'),
+        onVolumeUp: () => hit('volumeUp'),
+        onVolumeDown: () => hit('volumeDown'),
+        child: Scaffold(
+          body: withTextField
+              ? const Center(child: TextField())
+              : const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
+
   Future<void> press(WidgetTester tester, LogicalKeyboardKey key) async {
     await tester.sendKeyEvent(key);
     await tester.pump();
@@ -45,7 +61,7 @@ void main() {
   });
 
   testWidgets('arrow keys seek and adjust volume', (tester) async {
-    await tester.pumpWidget(build());
+    await tester.pumpWidget(buildArrowScope());
     await tester.pump();
     await press(tester, LogicalKeyboardKey.arrowRight);
     await press(tester, LogicalKeyboardKey.arrowLeft);

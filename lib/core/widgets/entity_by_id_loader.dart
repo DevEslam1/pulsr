@@ -97,12 +97,10 @@ class _EntityByIdLoaderState<T> extends State<EntityByIdLoader<T>> {
             }
           });
           if (!mounted) return;
-          if (matched != null) {
-            setState(() {
-              _entity = matched;
-              _done = true;
-            });
-          }
+          setState(() {
+            _entity = matched;
+            _done = true;
+          });
         },
         onError: (_) {
           if (mounted && generation == _generation) {

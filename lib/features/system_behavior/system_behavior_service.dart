@@ -294,6 +294,7 @@ class SystemBehaviorService with WidgetsBindingObserver {
   bool _started = false;
   bool _disposed = false;
   bool _usbReleasedForBackground = false;
+  bool _usbReleasedForFocusLoss = false;
 
   /// Whether a fade-out ramp is currently running.
   bool get isFading => _fade.isRunning;
@@ -404,6 +405,19 @@ class SystemBehaviorService with WidgetsBindingObserver {
     _fade.cancelTimer();
     await _fade.restore();
     if (decision != InterruptionDecision.resume) return false;
+    if (_usbReleasedForFocusLoss) {
+      _usbReleasedForFocusLoss = false;
+      try {
+        await _usbRelease(true);
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Re-claiming the exclusive USB stream after focus loss failed',
+          error: e,
+          stackTrace: st,
+          category: 'SystemBehavior',
+        );
+      }
+    }
     await _resume();
     return true;
   }
@@ -554,6 +568,7 @@ class SystemBehaviorService with WidgetsBindingObserver {
     }
     _interruptionSub = null;
     _noisySub = null;
+    _usbReleasedForFocusLoss = false;
   }
 
   void _onInterruptionEvent(AudioInterruptionEvent event) {
@@ -597,6 +612,7 @@ class SystemBehaviorService with WidgetsBindingObserver {
         await _pause();
         return;
       case SystemAction.pauseAndReleaseUsb:
+        _usbReleasedForFocusLoss = true;
         await _fade.cancel(restoreVolume: true);
         await _releaseUsb();
         await _pause();

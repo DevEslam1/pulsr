@@ -11,6 +11,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:mutex/mutex.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -174,6 +175,7 @@ class AudioProfileService {
 
   /// Temporary export folders created by [export] and not cleaned up yet.
   final Set<String> _pendingExports = <String>{};
+  final Mutex _mutex = Mutex();
 
   late final _ProfileBackups _backups = _ProfileBackups(
     directory: () => _directory(backups: true),
@@ -269,6 +271,19 @@ class AudioProfileService {
   /// Captures the whitelisted settings currently in shared preferences and
   /// stores them as a new profile called [name].
   Future<AudioProfile> captureCurrent(
+    String name, {
+    int? deviceVid,
+    int? devicePid,
+    String? deviceName,
+  }) =>
+      _mutex.protect(() => _captureCurrentUnlocked(
+            name,
+            deviceVid: deviceVid,
+            devicePid: devicePid,
+            deviceName: deviceName,
+          ));
+
+  Future<AudioProfile> _captureCurrentUnlocked(
     String name, {
     int? deviceVid,
     int? devicePid,
@@ -371,7 +386,10 @@ class AudioProfileService {
   /// attempted and its individual outcome is reported; if any write fails the
   /// snapshot is restored and [AudioProfileApplyError.results] carries the
   /// per-key status.
-  Future<AudioProfileApplyReport> apply(AudioProfile profile) async {
+  Future<AudioProfileApplyReport> apply(AudioProfile profile) =>
+      _mutex.protect(() => _applyUnlocked(profile));
+
+  Future<AudioProfileApplyReport> _applyUnlocked(AudioProfile profile) async {
     final snapshot = <String, Object?>{
       for (final key in AudioProfileKeys.whitelist) key: _prefs.get(key),
     };
@@ -470,7 +488,10 @@ class AudioProfileService {
   /// profile twice keeps both copies. Settings that are not whitelisted or
   /// carry corrupt values are dropped (see [AudioProfile.ignoredKeys]); the
   /// live settings are refreshed after a successful import.
-  Future<AudioProfile> importFromFile(String path) async {
+  Future<AudioProfile> importFromFile(String path) =>
+      _mutex.protect(() => _importFromFileUnlocked(path));
+
+  Future<AudioProfile> _importFromFileUnlocked(String path) async {
     try {
       final file = File(path);
       if (!await file.exists()) {
@@ -599,7 +620,10 @@ class AudioProfileService {
   ///
   /// Deleting the profile that is currently marked as the default also clears
   /// the default selection so it can never point at a missing file.
-  Future<void> delete(String id) async {
+  Future<void> delete(String id) =>
+      _mutex.protect(() => _deleteUnlocked(id));
+
+  Future<void> _deleteUnlocked(String id) async {
     try {
       if (!_safeId.hasMatch(id)) {
         throw const AudioProfileStoreError(

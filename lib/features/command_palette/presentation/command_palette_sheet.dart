@@ -19,6 +19,9 @@ import '../../../core/widgets/highlighted_text.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_pressable.dart';
 import '../../../core/widgets/pulsr_search_field.dart';
+import '../../../domain/models/genre_item.dart';
+import '../../dlna/dlna_screen.dart';
+import '../../extras/presentation/extras_screen.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
@@ -89,6 +92,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   final FocusNode _focusNode = FocusNode();
   int _selectedIndex = 0;
   String _query = '';
+  List<CommandPaletteItem>? _cachedAllItems;
+  final Map<int, GlobalKey> _itemKeys = <int, GlobalKey>{};
 
   @override
   void initState() {
@@ -96,10 +101,32 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
     _searchController.addListener(_onSearchChanged);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cachedAllItems = _buildAllItems(context);
+  }
+
   void _onSearchChanged() {
     setState(() {
       _query = _searchController.text.trim();
       _selectedIndex = 0;
+      _itemKeys.clear();
+    });
+  }
+
+  void _scrollToSelected() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _itemKeys[_selectedIndex];
+      final itemContext = key?.currentContext;
+      if (itemContext != null && itemContext.mounted) {
+        Scrollable.ensureVisible(
+          itemContext,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeInOut,
+        );
+      }
     });
   }
 
@@ -166,10 +193,114 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       CommandPaletteItem(
         id: 'nav_radio',
         title: l10n.radioTitle,
+        subtitle: 'Stream online radio stations',
         icon: Icons.radio_rounded,
         section: CommandPaletteSection.navigation,
-        keywords: ['quran', 'recitation', 'broadcast'],
+        keywords: [
+          'radio',
+          'stream',
+          'broadcast',
+          'stations',
+          'live',
+          'quran',
+          'recitation',
+        ],
         onSelect: (ctx) => ctx.push('/radio'),
+      ),
+      CommandPaletteItem(
+        id: 'nav_equalizer',
+        title: l10n.equalizerTitle,
+        subtitle: l10n.equalizerSubtitle,
+        icon: Icons.tune_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: [
+          'equalizer',
+          'eq',
+          'dsp',
+          'sound',
+          'bands',
+          'bass',
+          'profile',
+          'tone',
+        ],
+        onSelect: (ctx) => EqualizerSheet.show(ctx),
+      ),
+      CommandPaletteItem(
+        id: 'nav_diagnostics',
+        title: 'Diagnostics',
+        subtitle: 'System logs, USB audio checks and safe mode',
+        icon: Icons.monitor_heart_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: [
+          'diagnostics',
+          'logs',
+          'bundle',
+          'usb',
+          'safe mode',
+          'bug',
+          'report',
+          'troubleshoot',
+        ],
+        onSelect: (ctx) => Navigator.of(ctx).push(
+          MaterialPageRoute<void>(builder: (_) => const ExtrasScreen()),
+        ),
+      ),
+      CommandPaletteItem(
+        id: 'nav_audio_profiles',
+        title: 'Audio Profiles',
+        subtitle: 'Saved sound and DSP presets',
+        icon: Icons.badge_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: [
+          'profiles',
+          'audio profiles',
+          'sound profile',
+          'preset',
+          'dsp',
+          'dac',
+        ],
+        onSelect: (ctx) => Navigator.of(ctx).push(
+          MaterialPageRoute<void>(builder: (_) => const ExtrasScreen()),
+        ),
+      ),
+      CommandPaletteItem(
+        id: 'nav_dlna',
+        title: 'DLNA / UPnP Cast',
+        subtitle: 'Cast audio to network renderers and speakers',
+        icon: Icons.cast_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: [
+          'dlna',
+          'upnp',
+          'cast',
+          'stream',
+          'renderer',
+          'network audio',
+          'wifi speaker',
+        ],
+        onSelect: (ctx) => Navigator.of(ctx).push(
+          MaterialPageRoute<void>(builder: (_) => const DlnaScreen()),
+        ),
+      ),
+      CommandPaletteItem(
+        id: 'nav_podcasts_audiobooks',
+        title: 'Podcasts & Audiobooks',
+        subtitle: 'Long-form spoken word with position bookmarks',
+        icon: Icons.podcasts_rounded,
+        section: CommandPaletteSection.navigation,
+        keywords: [
+          'podcast',
+          'podcasts',
+          'audiobook',
+          'audiobooks',
+          'spoken',
+          'bookmark',
+          'resume',
+        ],
+        onSelect: (ctx) => ctx.push(
+          '/genre',
+          extra: const GenreItem(name: 'Podcasts', songCount: 0),
+        ),
       ),
       CommandPaletteItem(
         id: 'nav_downloads',
@@ -409,7 +540,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
-    final filtered = _buildAllItems(context)
+    final allItems = _cachedAllItems ?? _buildAllItems(context);
+    final filtered = allItems
         .where((item) => item.matches(_query))
         .toList();
 
@@ -419,11 +551,13 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       setState(() {
         _selectedIndex = (_selectedIndex + 1) % filtered.length;
       });
+      _scrollToSelected();
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       setState(() {
         _selectedIndex = (_selectedIndex - 1 + filtered.length) % filtered.length;
       });
+      _scrollToSelected();
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter) {
@@ -455,7 +589,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final l10n = context.l10n;
-    final allItems = _buildAllItems(context);
+    final allItems = _cachedAllItems ?? _buildAllItems(context);
     final filtered = allItems.where((item) => item.matches(_query)).toList();
 
     final maxH = math.min(
@@ -561,6 +695,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
                               label: item.title,
                               hint: item.subtitle,
                               child: Container(
+                                key: _itemKeys.putIfAbsent(index, GlobalKey.new),
                                 margin: const EdgeInsets.symmetric(
                                   vertical: 1.5,
                                 ),

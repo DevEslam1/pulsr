@@ -84,10 +84,13 @@ class DlnaRendererService extends ChangeNotifier {
   bool _pollStale = false;
   String? _token;
   String? _lastCastPath;
+  String? _lastCastUrl;
+  String? _lastCastMimeType;
   String? _lastCastTitle;
   String? _lastCastArtist;
   String? _lastCastAlbum;
   Duration? _lastCastDuration;
+  int _opSequence = 0;
   bool _disposed = false;
 
   /// Creates the service. Every collaborator is injectable for tests.
@@ -196,6 +199,7 @@ class DlnaRendererService extends ChangeNotifier {
   /// interface facing the new device.
   Future<void> select(UpnpDeviceDescription device) async {
     if (_disposed) return;
+    final op = ++_opSequence;
     _state = DlnaState.connecting;
     _lastError = null;
     notifyListeners();
@@ -221,7 +225,7 @@ class DlnaRendererService extends ChangeNotifier {
       _revokeMediaToken();
       await _shutdownMediaServer();
     }
-    if (_disposed) return;
+    if (_disposed || op != _opSequence) return;
 
     final client = AvTransportClient(
       device.avTransportControlUrl,
@@ -231,7 +235,10 @@ class DlnaRendererService extends ChangeNotifier {
 
     try {
       final info = await client.getTransportInfo();
-      if (_disposed) return;
+      if (_disposed || op != _opSequence) {
+        client.close();
+        return;
+      }
       _selectedDevice = device;
       if (switching) {
         _nowPlayingTitle = null;
@@ -241,6 +248,7 @@ class DlnaRendererService extends ChangeNotifier {
       _state = _stateFor(info.state);
       notifyListeners();
     } catch (error, stackTrace) {
+      if (op != _opSequence) return;
       _avTransport = null;
       client.close();
       _fail(error, stackTrace, 'DLNA connect failed');
@@ -259,6 +267,7 @@ class DlnaRendererService extends ChangeNotifier {
     Duration? duration,
   }) async {
     if (_disposed) return;
+    final op = ++_opSequence;
     final client = _avTransport;
     final device = _selectedDevice;
     if (client == null || device == null) {
@@ -280,6 +289,8 @@ class DlnaRendererService extends ChangeNotifier {
 
     final resolvedTitle = title ?? p.basenameWithoutExtension(path);
     _lastCastPath = path;
+    _lastCastUrl = null;
+    _lastCastMimeType = null;
     _lastCastTitle = resolvedTitle;
     _lastCastArtist = artist;
     _lastCastAlbum = album;
@@ -291,6 +302,7 @@ class DlnaRendererService extends ChangeNotifier {
       // attempt must never leave the old URL fetchable.
       _revokeMediaToken();
       final size = await File(path).length();
+      if (_disposed || op != _opSequence) return;
       if (!_mediaServer.isRunning) {
         final controlUrl = device.avTransportControlUrl;
         final controlPort = controlUrl.hasPort
@@ -298,7 +310,9 @@ class DlnaRendererService extends ChangeNotifier {
             : (controlUrl.scheme == 'https' ? 443 : 80);
         final bindAddress =
             await _localAddressResolver(controlUrl.host, controlPort);
+        if (_disposed || op != _opSequence) return;
         await _mediaServer.start(bindAddress: bindAddress);
+        if (_disposed || op != _opSequence) return;
       }
 
       token = MediaHttpServer.newToken();
@@ -323,12 +337,17 @@ class DlnaRendererService extends ChangeNotifier {
 
       await client.setAvTransportUri(url, metadata);
       await client.play();
-      if (_disposed) return;
+      if (_disposed || op != _opSequence) {
+        _mediaServer.unregister(token);
+        if (_token == token) _token = null;
+        return;
+      }
       _state = DlnaState.playing;
       _pollFailures = 0;
       notifyListeners();
       _startPolling();
     } catch (error, stackTrace) {
+      if (op != _opSequence) return;
       if (token != null) {
         _mediaServer.unregister(token);
         if (_token == token) _token = null;
@@ -348,6 +367,7 @@ class DlnaRendererService extends ChangeNotifier {
     String? mimeType,
   }) async {
     if (_disposed) return;
+    final op = ++_opSequence;
     final client = _avTransport;
     final device = _selectedDevice;
     if (client == null || device == null) {
@@ -360,6 +380,8 @@ class DlnaRendererService extends ChangeNotifier {
     }
     final resolvedTitle = title ?? url;
     _lastCastPath = null;
+    _lastCastUrl = url;
+    _lastCastMimeType = mimeType;
     _lastCastTitle = resolvedTitle;
     _lastCastArtist = artist;
     _lastCastAlbum = album;
@@ -383,12 +405,13 @@ class DlnaRendererService extends ChangeNotifier {
 
       await client.setAvTransportUri(url, metadata);
       await client.play();
-      if (_disposed) return;
+      if (_disposed || op != _opSequence) return;
       _state = DlnaState.playing;
       _pollFailures = 0;
       notifyListeners();
       _startPolling();
     } catch (error, stackTrace) {
+      if (op != _opSequence) return;
       _fail(error, stackTrace, 'DLNA playUrl failed');
     }
   }
@@ -476,6 +499,7 @@ class DlnaRendererService extends ChangeNotifier {
   /// Stops playback on the renderer and revokes the media token.
   Future<void> stop() async {
     if (_disposed) return;
+    final op = ++_opSequence;
     final client = _avTransport;
     if (client == null) {
       _revokeMediaToken();
@@ -484,12 +508,13 @@ class DlnaRendererService extends ChangeNotifier {
     _stopPolling();
     try {
       await client.stop();
-      if (_disposed) return;
+      if (_disposed || op != _opSequence) return;
       _state = DlnaState.stopped;
       _nowPlayingTitle = null;
       _position = Duration.zero;
       notifyListeners();
     } catch (error, stackTrace) {
+      if (op != _opSequence) return;
       _fail(error, stackTrace, 'DLNA stop failed');
     } finally {
       _revokeMediaToken();
@@ -525,6 +550,18 @@ class DlnaRendererService extends ChangeNotifier {
         artist: _lastCastArtist,
         album: _lastCastAlbum,
         duration: _lastCastDuration,
+      );
+      return;
+    }
+    final url = _lastCastUrl;
+    if (url != null && _avTransport != null && _selectedDevice != null) {
+      await playUrl(
+        url,
+        title: _lastCastTitle,
+        artist: _lastCastArtist,
+        album: _lastCastAlbum,
+        duration: _lastCastDuration,
+        mimeType: _lastCastMimeType,
       );
       return;
     }

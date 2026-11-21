@@ -31,6 +31,7 @@ class WaveformService {
   /// treat such an entry as a finished result, otherwise the instant preview
   /// permanently shadows the accurate native PCM decode under the same key.
   final Set<String> _syntheticMemKeys = {};
+  final Map<String, Future<List<double>>> _inFlight = {};
   Directory? _cacheDir;
 
   static const Duration _pruneInterval = Duration(seconds: 60);
@@ -81,6 +82,33 @@ class WaveformService {
     }
     _syntheticMemKeys.remove(memKey);
 
+    final existing = _inFlight[memKey];
+    if (existing != null) {
+      return existing;
+    }
+
+    final future = _loadAndCacheWaveform(
+      songId: songId,
+      filePath: filePath,
+      count: count,
+      memKey: memKey,
+    );
+    _inFlight[memKey] = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_inFlight[memKey], future)) {
+        _inFlight.remove(memKey);
+      }
+    }
+  }
+
+  Future<List<double>> _loadAndCacheWaveform({
+    required int songId,
+    String? filePath,
+    required int count,
+    required String memKey,
+  }) async {
     List<double>? samples;
     if (_isLocalFile(filePath)) {
       samples = await _loadFromDiskOrDecode(filePath!, count);
@@ -106,6 +134,7 @@ class WaveformService {
   void clearMemoryCache() {
     _memCache.clear();
     _syntheticMemKeys.clear();
+    _inFlight.clear();
   }
 
   void _putMem(String key, List<double> value) {

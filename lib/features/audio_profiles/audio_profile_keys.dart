@@ -109,6 +109,34 @@ abstract final class AudioProfileKeys {
     PrefsKeys.dacVoicingEnabled,
     PrefsKeys.dacVoicingCharacter,
     PrefsKeys.dacVoicingAmount,
+    // Loudness contour.
+    PrefsKeys.loudnessContourEnabled,
+    PrefsKeys.loudnessContourIntensity,
+    // Subwoofer crossover.
+    PrefsKeys.subCrossoverEnabled,
+    PrefsKeys.subCrossoverCornerHz,
+    PrefsKeys.subCrossoverSlopeDbPerOct,
+    PrefsKeys.subCrossoverGain,
+    PrefsKeys.subCrossoverBassMono,
+    PrefsKeys.subCrossoverAntiPop,
+    // Dynamic EQ.
+    PrefsKeys.dynamicEqEnabled,
+    PrefsKeys.dynamicEqBands,
+    // ViPER-DDC.
+    PrefsKeys.viperDdcEnabled,
+    PrefsKeys.viperDdcProfileName,
+    PrefsKeys.viperDdcContent,
+    // Arbitrary response EQ.
+    PrefsKeys.arbitraryEqEnabled,
+    PrefsKeys.arbitraryEqString,
+    PrefsKeys.arbitraryEqLinearPhase,
+    // Live programmable DSP.
+    PrefsKeys.liveProgEnabled,
+    PrefsKeys.liveProgCode,
+    PrefsKeys.liveProgSliders,
+    // Balance and mix.
+    PrefsKeys.stereoBalance,
+    PrefsKeys.monoMix,
   ];
 
   static final Set<String> _lookup = whitelist.toSet();

@@ -100,39 +100,64 @@ class PulsrListTile extends StatelessWidget {
       height: 1.2,
     );
 
+    Widget mainContent = Row(
+      children: [
+        if (leading != null) ...[
+          leading!,
+          const SizedBox(width: AppSpacing.sm),
+        ],
+        Expanded(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: titleStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: AppSpacing.s2),
+                Text(
+                  subtitle!,
+                  style: subtitleStyle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (onTap != null || onLongPress != null) {
+      mainContent = PulsrPressable(
+        onTap: enabled ? onTap : null,
+        onLongPress: enabled ? onLongPress : null,
+        child: mainContent,
+      );
+    }
+
+    final semanticMain = Semantics(
+      button: onTap != null,
+      enabled: enabled,
+      selected: selected,
+      // The visible title/subtitle live inside `mainContent`; without exclusion
+      // Flutter merges them into this node and TalkBack reads the row twice.
+      excludeSemantics: true,
+      label: subtitle == null ? title : '$title, $subtitle',
+      child: mainContent,
+    );
+
     Widget content = ConstrainedBox(
       constraints: BoxConstraints(minHeight: _minHeight),
       child: Padding(
         padding: _resolvePadding(),
         child: Row(
           children: [
-            if (leading != null) ...[
-              leading!,
-              const SizedBox(width: AppSpacing.sm),
-            ],
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: titleStyle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: AppSpacing.s2),
-                    Text(
-                      subtitle!,
-                      style: subtitleStyle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
+            Expanded(child: semanticMain),
             if (trailing != null) ...[
               const SizedBox(width: AppSpacing.sm),
               trailing!,
@@ -154,25 +179,6 @@ class PulsrListTile extends StatelessWidget {
       child: content,
     );
 
-    if (onTap != null || onLongPress != null) {
-      content = PulsrPressable(
-        onTap: enabled ? onTap : null,
-        onLongPress: enabled ? onLongPress : null,
-        child: content,
-      );
-    }
-
-    return RepaintBoundary(
-      child: Semantics(
-        button: onTap != null,
-        enabled: enabled,
-        selected: selected,
-        // The visible title/subtitle live inside `content`; without exclusion
-        // Flutter merges them into this node and TalkBack reads the row twice.
-        excludeSemantics: true,
-        label: subtitle == null ? title : '$title, $subtitle',
-        child: content,
-      ),
-    );
+    return RepaintBoundary(child: content);
   }
 }

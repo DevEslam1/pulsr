@@ -94,7 +94,8 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
     super.initState();
     final initial = widget.initial;
     _kind = initial?.kind ?? RemoteSourceKind.webdav;
-    _useTls = initial?.useTls ?? false;
+    _useTls =
+        initial?.useTls ?? (_kind == RemoteSourceKind.webdav ? true : false);
     _name = TextEditingController(text: initial?.displayName ?? '');
     _host = TextEditingController(text: initial?.host ?? '');
     _port = TextEditingController(
@@ -338,7 +339,15 @@ class _RemoteSourceEditorDialogState extends State<RemoteSourceEditorDialog> {
                     contentPadding: EdgeInsets.zero,
                     title: const Text(RemoteSourcesStrings.tlsLabel),
                     value: _useTls,
-                    onChanged: (value) => setState(() => _useTls = value),
+                    onChanged: (value) => setState(() {
+                      final currentPort = _port.text.trim();
+                      final previousDefault = _useTls ? '443' : '80';
+                      _useTls = value;
+                      if (currentPort == previousDefault ||
+                          currentPort.isEmpty) {
+                        _port.text = _useTls ? '443' : '80';
+                      }
+                    }),
                   ),
                   if (!_useTls)
                     Padding(

@@ -65,14 +65,39 @@ void main() {
         'http://[::1]/a',
         'http://[fe80::1]/a',
         'http://[fc00::1]/a',
+        'http://[ff02::1]/a',
+        'http://[fec0::1]/a',
         'http://[::ffff:192.168.0.2]/a',
         'http://[::ffff:7f00:1]/a',
+        'http://224.0.0.1/a',
+        'http://239.255.255.250/a',
+        'http://240.0.0.1/a',
+        'http://255.255.255.255/a',
       ];
       for (final url in blocked) {
         expect(RemoteTargetPolicy.classify(url),
             RemoteTargetVerdict.privateNetwork,
             reason: url);
       }
+    });
+
+    test('isUnsafeHost handles bracketed IPv6 directly', () {
+      expect(RemoteTargetPolicy.isUnsafeHost('[::1]'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('[fe80::1]'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('[ff00::1]'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('[fec0::1]'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('[2606:2800:220:1::1]'), isFalse);
+    });
+
+    test('isUnsafeHost and isIpLiteral reject IPv6 zone identifiers', () {
+      expect(RemoteTargetPolicy.isUnsafeHost('::1%lo'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('[::1%lo]'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('fe80::1%eth0'), isTrue);
+      expect(RemoteTargetPolicy.isUnsafeHost('[fe80::1%eth0]'), isTrue);
+      expect(RemoteTargetPolicy.isIpLiteral('::1%lo'), isTrue);
+      expect(RemoteTargetPolicy.isIpLiteral('[::1%lo]'), isTrue);
+      expect(RemoteTargetPolicy.isIpLiteral('fe80::1%eth0'), isTrue);
+      expect(RemoteTargetPolicy.isIpLiteral('[fe80::1%eth0]'), isTrue);
     });
 
     test('allows public addresses near but outside the private ranges', () {
@@ -123,6 +148,43 @@ void main() {
           allowedHostSuffixes: const {'192.168.1.50'},
         ),
         RemoteTargetVerdict.invalidScheme,
+      );
+    });
+
+    test('enforceAllowlist returns notAllowlisted when host does not match suffixes', () {
+      const suffixes = {'youtube.com', 'google.com'};
+      expect(
+        RemoteTargetPolicy.classify(
+          'https://music.youtube.com/watch',
+          allowedHostSuffixes: suffixes,
+          enforceAllowlist: true,
+        ),
+        RemoteTargetVerdict.allowed,
+      );
+      expect(
+        RemoteTargetPolicy.classify(
+          'https://example.com/watch',
+          allowedHostSuffixes: suffixes,
+          enforceAllowlist: true,
+        ),
+        RemoteTargetVerdict.notAllowlisted,
+      );
+      expect(
+        RemoteTargetPolicy.isAllowed(
+          'https://example.com/watch',
+          allowedHostSuffixes: suffixes,
+          enforceAllowlist: true,
+        ),
+        isFalse,
+      );
+      // When enforceAllowlist is false, public host passes even if not in suffixes
+      expect(
+        RemoteTargetPolicy.classify(
+          'https://example.com/watch',
+          allowedHostSuffixes: suffixes,
+          enforceAllowlist: false,
+        ),
+        RemoteTargetVerdict.allowed,
       );
     });
   });

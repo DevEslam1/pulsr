@@ -142,9 +142,23 @@ class DiagnosticsBundleService {
   static final RegExp _urlUserInfo =
       RegExp(r'([A-Za-z][A-Za-z0-9+.\-]*://)[^\s/@]+@');
   static final RegExp _credentialPair = RegExp(
-    r'\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|'
-    r'client[_-]?secret|authorization|cookie|session[_-]?id)\b\s*[:=]\s*'
-    r'[^\s,;"}]+',
+    r'''(["']?)\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|'''
+    r'''client[_-]?secret|authorization|cookie|session[_-]?id|username)\b\1'''
+    r'''(\s*[:=]\s*)'''
+    r'''(?:(["'])(?:\\.|(?!\4)[^\r\n\\])*\4|[^\s,;"}]+)''',
+    caseSensitive: false,
+  );
+  static final RegExp _privateIpv4 = RegExp(
+    r'\b(?:10(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}|'
+    r'172\.(?:1[6-9]|2\d|3[01])(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){2}|'
+    r'192\.168(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){2}|'
+    r'127(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}|'
+    r'169\.254(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){2})\b',
+  );
+  static final RegExp _privateIpv6 = RegExp(
+    r'(?:::1(?!\w)|'
+    r'\bfe[89ab][0-9a-fA-F]:[0-9a-fA-F:]*\b|'
+    r'\bf[cd][0-9a-fA-F]{2}:[0-9a-fA-F:]*\b)',
     caseSensitive: false,
   );
   static final RegExp _authorizationScheme =
@@ -178,8 +192,16 @@ class DiagnosticsBundleService {
     );
     output = output.replaceAllMapped(
       _credentialPair,
-      (match) => '${match.group(1)}=[REDACTED_SECRET]',
+      (match) {
+        final keyQuote = match.group(1) ?? '';
+        final key = match.group(2) ?? '';
+        final sep = match.group(3) ?? '=';
+        final valQuote = match.group(4) ?? '';
+        return '$keyQuote$key$keyQuote$sep$valQuote[REDACTED_SECRET]$valQuote';
+      },
     );
+    output = output.replaceAll(_privateIpv4, '[REDACTED_IP]');
+    output = output.replaceAll(_privateIpv6, '[REDACTED_IP]');
     output = output.replaceAllMapped(
       _authorizationScheme,
       (match) => '${match.group(1)} [REDACTED_TOKEN]',
@@ -395,6 +417,50 @@ class DiagnosticsBundleService {
         'enabled': enabled(PrefsKeys.dacVoicingEnabled),
         'detail': intDetail(PrefsKeys.dacVoicingCharacter, 'neutral'),
       },
+      <String, Object?>{
+        'stage': 'loudness_contour',
+        'enabled': enabled(PrefsKeys.loudnessContourEnabled),
+        'detail':
+            '${_doubleValue(PrefsKeys.loudnessContourIntensity) ?? 0.0}',
+      },
+      <String, Object?>{
+        'stage': 'sub_crossover',
+        'enabled': enabled(PrefsKeys.subCrossoverEnabled),
+        'detail':
+            '${_doubleValue(PrefsKeys.subCrossoverCornerHz) ?? 80.0} Hz',
+      },
+      <String, Object?>{
+        'stage': 'dynamic_eq',
+        'enabled': enabled(PrefsKeys.dynamicEqEnabled),
+        'detail': detail(PrefsKeys.dynamicEqBands, 'flat'),
+      },
+      <String, Object?>{
+        'stage': 'viper_ddc',
+        'enabled': enabled(PrefsKeys.viperDdcEnabled),
+        'detail': detail(PrefsKeys.viperDdcProfileName, 'none'),
+      },
+      <String, Object?>{
+        'stage': 'arbitrary_eq',
+        'enabled': enabled(PrefsKeys.arbitraryEqEnabled),
+        'detail': enabled(PrefsKeys.arbitraryEqLinearPhase)
+            ? 'linear-phase'
+            : 'minimum-phase',
+      },
+      <String, Object?>{
+        'stage': 'live_prog',
+        'enabled': enabled(PrefsKeys.liveProgEnabled),
+        'detail': detail(PrefsKeys.liveProgCode, 'none'),
+      },
+      <String, Object?>{
+        'stage': 'stereo_balance',
+        'enabled': (_doubleValue(PrefsKeys.stereoBalance) ?? 0.0) != 0.0,
+        'detail': '${_doubleValue(PrefsKeys.stereoBalance) ?? 0.0}',
+      },
+      <String, Object?>{
+        'stage': 'mono_mix',
+        'enabled': enabled(PrefsKeys.monoMix),
+        'detail': enabled(PrefsKeys.monoMix) ? 'on' : 'off',
+      },
     ];
   }
 
@@ -554,7 +620,10 @@ class DiagnosticsBundleService {
     if (!section.containsKey('events')) {
       section['events'] = await usb.getUsbEvents();
     }
-    final status = usb.lastStatus;
+    var status = usb.lastStatus;
+    if (!status.attached && status.deviceId == null) {
+      status = await usb.getStatus();
+    }
     section.putIfAbsent('clockDomain', () => status.clockDomain.wireName);
     section.putIfAbsent('clockDriftPpm', () => status.clockDriftPpm);
     section.putIfAbsent('ringFillMs', () => status.ringFillMs);

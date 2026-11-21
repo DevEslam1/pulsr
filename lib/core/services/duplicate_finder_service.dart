@@ -19,9 +19,15 @@ class DuplicateGroup {
   });
 }
 
-Future<List<DuplicateGroup>> _findDuplicatesWorker(
+typedef RawDuplicateGroup = ({
+  String key,
+  List<SongsTableData> songs,
+  bool isChecksum,
+});
+
+Future<List<RawDuplicateGroup>> _findRawDuplicatesWorker(
     List<SongsTableData> allSongs) async {
-  return DuplicateFinderService.findDuplicatesInternal(allSongs);
+  return DuplicateFinderService.findRawDuplicates(allSongs);
 }
 
 @lazySingleton
@@ -33,13 +39,34 @@ class DuplicateFinderService {
   /// Offloads execution to a background isolate via [compute] for larger collections.
   Future<List<DuplicateGroup>> findDuplicates(
       List<SongsTableData> allSongs) async {
+    final List<RawDuplicateGroup> rawGroups;
     if (allSongs.length < 20) {
-      return findDuplicatesInternal(allSongs);
+      rawGroups = await findRawDuplicates(allSongs);
+    } else {
+      rawGroups = await compute(_findRawDuplicatesWorker, allSongs);
     }
-    return compute(_findDuplicatesWorker, allSongs);
+    return rawGroups.map(formatDuplicateGroup).toList();
+  }
+
+  static DuplicateGroup formatDuplicateGroup(RawDuplicateGroup raw) {
+    return DuplicateGroup(
+      key: raw.key,
+      songs: raw.songs,
+      reason: raw.isChecksum
+          ? (L10nHolder.current?.dupReasonChecksum ??
+              'Identical Audio Content (Checksum Verified)')
+          : (L10nHolder.current?.dupReasonTitleArtist(raw.songs.length) ??
+              'Identical Title & Artist (${raw.songs.length} copies)'),
+    );
   }
 
   static Future<List<DuplicateGroup>> findDuplicatesInternal(
+      List<SongsTableData> allSongs) async {
+    final raw = await findRawDuplicates(allSongs);
+    return raw.map(formatDuplicateGroup).toList();
+  }
+
+  static Future<List<RawDuplicateGroup>> findRawDuplicates(
       List<SongsTableData> allSongs) async {
     final Map<String, List<SongsTableData>> byTitleArtist = {};
     final Map<(int, int), List<SongsTableData>> byDurationSize = {};
@@ -60,7 +87,7 @@ class DuplicateFinderService {
       }
     }
 
-    final List<DuplicateGroup> result = [];
+    final List<RawDuplicateGroup> result = [];
     final Set<int> capturedSongIds = {};
 
     // Pass 1: Title + Artist matches, refined by same-recording heuristics so
@@ -79,11 +106,10 @@ class DuplicateFinderService {
           }
         }
         if (cluster.length > 1) {
-          result.add(DuplicateGroup(
+          result.add((
             key: '${entry.key}-${anchor.id}',
             songs: cluster,
-            reason: L10nHolder.current?.dupReasonTitleArtist(cluster.length) ??
-                'Identical Title & Artist (${cluster.length} copies)',
+            isChecksum: false,
           ));
           for (final song in cluster) {
             capturedSongIds.add(song.id);
@@ -116,11 +142,10 @@ class DuplicateFinderService {
       if (!seenCandidateSets.add(sortedIds)) continue;
       final clusters = await _verifyWithChecksum(candidates);
       for (final cluster in clusters) {
-        result.add(DuplicateGroup(
+        result.add((
           key: '$durBucket-$sizeBucket-${cluster.first.id}',
           songs: cluster,
-          reason: L10nHolder.current?.dupReasonChecksum ??
-              'Identical Audio Content (Checksum Verified)',
+          isChecksum: true,
         ));
         for (final song in cluster) {
           capturedSongIds.add(song.id);

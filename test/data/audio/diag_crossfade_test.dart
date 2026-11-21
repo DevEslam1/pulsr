@@ -31,15 +31,6 @@ void main() {
     JustAudioPlatform.instance = originalPlatform;
   });
 
-  void dump(String tag) {
-    final players = platform.players.values.toList();
-    // ignore: avoid_print
-    print('[$tag] title=${handler!.mediaItem.value?.title} '
-        'enginePlaying=${handler!.playbackState.value.playing} '
-        'state=${handler!.playbackState.value.processingState} '
-        'fakes=${players.map((p) => "playing=${p.playing},idx=${p.currentIndex},pos=${p.position.inSeconds}s,src=${p.sourceCount}").join(" | ")}');
-  }
-
   test('DIAG crossfade end-to-end', () async {
     handler = await buildTestHandler(repository: repo, ytmService: ytm);
     handler!.setGaplessEnabled(false);
@@ -49,7 +40,6 @@ void main() {
       autoPlay: true,
     );
     await Future<void>.delayed(const Duration(milliseconds: 120));
-    dump('after-load');
 
     final active = platform.players.values.first;
     active.duration = const Duration(minutes: 3, seconds: 30);
@@ -58,10 +48,8 @@ void main() {
         updatePosition: const Duration(seconds: 206),
         durationOverride: const Duration(minutes: 3, seconds: 30));
     await Future<void>.delayed(const Duration(milliseconds: 300));
-    dump('after-trigger');
 
     await Future<void>.delayed(const Duration(seconds: 6));
-    dump('after-fade');
     expect(handler!.mediaItem.value?.title, 'Track 2',
         reason: 'crossfade should advance the queue');
     expect(handler!.playbackState.value.playing, isTrue,
@@ -85,10 +73,8 @@ void main() {
         durationOverride: const Duration(minutes: 3, seconds: 30));
     // Let the fade arm, then interrupt it with a manual skip.
     await Future<void>.delayed(const Duration(milliseconds: 2200));
-    dump('mid-fade');
     await handler!.skipToNext();
     await Future<void>.delayed(const Duration(seconds: 2));
-    dump('after-skip');
     expect(handler!.playbackState.value.playing, isTrue,
         reason: 'manual Next during a fade must start the new track');
   }, timeout: const Timeout(Duration(seconds: 60)));

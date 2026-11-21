@@ -622,6 +622,12 @@ abstract class AppLocalizations {
   /// **'Something went wrong'**
   String get somethingWentWrong;
 
+  /// No description provided for @errorBoundarySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'An unexpected error occurred while displaying this content.'**
+  String get errorBoundarySubtitle;
+
   /// No description provided for @saveSearch.
   ///
   /// In en, this message translates to:

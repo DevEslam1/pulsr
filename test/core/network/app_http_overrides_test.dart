@@ -205,5 +205,83 @@ void main() {
         await socksServer.close();
       }
     });
+
+    test('proxy password update clears authAttempts on long-lived HttpClient',
+        () async {
+      var currentConfig = const ProxyConfig(
+        enabled: true,
+        type: AppProxyType.http,
+        host: 'proxy.test',
+        port: 8080,
+        username: 'alice',
+        password: 'initial_password',
+      );
+
+      var credentialsAddedCount = 0;
+      final authenticator = AppHttpOverrides.createProxyAuthenticator(
+        configProvider: () => currentConfig,
+        onAddCredentials: (h, p, r, creds) => credentialsAddedCount++,
+      );
+
+      // 1. First attempt with initial password succeeds
+      final ok1 =
+          await authenticator('proxy.test', 8080, 'basic', 'ProxyRealm');
+      expect(ok1, isTrue);
+      expect(credentialsAddedCount, 1);
+
+      // 2. Immediate second attempt with same credentials returns false (rejection loop guard)
+      final ok2 =
+          await authenticator('proxy.test', 8080, 'basic', 'ProxyRealm');
+      expect(ok2, isFalse);
+      expect(credentialsAddedCount, 1);
+
+      // 3. User corrects their password in settings
+      currentConfig = currentConfig.copyWith(password: 'fixed_password');
+
+      // 4. Authenticator now succeeds again because authAttempts was reset
+      final ok3 =
+          await authenticator('proxy.test', 8080, 'basic', 'ProxyRealm');
+      expect(ok3, isTrue);
+      expect(credentialsAddedCount, 2);
+    });
+
+    test('SOCKS5 testConnection(configToTest: ...) uses supplied config',
+        () async {
+      // Global config is inactive
+      AppHttpOverrides.instance.update(const ProxyConfig(enabled: false));
+
+      final socksServer =
+          await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      socksServer.listen((client) {
+        client.listen((data) {
+          if (data.isNotEmpty && data[0] == 0x05 && data.length <= 4) {
+            client.add([0x05, 0x00]);
+          } else if (data.isNotEmpty && data[0] == 0x05 && data[1] == 0x01) {
+            client.add([0x05, 0x00, 0x00, 0x01, 127, 0, 0, 1, 0, 80]);
+          }
+        });
+      });
+
+      try {
+        final suppliedConfig = ProxyConfig(
+          enabled: true,
+          type: AppProxyType.socks5,
+          host: '127.0.0.1',
+          port: socksServer.port,
+        );
+
+        final result = await AppHttpOverrides.instance.testConnection(
+          configToTest: suppliedConfig,
+          timeout: const Duration(seconds: 2),
+        );
+
+        expect(result.success, isTrue);
+        expect(result.error, isNull);
+        // Ensure global config was not overwritten
+        expect(AppHttpOverrides.instance.currentConfig.enabled, isFalse);
+      } finally {
+        await socksServer.close();
+      }
+    });
   });
 }

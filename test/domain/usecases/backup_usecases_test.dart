@@ -44,7 +44,7 @@ void main() {
       expect(exported, isNotEmpty);
 
       final decoded = jsonDecode(exported) as Map<String, dynamic>;
-      expect(decoded['version'], equals(4));
+      expect(decoded['version'], equals(5));
       expect(decoded['favorites'], contains('/storage/music/song1.mp3'));
       expect(decoded['settings'], isA<Map>());
       expect(decoded['playHistory'], isA<List>());

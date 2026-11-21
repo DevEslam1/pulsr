@@ -203,7 +203,8 @@ class MethodChannelTtsEngine implements TtsEngine {
         _handleFailure(error, stackTrace, 'dispose');
       }
     }
-    _available = false;
+    _setAvailable(false);
+    availability.dispose();
   }
 
   /// Updates [isAvailable] and notifies listeners on a real change only.

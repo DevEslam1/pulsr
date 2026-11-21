@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import 'package:pulsr/core/theme/aura_theme.dart' as aura_theme;
 import 'package:pulsr/core/theme/aura_theme.dart';
 
 /// {@category DesignSystem}
@@ -11,13 +12,8 @@ import 'package:pulsr/core/theme/aura_theme.dart';
 class PulsrText {
   PulsrText._();
 
-  static const String fontFamily = 'Manrope';
-  static const List<String> fontFallbacks = [
-    '.SF Pro Text',
-    'Segoe UI',
-    'Roboto',
-    'sans-serif',
-  ];
+  static const String fontFamily = aura_theme.fontFamily;
+  static const List<String> fontFallbacks = aura_theme.fontFallbacks;
 
   /// Hero display heading style (30dp, w800, -0.8 tracking).
   static TextStyle display({

@@ -14,6 +14,12 @@ class ErrorLogger {
   static final _cookieAuthRegex = RegExp(
       r'\b(SAPISID|HSID|SSID|APISID|SID|__Secure-[^=;\s]+|po_token|visitor_data)\s*=\s*([^;,\s]+)',
       caseSensitive: false);
+  static final _secretKvRegex = RegExp(
+      r'\b(token|api_key|password|secret)\s*=\s*([^;&,\s]+)',
+      caseSensitive: false);
+  static final _jsonCredentialRegex = RegExp(
+      r'("(?:token|password|secret|api_key|authorization)")\s*:\s*"[^"]*"',
+      caseSensitive: false);
   static final _authHeaderRegex = RegExp(
       r'\b(Authorization|token|key):\s*(?:Bearer\s+)?([^\s,;]+)|\b(Bearer)\s+([A-Za-z0-9._~+/-]+=*)',
       caseSensitive: false);
@@ -35,6 +41,10 @@ class ErrorLogger {
         sanitized.replaceAllMapped(_emailRegex, (m) => '[REDACTED_EMAIL]');
     sanitized = sanitized.replaceAllMapped(
         _cookieAuthRegex, (m) => '${m.group(1)}=[REDACTED_TOKEN]');
+    sanitized = sanitized.replaceAllMapped(
+        _secretKvRegex, (m) => '${m.group(1)}=[REDACTED_TOKEN]');
+    sanitized = sanitized.replaceAllMapped(
+        _jsonCredentialRegex, (m) => '${m.group(1)}: "[REDACTED_TOKEN]"');
     sanitized = sanitized.replaceAllMapped(
         _authHeaderRegex,
         (m) => m.group(1) != null
@@ -144,11 +154,20 @@ class ErrorLogger {
     }
   }
 
+  static const int _maxSwallowedRateLimits = 256;
   static final Map<String, ({DateTime lastLog, int count})>
       _swallowedRateLimits = {};
 
+  @visibleForTesting
+  static int get swallowedRateLimitsCount => _swallowedRateLimits.length;
+
+  @visibleForTesting
+  static void clearSwallowedRateLimitsForTesting() =>
+      _swallowedRateLimits.clear();
+
   /// Rate-limited logging for swallowed/caught errors (Phase 6).
   /// Logs at most once every 60 seconds per [where] site, accumulating suppressed counts.
+  /// Bounded to 256 call-sites to prevent memory leaks from dynamic keys.
   static void logSwallowed(String where, Object error,
       [StackTrace? stackTrace]) {
     final now = DateTime.now();
@@ -159,6 +178,15 @@ class ErrorLogger {
       final msg = suppressed > 0
           ? 'Swallowed exception at $where ($suppressed repeats suppressed)'
           : 'Swallowed exception at $where';
+
+      if (!_swallowedRateLimits.containsKey(where) &&
+          _swallowedRateLimits.length >= _maxSwallowedRateLimits) {
+        final oldestKey = _swallowedRateLimits.entries
+            .reduce((a, b) => a.value.lastLog.isBefore(b.value.lastLog) ? a : b)
+            .key;
+        _swallowedRateLimits.remove(oldestKey);
+      }
+
       _swallowedRateLimits[where] = (lastLog: now, count: 0);
       log(msg,
           error: error, stackTrace: stackTrace, category: 'SwallowedError');

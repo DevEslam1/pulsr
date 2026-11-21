@@ -91,5 +91,120 @@ void main() {
       expect(httpRequests.length, equals(2));
       expect(httpRequests.last.body, contains('single'));
     });
+
+    test('Custom webhook rejects private/loopback targets', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(ScrobblerService.keyCustomWebhookEnabled, true);
+      await prefs.setString(
+          ScrobblerService.keyCustomWebhookUrl, 'http://127.0.0.1:8080/scrobble');
+
+      await service.notifyPlaybackState(
+        id: 789,
+        artist: 'Daft Punk',
+        track: 'Around the World',
+        album: 'Homework',
+        durationMs: 425000,
+        positionMs: 220000,
+        isPlaying: true,
+      );
+
+      // Webhook should be skipped due to SSRF policy
+      expect(httpRequests.where((r) => r.url.host == '127.0.0.1'), isEmpty);
+      // Scrobble count must not be inflated when all services failed or blocked
+      expect(prefs.getInt(ScrobblerService.keyTotalScrobbleCount), isNull);
+    });
+
+    test('Custom webhook accepts routable targets', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(ScrobblerService.keyCustomWebhookEnabled, true);
+      await prefs.setString(
+          ScrobblerService.keyCustomWebhookUrl, 'https://example.com/scrobble');
+
+      await service.notifyPlaybackState(
+        id: 790,
+        artist: 'Daft Punk',
+        track: 'Around the World',
+        album: 'Homework',
+        durationMs: 425000,
+        positionMs: 220000,
+        isPlaying: true,
+      );
+
+      expect(httpRequests.where((r) => r.url.host == 'example.com'), hasLength(1));
+      expect(prefs.getInt(ScrobblerService.keyTotalScrobbleCount), equals(1));
+    });
+
+    test('Custom webhook rejects redirect pointing to private network', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(ScrobblerService.keyCustomWebhookEnabled, true);
+      await prefs.setString(
+          ScrobblerService.keyCustomWebhookUrl, 'https://example.com/webhook');
+
+      final redirectRequests = <http.Request>[];
+      final redirectClient = MockClient((request) async {
+        redirectRequests.add(request);
+        if (request.url.toString() == 'https://example.com/webhook') {
+          return http.Response('', 302, headers: {
+            'location': 'http://192.168.1.1/secret',
+          });
+        }
+        return http.Response('', 200);
+      });
+
+      final testService = ScrobblerService(redirectClient);
+      await testService.notifyPlaybackState(
+        id: 791,
+        artist: 'Daft Punk',
+        track: 'One More Time',
+        album: 'Discovery',
+        durationMs: 320000,
+        positionMs: 200000,
+        isPlaying: true,
+      );
+
+      expect(redirectRequests.where((r) => r.url.host == '192.168.1.1'), isEmpty);
+      expect(prefs.getInt(ScrobblerService.keyTotalScrobbleCount), isNull);
+    });
+
+    test('Custom webhook follows safe redirects up to 3 hops', () async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(ScrobblerService.keyCustomWebhookEnabled, true);
+      await prefs.setString(
+          ScrobblerService.keyCustomWebhookUrl, 'https://example.com/redir1');
+
+      final redirectRequests = <http.Request>[];
+      final redirectClient = MockClient((request) async {
+        redirectRequests.add(request);
+        if (request.url.toString() == 'https://example.com/redir1') {
+          return http.Response('', 302, headers: {
+            'location': 'https://example.com/final_hook',
+          });
+        }
+        if (request.url.toString() == 'https://example.com/final_hook') {
+          return http.Response(jsonEncode({'status': 'ok'}), 200);
+        }
+        return http.Response('not found', 404);
+      });
+
+      final testService = ScrobblerService(redirectClient);
+      await testService.notifyPlaybackState(
+        id: 792,
+        artist: 'Daft Punk',
+        track: 'Harder, Better, Faster, Stronger',
+        album: 'Discovery',
+        durationMs: 224000,
+        positionMs: 150000,
+        isPlaying: true,
+      );
+
+      expect(redirectRequests.length, equals(2));
+      expect(redirectRequests.last.url.toString(), 'https://example.com/final_hook');
+      expect(prefs.getInt(ScrobblerService.keyTotalScrobbleCount), equals(1));
+    });
+
+    test('dispose closes owned client without throwing', () {
+      final ownedService = ScrobblerService();
+      expect(() => ownedService.dispose(), returnsNormally);
+    });
   });
 }

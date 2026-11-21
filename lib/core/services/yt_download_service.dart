@@ -104,9 +104,35 @@ class YtDownloadService {
 
   final Queue<_QueuedDownload> _queue = Queue<_QueuedDownload>();
   final Map<String, _QueuedDownload> _activeDownloads = {};
+  final Map<String, Set<HttpClientRequest>> _activeRequests = {};
   static const int _maxCanceledIds = 200;
   final Set<String> _canceledVideoIds = <String>{};
   DateTime _lastTransferPolicyCheck = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void _trackRequest(String? videoId, HttpClientRequest request) {
+    if (videoId == null || videoId.isEmpty) return;
+    (_activeRequests[videoId] ??= <HttpClientRequest>{}).add(request);
+  }
+
+  void _untrackRequest(String? videoId, HttpClientRequest request) {
+    if (videoId == null || videoId.isEmpty) return;
+    final set = _activeRequests[videoId];
+    if (set != null) {
+      set.remove(request);
+      if (set.isEmpty) _activeRequests.remove(videoId);
+    }
+  }
+
+  void _abortRequestsFor(String videoId) {
+    final requests = _activeRequests.remove(videoId);
+    if (requests != null) {
+      for (final req in requests) {
+        try {
+          req.abort();
+        } catch (_) {}
+      }
+    }
+  }
 
   /// Per-download quality overrides requested from the search row's picker.
   final YtDownloadQualityPolicy _qualityPolicy = YtDownloadQualityPolicy();
@@ -229,6 +255,7 @@ class YtDownloadService {
   /// cancellation marker its loops poll.
   void cancel(String videoId) {
     _qualityPolicy.discardPending(videoId);
+    _abortRequestsFor(videoId);
 
     final active = _activeDownloads[videoId];
     if (active != null) {
@@ -1007,40 +1034,45 @@ class YtDownloadService {
     // classify.
     try {
       final probeReq = await _http.openUrl('GET', uri);
-      YtDownloadTransferPolicy.applyHeaders(probeReq, userAgent,
-          cookies: cookies, range: 'bytes=0-0');
-      final probeResp =
-          await probeReq.close().timeout(const Duration(seconds: 20));
+      _trackRequest(task.song.remoteId, probeReq);
+      try {
+        YtDownloadTransferPolicy.applyHeaders(probeReq, userAgent,
+            cookies: cookies, range: 'bytes=0-0');
+        final probeResp =
+            await probeReq.close().timeout(const Duration(seconds: 20));
 
-      final status = probeResp.statusCode;
-      final acceptRanges =
-          probeResp.headers.value(HttpHeaders.acceptRangesHeader);
-      final contentRange =
-          probeResp.headers.value(HttpHeaders.contentRangeHeader);
-      if (contentRange != null && contentRange.contains('/')) {
-        total = int.tryParse(contentRange.split('/').last) ?? -1;
-      }
-      if (total <= 0 && probeResp.contentLength > 0) {
-        total = probeResp.contentLength;
-      }
+        final status = probeResp.statusCode;
+        final acceptRanges =
+            probeResp.headers.value(HttpHeaders.acceptRangesHeader);
+        final contentRange =
+            probeResp.headers.value(HttpHeaders.contentRangeHeader);
+        if (contentRange != null && contentRange.contains('/')) {
+          total = int.tryParse(contentRange.split('/').last) ?? -1;
+        }
+        if (total <= 0 && probeResp.contentLength > 0) {
+          total = probeResp.contentLength;
+        }
 
-      if (status == HttpStatus.forbidden || status == HttpStatus.unauthorized) {
-        await YtDownloadHttpSupport.drainSmall(probeResp);
-        throw YtmException(
-            'YTM_STREAM_EXPIRED', 'HTTP $status on stream probe');
-      }
+        if (status == HttpStatus.forbidden || status == HttpStatus.unauthorized) {
+          await YtDownloadHttpSupport.drainSmall(probeResp);
+          throw YtmException(
+              'YTM_STREAM_EXPIRED', 'HTTP $status on stream probe');
+        }
 
-      rangesSupported =
-          status == HttpStatus.partialContent && acceptRanges != 'none';
-      if (rangesSupported || status != HttpStatus.ok) {
-        // A 1-byte 206 (or an HTTP error) has a negligible body. Draining it
-        // releases the connection for reuse.
-        await YtDownloadHttpSupport.drainSmall(probeResp);
-      } else {
-        // 200 to a 1-byte Range means the server ignored Range and is sending
-        // the whole file. Draining it used to download the entire body just to
-        // throw it away — then the fallback downloaded it a second time.
-        await YtDownloadHttpSupport.abortBody(probeResp);
+        rangesSupported =
+            status == HttpStatus.partialContent && acceptRanges != 'none';
+        if (rangesSupported || status != HttpStatus.ok) {
+          // A 1-byte 206 (or an HTTP error) has a negligible body. Draining it
+          // releases the connection for reuse.
+          await YtDownloadHttpSupport.drainSmall(probeResp);
+        } else {
+          // 200 to a 1-byte Range means the server ignored Range and is sending
+          // the whole file. Draining it used to download the entire body just to
+          // throw it away — then the fallback downloaded it a second time.
+          await YtDownloadHttpSupport.abortBody(probeResp);
+        }
+      } finally {
+        _untrackRequest(task.song.remoteId, probeReq);
       }
     } catch (e) {
       if (e is YtmException || e is DownloadFailure) rethrow;
@@ -1151,6 +1183,18 @@ class YtDownloadService {
     var mergeCompleted = false;
     var keepParts = false;
 
+    final chunkRequests = <HttpClientRequest>{};
+    void abortSiblingRequests() {
+      for (final req in chunkRequests.toList()) {
+        try {
+          req.abort();
+        } catch (_) {}
+      }
+      chunkRequests.clear();
+    }
+
+    final futures = <Future<void>>[];
+
     try {
       // FIX-A02: Outer try to catch _RangeIgnored outside the inner try/finally
       try {
@@ -1168,7 +1212,7 @@ class YtDownloadService {
           if (e is DownloadFailure) rethrow;
         }
 
-        final futures = <Future<void>>[];
+        final videoId = task.song.remoteId;
 
         for (var i = 0; i < concurrentChunks; i++) {
           final chunkIndex = i;
@@ -1206,8 +1250,11 @@ class YtDownloadService {
             }
 
             final req = await _http.getUrl(uri);
-            YtDownloadTransferPolicy.applyHeaders(req, userAgent,
-                cookies: cookies, range: 'bytes=${start + have}-$end');
+            _trackRequest(videoId, req);
+            chunkRequests.add(req);
+            try {
+              YtDownloadTransferPolicy.applyHeaders(req, userAgent,
+                  cookies: cookies, range: 'bytes=${start + have}-$end');
             final resp = await req.close().timeout(_stallTimeout);
 
             if (resp.statusCode == 429) {
@@ -1300,10 +1347,14 @@ class YtDownloadService {
                 YtDownloadHttpSupport.throwStorageOrOriginal(e);
               }
             }
+            } finally {
+              _untrackRequest(videoId, req);
+              chunkRequests.remove(req);
+            }
           }());
         }
 
-        await Future.wait(futures);
+        await Future.wait(futures, eagerError: true);
         if (sessionBytes > 0) {
           _sampleThroughput(sessionBytes, stopwatch.elapsed);
         }
@@ -1383,6 +1434,9 @@ class YtDownloadService {
         mergeCompleted = true;
         await YtDownloadArtifactStore.deleteLegacySequentialPart(dest.path);
       } catch (e) {
+        abortSiblingRequests();
+        await Future.wait(futures.map((f) => f.catchError((_) {})))
+            .timeout(const Duration(seconds: 2), onTimeout: () => const []);
         if (e is _RangeIgnored) {
           rethrow; // FIX-A02: Bubble _RangeIgnored to outer catch
         }
@@ -1535,13 +1589,15 @@ class YtDownloadService {
     }
 
     final request = await _http.openUrl('GET', uri);
-    if (resumeOffset > 0) {
-      YtDownloadTransferPolicy.applyHeaders(request, userAgent,
-          cookies: cookies, range: 'bytes=$resumeOffset-');
-    } else {
-      YtDownloadTransferPolicy.applyHeaders(request, userAgent,
-          cookies: cookies);
-    }
+    _trackRequest(task.song.remoteId, request);
+    try {
+      if (resumeOffset > 0) {
+        YtDownloadTransferPolicy.applyHeaders(request, userAgent,
+            cookies: cookies, range: 'bytes=$resumeOffset-');
+      } else {
+        YtDownloadTransferPolicy.applyHeaders(request, userAgent,
+            cookies: cookies);
+      }
     final response = await request.close().timeout(_stallTimeout);
 
     // 429 / Retry-After aware backoff + jitter integration
@@ -1579,7 +1635,7 @@ class YtDownloadService {
       if (retryCount >= 1) {
         throw const DownloadFailure('Server rejected the resume range');
       }
-      return _downloadSequential(uri, dest, task, onProgress,
+      return await _downloadSequential(uri, dest, task, onProgress,
           userAgent: userAgent,
           cookies: cookies,
           expectedBytes: expectedBytes,
@@ -1603,7 +1659,7 @@ class YtDownloadService {
           throw const DownloadFailure('Server does not support resume');
         }
         // Retry from scratch with incremented retryCount
-        return _downloadSequential(uri, dest, task, onProgress,
+        return await _downloadSequential(uri, dest, task, onProgress,
             userAgent: userAgent,
             cookies: cookies,
             expectedBytes: expectedBytes,
@@ -1755,7 +1811,10 @@ class YtDownloadService {
         // Best-effort: failure intentionally ignored on this non-critical path.
       }
     }
+  } finally {
+    _untrackRequest(task.song.remoteId, request);
   }
+}
 
   /// Sweeps stale download scratch files while preserving active, queued and
   /// explicitly protected ids.

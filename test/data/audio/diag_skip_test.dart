@@ -60,18 +60,9 @@ void main() {
     );
     // Still inside the native load window: nothing is playing yet.
     await Future<void>.delayed(const Duration(milliseconds: 120));
-    // ignore: avoid_print
-    print('before-skip title=${handler!.mediaItem.value?.title} '
-        'bb=${handler!.playbackState.value.playing} '
-        'fakes=${platform.players.values.map((p) => p.playing).toList()}');
 
     await handler!.skipToNext();
     await Future<void>.delayed(const Duration(milliseconds: 600));
-    // ignore: avoid_print
-    print('after-skip  title=${handler!.mediaItem.value?.title} '
-        'bb=${handler!.playbackState.value.playing} '
-        'state=${handler!.playbackState.value.processingState} '
-        'fakes=${platform.players.values.map((p) => p.playing).toList()}');
     await loadFuture.timeout(const Duration(seconds: 5)).catchError((_) {});
 
     expect(handler!.mediaItem.value?.title, 'Track 2');

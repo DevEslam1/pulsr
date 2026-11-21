@@ -276,10 +276,14 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
           : MethodChannelTtsEngine();
       if (!mounted) return;
       if (!getIt.isRegistered<AnnouncementSettings>()) {
-        getIt.registerSingleton<AnnouncementSettings>(announcements);
+        try {
+          getIt.registerSingleton<AnnouncementSettings>(announcements);
+        } catch (_) {}
       }
       if (!getIt.isRegistered<MethodChannelTtsEngine>()) {
-        getIt.registerSingleton<MethodChannelTtsEngine>(engine);
+        try {
+          getIt.registerSingleton<MethodChannelTtsEngine>(engine);
+        } catch (_) {}
         await engine.init();
       }
       engine.voiceId = announcements.voiceId;
@@ -302,7 +306,9 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
           : await AssistantSettings.load();
       if (!mounted) return;
       if (!getIt.isRegistered<AssistantSettings>()) {
-        getIt.registerSingleton<AssistantSettings>(assistant);
+        try {
+          getIt.registerSingleton<AssistantSettings>(assistant);
+        } catch (_) {}
       }
       setState(() => _assistantSettings = assistant);
     } catch (e, st) {
@@ -418,6 +424,7 @@ class _ExtrasScreenState extends State<ExtrasScreen> {
         // path (position reset) and show the radio recommendation card.
         source: SongSource.remote,
         isDownloaded: false,
+        remoteArtworkUrl: entry.artworkUri,
       );
       await getIt<PlayerCubit>().playSong(song);
     } catch (e, st) {

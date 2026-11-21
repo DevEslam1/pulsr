@@ -156,6 +156,28 @@ class CloudSyncService {
   Map<String, Set<String>> _lastUploadedPlaylistSongIds =
       <String, Set<String>>{};
   Set<String> _lastUploadedPlaylistIds = <String>{};
+  String? _lastSyncedUid;
+
+  Future<void> resetSessionState() async {
+    _localModifiedFavorites.clear();
+    _localModifiedLoaded = false;
+    _localModifiedPersistChain = null;
+    _syncedDocHashes.clear();
+    _lastUploadedFavoriteIds.clear();
+    _lastUploadedPlaylistIds.clear();
+    _lastUploadedPlaylistSongIds.clear();
+    _lastSyncedUid = null;
+    try {
+      final prefs = await _getPrefs();
+      await prefs.remove(_keyLocalModifiedFavorites);
+      await prefs.remove(_keySyncedHashes);
+      await prefs.remove(_keyUploadedFavoriteIds);
+      await prefs.remove(_keyUploadedPlaylistIds);
+      await prefs.remove(_keyUploadedPlaylistSongs);
+    } catch (_) {
+      // Best-effort: pure-Dart tests run without a platform SP binding.
+    }
+  }
 
   Future<String> getDeviceId() async {
     final prefs = await _getPrefs();
@@ -330,11 +352,16 @@ class CloudSyncService {
     if (!AppConfig.isCloudSyncAllowed) return false;
     // User-facing Offline-only mode: never sync even in network builds.
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       if (prefs.getBool(PrefsKeys.offlineOnlyMode) == true) return false;
     } catch (_) {}
     final user = _authService.currentUser;
     if (user == null) return false;
+
+    if (_lastSyncedUid != null && _lastSyncedUid != user.uid) {
+      await resetSessionState();
+    }
+    _lastSyncedUid = user.uid;
 
     // Fall back to the persisted per-scope toggles when the caller does not
     // pass explicit values, so the dashboard switches actually gate syncing.
@@ -539,6 +566,7 @@ class CloudSyncService {
 
     // 2. Upload playlists with stable playlist doc ID
     if (syncPlaylists) {
+      playlistSongBaseline = <String, Set<String>>{};
       final playlistRes = await _repository.getPlaylists();
       final localPlaylists =
           playlistRes.fold((l) => <PlaylistsTableData>[], (r) => r);
@@ -856,8 +884,8 @@ class CloudSyncService {
               final mapped = prefs.getString('sync_pl_stable_id_${cand.id}');
               if (mapped == null || mapped == cloudSyncId) {
                 pl = cand;
-                prefs.setString('sync_pl_stable_id_${cand.id}', cloudSyncId);
-                prefs.setInt('sync_cloud_pl_$cloudSyncId', cand.id);
+                await prefs.setString('sync_pl_stable_id_${cand.id}', cloudSyncId);
+                await prefs.setInt('sync_cloud_pl_$cloudSyncId', cand.id);
                 break;
               }
             }
@@ -878,8 +906,8 @@ class CloudSyncService {
                     ..where((t) => t.id.equals(newId)))
                   .getSingleOrNull();
               if (pl != null) {
-                prefs.setString('sync_pl_stable_id_${pl.id}', cloudSyncId);
-                prefs.setInt('sync_cloud_pl_$cloudSyncId', pl.id);
+                await prefs.setString('sync_pl_stable_id_${pl.id}', cloudSyncId);
+                await prefs.setInt('sync_cloud_pl_$cloudSyncId', pl.id);
               }
             }
           }

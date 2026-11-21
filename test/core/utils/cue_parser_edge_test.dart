@@ -451,6 +451,21 @@ FILE "album.flac" FLAC
       expect(chapters[1].start, const Duration(seconds: 2));
     });
 
+    test('embedded WAV cue chunk with sampleRate == 0 handles fallback gracefully without division by zero', () async {
+      final file = writeFile(
+        'zerorate.wav',
+        _wavBytes(
+          sampleRate: 0,
+          cueSampleOffsets: [0, 44100, 88200],
+        ),
+      );
+      final chapters = await CueParser.findAndParseCue(file.path);
+      expect(chapters, hasLength(3));
+      expect(chapters[0].start, const Duration(seconds: 0));
+      expect(chapters[1].start, const Duration(seconds: 1));
+      expect(chapters[2].start, const Duration(seconds: 2));
+    });
+
     test('a cue chunk with zero points yields null', () async {
       final file = writeFile(
         'zeropoints.wav',

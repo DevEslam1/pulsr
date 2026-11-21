@@ -30,10 +30,17 @@ class _RecordingSync extends AssistantSuggestionSync {
         );
 
   bool cleared = false;
+  bool pushed = false;
 
   @override
   Future<void> clear() async {
     cleared = true;
+  }
+
+  @override
+  Future<int> pushRecent({int limit = 20}) async {
+    pushed = true;
+    return 1;
   }
 }
 
@@ -110,5 +117,23 @@ void main() {
     expect(reported, hasLength(1));
     expect(reported.single.category, 'Assistant');
     expect(reported.single.error, isStateError);
+  });
+
+  testWidgets('turning suggestions on pushes recent suggestions', (tester) async {
+    final settings = await AssistantSettings.load();
+    addTearDown(settings.dispose);
+    settings.setSuggestionsEnabled(false);
+    final sync = _RecordingSync();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AssistantSettingsScreen(settings: settings, suggestionSync: sync),
+      ),
+    );
+    await tester.tap(find.text(AssistantStrings.suggestionsTitle));
+    await tester.pumpAndSettle();
+
+    expect(settings.suggestionsEnabled, isTrue);
+    expect(sync.pushed, isTrue);
   });
 }

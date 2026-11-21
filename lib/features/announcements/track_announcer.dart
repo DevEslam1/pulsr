@@ -241,6 +241,7 @@ class TrackAnnouncer {
       await pendingStop;
       if (_disposed || !_isPlaying || !_canAnnounce) return;
       if (item.id == _announcedId) return;
+      if (_currentItem?.id != item.id) return;
     }
     final text = composeAnnouncement(
       settings.elements,

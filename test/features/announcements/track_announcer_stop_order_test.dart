@@ -94,4 +94,54 @@ void main() {
     // And the new sentence is the last thing the engine was asked to do.
     expect(engine.calls.last, 'speak:Second Song');
   });
+
+  test('stale track announcement is skipped if currentItem changed during pendingStop', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final settings = await AnnouncementSettings.load();
+    settings.setEnabled(true);
+    settings.setDelayMs(0);
+    settings.setElementEnabled(AnnouncementElement.title, true);
+    settings.setElementEnabled(AnnouncementElement.artist, false);
+    settings.setElementEnabled(AnnouncementElement.album, false);
+    settings.setElementEnabled(AnnouncementElement.year, false);
+    settings.setElementEnabled(AnnouncementElement.trackNumber, false);
+
+    final items = StreamController<MediaItem?>.broadcast();
+    final states = StreamController<PlaybackState>.broadcast();
+    final engine = _SlowStopEngine();
+    final announcer = TrackAnnouncer(
+      mediaItemStream: items.stream,
+      playbackStateStream: states.stream,
+      settings: settings,
+      engine: engine,
+    )..start();
+    addTearDown(() async {
+      await announcer.dispose();
+      await items.close();
+      await states.close();
+      settings.dispose();
+    });
+
+    states.add(PlaybackState(
+      playing: true,
+      processingState: AudioProcessingState.ready,
+    ));
+    items.add(const MediaItem(id: 'track-1', title: 'First Song'));
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    // Rapid track skip 1 -> 2 -> 3 in quick succession
+    items.add(const MediaItem(id: 'track-2', title: 'Second Song'));
+    items.add(const MediaItem(id: 'track-3', title: 'Third Song'));
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+
+    expect(engine.calls.contains('speak:Second Song'), isFalse);
+    expect(engine.calls.contains('speak:Third Song'), isTrue);
+  });
+
+  test('MethodChannelTtsEngine dispose disposes availability ValueNotifier', () async {
+    final engine = MethodChannelTtsEngine();
+    expect(engine.availability.value, isFalse);
+    await engine.dispose();
+    expect(() => engine.availability.addListener(() {}), throwsFlutterError);
+  });
 }

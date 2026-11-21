@@ -267,10 +267,26 @@ class AudioSessionLog {
 
   String _nowIso() => _clock().toUtc().toIso8601String();
 
+  /// Serializes an operation onto the tail without checking [_enabledProvider],
+  /// swallowing errors on [_tail] so the chain never breaks.
+  Future<T> _serialize<T>(Future<T> Function() body) {
+    final completer = Completer<T>();
+    final next = _tail.then((_) async {
+      try {
+        final result = await body();
+        completer.complete(result);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    _tail = next.catchError((_) {});
+    return completer.future;
+  }
+
   /// Serializes an operation onto the write tail and swallows every failure, so
   /// telemetry can never throw into playback. Skips entirely when disabled.
   Future<void> _run(Future<void> Function() body) {
-    final next = _tail.then((_) async {
+    return _serialize(() async {
       try {
         if (!await _enabledProvider()) return;
         await body();
@@ -279,8 +295,6 @@ class AudioSessionLog {
             error: e, stackTrace: st, category: 'AudioSessionLog');
       }
     });
-    _tail = next;
-    return next;
   }
 
   /// Starts a new session, finalizing the previous one (if any) first so there
@@ -445,69 +459,74 @@ class AudioSessionLog {
         .toList();
   }
 
-  /// Reads every persisted session, newest last. Malformed lines are skipped.
-  Future<List<AudioSessionRecord>> readAll() async {
-    try {
-      final dir = await _directoryProvider();
-      if (dir == null) return const <AudioSessionRecord>[];
-      final file = File('${dir.path}${Platform.pathSeparator}$fileName');
-      final records = <AudioSessionRecord>[];
-      for (final line in await _readLines(file)) {
-        try {
-          final decoded = jsonDecode(line);
-          if (decoded is Map) {
-            records.add(AudioSessionRecord.fromJson(
-                Map<String, dynamic>.from(decoded)));
-          }
-        } catch (_) {
-          // Skip a corrupt line rather than failing the whole export.
+  Future<List<AudioSessionRecord>> _readRecords(File file) async {
+    final records = <AudioSessionRecord>[];
+    for (final line in await _readLines(file)) {
+      try {
+        final decoded = jsonDecode(line);
+        if (decoded is Map) {
+          records.add(AudioSessionRecord.fromJson(
+              Map<String, dynamic>.from(decoded)));
         }
+      } catch (_) {
+        // Skip a corrupt line rather than failing the whole export.
       }
-      return records;
-    } catch (e, st) {
-      ErrorLogger.log('Audio session log read failed',
-          error: e, stackTrace: st, category: 'AudioSessionLog');
-      return const <AudioSessionRecord>[];
     }
+    return records;
   }
+
+  /// Reads every persisted session, newest last. Malformed lines are skipped.
+  Future<List<AudioSessionRecord>> readAll() => _serialize(() async {
+        try {
+          final dir = await _directoryProvider();
+          if (dir == null) return const <AudioSessionRecord>[];
+          final file = File('${dir.path}${Platform.pathSeparator}$fileName');
+          return await _readRecords(file);
+        } catch (e, st) {
+          ErrorLogger.log('Audio session log read failed',
+              error: e, stackTrace: st, category: 'AudioSessionLog');
+          return const <AudioSessionRecord>[];
+        }
+      });
 
   /// Writes all persisted records to a fresh JSONL file and returns it, or null
   /// when the documents directory is unavailable. Read-only with respect to the
   /// recording flag: existing logs can always be exported.
-  Future<File?> exportToFile() async {
-    try {
-      final dir = await _directoryProvider();
-      if (dir == null) return null;
-      final records = await readAll();
-      final stamp =
-          _clock().toUtc().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
-      final file = File(
-          '${dir.path}${Platform.pathSeparator}pulsr_audio_session_logs_$stamp.jsonl');
-      final buffer = StringBuffer();
-      for (final record in records) {
-        buffer.writeln(jsonEncode(record.toJson()));
-      }
-      await file.writeAsString(buffer.toString(), flush: true);
-      return file;
-    } catch (e, st) {
-      ErrorLogger.log('Audio session log export failed',
-          error: e, stackTrace: st, category: 'AudioSessionLog');
-      return null;
-    }
-  }
+  Future<File?> exportToFile() => _serialize(() async {
+        try {
+          final dir = await _directoryProvider();
+          if (dir == null) return null;
+          final file = File('${dir.path}${Platform.pathSeparator}$fileName');
+          final records = await _readRecords(file);
+          final stamp =
+              _clock().toUtc().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
+          final exportFile = File(
+              '${dir.path}${Platform.pathSeparator}pulsr_audio_session_logs_$stamp.jsonl');
+          final buffer = StringBuffer();
+          for (final record in records) {
+            buffer.writeln(jsonEncode(record.toJson()));
+          }
+          await exportFile.writeAsString(buffer.toString(), flush: true);
+          return exportFile;
+        } catch (e, st) {
+          ErrorLogger.log('Audio session log export failed',
+              error: e, stackTrace: st, category: 'AudioSessionLog');
+          return null;
+        }
+      });
 
   /// Deletes the persisted log file. Never throws.
-  Future<void> clear() async {
-    try {
-      final dir = await _directoryProvider();
-      if (dir == null) return;
-      final file = File('${dir.path}${Platform.pathSeparator}$fileName');
-      if (await file.exists()) await file.delete();
-    } catch (e, st) {
-      ErrorLogger.log('Audio session log clear failed',
-          error: e, stackTrace: st, category: 'AudioSessionLog');
-    }
-  }
+  Future<void> clear() => _serialize(() async {
+        try {
+          final dir = await _directoryProvider();
+          if (dir == null) return;
+          final file = File('${dir.path}${Platform.pathSeparator}$fileName');
+          if (await file.exists()) await file.delete();
+        } catch (e, st) {
+          ErrorLogger.log('Audio session log clear failed',
+              error: e, stackTrace: st, category: 'AudioSessionLog');
+        }
+      });
 
   /// Classifies an [AudioOutputInfo] into a session route type.
   static AudioRouteType routeTypeForInfo(AudioOutputInfo? info) {

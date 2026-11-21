@@ -75,8 +75,8 @@ class SettingsProfile {
 
   factory SettingsProfile.fromJson(Map<String, dynamic> json) =>
       SettingsProfile(
-        id: json['id'] as String,
-        name: json['name'] as String,
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? 'Custom Profile',
         type: ProfileType.values.firstWhere(
           (t) => t.name == json['type'],
           orElse: () => ProfileType.custom,
@@ -97,6 +97,95 @@ class SettingsProfile {
         crossfeedDelayUs: (json['crossfeedDelayUs'] as num?)?.toDouble(),
         crossfeedFeedDb: (json['crossfeedFeedDb'] as num?)?.toDouble(),
       );
+
+  SettingsProfile copyWith({
+    String? id,
+    String? name,
+    ProfileType? type,
+    String? eqPresetName,
+    double? volumeBoost,
+    bool? crossfadeEnabled,
+    double? crossfadeSeconds,
+    bool? bitPerfectEnabled,
+    String? playerTheme,
+    bool? saturationEnabled,
+    bool? stereoWidthEnabled,
+    bool? loudnessContourEnabled,
+    bool? subCrossoverEnabled,
+    bool? dynamicEqEnabled,
+    String? headphoneProfileId,
+    bool? crossfeedEnabled,
+    double? crossfeedDelayUs,
+    double? crossfeedFeedDb,
+  }) {
+    return SettingsProfile(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      eqPresetName: eqPresetName ?? this.eqPresetName,
+      volumeBoost: volumeBoost ?? this.volumeBoost,
+      crossfadeEnabled: crossfadeEnabled ?? this.crossfadeEnabled,
+      crossfadeSeconds: crossfadeSeconds ?? this.crossfadeSeconds,
+      bitPerfectEnabled: bitPerfectEnabled ?? this.bitPerfectEnabled,
+      playerTheme: playerTheme ?? this.playerTheme,
+      saturationEnabled: saturationEnabled ?? this.saturationEnabled,
+      stereoWidthEnabled: stereoWidthEnabled ?? this.stereoWidthEnabled,
+      loudnessContourEnabled:
+          loudnessContourEnabled ?? this.loudnessContourEnabled,
+      subCrossoverEnabled: subCrossoverEnabled ?? this.subCrossoverEnabled,
+      dynamicEqEnabled: dynamicEqEnabled ?? this.dynamicEqEnabled,
+      headphoneProfileId: headphoneProfileId ?? this.headphoneProfileId,
+      crossfeedEnabled: crossfeedEnabled ?? this.crossfeedEnabled,
+      crossfeedDelayUs: crossfeedDelayUs ?? this.crossfeedDelayUs,
+      crossfeedFeedDb: crossfeedFeedDb ?? this.crossfeedFeedDb,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SettingsProfile &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          name == other.name &&
+          type == other.type &&
+          eqPresetName == other.eqPresetName &&
+          volumeBoost == other.volumeBoost &&
+          crossfadeEnabled == other.crossfadeEnabled &&
+          crossfadeSeconds == other.crossfadeSeconds &&
+          bitPerfectEnabled == other.bitPerfectEnabled &&
+          playerTheme == other.playerTheme &&
+          saturationEnabled == other.saturationEnabled &&
+          stereoWidthEnabled == other.stereoWidthEnabled &&
+          loudnessContourEnabled == other.loudnessContourEnabled &&
+          subCrossoverEnabled == other.subCrossoverEnabled &&
+          dynamicEqEnabled == other.dynamicEqEnabled &&
+          headphoneProfileId == other.headphoneProfileId &&
+          crossfeedEnabled == other.crossfeedEnabled &&
+          crossfeedDelayUs == other.crossfeedDelayUs &&
+          crossfeedFeedDb == other.crossfeedFeedDb;
+
+  @override
+  int get hashCode => Object.hashAll([
+        id,
+        name,
+        type,
+        eqPresetName,
+        volumeBoost,
+        crossfadeEnabled,
+        crossfadeSeconds,
+        bitPerfectEnabled,
+        playerTheme,
+        saturationEnabled,
+        stereoWidthEnabled,
+        loudnessContourEnabled,
+        subCrossoverEnabled,
+        dynamicEqEnabled,
+        headphoneProfileId,
+        crossfeedEnabled,
+        crossfeedDelayUs,
+        crossfeedFeedDb,
+      ]);
 
   static const List<SettingsProfile> defaultProfiles = [
     SettingsProfile(
@@ -153,10 +242,31 @@ class SettingsProfilesService {
       final prefs = await SharedPreferences.getInstance();
       final jsonStr = prefs.getString(_keyProfiles);
       if (jsonStr != null) {
-        final list = json.decode(jsonStr) as List<dynamic>;
-        return list
-            .map((e) => SettingsProfile.fromJson(e as Map<String, dynamic>))
-            .toList();
+        final list = json.decode(jsonStr);
+        if (list is List) {
+          final profiles = <SettingsProfile>[];
+          for (final item in list) {
+            if (item is Map) {
+              try {
+                final map = Map<String, dynamic>.from(item);
+                final profile = SettingsProfile.fromJson(map);
+                if (profile.id.isNotEmpty) {
+                  profiles.add(profile);
+                }
+              } catch (e, st) {
+                ErrorLogger.log(
+                  'Skipping malformed settings profile entry',
+                  error: e,
+                  stackTrace: st,
+                  category: 'SettingsProfilesService',
+                );
+              }
+            }
+          }
+          if (profiles.isNotEmpty) {
+            return profiles;
+          }
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to load settings profiles',

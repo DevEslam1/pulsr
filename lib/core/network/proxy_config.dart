@@ -144,6 +144,30 @@ class ProxyConfig {
       bypassHosts: bypassHosts ?? this.bypassHosts,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProxyConfig &&
+          runtimeType == other.runtimeType &&
+          enabled == other.enabled &&
+          type == other.type &&
+          host == other.host &&
+          port == other.port &&
+          username == other.username &&
+          password == other.password &&
+          bypassHosts == other.bypassHosts;
+
+  @override
+  int get hashCode => Object.hash(
+        enabled,
+        type,
+        host,
+        port,
+        username,
+        password,
+        bypassHosts,
+      );
 }
 
 /// An individual proxy item in a multi-proxy pool / list.

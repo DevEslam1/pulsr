@@ -334,4 +334,53 @@ void main() {
       expect(v.convergence.score, 0.0);
     });
   });
+
+  group('room correction service hardening', () {
+    test('evaluateLoopback returns 0.0 thdEstimatePercent', () {
+      final res = RoomCorrectionService.evaluateLoopback(
+        measuredDb: [1.0, 2.0],
+        targetDb: [0.0, 0.0],
+      );
+      expect(res.thdEstimatePercent, 0.0);
+    });
+
+    test('fitCorrection caps sub-50Hz positive boost to 0 dB', () {
+      final tones = [20.0, 31.5, 63.0, 125.0];
+      final responseDb = [-10.0, -10.0, -10.0, -10.0];
+      final centers = [31.25, 62.5, 125.0];
+      final gains = RoomCorrectionService.fitCorrection(
+        responseDb,
+        tones,
+        centers: centers,
+      );
+      expect(gains[0], lessThanOrEqualTo(0.0));
+      expect(gains[1], greaterThan(0.0));
+    });
+
+    test('analyzeResponse detects latency and aligns tone windows', () {
+      final tones = [440.0, 880.0];
+      const sampleRate = 48000;
+      const toneMs = 350;
+      final framesPerTone = sampleRate * toneMs ~/ 1000;
+      const latencyFrames = 4800; // 100ms latency
+      final pcm = Int16List(latencyFrames + framesPerTone * tones.length);
+
+      for (var i = 0; i < latencyFrames; i++) {
+        pcm[i] = 10;
+      }
+      var w = latencyFrames;
+      for (var i = 0; i < tones.length; i++) {
+        for (var j = 0; j < framesPerTone; j++) {
+          final t = j / sampleRate;
+          pcm[w++] =
+              (math.sin(2 * math.pi * tones[i] * t) * 0.3 * 32767).round();
+        }
+      }
+
+      final resp = RoomCorrectionService.analyzeResponse(pcm, sampleRate, tones);
+      expect(resp.length, 2);
+      expect(resp[0], closeTo(0.0, 1.5));
+      expect(resp[1], closeTo(0.0, 1.5));
+    });
+  });
 }

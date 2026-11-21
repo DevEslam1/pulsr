@@ -66,7 +66,7 @@ class FtpFsProvider implements RemoteFsProvider {
   /// Lists [path] (`LIST`, falling back to `NLST` plus type probing).
   @override
   Future<List<RemoteEntry>> list(String path) =>
-      _errors.guard('list', () async {
+      _transferLock.protect(() => _errors.guard('list', () async {
         await _session.ensureConnected();
         final absolute = _resolve(path);
         List<RemoteEntry> entries = const [];
@@ -93,11 +93,15 @@ class FtpFsProvider implements RemoteFsProvider {
         return _enrichTypes(
           FtpListingParser.parseNameList(names, parentPath: path),
         );
-      });
+      }));
 
   /// Returns metadata for [path] using `SIZE` / `MDTM`, falling back to `CWD`.
   @override
-  Future<RemoteEntry?> stat(String path) => _errors.guard('stat', () async {
+  Future<RemoteEntry?> stat(String path) =>
+      _transferLock.protect(() => _statUnlocked(path));
+
+  Future<RemoteEntry?> _statUnlocked(String path) =>
+      _errors.guard('stat', () async {
         await _session.ensureConnected();
         final control = _session.requireControl();
         final absolute = _resolve(path);
@@ -326,7 +330,7 @@ class FtpFsProvider implements RemoteFsProvider {
         enriched.add(entry);
         continue;
       }
-      final metadata = await stat(entry.path);
+      final metadata = await _statUnlocked(entry.path);
       enriched.add(metadata ?? entry);
     }
     enriched.sort(RemoteEntry.compare);

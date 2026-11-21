@@ -243,6 +243,9 @@ class DownloadTask {
           artist == other.artist &&
           status == other.status &&
           progress == other.progress &&
+          speedKbps == other.speedKbps &&
+          etaSeconds == other.etaSeconds &&
+          artworkUrl == other.artworkUrl &&
           filePath == other.filePath &&
           format == other.format &&
           bitrate == other.bitrate &&
@@ -263,6 +266,9 @@ class DownloadTask {
         artist,
         status,
         progress,
+        speedKbps,
+        etaSeconds,
+        artworkUrl,
         filePath,
         format,
         bitrate,

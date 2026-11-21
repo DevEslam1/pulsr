@@ -67,6 +67,40 @@ void main() {
       final scrubbedAuth = ErrorLogger.redactPii(authHeaderFixture);
       expect(scrubbedAuth, contains('Authorization: [REDACTED_TOKEN]'));
       expect(scrubbedAuth, isNot(contains('my_secret_jwt_token_here')));
+
+      const kvFixture =
+          'https://api.example.com?token=myToken123&api_key=myApiKey456&password=myPassword789&secret=mySecretXYZ';
+      final scrubbedKv = ErrorLogger.redactPii(kvFixture);
+      expect(scrubbedKv, contains('token=[REDACTED_TOKEN]'));
+      expect(scrubbedKv, contains('api_key=[REDACTED_TOKEN]'));
+      expect(scrubbedKv, contains('password=[REDACTED_TOKEN]'));
+      expect(scrubbedKv, contains('secret=[REDACTED_TOKEN]'));
+      expect(scrubbedKv, isNot(contains('myToken123')));
+      expect(scrubbedKv, isNot(contains('myApiKey456')));
+      expect(scrubbedKv, isNot(contains('myPassword789')));
+      expect(scrubbedKv, isNot(contains('mySecretXYZ')));
+
+      const jsonFixture =
+          '{"token": "secret_tok", "password": "secret_pwd", "secret": "secret_sec", "api_key": "secret_key", "authorization": "secret_auth"}';
+      final scrubbedJson = ErrorLogger.redactPii(jsonFixture);
+      expect(scrubbedJson, contains('"token": "[REDACTED_TOKEN]"'));
+      expect(scrubbedJson, contains('"password": "[REDACTED_TOKEN]"'));
+      expect(scrubbedJson, contains('"secret": "[REDACTED_TOKEN]"'));
+      expect(scrubbedJson, contains('"api_key": "[REDACTED_TOKEN]"'));
+      expect(scrubbedJson, contains('"authorization": "[REDACTED_TOKEN]"'));
+      expect(scrubbedJson, isNot(contains('secret_tok')));
+      expect(scrubbedJson, isNot(contains('secret_pwd')));
+      expect(scrubbedJson, isNot(contains('secret_sec')));
+      expect(scrubbedJson, isNot(contains('secret_key')));
+      expect(scrubbedJson, isNot(contains('secret_auth')));
+    });
+
+    test('logSwallowed caps rate limits at 256 entries evicting oldest', () {
+      ErrorLogger.clearSwallowedRateLimitsForTesting();
+      for (var i = 0; i < 300; i++) {
+        ErrorLogger.logSwallowed('call_site_$i', Exception('err_$i'));
+      }
+      expect(ErrorLogger.swallowedRateLimitsCount, equals(256));
     });
 
     test('reports each error to onCrashReported exactly once (single sink)',

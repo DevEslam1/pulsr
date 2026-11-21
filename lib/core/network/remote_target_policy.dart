@@ -56,6 +56,7 @@ abstract final class RemoteTargetPolicy {
     String url, {
     bool requireHttps = false,
     Set<String> allowedHostSuffixes = const {},
+    bool enforceAllowlist = false,
   }) {
     final uri = Uri.tryParse(url.trim());
     if (uri == null) return RemoteTargetVerdict.invalidScheme;
@@ -73,6 +74,9 @@ abstract final class RemoteTargetPolicy {
         hostMatchesAnySuffix(host, allowedHostSuffixes)) {
       return RemoteTargetVerdict.allowed;
     }
+    if (enforceAllowlist) {
+      return RemoteTargetVerdict.notAllowlisted;
+    }
     if (isUnsafeHost(host)) return RemoteTargetVerdict.privateNetwork;
     return RemoteTargetVerdict.allowed;
   }
@@ -82,11 +86,13 @@ abstract final class RemoteTargetPolicy {
     String url, {
     bool requireHttps = false,
     Set<String> allowedHostSuffixes = const {},
+    bool enforceAllowlist = false,
   }) =>
       classify(
         url,
         requireHttps: requireHttps,
         allowedHostSuffixes: allowedHostSuffixes,
+        enforceAllowlist: enforceAllowlist,
       ) ==
       RemoteTargetVerdict.allowed;
 
@@ -112,14 +118,19 @@ abstract final class RemoteTargetPolicy {
   /// True when [host] is a literal in loopback / private / link-local /
   /// reserved space, or a name that can only resolve locally.
   static bool isUnsafeHost(String host) {
-    final lower = host.trim().toLowerCase();
+    var lower = host.trim().toLowerCase();
+    if (lower.startsWith('[') && lower.endsWith(']')) {
+      lower = lower.substring(1, lower.length - 1).trim();
+    }
+    final zoneIdx = lower.indexOf('%');
+    if (zoneIdx != -1) lower = lower.substring(0, zoneIdx);
     if (lower.isEmpty) return true;
     if (lower == 'localhost' || lower.endsWith('.localhost')) return true;
     if (lower.endsWith('.local')) return true;
 
     if (lower.contains(':')) {
       // IPv6 literal (Uri strips the brackets). Reject unspecified/loopback,
-      // unique-local, link-local, and IPv4-mapped private addresses.
+      // unique-local, link-local, multicast, site-local, and IPv4-mapped private addresses.
       const loopbacks = {'::', '::1', '0:0:0:0:0:0:0:0', '0:0:0:0:0:0:0:1'};
       if (loopbacks.contains(lower)) return true;
       final embedded = embeddedIpv4(lower);
@@ -129,6 +140,8 @@ abstract final class RemoteTargetPolicy {
       if (value != null) {
         if ((value & 0xfe00) == 0xfc00) return true; // fc00::/7
         if ((value & 0xffc0) == 0xfe80) return true; // fe80::/10
+        if ((value & 0xff00) == 0xff00) return true; // ff00::/8 (multicast)
+        if ((value & 0xffc0) == 0xfec0) return true; // fec0::/10 (deprecated site-local)
       }
       return false;
     }
@@ -178,7 +191,12 @@ abstract final class RemoteTargetPolicy {
 
   /// True for a syntactically valid IPv4 or IPv6 literal.
   static bool isIpLiteral(String host) {
-    final trimmed = host.trim();
+    var trimmed = host.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      trimmed = trimmed.substring(1, trimmed.length - 1).trim();
+    }
+    final zoneIdx = trimmed.indexOf('%');
+    if (zoneIdx != -1) trimmed = trimmed.substring(0, zoneIdx);
     if (trimmed.contains(':')) return true;
     final parts = trimmed.split('.');
     if (parts.length != 4) return false;
@@ -248,6 +266,7 @@ abstract final class RemoteTargetPolicy {
     if (a == 192 && b == 168) return true; // 192.168.0.0/16
     if (a == 169 && b == 254) return true; // 169.254.0.0/16
     if (a == 100 && b >= 64 && b <= 127) return true; // 100.64.0.0/10
+    if (a >= 224) return true; // 224.0.0.0/4 multicast, 240.0.0.0/4 reserved, 255.255.255.255
     return false;
   }
 }

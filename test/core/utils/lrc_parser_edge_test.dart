@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/lrc_parser.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
 
-class _FakeLrclib {
+class _FakeLrclib implements LrclibLyricsClient {
   int calls = 0;
   LyricsResult? result;
   String? lastTrack;
@@ -18,6 +18,7 @@ class _FakeLrclib {
   String? lastAlbum;
   int? lastDuration;
 
+  @override
   Future<LyricsResult?> fetchLyrics({
     String? trackName,
     String? artistName,
@@ -33,7 +34,8 @@ class _FakeLrclib {
   }
 }
 
-class _ThrowingLrclib {
+class _ThrowingLrclib implements LrclibLyricsClient {
+  @override
   Future<LyricsResult?> fetchLyrics({
     String? trackName,
     String? artistName,
@@ -44,10 +46,11 @@ class _ThrowingLrclib {
   }
 }
 
-class _DeferredLrclib {
+class _DeferredLrclib implements LrclibLyricsClient {
   final Completer<LyricsResult?> completer = Completer<LyricsResult?>();
   int calls = 0;
 
+  @override
   Future<LyricsResult?> fetchLyrics({
     String? trackName,
     String? artistName,

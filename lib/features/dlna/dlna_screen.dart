@@ -642,10 +642,10 @@ class _NowPlayingCard extends StatelessWidget {
             children: <Widget>[
               Semantics(
                 button: true,
-                label: 'Previous',
+                label: DlnaStrings.previous,
                 child: IconButton(
                   onPressed: onPrevious,
-                  tooltip: 'Previous',
+                  tooltip: DlnaStrings.previous,
                   icon: const Icon(Icons.skip_previous_rounded),
                   style: IconButton.styleFrom(
                     minimumSize: const Size(48, 48),
@@ -691,10 +691,10 @@ class _NowPlayingCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.xs),
               Semantics(
                 button: true,
-                label: 'Next',
+                label: DlnaStrings.next,
                 child: IconButton(
                   onPressed: onNext,
-                  tooltip: 'Next',
+                  tooltip: DlnaStrings.next,
                   icon: const Icon(Icons.skip_next_rounded),
                   style: IconButton.styleFrom(
                     minimumSize: const Size(48, 48),

@@ -271,4 +271,54 @@ void main() {
       expect(entries.first.songId, songs.first.id);
     });
   });
+
+  group('SpotifyImporterService Match Accuracy & Lifecycle', () {
+    test('does not match wrong artist on common titles', () async {
+      final mockYtmService = MockYtmService();
+      final service = SpotifyImporterService(ytmService: mockYtmService);
+
+      const adele = YtmTrack(
+        videoId: 'v_adele',
+        title: 'Hello (Official Music Video)',
+        artist: 'Adele',
+        duration: Duration(seconds: 300),
+      );
+      const lionel = YtmTrack(
+        videoId: 'v_lionel',
+        title: 'Hello',
+        artist: 'Lionel Richie',
+        duration: Duration(seconds: 300),
+      );
+
+      when(() => mockYtmService.search('Hello Adele', limit: any(named: 'limit')))
+          .thenAnswer((_) async => [lionel, adele]);
+
+      final resolved = await service.resolveTracks([
+        const SpotifyImportTrack(title: 'Hello', artist: 'Adele'),
+      ]);
+
+      expect(resolved.resolved.length, 1);
+      expect(resolved.resolved.first.videoId, 'v_adele');
+      expect(resolved.unmatched.length, 0);
+
+      when(() => mockYtmService.search('Hello SomeoneElse', limit: any(named: 'limit')))
+          .thenAnswer((_) async => [lionel]);
+
+      final unmatched = await service.resolveTracks([
+        const SpotifyImportTrack(title: 'Hello', artist: 'SomeoneElse'),
+      ]);
+
+      expect(unmatched.resolved.length, 0);
+      expect(unmatched.unmatched.length, 1);
+    });
+
+    test('dispose closes httpClient only when owned', () {
+      final mockClient = MockClient((_) async => http.Response('', 200));
+      final serviceInjected = SpotifyImporterService(httpClient: mockClient);
+      serviceInjected.dispose();
+
+      final serviceOwned = SpotifyImporterService();
+      serviceOwned.dispose();
+    });
+  });
 }

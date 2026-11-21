@@ -66,7 +66,11 @@ class AssistantSettingsScreen extends StatelessWidget {
                 subtitle: const Text(AssistantStrings.suggestionsSubtitle),
                 onChanged: (value) {
                   settings.setSuggestionsEnabled(value);
-                  if (!value) _clearSuggestionCache(suggestionSync);
+                  if (value) {
+                    unawaited(suggestionSync?.pushRecent());
+                  } else {
+                    _clearSuggestionCache(suggestionSync);
+                  }
                 },
               ),
               if (!settings.suggestionsEnabled) ...<Widget>[
@@ -135,7 +139,11 @@ Future<void> showAssistantSettingsSheet(
             subtitle: const Text(AssistantStrings.suggestionsSubtitle),
             onChanged: (value) {
               settings.setSuggestionsEnabled(value);
-              if (!value) _clearSuggestionCache(suggestionSync);
+              if (value) {
+                unawaited(suggestionSync?.pushRecent());
+              } else {
+                _clearSuggestionCache(suggestionSync);
+              }
             },
           ),
         ),

@@ -1,6 +1,7 @@
 // test/domain/models/value_equality_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
+import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/models/headphone_profile.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
 
@@ -50,6 +51,8 @@ void main() {
         'btSelectableSampleRates':
             base.copyWith(btSelectableSampleRates: [96000]),
         'btSelectableBitDepths': base.copyWith(btSelectableBitDepths: [24]),
+        'outputChannels': base.copyWith(outputChannels: 6),
+        'decodedChannelCount': base.copyWith(decodedChannelCount: 6),
       };
 
       variants.forEach((name, variant) {
@@ -63,6 +66,16 @@ void main() {
       final base = _baseAudio();
       final withCodec = base.copyWith(btCodecConnected: true);
       expect(withCodec, isNot(equals(base)));
+    });
+
+    test('toMap includes outputChannels and decodedChannelCount', () {
+      final audio = _baseAudio().copyWith(
+        outputChannels: 6,
+        decodedChannelCount: 6,
+      );
+      final map = audio.toMap();
+      expect(map['outputChannels'], 6);
+      expect(map['decodedChannelCount'], 6);
     });
 
     test('AudioDeviceEntry isPreferred and sampleRates affect equality', () {
@@ -189,6 +202,34 @@ void main() {
       );
       expect(line, equals(same));
       expect(line.hashCode, equals(same.hashCode));
+    });
+  });
+
+  group('DownloadTask equality includes speedKbps, etaSeconds, artworkUrl', () {
+    final base = DownloadTask(
+      id: 'task_1',
+      videoId: 'vid_1',
+      title: 'Title',
+      artist: 'Artist',
+      createdAt: DateTime.utc(2026, 1, 1),
+    );
+
+    test('speedKbps change breaks equality and hashCode', () {
+      final withSpeed = base.copyWith(speedKbps: 512.0);
+      expect(withSpeed, isNot(equals(base)));
+      expect(withSpeed.hashCode, isNot(equals(base.hashCode)));
+    });
+
+    test('etaSeconds change breaks equality and hashCode', () {
+      final withEta = base.copyWith(etaSeconds: 42);
+      expect(withEta, isNot(equals(base)));
+      expect(withEta.hashCode, isNot(equals(base.hashCode)));
+    });
+
+    test('artworkUrl change breaks equality and hashCode', () {
+      final withArt = base.copyWith(artworkUrl: 'https://example.com/art.jpg');
+      expect(withArt, isNot(equals(base)));
+      expect(withArt.hashCode, isNot(equals(base.hashCode)));
     });
   });
 }

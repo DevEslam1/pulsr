@@ -111,56 +111,63 @@ class UsbQuirkEditor extends StatelessWidget {
                 onChanged(profile.copyWith(disableUac2ClockSwitch: v)),
           ),
           const SizedBox(height: AppSpacing.sm),
-          _QuirkNumberField(
+          _QuirkNumberField<int>(
             label: UsbErgonomicsStrings.silenceLabel,
             initialValue: profile.silenceMs == 0 ? '' : '${profile.silenceMs}',
             enabled: enabled,
+            allowBlank: true,
+            min: 0,
+            max: UsbQuirkProfile.maxSilenceMs,
             onValue: (value) {
-              if (value == null || value < 0 || value > UsbQuirkProfile.maxSilenceMs) {
-                return;
-              }
-              onChanged(profile.copyWith(silenceMs: value));
+              onChanged(profile.copyWith(silenceMs: value ?? 0));
             },
           ),
-          _QuirkNumberField(
+          _QuirkNumberField<int>(
             label: UsbErgonomicsStrings.bufferLabel,
             initialValue: profile.bufferMs == 0 ? '' : '${profile.bufferMs}',
             enabled: enabled,
+            allowBlank: true,
+            min: 0,
+            max: UsbQuirkProfile.maxBufferMs,
             onValue: (value) {
-              if (value == null || value < 0 || value > UsbQuirkProfile.maxBufferMs) {
-                return;
-              }
-              onChanged(profile.copyWith(bufferMs: value));
+              onChanged(profile.copyWith(bufferMs: value ?? 0));
             },
           ),
-          _QuirkNumberField(
+          _QuirkNumberField<int>(
             label: UsbErgonomicsStrings.transferSizeLabel,
             initialValue:
                 profile.transferSizeBytes == 0 ? '' : '${profile.transferSizeBytes}',
             enabled: enabled,
+            allowBlank: true,
+            isValid: (v) =>
+                v == 0 ||
+                (v >= 64 && v <= UsbQuirkProfile.maxTransferSizeBytes),
             onValue: (value) {
-              if (value == null) {
-                onChanged(profile.copyWith(transferSizeBytes: 0));
-                return;
-              }
-              if (value < 64 || value > UsbQuirkProfile.maxTransferSizeBytes) {
-                return;
-              }
-              onChanged(profile.copyWith(transferSizeBytes: value));
+              onChanged(profile.copyWith(transferSizeBytes: value ?? 0));
             },
           ),
-          _QuirkNumberField(
+          _QuirkNumberField<int>(
             label: UsbErgonomicsStrings.selectorPinLabel,
             initialValue: profile.preferredSelectorPin?.toString() ?? '',
             enabled: enabled,
             allowBlank: true,
+            min: 0,
+            max: 255,
             onValue: (value) {
-              if (value == null) {
-                onChanged(profile.copyWith(preferredSelectorPin: null));
-                return;
-              }
-              if (value < 0 || value > 255) return;
               onChanged(profile.copyWith(preferredSelectorPin: value));
+            },
+          ),
+          _QuirkNumberField<double>(
+            label: UsbErgonomicsStrings.volumeCalibrationLabel,
+            initialValue: profile.volumeCalibrationDb == 0.0
+                ? ''
+                : profile.volumeCalibrationDb.toStringAsFixed(1),
+            enabled: enabled,
+            allowBlank: true,
+            min: -24.0,
+            max: 24.0,
+            onValue: (value) {
+              onChanged(profile.copyWith(volumeCalibrationDb: value ?? 0.0));
             },
           ),
         ],
@@ -195,24 +202,27 @@ class _QuirkSwitch extends StatelessWidget {
       enabled: enabled,
       onTap: enabled ? () => onChanged(!value) : null,
       child: ExcludeSemantics(
-        child: SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          title: Text(
-            title,
-            style: TextStyle(
-              color: p.textPrimary,
-              fontSize: AppFontSize.body,
+        child: Material(
+          type: MaterialType.transparency,
+          child: SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              title,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: AppFontSize.body,
+              ),
             ),
-          ),
-          subtitle: Text(
-            hint,
-            style: TextStyle(
-              color: p.textSecondary,
-              fontSize: AppFontSize.caption,
+            subtitle: Text(
+              hint,
+              style: TextStyle(
+                color: p.textSecondary,
+                fontSize: AppFontSize.caption,
+              ),
             ),
+            value: value,
+            onChanged: enabled ? onChanged : null,
           ),
-          value: value,
-          onChanged: enabled ? onChanged : null,
         ),
       ),
     );
@@ -220,45 +230,121 @@ class _QuirkSwitch extends StatelessWidget {
 }
 
 /// Numeric quirk field. Empty input means "automatic" for the knobs that allow
-/// it; every other field ignores an out-of-range intermediate value.
-class _QuirkNumberField extends StatelessWidget {
+/// it; out-of-range input surfaces [UsbErgonomicsStrings.numberInvalid].
+class _QuirkNumberField<T extends num> extends StatefulWidget {
   const _QuirkNumberField({
+    super.key,
     required this.label,
     required this.initialValue,
     required this.enabled,
     required this.onValue,
     this.allowBlank = true,
+    this.min,
+    this.max,
+    this.isValid,
   });
 
   final String label;
   final String initialValue;
   final bool enabled;
-  final ValueChanged<int?> onValue;
+  final ValueChanged<T?> onValue;
   final bool allowBlank;
+  final T? min;
+  final T? max;
+  final bool Function(T value)? isValid;
+
+  @override
+  State<_QuirkNumberField<T>> createState() => _QuirkNumberFieldState<T>();
+}
+
+class _QuirkNumberFieldState<T extends num>
+    extends State<_QuirkNumberField<T>> {
+  late final TextEditingController _controller;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void didUpdateWidget(_QuirkNumberField<T> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialValue != widget.initialValue &&
+        widget.initialValue != _controller.text) {
+      _controller.text = widget.initialValue;
+      if (_errorText != null) {
+        setState(() => _errorText = null);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  T? _parse(String text) {
+    if (T == double) {
+      return double.tryParse(text) as T?;
+    }
+    return int.tryParse(text) as T?;
+  }
+
+  void _onChanged(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      if (_errorText != null) {
+        setState(() => _errorText = null);
+      }
+      if (widget.allowBlank) {
+        widget.onValue(null);
+      }
+      return;
+    }
+    if (trimmed == '-' ||
+        (T == double && (trimmed == '.' || trimmed == '-.'))) {
+      if (_errorText != null) {
+        setState(() => _errorText = null);
+      }
+      return;
+    }
+    final parsed = _parse(trimmed);
+    if (parsed == null) {
+      setState(() => _errorText = UsbErgonomicsStrings.numberInvalid);
+      return;
+    }
+    if ((widget.min != null && parsed < widget.min!) ||
+        (widget.max != null && parsed > widget.max!) ||
+        (widget.isValid != null && !widget.isValid!(parsed))) {
+      setState(() => _errorText = UsbErgonomicsStrings.numberInvalid);
+      return;
+    }
+    if (_errorText != null) {
+      setState(() => _errorText = null);
+    }
+    widget.onValue(parsed);
+  }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsetsDirectional.only(top: AppSpacing.xs),
-      child: TextFormField(
-        initialValue: initialValue,
-        enabled: enabled,
-        keyboardType: TextInputType.number,
+      child: TextField(
+        controller: _controller,
+        enabled: widget.enabled,
+        keyboardType: T == double
+            ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+            : TextInputType.number,
         decoration: InputDecoration(
-          labelText: label,
+          labelText: widget.label,
+          errorText: _errorText,
           isDense: true,
           border: const OutlineInputBorder(),
         ),
-        onChanged: (raw) {
-          final trimmed = raw.trim();
-          if (trimmed.isEmpty) {
-            if (allowBlank) onValue(null);
-            return;
-          }
-          final parsed = int.tryParse(trimmed);
-          if (parsed == null) return;
-          onValue(parsed);
-        },
+        onChanged: _onChanged,
       ),
     );
   }

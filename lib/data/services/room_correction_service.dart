@@ -124,11 +124,57 @@ class RoomCorrectionService {
     final framesPerTone = sampleRate * toneMs ~/ 1000;
     final lead = sampleRate * leadMs ~/ 1000;
     final tail = sampleRate * tailMs ~/ 1000;
-    final usableTones = math.min(tones.length, pcm.length ~/ framesPerTone);
+    // Detect onset if there is leading latency/silence before the sweep starts.
+    var onsetFrame = 0;
+    const blockMs = 10;
+    final blockSize = sampleRate * blockMs ~/ 1000;
+    if (pcm.length > blockSize * 4 && blockSize > 0) {
+      double initialSum = 0.0;
+      for (var j = 0; j < blockSize; j++) {
+        final v = pcm[j] / 32768.0;
+        initialSum += v * v;
+      }
+      final initialRms = math.sqrt(initialSum / blockSize);
+
+      // In zero-latency synthetic sweeps, initialRms is high (> 0.05).
+      // If initialRms is low, sound playback had latency, so scan for the onset.
+      if (initialRms < 0.05) {
+        final searchLimit = math.min(pcm.length, sampleRate * 2);
+        double peakRms = 0.0;
+        for (var i = 0; i + blockSize <= searchLimit; i += blockSize) {
+          double s = 0.0;
+          for (var j = 0; j < blockSize; j++) {
+            final v = pcm[i + j] / 32768.0;
+            s += v * v;
+          }
+          final r = math.sqrt(s / blockSize);
+          if (r > peakRms) peakRms = r;
+        }
+
+        if (peakRms > 0.05 && peakRms > initialRms * 2.5) {
+          final threshold = math.max(initialRms * 3.0, peakRms * 0.25);
+          for (var i = 0; i + blockSize <= searchLimit; i += (blockSize ~/ 2)) {
+            double s = 0.0;
+            for (var j = 0; j < blockSize; j++) {
+              final v = pcm[i + j] / 32768.0;
+              s += v * v;
+            }
+            final r = math.sqrt(s / blockSize);
+            if (r >= threshold) {
+              onsetFrame = i;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    final usableTones =
+        math.min(tones.length, (pcm.length - onsetFrame) ~/ framesPerTone);
     final raw = List<double>.filled(usableTones, 0.0);
     for (var i = 0; i < usableTones; i++) {
-      final start = i * framesPerTone + lead;
-      final end = (i + 1) * framesPerTone - tail;
+      final start = onsetFrame + i * framesPerTone + lead;
+      final end = onsetFrame + (i + 1) * framesPerTone - tail;
       double sum = 0.0;
       var n = 0;
       for (var j = start; j < end && j < pcm.length; j++) {
@@ -204,16 +250,36 @@ class RoomCorrectionService {
       }
       final dev = windowCount > 0 ? windowSum / windowCount : respA[bestIdx];
       final correction = -dev;
-      final clamped = correction.clamp(-maxGainDb, maxGainDb).toDouble();
+      var clamped = correction.clamp(-maxGainDb, maxGainDb).toDouble();
+      if (center < 50.0 && clamped > 0.0) {
+        clamped = 0.0;
+      }
       gains.add(clamped);
     }
-    // Adjacent-band smoothing (causal clamp toward the previous band).
-    for (var i = 1; i < gains.length; i++) {
-      final prev = gains[i - 1];
-      gains[i] =
-          gains[i].clamp(prev - maxAdjacentDeltaDb, prev + maxAdjacentDeltaDb);
+    // Adjacent-band smoothing: bidirectional (average of forward and backward clamped passes).
+    final forward = List<double>.from(gains);
+    for (var i = 1; i < forward.length; i++) {
+      final prev = forward[i - 1];
+      forward[i] = forward[i].clamp(
+        prev - maxAdjacentDeltaDb,
+        prev + maxAdjacentDeltaDb,
+      );
     }
-    return gains;
+    final backward = List<double>.from(gains);
+    for (var i = backward.length - 2; i >= 0; i--) {
+      final next = backward[i + 1];
+      backward[i] = backward[i].clamp(
+        next - maxAdjacentDeltaDb,
+        next + maxAdjacentDeltaDb,
+      );
+    }
+    return List<double>.generate(gains.length, (i) {
+      var avg = (forward[i] + backward[i]) / 2.0;
+      if (centers[i] < 50.0 && avg > 0.0) {
+        avg = 0.0;
+      }
+      return avg;
+    });
   }
 
   /// Builds the EQ preset the wizard applies. [gains] must match
@@ -468,8 +534,14 @@ class RoomCorrectionService {
       });
       final ok = await _method
           .invokeMethod<bool>('startCapture', {'sampleRate': sampleRate});
-      _capturing = ok ?? false;
-      return _capturing;
+      if (ok != true) {
+        await _captureSub?.cancel();
+        _captureSub = null;
+        _capturing = false;
+        return false;
+      }
+      _capturing = true;
+      return true;
     } catch (e, st) {
       ErrorLogger.log('Failed to start room-correction capture',
           error: e, stackTrace: st, category: 'RoomCorrection');
@@ -575,13 +647,12 @@ class RoomCorrectionService {
     }
 
     final meanDev = totalDev / n;
-    final thdPercent = (meanDev * 0.05).clamp(0.001, 10.0);
     final isWithinGate = maxDev <= gateThresholdDb;
 
     return LoopbackVerificationResult(
       maxDeviationDb: (maxDev * 100).roundToDouble() / 100.0,
       meanDeviationDb: (meanDev * 100).roundToDouble() / 100.0,
-      thdEstimatePercent: (thdPercent * 1000).roundToDouble() / 1000.0,
+      thdEstimatePercent: 0.0,
       isWithinGate: isWithinGate,
     );
   }

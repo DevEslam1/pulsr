@@ -471,8 +471,9 @@ class UsbExclusiveService {
   static const EventChannel _eventChannel =
       EventChannel(PulsrChannels.usbExclusiveEvents);
 
-  static final UsbExclusiveService _instance = UsbExclusiveService._internal();
-  factory UsbExclusiveService() => _instance;
+  static UsbExclusiveService? _instance;
+  factory UsbExclusiveService() =>
+      _instance ??= UsbExclusiveService._internal();
   UsbExclusiveService._internal();
 
   /// Visible for testing to allow creating mocks/fakes.
@@ -961,5 +962,8 @@ class UsbExclusiveService {
     _subscription?.cancel();
     _subscription = null;
     if (!_controller.isClosed) _controller.close();
+    if (identical(_instance, this)) {
+      _instance = null;
+    }
   }
 }

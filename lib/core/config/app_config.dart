@@ -169,7 +169,7 @@ class AppConfig {
   static bool get isCloudSyncAllowed => !isPure;
 
   static String get appTitle {
-    final lowerFlavor = flavor.toLowerCase();
+    final lowerFlavor = effectiveFlavor;
     if (lowerFlavor == 'ytm' || ytmEnabled) {
       return 'Pulsr Music';
     }
@@ -182,7 +182,7 @@ class AppConfig {
 
   /// Validates that build flavor and runtime environment configuration are aligned.
   static void validateConfiguration() {
-    final lowerFlavor = flavor.toLowerCase();
+    final lowerFlavor = effectiveFlavor;
     if (const bool.hasEnvironment('ENV') &&
         lowerFlavor == 'prod' &&
         envName.toLowerCase() == 'dev') {
@@ -202,7 +202,7 @@ class AppConfig {
     }
     if ((lowerFlavor == 'dev' || lowerFlavor == 'ytm') && !ytmEnabled) {
       ErrorLogger.log(
-        'Flavor is "$flavor" (native NewPipe bridge compiled) but Dart gate ENABLE_YTM is false. Run with --dart-define=ENABLE_YTM=true to activate YTM features.',
+        'Flavor is "$effectiveFlavor" (native NewPipe bridge compiled) but Dart gate ENABLE_YTM is false. Run with --dart-define=ENABLE_YTM=true to activate YTM features.',
         category: 'AppConfig',
       );
     }

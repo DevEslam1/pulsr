@@ -105,6 +105,10 @@ abstract final class UsbErgonomicsStrings {
   /// Label of the selector pin field.
   static const String selectorPinLabel = 'Clock selector pin (blank = auto)';
 
+  /// Label of the volume calibration field.
+  static const String volumeCalibrationLabel =
+      'Volume calibration (dB, -24.0 to +24.0)';
+
   /// Validation error for a numeric field.
   static const String numberInvalid = 'Enter a number in the allowed range.';
 
