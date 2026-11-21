@@ -7,6 +7,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../data/services/cast_service.dart';
 import '../../../player/cubit/player_cubit.dart';
 import 'settings_section.dart';
@@ -211,13 +212,10 @@ class _CastSectionState extends State<CastSection> {
             horizontal: AppSpacing.md, vertical: AppSpacing.s14),
         child: Row(
           children: [
-            SizedBox(
-              width: AppSpacing.s18,
-              height: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: p.accent,
-              ),
+            PulsrProgressBar.circular(
+              size: AppSpacing.s18,
+              strokeWidth: 2,
+              color: p.accent,
             ),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
@@ -291,14 +289,15 @@ class _CastSectionState extends State<CastSection> {
           ? (_session.deviceName ?? l10n.castConnected)
           : null,
       trailing: IconButton(
+        constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget,
+        ),
         icon: _scanning
-            ? SizedBox(
-                width: AppSpacing.md,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: p.accent,
-                ),
+            ? PulsrProgressBar.circular(
+                size: AppSpacing.md,
+                strokeWidth: 2,
+                color: p.accent,
               )
             : Icon(
                 Icons.refresh_rounded,
@@ -306,7 +305,6 @@ class _CastSectionState extends State<CastSection> {
                 color: p.textSecondary,
               ),
         tooltip: l10n.scanningCastDevices,
-        visualDensity: VisualDensity.compact,
         onPressed: _scanning || _busy ? null : _rescan,
       ),
       children: [

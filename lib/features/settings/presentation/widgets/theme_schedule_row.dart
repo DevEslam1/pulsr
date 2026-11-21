@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../cubit/settings_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -69,14 +70,14 @@ class _ThemeScheduleRowState extends State<ThemeScheduleRow> {
   Widget build(BuildContext context) {
     final p = context.palette;
     if (!_loaded) {
-      return const SizedBox(
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+      return const Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.xs,
+        ),
+        child: SkeletonBox(
+          height: 40,
+          radius: 12,
         ),
       );
     }

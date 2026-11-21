@@ -284,10 +284,10 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                                                 .withValues(alpha: 0.45),
                                             borderRadius: AppRadii.r16All,
                                           ),
-                                          child: const Center(
+                                          child: Center(
                                             child: Icon(
                                               Icons.check_circle_rounded,
-                                              color: Colors.white,
+                                              color: p.onAccent,
                                               size: 36,
                                             ),
                                           ),
@@ -328,13 +328,15 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                                             context,
                                             song: song,
                                           ),
-                                          child: const SizedBox(
+                                          child: SizedBox(
                                             width: AppSpacing.minTouchTarget,
                                             height: AppSpacing.minTouchTarget,
                                             child: Center(
                                               child: Icon(
                                                 Icons.more_vert_rounded,
-                                                color: Colors.white,
+                                                color: context
+                                                    .playerSurfacePalette
+                                                    .highContrastInk,
                                                 size: 18,
                                               ),
                                             ),
@@ -590,12 +592,14 @@ mixin LibrarySongsTab on State<LibraryScreen> {
                 vertical: AppSpacing.sm,
               ),
               decoration: BoxDecoration(
-                color: (p.isDark ? Colors.white : Colors.black)
-                    .withValues(alpha: 0.05),
+                color: p.isDark
+                    ? AppColors.specularAt(0.05)
+                    : AppColors.scrimAt(0.05),
                 borderRadius: AppRadii.r18All,
                 border: Border.all(
-                  color: (p.isDark ? Colors.white : Colors.black)
-                      .withValues(alpha: 0.08),
+                  color: p.isDark
+                      ? AppColors.specularAt(0.08)
+                      : AppColors.scrimAt(0.08),
                 ),
               ),
               child: Row(

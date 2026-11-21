@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 import 'package:go_router/go_router.dart';
 
@@ -83,8 +85,12 @@ class QuickDiscoveryHeader extends StatelessWidget {
       ),
     ];
 
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.6);
+    final railHeight = math.max(48.0, (48.0 * textScale).roundToDouble());
+
     return SizedBox(
-      height: 48.0,
+      height: railHeight,
       child: Row(
         children: [
           Expanded(
@@ -101,11 +107,13 @@ class QuickDiscoveryHeader extends StatelessWidget {
                     const SizedBox(width: AppSpacing.s8),
                 itemBuilder: (context, index) {
                   final item = items[index];
-                  return DiscoveryChip(
-                    icon: item.icon,
-                    label: item.label,
-                    iconColor: p.accent,
-                    onTap: item.onTap,
+                  return Center(
+                    child: DiscoveryChip(
+                      icon: item.icon,
+                      label: item.label,
+                      iconColor: p.accent,
+                      onTap: item.onTap,
+                    ),
                   );
                 },
               ),
@@ -118,13 +126,15 @@ class QuickDiscoveryHeader extends StatelessWidget {
               end: Adaptive.pagePadding(context),
             ),
             child: SizedBox(
-              height: 48.0,
-              child: DiscoveryChip(
-                icon: Icons.apps_rounded,
-                label: context.l10n.browseMoreTools,
-                iconColor: p.textSecondary,
-                onTap: onMore,
-                compact: true,
+              height: railHeight,
+              child: Center(
+                child: DiscoveryChip(
+                  icon: Icons.apps_rounded,
+                  label: context.l10n.browseMoreTools,
+                  iconColor: p.textSecondary,
+                  onTap: onMore,
+                  compact: true,
+                ),
               ),
             ),
           ),

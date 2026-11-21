@@ -57,6 +57,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
             ByteBuffer outBuffer, int maxOutFrames, double srcRate, double dstRate);
     private static native boolean nativeIsBitPerfect(long engineHandle);
     private static native boolean nativeIsUsbExclusive(long engineHandle);
+    private static native boolean nativeNeedsUsbPrefillCushion(long engineHandle);
     private static native void nativeResyncForTrack(
             long engineHandle, double sampleRate, int channels);
 
@@ -426,6 +427,21 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         }
     }
 
+    boolean needsUsbPrefillCushion() {
+        engineLock.readLock().lock();
+        try {
+            final long handle = nativeEngineHandle.get();
+            if (handle == 0 || !NATIVE_AVAILABLE) return false;
+            try {
+                return nativeNeedsUsbPrefillCushion(handle);
+            } catch (RuntimeException | UnsatisfiedLinkError e) {
+                return false;
+            }
+        } finally {
+            engineLock.readLock().unlock();
+        }
+    }
+
     boolean consumeDirectUsbBackpressure() {
         final boolean busy = directUsbBackpressured;
         directUsbBackpressured = false;
@@ -658,16 +674,32 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         // the gain in the Java output loop below.
         int nativeGainedFrames = 0;
         if (emitFrames > 0 && isNativeAvailableForConfiguration()) {
-            final boolean rawEligible = !tapSrcActive
-                    && sourcePcm != null && sourcePcm.isDirect()
+            final long expectedSourceBytes = (long) frameCount * channelCount * (sourceBitDepth / 8);
+            ByteBuffer directSourcePcm = sourcePcm;
+            if (!tapSrcActive
+                    && sourcePcm != null
+                    && !sourcePcm.isDirect()
                     && (sourceBitDepth == 16 || sourceBitDepth == 24 || sourceBitDepth == 32)
                     && sourceSampleRate == inputAudioFormat.sampleRate
-                    && sourcePcm.remaining() == (long) frameCount * channelCount * (sourceBitDepth / 8);
+                    && expectedSourceBytes > 0
+                    && expectedSourceBytes <= Integer.MAX_VALUE
+                    && sourcePcm.remaining() == expectedSourceBytes) {
+                directSourcePcm = ensureRawSourceScratch((int) expectedSourceBytes);
+                ByteBuffer dup = sourcePcm.duplicate();
+                directSourcePcm.clear();
+                directSourcePcm.put(dup);
+                directSourcePcm.flip();
+            }
+            final boolean rawEligible = !tapSrcActive
+                    && directSourcePcm != null && directSourcePcm.isDirect()
+                    && (sourceBitDepth == 16 || sourceBitDepth == 24 || sourceBitDepth == 32)
+                    && sourceSampleRate == inputAudioFormat.sampleRate
+                    && directSourcePcm.remaining() == expectedSourceBytes;
             try {
                 processed = processNativeBlock(emitNativeBuffer, emitFrames, channelCount,
                         gains == null ? null : gainScratch,
-                        rawEligible ? sourcePcm : null,
-                        rawEligible ? sourcePcm.position() : 0,
+                        rawEligible ? directSourcePcm : null,
+                        rawEligible ? directSourcePcm.position() : 0,
                         rawEligible ? sourceBitDepth : 0, sourceSampleRate);
                 if (processed == DIRECT_USB_RETRY) {
                     directUsbBackpressured = true;
@@ -832,6 +864,7 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
         gainScratchFloats = null;
         resampleScratch = null;
         resampleScratchFloats = null;
+        rawSourceScratch = null;
         synchronized (rampLock) {
             rampGains = null;
             rampSegmentMs = 0;
@@ -900,6 +933,16 @@ public class NativeDspAudioProcessor extends BaseAudioProcessor {
     // Direct buffer holding the tap-SRC output block fed to the native engine.
     private ByteBuffer resampleScratch;
     private FloatBuffer resampleScratchFloats;
+    private ByteBuffer rawSourceScratch;
+
+    private ByteBuffer ensureRawSourceScratch(int byteCount) {
+        if (rawSourceScratch == null || rawSourceScratch.capacity() < byteCount) {
+            int targetBytes = Math.max(byteCount,
+                    rawSourceScratch == null ? 16384 : rawSourceScratch.capacity() * 2);
+            rawSourceScratch = ByteBuffer.allocateDirect(targetBytes).order(ByteOrder.nativeOrder());
+        }
+        return rawSourceScratch;
+    }
 
     private FloatBuffer ensureResampleScratch(int sampleCount) {
         if (resampleScratch == null || resampleScratch.capacity() < sampleCount * 4) {

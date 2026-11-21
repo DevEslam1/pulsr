@@ -1,15 +1,20 @@
 // lib/features/onboarding/presentation/onboarding_screen.dart
+import 'dart:async';
 import 'dart:io';
-import 'package:material_ui/material_ui.dart';
+import 'dart:math' as math;
+
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../core/di/injection.dart';
 import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/services/sound_feedback_service.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -19,8 +24,18 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/pulsr_haptics.dart';
 import '../../../core/widgets/gestures_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
+import '../../../core/widgets/pulsr_pressable.dart';
+import '../../../core/widgets/pulsr_progress.dart';
+import '../../../core/widgets/pulsr_segmented_control.dart';
 import '../../../data/scanner/media_scanner_service.dart';
+import '../../player/cubit/player_cubit.dart';
+import '../../player/presentation/themes/player_theme.dart';
+import '../../player/presentation/themes/theme_registry.dart';
 import '../../settings/cubit/settings_cubit.dart';
+import '../../settings/cubit/settings_state.dart';
+import '../../settings/presentation/widgets/audio_setup_wizard.dart';
+
+part 'onboarding_steps_part.dart';
 
 class OnboardingScreen extends StatefulWidget {
   final MediaScannerService scannerService;
@@ -33,20 +48,72 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
+  StreamSubscription<ScanProgressUpdate>? _progressSub;
   int _currentPage = 0;
   bool _isLoading = false;
+  bool _hasScanned = false;
+  bool _notificationsGranted = false;
+  int _scannedTrackCount = 0;
+  double? _scanProgress;
 
-  /// Total walkthrough pages (privacy, playback, beauty, gestures, personalize).
-  static const int _pageCount = 5;
+  /// Total interactive walkthrough steps:
+  /// 0: Welcome + Storage/Notification Permissions with live scanned track counter
+  /// 1: Interactive Experience Mode (Normal vs Professional) + top 4 Player Themes live preview
+  /// 2: Optional 1-tap AudioSetupWizard launch or "Start Listening" primary action
+  static const int _pageCount = 3;
   int get _lastPage => _pageCount - 1;
 
   @override
+  void initState() {
+    super.initState();
+    _bindProgressStream();
+  }
+
+  void _bindProgressStream() {
+    try {
+      final stream = widget.scannerService.detailedProgress;
+      _progressSub = stream.listen((update) {
+        if (!mounted) return;
+        setState(() {
+          _scannedTrackCount = update.scannedCount;
+          _scanProgress = update.progress;
+        });
+      });
+    } catch (_) {
+      // Safe fallback when a mock scanner does not stub detailedProgress.
+    }
+  }
+
+  @override
   void dispose() {
+    _progressSub?.cancel();
     _pageController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleGrantAccess() async {
+  String _startListeningLabel(BuildContext context) {
+    final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+    switch (code) {
+      case 'ar':
+        return 'ابدأ الاستماع';
+      case 'es':
+        return 'Empezar a escuchar';
+      default:
+        return 'Start Listening';
+    }
+  }
+
+  Widget _animateIfEnabled(
+    BuildContext context,
+    Widget child,
+    Widget Function(Animate) effect,
+  ) {
+    if (!PulsrMotion.shouldAnimate(context)) return child;
+    return effect(child.animate());
+  }
+
+  Future<void> _handleGrantAccess({bool completeOnSuccess = true}) async {
+    if (_isLoading) return;
     setState(() => _isLoading = true);
     try {
       final granted = await widget.scannerService.requestPermission();
@@ -60,7 +127,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       }
 
       await _scanLibrary();
-      await _completeOnboarding();
+      if (completeOnSuccess) {
+        await _completeOnboarding();
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Onboarding permission grant flow failed',
@@ -87,6 +156,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _handleStartListening() async {
+    if (_isLoading) return;
+    if (_hasScanned) {
+      await _completeOnboarding();
+      return;
+    }
+    await _handleGrantAccess(completeOnSuccess: true);
   }
 
   Future<void> _requestNotificationPermission() async {
@@ -116,6 +194,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           final messenger = mounted ? ScaffoldMessenger.of(context) : null;
           final msg = mounted ? context.l10n.onboardingNotificationDenied : '';
           await _setNotificationDeniedPref(true);
+          if (mounted) setState(() => _notificationsGranted = false);
           if (mounted && messenger != null) {
             messenger
               ..clearSnackBars()
@@ -132,6 +211,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           }
         } else if (status.isGranted) {
           await _setNotificationDeniedPref(false);
+          if (mounted) setState(() => _notificationsGranted = true);
         }
       } catch (e, st) {
         final messenger = mounted ? ScaffoldMessenger.of(context) : null;
@@ -159,23 +239,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
       }
     } else {
-      // "Not now" is a deliberate deferral, not a denial. Marking it denied
-      // made Home show a persistent nag banner for a permission the user never
-      // refused at the OS level.
       await _setNotificationDeniedPref(false);
     }
   }
 
-  /// Opens the system notification settings and refreshes the persisted
-  /// denial flag from the real OS state when the user returns, so the home
-  /// banner is not shown for a permission that was just granted.
   Future<void> _openNotificationSettings() async {
     await openAppSettings();
     try {
       final status = await Permission.notification.status;
-      await _setNotificationDeniedPref(
-        status.isDenied || status.isPermanentlyDenied,
-      );
+      final denied = status.isDenied || status.isPermanentlyDenied;
+      await _setNotificationDeniedPref(denied);
+      if (mounted) {
+        setState(() => _notificationsGranted = status.isGranted);
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to re-check notification permission',
@@ -186,9 +262,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  /// Persists the notification-denied flag without letting a SharedPreferences
-  /// failure escape the notification catch path (a throw here would surface as
-  /// an unhandled async error and skip the user-facing snackbar).
   Future<void> _setNotificationDeniedPref(bool denied) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -205,7 +278,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Future<void> _scanLibrary() async {
     try {
-      await widget.scannerService.scanDeviceLibrary();
+      final count = await widget.scannerService.scanDeviceLibrary();
+      if (mounted) {
+        setState(() {
+          _scannedTrackCount = count;
+          _hasScanned = true;
+          _scanProgress = 1.0;
+        });
+      }
     } catch (e, st) {
       ErrorLogger.log(
         'Library scan failed during onboarding',
@@ -248,8 +328,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else if (action == 'settings') {
       await openAppSettings();
     }
-    // A null result (barrier tap / back) means the user dismissed the dialog
-    // without choosing: keep onboarding open and leave the CTA tappable.
   }
 
   Future<void> _completeOnboarding() async {
@@ -282,59 +360,77 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _nextPage() {
     SoundFeedbackService.playClick(mirrorHaptics: true);
     if (_currentPage < _lastPage) {
-      _pageController.nextPage(
-        duration: context.motionMs(320),
-        curve: context.motionCurve(Curves.easeInOut),
-      );
+      final target = _currentPage + 1;
+      if (!PulsrMotion.shouldAnimate(context)) {
+        _pageController.jumpToPage(target);
+      } else {
+        _pageController.nextPage(
+          duration: context.motionMs(320),
+          curve: context.motionCurve(Curves.easeInOut),
+        );
+      }
     }
   }
 
   void _previousPage() {
     SoundFeedbackService.playClick(mirrorHaptics: true);
     if (_currentPage > 0) {
-      _pageController.previousPage(
-        duration: context.motionMs(260),
-        curve: context.motionCurve(Curves.easeInOut),
-      );
+      final target = _currentPage - 1;
+      if (!PulsrMotion.shouldAnimate(context)) {
+        _pageController.jumpToPage(target);
+      } else {
+        _pageController.previousPage(
+          duration: context.motionMs(260),
+          curve: context.motionCurve(Curves.easeInOut),
+        );
+      }
     }
   }
 
   void _jumpToPage(int index) {
     if (index == _currentPage) return;
     PulsrHaptics.selection();
-    _pageController.animateToPage(
-      index,
-      duration: context.motionMs(320),
-      curve: context.motionCurve(Curves.easeInOut),
-    );
+    if (!PulsrMotion.shouldAnimate(context)) {
+      _pageController.jumpToPage(index);
+    } else {
+      _pageController.animateToPage(
+        index,
+        duration: context.motionMs(320),
+        curve: context.motionCurve(Curves.easeInOut),
+      );
+    }
   }
 
   void _skipToFinal() {
     SoundFeedbackService.playClick(mirrorHaptics: true);
-    _pageController.animateToPage(
-      _lastPage,
-      duration: context.motionMs(400),
-      curve: context.motionCurve(Curves.easeInOut),
-    );
+    if (!PulsrMotion.shouldAnimate(context)) {
+      _pageController.jumpToPage(_lastPage);
+    } else {
+      _pageController.animateToPage(
+        _lastPage,
+        duration: context.motionMs(400),
+        curve: context.motionCurve(Curves.easeInOut),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final isLandscape = context.isLandscape;
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
 
     return Scaffold(
       backgroundColor: p.bg,
       body: Stack(
         children: [
-          // Subtle ambient radial glow tied to the active accent color
           PositionedDirectional(
             top: -120,
             start: 0,
             end: 0,
             child: IgnorePointer(
               child: AnimatedContainer(
-                duration: context.motionMs(320),
+                duration: shouldAnimate ? context.motionMs(320) : Duration.zero,
                 height: 360,
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
@@ -358,7 +454,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: AppSpacing.lg,
-                        vertical: isLandscape ? AppSpacing.xxs : AppSpacing.sm,
+                        vertical: isLandscape ? AppSpacing.xxs : AppSpacing.xs,
                       ),
                       child: Row(
                         children: [
@@ -396,61 +492,84 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ),
                           const SizedBox(width: AppSpacing.xs),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.xs,
-                              vertical: AppSpacing.s2,
+                          Semantics(
+                            liveRegion: true,
+                            label: context.l10n.onboardingPageIndicator(
+                              _currentPage + 1,
+                              _pageCount,
                             ),
-                            decoration: BoxDecoration(
-                              color: p.surfaceContainer,
-                              borderRadius: AppRadii.r8All,
-                              border: Border.all(color: p.hairline),
-                            ),
-                            child: Text(
-                              '${_currentPage + 1} / $_pageCount',
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700,
-                                color: p.textSecondary,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.xs,
+                                vertical: AppSpacing.s2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: p.surfaceContainer,
+                                borderRadius: AppRadii.r8All,
+                                border: Border.all(color: p.hairline),
+                              ),
+                              child: Text(
+                                '${_currentPage + 1} / $_pageCount',
+                                style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.textSecondary,
+                                ),
                               ),
                             ),
                           ),
-                          const Spacer(),
-                          if (_currentPage < _lastPage)
-                            TextButton.icon(
-                              onPressed: _skipToFinal,
-                              style: TextButton.styleFrom(
-                                foregroundColor: p.textSecondary,
-                                visualDensity: VisualDensity.compact,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: AppRadii.r10All,
-                                ),
-                              ),
-                              iconAlignment: IconAlignment.end,
-                              icon: const Icon(
-                                Icons.keyboard_double_arrow_right_rounded,
-                                size: 16,
-                              ),
-                              label: Text(
-                                context.l10n.skipAction,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: AppFontSize.label,
-                                ),
-                              ),
-                            )
-                          else
-                            SizedBox(
-                              height:
-                                  isLandscape ? AppSpacing.lg : AppSpacing.s32,
+                          const SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: _currentPage < _lastPage
+                                  ? TextButton(
+                                      onPressed: _skipToFinal,
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: p.textSecondary,
+                                        minimumSize: const Size(
+                                          AppSpacing.minTouchTarget,
+                                          AppSpacing.minTouchTarget,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: AppRadii.r10All,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              context.l10n.skipAction,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: AppFontSize.label,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: AppSpacing.xxs),
+                                          const Icon(
+                                            Icons
+                                                .keyboard_double_arrow_right_rounded,
+                                            size: 16,
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : const SizedBox(
+                                      height: AppSpacing.minTouchTarget,
+                                    ),
                             ),
+                          ),
                         ],
                       ),
                     ),
                   ),
                 ),
 
-                // ---------- PageView Walkthrough ----------
+                // ---------- 3-Step Interactive PageView ----------
                 Expanded(
                   child: PageView(
                     controller: _pageController,
@@ -458,11 +577,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       setState(() => _currentPage = index);
                     },
                     children: [
-                      _buildPage1(context),
-                      _buildPage2(context),
-                      _buildPage3(context),
-                      _buildPage4(context),
-                      _buildPage5(context),
+                      _buildStep1(context),
+                      _buildStep2(context),
+                      _buildStep3(context),
                     ],
                   ),
                 ),
@@ -474,14 +591,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Padding(
                       padding: EdgeInsetsDirectional.fromSTEB(
                         AppSpacing.s28,
-                        AppSpacing.xs,
+                        AppSpacing.xxs,
                         AppSpacing.s28,
-                        isLandscape ? AppSpacing.sm : AppSpacing.lg,
+                        isLandscape ? AppSpacing.xs : AppSpacing.md,
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Interactive Page Indicators (Dots)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: List.generate(_pageCount, (index) {
@@ -496,23 +612,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 child: GestureDetector(
                                   behavior: HitTestBehavior.opaque,
                                   onTap: () => _jumpToPage(index),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: AppSpacing.xxs,
-                                      vertical: AppSpacing.xs,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget,
                                     ),
-                                    child: AnimatedContainer(
-                                      duration: context.motionMs(260),
-                                      curve: context.motionCurve(PulsrMotion.enter),
-                                      height: isLandscape ? 6 : 8,
-                                      width: isActive
-                                          ? (isLandscape ? 22 : 28)
-                                          : (isLandscape ? 6 : 8),
-                                      decoration: BoxDecoration(
-                                        color: isActive
-                                            ? p.accent
-                                            : p.hairline.withValues(alpha: 0.8),
-                                        borderRadius: AppRadii.r4All,
+                                    child: Center(
+                                      child: AnimatedContainer(
+                                        duration: shouldAnimate
+                                            ? context.motionMs(260)
+                                            : Duration.zero,
+                                        curve: context
+                                            .motionCurve(PulsrMotion.enter),
+                                        height: isLandscape ? 6 : 8,
+                                        width: isActive
+                                            ? (isLandscape ? 24 : 30)
+                                            : (isLandscape ? 8 : 10),
+                                        decoration: BoxDecoration(
+                                          color: isActive
+                                              ? p.accent
+                                              : p.hairline
+                                                  .withValues(alpha: 0.8),
+                                          borderRadius: AppRadii.r4All,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -521,22 +643,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             }),
                           ),
                           SizedBox(
-                            height: isLandscape ? AppSpacing.xs : AppSpacing.md,
+                            height:
+                                isLandscape ? AppSpacing.xxs : AppSpacing.xs,
                           ),
-
-                          // Navigation Buttons Row (Back + Next / Grant Access)
-                          SizedBox(
-                            height: isLandscape ? 44 : 52,
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(
+                              minHeight: AppSpacing.minTouchTarget,
+                            ),
                             child: Row(
                               children: [
                                 if (_currentPage > 0) ...[
                                   SizedBox(
-                                    width: isLandscape
-                                        ? AppSpacing.minTouchTarget
-                                        : 52,
-                                    height: isLandscape
-                                        ? AppSpacing.minTouchTarget
-                                        : 52,
+                                    width: AppSpacing.minTouchTarget,
+                                    height: AppSpacing.minTouchTarget,
                                     child: IconButton.outlined(
                                       tooltip: context.l10n.previous,
                                       style: IconButton.styleFrom(
@@ -559,11 +678,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 Expanded(
                                   child: _currentPage == _lastPage
                                       ? FilledButton(
+                                          key: const ValueKey(
+                                              'onboarding_start_listening_btn'),
                                           style: FilledButton.styleFrom(
                                             backgroundColor: p.accent,
                                             foregroundColor: p.onAccent,
-                                            minimumSize: Size.fromHeight(
-                                              isLandscape ? 44 : 52,
+                                            minimumSize: const Size.fromHeight(
+                                              AppSpacing.minTouchTarget,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.md,
+                                              vertical: AppSpacing.xs,
                                             ),
                                             shape: RoundedRectangleBorder(
                                               borderRadius: AppRadii.r16All,
@@ -572,47 +697,55 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                           ),
                                           onPressed: _isLoading
                                               ? null
-                                              : _handleGrantAccess,
+                                              : _handleStartListening,
                                           child: _isLoading
-                                              ? SizedBox(
-                                                  height: 22,
-                                                  width: 22,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                    strokeWidth: 2.5,
-                                                    color: p.onAccent,
-                                                  ),
+                                              ? PulsrProgressBar.circular(
+                                                  size: 22,
+                                                  strokeWidth: 2.5,
+                                                  color: p.onAccent,
                                                 )
                                               : Row(
                                                   mainAxisAlignment:
                                                       MainAxisAlignment.center,
                                                   children: [
                                                     const Icon(
-                                                      Icons.shield_rounded,
-                                                      size: 20,
+                                                      Icons.play_arrow_rounded,
+                                                      size: 22,
                                                     ),
                                                     const SizedBox(
                                                       width: AppSpacing.xs,
                                                     ),
-                                                    Text(
-                                                      context.l10n.grantAccess,
-                                                      style: const TextStyle(
-                                                        fontSize: AppFontSize
-                                                            .bodyLarge,
-                                                        fontWeight:
-                                                            FontWeight.w800,
+                                                    Flexible(
+                                                      child: Text(
+                                                        _startListeningLabel(
+                                                            context),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                          fontSize: AppFontSize
+                                                              .bodyLarge,
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                        ),
                                                       ),
                                                     ),
                                                   ],
                                                 ),
                                         )
                                       : FilledButton.tonal(
+                                          key: const ValueKey(
+                                              'onboarding_next_btn'),
                                           style: FilledButton.styleFrom(
                                             backgroundColor:
                                                 p.surfaceContainerHigh,
                                             foregroundColor: p.textPrimary,
-                                            minimumSize: Size.fromHeight(
-                                              isLandscape ? 44 : 52,
+                                            minimumSize: const Size.fromHeight(
+                                              AppSpacing.minTouchTarget,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: AppSpacing.md,
+                                              vertical: AppSpacing.xs,
                                             ),
                                             side: BorderSide(
                                               color: p.hairline,
@@ -626,12 +759,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                             mainAxisAlignment:
                                                 MainAxisAlignment.center,
                                             children: [
-                                              Text(
-                                                context.l10n.next,
-                                                style: const TextStyle(
-                                                  fontSize:
-                                                      AppFontSize.bodyLarge,
-                                                  fontWeight: FontWeight.w800,
+                                              Flexible(
+                                                child: Text(
+                                                  context.l10n.next,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize:
+                                                        AppFontSize.bodyLarge,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
                                                 ),
                                               ),
                                               const SizedBox(
@@ -663,903 +801,383 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  // Page 1: "Your Music, Your Privacy"
-  Widget _buildPage1(BuildContext context) {
+  // ===========================================================================
+  // Step 1: Welcome + Storage/Notification Permissions + Live Scanned Counter
+  // ===========================================================================
+  Widget _buildStep1(BuildContext context) {
     final p = context.palette;
     final isLandscape = context.isLandscape;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.s28,
-            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
-              Container(
-                padding: EdgeInsets.all(isLandscape ? 10 : 16),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: p.accent.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: Container(
-                  width: isLandscape ? 72 : 108,
-                  height: isLandscape ? 72 : 108,
-                  decoration: BoxDecoration(
-                    color: p.surfaceCard,
-                    borderRadius:
-                        isLandscape ? AppRadii.r20All : AppRadii.r28All,
-                    border: Border.all(color: p.hairline, width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: p.accent.withValues(alpha: 0.22),
-                        blurRadius: 36,
-                        spreadRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius:
-                        isLandscape ? AppRadii.r20All : AppRadii.r28All,
-                    child: Image.asset(
-                      'assets/app_icon/app_icon_plus.png',
-                      width: isLandscape ? 72 : 108,
-                      height: isLandscape ? 72 : 108,
-                      fit: BoxFit.cover,
-                      semanticLabel: context.l10n.appTitle,
-                    ),
-                  ),
-                ),
-              ).animate().scale(
-                    duration: context.motionMs(400),
-                    curve: context.motionCurve(Curves.easeOutBack),
-                  ),
-              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
-              Text(
-                context.l10n.onboardingHeading,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: AppTracking.heading,
-                      color: p.textPrimary,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(200))
-                  .slideY(begin: 0.1, end: 0),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                context.l10n.onboardingPrivacyDesc,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: p.textSecondary,
-                      height: 1.5,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(320))
-                  .slideY(begin: 0.1, end: 0),
-              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.xl),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.s14,
-                ),
-                decoration: BoxDecoration(
-                  color: p.surfaceCard,
-                  borderRadius: AppRadii.r18All,
-                  border: Border.all(color: p.hairline),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(AppSpacing.s10),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.15),
-                        borderRadius: AppRadii.r12All,
-                      ),
-                      child: Icon(
-                        Icons.verified_user_rounded,
-                        color: p.accent,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        context.l10n.privacyGuarantee,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.bodySmall,
-                          fontWeight: FontWeight.w700,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ).animate().fadeIn(delay: context.motionMs(320)),
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
-            ],
-          ),
+
+    final heroIcon = Container(
+      padding: EdgeInsets.all(isLandscape ? 8 : 14),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: p.accent.withValues(alpha: 0.18),
         ),
       ),
-    );
-  }
-
-  // Page 2: "Powerful Playback"
-  Widget _buildPage2(BuildContext context) {
-    final p = context.palette;
-    final isLandscape = context.isLandscape;
-    const eqHeights = <double>[12, 22, 30, 18, 28, 34, 24, 16, 26, 14];
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.s28,
-            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
-              // Audiophile DSP Rack Card
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  vertical: isLandscape ? AppSpacing.sm : AppSpacing.lg,
-                  horizontal: AppSpacing.md,
-                ),
-                decoration: BoxDecoration(
-                  color: p.surfaceCard,
-                  borderRadius: isLandscape ? AppRadii.r18All : AppRadii.r24All,
-                  border: Border.all(
-                    color: p.accent.withValues(alpha: 0.28),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: p.accent.withValues(alpha: 0.14),
-                      blurRadius: 32,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    if (!isLandscape) ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          for (final h in eqHeights)
-                            Container(
-                              width: 6,
-                              height: h,
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
-                              decoration: BoxDecoration(
-                                borderRadius: AppRadii.r4All,
-                                gradient: LinearGradient(
-                                  colors: [
-                                    p.accent,
-                                    p.accent.withValues(alpha: 0.35),
-                                  ],
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      Divider(
-                        height: 1,
-                        color: p.hairline.withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                    ],
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        Expanded(
-                          child: _buildPlaybackFeatureIcon(
-                            Icons.equalizer_rounded,
-                            context.l10n.browseTenBandGraphicEq,
-                            p.accent,
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildPlaybackFeatureIcon(
-                            Icons.tune_rounded,
-                            context.l10n.browseCrossfade,
-                            p.info,
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildPlaybackFeatureIcon(
-                            Icons.timer_rounded,
-                            context.l10n.sleepTimer,
-                            p.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              )
-                  .animate()
-                  .fadeIn(duration: context.motionMs(400))
-                  .scale(begin: const Offset(0.92, 0.92)),
-              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
-              Text(
-                context.l10n.onboardingPowerful,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: AppTracking.heading,
-                      color: p.textPrimary,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(200))
-                  .slideY(begin: 0.1, end: 0),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                context.l10n.onboardingPowerfulDesc,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: p.textSecondary,
-                      height: 1.5,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(320))
-                  .slideY(begin: 0.1, end: 0),
-              SizedBox(height: isLandscape ? AppSpacing.sm : AppSpacing.lg),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                alignment: WrapAlignment.center,
-                children: [
-                  _FeatureBadge(
-                    icon: Icons.graphic_eq_rounded,
-                    label: context.l10n.browseTenBandGraphicEq,
-                  ),
-                  _FeatureBadge(
-                    icon: Icons.compare_arrows_rounded,
-                    label: context.l10n.browseSmoothCrossfade,
-                  ),
-                  _FeatureBadge(
-                    icon: Icons.bedtime_rounded,
-                    label: context.l10n.sleepTimer,
-                  ),
-                  _FeatureBadge(
-                    icon: Icons.all_inclusive_rounded,
-                    label: context.l10n.gaplessPlayback,
-                  ),
-                ],
-              ).animate().fadeIn(delay: context.motionMs(320)),
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Page 3: "Beautiful & Personal"
-  Widget _buildPage3(BuildContext context) {
-    final p = context.palette;
-    final isLandscape = context.isLandscape;
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.s28,
-            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
-              // Theme Swatches Showcase Card
-              Container(
-                padding: EdgeInsets.all(
-                  isLandscape ? AppSpacing.sm : AppSpacing.s20,
-                ),
-                decoration: BoxDecoration(
-                  color: p.surfaceCard,
-                  borderRadius: isLandscape ? AppRadii.r18All : AppRadii.r24All,
-                  border: Border.all(color: p.hairline, width: 1.2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: p.accent.withValues(alpha: 0.16),
-                      blurRadius: 36,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s10,
-                        vertical: AppSpacing.xxs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.14),
-                        borderRadius: AppRadii.r10All,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.palette_rounded,
-                            color: p.accent,
-                            size: 18,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            context.l10n.onboardingThemes,
-                            style: TextStyle(
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: AppTracking.wide,
-                              color: p.accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(
-                      height: isLandscape ? AppSpacing.xs : AppSpacing.md,
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        Expanded(
-                          child: _buildThemeSwatch(
-                            'Pulsr Modern',
-                            const [AppColors.primary, AppColors.secondary],
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildThemeSwatch(
-                            'Glassmorphism',
-                            const [AppColors.swatchGreen, AppColors.mint],
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildThemeSwatch(
-                            'Dynamic Palette',
-                            const [
-                              AppColors.swatchAmber,
-                              AppColors.swatchPink,
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: _buildThemeSwatch(
-                            'Cyberpunk Aura',
-                            const [
-                              AppColors.swatchPurple,
-                              AppColors.skyBlue,
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              )
-                  .animate()
-                  .fadeIn(duration: context.motionMs(400))
-                  .scale(begin: const Offset(0.92, 0.92)),
-              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
-              Text(
-                context.l10n.onboardingBeautiful,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: AppTracking.heading,
-                      color: p.textPrimary,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(200))
-                  .slideY(begin: 0.1, end: 0),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                context.l10n.onboardingBeautifulDesc,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: p.textSecondary,
-                      height: 1.5,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(320))
-                  .slideY(begin: 0.1, end: 0),
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Page 4: "Gestures & shortcuts"
-  Widget _buildPage4(BuildContext context) {
-    final p = context.palette;
-    final isLandscape = context.isLandscape;
-    final gestures = <(IconData, String, String, Color)>[
-      (
-        Icons.swipe_up_rounded,
-        context.l10n.onboardingGestureSwipeUpTitle,
-        context.l10n.onboardingGestureSwipeUpDesc,
-        p.accent,
-      ),
-      (
-        Icons.swipe_down_rounded,
-        context.l10n.onboardingGestureSwipeDownTitle,
-        context.l10n.onboardingGestureSwipeDownDesc,
-        p.info,
-      ),
-      (
-        Icons.favorite_rounded,
-        context.l10n.onboardingGestureDoubleTapTitle,
-        context.l10n.onboardingGestureDoubleTapDesc,
-        p.favorite,
-      ),
-      (
-        Icons.touch_app_rounded,
-        context.l10n.onboardingGestureLongPressTitle,
-        context.l10n.onboardingGestureLongPressDesc,
-        p.primary,
-      ),
-    ];
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.s28,
-            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.sm),
-              Text(
-                context.l10n.onboardingGesturesTitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: AppTracking.heading,
-                      color: p.textPrimary,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(120))
-                  .slideY(begin: 0.1, end: 0),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                context.l10n.onboardingGesturesDesc,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: p.textSecondary,
-                      height: 1.45,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(260))
-                  .slideY(begin: 0.1, end: 0),
-              SizedBox(height: isLandscape ? AppSpacing.sm : AppSpacing.md),
-              Column(
-                children: [
-                  for (final (icon, title, desc, color) in gestures)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: AppSpacing.s10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.surfaceCard,
-                        borderRadius: AppRadii.r16All,
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.15),
-                              borderRadius: AppRadii.r12All,
-                            ),
-                            child: Icon(icon, color: color, size: 20),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  title,
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.bodySmall,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  desc,
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ).animate().fadeIn(delay: context.motionMs(400)),
-              const SizedBox(height: AppSpacing.xs),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(0, AppSpacing.minTouchTarget),
-                ),
-                onPressed: () {
-                  PulsrHaptics.selectionClick();
-                  GesturesSheet.show(context);
-                },
-                icon: const Icon(Icons.gesture_rounded, size: 18),
-                label: Text(context.l10n.viewAllGestures),
-              ),
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.sm),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Page 5: "Make it yours"
-  Widget _buildPage5(BuildContext context) {
-    final p = context.palette;
-    final isLandscape = context.isLandscape;
-    final selected = context
-        .select<SettingsCubit, int>((c) => c.state.customAccentColorValue);
-    final cubit = context.read<SettingsCubit>();
-
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(
-            horizontal: AppSpacing.s28,
-            vertical: isLandscape ? AppSpacing.xs : AppSpacing.md,
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
-              Container(
-                padding: const EdgeInsets.all(AppSpacing.s20),
-                decoration: BoxDecoration(
-                  color: p.surfaceCard,
-                  borderRadius: isLandscape ? AppRadii.r18All : AppRadii.r24All,
-                  border: Border.all(
-                    color: p.accent.withValues(alpha: 0.3),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: p.accent.withValues(alpha: 0.16),
-                      blurRadius: 36,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Live interactive mini-player preview banner
-                    AnimatedContainer(
-                      duration: context.motionMs(260),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sm,
-                        vertical: AppSpacing.xs,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.accent.withValues(alpha: 0.12),
-                        borderRadius: AppRadii.r14All,
-                        border: Border.all(
-                          color: p.accent.withValues(alpha: 0.28),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: p.accent,
-                              borderRadius: AppRadii.r10All,
-                            ),
-                            child: Icon(
-                              Icons.music_note_rounded,
-                              color: p.onAccent,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  context.l10n.onboardingAudioEngine,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w800,
-                                    color: p.textPrimary,
-                                  ),
-                                ),
-                                Text(
-                                  '24-bit / 192kHz • FLAC',
-                                  style: TextStyle(
-                                    fontSize: AppFontSize.caption,
-                                    fontWeight: FontWeight.w700,
-                                    color: p.accent,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            Icons.play_circle_fill_rounded,
-                            color: p.accent,
-                            size: 28,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Wrap(
-                      spacing: AppSpacing.sm,
-                      runSpacing: AppSpacing.sm,
-                      alignment: WrapAlignment.center,
-                      children: AppColors.customAccents.indexed.map((entry) {
-                        final index = entry.$1;
-                        final color = entry.$2;
-                        final isSelected = selected == color.toARGB32();
-                        return Semantics(
-                          button: true,
-                          selected: isSelected,
-                          label:
-                              '${context.l10n.customAccentColor} ${index + 1}',
-                          child: GestureDetector(
-                            onTap: () {
-                              PulsrHaptics.selection();
-                              SoundFeedbackService.playClick();
-                              cubit.setCustomAccentColor(color);
-                            },
-                            child: AnimatedContainer(
-                              duration: context.motionMs(200),
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: color,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isSelected
-                                      ? p.textPrimary
-                                      : Colors.transparent,
-                                  width: isSelected ? 3 : 1,
-                                ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: color.withValues(alpha: 0.45),
-                                          blurRadius: 12,
-                                          spreadRadius: 1,
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: isSelected
-                                  ? Icon(
-                                      Icons.check_rounded,
-                                      color: color.computeLuminance() > 0.5
-                                          ? Colors.black
-                                          : Colors.white,
-                                      size: 22,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              )
-                  .animate()
-                  .fadeIn(duration: context.motionMs(400))
-                  .scale(begin: const Offset(0.92, 0.92)),
-              SizedBox(height: isLandscape ? AppSpacing.md : AppSpacing.s32),
-              Text(
-                context.l10n.onboardingPersonalizeTitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: AppTracking.heading,
-                      color: p.textPrimary,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(200))
-                  .slideY(begin: 0.1, end: 0),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                context.l10n.onboardingPersonalizeDesc,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: p.textSecondary,
-                      height: 1.5,
-                    ),
-              )
-                  .animate()
-                  .fadeIn(delay: context.motionMs(320))
-                  .slideY(begin: 0.1, end: 0),
-              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.lg),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaybackFeatureIcon(IconData icon, String label, Color color) {
-    final p = context.palette;
-    return Column(
-      children: [
-        Container(
-          width: 54,
-          height: 54,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.14),
-            borderRadius: AppRadii.r16All,
-            border:
-                Border.all(color: color.withValues(alpha: 0.35), width: 1.2),
-          ),
-          child: Icon(icon, color: color, size: 26),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: p.textPrimary,
-            fontSize: AppFontSize.label,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildThemeSwatch(String name, List<Color> colors) {
-    final p = context.palette;
-    return Column(
-      children: [
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: colors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: Container(
+        width: isLandscape ? 64 : 88,
+        height: isLandscape ? 64 : 88,
+        decoration: BoxDecoration(
+          color: p.surfaceCard,
+          borderRadius: isLandscape ? AppRadii.r20All : AppRadii.r24All,
+          border: Border.all(color: p.hairline, width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: p.accent.withValues(alpha: 0.22),
+              blurRadius: 32,
+              spreadRadius: 2,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: colors.first.withValues(alpha: 0.38),
-                blurRadius: 12,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: Center(
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: p.surfaceCard.withValues(alpha: 0.85),
-                shape: BoxShape.circle,
-              ),
-            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: isLandscape ? AppRadii.r20All : AppRadii.r24All,
+          child: Image.asset(
+            'assets/app_icon/app_icon_plus.png',
+            width: isLandscape ? 64 : 88,
+            height: isLandscape ? 64 : 88,
+            fit: BoxFit.cover,
+            semanticLabel: context.l10n.appTitle,
           ),
         ),
-        const SizedBox(height: AppSpacing.s6),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Text(
-            name,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: p.textSecondary,
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FeatureBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _FeatureBadge({
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.s6,
       ),
+    );
+
+    final headingWidget = Semantics(
+      header: true,
+      child: Text(
+        context.l10n.onboardingHeading,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: AppTracking.heading,
+              color: p.textPrimary,
+            ),
+      ),
+    );
+
+    final descWidget = Text(
+      context.l10n.onboardingPrivacyDesc,
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: p.textSecondary,
+            height: 1.45,
+          ),
+    );
+
+    final permissionsCard = Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
         color: p.surfaceCard,
         borderRadius: AppRadii.r20All,
         border: Border.all(color: p.hairline),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(icon, size: 14, color: p.accent),
-          const SizedBox(width: AppSpacing.xxs),
-          Text(
-            label,
-            style: TextStyle(
-              color: p.textPrimary,
-              fontSize: AppFontSize.label,
-              fontWeight: FontWeight.w700,
+          Semantics(
+            liveRegion: true,
+            label: context.l10n.lastScanTracks(_scannedTrackCount),
+            child: Container(
+              key: const ValueKey('onboarding_live_track_counter'),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: p.accent.withValues(alpha: 0.12),
+                borderRadius: AppRadii.r14All,
+                border: Border.all(
+                  color: p.accent.withValues(alpha: 0.28),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.18),
+                      borderRadius: AppRadii.r10All,
+                    ),
+                    child: Icon(
+                      _hasScanned
+                          ? Icons.library_music_rounded
+                          : Icons.radar_rounded,
+                      color: p.accent,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n.lastScanTracks(_scannedTrackCount),
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          _isLoading
+                              ? context.l10n.scanningStorage
+                              : (_hasScanned
+                                  ? context.l10n.scanCompleted
+                                  : context.l10n.scanDeviceStorageForAudio),
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.caption,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.s2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _hasScanned
+                          ? p.success.withValues(alpha: 0.16)
+                          : p.surfaceContainerHigh,
+                      borderRadius: AppRadii.full,
+                    ),
+                    child: Text(
+                      '$_scannedTrackCount',
+                      style: TextStyle(
+                        color: _hasScanned ? p.success : p.accent,
+                        fontSize: AppFontSize.label,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_isLoading) ...[
+            const SizedBox(height: AppSpacing.xs),
+            if (_scanProgress != null && _scanProgress! > 0)
+              PulsrProgressBar.determinate(
+                value: _scanProgress!,
+                color: p.accent,
+              )
+            else
+              PulsrProgressBar.indeterminate(color: p.accent),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+
+          // Primary Storage & Library Scan Permission Action (overflow-safe Row)
+          FilledButton.tonal(
+            key: const ValueKey('onboarding_step1_grant_access_btn'),
+            style: FilledButton.styleFrom(
+              backgroundColor: _hasScanned
+                  ? p.success.withValues(alpha: 0.16)
+                  : p.accent.withValues(alpha: 0.16),
+              foregroundColor: _hasScanned ? p.success : p.accent,
+              minimumSize: const Size.fromHeight(AppSpacing.minTouchTarget),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r14All,
+                side: BorderSide(
+                  color: (_hasScanned ? p.success : p.accent)
+                      .withValues(alpha: 0.35),
+                ),
+              ),
+            ),
+            onPressed: _isLoading
+                ? null
+                : () => _handleGrantAccess(completeOnSuccess: false),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_isLoading)
+                  PulsrProgressBar.circular(
+                    size: 18,
+                    strokeWidth: 2,
+                    color: p.accent,
+                  )
+                else
+                  Icon(
+                    _hasScanned
+                        ? Icons.check_circle_rounded
+                        : Icons.shield_rounded,
+                    size: 20,
+                  ),
+                const SizedBox(width: AppSpacing.xs),
+                Flexible(
+                  child: Text(
+                    context.l10n.grantAccess,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: AppFontSize.body,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+
+          // Notification Permission Action Row (>= 48dp hit target)
+          Semantics(
+            button: true,
+            toggled: _notificationsGranted,
+            label: context.l10n.notificationPermissionTitle,
+            child: InkWell(
+              key: const ValueKey('onboarding_notification_permission_btn'),
+              borderRadius: AppRadii.r14All,
+              onTap: _isLoading ? null : _requestNotificationPermission,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: AppSpacing.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _notificationsGranted
+                            ? Icons.notifications_active_rounded
+                            : Icons.notifications_none_rounded,
+                        color: _notificationsGranted
+                            ? p.success
+                            : p.textSecondary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          context.l10n.notificationPermissionTitle,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.label,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        _notificationsGranted
+                            ? Icons.check_circle_rounded
+                            : Icons.chevron_right_rounded,
+                        color:
+                            _notificationsGranted ? p.success : p.textTertiary,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ],
+      ),
+    );
+
+    final privacyBadge = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: p.surfaceCard,
+        borderRadius: AppRadii.r16All,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.xs),
+            decoration: BoxDecoration(
+              color: p.accent.withValues(alpha: 0.15),
+              borderRadius: AppRadii.r10All,
+            ),
+            child: Icon(
+              Icons.verified_user_rounded,
+              color: p.accent,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              context.l10n.privacyGuarantee,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontSize: AppFontSize.caption,
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSpacing.s28,
+            vertical: isLandscape ? AppSpacing.xxs : AppSpacing.sm,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _animateIfEnabled(
+                context,
+                heroIcon,
+                (a) => a.scale(
+                  duration: context.motionMs(400),
+                  curve: context.motionCurve(Curves.easeOutBack),
+                ),
+              ),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
+              _animateIfEnabled(
+                context,
+                headingWidget,
+                (a) => a
+                    .fadeIn(delay: context.motionMs(120))
+                    .slideY(begin: 0.08, end: 0),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _animateIfEnabled(
+                context,
+                descWidget,
+                (a) => a
+                    .fadeIn(delay: context.motionMs(200))
+                    .slideY(begin: 0.08, end: 0),
+              ),
+              SizedBox(height: isLandscape ? AppSpacing.xs : AppSpacing.md),
+              _animateIfEnabled(
+                context,
+                permissionsCard,
+                (a) => a.fadeIn(delay: context.motionMs(260)),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              _animateIfEnabled(
+                context,
+                privacyBadge,
+                (a) => a.fadeIn(delay: context.motionMs(320)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

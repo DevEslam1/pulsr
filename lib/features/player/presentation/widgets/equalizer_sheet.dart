@@ -62,6 +62,23 @@ part 'eq_preset_carousel.dart';
 part 'eq_advanced_controls.dart';
 part 'remaster_control_card.dart';
 part 'eq_ab_compare_bar.dart';
+part 'eq/eq_shell_header.dart';
+part 'eq/eq_device_profile_bar.dart';
+part 'eq/eq_quick_sound_view.dart';
+part 'eq/eq_macro_tone_sliders.dart';
+part 'eq/eq_pro_rack_view.dart';
+part 'eq/eq_parametric_tab.dart';
+part 'eq/eq_parametric_toolbar.dart';
+part 'eq/eq_gain_staging_cards.dart';
+part 'eq/eq_boost_cards.dart';
+part 'eq/eq_autoeq_viper_tab.dart';
+part 'eq/eq_spatial_hrtf_tab.dart';
+part 'eq/eq_spatial_cards.dart';
+part 'eq/eq_balance_reverb_cards.dart';
+part 'eq/eq_dynamics_saturation_tab.dart';
+part 'eq/eq_dynamics_cards.dart';
+part 'eq/eq_loudness_dither_cards.dart';
+part 'eq/eq_dynamic_eq_card.dart';
 
 // Rebuild gate for the whole DSP sheet (F-01 / C-01 / H2).
 //
@@ -167,7 +184,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     } catch (_) {
       _cachedEqualizerManager = null;
     }
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     try {
       _activeComparisonSlot =
           _cachedEqualizerManager?.activeComparisonSlot ?? ComparisonSlot.slotA;

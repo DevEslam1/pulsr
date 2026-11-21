@@ -8,6 +8,7 @@ import '../../../../data/services/settings_profiles_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -135,9 +136,17 @@ class _AutomationRulesSheetState extends State<AutomationRulesSheet> {
               const SizedBox(height: AppSpacing.md),
               if (_loading)
                 const Padding(
-                  padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-                  child:
-                      Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                  child: SkeletonShimmer(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SkeletonBox(height: 56, radius: AppRadii.r14),
+                        SizedBox(height: AppSpacing.xs),
+                        SkeletonBox(height: 56, radius: AppRadii.r14),
+                      ],
+                    ),
+                  ),
                 )
               else if (_rules.isEmpty)
                 Text(

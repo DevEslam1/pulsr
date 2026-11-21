@@ -84,7 +84,10 @@ void main() {
   testWidgets('reordering the active tabs persists the new order',
       (tester) async {
     await pump(tester);
-    await tester.tap(find.byIcon(Icons.dashboard_customize_rounded));
+    await tester.tap(find.byKey(const ValueKey('library_overflow_menu')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('library_sheet_customize_tabs')));
     await tester.pumpAndSettle();
 
     final list =

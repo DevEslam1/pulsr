@@ -1,6 +1,7 @@
 // lib/features/playlist_detail/presentation/playlist_detail_screen.dart
 import 'dart:io';
 
+import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -554,15 +555,17 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       );
     }
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        borderRadius: AppRadii.r16All,
-        border: Border.all(color: p.hairline),
+    return ExcludeSemantics(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          borderRadius: AppRadii.r16All,
+          border: Border.all(color: p.hairline),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: inner,
       ),
-      clipBehavior: Clip.antiAlias,
-      child: inner,
     );
   }
 
@@ -624,50 +627,57 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                           ],
                         ),
                       ),
-                    Text(
-                      playlist.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontSize: AppFontSize.titleLarge,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.3,
-                        height: 1.15,
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        playlist.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: AppFontSize.titleLarge,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                          height: 1.15,
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        Text(
-                          context.l10n.tracksCount(songs.length),
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: AppFontSize.label,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        if (totalDurationMs > 0) ...[
+                    MergeSemantics(
+                      child: Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
                           Text(
-                            '•',
-                            style: TextStyle(color: p.textTertiary),
-                          ),
-                          Text(
-                            Formatters.formatDurationMs(totalDurationMs),
+                            context.l10n.tracksCount(songs.length),
                             style: TextStyle(
                               color: p.textSecondary,
                               fontSize: AppFontSize.label,
                               fontWeight: FontWeight.w600,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
                             ),
                           ),
+                          if (totalDurationMs > 0) ...[
+                            ExcludeSemantics(
+                              child: Text(
+                                '•',
+                                style: TextStyle(color: p.textTertiary),
+                              ),
+                            ),
+                            Text(
+                              Formatters.formatDurationMs(totalDurationMs),
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.label,
+                                fontWeight: FontWeight.w600,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -780,17 +790,23 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.swap_vert_rounded, size: 16, color: p.accent),
+                  ExcludeSemantics(
+                    child:
+                        Icon(Icons.swap_vert_rounded, size: 16, color: p.accent),
+                  ),
                   const SizedBox(width: AppSpacing.s6),
                   Expanded(
-                    child: Text(
-                      selectedCount > 0
-                          ? context.l10n.selectedCount(selectedCount)
-                          : context.l10n.reorderInstructions,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w700,
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        selectedCount > 0
+                            ? context.l10n.selectedCount(selectedCount)
+                            : context.l10n.reorderInstructions,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -868,174 +884,198 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
             itemBuilder: (context, index) {
               final song = _reorderSongs[index];
               final selected = _selectedReorderIds.contains(song.id);
-              return Padding(
+              return Semantics(
                 key: ValueKey('reorder_song_${song.id}'),
-                padding: EdgeInsets.symmetric(
-                  horizontal: Adaptive.pagePadding(context),
-                  vertical: 2,
-                ),
-                child: AnimatedContainer(
-                  duration: context.motion(PulsrMotion.state),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? p.accent.withValues(alpha: p.isDark ? 0.14 : 0.08)
-                        : p.surface,
-                    borderRadius: AppRadii.r16All,
-                    border: Border.all(
-                      color: selected
-                          ? p.accent.withValues(alpha: 0.35)
-                          : Colors.transparent,
-                    ),
+                container: true,
+                selected: selected,
+                customSemanticsActions: {
+                  CustomSemanticsAction(label: context.l10n.moveToTop): () =>
+                      _moveSingleToEdge(index, toTop: true),
+                  CustomSemanticsAction(label: context.l10n.moveToBottom): () =>
+                      _moveSingleToEdge(index, toTop: false),
+                  CustomSemanticsAction(label: context.l10n.moveToPosition):
+                      () => _promptMoveSingleToPosition(index),
+                },
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context),
+                    vertical: 2,
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _toggleReorderSelection(song.id),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xs),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: selected,
-                              onChanged: (_) =>
-                                  _toggleReorderSelection(song.id),
-                              activeColor: p.accent,
-                              checkColor: p.onAccent,
-                              visualDensity: VisualDensity.compact,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadii.circular(AppRadii.r6),
+                  child: AnimatedContainer(
+                    duration: context.motion(PulsrMotion.state),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? p.accent.withValues(alpha: p.isDark ? 0.14 : 0.08)
+                          : p.surface,
+                      borderRadius: AppRadii.r16All,
+                      border: Border.all(
+                        color: selected
+                            ? p.accent.withValues(alpha: 0.35)
+                            : Colors.transparent,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _toggleReorderSelection(song.id),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xs),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: selected,
+                                onChanged: (_) =>
+                                    _toggleReorderSelection(song.id),
+                                activeColor: p.accent,
+                                checkColor: p.onAccent,
+                                visualDensity: VisualDensity.compact,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadii.circular(AppRadii.r6),
+                                ),
                               ),
-                            ),
-                            Container(
-                              width: 30,
-                              height: 26,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? p.accent.withValues(alpha: 0.2)
-                                    : p.surfaceContainerHigh,
-                                borderRadius: AppRadii.r8All,
+                              Container(
+                                width: 30,
+                                height: 26,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? p.accent.withValues(alpha: 0.2)
+                                      : p.surfaceContainerHigh,
+                                  borderRadius: AppRadii.r8All,
+                                ),
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color:
+                                        selected ? p.accent : p.textSecondary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: AppFontSize.caption,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  color: selected ? p.accent : p.textSecondary,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: AppFontSize.caption,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
+                              const SizedBox(width: AppSpacing.xs),
+                              ExcludeSemantics(
+                                child: CachedArtwork(
+                                  id: song.id,
+                                  albumId: song.albumId,
+                                  remoteUrl:
+                                      song.remoteArtworkUrl ?? song.artworkUri,
+                                  type: ArtworkType.AUDIO,
+                                  size: 44,
+                                  borderRadius: 10,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      song.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppFontSize.body,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s2),
+                                    Text(
+                                      song.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.label,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            CachedArtwork(
-                              id: song.id,
-                              albumId: song.albumId,
-                              remoteUrl:
-                                  song.remoteArtworkUrl ?? song.artworkUri,
-                              type: ArtworkType.AUDIO,
-                              size: 44,
-                              borderRadius: 10,
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    song.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: AppFontSize.body,
+                              PopupMenuButton<String>(
+                                icon: Icon(
+                                  Icons.more_vert_rounded,
+                                  size: 20,
+                                  color: p.textTertiary,
+                                ),
+                                tooltip: context.l10n.moveToPosition,
+                                onSelected: (val) {
+                                  if (val == 'top') {
+                                    _moveSingleToEdge(index, toTop: true);
+                                  } else if (val == 'bottom') {
+                                    _moveSingleToEdge(index, toTop: false);
+                                  } else if (val == 'position') {
+                                    _promptMoveSingleToPosition(index);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: 'top',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.vertical_align_top_rounded,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Text(context.l10n.moveToTop),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: AppSpacing.s2),
-                                  Text(
-                                    song.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label,
+                                  PopupMenuItem(
+                                    value: 'position',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.format_list_numbered_rounded,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Text(context.l10n.moveToPosition),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'bottom',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.vertical_align_bottom_rounded,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Text(context.l10n.moveToBottom),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: Icon(
-                                Icons.more_vert_rounded,
-                                size: 20,
-                                color: p.textTertiary,
-                              ),
-                              tooltip: context.l10n.moveToPosition,
-                              onSelected: (val) {
-                                if (val == 'top') {
-                                  _moveSingleToEdge(index, toTop: true);
-                                } else if (val == 'bottom') {
-                                  _moveSingleToEdge(index, toTop: false);
-                                } else if (val == 'position') {
-                                  _promptMoveSingleToPosition(index);
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'top',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.vertical_align_top_rounded,
-                                        size: 18,
+                              Semantics(
+                                label:
+                                    '${context.l10n.reorderSongs}: ${song.title}',
+                                child: ReorderableDragStartListener(
+                                  index: index,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget,
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.drag_handle_rounded,
+                                        color: p.textTertiary,
                                       ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Text(context.l10n.moveToTop),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'position',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.format_list_numbered_rounded,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Text(context.l10n.moveToPosition),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'bottom',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.vertical_align_bottom_rounded,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Text(context.l10n.moveToBottom),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            ReorderableDragStartListener(
-                              index: index,
-                              child: Padding(
-                                padding: const EdgeInsets.all(AppSpacing.s10),
-                                child: Icon(
-                                  Icons.drag_handle_rounded,
-                                  color: p.textTertiary,
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1097,30 +1137,35 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                     onPressed: _exitReorderMode,
                   )
                 : (widget.isEmbedded ? null : const PulsrBackButton()),
-            title: _isReordering
-                ? Text(
-                    context.l10n.reorderSongs,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  )
-                : Row(
-                    children: [
-                      if (playlist.isSmart) ...[
-                        Icon(
-                          Icons.auto_awesome_rounded,
-                          color: p.accent,
-                          size: 20,
+            title: Semantics(
+              header: true,
+              child: _isReordering
+                  ? Text(
+                      context.l10n.reorderSongs,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    )
+                  : Row(
+                      children: [
+                        if (playlist.isSmart) ...[
+                          ExcludeSemantics(
+                            child: Icon(
+                              Icons.auto_awesome_rounded,
+                              color: p.accent,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                        ],
+                        Expanded(
+                          child: Text(
+                            playlist.name,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
                         ),
-                        const SizedBox(width: AppSpacing.xs),
                       ],
-                      Expanded(
-                        child: Text(
-                          playlist.name,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+            ),
             actions: [
               if (_isReordering)
                 TextButton.icon(
@@ -1170,6 +1215,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
               if (!_isReordering)
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert_rounded),
+                  tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
                   onSelected: (value) async {
                     switch (value) {
                       case 'manage':
@@ -1436,31 +1482,38 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                                 song.remoteId != null &&
                                 song.remoteId!.isNotEmpty)
                               YtmDownloadButton(song: song),
-                            IconButton(
-                              constraints: const BoxConstraints(
-                                minWidth: AppSpacing.minTouchTarget,
-                                minHeight: AppSpacing.minTouchTarget,
+                            MergeSemantics(
+                              child: Semantics(
+                                toggled: song.isFavorite,
+                                child: IconButton(
+                                  constraints: const BoxConstraints(
+                                    minWidth: AppSpacing.minTouchTarget,
+                                    minHeight: AppSpacing.minTouchTarget,
+                                  ),
+                                  tooltip: song.isFavorite
+                                      ? context.l10n.removeFromFavorites
+                                      : context.l10n.addToFavorites,
+                                  icon: Icon(
+                                    song.isFavorite
+                                        ? Icons.favorite_rounded
+                                        : Icons.favorite_border_rounded,
+                                    color: song.isFavorite
+                                        ? p.favorite
+                                        : p.textTertiary,
+                                    size: 20,
+                                  ),
+                                  onPressed: () {
+                                    PulsrHaptics.selectionClick();
+                                    try {
+                                      context
+                                          .read<LibraryCubit>()
+                                          .toggleFavorite(song.id);
+                                    } on ProviderNotFoundException {
+                                      getIt<ToggleFavoriteUseCase>()(song.id);
+                                    }
+                                  },
+                                ),
                               ),
-                              tooltip: context.l10n.favorite,
-                              icon: Icon(
-                                song.isFavorite
-                                    ? Icons.favorite_rounded
-                                    : Icons.favorite_border_rounded,
-                                color: song.isFavorite
-                                    ? p.favorite
-                                    : p.textTertiary,
-                                size: 20,
-                              ),
-                              onPressed: () {
-                                PulsrHaptics.selectionClick();
-                                try {
-                                  context
-                                      .read<LibraryCubit>()
-                                      .toggleFavorite(song.id);
-                                } on ProviderNotFoundException {
-                                  getIt<ToggleFavoriteUseCase>()(song.id);
-                                }
-                              },
                             ),
                           ],
                         ),

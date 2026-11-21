@@ -12,6 +12,7 @@ import '../../../../core/constants/prefs_keys.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
 import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
@@ -391,6 +392,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
     }
 
     final p = context.palette;
+    final l10n = context.l10n;
     final dspBlocked = widget.blockedReason;
     final isBlocked = dspBlocked != null || !widget.nativeAvailable;
 
@@ -422,7 +424,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Multichannel Speaker Alignment',
+                      l10n.multichannelSpeakerAlignment,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: AppFontSize.body,
@@ -432,7 +434,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      'Per-channel trim, alignment delay & LFE crossover',
+                      l10n.multichannelSubtitle,
                       style: TextStyle(
                         fontSize: AppFontSize.caption,
                         color: p.textTertiary,
@@ -446,7 +448,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               IconButton(
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
-                tooltip: 'Multichannel Info',
+                tooltip: l10n.multichannelInfoTooltip,
                 onPressed: () => _showInfo(AudioFeatureRegistry.channelManager),
               ),
               const SizedBox(width: AppSpacing.xxs),
@@ -465,7 +467,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.s6),
               child: Text(
-                'Bypassed by Bit-Perfect Mode',
+                l10n.multichannelBypassedByBitPerfect,
                 style: TextStyle(
                   color: p.error,
                   fontSize: AppFontSize.caption,
@@ -491,7 +493,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    'AAudio is limited to 2 channels on Android; multichannel streams (>2 ch) route through Pulsr\'s 32-bit float AudioTrack path for genuine surround output.',
+                    l10n.multichannelAaudioNote,
                     style: TextStyle(
                       fontSize: AppFontSize.caption,
                       color: p.textSecondary,
@@ -511,7 +513,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Speaker Layout',
+                  l10n.multichannelSpeakerLayout,
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
@@ -519,8 +521,11 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   ),
                 ),
                 Text(
-                  '${_layout?.displayName ?? '$_channelCount ch'} '
-                  '($_channelCount channels)',
+                  l10n.multichannelLayoutSummary(
+                    _layout?.displayName ??
+                        l10n.multichannelChannelsShort(_channelCount),
+                    _channelCount,
+                  ),
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
@@ -538,7 +543,10 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   _buildLayoutChip(
                     p,
                     layout,
-                    '${layout.displayName} (${layout.channelCount} ch)',
+                    l10n.multichannelLayoutChipLabel(
+                      layout.displayName,
+                      layout.channelCount,
+                    ),
                   ),
               ],
             ),
@@ -556,7 +564,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
 
             // Channel Selector Tabs
             Text(
-              'Select Speaker Channel',
+              l10n.multichannelSelectChannel,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w700,
@@ -569,7 +577,8 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               child: Row(
                 children: List.generate(_channelCount, (i) {
                   final isSelected = i == _selectedChannel;
-                  final label = _layout?.labelAt(i) ?? 'CH $i';
+                  final label =
+                      _layout?.labelAt(i) ?? l10n.multichannelChannelShort(i);
                   return Padding(
                     padding: const EdgeInsetsDirectional.only(end: 6),
                     child: ChoiceChip(
@@ -609,7 +618,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                       const SizedBox(width: AppSpacing.xs),
                       Text(
                         _layout?.fullNameAt(_selectedChannel) ??
-                            'Channel $_selectedChannel',
+                            l10n.multichannelChannelFull(_selectedChannel),
                         style: TextStyle(
                           fontSize: AppFontSize.label,
                           fontWeight: FontWeight.w700,
@@ -623,7 +632,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   // Gain Trim Slider
                   _buildSliderRow(
                     p: p,
-                    label: 'Gain Trim',
+                    label: l10n.multichannelGainTrim,
                     valueText:
                         '${_channelTrims[_selectedChannel] >= 0 ? '+' : ''}${_channelTrims[_selectedChannel].toStringAsFixed(1)} dB',
                     value: _channelTrims[_selectedChannel],
@@ -638,7 +647,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   // Delay Slider
                   _buildSliderRow(
                     p: p,
-                    label: 'Alignment Delay',
+                    label: l10n.multichannelAlignmentDelay,
                     valueText:
                         '${_channelDelays[_selectedChannel].toStringAsFixed(1)} ms',
                     value: _channelDelays[_selectedChannel],
@@ -676,7 +685,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'LFE Crossover & Bass Management',
+                      l10n.multichannelLfeTitle,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: AppFontSize.body,
@@ -686,7 +695,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      'Satellite HPF & dedicated subwoofer crossover',
+                      l10n.multichannelLfeSubtitle,
                       style: TextStyle(
                         fontSize: AppFontSize.caption,
                         color: p.textTertiary,
@@ -700,7 +709,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               IconButton(
                 icon: Icon(Icons.info_outline_rounded,
                     size: 16, color: p.textTertiary),
-                tooltip: 'LFE Crossover Info',
+                tooltip: l10n.multichannelLfeInfoTooltip,
                 onPressed: () => _showInfo(AudioFeatureRegistry.lfeCrossover),
               ),
               const SizedBox(width: AppSpacing.xxs),
@@ -718,7 +727,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
           if (!isBlocked && hasLfe && _lfeCrossoverEnabled) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Linkwitz-Riley crossover applies high-pass filter to satellite channels and routes redirected low frequencies to the dedicated LFE channel.',
+              l10n.multichannelLfeDescription,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 color: p.textTertiary,
@@ -730,7 +739,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
             // Satellite Crossover Frequency
             _buildSliderRow(
               p: p,
-              label: 'Satellite Crossover (HPF)',
+              label: l10n.multichannelSatelliteCrossover,
               valueText: '${_lfeCrossoverHz.round()} Hz',
               value: _lfeCrossoverHz,
               min: 40.0,
@@ -743,7 +752,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
             // Dedicated LFE Low-Pass
             _buildSliderRow(
               p: p,
-              label: 'Subwoofer Low-Pass (LPF)',
+              label: l10n.multichannelSubwooferLowPass,
               valueText: '${_lfeLowPassHz.round()} Hz',
               value: _lfeLowPassHz,
               min: 60.0,
@@ -758,7 +767,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Crossover Filter Slope',
+                  l10n.multichannelFilterSlope,
                   style: TextStyle(
                     fontSize: AppFontSize.label,
                     color: p.textSecondary,
@@ -770,7 +779,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                   spacing: 6,
                   children: [
                     ChoiceChip(
-                      label: const Text('12 dB/oct (LR2)'),
+                      label: Text(l10n.multichannelSlopeLr2),
                       selected: _lfeSlopeDbPerOct < 18.0,
                       selectedColor: p.accent,
                       labelStyle: TextStyle(
@@ -785,7 +794,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                       },
                     ),
                     ChoiceChip(
-                      label: const Text('24 dB/oct (LR4)'),
+                      label: Text(l10n.multichannelSlopeLr4),
                       selected: _lfeSlopeDbPerOct >= 18.0,
                       selectedColor: p.accent,
                       labelStyle: TextStyle(
@@ -809,7 +818,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
             // LFE Gain Trim
             _buildSliderRow(
               p: p,
-              label: 'LFE Channel Gain Trim',
+              label: l10n.multichannelLfeGainTrim,
               valueText:
                   '${_lfeGainDb >= 0 ? '+' : ''}${_lfeGainDb.toStringAsFixed(1)} dB',
               value: _lfeGainDb,
@@ -831,7 +840,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Redirect Satellite Bass',
+                        l10n.multichannelRedirectSatelliteBass,
                         style: TextStyle(
                           fontSize: AppFontSize.body,
                           color: p.textPrimary,
@@ -839,7 +848,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                         ),
                       ),
                       Text(
-                        'Sums satellite frequencies below crossover into LFE with 1/√(N-1) power normalization.',
+                        l10n.multichannelRedirectSatelliteBassDesc,
                         style: TextStyle(
                           fontSize: AppFontSize.caption,
                           color: p.textTertiary,
@@ -930,7 +939,7 @@ class _MultichannelBassCardState extends State<MultichannelBassCard> {
                         ? p.textTertiary.withValues(alpha: 0.35)
                         : p.accent,
                   ),
-                  tooltip: 'Reset',
+                  tooltip: context.l10n.reset,
                   padding: EdgeInsets.zero,
                   constraints:
                       const BoxConstraints(minWidth: 36, minHeight: 36),

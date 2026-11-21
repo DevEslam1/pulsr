@@ -23,30 +23,38 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
           ),
           const SizedBox(width: AppSpacing.xxs),
           Expanded(
-            child: Container(
-              height: 36,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
-              decoration: BoxDecoration(
-                color: p.surfaceContainerHigh,
-                borderRadius: AppRadii.r10All,
-                border: Border.all(color: p.hairline),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.lock_rounded, size: 13, color: p.accent),
-                  const SizedBox(width: AppSpacing.s6),
-                  Expanded(
-                    child: Text(
-                      _currentUrl.replaceFirst('https://', ''),
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                        fontFamily: 'monospace',
-                      ),
-                      overflow: TextOverflow.ellipsis,
+            child: Semantics(
+              readOnly: true,
+              label: _currentUrl.replaceFirst('https://', ''),
+              child: Container(
+                height: 36,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
+                decoration: BoxDecoration(
+                  color: p.surfaceContainerHigh,
+                  borderRadius: AppRadii.r10All,
+                  border: Border.all(color: p.hairline),
+                ),
+                child: Row(
+                  children: [
+                    ExcludeSemantics(
+                      child:
+                          Icon(Icons.lock_rounded, size: 13, color: p.accent),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: AppSpacing.s6),
+                    Expanded(
+                      child: Text(
+                        _currentUrl.replaceFirst('https://', ''),
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.label,
+                          fontFamily: 'monospace',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -71,11 +79,10 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
       ),
       // Quick Navigation Chips
       SizedBox(
-        height: 36,
+        height: AppSpacing.minTouchTarget,
         child: ListView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xxs, vertical: AppSpacing.s2),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
           children: [
             _navChip(
               label: context.l10n.browseHome,
@@ -175,33 +182,53 @@ extension _YtmBrowseToolbar on _YtmWebLoginSheetState {
   }) {
     final isCurrent = _isCurrentUrl(url);
 
-    return InkWell(
-      onTap: () => _navigateTo(url),
-      borderRadius: AppRadii.r8All,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs, vertical: AppSpacing.xxs),
-        decoration: BoxDecoration(
-          color: isCurrent ? p.accentContainer : p.surfaceContainerHigh,
-          borderRadius: AppRadii.r8All,
-          border: Border.all(
-            color: isCurrent ? p.accent : p.hairline,
+    return Semantics(
+      button: true,
+      selected: isCurrent,
+      label: label,
+      child: InkWell(
+        onTap: () => _navigateTo(url),
+        borderRadius: AppRadii.r8All,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: isCurrent ? p.accent : p.textSecondary),
-            const SizedBox(width: AppSpacing.s6),
-            Text(
-              label,
-              style: TextStyle(
-                color: isCurrent ? p.accent : p.textPrimary,
-                fontSize: AppFontSize.caption,
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.xs, vertical: AppSpacing.s6),
+              decoration: BoxDecoration(
+                color: isCurrent ? p.accentContainer : p.surfaceContainerHigh,
+                borderRadius: AppRadii.r8All,
+                border: Border.all(
+                  color: isCurrent ? p.accent : p.hairline,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ExcludeSemantics(
+                    child: Icon(
+                      icon,
+                      size: 13,
+                      color: isCurrent ? p.accent : p.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.s6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: isCurrent ? p.accent : p.textPrimary,
+                      fontSize: AppFontSize.caption,
+                      fontWeight:
+                          isCurrent ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );

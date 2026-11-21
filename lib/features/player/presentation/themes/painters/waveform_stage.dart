@@ -171,13 +171,20 @@ class _WaveformHeroStage extends StatelessWidget {
                                     fallbackIcon: Icons.music_note_rounded,
                                   )
                                 : ExcludeSemantics(
-                                    child: Container(
-                                      color: Colors.black26,
-                                      child: Icon(
-                                        Icons.music_note_rounded,
-                                        size: artSize * 0.4,
-                                        color: Colors.white54,
-                                      ),
+                                    child: Builder(
+                                      builder: (context) {
+                                        final surface =
+                                            context.playerSurfacePalette;
+                                        return Container(
+                                          color: surface.tapeWindow
+                                              .withValues(alpha: 0.45),
+                                          child: Icon(
+                                            Icons.music_note_rounded,
+                                            size: artSize * 0.4,
+                                            color: surface.mutedInk,
+                                          ),
+                                        );
+                                      },
                                     ),
                                   ),
                           ),

@@ -60,7 +60,10 @@ mixin SettingsCategoryWidgetsSection
               subtitle: context.l10n.settingsSmartAudioSectionSubtitle,
               trailing: TextButton.icon(
                 style: TextButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
+                  minimumSize: const Size(
+                    AppSpacing.minTouchTarget,
+                    AppSpacing.minTouchTarget,
+                  ),
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm, vertical: AppSpacing.xxs),
                 ),
@@ -80,6 +83,12 @@ mixin SettingsCategoryWidgetsSection
                 ),
               ],
             ),
+          ),
+
+          // A2. Reset Audio Engine to Recommended Guardrail
+          KeyedSubtree(
+            key: stateObj._sectionKeyFor('reset_audio_engine'),
+            child: ResetAudioEngineGuardrailCard(cubit: cubit),
           ),
 
           // B. Output Device Card (device-adaptive surface)

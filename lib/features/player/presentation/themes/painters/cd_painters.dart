@@ -3,9 +3,11 @@ part of '../cd_player_theme.dart';
 /// Custom painter for the realistic iridescent Compact Disc (CD) surface.
 class _CdDiscPainter extends CustomPainter {
   final Color activeColor;
+  final PlayerSurfacePalette surface;
 
   _CdDiscPainter({
     required this.activeColor,
+    required this.surface,
   });
 
   @override
@@ -33,18 +35,18 @@ class _CdDiscPainter extends CustomPainter {
       ..shader = SweepGradient(
         center: Alignment.center,
         colors: [
-          Colors.cyanAccent.withValues(alpha: 0.18),
-          Colors.blueAccent.withValues(alpha: 0.22),
-          Colors.purpleAccent.withValues(alpha: 0.20),
-          Colors.pinkAccent.withValues(alpha: 0.24),
-          Colors.amberAccent.withValues(alpha: 0.22),
-          Colors.greenAccent.withValues(alpha: 0.18),
-          Colors.cyanAccent.withValues(alpha: 0.18),
-          Colors.blueAccent.withValues(alpha: 0.22),
-          Colors.purpleAccent.withValues(alpha: 0.20),
-          Colors.pinkAccent.withValues(alpha: 0.24),
-          Colors.amberAccent.withValues(alpha: 0.22),
-          Colors.cyanAccent.withValues(alpha: 0.18),
+          surface.ledGlow.withValues(alpha: 0.18),
+          AppColors.azure.withValues(alpha: 0.22),
+          AppColors.swatchPurple.withValues(alpha: 0.20),
+          AppColors.swatchPink.withValues(alpha: 0.24),
+          AppColors.amberDeep.withValues(alpha: 0.22),
+          AppColors.swatchGreen.withValues(alpha: 0.18),
+          surface.ledGlow.withValues(alpha: 0.18),
+          AppColors.azure.withValues(alpha: 0.22),
+          AppColors.swatchPurple.withValues(alpha: 0.20),
+          AppColors.swatchPink.withValues(alpha: 0.24),
+          AppColors.amberDeep.withValues(alpha: 0.22),
+          surface.ledGlow.withValues(alpha: 0.18),
         ],
         stops: const [
           0.0,
@@ -80,12 +82,12 @@ class _CdDiscPainter extends CustomPainter {
           (r > labelRadius + 105 && r < labelRadius + 108);
 
       if (isSubTrack) {
-        trackPaint.color = Colors.white.withValues(alpha: 0.12);
+        trackPaint.color = surface.specularAt(0.12);
         trackPaint.strokeWidth = 0.9;
       } else {
         final variance =
             ((math.sin(r * 1.2) + 1.0) * 0.035 + 0.02).clamp(0.015, 0.075);
-        trackPaint.color = Colors.white.withValues(alpha: variance);
+        trackPaint.color = surface.specularAt(variance);
         trackPaint.strokeWidth = 0.45;
       }
       canvas.drawCircle(center, r, trackPaint);
@@ -95,10 +97,10 @@ class _CdDiscPainter extends CustomPainter {
     final mirrorPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          Colors.white.withValues(alpha: 0.18),
-          Colors.white.withValues(alpha: 0.05),
-          Colors.white.withValues(alpha: 0.15),
-          Colors.white.withValues(alpha: 0.04),
+          surface.specularAt(0.18),
+          surface.specularAt(0.05),
+          surface.specularAt(0.15),
+          surface.specularAt(0.04),
         ],
         stops: const [0.0, 0.4, 0.75, 1.0],
       ).createShader(
@@ -119,11 +121,11 @@ class _CdDiscPainter extends CustomPainter {
     final outerRimPaint = Paint()
       ..shader = SweepGradient(
         colors: [
-          Colors.white.withValues(alpha: 0.45),
-          Colors.white.withValues(alpha: 0.15),
-          Colors.white.withValues(alpha: 0.50),
-          Colors.white.withValues(alpha: 0.12),
-          Colors.white.withValues(alpha: 0.45),
+          surface.specularAt(0.45),
+          surface.specularAt(0.15),
+          surface.specularAt(0.50),
+          surface.specularAt(0.12),
+          surface.specularAt(0.45),
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
@@ -131,7 +133,7 @@ class _CdDiscPainter extends CustomPainter {
     canvas.drawCircle(center, radius - 1, outerRimPaint);
 
     final innerBevelPaint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.35)
+      ..color = surface.shadowAt(0.35)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
     canvas.drawCircle(center, radius - 3, innerBevelPaint);
@@ -139,7 +141,7 @@ class _CdDiscPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CdDiscPainter oldDelegate) =>
-      oldDelegate.activeColor != activeColor;
+      oldDelegate.activeColor != activeColor || oldDelegate.surface != surface;
 }
 
 /// Bilateral specular flare anchored to the virtual light source. Painted once
@@ -221,6 +223,7 @@ class _CdJewelCasePainter extends CustomPainter {
   final double discRadius;
   final Color activeColor;
   final bool isPlaying;
+  final PlayerSurfacePalette surface;
 
   _CdJewelCasePainter({
     required this.spineWidth,
@@ -229,6 +232,7 @@ class _CdJewelCasePainter extends CustomPainter {
     required this.discRadius,
     required this.activeColor,
     required this.isPlaying,
+    required this.surface,
   });
 
   @override
@@ -243,7 +247,7 @@ class _CdJewelCasePainter extends CustomPainter {
     canvas.drawRRect(
       caseRRect.shift(const Offset(0, 8)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.42)
+        ..color = surface.shadowAt(0.42)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
     );
 
@@ -256,9 +260,9 @@ class _CdJewelCasePainter extends CustomPainter {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            PlayerMaterialColors.cdSurfaceUpper.withValues(alpha: 0.97),
+            surface.cassetteShell.withValues(alpha: 0.97),
             PlayerMaterialColors.cdTrayGradStart,
-            PlayerMaterialColors.cdTrayGradEnd,
+            surface.tapeWindow,
           ],
           stops: const [0.0, 0.55, 1.0],
         ).createShader(caseRect),
@@ -274,9 +278,9 @@ class _CdJewelCasePainter extends CustomPainter {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.30),
-            Colors.white.withValues(alpha: 0.06),
-            Colors.white.withValues(alpha: 0.16),
+            surface.specularAt(0.30),
+            surface.specularAt(0.06),
+            surface.specularAt(0.16),
           ],
         ).createShader(caseRect),
     );
@@ -293,7 +297,7 @@ class _CdJewelCasePainter extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            PlayerMaterialColors.recordBase.withValues(alpha: 0.55),
+            surface.vinylGroove.withValues(alpha: 0.55),
             PlayerMaterialColors.cdSurfaceBottom.withValues(alpha: 0.78),
           ],
         ).createShader(trayRect),
@@ -303,7 +307,7 @@ class _CdJewelCasePainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0
-        ..color = Colors.white.withValues(alpha: 0.10),
+        ..color = surface.specularAt(0.10),
     );
 
     // 5. Hinge spine along the leading edge, with the lid seam and ribs.
@@ -329,11 +333,11 @@ class _CdJewelCasePainter extends CustomPainter {
       Offset(spineRect.right, spineRect.top),
       Offset(spineRect.right, spineRect.bottom),
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.14)
+        ..color = surface.specularAt(0.14)
         ..strokeWidth = 1.0,
     );
     final ribPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.10)
+      ..color = surface.specularAt(0.10)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round;
@@ -351,7 +355,7 @@ class _CdJewelCasePainter extends CustomPainter {
     canvas.drawCircle(
       discCenter,
       discRadius + 7,
-      Paint()..color = Colors.black.withValues(alpha: 0.30),
+      Paint()..color = surface.shadowAt(0.30),
     );
     canvas.drawCircle(
       discCenter,
@@ -359,7 +363,7 @@ class _CdJewelCasePainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.0
-        ..color = Colors.white.withValues(alpha: 0.08),
+        ..color = surface.specularAt(0.08),
     );
     canvas.drawCircle(
       discCenter,
@@ -381,7 +385,8 @@ class _CdJewelCasePainter extends CustomPainter {
       oldDelegate.discCenter != discCenter ||
       oldDelegate.discRadius != discRadius ||
       oldDelegate.activeColor != activeColor ||
-      oldDelegate.isPlaying != isPlaying;
+      oldDelegate.isPlaying != isPlaying ||
+      oldDelegate.surface != surface;
 }
 
 /// Paints the optical pickup sled: the rail along the tray lip, the lens head
@@ -397,6 +402,7 @@ class _CdPickupSledPainter extends CustomPainter {
   final Color activeColor;
   final Offset discCenter;
   final double discRadius;
+  final PlayerSurfacePalette surface;
 
   _CdPickupSledPainter({
     required this.railLeft,
@@ -407,6 +413,7 @@ class _CdPickupSledPainter extends CustomPainter {
     required this.activeColor,
     required this.discCenter,
     required this.discRadius,
+    required this.surface,
   });
 
   @override
@@ -492,7 +499,7 @@ class _CdPickupSledPainter extends CustomPainter {
       Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = 0.8
-        ..color = Colors.white.withValues(alpha: 0.18),
+        ..color = surface.specularAt(0.18),
     );
 
     final objective = Offset(lensX, railY - 10);
@@ -521,7 +528,8 @@ class _CdPickupSledPainter extends CustomPainter {
       oldDelegate.engage != engage ||
       oldDelegate.activeColor != activeColor ||
       oldDelegate.discCenter != discCenter ||
-      oldDelegate.discRadius != discRadius;
+      oldDelegate.discRadius != discRadius ||
+      oldDelegate.surface != surface;
 }
 
 /// The lid highlight that sweeps across the closed case when playback starts or
@@ -529,8 +537,10 @@ class _CdPickupSledPainter extends CustomPainter {
 /// driven straight from the gloss animation so no widget rebuilds per frame.
 class _CdLidGlossPainter extends CustomPainter {
   final Animation<double> gloss;
+  final PlayerSurfacePalette surface;
 
-  _CdLidGlossPainter({required this.gloss}) : super(repaint: gloss);
+  _CdLidGlossPainter({required this.gloss, required this.surface})
+      : super(repaint: gloss);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -556,9 +566,9 @@ class _CdLidGlossPainter extends CustomPainter {
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
           colors: [
-            Colors.white.withValues(alpha: 0.0),
-            Colors.white.withValues(alpha: 0.16),
-            Colors.white.withValues(alpha: 0.0),
+            surface.specularAt(0.0),
+            surface.specularAt(0.16),
+            surface.specularAt(0.0),
           ],
         ).createShader(bandRect)
         ..blendMode = BlendMode.screen,
@@ -568,5 +578,5 @@ class _CdLidGlossPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CdLidGlossPainter oldDelegate) =>
-      oldDelegate.gloss != gloss;
+      oldDelegate.gloss != gloss || oldDelegate.surface != surface;
 }

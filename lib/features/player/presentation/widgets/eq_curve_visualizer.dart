@@ -4,8 +4,10 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headphone_target_curve.dart';
 
@@ -101,23 +103,61 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
     }
   }
 
+  String _buildSemanticValue(BuildContext context) {
+    final parts = <String>[
+      '${widget.gains.length} ${context.l10n.bandsLabel}',
+    ];
+    if (widget.gains.isNotEmpty) {
+      var minDb = widget.gains.first;
+      var maxDb = widget.gains.first;
+      for (final g in widget.gains) {
+        if (g < minDb) minDb = g;
+        if (g > maxDb) maxDb = g;
+      }
+      if (minDb.abs() < 0.05 && maxDb.abs() < 0.05) {
+        parts.add('0.0 dB');
+      } else {
+        final minStr = '${minDb > 0 ? '+' : ''}${minDb.toStringAsFixed(1)}';
+        final maxStr = '${maxDb > 0 ? '+' : ''}${maxDb.toStringAsFixed(1)}';
+        parts.add('$minStr to $maxStr dB');
+      }
+    }
+    final activeIdx = _activeDraggingBand ?? widget.selectedBandIndex;
+    if (activeIdx != null && activeIdx >= 0 && activeIdx < widget.gains.length) {
+      final db = widget.gains[activeIdx];
+      final dbStr = '${db > 0 ? '+' : ''}${db.toStringAsFixed(1)} dB';
+      parts.add('${context.l10n.eqBandLabel(activeIdx + 1)}: $dbStr');
+    }
+    if (_selectedTargetCurve != null) {
+      parts.add('${context.l10n.autoeqTargetCurve}: ${_selectedTargetCurve!.name}');
+    }
+    return parts.join(', ');
+  }
+
+  String? _buildSemanticHint(BuildContext context, bool isInteractive) {
+    if (!isInteractive) return null;
+    return '${context.l10n.featureInfoEqualizerSubtitle}. '
+        '${context.l10n.eqBandLabel(1)}–${widget.gains.length}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isInteractive = widget.onGainChanged != null;
+    final shouldAnimate =
+        _activeDraggingBand == null && PulsrMotion.shouldAnimate(context);
+    final surfacePalette = context.playerSurfacePalette;
+    final curveDuration =
+        shouldAnimate ? context.motionMs(260) : Duration.zero;
 
     Widget visualizer = RepaintBoundary(
-      child: Semantics(
-        label: context.l10n.equalizer,
-        value: '${widget.gains.length} ${context.l10n.bandsLabel}',
+      child: ExcludeSemantics(
         child: TweenAnimationBuilder<List<double>>(
           tween: _ListDoubleTween(
             begin: _prevGains ?? widget.gains,
             end: widget.gains,
           ),
-          duration: _activeDraggingBand != null
-              ? Duration.zero
-              : context.motionMs(260),
-          curve: Curves.easeOutCubic,
+          duration: curveDuration,
+          curve: PulsrMotion.resolveCurve(context, PulsrMotion.enter),
           onEnd: () {
             _prevGains = widget.gains;
           },
@@ -126,6 +166,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
             painter: _CatmullRomEqPainter(
               gains: animatedGains,
               color: widget.activeColor,
+              specularColor: surfacePalette.highContrastInk,
               spectrumData: widget.spectrumData,
               frequencies: widget.frequencies,
               targetCurve: _selectedTargetCurve,
@@ -156,6 +197,15 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       );
     }
 
+    visualizer = Semantics(
+      container: true,
+      label: context.l10n.equalizerResponseCurve,
+      value: _buildSemanticValue(context),
+      hint: _buildSemanticHint(context, isInteractive),
+      liveRegion: _activeDraggingBand != null,
+      child: visualizer,
+    );
+
     // Target-curve selector: overlaid on the chart rather than stacked above it
     // because the host layouts give this widget a fixed height (52–72 px), and
     // kept outside the GestureDetector so its taps cannot be read as a band
@@ -170,6 +220,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
             child: _TargetCurvePicker(
               selected: _selectedTargetCurve,
               color: widget.activeColor,
+              maxHeight: widget.height,
               onSelected: _handleTargetCurveSelected,
             ),
           ),
@@ -177,10 +228,7 @@ class _EqCurveVisualizerState extends State<EqCurveVisualizer> {
       );
     }
 
-    return Semantics(
-      label: context.l10n.equalizerResponseCurve,
-      child: visualizer,
-    );
+    return visualizer;
   }
 
   void _handleTargetCurveSelected(HeadphoneTargetCurve? curve) {
@@ -307,62 +355,81 @@ class _TargetCurvePicker extends StatelessWidget {
   const _TargetCurvePicker({
     required this.selected,
     required this.color,
+    required this.maxHeight,
     required this.onSelected,
   });
 
   final HeadphoneTargetCurve? selected;
   final Color color;
+  final double maxHeight;
   final ValueChanged<HeadphoneTargetCurve?> onSelected;
 
   @override
   Widget build(BuildContext context) {
     final label = selected?.name ?? context.l10n.autoeqTargetCurve;
-    return PopupMenuButton<HeadphoneTargetCurve?>(
-      tooltip: context.l10n.autoeqTargetCurve,
-      padding: EdgeInsets.zero,
-      onSelected: onSelected,
-      itemBuilder: (context) => [
-        CheckedPopupMenuItem<HeadphoneTargetCurve?>(
-          value: null,
-          checked: selected == null,
-          child: Text(context.l10n.autoeqTargetCurveNone),
-        ),
-        for (final curve in HeadphoneTargetCurve.all)
+    final targetHeight = math.min(AppSpacing.minTouchTarget, maxHeight);
+    return Semantics(
+      button: true,
+      label: context.l10n.autoeqTargetCurve,
+      value: selected?.name ?? context.l10n.autoeqTargetCurveNone,
+      child: PopupMenuButton<HeadphoneTargetCurve?>(
+        tooltip: context.l10n.autoeqTargetCurve,
+        padding: EdgeInsets.zero,
+        onSelected: onSelected,
+        itemBuilder: (context) => [
           CheckedPopupMenuItem<HeadphoneTargetCurve?>(
-            value: curve,
-            checked: selected == curve,
-            child: Text(curve.name),
+            value: null,
+            checked: selected == null,
+            child: Text(context.l10n.autoeqTargetCurveNone),
           ),
-      ],
-      child: Container(
-        padding: const EdgeInsetsDirectional.fromSTEB(6, 1, 2, 1),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.10),
-          borderRadius: AppRadii.r8All,
-          border: Border.all(color: color.withValues(alpha: 0.22)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.straighten_rounded,
-                size: 11, color: color.withValues(alpha: 0.75)),
-            const SizedBox(width: 3),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 104),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: color.withValues(alpha: 0.85),
-                  fontSize: AppFontSize.nano,
-                  fontWeight: FontWeight.w600,
-                ),
+          for (final curve in HeadphoneTargetCurve.all)
+            CheckedPopupMenuItem<HeadphoneTargetCurve?>(
+              value: curve,
+              checked: selected == curve,
+              child: Text(curve.name),
+            ),
+        ],
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: targetHeight,
+          ),
+          child: Align(
+            alignment: AlignmentDirectional.topEnd,
+            widthFactor: 1.0,
+            heightFactor: 1.0,
+            child: Container(
+              padding: const EdgeInsetsDirectional.fromSTEB(6, 2, 2, 2),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: AppRadii.r8All,
+                border: Border.all(color: color.withValues(alpha: 0.22)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.straighten_rounded,
+                      size: 11, color: color.withValues(alpha: 0.75)),
+                  const SizedBox(width: 3),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 104),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: color.withValues(alpha: 0.85),
+                        fontSize: AppFontSize.nano,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Icon(Icons.arrow_drop_down_rounded,
+                      size: 14, color: color.withValues(alpha: 0.75)),
+                ],
               ),
             ),
-            Icon(Icons.arrow_drop_down_rounded,
-                size: 14, color: color.withValues(alpha: 0.75)),
-          ],
+          ),
         ),
       ),
     );
@@ -372,6 +439,7 @@ class _TargetCurvePicker extends StatelessWidget {
 class _CatmullRomEqPainter extends CustomPainter {
   final List<double> gains;
   final Color color;
+  final Color specularColor;
   final List<double>? spectrumData;
   final List<double>? frequencies;
   final HeadphoneTargetCurve? targetCurve;
@@ -383,6 +451,7 @@ class _CatmullRomEqPainter extends CustomPainter {
   _CatmullRomEqPainter({
     required this.gains,
     required this.color,
+    required this.specularColor,
     this.spectrumData,
     this.frequencies,
     this.targetCurve,
@@ -712,7 +781,7 @@ class _CatmullRomEqPainter extends CustomPainter {
 
         // Specular center dot
         final specularPaint = Paint()
-          ..color = Colors.white.withValues(alpha: 0.90)
+          ..color = specularColor.withValues(alpha: 0.90)
           ..style = PaintingStyle.fill;
         canvas.drawCircle(pt, 1.8, specularPaint);
       } else if (hasGain) {
@@ -731,6 +800,7 @@ class _CatmullRomEqPainter extends CustomPainter {
   bool shouldRepaint(covariant _CatmullRomEqPainter oldDelegate) {
     return !listEquals(oldDelegate.gains, gains) ||
         oldDelegate.color != color ||
+        oldDelegate.specularColor != specularColor ||
         !listEquals(oldDelegate.spectrumData, spectrumData) ||
         !listEquals(oldDelegate.frequencies, frequencies) ||
         oldDelegate.targetCurve != targetCurve ||

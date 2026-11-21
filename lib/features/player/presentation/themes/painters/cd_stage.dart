@@ -51,6 +51,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     final props = widget.props;
     final state = props.state;
     final cubit = props.cubit;
@@ -104,7 +105,10 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                     // CD optical substrate surface and iridescent sheen.
                     CustomPaint(
                       size: Size(cdSize, cdSize),
-                      painter: _CdDiscPainter(activeColor: activeColor),
+                      painter: _CdDiscPainter(
+                        activeColor: activeColor,
+                        surface: surface,
+                      ),
                     ),
 
                     // Circular album artwork printed onto the disc label.
@@ -114,12 +118,12 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                       decoration: BoxDecoration(
                         borderRadius: AppRadii.circular(artRadius),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.28),
+                          color: surface.specularAt(0.28),
                           width: 1.5,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.4),
+                            color: surface.shadowAt(0.40),
                             blurRadius: 8,
                             spreadRadius: -1,
                           ),
@@ -138,11 +142,11 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                               highQuality: true,
                               fallbackIcon: Icons.music_note_rounded,
                             )
-                          : const ExcludeSemantics(
+                          : ExcludeSemantics(
                               child: Icon(
                                 Icons.album_rounded,
                                 size: 48,
-                                color: Colors.white38,
+                                color: surface.mutedInk,
                               ),
                             ),
                     ),
@@ -177,6 +181,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                               discRadius: cdSize / 2,
                               activeColor: activeColor,
                               isPlaying: state.isPlaying,
+                              surface: surface,
                             ),
                           ),
                         ),
@@ -316,6 +321,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                                         activeColor: activeColor,
                                         discCenter: cdCenter,
                                         discRadius: cdSize / 2,
+                                        surface: surface,
                                       ),
                                     );
                                   },
@@ -334,6 +340,7 @@ class _CdJewelStageState extends State<_CdJewelStage> {
                             child: CustomPaint(
                               painter: _CdLidGlossPainter(
                                 gloss: widget.glossAnimation,
+                                surface: surface,
                               ),
                             ),
                           ),
@@ -360,6 +367,7 @@ class _JewelSpiderHub extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     final hubDiameter = math.max(diameter * 0.42, 18.0);
     return ExcludeSemantics(
       child: SizedBox(
@@ -374,9 +382,9 @@ class _JewelSpiderHub extends StatelessWidget {
               height: diameter,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.06),
+                color: surface.specularAt(0.06),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.30),
+                  color: surface.specularAt(0.30),
                   width: 1.0,
                 ),
               ),
@@ -392,10 +400,10 @@ class _JewelSpiderHub extends StatelessWidget {
                     height: diameter * 0.26,
                     margin: EdgeInsets.only(top: diameter * 0.06),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: surface.specularAt(0.12),
                       borderRadius: AppRadii.circular(hubDiameter * 0.15),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.26),
+                        color: surface.specularAt(0.26),
                         width: 0.8,
                       ),
                     ),
@@ -410,19 +418,19 @@ class _JewelSpiderHub extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    Colors.grey.shade300,
-                    Colors.grey.shade600,
+                    surface.platterMetalHighlight,
+                    surface.platterMetalDeep,
                     PlayerMaterialColors.cdPivotLow,
                   ],
                   stops: const [0.0, 0.55, 1.0],
                 ),
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.5),
+                  color: surface.specularAt(0.50),
                   width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.55),
+                    color: surface.shadowAt(0.55),
                     blurRadius: 4,
                   ),
                 ],
@@ -433,9 +441,9 @@ class _JewelSpiderHub extends StatelessWidget {
                   height: hubDiameter * 0.36,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: PlayerMaterialColors.recordBase,
+                    color: surface.vinylGroove,
                     border: Border.all(
-                      color: Colors.white24,
+                      color: surface.specularAt(0.24),
                       width: 0.6,
                     ),
                   ),
@@ -463,6 +471,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     final state = props.state;
     final trackNum = (state.currentIndex >= 0 ? state.currentIndex + 1 : 1)
         .toString()
@@ -479,8 +488,8 @@ class _CdOpticalDisplayHud extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            PlayerMaterialColors.cdTrayGradStart.withValues(alpha: 0.92),
-            PlayerMaterialColors.cdTrayGradEnd.withValues(alpha: 0.90),
+            surface.tapeWindow.withValues(alpha: 0.94),
+            surface.vinylGroove.withValues(alpha: 0.92),
           ],
         ),
         borderRadius: AppRadii.r8All,
@@ -490,7 +499,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.5),
+            color: surface.shadowAt(0.50),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -499,17 +508,17 @@ class _CdOpticalDisplayHud extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Blue optical laser status dot.
+          // Optical laser status dot.
           Container(
             width: 6,
             height: 6,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isPlaying ? Colors.cyanAccent : Colors.white24,
+              color: isPlaying ? surface.ledGlow : surface.specularAt(0.24),
               boxShadow: isPlaying
                   ? [
-                      const BoxShadow(
-                        color: Colors.cyanAccent,
+                      BoxShadow(
+                        color: surface.ledGlow,
                         blurRadius: 6,
                         spreadRadius: 1.5,
                       ),
@@ -530,7 +539,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 fontWeight: FontWeight.w900,
-                color: isPlaying ? Colors.cyanAccent : Colors.white70,
+                color: isPlaying ? surface.ledGlow : surface.highContrastInk,
                 letterSpacing: 1.0,
               ),
             ),
@@ -541,7 +550,7 @@ class _CdOpticalDisplayHud extends StatelessWidget {
             Container(
               width: 1,
               height: 10,
-              color: Colors.white24,
+              color: surface.specularAt(0.24),
             ),
             const SizedBox(width: 8),
             // Shrinks and ellipsises at large text scales instead of pushing
@@ -551,10 +560,10 @@ class _CdOpticalDisplayHud extends StatelessWidget {
                 audioSpec,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white60,
+                  color: surface.mutedInk,
                   letterSpacing: 0.6,
                 ),
               ),

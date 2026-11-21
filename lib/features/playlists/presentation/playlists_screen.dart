@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -555,15 +556,18 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
           backgroundColor: p.bg,
           appBar: AppBar(
             backgroundColor: p.bg,
-            surfaceTintColor: Colors.transparent,
+            surfaceTintColor: p.bg.withValues(alpha: 0),
             elevation: 0,
-            title: Text(
-              context.l10n.playlists,
-              style: TextStyle(
-                color: p.textPrimary,
-                fontSize: AppFontSize.titleLarge,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
+            title: Semantics(
+              header: true,
+              child: Text(
+                context.l10n.playlists,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: AppFontSize.titleLarge,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
               ),
             ),
             actions: [
@@ -1219,7 +1223,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           const SizedBox(width: AppSpacing.xs),
                           PulsrButton(
                             label: context.l10n.signIn,
-                            size: PulsrButtonSize.sm,
+                            size: PulsrButtonSize.lg,
                             onPressed: () async {
                               final ok = await YtmWebLoginSheet.show(context);
                               if (ok == true) {
@@ -1239,53 +1243,59 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       Adaptive.pagePadding(context),
                       AppSpacing.sm,
                     ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s14,
-                        vertical: AppSpacing.s10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: p.surfaceContainer,
-                        borderRadius: AppRadii.r14All,
-                        border: Border.all(color: p.hairline),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.cloud_download_rounded,
-                            color: p.accent,
-                            size: 20,
-                          ),
-                          const SizedBox(width: AppSpacing.s10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  context.l10n.onlineCacheProgress(
-                                    online.cacheCompleted,
-                                    online.cacheTotal,
-                                  ),
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.s6),
-                                PulsrProgressBar(
-                                  value: online.cacheTotal == 0
-                                      ? null
-                                      : online.cacheCompleted /
-                                          online.cacheTotal,
-                                  height: 4,
-                                  color: p.accent,
-                                  backgroundColor: p.surfaceContainerHigh,
-                                ),
-                              ],
+                    child: Semantics(
+                      container: true,
+                      liveRegion: true,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.s14,
+                          vertical: AppSpacing.s10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: AppRadii.r14All,
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            ExcludeSemantics(
+                              child: Icon(
+                                Icons.cloud_download_rounded,
+                                color: p.accent,
+                                size: 20,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: AppSpacing.s10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    context.l10n.onlineCacheProgress(
+                                      online.cacheCompleted,
+                                      online.cacheTotal,
+                                    ),
+                                    style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: AppFontSize.label,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.s6),
+                                  PulsrProgressBar(
+                                    value: online.cacheTotal == 0
+                                        ? null
+                                        : online.cacheCompleted /
+                                            online.cacheTotal,
+                                    height: 4,
+                                    color: p.accent,
+                                    backgroundColor: p.surfaceContainerHigh,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1358,37 +1368,49 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         horizontal: Adaptive.pagePadding(context),
                         vertical: 10,
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: AppRadii.r16All,
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline_rounded,
-                              color: p.error,
-                              size: 22,
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Text(
-                                online.accountError ??
-                                    context.l10n
-                                        .browseFailedToLoadAccountPlaylists,
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.label,
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainer,
+                            borderRadius: AppRadii.r16All,
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: Row(
+                            children: [
+                              ExcludeSemantics(
+                                child: Icon(
+                                  Icons.error_outline_rounded,
+                                  color: p.error,
+                                  size: 22,
                                 ),
                               ),
-                            ),
-                            TextButton(
-                              onPressed: () => cubit.fetchAccountPlaylists(),
-                              child: Text(context.l10n.retry),
-                            ),
-                          ],
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  online.accountError ??
+                                      context.l10n
+                                          .browseFailedToLoadAccountPlaylists,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label,
+                                  ),
+                                ),
+                              ),
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  minimumSize: const Size(
+                                    AppSpacing.minTouchTarget,
+                                    AppSpacing.minTouchTarget,
+                                  ),
+                                  tapTargetSize: MaterialTapTargetSize.padded,
+                                ),
+                                onPressed: () => cubit.fetchAccountPlaylists(),
+                                child: Text(context.l10n.retry),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -1470,32 +1492,37 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         horizontal: Adaptive.pagePadding(context),
                         vertical: 10,
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: AppRadii.r16All,
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline_rounded,
-                              color: p.error,
-                              size: 22,
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Text(
-                                online.customError ??
-                                    context.l10n.browseFailedToFetch,
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: AppFontSize.label,
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Container(
+                          padding: const EdgeInsets.all(AppSpacing.md),
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainer,
+                            borderRadius: AppRadii.r16All,
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: Row(
+                            children: [
+                              ExcludeSemantics(
+                                child: Icon(
+                                  Icons.error_outline_rounded,
+                                  color: p.error,
+                                  size: 22,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Text(
+                                  online.customError ??
+                                      context.l10n.browseFailedToFetch,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.label,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     )
@@ -1542,32 +1569,38 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     Adaptive.pagePadding(context),
                     0,
                   ),
-                  child: InkWell(
-                    onTap: () {
-                      PulsrHaptics.selectionClick();
-                      onAddPlaylist();
-                    },
-                    borderRadius: AppRadii.r18All,
-                    child: DashedBorderCard(
-                      color: AppColors.ytRed,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.add_rounded,
-                            color: AppColors.ytRed,
-                            size: 20,
-                          ),
-                          const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            context.l10n.addYtmUrl,
-                            style: const TextStyle(
-                              color: AppColors.ytRed,
-                              fontWeight: FontWeight.w800,
-                              fontSize: AppFontSize.body,
+                  child: Semantics(
+                    button: true,
+                    label: context.l10n.addYtmUrl,
+                    child: InkWell(
+                      onTap: () {
+                        PulsrHaptics.selectionClick();
+                        onAddPlaylist();
+                      },
+                      borderRadius: AppRadii.r18All,
+                      child: DashedBorderCard(
+                        color: AppColors.ytRed,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const ExcludeSemantics(
+                              child: Icon(
+                                Icons.add_rounded,
+                                color: AppColors.ytRed,
+                                size: 20,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: AppSpacing.xs),
+                            Text(
+                              context.l10n.addYtmUrl,
+                              style: const TextStyle(
+                                color: AppColors.ytRed,
+                                fontWeight: FontWeight.w800,
+                                fontSize: AppFontSize.body,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1580,10 +1613,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Account Playlist Card (from YouTube Music library)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _AccountPlaylistCard extends StatelessWidget {
   final YtmAccountPlaylist playlist;
@@ -1600,10 +1629,16 @@ class _AccountPlaylistCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     const gradientColors = [AppColors.netflixRed, AppColors.ytRedDeep];
+    final onScrim = AppColors.textOnAccent(AppColors.scrim);
 
     return Semantics(
       button: true,
-      label: playlist.title,
+      label: '${playlist.title}, ${playlist.subtitle}',
+      customSemanticsActions: {
+        if (onDownload != null)
+          CustomSemanticsAction(label: context.l10n.downloadAction):
+              onDownload!,
+      },
       child: InkWell(
         onTap: () {
           PulsrHaptics.selectionClick();
@@ -1624,25 +1659,26 @@ class _AccountPlaylistCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (playlist.artworkUrl != null)
-                      Image.network(
-                        playlist.artworkUrl!,
-                        fit: BoxFit.cover,
-                        cacheWidth: 360,
-                        cacheHeight: 360,
-                        loadingBuilder: (context, child, progress) =>
-                            progress == null
-                                ? child
-                                : _buildFallbackCover(gradientColors),
-                        errorBuilder: (_, __, ___) =>
-                            _buildFallbackCover(gradientColors),
-                      )
-                    else
-                      _buildFallbackCover(gradientColors),
+                    ExcludeSemantics(
+                      child: playlist.artworkUrl != null
+                          ? Image.network(
+                              playlist.artworkUrl!,
+                              fit: BoxFit.cover,
+                              cacheWidth: 360,
+                              cacheHeight: 360,
+                              loadingBuilder: (context, child, progress) =>
+                                  progress == null
+                                      ? child
+                                      : _buildFallbackCover(gradientColors),
+                              errorBuilder: (_, __, ___) =>
+                                  _buildFallbackCover(gradientColors),
+                            )
+                          : _buildFallbackCover(gradientColors),
+                    ),
                     if (onDownload != null)
                       PositionedDirectional(
-                        top: 6,
-                        end: 6,
+                        top: 0,
+                        end: 0,
                         child: Semantics(
                           button: true,
                           label: context.l10n.downloadAction,
@@ -1650,8 +1686,8 @@ class _AccountPlaylistCard extends StatelessWidget {
                             behavior: HitTestBehavior.opaque,
                             onTap: onDownload,
                             child: SizedBox(
-                              width: 40,
-                              height: 40,
+                              width: AppSpacing.minTouchTarget,
+                              height: AppSpacing.minTouchTarget,
                               child: Center(
                                 child: Container(
                                   padding: const EdgeInsets.all(AppSpacing.s6),
@@ -1659,9 +1695,9 @@ class _AccountPlaylistCard extends StatelessWidget {
                                     color: AppColors.scrimAt(0.60),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.download_rounded,
-                                    color: Colors.white,
+                                    color: onScrim,
                                     size: 16,
                                   ),
                                 ),
@@ -1722,20 +1758,16 @@ class _AccountPlaylistCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      child: const Center(
+      child: Center(
         child: Icon(
           Icons.queue_music_rounded,
-          color: Colors.white,
+          color: AppColors.textOnAccent(AppColors.ytRedDeep),
           size: 36,
         ),
       ),
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Liked Music Online Hero Card
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _LikedMusicOnlineCard extends StatelessWidget {
   final YtmFetchStatus status;
@@ -1754,9 +1786,54 @@ class _LikedMusicOnlineCard extends StatelessWidget {
     this.onDownload,
   });
 
+  Widget _circleAction({
+    required String label,
+    required IconData icon,
+    required Color onBrand,
+    required VoidCallback onTap,
+  }) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          child: Center(
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.specularAt(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: onBrand, size: 22),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _solidBadge(IconData icon, Color bg, Color fg, {double size = 26}) {
+    return ExcludeSemantics(
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+        child: Icon(icon, color: fg, size: size),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const gradientColors = [AppColors.spotifyGreen, AppColors.spotifyGreenDeep];
+    final onBrand = AppColors.textOnAccent(AppColors.spotifyGreenDeep);
     final hasCachedTracks = trackCount > 0;
     final isAuthError = error != null &&
         (error!.toLowerCase().contains('sign in') ||
@@ -1784,206 +1861,145 @@ class _LikedMusicOnlineCard extends StatelessWidget {
         break;
     }
 
-    final canOpenCached =
-        status == YtmFetchStatus.done ||
+    final canOpenCached = status == YtmFetchStatus.done ||
         (status == YtmFetchStatus.error && hasCachedTracks);
 
-    return InkWell(
-      onTap: status == YtmFetchStatus.loading
-          ? null
-          : (canOpenCached ? onPlay : retryAction),
-      borderRadius: AppRadii.r22All,
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.s20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: gradientColors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return Semantics(
+      button: true,
+      label: '${context.l10n.likedMusic}, $subtitle',
+      customSemanticsActions: {
+        if (status == YtmFetchStatus.done && onDownload != null)
+          CustomSemanticsAction(label: context.l10n.downloadAction):
+              onDownload!,
+        if (status == YtmFetchStatus.error && hasCachedTracks)
+          CustomSemanticsAction(label: context.l10n.retry): retryAction,
+      },
+      child: InkWell(
+        onTap: status == YtmFetchStatus.loading
+            ? null
+            : (canOpenCached ? onPlay : retryAction),
+        borderRadius: AppRadii.r22All,
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.s20),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: gradientColors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: AppRadii.r22All,
+            boxShadow: [
+              BoxShadow(
+                color: gradientColors.first.withValues(alpha: 0.35),
+                blurRadius: 28,
+                spreadRadius: -6,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
-          borderRadius: AppRadii.r22All,
-          boxShadow: [
-            BoxShadow(
-              color: gradientColors.first.withValues(alpha: 0.35),
-              blurRadius: 28,
-              spreadRadius: -6,
-              offset: const Offset(0, 12),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              decoration: BoxDecoration(
-                color: AppColors.specularAt(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.thumb_up_alt_rounded,
-                color: Colors.white,
-                size: 26,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    context.l10n.likedMusic,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: AppFontSize.title,
-                      letterSpacing: AppTracking.title,
-                    ),
+          child: Row(
+            children: [
+              ExcludeSemantics(
+                child: Container(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: AppColors.specularAt(0.2),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: AppSpacing.s2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: AppColors.specularAt(
-                        status == YtmFetchStatus.error ? 0.7 : 0.85,
+                  child: Icon(
+                    Icons.thumb_up_alt_rounded,
+                    color: onBrand,
+                    size: 26,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.l10n.likedMusic,
+                      style: TextStyle(
+                        color: onBrand,
+                        fontWeight: FontWeight.w900,
+                        fontSize: AppFontSize.title,
+                        letterSpacing: AppTracking.title,
                       ),
-                      fontSize: AppFontSize.label,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (status == YtmFetchStatus.loading)
-              const SkeletonBox(
-                width: AppSpacing.s40,
-                height: AppSpacing.s40,
-                radius: AppRadii.r20,
-              )
-            else if (status == YtmFetchStatus.done)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (onDownload != null) ...[
-                    Semantics(
-                      button: true,
-                      label: context.l10n.downloadAction,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: onDownload,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minWidth: 44,
-                            minHeight: 44,
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: AppColors.specularAt(0.2),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.download_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          ),
+                    const SizedBox(height: AppSpacing.s2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: AppColors.specularAt(
+                          status == YtmFetchStatus.error ? 0.7 : 0.85,
                         ),
+                        fontSize: AppFontSize.label,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+              if (status == YtmFetchStatus.loading)
+                const SkeletonBox(
+                  width: AppSpacing.s40,
+                  height: AppSpacing.s40,
+                  radius: AppRadii.r20,
+                )
+              else if (status == YtmFetchStatus.done)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onDownload != null) ...[
+                      _circleAction(
+                        label: context.l10n.downloadAction,
+                        icon: Icons.download_rounded,
+                        onBrand: onBrand,
+                        onTap: onDownload!,
+                      ),
+                      const SizedBox(width: AppSpacing.s10),
+                    ],
+                    _solidBadge(
+                      Icons.play_arrow_rounded,
+                      onBrand,
+                      gradientColors.first,
+                    ),
+                  ],
+                )
+              else if (status == YtmFetchStatus.error && hasCachedTracks)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _circleAction(
+                      label: context.l10n.retry,
+                      icon: Icons.refresh_rounded,
+                      onBrand: onBrand,
+                      onTap: retryAction,
                     ),
                     const SizedBox(width: AppSpacing.s10),
+                    _solidBadge(
+                      Icons.play_arrow_rounded,
+                      onBrand,
+                      gradientColors.first,
+                    ),
                   ],
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.play_arrow_rounded,
-                      color: gradientColors.first,
-                      size: 26,
-                    ),
-                  ),
-                ],
-              )
-            else if (status == YtmFetchStatus.error && hasCachedTracks)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Semantics(
-                    button: true,
-                    label: context.l10n.retry,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: retryAction,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(
-                          minWidth: 44,
-                          minHeight: 44,
-                        ),
-                        child: Center(
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: AppColors.specularAt(0.2),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.refresh_rounded,
-                              color: Colors.white,
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.s10),
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.play_arrow_rounded,
-                      color: gradientColors.first,
-                      size: 26,
-                    ),
-                  ),
-                ],
-              )
-            else
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
+                )
+              else
+                _solidBadge(
                   status == YtmFetchStatus.error
                       ? Icons.refresh_rounded
                       : Icons.download_rounded,
-                  color: gradientColors.first,
+                  onBrand,
+                  gradientColors.first,
                   size: 22,
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Online Playlist Card (custom URL/ID)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _OnlinePlaylistCard extends StatelessWidget {
   final OnlinePlaylistEntry entry;
@@ -1998,6 +2014,37 @@ class _OnlinePlaylistCard extends StatelessWidget {
     this.onDownload,
   });
 
+  Widget _overlayButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    final onScrim = AppColors.textOnAccent(AppColors.scrim);
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: SizedBox(
+          width: AppSpacing.minTouchTarget,
+          height: AppSpacing.minTouchTarget,
+          child: Center(
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppColors.scrimAt(0.55),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: onScrim, size: 16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -2007,6 +2054,12 @@ class _OnlinePlaylistCard extends StatelessWidget {
     return Semantics(
       button: true,
       label: entry.title,
+      customSemanticsActions: {
+        if (onDownload != null)
+          CustomSemanticsAction(label: context.l10n.downloadAction):
+              onDownload!,
+        CustomSemanticsAction(label: context.l10n.remove): onRemove,
+      },
       child: InkWell(
         onTap: () {
           PulsrHaptics.selectionClick();
@@ -2028,57 +2081,35 @@ class _OnlinePlaylistCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (previewArt != null && previewArt.isNotEmpty)
-                      Image.network(
-                        previewArt,
-                        fit: BoxFit.cover,
-                        cacheWidth: 360,
-                        cacheHeight: 360,
-                        errorBuilder: (_, __, ___) => _buildGradientCover(),
-                      )
-                    else
-                      _buildGradientCover(),
+                    ExcludeSemantics(
+                      child: previewArt != null && previewArt.isNotEmpty
+                          ? Image.network(
+                              previewArt,
+                              fit: BoxFit.cover,
+                              cacheWidth: 360,
+                              cacheHeight: 360,
+                              errorBuilder: (_, __, ___) =>
+                                  _buildGradientCover(),
+                            )
+                          : _buildGradientCover(),
+                    ),
                     if (onDownload != null)
                       PositionedDirectional(
-                        top: 6,
-                        start: 6,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: onDownload,
-                          child: Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: AppColors.scrimAt(0.55),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.download_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
+                        top: 0,
+                        start: 0,
+                        child: _overlayButton(
+                          label: context.l10n.downloadAction,
+                          icon: Icons.download_rounded,
+                          onTap: onDownload!,
                         ),
                       ),
                     PositionedDirectional(
-                      top: 6,
-                      end: 6,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
+                      top: 0,
+                      end: 0,
+                      child: _overlayButton(
+                        label: context.l10n.remove,
+                        icon: Icons.close_rounded,
                         onTap: onRemove,
-                        child: Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: AppColors.scrimAt(0.55),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close_rounded,
-                            color: Colors.white,
-                            size: 16,
-                          ),
-                        ),
                       ),
                     ),
                   ],
@@ -2134,10 +2165,10 @@ class _OnlinePlaylistCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
       ),
-      child: const Center(
+      child: Center(
         child: Icon(
           Icons.queue_music_rounded,
-          color: Colors.white,
+          color: AppColors.textOnAccent(AppColors.ytRedDeep),
           size: 40,
         ),
       ),

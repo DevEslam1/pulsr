@@ -32,7 +32,7 @@ extension PlayerDspFollowRate on PlayerDspController {
         // Re-check after the mutex wait: the lock can be held across a track
         // change, so this request may have gone stale while queued here.
         if (_isStaleFollowRequest(song)) return;
-        final settings = _settingsCubit!.state;
+        var settings = _settingsCubit!.state;
         // Log real-time 4-stage signal path telemetry per track start (no-op if disabled).
         final outputDevice = settings.currentOutputDevice;
         final usbSnapshot = _usbExclusiveService.lastStatus;
@@ -127,6 +127,10 @@ extension PlayerDspFollowRate on PlayerDspController {
           return;
         }
         if (_isClosed()) return;
+        // Re-read state after validateBitPerfectTrackSource acquires/releases
+        // _audioModeMutex so an in-flight bit-perfect enable transition that
+        // just finished on that mutex is observed here.
+        settings = _settingsCubit!.state;
         final following = settings.strictBitPerfect ||
             (settings.outputFormatNegotiationEnabled &&
                 settings.followTrackSampleRate);
@@ -239,13 +243,27 @@ extension PlayerDspFollowRate on PlayerDspController {
             '${activeDevice?.id}|${usb.lastStatus.deviceId}|${device?.activeDeviceType}'
             '|${settings.bitPerfectOutput}|${settings.strictBitPerfect}'
             '|${song.codec}|${song.path.split('?').first.split('#').first.split('.').last}'
-            '|${device?.decodedPcmEncoding}|$trackChannels';
+            '|$trackChannels';
+        final currentEncoding = device?.decodedPcmEncoding ?? 0;
+        if (_lastFollowedRoute == route &&
+            depth == _lastFollowedBitDepth &&
+            (_lastFollowedPcmEncoding == 0 || currentEncoding == 0)) {
+          if (currentEncoding > 0) {
+            _lastFollowedPcmEncoding = currentEncoding;
+          }
+        }
+        final encodingMatches = _lastFollowedPcmEncoding == null ||
+            _lastFollowedPcmEncoding == 0 ||
+            currentEncoding == 0 ||
+            _lastFollowedPcmEncoding == currentEncoding;
         final rate = HiResAudioService.followTrackRateToApply(
           trackSampleRate:
               effectiveTrackRate > 0 ? effectiveTrackRate : song.sampleRate,
           lastRequestedSampleRate: canResumeSuspendedDirect
               ? null
-              : (depth == _lastFollowedBitDepth && route == _lastFollowedRoute
+              : (depth == _lastFollowedBitDepth &&
+                      route == _lastFollowedRoute &&
+                      encodingMatches
                   ? _lastFollowedSampleRate
                   : null),
           isBluetooth: settings.currentOutputDevice?.isBluetooth == true,
@@ -266,6 +284,20 @@ extension PlayerDspFollowRate on PlayerDspController {
           _lastFollowedSampleRate = rate;
           _lastFollowedBitDepth = depth;
           _lastFollowedRoute = route;
+          _lastFollowedPcmEncoding = currentEncoding;
+          return;
+        }
+        if (directOwned &&
+            directStreaming &&
+            settings.bitPerfectOutput &&
+            usbStatus.streamingSampleRate == rate &&
+            usbStatus.streamingBitDepth >= depth &&
+            (usbStatus.streamingChannels <= 0 ||
+                usbStatus.streamingChannels == trackChannels)) {
+          _lastFollowedSampleRate = rate;
+          _lastFollowedBitDepth = depth;
+          _lastFollowedRoute = route;
+          _lastFollowedPcmEncoding = currentEncoding;
           return;
         }
         // Negotiate the format against the advertised device caps so a device
@@ -360,6 +392,7 @@ extension PlayerDspFollowRate on PlayerDspController {
           _lastFollowedSampleRate = decision.sampleRate;
           _lastFollowedBitDepth = depth;
           _lastFollowedRoute = route;
+          _lastFollowedPcmEncoding = currentEncoding;
           await _settingsCubit!.refreshOutputDevice();
         } catch (e, st) {
           _lastFollowedSampleRate = null;

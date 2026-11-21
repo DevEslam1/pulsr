@@ -1,15 +1,15 @@
 // Onboarding edge-flow coverage: the denied-permission dialog (limited vs.
 // open-settings branches), the scan-failure snackbar, a hard permission
-// exception, and the page-5 accent colour interaction. The happy path is
-// already covered by onboarding_screen_test.dart.
+// exception, and Step 2 Experience Mode / Player Theme / accent colour
+// interactions.
 import 'dart:async';
 
 import 'package:bloc_test/bloc_test.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/sound_feedback_service.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
@@ -39,6 +39,8 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(const Color(0xFF000000));
+    registerFallbackValue(ExperienceMode.normal);
+    registerFallbackValue(PlayerThemeMode.classic);
   });
 
   setUp(() {
@@ -56,6 +58,8 @@ void main() {
     scanner = MockMediaScannerService();
     when(() => scanner.requestPermission()).thenAnswer((_) async => true);
     when(() => scanner.scanDeviceLibrary()).thenAnswer((_) async => 0);
+    when(() => scanner.detailedProgress)
+        .thenAnswer((_) => const Stream<ScanProgressUpdate>.empty());
 
     settingsCubit = MockSettingsCubit();
     settingsController = StreamController<SettingsState>.broadcast();
@@ -63,6 +67,10 @@ void main() {
     when(() => settingsCubit.stream)
         .thenAnswer((_) => settingsController.stream);
     when(() => settingsCubit.setCustomAccentColor(any()))
+        .thenAnswer((_) async {});
+    when(() => settingsCubit.setExperienceMode(any()))
+        .thenAnswer((_) async {});
+    when(() => settingsCubit.setPlayerThemeMode(any()))
         .thenAnswer((_) async {});
   });
 
@@ -114,7 +122,7 @@ void main() {
     when(() => scanner.requestPermission()).thenAnswer((_) async => false);
     await goToFinalPage(tester);
 
-    await tester.tap(find.text(l10n.grantAccess));
+    await tester.tap(find.text('Start Listening'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
@@ -142,7 +150,7 @@ void main() {
     when(() => scanner.requestPermission()).thenAnswer((_) async => false);
     await goToFinalPage(tester);
 
-    await tester.tap(find.text(l10n.grantAccess));
+    await tester.tap(find.text('Start Listening'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
@@ -152,7 +160,7 @@ void main() {
 
     // Still on onboarding: the settings branch returns without completing.
     expect(find.text('HOME_SCREEN'), findsNothing);
-    expect(find.text(l10n.grantAccess), findsOneWidget);
+    expect(find.text('Start Listening'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool('onboarding_completed'), isNull);
   });
@@ -163,7 +171,7 @@ void main() {
     when(() => scanner.requestPermission()).thenAnswer((_) async => false);
     await goToFinalPage(tester);
 
-    await tester.tap(find.text(l10n.grantAccess));
+    await tester.tap(find.text('Start Listening'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text(l10n.audioAccessRequired), findsOneWidget);
@@ -175,7 +183,7 @@ void main() {
 
     expect(find.text(l10n.audioAccessRequired), findsNothing);
     expect(find.text('HOME_SCREEN'), findsNothing);
-    expect(find.text(l10n.grantAccess), findsOneWidget);
+    expect(find.text('Start Listening'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool('onboarding_completed'), isNull);
     verifyNever(() => scanner.scanDeviceLibrary());
@@ -187,7 +195,7 @@ void main() {
         .thenAnswer((_) async => throw Exception('scan boom'));
     await goToFinalPage(tester);
 
-    await tester.tap(find.text(l10n.grantAccess));
+    await tester.tap(find.text('Start Listening'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
     for (var i = 0; i < 2; i++) {
@@ -208,7 +216,7 @@ void main() {
         .thenAnswer((_) async => throw Exception('permission boom'));
     await goToFinalPage(tester);
 
-    await tester.tap(find.text(l10n.grantAccess));
+    await tester.tap(find.text('Start Listening'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
 
@@ -218,17 +226,33 @@ void main() {
     expect(find.text('HOME_SCREEN'), findsNothing);
   });
 
-  testWidgets('page 5 lets the user pick a custom accent colour',
+  testWidgets(
+      'Step 2 lets the user switch Experience Mode, pick top 4 Player Themes, and pick a custom accent colour',
       (tester) async {
     await tester.pumpWidget(buildApp());
     await tester.pump();
-    await tester.tap(find.text(l10n.skipAction));
+    await tester.tap(find.text(l10n.next));
     await tester.pump();
     for (var i = 0; i < 2; i++) {
       await tester.pump(const Duration(milliseconds: 400));
     }
 
-    // The accent swatches are rendered on the final page.
+    // 1. Switch Experience Mode to Professional
+    await tester.tap(find.text(l10n.experienceModeProfessional));
+    await tester.pump();
+    verify(() => settingsCubit.setExperienceMode(ExperienceMode.professional))
+        .called(1);
+
+    // 2. Select one of the top 4 Player Themes (Vinyl Turntable)
+    final vinylFinder = find.text(l10n.settingsThemeVinylTurntable);
+    await tester.ensureVisible(vinylFinder);
+    await tester.pump();
+    await tester.tap(vinylFinder);
+    await tester.pump();
+    verify(() => settingsCubit.setPlayerThemeMode(PlayerThemeMode.vinyl))
+        .called(1);
+
+    // 3. Pick a custom accent colour swatch
     final swatches = find.byWidgetPredicate(
       (w) =>
           w is Semantics &&
@@ -236,9 +260,11 @@ void main() {
           w.properties.label!.startsWith(l10n.customAccentColor),
     );
     expect(swatches, findsWidgets);
-
+    await tester.ensureVisible(swatches.first);
+    await tester.pump();
     await tester.tap(swatches.first);
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     verify(() => settingsCubit.setCustomAccentColor(any())).called(1);
   });
 }

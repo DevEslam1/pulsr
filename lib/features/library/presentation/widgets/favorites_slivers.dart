@@ -352,7 +352,7 @@ class _FavoritesHeaderCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Material(
-            color: Colors.transparent,
+            color: AppColors.fadeStopTransparent,
             child: InkWell(
               borderRadius: showActionsRow
                   ? const BorderRadius.vertical(
@@ -620,7 +620,7 @@ class _FavoriteGridCard extends StatelessWidget {
 
     return RepaintBoundary(
       child: Material(
-        color: Colors.transparent,
+        color: AppColors.fadeStopTransparent,
         borderRadius: AppRadii.r18All,
         child: InkWell(
           borderRadius: AppRadii.r18All,
@@ -690,8 +690,10 @@ class _FavoriteGridCard extends StatelessWidget {
                             ),
                             child: YtmDownloadButton(
                               song: song,
-                              activeColor: Colors.white,
-                              iconColor: Colors.white,
+                              activeColor: context
+                                  .playerSurfacePalette.highContrastInk,
+                              iconColor: context
+                                  .playerSurfacePalette.highContrastInk,
                               iconSize: 18,
                             ),
                           ),

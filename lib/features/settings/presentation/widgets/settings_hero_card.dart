@@ -1,21 +1,318 @@
 // lib/features/settings/presentation/widgets/settings_hero_card.dart
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../../../../core/config/app_config.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/performance/gpu_budget.dart';
 import '../../../../core/services/ytm_account_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
+import '../../../../core/widgets/pulsr_pressable.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../auth/cubit/auth_cubit.dart';
 import '../../../auth/cubit/auth_state.dart';
 import '../../../auth/presentation/auth_sheet.dart';
 import '../../../auth/presentation/ytm_web_login_sheet.dart';
+import '../../../player/cubit/player_cubit.dart';
+import '../../../player/presentation/widgets/equalizer_sheet.dart';
+import '../../cubit/settings_cubit.dart';
+import '../../cubit/settings_state.dart';
+import 'audio_setup_wizard.dart';
 import 'ytm_account_disconnect_dialog.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
+
+/// Top "Quick Controls" strip for the 4 most toggled preferences in Settings:
+/// 1. Experience Mode (Normal vs Professional)
+/// 2. Theme / AMOLED
+/// 3. Offline-Only Mode
+/// 4. Active Audio Engine / EQ
+class SettingsQuickControlsStrip extends StatelessWidget {
+  final SettingsState? state;
+  final SettingsCubit? cubit;
+  final VoidCallback? onOpenAudioEngine;
+
+  const SettingsQuickControlsStrip({
+    super.key,
+    this.state,
+    this.cubit,
+    this.onOpenAudioEngine,
+  });
+
+  static String quickControlsHeading(BuildContext context) {
+    final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+    switch (code) {
+      case 'ar':
+        return 'عناصر التحكم السريعة';
+      case 'es':
+        return 'Controles rápidos';
+      default:
+        return 'Quick Controls';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeCubit = cubit ?? context.read<SettingsCubit>();
+    final activeState = state ?? context.watch<SettingsCubit>().state;
+    final p = context.palette;
+    final l10n = context.l10n;
+    final isPro = activeState.isProfessional;
+    final isAmoled = activeState.themeMode == AppThemeMode.amoled;
+    final isOffline = activeState.offlineOnlyMode;
+    final isBitPerfect = activeState.bitPerfectOutput;
+
+    final themeStatus = switch (activeState.themeMode) {
+      AppThemeMode.amoled => l10n.amoledLabel,
+      AppThemeMode.dark => l10n.themeDark,
+      AppThemeMode.light => l10n.themeLight,
+      AppThemeMode.system => l10n.systemDefault,
+    };
+
+    final tiles = <Widget>[
+      _QuickControlTile(
+        tileKey: const ValueKey('quick_control_experience_mode'),
+        icon: isPro ? Icons.tune_rounded : Icons.auto_awesome_rounded,
+        label: l10n.experienceModeTitle,
+        status: isPro
+            ? l10n.experienceModeProfessional
+            : l10n.experienceModeNormal,
+        isActive: isPro,
+        onTap: () {
+          PulsrHaptics.selectionClick();
+          activeCubit.setExperienceMode(
+            isPro ? ExperienceMode.normal : ExperienceMode.professional,
+          );
+        },
+      ),
+      _QuickControlTile(
+        tileKey: const ValueKey('quick_control_theme_amoled'),
+        icon: isAmoled ? Icons.nightlight_round : Icons.dark_mode_outlined,
+        label: l10n.amoledLabel,
+        status: themeStatus,
+        isActive: isAmoled,
+        onTap: () {
+          PulsrHaptics.selectionClick();
+          activeCubit.setThemeMode(
+            isAmoled ? AppThemeMode.dark : AppThemeMode.amoled,
+          );
+        },
+      ),
+      _QuickControlTile(
+        tileKey: const ValueKey('quick_control_offline_only'),
+        icon: isOffline ? Icons.cloud_off_rounded : Icons.cloud_queue_rounded,
+        label: l10n.offlineOnlyMode,
+        status: isOffline ? l10n.activeLabel : l10n.rgOff,
+        isActive: isOffline,
+        onTap: () {
+          PulsrHaptics.selectionClick();
+          activeCubit.setOfflineOnlyMode(!isOffline);
+        },
+      ),
+      _QuickControlTile(
+        tileKey: const ValueKey('quick_control_audio_engine_eq'),
+        icon: isBitPerfect ? Icons.usb_rounded : Icons.equalizer_rounded,
+        label: l10n.equalizer,
+        status:
+            isBitPerfect ? l10n.badgeExclusive : l10n.onboardingAudioEngine,
+        isActive: isBitPerfect,
+        onTap: () {
+          PulsrHaptics.selectionClick();
+          if (onOpenAudioEngine != null) {
+            onOpenAudioEngine!();
+            return;
+          }
+          bool hasPlayerCubit = false;
+          try {
+            context.read<PlayerCubit>();
+            hasPlayerCubit = true;
+          } catch (_) {
+            hasPlayerCubit = false;
+          }
+          if (hasPlayerCubit) {
+            EqualizerSheet.show(context);
+          } else {
+            AudioSetupWizardSheet.show(context, cubit: activeCubit);
+          }
+        },
+      ),
+    ];
+
+    final heading = quickControlsHeading(context);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.xxs,
+              0,
+              AppSpacing.xxs,
+              AppSpacing.xs,
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.bolt_rounded, size: 16, color: p.accent),
+                const SizedBox(width: AppSpacing.xxs),
+                Expanded(
+                  child: Semantics(
+                    header: true,
+                    child: Text(
+                      heading,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: AppTracking.wide,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(child: tiles[0]),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(child: tiles[1]),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(child: tiles[2]),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(child: tiles[3]),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickControlTile extends StatelessWidget {
+  final Key tileKey;
+  final IconData icon;
+  final String label;
+  final String status;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _QuickControlTile({
+    required this.tileKey,
+    required this.icon,
+    required this.label,
+    required this.status,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
+
+    return Semantics(
+      button: true,
+      toggled: isActive,
+      label: '$label, $status',
+      child: PulsrPressable(
+        pressedScale: 0.98,
+        onTap: onTap,
+        child: AnimatedContainer(
+          key: tileKey,
+          duration: shouldAnimate ? context.motionMs(200) : Duration.zero,
+          constraints: const BoxConstraints(
+            minHeight: AppSpacing.minTouchTarget,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.xs,
+          ),
+          decoration: BoxDecoration(
+            color: isActive
+                ? p.accent.withValues(alpha: 0.14)
+                : p.surfaceContainerHigh.withValues(alpha: 0.55),
+            borderRadius: AppRadii.r14All,
+            border: Border.all(
+              color: isActive
+                  ? p.accent.withValues(alpha: 0.55)
+                  : p.hairline,
+              width: isActive ? 1.4 : 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? p.accent.withValues(alpha: 0.20)
+                      : p.surfaceContainer,
+                  borderRadius: AppRadii.r10All,
+                ),
+                child: Icon(
+                  icon,
+                  size: 17,
+                  color: isActive ? p.accent : p.textSecondary,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      status,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isActive ? p.accent : p.textSecondary,
+                        fontSize: AppFontSize.caption,
+                        fontWeight:
+                            isActive ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// A hero card displayed at the top of the Settings screen showing the user's
 /// account identity, real-time Cloud Sync status, and quick sync/sign-out actions.
@@ -126,21 +423,15 @@ class SettingsHeroCard extends StatelessWidget {
                                               fit: BoxFit.cover,
                                               cacheWidth: 104,
                                               cacheHeight: 104,
-                                              loadingBuilder:
-                                                  (context, child, progress) =>
-                                                      progress == null
-                                                          ? child
-                                                          : Center(
-                                                              child: SizedBox(
-                                                                width: 16,
-                                                                height: 16,
-                                                                child: CircularProgressIndicator(
-                                                                    strokeWidth:
-                                                                        2,
-                                                                    color: p
-                                                                        .accent),
-                                                              ),
-                                                            ),
+                                              loadingBuilder: (context, child,
+                                                      progress) =>
+                                                  progress == null
+                                                      ? child
+                                                      : const SkeletonBox(
+                                                          width: 50,
+                                                          height: 50,
+                                                          radius: 25,
+                                                        ),
                                               errorBuilder: (_, __, ___) =>
                                                   Icon(
                                                 Icons.person_rounded,
@@ -226,11 +517,14 @@ class SettingsHeroCard extends StatelessWidget {
                                       ],
                                     ),
                                     const SizedBox(height: AppSpacing.xxs),
-                                    Text(
-                                      syncSubtitle,
-                                      style: TextStyle(
-                                        color: p.textSecondary,
-                                        fontSize: AppFontSize.label,
+                                    Semantics(
+                                      liveRegion: isSyncing,
+                                      child: Text(
+                                        syncSubtitle,
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: AppFontSize.label,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -247,6 +541,10 @@ class SettingsHeroCard extends StatelessWidget {
                                   style: FilledButton.styleFrom(
                                     backgroundColor: p.accent,
                                     foregroundColor: p.onAccent,
+                                    minimumSize: const Size(
+                                      AppSpacing.minTouchTarget,
+                                      AppSpacing.minTouchTarget,
+                                    ),
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: AppSpacing.s14,
                                         vertical: AppSpacing.xs),
@@ -277,13 +575,10 @@ class SettingsHeroCard extends StatelessWidget {
                                             const EdgeInsets.all(AppSpacing.xs),
                                       ),
                                       icon: isSyncing
-                                          ? SizedBox(
-                                              width: AppSpacing.s18,
-                                              height: 18,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: p.accent,
-                                              ),
+                                          ? PulsrProgressBar.circular(
+                                              size: AppSpacing.s18,
+                                              strokeWidth: 2,
+                                              color: p.accent,
                                             )
                                           : const Icon(Icons.sync_rounded,
                                               size: 20),
@@ -308,10 +603,6 @@ class SettingsHeroCard extends StatelessWidget {
                                 );
                           final stacked = (user != null &&
                                   constraints.maxWidth < 320) ||
-                              // The cloud card's 16px title needs ~160px next to
-                              // the 50px avatar and the Sign In button. Below
-                              // this width the row cannot fit it without
-                              // ellipsising the primary label.
                               (user == null && constraints.maxWidth < 360) ||
                               MediaQuery.textScalerOf(context).scale(14) > 18;
                           final body = stacked
@@ -349,32 +640,35 @@ class SettingsHeroCard extends StatelessWidget {
                         }),
                         if (state.syncError != null) ...[
                           const SizedBox(height: AppSpacing.s10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: AppSpacing.s10,
-                                vertical: AppSpacing.s6),
-                            decoration: BoxDecoration(
-                              color: p.error.withValues(alpha: 0.12),
-                              borderRadius: AppRadii.r8All,
-                              border: Border.all(
-                                  color: p.error.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.error_outline_rounded,
-                                    color: p.error, size: 16),
-                                const SizedBox(width: AppSpacing.xs),
-                                Expanded(
-                                  child: Text(
-                                    state.syncError!.userMessage,
-                                    style: TextStyle(
-                                      color: p.error,
-                                      fontSize: AppFontSize.label,
-                                      fontWeight: FontWeight.w600,
+                          Semantics(
+                            liveRegion: true,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppSpacing.s10,
+                                  vertical: AppSpacing.s6),
+                              decoration: BoxDecoration(
+                                color: p.error.withValues(alpha: 0.12),
+                                borderRadius: AppRadii.r8All,
+                                border: Border.all(
+                                    color: p.error.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.error_outline_rounded,
+                                      color: p.error, size: 16),
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Expanded(
+                                    child: Text(
+                                      state.syncError!.userMessage,
+                                      style: TextStyle(
+                                        color: p.error,
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -564,6 +858,10 @@ class SettingsHeroCard extends StatelessWidget {
                         backgroundColor: AppColors.ytRed,
                         foregroundColor:
                             AppColors.textOnAccent(AppColors.ytRed),
+                        minimumSize: const Size(
+                          AppSpacing.minTouchTarget,
+                          AppSpacing.minTouchTarget,
+                        ),
                         padding: const EdgeInsets.symmetric(
                             horizontal: AppSpacing.s14,
                             vertical: AppSpacing.xs),

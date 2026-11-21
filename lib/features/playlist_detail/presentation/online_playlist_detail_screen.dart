@@ -1,6 +1,7 @@
 // lib/features/playlist_detail/presentation/online_playlist_detail_screen.dart
 import 'dart:async';
 
+import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
@@ -44,6 +45,8 @@ import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
+
+part 'online_playlist_detail_hero.dart';
 
 class OnlinePlaylistDetailArgs {
   final String playlistId;
@@ -872,17 +875,23 @@ class _OnlinePlaylistDetailScreenState
             children: [
               Row(
                 children: [
-                  Icon(Icons.swap_vert_rounded, size: 16, color: p.accent),
+                  ExcludeSemantics(
+                    child:
+                        Icon(Icons.swap_vert_rounded, size: 16, color: p.accent),
+                  ),
                   const SizedBox(width: AppSpacing.s6),
                   Expanded(
-                    child: Text(
-                      selectedCount > 0
-                          ? context.l10n.selectedCount(selectedCount)
-                          : context.l10n.reorderInstructions,
-                      style: TextStyle(
-                        color: p.textSecondary,
-                        fontSize: AppFontSize.label,
-                        fontWeight: FontWeight.w700,
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        selectedCount > 0
+                            ? context.l10n.selectedCount(selectedCount)
+                            : context.l10n.reorderInstructions,
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: AppFontSize.label,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -960,171 +969,195 @@ class _OnlinePlaylistDetailScreenState
             itemBuilder: (context, index) {
               final track = _tracks[index];
               final selected = _selectedVideoIds.contains(track.videoId);
-              return Padding(
+              return Semantics(
                 key: ValueKey('online_reorder_${track.videoId}'),
-                padding: EdgeInsets.symmetric(
-                  horizontal: Adaptive.pagePadding(context),
-                  vertical: 2,
-                ),
-                child: AnimatedContainer(
-                  duration: context.motion(PulsrMotion.state),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? p.accent.withValues(alpha: p.isDark ? 0.14 : 0.08)
-                        : p.surface,
-                    borderRadius: AppRadii.r16All,
-                    border: Border.all(
-                      color: selected
-                          ? p.accent.withValues(alpha: 0.35)
-                          : Colors.transparent,
-                    ),
+                container: true,
+                selected: selected,
+                customSemanticsActions: {
+                  CustomSemanticsAction(label: context.l10n.moveToTop): () =>
+                      _moveSingleToEdge(index, toTop: true),
+                  CustomSemanticsAction(label: context.l10n.moveToBottom): () =>
+                      _moveSingleToEdge(index, toTop: false),
+                  CustomSemanticsAction(label: context.l10n.moveToPosition):
+                      () => _promptMoveSingleToPosition(index),
+                },
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context),
+                    vertical: 2,
                   ),
-                  clipBehavior: Clip.antiAlias,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _toggleReorderSelection(track.videoId),
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xs),
-                        child: Row(
-                          children: [
-                            Checkbox(
-                              value: selected,
-                              onChanged: (_) =>
-                                  _toggleReorderSelection(track.videoId),
-                              activeColor: p.accent,
-                              checkColor: p.onAccent,
-                              visualDensity: VisualDensity.compact,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: AppRadii.circular(AppRadii.r6),
+                  child: AnimatedContainer(
+                    duration: context.motion(PulsrMotion.state),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? p.accent.withValues(alpha: p.isDark ? 0.14 : 0.08)
+                          : p.surface,
+                      borderRadius: AppRadii.r16All,
+                      border: Border.all(
+                        color: selected
+                            ? p.accent.withValues(alpha: 0.35)
+                            : Colors.transparent,
+                      ),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _toggleReorderSelection(track.videoId),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xs),
+                          child: Row(
+                            children: [
+                              Checkbox(
+                                value: selected,
+                                onChanged: (_) =>
+                                    _toggleReorderSelection(track.videoId),
+                                activeColor: p.accent,
+                                checkColor: p.onAccent,
+                                visualDensity: VisualDensity.compact,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadii.circular(AppRadii.r6),
+                                ),
                               ),
-                            ),
-                            Container(
-                              width: 30,
-                              height: 26,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: selected
-                                    ? p.accent.withValues(alpha: 0.2)
-                                    : p.surfaceContainerHigh,
-                                borderRadius: AppRadii.r8All,
+                              Container(
+                                width: 30,
+                                height: 26,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? p.accent.withValues(alpha: 0.2)
+                                      : p.surfaceContainerHigh,
+                                  borderRadius: AppRadii.r8All,
+                                ),
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    color:
+                                        selected ? p.accent : p.textSecondary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: AppFontSize.caption,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
                               ),
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  color: selected ? p.accent : p.textSecondary,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: AppFontSize.caption,
-                                  fontFeatures: const [
-                                    FontFeature.tabularFigures(),
+                              const SizedBox(width: AppSpacing.xs),
+                              ExcludeSemantics(
+                                child: CachedArtwork(
+                                  id: track.songId,
+                                  remoteUrl: track.artworkUrl,
+                                  size: 44,
+                                  borderRadius: 10,
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      track.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: AppFontSize.body,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.s2),
+                                    Text(
+                                      track.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: AppFontSize.label,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: AppSpacing.xs),
-                            CachedArtwork(
-                              id: track.songId,
-                              remoteUrl: track.artworkUrl,
-                              size: 44,
-                              borderRadius: 10,
-                            ),
-                            const SizedBox(width: AppSpacing.sm),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    track.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: AppFontSize.body,
+                              PopupMenuButton<String>(
+                                icon: Icon(
+                                  Icons.more_vert_rounded,
+                                  size: 20,
+                                  color: p.textTertiary,
+                                ),
+                                tooltip: context.l10n.moveToPosition,
+                                onSelected: (val) {
+                                  if (val == 'top') {
+                                    _moveSingleToEdge(index, toTop: true);
+                                  } else if (val == 'bottom') {
+                                    _moveSingleToEdge(index, toTop: false);
+                                  } else if (val == 'position') {
+                                    _promptMoveSingleToPosition(index);
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: 'top',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.vertical_align_top_rounded,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Text(context.l10n.moveToTop),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(height: AppSpacing.s2),
-                                  Text(
-                                    track.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: AppFontSize.label,
+                                  PopupMenuItem(
+                                    value: 'position',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.format_list_numbered_rounded,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Text(context.l10n.moveToPosition),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'bottom',
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.vertical_align_bottom_rounded,
+                                          size: 18,
+                                        ),
+                                        const SizedBox(width: AppSpacing.sm),
+                                        Text(context.l10n.moveToBottom),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                            PopupMenuButton<String>(
-                              icon: Icon(
-                                Icons.more_vert_rounded,
-                                size: 20,
-                                color: p.textTertiary,
-                              ),
-                              tooltip: context.l10n.moveToPosition,
-                              onSelected: (val) {
-                                if (val == 'top') {
-                                  _moveSingleToEdge(index, toTop: true);
-                                } else if (val == 'bottom') {
-                                  _moveSingleToEdge(index, toTop: false);
-                                } else if (val == 'position') {
-                                  _promptMoveSingleToPosition(index);
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'top',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.vertical_align_top_rounded,
-                                        size: 18,
+                              Semantics(
+                                label:
+                                    '${context.l10n.reorderSongs}: ${track.title}',
+                                child: ReorderableDragStartListener(
+                                  index: index,
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      minWidth: AppSpacing.minTouchTarget,
+                                      minHeight: AppSpacing.minTouchTarget,
+                                    ),
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.drag_handle_rounded,
+                                        color: p.textTertiary,
                                       ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Text(context.l10n.moveToTop),
-                                    ],
+                                    ),
                                   ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'position',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.format_list_numbered_rounded,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Text(context.l10n.moveToPosition),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'bottom',
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.vertical_align_bottom_rounded,
-                                        size: 18,
-                                      ),
-                                      const SizedBox(width: AppSpacing.sm),
-                                      Text(context.l10n.moveToBottom),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            ReorderableDragStartListener(
-                              index: index,
-                              child: Padding(
-                                padding: const EdgeInsets.all(AppSpacing.s10),
-                                child: Icon(
-                                  Icons.drag_handle_rounded,
-                                  color: p.textTertiary,
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -1159,10 +1192,14 @@ class _OnlinePlaylistDetailScreenState
       content = Column(
         children: [
           if (_isLoading && _tracks.isNotEmpty)
-            PulsrProgressBar.indeterminate(
-              height: 2,
-              color: p.accent,
-              backgroundColor: Colors.transparent,
+            Semantics(
+              liveRegion: true,
+              label: context.l10n.pageLoadingProgress,
+              child: PulsrProgressBar.indeterminate(
+                height: 2,
+                color: p.accent,
+                backgroundColor: Colors.transparent,
+              ),
             ),
           Expanded(
             child: PulsrRefreshIndicator(
@@ -1290,11 +1327,14 @@ class _OnlinePlaylistDetailScreenState
           backgroundColor: p.surface,
           surfaceTintColor: Colors.transparent,
           elevation: 0,
-          title: Text(
-            _isReordering ? context.l10n.reorderSongs : _title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontWeight: FontWeight.w800),
+          title: Semantics(
+            header: true,
+            child: Text(
+              _isReordering ? context.l10n.reorderSongs : _title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
           actions: [
             if (_isReordering)
@@ -1332,396 +1372,6 @@ class _OnlinePlaylistDetailScreenState
             child: content,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeroCard(
-    BuildContext context,
-    PulsrPalette p,
-    int totalDurationMs,
-  ) {
-    const ytGradient = [AppColors.netflixRed, AppColors.ytRedDeep];
-
-    return Container(
-      decoration: BoxDecoration(
-        color: p.surfaceContainer,
-        borderRadius: AppRadii.r24All,
-        border: Border.all(color: p.hairline),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.scrimAt(p.isDark ? 0.25 : 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 164,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (_artworkUrl != null && _artworkUrl!.isNotEmpty)
-                  Image.network(
-                    _artworkUrl!,
-                    fit: BoxFit.cover,
-                    cacheWidth: 600,
-                    cacheHeight: 360,
-                    loadingBuilder: (context, child, progress) =>
-                        progress == null
-                            ? child
-                            : _buildFallbackHeroGradient(ytGradient),
-                    errorBuilder: (_, __, ___) =>
-                        _buildFallbackHeroGradient(ytGradient),
-                  )
-                else
-                  _buildFallbackHeroGradient(ytGradient),
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.scrimAt(0.15),
-                        p.surfaceContainer.withValues(alpha: 0.92),
-                        p.surfaceContainer,
-                      ],
-                      stops: const [0.0, 0.78, 1.0],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                ),
-                PositionedDirectional(
-                  top: AppSpacing.sm,
-                  start: AppSpacing.sm,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.ytRed,
-                      borderRadius: AppRadii.r8All,
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black38,
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.play_circle_fill_rounded,
-                          color: Colors.white,
-                          size: 14,
-                        ),
-                        const SizedBox(width: AppSpacing.xxs),
-                        Text(
-                          context.l10n.ytmHeader,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: AppTracking.medium,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                PositionedDirectional(
-                  bottom: 0,
-                  start: AppSpacing.s18,
-                  end: AppSpacing.s18,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: AppFontSize.titleLarge,
-                                fontWeight: FontWeight.w900,
-                                color: p.textPrimary,
-                                letterSpacing: AppTracking.heading,
-                                height: 1.15,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: AppFontSize.bodySmall,
-                                color: p.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                          Icons.edit_rounded,
-                          size: 18,
-                          color: p.textSecondary,
-                        ),
-                        tooltip: context.l10n.browseRenamePlaylist,
-                        onPressed: _showRenameDialog,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(
-              AppSpacing.s18,
-              AppSpacing.xs,
-              AppSpacing.s18,
-              AppSpacing.md,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xxs,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    _buildHeroBadge(
-                      p,
-                      icon: Icons.music_note_rounded,
-                      label: context.l10n.previewTrackCount(_tracks.length),
-                    ),
-                    if (totalDurationMs > 0)
-                      _buildHeroBadge(
-                        p,
-                        icon: Icons.schedule_rounded,
-                        label: Formatters.formatDurationMs(totalDurationMs),
-                      ),
-                    if (_hasCustomOrder)
-                      _buildHeroBadge(
-                        p,
-                        icon: Icons.reorder_rounded,
-                        label: context.l10n.customOrder,
-                        highlight: true,
-                      ),
-                    if (_isOfflineCache)
-                      _buildHeroBadge(
-                        p,
-                        icon: Icons.cloud_off_rounded,
-                        label: context.l10n.cachedCopy,
-                      ),
-                  ],
-                ),
-                if (_tracks.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => _playAll(shuffle: false),
-                          icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                          label: Text(
-                            context.l10n.playAll,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: p.accent,
-                            foregroundColor: p.onAccent,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.s12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadii.r14All,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: () => _playAll(shuffle: true),
-                          icon: const Icon(Icons.shuffle_rounded, size: 18),
-                          label: Text(
-                            context.l10n.shuffle,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: p.surfaceContainerHigh,
-                            foregroundColor: p.textPrimary,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.s12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadii.r14All,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      IconButton.filledTonal(
-                        constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget,
-                        ),
-                        onPressed: _enterReorderMode,
-                        icon: const Icon(Icons.swap_vert_rounded, size: 20),
-                        tooltip: context.l10n.reorderSongs,
-                        style: IconButton.styleFrom(
-                          backgroundColor: p.surfaceContainerHigh,
-                          foregroundColor: p.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isDownloading ? null : _downloadAll,
-                          icon: _isDownloading
-                              ? PulsrProgressBar.circular(
-                                  size: 14,
-                                  strokeWidth: 2,
-                                  color: p.accent,
-                                )
-                              : const Icon(Icons.download_rounded, size: 16),
-                          label: Text(
-                            context.l10n.downloadAll,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: p.hairline),
-                            foregroundColor: p.textPrimary,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.s10,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadii.r12All,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _isSaving ? null : _saveToLocalPlaylists,
-                          icon: _isSaving
-                              ? PulsrProgressBar.circular(
-                                  size: 14,
-                                  strokeWidth: 2,
-                                  color: p.accent,
-                                )
-                              : const Icon(
-                                  Icons.playlist_add_rounded,
-                                  size: 18,
-                                ),
-                          label: Text(
-                            context.l10n.saveToPulsr,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: AppFontSize.label,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: p.hairline),
-                            foregroundColor: p.textPrimary,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: AppSpacing.s10,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadii.r12All,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeroBadge(
-    PulsrPalette p, {
-    required IconData icon,
-    required String label,
-    bool highlight = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: highlight ? p.accentSoft : p.surfaceContainerHigh,
-        borderRadius: AppRadii.r8All,
-        border: Border.all(
-          color: highlight ? p.accent.withValues(alpha: 0.35) : p.hairline,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 13,
-            color: highlight ? p.accent : p.textSecondary,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w700,
-              color: highlight ? p.accent : p.textSecondary,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFallbackHeroGradient(List<Color> gradient) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: const Center(
-        child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 54),
       ),
     );
   }

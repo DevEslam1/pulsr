@@ -145,7 +145,7 @@ struct UsbAudioSinkTestAccess {
         sink.pullRenderer_.Configure(sampleRate, 2, storageBytes, bufferMs);
         sink.asrcOutAvail_ = 0;
         if (mode == 2) {
-            sink.asrc_.configure(2, 32, 256);
+            sink.asrc_.configure(2, 32, 256, /*allowDynamicBypass=*/false);
             sink.allocateAsrcBuffers();
         }
     }

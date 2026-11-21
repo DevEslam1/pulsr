@@ -1,6 +1,8 @@
 // lib/core/motion/pulsr_motion.dart
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../features/settings/cubit/settings_cubit.dart';
 import 'motion_durations.dart';
 
 /// {@category DesignSystem}
@@ -57,13 +59,40 @@ abstract class PulsrMotion {
   /// 400ms — ambient/expressive motion (hero artwork, decorative loops).
   static const Duration ambient = PulsrDurations.ambient;
 
+  /// Whether animations should play for [context].
+  ///
+  /// Combines the OS "Reduce motion" / "Remove animations" accessibility flag
+  /// ([MediaQuery.disableAnimationsOf]) with the user's in-app
+  /// `SettingsState.reduceMotion` preference. When [SettingsCubit] is not in
+  /// the widget tree (such as isolated widget tests), safely falls back to
+  /// `!MediaQuery.disableAnimationsOf(context)` without throwing.
+  static bool shouldAnimate(BuildContext context) {
+    if (MediaQuery.disableAnimationsOf(context)) return false;
+    return !_isInAppReduceMotionEnabled(context);
+  }
+
+  static bool _isInAppReduceMotionEnabled(BuildContext context) {
+    try {
+      return context.select<SettingsCubit, bool>((c) => c.state.reduceMotion);
+    } on ProviderNotFoundException {
+      return false;
+    } catch (_) {
+      // Called outside build (e.g. callback or listener): read without listening.
+      try {
+        return context.read<SettingsCubit>().state.reduceMotion;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
   /// Whether animations should play at all for the given context.
   ///
-  /// Returns `false` when the OS reports Reduce Motion / Remove animations, or
-  /// when the user is navigating with an accessibility service.
+  /// Returns `false` when the OS reports Reduce Motion / Remove animations,
+  /// when the user's in-app reduce-motion toggle is enabled, or when the user
+  /// is navigating with an accessibility service.
   static bool isEnabled(BuildContext context) =>
-      !MediaQuery.disableAnimationsOf(context) &&
-      !MediaQuery.accessibleNavigationOf(context);
+      shouldAnimate(context) && !MediaQuery.accessibleNavigationOf(context);
 
   /// Clamps a desired [duration] to zero when motion is disabled.
   static Duration resolve(BuildContext context, Duration duration) =>
@@ -81,6 +110,9 @@ abstract class PulsrMotion {
 }
 
 extension PulsrMotionX on BuildContext {
+  /// `true` when animations should play (see [PulsrMotion.shouldAnimate]).
+  bool get shouldAnimate => PulsrMotion.shouldAnimate(this);
+
   /// `true` when animations may play (see [PulsrMotion.isEnabled]).
   bool get motionEnabled => PulsrMotion.isEnabled(this);
 

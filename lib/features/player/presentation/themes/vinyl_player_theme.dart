@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -43,6 +44,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
   late final AnimationController _velocityController;
   late final AnimationController _tonearmController;
   late final CurvedAnimation _tonearmAnimation;
+  bool? _lastAllowMotion;
 
   @override
   void initState() {
@@ -70,6 +72,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     );
   }
 
+  bool _allowMotion(BuildContext context) =>
+      PulsrMotion.shouldAnimate(context) && context.motionEnabled;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -78,8 +83,9 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
     _syncRotation();
   }
 
-  void _syncRotation() {
-    final shouldSpin = widget.props.state.isPlaying && context.motionEnabled;
+  void _syncRotation({bool? allowMotionOverride}) {
+    final allowMotion = allowMotionOverride ?? _allowMotion(context);
+    final shouldSpin = widget.props.state.isPlaying && allowMotion;
     if (shouldSpin) {
       if (!_rotationController.isAnimating) {
         _rotationController.repeat();
@@ -90,7 +96,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
         curve: Curves.easeOutCubic,
       );
     } else {
-      if (!context.motionEnabled) {
+      if (!allowMotion) {
         _velocityController.value = 0.0;
         if (_rotationController.isAnimating) {
           _rotationController.stop();
@@ -116,14 +122,17 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
   @override
   void didUpdateWidget(covariant VinylPlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final allowMotion = _allowMotion(context);
     if (widget.props.state.isPlaying != oldWidget.props.state.isPlaying) {
-      if (widget.props.state.isPlaying) {
+      if (!allowMotion) {
+        _tonearmController.value = widget.props.state.isPlaying ? 1.0 : 0.0;
+      } else if (widget.props.state.isPlaying) {
         _tonearmController.forward();
       } else {
         _tonearmController.reverse();
       }
     }
-    _syncRotation();
+    _syncRotation(allowMotionOverride: allowMotion);
   }
 
   @override
@@ -136,5 +145,22 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
   }
 
   @override
-  Widget build(BuildContext context) => _buildBody(context);
+  Widget build(BuildContext context) {
+    final allowMotion = _allowMotion(context);
+    if (_lastAllowMotion != allowMotion) {
+      _lastAllowMotion = allowMotion;
+      if (!allowMotion) {
+        if (_rotationController.isAnimating) {
+          _rotationController.stop();
+        }
+        _velocityController.value = 0.0;
+        _tonearmController.value = widget.props.state.isPlaying ? 1.0 : 0.0;
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _syncRotation(allowMotionOverride: allowMotion);
+        });
+      }
+    }
+    return _buildBody(context);
+  }
 }

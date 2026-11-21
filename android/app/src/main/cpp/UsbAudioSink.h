@@ -162,6 +162,11 @@ public:
     // inactive/closed/unbounded so callers can route through normal error handling.
     int WaitForWriteSpace(int frames, int maxWaitMs);
 
+    // Lock-free check used by the ExoPlayer tap to avoid stalling behind a full
+    // silent AudioTrack while the Direct USB ring/reservoir still needs frames
+    // to reach or maintain its prefill cushion.
+    bool NeedsPrefillCushion() const;
+
     // ---- Stream shape and clock-domain telemetry --------------------------
     // Control-thread configuration for the NEXT Open(); it never mutates a live
     // stream. Callers (UsbExclusivePlugin) set it before starting.

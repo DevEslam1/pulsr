@@ -58,7 +58,10 @@ void main() {
     final cubit = stubLibraryCubit(const LibraryState());
     await pumpScreen(tester, cubit: cubit);
 
-    await tester.tap(find.byIcon(Icons.grid_view_rounded));
+    await tester.tap(find.byKey(const ValueKey('library_overflow_menu')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('library_sheet_layout_toggle')));
     await tester.pump();
 
     verify(() => cubit.toggleViewMode()).called(1);
@@ -74,7 +77,7 @@ void main() {
 
     expect(find.text('Sort & Filter'), findsOneWidget);
 
-    await tester.tap(find.text('Title'));
+    await tester.tap(find.text('Title').last);
     await tester.pumpAndSettle();
 
     verify(() => cubit.updateSort('title', false)).called(1);
@@ -83,7 +86,11 @@ void main() {
   testWidgets('the manage-tabs action opens the tabs sheet', (tester) async {
     await pumpScreen(tester);
 
-    await tester.tap(find.byIcon(Icons.dashboard_customize_rounded));
+    await tester.tap(find.byKey(const ValueKey('library_overflow_menu')));
+    await tester.pumpAndSettle();
+
+    await tester
+        .tap(find.byKey(const ValueKey('library_sheet_customize_tabs')));
     await tester.pumpAndSettle();
 
     expect(find.text('Tabs'), findsWidgets);

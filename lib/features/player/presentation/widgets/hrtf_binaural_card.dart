@@ -9,6 +9,7 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../../core/widgets/throttled_slider.dart';
@@ -165,7 +166,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
         if (context.mounted) {
           PulsrToast.show(
             context,
-            message: 'Loaded HRTF dataset: ${result.name}',
+            message: context.l10n.hrtfDatasetLoadedToast(result.name),
             icon: Icons.check_circle_rounded,
           );
         }
@@ -175,7 +176,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
       if (context.mounted) {
         PulsrToast.show(
           context,
-          message: 'Failed to load SOFA/HRIR dataset',
+          message: context.l10n.hrtfDatasetLoadFailedToast,
           icon: Icons.error_outline_rounded,
         );
       }
@@ -206,6 +207,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final l10n = context.l10n;
     final isCrossfeedActive = context.select<PlayerCubit, bool>(
       (c) => c.state.isCrossfeedEnabled,
     );
@@ -252,7 +254,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'HRTF 3D Binaural Spatializer',
+                      l10n.hrtfTitle,
                       style: TextStyle(
                         fontSize: AppFontSize.body,
                         fontWeight: FontWeight.w700,
@@ -260,7 +262,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                       ),
                     ),
                     Text(
-                      'Partitioned SOFA/HRIR convolution for 3D realism',
+                      l10n.hrtfSubtitle,
                       style: TextStyle(
                         fontSize: AppFontSize.caption,
                         color: p.textSecondary,
@@ -293,7 +295,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
-                      'Blocked by Bit-Perfect (${widget.blockedReason})',
+                      l10n.hrtfBlockedByBitPerfect(widget.blockedReason!),
                       style: TextStyle(
                           fontSize: AppFontSize.caption, color: p.error),
                     ),
@@ -316,7 +318,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
-                      'Mutually exclusive: Engaging HRTF disables Headphone Crossfeed.',
+                      l10n.hrtfCrossfeedConflict,
                       style: TextStyle(
                           fontSize: AppFontSize.caption, color: p.accent),
                     ),
@@ -336,7 +338,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Virtual Speaker Azimuth',
+                  l10n.hrtfVirtualSpeakerAzimuth,
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
@@ -344,7 +346,14 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                   ),
                 ),
                 Text(
-                  '${_azimuth.toStringAsFixed(0)}° (${_azimuth < 0 ? 'Left' : (_azimuth > 0 ? 'Right' : 'Center')})',
+                  l10n.hrtfAngleDirection(
+                    _azimuth.toStringAsFixed(0),
+                    _azimuth < 0
+                        ? l10n.hrtfDirectionLeft
+                        : (_azimuth > 0
+                            ? l10n.hrtfDirectionRight
+                            : l10n.hrtfDirectionCenter),
+                  ),
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
@@ -368,7 +377,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Virtual Speaker Elevation',
+                  l10n.hrtfVirtualSpeakerElevation,
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
@@ -376,7 +385,14 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                   ),
                 ),
                 Text(
-                  '${_elevation.toStringAsFixed(0)}° (${_elevation < 0 ? 'Below' : (_elevation > 0 ? 'Above' : 'Ear Level')})',
+                  l10n.hrtfAngleDirection(
+                    _elevation.toStringAsFixed(0),
+                    _elevation < 0
+                        ? l10n.hrtfElevationBelow
+                        : (_elevation > 0
+                            ? l10n.hrtfElevationAbove
+                            : l10n.hrtfElevationEarLevel),
+                  ),
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
@@ -403,8 +419,10 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                     icon: const Icon(Icons.file_open_rounded, size: 16),
                     label: Text(
                       _sofaPath != null && _sofaPath!.isNotEmpty
-                          ? 'SOFA: ${_sofaPath!.split(RegExp(r'[/\\]')).last}'
-                          : 'Load Custom SOFA / WAV...',
+                          ? l10n.hrtfSofaLoadedLabel(
+                              _sofaPath!.split(RegExp(r'[/\\]')).last,
+                            )
+                          : l10n.hrtfLoadCustomSofa,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: AppFontSize.caption),
@@ -415,7 +433,7 @@ class _HrtfBinauralCardState extends State<HrtfBinauralCard> {
                 const SizedBox(width: AppSpacing.xs),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded, size: 18),
-                  tooltip: 'Reset Azimuth / Elevation / Dataset',
+                  tooltip: l10n.hrtfResetTooltip,
                   onPressed: () => _resetToDefault(context),
                 ),
               ],

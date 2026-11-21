@@ -9,6 +9,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_progress.dart';
 import '../../../core/widgets/pulsr_slider.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../../../domain/usecases/folder_usecases.dart';
@@ -184,11 +185,10 @@ class HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                         RoundedRectangleBorder(borderRadius: AppRadii.r16All),
                   ),
                   icon: state.isScanning
-                      ? SizedBox(
-                          width: AppSpacing.s18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: p.onAccent),
+                      ? PulsrProgressBar.circular(
+                          size: AppSpacing.s18,
+                          strokeWidth: 2,
+                          color: p.onAccent,
                         )
                       : const Icon(Icons.sync_rounded),
                   label: Text(

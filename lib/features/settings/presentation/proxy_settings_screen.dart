@@ -11,6 +11,7 @@ import '../../../core/widgets/pulsr_back_button.dart';
 import '../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../core/widgets/pulsr_dialog.dart';
 import '../../../core/widgets/pulsr_page_pop_scope.dart';
+import '../../../core/widgets/pulsr_progress.dart';
 import '../../../core/widgets/pulsr_toast.dart';
 import '../../../core/widgets/shimmer_skeleton.dart';
 import '../cubit/proxy_endpoint_validator.dart';
@@ -675,13 +676,10 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen>
                         FilledButton.icon(
                           onPressed: _isTesting ? null : _runTest,
                           icon: _isTesting
-                              ? SizedBox(
-                                  width: AppSpacing.s18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: p.onAccent,
-                                  ),
+                              ? PulsrProgressBar.circular(
+                                  size: AppSpacing.s18,
+                                  strokeWidth: 2,
+                                  color: p.onAccent,
                                 )
                               : const Icon(Icons.speed_rounded),
                           label: Text(

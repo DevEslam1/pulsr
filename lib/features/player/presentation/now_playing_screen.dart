@@ -230,7 +230,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                         ),
                       ),
 
-                    // Subtle top status-bar protection vignette for legibility (portrait only)
+                    // Adaptive top status-bar legibility scrim (portrait only)
                     if (MediaQuery.orientationOf(context) !=
                             Orientation.landscape &&
                         ((!state.isLyricsVisible && !state.isQueueVisible) ||
@@ -241,17 +241,21 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                         start: 0,
                         end: 0,
                         height: 88,
-                        child: IgnorePointer(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.black
-                                      .withValues(alpha: isDark ? 0.28 : 0.08),
-                                  Colors.transparent,
-                                ],
+                        child: ExcludeSemantics(
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    context.playerSurfacePalette.scrimStart
+                                        .withValues(
+                                            alpha: isDark ? 0.45 : 0.14),
+                                    context.playerSurfacePalette.scrimStart
+                                        .withValues(alpha: 0.0),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -266,6 +270,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                         switchInCurve: context.motionCurve(Curves.easeOutCubic),
                         switchOutCurve: context.motionCurve(Curves.easeInCubic),
                         transitionBuilder: (child, animation) {
+                          if (!PulsrMotion.shouldAnimate(context)) {
+                            return child;
+                          }
                           final scale = Tween<double>(
                             begin: 0.965,
                             end: 1.0,
@@ -409,6 +416,13 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   // AUDIT-FIX: Extract snap-back helper ensuring tween endpoints are reset
   void _snapBack() {
     if (_dragOffset > 0) {
+      if (!PulsrMotion.shouldAnimate(context)) {
+        setState(() {
+          _dragOffset = 0.0;
+          _crossedThreshold = false;
+        });
+        return;
+      }
       _tween.begin = _dragOffset;
       _tween.end = 0.0;
       _animController.forward(from: 0.0);

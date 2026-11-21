@@ -124,6 +124,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     final state = widget.props.state;
     final song = state.currentSong;
     final durationMs = state.duration.inMilliseconds;
@@ -158,13 +159,13 @@ class _CassetteBodyState extends State<_CassetteBody> {
                 child: Container(
                   padding: const EdgeInsets.all(AppSpacing.sm),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        PlayerMaterialColors.cassetteBodyTop,
+                        surface.cassetteShell,
                         PlayerMaterialColors.cassetteBodyMid,
-                        PlayerMaterialColors.circleSpindle,
+                        surface.tapeWindow,
                       ],
                     ),
                     borderRadius: AppRadii.r20All,
@@ -174,7 +175,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.scrimAt(0.6),
+                        color: surface.shadowAt(0.6),
                         blurRadius: 30,
                         offset: const Offset(0, 14),
                       ),
@@ -246,6 +247,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
 
   /// Upper label band with tape format badges and dual stereo dancing VU meters
   Widget _buildCassetteHeader(BuildContext context, bool isPlaying) {
+    final surface = context.playerSurfacePalette;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
@@ -274,19 +276,19 @@ class _CassetteBodyState extends State<_CassetteBody> {
                 children: [
                   Text(
                     context.l10n.cassetteSideA,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      color: surface.highContrastInk,
                       letterSpacing: AppTracking.wide,
                     ),
                   ),
                   Text(
                     context.l10n.cassetteTapeType,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white60,
+                      color: surface.mutedInk,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -319,10 +321,10 @@ class _CassetteBodyState extends State<_CassetteBody> {
                   ),
                   Text(
                     context.l10n.cassetteEqSpec,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white60,
+                      color: surface.mutedInk,
                       letterSpacing: 0.8,
                     ),
                   ),
@@ -388,7 +390,9 @@ class _CassetteBodyState extends State<_CassetteBody> {
               children: [
                 _buildCenterTapeWindow(context, progress, isPlaying),
                 if (_isScrubbing)
-                  Center(child: IgnorePointer(child: _buildScrubDeltaPill())),
+                  Center(
+                    child: IgnorePointer(child: _buildScrubDeltaPill(context)),
+                  ),
               ],
             ),
           ),
@@ -400,7 +404,8 @@ class _CassetteBodyState extends State<_CassetteBody> {
   /// Delta read-out while scrubbing, reusing the rounded dark pill with an
   /// active-colour rim that the vinyl and CD platters show, so all the
   /// skeuomorphic themes speak the same scrub language.
-  Widget _buildScrubDeltaPill() {
+  Widget _buildScrubDeltaPill(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     // Rounded to tenths first so a backwards drag reads "-12.3s" and never
     // "-0.0s" when the finger barely moves.
     final deltaTenths = ((_scrubTargetMs! - _scrubBaseMs) / 100).round();
@@ -413,7 +418,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
         vertical: AppSpacing.s6,
       ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.82),
+        color: surface.tapeWindow.withValues(alpha: 0.90),
         borderRadius: AppRadii.full,
         border: Border.all(
           color: widget.activeColor.withValues(alpha: 0.65),
@@ -429,10 +434,10 @@ class _CassetteBodyState extends State<_CassetteBody> {
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: AppFontSize.label,
           fontWeight: FontWeight.w800,
-          color: Colors.white,
+          color: surface.highContrastInk,
           letterSpacing: AppTracking.label,
         ),
       ),
@@ -445,6 +450,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
     double progress,
     bool isPlaying,
   ) {
+    final surface = context.playerSurfacePalette;
     // Tape pack radius calculation (Tape transfers smoothly from Left to Right)
     // Left spool starts full (r=42) and drains to empty hub (r=26)
     // Right spool starts empty hub (r=26) and fills to full (r=42)
@@ -457,14 +463,14 @@ class _CassetteBodyState extends State<_CassetteBody> {
 
     return Container(
       decoration: BoxDecoration(
-        color: PlayerMaterialColors.cassetteWell,
+        color: surface.tapeWindow,
         borderRadius: AppRadii.r14All,
-        border: Border.all(color: Colors.white24, width: 1.5),
-        boxShadow: const [
+        border: Border.all(color: surface.specularAt(0.24), width: 1.5),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black54,
+            color: surface.shadowAt(0.54),
             blurRadius: 8,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -475,7 +481,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
           // 1. Diagonal Acrylic Reflection Flare
           Positioned.fill(
             child: CustomPaint(
-              painter: _AcrylicReflectionPainter(),
+              painter: _AcrylicReflectionPainter(surface: surface),
             ),
           ),
 
@@ -491,6 +497,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
               painter: _MagneticTapePathPainter(
                 leftTapeRadius: leftTapeRadius,
                 rightTapeRadius: rightTapeRadius,
+                surface: surface,
               ),
             ),
           ),
@@ -531,6 +538,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
               children: [
                 // Left Spool Pack (Draining)
                 _buildReelPack(
+                  surface: surface,
                   tapeRadius: leftTapeRadius,
                   isLeft: true,
                 ),
@@ -544,13 +552,16 @@ class _CassetteBodyState extends State<_CassetteBody> {
                       width: i == 3 ? 24 : 14,
                       height: 1.5,
                       margin: const EdgeInsets.symmetric(vertical: 2.2),
-                      color: i == 3 ? Colors.white54 : Colors.white24,
+                      color: i == 3
+                          ? surface.specularAt(0.54)
+                          : surface.specularAt(0.24),
                     ),
                   ),
                 ),
 
                 // Right Spool Pack (Accumulating)
                 _buildReelPack(
+                  surface: surface,
                   tapeRadius: rightTapeRadius,
                   isLeft: false,
                 ),
@@ -564,6 +575,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
 
   /// Builds a tape reel with its dynamic dark oxide tape pack and rotating notched hub
   Widget _buildReelPack({
+    required PlayerSurfacePalette surface,
     required double tapeRadius,
     required bool isLeft,
   }) {
@@ -579,24 +591,24 @@ class _CassetteBodyState extends State<_CassetteBody> {
             height: tapeRadius * 2,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: const [
+              gradient: const RadialGradient(
+                colors: [
                   PlayerMaterialColors.cassetteTapeOuter,
                   PlayerMaterialColors.cassetteTapeMid,
                   PlayerMaterialColors.cassetteTapeInner,
                 ],
-                stops: const [0.35, 0.75, 1.0],
+                stops: [0.35, 0.75, 1.0],
               ),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black87,
+                  color: surface.shadowAt(0.87),
                   blurRadius: 4,
                   spreadRadius: 1,
                 ),
               ],
             ),
             child: CustomPaint(
-              painter: _TapePackRingsPainter(),
+              painter: _TapePackRingsPainter(surface: surface),
             ),
           ),
 
@@ -613,9 +625,9 @@ class _CassetteBodyState extends State<_CassetteBody> {
                     color: PlayerMaterialColors.cassetteReelHub,
                     border: Border.all(
                         color: PlayerMaterialColors.cassetteReelRim, width: 3),
-                    boxShadow: const [
+                    boxShadow: [
                       BoxShadow(
-                        color: Colors.black45,
+                        color: surface.shadowAt(0.45),
                         blurRadius: 6,
                       ),
                     ],
@@ -624,11 +636,13 @@ class _CassetteBodyState extends State<_CassetteBody> {
                     child: Container(
                       width: 22,
                       height: 22,
-                      decoration: const BoxDecoration(
-                        color: PlayerMaterialColors.cassetteWell,
+                      decoration: BoxDecoration(
+                        color: surface.tapeWindow,
                         shape: BoxShape.circle,
                       ),
-                      child: CustomPaint(painter: _SpoolTeethPainter()),
+                      child: CustomPaint(
+                        painter: _SpoolTeethPainter(surface: surface),
+                      ),
                     ),
                   ),
                 ),
@@ -649,6 +663,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
   /// shell's no-text-scaling MediaQuery - nothing here is the only copy of a
   /// piece of information.
   Widget _buildBottomSection(BuildContext context, SongsTableData? song) {
+    final surface = context.playerSurfacePalette;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
@@ -656,7 +671,7 @@ class _CassetteBodyState extends State<_CassetteBody> {
         vertical: AppSpacing.s6,
       ),
       decoration: BoxDecoration(
-        color: PlayerMaterialColors.cassetteBodyTop,
+        color: surface.cassetteShell,
         borderRadius: AppRadii.r8All,
         border: Border.all(
             color: PlayerMaterialColors.cassetteCapstanBorder, width: 1),
@@ -672,10 +687,10 @@ class _CassetteBodyState extends State<_CassetteBody> {
                   song?.title ?? context.l10n.dspTapeLoaded,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: surface.highContrastInk,
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -683,10 +698,10 @@ class _CassetteBodyState extends State<_CassetteBody> {
                   song?.artist ?? 'ANALOG MASTER AUDIO',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white60,
+                    color: surface.mutedInk,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -696,17 +711,17 @@ class _CassetteBodyState extends State<_CassetteBody> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.black45,
+              color: surface.shadowAt(0.45),
               borderRadius: AppRadii.r4All,
-              border: Border.all(color: Colors.white12),
+              border: Border.all(color: surface.specularAt(0.12)),
             ),
-            child: const ExcludeSemantics(
+            child: ExcludeSemantics(
               child: Text(
                 'NR • OFF',
                 style: TextStyle(
                   fontSize: AppFontSize.tiny,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white54,
+                  color: surface.mutedInk,
                   letterSpacing: 0.6,
                 ),
               ),
@@ -728,6 +743,7 @@ class _CassetteTapeCounter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     // AUDIT-FIX: Map progress to full 3-digit counter range 0..999
     final count = (progress * 999).clamp(0, 999).toInt();
     final digits = count.toString().padLeft(3, '0');
@@ -735,15 +751,15 @@ class _CassetteTapeCounter extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: surface.vinylGroove,
         borderRadius: AppRadii.r4All,
         border: Border.all(
             color: PlayerMaterialColors.cassetteHeadBorder, width: 1.2),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Colors.black87,
+            color: surface.shadowAt(0.87),
             blurRadius: 4,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
           ),
         ],
       ),
@@ -782,11 +798,11 @@ class _CassetteTapeCounter extends StatelessWidget {
                   child: Text(
                     digits[i],
                     key: ValueKey<String>('counter_${i}_${digits[i]}'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: AppFontSize.tiny,
                       fontWeight: FontWeight.w900,
-                      color: Colors.white,
+                      color: surface.highContrastInk,
                     ),
                   ),
                 ),
@@ -928,6 +944,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
   }
 
   Widget _buildVuBar(String channel, double level, double peak) {
+    final surface = context.playerSurfacePalette;
     const int totalSegments = 10;
     final int activeSegCount =
         (level * totalSegments).clamp(0, totalSegments).round();
@@ -940,10 +957,10 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
         ExcludeSemantics(
           child: Text(
             channel,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: AppFontSize.nano,
               fontWeight: FontWeight.w800,
-              color: Colors.white54,
+              color: surface.mutedInk,
             ),
           ),
         ),
@@ -951,9 +968,9 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 2.0, vertical: 1.0),
           decoration: BoxDecoration(
-            color: Colors.black87,
+            color: surface.tapeWindow,
             borderRadius: AppRadii.circular(2),
-            border: Border.all(color: Colors.white12, width: 0.6),
+            border: Border.all(color: surface.specularAt(0.12), width: 0.6),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -970,7 +987,7 @@ class _CassetteStereoVuMeterState extends State<_CassetteStereoVuMeter>
                   ? baseColor
                   : (isPeak
                       ? baseColor.withValues(alpha: 0.95)
-                      : Colors.white.withValues(alpha: 0.08));
+                      : surface.specularAt(0.08));
 
               return Container(
                 width: 4.2,
@@ -1005,6 +1022,7 @@ class _CassetteScrew extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     return Container(
       width: 10,
       height: 10,
@@ -1012,18 +1030,18 @@ class _CassetteScrew extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: RadialGradient(
           colors: [
-            Colors.grey.shade400,
-            Colors.grey.shade700,
-            Colors.grey.shade900,
+            surface.platterMetal,
+            surface.platterMetalDeep,
+            surface.platterMetalShadow,
           ],
         ),
-        border: Border.all(color: Colors.black87, width: 0.8),
+        border: Border.all(color: surface.shadowAt(0.87), width: 0.8),
       ),
       child: Center(
         child: Container(
           width: 6,
           height: 1.2,
-          color: PlayerMaterialColors.cassetteShell,
+          color: surface.cassetteShell,
         ),
       ),
     );
@@ -1031,8 +1049,11 @@ class _CassetteScrew extends StatelessWidget {
 }
 
 class _AcrylicReflectionPainter extends CustomPainter {
+  final PlayerSurfacePalette surface;
   Paint? _cachedPaint;
   Size? _lastSize;
+
+  _AcrylicReflectionPainter({required this.surface});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1043,11 +1064,11 @@ class _AcrylicReflectionPainter extends CustomPainter {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.10),
-            Colors.white.withValues(alpha: 0.02),
-            Colors.transparent,
-            Colors.white.withValues(alpha: 0.06),
-            Colors.transparent,
+            surface.specularAt(0.10),
+            surface.specularAt(0.02),
+            surface.specularAt(0.0),
+            surface.specularAt(0.06),
+            surface.specularAt(0.0),
           ],
           stops: const [0.0, 0.25, 0.45, 0.65, 1.0],
         ).createShader(Offset.zero & size);
@@ -1056,36 +1077,44 @@ class _AcrylicReflectionPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _AcrylicReflectionPainter oldDelegate) =>
+      oldDelegate.surface != surface;
 }
 
 class _TapePackRingsPainter extends CustomPainter {
-  static final Paint _paint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 0.6
-    ..color = Colors.white.withValues(alpha: 0.07);
+  final PlayerSurfacePalette surface;
+
+  _TapePackRingsPainter({required this.surface});
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6
+      ..color = surface.specularAt(0.07);
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
     for (double r = 26; r < radius - 2; r += 2.4) {
-      canvas.drawCircle(center, r, _paint);
+      canvas.drawCircle(center, r, paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _TapePackRingsPainter oldDelegate) =>
+      oldDelegate.surface != surface;
 }
 
 class _SpoolTeethPainter extends CustomPainter {
-  static final Paint _paint = Paint()
-    ..color = Colors.white
-    ..strokeWidth = 2.0;
+  final PlayerSurfacePalette surface;
+
+  _SpoolTeethPainter({required this.surface});
 
   @override
   void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = surface.highContrastInk
+      ..strokeWidth = 2.0;
     final center = Offset(size.width / 2, size.height / 2);
 
     for (int i = 0; i < 6; i++) {
@@ -1098,21 +1127,24 @@ class _SpoolTeethPainter extends CustomPainter {
         center.dx + 10 * math.cos(angle),
         center.dy + 10 * math.sin(angle),
       );
-      canvas.drawLine(p1, p2, _paint);
+      canvas.drawLine(p1, p2, paint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _SpoolTeethPainter oldDelegate) =>
+      oldDelegate.surface != surface;
 }
 
 class _MagneticTapePathPainter extends CustomPainter {
   final double leftTapeRadius;
   final double rightTapeRadius;
+  final PlayerSurfacePalette surface;
 
   _MagneticTapePathPainter({
     required this.leftTapeRadius,
     required this.rightTapeRadius,
+    required this.surface,
   });
 
   @override
@@ -1206,7 +1238,7 @@ class _MagneticTapePathPainter extends CustomPainter {
 
     // Specular sheen highlight along the tape edge
     final sheenPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.18)
+      ..color = surface.specularAt(0.18)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -1217,5 +1249,6 @@ class _MagneticTapePathPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MagneticTapePathPainter oldDelegate) =>
       oldDelegate.leftTapeRadius != leftTapeRadius ||
-      oldDelegate.rightTapeRadius != rightTapeRadius;
+      oldDelegate.rightTapeRadius != rightTapeRadius ||
+      oldDelegate.surface != surface;
 }

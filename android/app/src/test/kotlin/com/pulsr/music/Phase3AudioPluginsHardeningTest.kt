@@ -261,6 +261,75 @@ class Phase3AudioPluginsHardeningTest {
         verifyNoInteractions(sink)
     }
 
+    @Test
+    fun hiResDacTargetOutputFormatOffloadsToProbeThreadWhenBitPerfectRequestedAndPreservesFastPaths() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val messenger = mock(BinaryMessenger::class.java)
+        val plugin = HiResDacPlugin(ctx, messenger)
+        try {
+            // 1. Invalid formats fail synchronously with INVALID_FORMAT
+            val invalidResult = mock(MethodChannel.Result::class.java)
+            plugin.onMethodCall(
+                MethodCall("setTargetOutputFormat", mapOf("sampleRate" to 12345, "bitDepth" to 16)),
+                invalidResult,
+            )
+            verify(invalidResult).error("INVALID_FORMAT", "Unsupported target sample rate or bit depth", null)
+
+            // 2. When !bitPerfectRequested and non-zero format, returns false synchronously
+            setField(plugin, "bitPerfectRequested", false)
+            val nonZeroWithoutBpResult = mock(MethodChannel.Result::class.java)
+            plugin.onMethodCall(
+                MethodCall("setTargetOutputFormat", mapOf("sampleRate" to 96000, "bitDepth" to 24)),
+                nonZeroWithoutBpResult,
+            )
+            verify(nonZeroWithoutBpResult).success(false)
+
+            // 3. Fast-path when format is unchanged and mixerAttributesApplied == true
+            setField(plugin, "bitPerfectRequested", true)
+            setField(plugin, "targetSampleRate", 96000)
+            setField(plugin, "targetBitDepth", 24)
+            setField(plugin, "mixerAttributesApplied", true)
+            val unchangedResult = mock(MethodChannel.Result::class.java)
+            plugin.onMethodCall(
+                MethodCall("configureTargetAudio", mapOf("sampleRate" to 96000, "bitDepth" to 24)),
+                unchangedResult,
+            )
+            verify(unchangedResult).success(true)
+
+            // 4. When bitPerfectRequested == true, dispatches asynchronously to probeHandler
+            // and replies on mainHandler (not synchronously)
+            setField(plugin, "targetSampleRate", 48000)
+            setField(plugin, "targetBitDepth", 16)
+            setField(plugin, "mixerAttributesApplied", false)
+            setField(plugin, "bitPerfectRequested", true)
+
+            for (method in listOf("setTargetOutputFormat", "configureTargetAudio")) {
+                val asyncResult = mock(MethodChannel.Result::class.java)
+                val latch = CountDownLatch(1)
+                var reply: Any? = null
+                doAnswer { invocation ->
+                    reply = invocation.getArgument(0)
+                    latch.countDown()
+                    null
+                }.`when`(asyncResult).success(any())
+
+                plugin.onMethodCall(
+                    MethodCall(method, mapOf("sampleRate" to 96000, "bitDepth" to 24)),
+                    asyncResult,
+                )
+                // Nothing should have replied synchronously before the probe & main loopers run
+                verifyNoInteractions(asyncResult)
+
+                awaitWithMainLooperIdle(latch)
+                assertTrue("Timed out awaiting $method async completion", latch.await(0, TimeUnit.MILLISECONDS))
+                verify(asyncResult).success(any())
+                assertTrue("Reply must be a Boolean", reply is Boolean)
+            }
+        } finally {
+            plugin.dispose()
+        }
+    }
+
     // ---- Task 12: RoomCorrectionPlugin volatile eventSink & stop->join->release order ----
 
     @Test

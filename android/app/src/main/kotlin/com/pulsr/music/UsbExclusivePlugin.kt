@@ -1459,6 +1459,7 @@ class UsbExclusivePlugin(
      */
     private fun refreshHardwareVolumeIfNeeded() {
         val volume = hardwareVolume ?: return
+        if (volume.ready && (streaming || isDsdActive)) return
         val now = SystemClock.elapsedRealtime()
         if (volume.ready && now - lastVolumeRefreshAtMs < VOLUME_REFRESH_INTERVAL_MS) return
         lastVolumeRefreshAtMs = now

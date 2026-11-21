@@ -8535,5 +8535,410 @@
   "badgeExclusive": "EXCLUSIVE",
   "@badgeExclusive": {
     "description": "Compact badge shown on the direct USB output row when the exclusive streaming path is active"
+  },
+  "multichannelSpeakerAlignment": "Multichannel Speaker Alignment",
+  "@multichannelSpeakerAlignment": {
+    "description": "Card title for multichannel speaker gain trim and alignment delay controls"
+  },
+  "multichannelSubtitle": "Per-channel trim, alignment delay & LFE crossover",
+  "@multichannelSubtitle": {
+    "description": "Subtitle for multichannel speaker alignment card"
+  },
+  "multichannelInfoTooltip": "Multichannel Info",
+  "@multichannelInfoTooltip": {
+    "description": "Tooltip for multichannel speaker alignment info button"
+  },
+  "multichannelBypassedByBitPerfect": "Bypassed by Bit-Perfect Mode",
+  "@multichannelBypassedByBitPerfect": {
+    "description": "Status notice when multichannel DSP is bypassed by Bit-Perfect mode"
+  },
+  "multichannelAaudioNote": "AAudio is limited to 2 channels on Android; multichannel streams (>2 ch) route through Pulsr's 32-bit float AudioTrack path for genuine surround output.",
+  "@multichannelAaudioNote": {
+    "description": "Informational note explaining multichannel AudioTrack routing on Android"
+  },
+  "multichannelSpeakerLayout": "Speaker Layout",
+  "@multichannelSpeakerLayout": {
+    "description": "Section label for selecting the speaker channel layout"
+  },
+  "multichannelChannelsShort": "{count} ch",
+  "@multichannelChannelsShort": {
+    "description": "Short channel count fallback label",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multichannelLayoutSummary": "{layoutName} ({count} channels)",
+  "@multichannelLayoutSummary": {
+    "description": "Summary of active speaker layout and channel count",
+    "placeholders": {
+      "layoutName": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multichannelLayoutChipLabel": "{layoutName} ({count} ch)",
+  "@multichannelLayoutChipLabel": {
+    "description": "Choice chip label for a speaker layout option",
+    "placeholders": {
+      "layoutName": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "multichannelSelectChannel": "Select Speaker Channel",
+  "@multichannelSelectChannel": {
+    "description": "Section label for picking an individual speaker channel"
+  },
+  "multichannelChannelShort": "CH {index}",
+  "@multichannelChannelShort": {
+    "description": "Short fallback label for a speaker channel",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "multichannelChannelFull": "Channel {index}",
+  "@multichannelChannelFull": {
+    "description": "Full fallback name for a speaker channel",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "multichannelGainTrim": "Gain Trim",
+  "@multichannelGainTrim": {
+    "description": "Slider label for per-channel gain trim"
+  },
+  "multichannelAlignmentDelay": "Alignment Delay",
+  "@multichannelAlignmentDelay": {
+    "description": "Slider label for per-channel speaker alignment delay"
+  },
+  "multichannelLfeTitle": "LFE Crossover & Bass Management",
+  "@multichannelLfeTitle": {
+    "description": "Section title for LFE crossover and subwoofer bass management"
+  },
+  "multichannelLfeSubtitle": "Satellite HPF & dedicated subwoofer crossover",
+  "@multichannelLfeSubtitle": {
+    "description": "Subtitle for LFE crossover section"
+  },
+  "multichannelLfeInfoTooltip": "LFE Crossover Info",
+  "@multichannelLfeInfoTooltip": {
+    "description": "Tooltip for LFE crossover info button"
+  },
+  "multichannelLfeDescription": "Linkwitz-Riley crossover applies high-pass filter to satellite channels and routes redirected low frequencies to the dedicated LFE channel.",
+  "@multichannelLfeDescription": {
+    "description": "Explanatory description of Linkwitz-Riley LFE bass management"
+  },
+  "multichannelSatelliteCrossover": "Satellite Crossover (HPF)",
+  "@multichannelSatelliteCrossover": {
+    "description": "Slider label for satellite high-pass crossover frequency"
+  },
+  "multichannelSubwooferLowPass": "Subwoofer Low-Pass (LPF)",
+  "@multichannelSubwooferLowPass": {
+    "description": "Slider label for dedicated LFE subwoofer low-pass filter frequency"
+  },
+  "multichannelFilterSlope": "Crossover Filter Slope",
+  "@multichannelFilterSlope": {
+    "description": "Label for Linkwitz-Riley crossover filter slope selector"
+  },
+  "multichannelSlopeLr2": "12 dB/oct (LR2)",
+  "@multichannelSlopeLr2": {
+    "description": "12 dB per octave Linkwitz-Riley 2nd-order filter slope option"
+  },
+  "multichannelSlopeLr4": "24 dB/oct (LR4)",
+  "@multichannelSlopeLr4": {
+    "description": "24 dB per octave Linkwitz-Riley 4th-order filter slope option"
+  },
+  "multichannelLfeGainTrim": "LFE Channel Gain Trim",
+  "@multichannelLfeGainTrim": {
+    "description": "Slider label for dedicated LFE channel gain trim"
+  },
+  "multichannelRedirectSatelliteBass": "Redirect Satellite Bass",
+  "@multichannelRedirectSatelliteBass": {
+    "description": "Toggle title for redirecting low frequencies from satellites into LFE"
+  },
+  "multichannelRedirectSatelliteBassDesc": "Sums satellite frequencies below crossover into LFE with 1/√(N-1) power normalization.",
+  "@multichannelRedirectSatelliteBassDesc": {
+    "description": "Description of satellite bass redirection into LFE"
+  },
+  "hrtfTitle": "HRTF 3D Binaural Spatializer",
+  "@hrtfTitle": {
+    "description": "Card title for HRTF 3D binaural spatialization"
+  },
+  "hrtfSubtitle": "Partitioned SOFA/HRIR convolution for 3D realism",
+  "@hrtfSubtitle": {
+    "description": "Subtitle for HRTF 3D binaural spatializer card"
+  },
+  "hrtfBlockedByBitPerfect": "Blocked by Bit-Perfect ({reason})",
+  "@hrtfBlockedByBitPerfect": {
+    "description": "Notice when HRTF is blocked by Bit-Perfect mode",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "hrtfCrossfeedConflict": "Mutually exclusive: Engaging HRTF disables Headphone Crossfeed.",
+  "@hrtfCrossfeedConflict": {
+    "description": "Warning explaining mutual exclusivity between HRTF and Headphone Crossfeed"
+  },
+  "hrtfVirtualSpeakerAzimuth": "Virtual Speaker Azimuth",
+  "@hrtfVirtualSpeakerAzimuth": {
+    "description": "Slider label for HRTF virtual speaker azimuth angle"
+  },
+  "hrtfDirectionLeft": "Left",
+  "@hrtfDirectionLeft": {
+    "description": "Left directional label for HRTF azimuth"
+  },
+  "hrtfDirectionRight": "Right",
+  "@hrtfDirectionRight": {
+    "description": "Right directional label for HRTF azimuth"
+  },
+  "hrtfDirectionCenter": "Center",
+  "@hrtfDirectionCenter": {
+    "description": "Center directional label for HRTF azimuth"
+  },
+  "hrtfAngleDirection": "{degrees}° ({direction})",
+  "@hrtfAngleDirection": {
+    "description": "Formatted angle with directional label for HRTF azimuth or elevation",
+    "placeholders": {
+      "degrees": {
+        "type": "String"
+      },
+      "direction": {
+        "type": "String"
+      }
+    }
+  },
+  "hrtfVirtualSpeakerElevation": "Virtual Speaker Elevation",
+  "@hrtfVirtualSpeakerElevation": {
+    "description": "Slider label for HRTF virtual speaker elevation angle"
+  },
+  "hrtfElevationBelow": "Below",
+  "@hrtfElevationBelow": {
+    "description": "Below-ear directional label for HRTF elevation"
+  },
+  "hrtfElevationAbove": "Above",
+  "@hrtfElevationAbove": {
+    "description": "Above-ear directional label for HRTF elevation"
+  },
+  "hrtfElevationEarLevel": "Ear Level",
+  "@hrtfElevationEarLevel": {
+    "description": "Ear-level directional label for HRTF elevation"
+  },
+  "hrtfSofaLoadedLabel": "SOFA: {fileName}",
+  "@hrtfSofaLoadedLabel": {
+    "description": "Button label showing the currently loaded SOFA or WAV HRIR file name",
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+  "hrtfLoadCustomSofa": "Load Custom SOFA / WAV...",
+  "@hrtfLoadCustomSofa": {
+    "description": "Button label to pick a custom SOFA or WAV HRIR dataset"
+  },
+  "hrtfResetTooltip": "Reset Azimuth / Elevation / Dataset",
+  "@hrtfResetTooltip": {
+    "description": "Tooltip for resetting HRTF azimuth, elevation, and dataset to defaults"
+  },
+  "hrtfDatasetLoadedToast": "Loaded HRTF dataset: {name}",
+  "@hrtfDatasetLoadedToast": {
+    "description": "Toast shown after successfully loading a custom HRTF dataset",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "hrtfDatasetLoadFailedToast": "Failed to load SOFA/HRIR dataset",
+  "@hrtfDatasetLoadFailedToast": {
+    "description": "Toast shown when loading a custom SOFA or HRIR dataset fails"
+  },
+  "remasterSuiteTitle": "Remaster Suite",
+  "@remasterSuiteTitle": {
+    "description": "Card title for output oversampling and PCM-to-DSD remaster controls"
+  },
+  "remasterSuiteSubtitle": "Output oversampling, reconstruction filters & PCM→DSD",
+  "@remasterSuiteSubtitle": {
+    "description": "Subtitle for Remaster Suite card"
+  },
+  "remasterPcmOversampling": "PCM Output Oversampling",
+  "@remasterPcmOversampling": {
+    "description": "Label for PCM output oversampling multiplier selector"
+  },
+  "remasterOff1x": "Off (1x)",
+  "@remasterOff1x": {
+    "description": "Oversampling disabled (1x) segment label"
+  },
+  "remasterMultiplierValue": "{factor}x",
+  "@remasterMultiplierValue": {
+    "description": "Oversampling multiplier segment label",
+    "placeholders": {
+      "factor": {
+        "type": "int"
+      }
+    }
+  },
+  "remasterFilterKernel": "Reconstruction Filter Kernel",
+  "@remasterFilterKernel": {
+    "description": "Label for reconstruction filter kernel selector"
+  },
+  "remasterKernelSharp": "Sharp",
+  "@remasterKernelSharp": {
+    "description": "Sharp roll-off reconstruction filter kernel option"
+  },
+  "remasterKernelSlowRolloff": "Slow Roll-off",
+  "@remasterKernelSlowRolloff": {
+    "description": "Slow roll-off reconstruction filter kernel option"
+  },
+  "remasterKernelMinPhase": "MinPhase",
+  "@remasterKernelMinPhase": {
+    "description": "Minimum-phase reconstruction filter kernel option"
+  },
+  "remasterKernelApodizing": "Apodizing",
+  "@remasterKernelApodizing": {
+    "description": "Apodizing reconstruction filter kernel option"
+  },
+  "remasterPcmToDsdModulator": "PCM → DSD Modulator",
+  "@remasterPcmToDsdModulator": {
+    "description": "Toggle label for PCM to DSD sigma-delta modulator"
+  },
+  "remasterOfflineSdmNote": "Offline SDM engine (no playback route yet)",
+  "@remasterOfflineSdmNote": {
+    "description": "Clarification subtitle for PCM to DSD modulator"
+  },
+  "remasterDsdRate": "DSD Rate",
+  "@remasterDsdRate": {
+    "description": "Label for DSD rate selector"
+  },
+  "remasterDsdRate64": "DSD64",
+  "@remasterDsdRate64": {
+    "description": "DSD64 rate option label"
+  },
+  "remasterDsdRateValue": "{rate}",
+  "@remasterDsdRateValue": {
+    "description": "Numeric DSD rate option label (128, 256)",
+    "placeholders": {
+      "rate": {
+        "type": "int"
+      }
+    }
+  },
+  "remasterSdmOrder": "SDM Order (1-5)",
+  "@remasterSdmOrder": {
+    "description": "Label for sigma-delta modulator order selector"
+  },
+  "remasterSdmOrderValue": "{order}",
+  "@remasterSdmOrderValue": {
+    "description": "Numeric sigma-delta modulator order option label",
+    "placeholders": {
+      "order": {
+        "type": "int"
+      }
+    }
+  },
+  "remasterStatusPcmToDsd": "PCM → DSD requested · offline engine only, not on the playback route",
+  "@remasterStatusPcmToDsd": {
+    "description": "Status banner when PCM to DSD modulator is enabled"
+  },
+  "remasterStatusOversampling": "Oversampling {multiplier}x requested · Not Bit-Perfect (reconstruction DSP in path)",
+  "@remasterStatusOversampling": {
+    "description": "Status banner when PCM oversampling is active",
+    "placeholders": {
+      "multiplier": {
+        "type": "int"
+      }
+    }
+  },
+  "remasterStatusPassthrough": "Bit-Perfect compatible (passthrough)",
+  "@remasterStatusPassthrough": {
+    "description": "Status banner when Remaster Suite is in Bit-Perfect passthrough mode"
+  },
+  "telemetryDspPowerConsumption": "DSP Power Consumption",
+  "@telemetryDspPowerConsumption": {
+    "description": "Header for DSP power consumption telemetry section"
+  },
+  "telemetryLowPowerBypassBadge": "⚡ 0.0 mAh/h (Integer Low-Power)",
+  "@telemetryLowPowerBypassBadge": {
+    "description": "Badge text when low-power integer PCM bypass is active"
+  },
+  "telemetryPowerDrainEstimate": "~{mah} mAh/h",
+  "@telemetryPowerDrainEstimate": {
+    "description": "Estimated DSP battery drain in mAh per hour",
+    "placeholders": {
+      "mah": {
+        "type": "String"
+      }
+    }
+  },
+  "telemetryLowPowerBypassDesc": "True low-power integer route active: float DSP processor is completely bypassed for bit-perfect integer PCM.",
+  "@telemetryLowPowerBypassDesc": {
+    "description": "Explanation shown when true low-power integer PCM bypass is active"
+  },
+  "telemetryStageDrainBreakdown": "Active DSP stage drain breakdown:",
+  "@telemetryStageDrainBreakdown": {
+    "description": "Heading above per-stage DSP power drain chips"
+  },
+  "telemetryStageDrainItem": "{stageName}: +{mah} mAh/h",
+  "@telemetryStageDrainItem": {
+    "description": "Per-stage DSP battery drain chip text",
+    "placeholders": {
+      "stageName": {
+        "type": "String"
+      },
+      "mah": {
+        "type": "String"
+      }
+    }
+  },
+  "telemetryAllStagesIdle": "All DSP stages idle (~0.0 mAh/h).",
+  "@telemetryAllStagesIdle": {
+    "description": "Message shown when all DSP stages are idle with zero power drain"
+  },
+  "telemetryBandLow": "Low",
+  "@telemetryBandLow": {
+    "description": "Multiband compressor low frequency band label"
+  },
+  "telemetryBandLoMid": "Lo-Mid",
+  "@telemetryBandLoMid": {
+    "description": "Multiband compressor low-mid frequency band label"
+  },
+  "telemetryBandHiMid": "Hi-Mid",
+  "@telemetryBandHiMid": {
+    "description": "Multiband compressor high-mid frequency band label"
+  },
+  "telemetryBandHigh": "High",
+  "@telemetryBandHigh": {
+    "description": "Multiband compressor high frequency band label"
+  },
+  "telemetryDynEqBandShort": "B{index}",
+  "@telemetryDynEqBandShort": {
+    "description": "Short band index label for dynamic EQ telemetry meter",
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "telemetryDbValue": "{value} dB",
+  "@telemetryDbValue": {
+    "description": "Decibel readout value in DSP telemetry",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
   }
 }

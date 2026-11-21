@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/constants/audio_feature_info.dart';
+import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/di/injection.dart';
@@ -703,8 +705,13 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
                         fontSize: AppFontSize.label)),
                 style: FilledButton.styleFrom(
                     backgroundColor: p.warning,
-                    foregroundColor: Colors.black,
-                    visualDensity: VisualDensity.compact,
+                    foregroundColor: p.warning.computeLuminance() > 0.5
+                        ? p.surface
+                        : context.playerSurfacePalette.highContrastInk,
+                    minimumSize: const Size(
+                      AppSpacing.minTouchTarget,
+                      AppSpacing.minTouchTarget,
+                    ),
                     padding:
                         const EdgeInsets.symmetric(vertical: AppSpacing.s10)),
               ),
@@ -1169,11 +1176,81 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
     );
   }
 
+  String? _plainLanguageStageSubtitle(BuildContext context, String stageName) {
+    final lower = stageName.toLowerCase();
+    final l10n = context.l10n;
+    if (lower.contains('dynamic eq')) {
+      return AudioFeatureRegistry.dynamicEq.localized(l10n).subtitle;
+    }
+    if (lower.contains('arbitrary') || lower.contains('graphiceq')) {
+      return AudioFeatureRegistry.arbitraryEq.localized(l10n).subtitle;
+    }
+    if (lower.contains('eq') || lower.contains('equalizer')) {
+      return AudioFeatureRegistry.equalizer.localized(l10n).subtitle;
+    }
+    if (lower.contains('limiter')) {
+      return AudioFeatureRegistry.limiter.localized(l10n).subtitle;
+    }
+    if (lower.contains('reverb')) {
+      return AudioFeatureRegistry.reverb.localized(l10n).subtitle;
+    }
+    if (lower.contains('crossfeed')) {
+      return AudioFeatureRegistry.crossfeed.localized(l10n).subtitle;
+    }
+    if (lower.contains('virtualizer')) {
+      return AudioFeatureRegistry.virtualizer.localized(l10n).subtitle;
+    }
+    if (lower.contains('spatial')) {
+      return AudioFeatureRegistry.spatializer.localized(l10n).subtitle;
+    }
+    if (lower.contains('multiband')) {
+      return AudioFeatureRegistry.multibandCompressor.localized(l10n).subtitle;
+    }
+    if (lower.contains('dynamic bass')) {
+      return AudioFeatureRegistry.dynamicBass.localized(l10n).subtitle;
+    }
+    if (lower.contains('dynamics') || lower.contains('compressor')) {
+      return AudioFeatureRegistry.dynamics.localized(l10n).subtitle;
+    }
+    if (lower.contains('saturation') || lower.contains('exciter')) {
+      return AudioFeatureRegistry.saturation.localized(l10n).subtitle;
+    }
+    if (lower.contains('width')) {
+      return AudioFeatureRegistry.stereoWidth.localized(l10n).subtitle;
+    }
+    if (lower.contains('crossover') || lower.contains('sub')) {
+      return AudioFeatureRegistry.subCrossover.localized(l10n).subtitle;
+    }
+    if (lower.contains('loudness')) {
+      return AudioFeatureRegistry.loudnessContour.localized(l10n).subtitle;
+    }
+    if (lower.contains('viper') || lower.contains('ddc')) {
+      return AudioFeatureRegistry.viperDdc.localized(l10n).subtitle;
+    }
+    if (lower.contains('liveprog') || lower.contains('eel')) {
+      return AudioFeatureRegistry.liveProg.localized(l10n).subtitle;
+    }
+    if (lower.contains('resampl')) {
+      return AudioFeatureRegistry.resampler.localized(l10n).subtitle;
+    }
+    if (lower.contains('balance') ||
+        lower.contains('panner') ||
+        lower.contains('mono')) {
+      return AudioFeatureRegistry.panner.localized(l10n).subtitle;
+    }
+    if (lower.contains('bass')) {
+      return AudioFeatureRegistry.bassBoost.localized(l10n).subtitle;
+    }
+    return null;
+  }
+
   Widget _buildStageCard(DspStageDebugInfo stage, PulsrPalette p) {
     final bool isActive =
         stage.isEnabled && !stage.isBypassed && !stage.isDegraded;
     final bool isBypassed = stage.isBypassed;
     final bool isDegraded = stage.isDegraded;
+    final plainSubtitle = _plainLanguageStageSubtitle(context, stage.name);
+    final animate = PulsrMotion.shouldAnimate(context);
 
     final Color statusColor = isBypassed
         ? AppColors.dacGold
@@ -1181,91 +1258,114 @@ class _DspInspectorSheetState extends State<DspInspectorSheet>
             ? p.error
             : (isActive ? AppColors.studioGreen : p.textSecondary));
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: p.surfaceContainer,
-        borderRadius: AppRadii.r12All,
-        border: Border.all(
-          color: isActive ? statusColor.withValues(alpha: 0.4) : p.hairline,
+    final statusLabel = isBypassed
+        ? context.l10n.dspStatusBypassed
+        : (isDegraded
+            ? context.l10n.dspStatusDegraded
+            : (isActive
+                ? context.l10n.dspStageStatusActive
+                : context.l10n.dspStageStatusOff));
+
+    return Semantics(
+      container: true,
+      label: '${stage.name}, $statusLabel',
+      value: plainSubtitle != null
+          ? '$plainSubtitle. ${stage.statusDescription}'
+          : stage.statusDescription,
+      child: AnimatedContainer(
+        duration: animate ? context.motionMs(200) : Duration.zero,
+        margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+        padding: const EdgeInsets.all(AppSpacing.sm),
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: AppRadii.r12All,
+          border: Border.all(
+            color: isActive ? statusColor.withValues(alpha: 0.4) : p.hairline,
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: statusColor,
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Expanded(
-                child: Text(
-                  stage.name,
-                  style: TextStyle(
-                    fontSize: AppFontSize.label,
-                    fontWeight: FontWeight.w700,
-                    color: p.textPrimary,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainerHigh,
-                  borderRadius: AppRadii.r4All,
-                ),
-                child: Text(
-                  stage.category,
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    color: p.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.s6),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: AppRadii.r4All,
-                ),
-                child: Text(
-                  isBypassed
-                      ? context.l10n.dspStatusBypassed
-                      : (isDegraded
-                          ? context.l10n.dspStatusDegraded
-                          : (isActive
-                              ? context.l10n.dspStageStatusActive
-                              : context.l10n.dspStageStatusOff)),
-                  style: TextStyle(
-                    fontSize: AppFontSize.caption,
-                    fontWeight: FontWeight.w800,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
                     color: statusColor,
                   ),
                 ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    stage.name,
+                    style: TextStyle(
+                      fontSize: AppFontSize.label,
+                      fontWeight: FontWeight.w700,
+                      color: p.textPrimary,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainerHigh,
+                    borderRadius: AppRadii.r4All,
+                  ),
+                  child: Text(
+                    stage.category,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      color: p.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.s6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.12),
+                    borderRadius: AppRadii.r4All,
+                  ),
+                  child: Text(
+                    statusLabel,
+                    style: TextStyle(
+                      fontSize: AppFontSize.caption,
+                      fontWeight: FontWeight.w800,
+                      color: statusColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (plainSubtitle != null) ...[
+              const SizedBox(height: AppSpacing.s4),
+              Text(
+                plainSubtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: AppFontSize.caption,
+                  color: p.textTertiary,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ],
-          ),
-          const SizedBox(height: AppSpacing.s6),
-          Text(
-            stage.statusDescription,
-            style: TextStyle(
-              fontSize: AppFontSize.caption,
-              color: isActive ? p.textPrimary : p.textSecondary,
-              fontWeight: isActive ? FontWeight.w500 : FontWeight.w400,
+            const SizedBox(height: AppSpacing.s6),
+            Text(
+              stage.statusDescription,
+              style: TextStyle(
+                fontSize: AppFontSize.caption,
+                color: isActive ? p.textPrimary : p.textSecondary,
+                fontWeight: isActive ? FontWeight.w500 : FontWeight.w400,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

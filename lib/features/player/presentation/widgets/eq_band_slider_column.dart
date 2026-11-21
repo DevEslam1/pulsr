@@ -139,65 +139,64 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
           const SizedBox(height: AppSpacing.xxs),
           // F-35: fast solo/mute toggles. State is transient (native has no
           // getter), so it is mirrored locally for the current session only.
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _bandToggle(
-                  label: 'M',
-                  tooltip: isMuted
-                      ? context.l10n.dspUnmuteBand
-                      : context.l10n.dspMuteBand,
-                  active: isMuted,
-                  activeColor: errorColor,
-                  onTap: isEnabled
-                      ? () async {
-                          final next = !isMuted;
-                          final manager = _equalizerManagerOrNull();
-                          if (manager != null) {
-                            await manager.setBandMute(index, next);
-                          }
-                          if (!mounted) return;
-                          _setStateSafe(() {
-                            if (next) {
-                              _mutedBands.add(index);
-                            } else {
-                              _mutedBands.remove(index);
-                            }
-                          });
+          // Stacked vertically so each toggle preserves a full >= 48x48dp
+          // touch target without FittedBox shrink-down.
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _bandToggle(
+                key: ValueKey('eq_band_mute_$index'),
+                label: 'M',
+                tooltip: isMuted
+                    ? context.l10n.dspUnmuteBand
+                    : context.l10n.dspMuteBand,
+                active: isMuted,
+                activeColor: errorColor,
+                onTap: isEnabled
+                    ? () async {
+                        final next = !isMuted;
+                        final manager = _equalizerManagerOrNull();
+                        if (manager != null) {
+                          await manager.setBandMute(index, next);
                         }
-                      : null,
-                ),
-                const SizedBox(width: AppSpacing.s2),
-                _bandToggle(
-                  label: 'S',
-                  tooltip: isSoloed
-                      ? context.l10n.dspUnsoloBand
-                      : context.l10n.dspSoloBand,
-                  active: isSoloed,
-                  activeColor: accentColor,
-                  onTap: isEnabled
-                      ? () async {
-                          final next = !isSoloed;
-                          final manager = _equalizerManagerOrNull();
-                          if (manager != null) {
-                            await manager.setBandSolo(index, next);
+                        if (!mounted) return;
+                        _setStateSafe(() {
+                          if (next) {
+                            _mutedBands.add(index);
+                          } else {
+                            _mutedBands.remove(index);
                           }
-                          if (!mounted) return;
-                          _setStateSafe(() {
-                            if (next) {
-                              _soloedBands.add(index);
-                            } else {
-                              _soloedBands.remove(index);
-                            }
-                          });
+                        });
+                      }
+                    : null,
+              ),
+              _bandToggle(
+                key: ValueKey('eq_band_solo_$index'),
+                label: 'S',
+                tooltip: isSoloed
+                    ? context.l10n.dspUnsoloBand
+                    : context.l10n.dspSoloBand,
+                active: isSoloed,
+                activeColor: accentColor,
+                onTap: isEnabled
+                    ? () async {
+                        final next = !isSoloed;
+                        final manager = _equalizerManagerOrNull();
+                        if (manager != null) {
+                          await manager.setBandSolo(index, next);
                         }
-                      : null,
-                ),
-              ],
-            ),
+                        if (!mounted) return;
+                        _setStateSafe(() {
+                          if (next) {
+                            _soloedBands.add(index);
+                          } else {
+                            _soloedBands.remove(index);
+                          }
+                        });
+                      }
+                    : null,
+              ),
+            ],
           ),
         ],
       ),
@@ -205,35 +204,40 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
   }
 
   Widget _bandToggle({
+    Key? key,
     required String label,
     required String tooltip,
     required bool active,
     required Color activeColor,
     required VoidCallback? onTap,
   }) {
+    final p = context.palette;
     return Semantics(
       button: true,
+      toggled: active,
+      enabled: onTap != null,
       label: tooltip,
       child: Tooltip(
         message: tooltip,
         child: InkWell(
+          key: key,
           onTap: onTap,
-          borderRadius: AppRadii.r4All,
+          borderRadius: AppRadii.r8All,
           child: SizedBox(
-            width: 24,
-            height: 24,
+            width: AppSpacing.minTouchTarget,
+            height: AppSpacing.minTouchTarget,
             child: Center(
               child: Container(
-                width: 15,
-                height: 15,
+                width: 24,
+                height: 24,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: active
                       ? activeColor.withValues(alpha: 0.18)
-                      : Colors.transparent,
-                  borderRadius: AppRadii.r4All,
+                      : p.surfaceContainer.withValues(alpha: 0.4),
+                  borderRadius: AppRadii.r6All,
                   border: Border.all(
-                    color: active ? activeColor : context.palette.hairline,
+                    color: active ? activeColor : p.hairline,
                   ),
                 ),
                 child: Text(
@@ -242,7 +246,7 @@ extension _EqBandSliderColumn on _EqualizerSheetState {
                     fontSize: AppFontSize.caption,
                     height: 1.0,
                     fontWeight: FontWeight.w800,
-                    color: active ? activeColor : context.palette.textTertiary,
+                    color: active ? activeColor : p.textTertiary,
                   ),
                 ),
               ),
@@ -329,6 +333,9 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final surfacePalette = context.playerSurfacePalette;
+    final animate = PulsrMotion.shouldAnimate(context);
     final gain = (_isDragging && _dragGain != null ? _dragGain! : widget.value)
         .clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
 
@@ -339,8 +346,8 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: AnimatedContainer(
-            duration: context.motionMs(120),
-            curve: context.motionCurve(PulsrMotion.enter),
+            duration: animate ? context.motionMs(120) : Duration.zero,
+            curve: PulsrMotion.resolveCurve(context, PulsrMotion.enter),
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.s6, vertical: AppSpacing.s2),
             decoration: BoxDecoration(
@@ -354,7 +361,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                     ? widget.accentColor
                     : (gain.abs() > 0.1
                         ? widget.accentColor.withValues(alpha: 0.4)
-                        : Colors.transparent),
+                        : widget.trackColor.withValues(alpha: 0.0)),
                 width: 1.0,
               ),
             ),
@@ -363,7 +370,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 color: _isDragging
-                    ? Colors.white
+                    ? p.onAccent
                     : (gain.abs() > 0.1
                         ? widget.accentColor
                         : widget.textColor),
@@ -374,126 +381,134 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         ),
         const SizedBox(height: AppSpacing.xs),
 
-        // Vertical Slider Track
-        SizedBox(
-          height: 140,
-          width: double.infinity,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final height = constraints.maxHeight;
-              const topMargin = 12.0;
-              const bottomMargin = 12.0;
-              final trackHeight = height - topMargin - bottomMargin;
-              final fraction = (gain - _VerticalEqSlider.min) /
-                  (_VerticalEqSlider.max - _VerticalEqSlider.min);
-              final thumbY = topMargin + (1.0 - fraction) * trackHeight;
-              final centerY = topMargin + trackHeight / 2;
+        // Vertical Slider Track (>= 48dp wide hit target)
+        ConstrainedBox(
+          constraints: const BoxConstraints(
+            minWidth: AppSpacing.minTouchTarget,
+            minHeight: 140,
+            maxHeight: 140,
+          ),
+          child: SizedBox(
+            height: 140,
+            width: double.infinity,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final height = constraints.maxHeight;
+                const topMargin = 12.0;
+                const bottomMargin = 12.0;
+                final trackHeight = height - topMargin - bottomMargin;
+                final fraction = (gain - _VerticalEqSlider.min) /
+                    (_VerticalEqSlider.max - _VerticalEqSlider.min);
+                final thumbY = topMargin + (1.0 - fraction) * trackHeight;
+                final centerY = topMargin + trackHeight / 2;
 
-              // AUDIT-FIX (P2-21): Outer slider column Semantics owns the single
-              // slider node (`excludeSemantics: true`); avoid a duplicate inner
-              // slider node here.
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                // Tap-to-set on release so starting a drag never jumps the band.
-                onTapUp: (details) {
-                  _handlePointer(details.localPosition.dy, height,
-                      notifyParent: true);
-                },
-                // Double-tap-to-zero (0.0 dB) reset with confirmation haptics.
-                onDoubleTap: () {
-                  PulsrHaptics.confirm();
-                  widget.onChanged(0.0);
-                  setState(() => _dragGain = 0.0);
-                },
-                onVerticalDragStart: (details) {
-                  setState(() => _isDragging = true);
-                  widget.onDragStart?.call();
-                  _handlePointer(details.localPosition.dy, height,
-                      notifyParent: true);
-                },
-                onVerticalDragUpdate: (details) {
-                  _handlePointer(details.localPosition.dy, height,
-                      notifyParent: true);
-                },
-                onVerticalDragEnd: (_) {
-                  final finalGain = _dragGain ?? widget.value;
-                  widget.onChanged(finalGain);
-                  widget.onDragEnd?.call();
-                  setState(() {
-                    _isDragging = false;
-                    _dragGain = null;
-                  });
-                },
-                onVerticalDragCancel: () {
-                  widget.onDragEnd?.call();
-                  setState(() {
-                    _isDragging = false;
-                    _dragGain = null;
-                  });
-                },
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    CustomPaint(
-                      size: Size(constraints.maxWidth, height),
-                      painter: _VerticalSliderPainter(
-                        fraction: fraction,
-                        thumbY: thumbY,
-                        centerY: centerY,
-                        topMargin: topMargin,
-                        bottomMargin: bottomMargin,
-                        isDragging: _isDragging,
-                        isEnabled: widget.isEnabled,
-                        accentColor: widget.accentColor,
-                        trackColor: widget.trackColor,
-                        surfaceColor: widget.surfaceColor,
+                // AUDIT-FIX (P2-21): Outer slider column Semantics owns the single
+                // slider node (`excludeSemantics: true`); avoid a duplicate inner
+                // slider node here.
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  // Tap-to-set on release so starting a drag never jumps the band.
+                  onTapUp: (details) {
+                    _handlePointer(details.localPosition.dy, height,
+                        notifyParent: true);
+                  },
+                  // Double-tap-to-zero (0.0 dB) reset with confirmation haptics.
+                  onDoubleTap: () {
+                    PulsrHaptics.confirm();
+                    widget.onChanged(0.0);
+                    setState(() => _dragGain = 0.0);
+                  },
+                  onVerticalDragStart: (details) {
+                    setState(() => _isDragging = true);
+                    widget.onDragStart?.call();
+                    _handlePointer(details.localPosition.dy, height,
+                        notifyParent: true);
+                  },
+                  onVerticalDragUpdate: (details) {
+                    _handlePointer(details.localPosition.dy, height,
+                        notifyParent: true);
+                  },
+                  onVerticalDragEnd: (_) {
+                    final finalGain = _dragGain ?? widget.value;
+                    widget.onChanged(finalGain);
+                    widget.onDragEnd?.call();
+                    setState(() {
+                      _isDragging = false;
+                      _dragGain = null;
+                    });
+                  },
+                  onVerticalDragCancel: () {
+                    widget.onDragEnd?.call();
+                    setState(() {
+                      _isDragging = false;
+                      _dragGain = null;
+                    });
+                  },
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CustomPaint(
+                        size: Size(constraints.maxWidth, height),
+                        painter: _VerticalSliderPainter(
+                          fraction: fraction,
+                          thumbY: thumbY,
+                          centerY: centerY,
+                          topMargin: topMargin,
+                          bottomMargin: bottomMargin,
+                          isDragging: _isDragging,
+                          isEnabled: widget.isEnabled,
+                          accentColor: widget.accentColor,
+                          trackColor: widget.trackColor,
+                          surfaceColor: widget.surfaceColor,
+                          coreColor: surfacePalette.highContrastInk,
+                        ),
                       ),
-                    ),
-                    // Floating dB readout badge while dragging
-                    if (_isDragging)
-                      PositionedDirectional(
-                        top: (thumbY - 26).clamp(0.0, height - 22.0),
-                        start: 0,
-                        end: 0,
-                        child: Center(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color:
-                                  widget.surfaceColor.withValues(alpha: 0.95),
-                              borderRadius: AppRadii.r6All,
-                              border: Border.all(
-                                color:
-                                    widget.accentColor.withValues(alpha: 0.7),
-                                width: 1.0,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.35),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
+                      // Floating dB readout badge while dragging
+                      if (_isDragging)
+                        PositionedDirectional(
+                          top: (thumbY - 26).clamp(0.0, height - 22.0),
+                          start: 0,
+                          end: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: widget.surfaceColor
+                                    .withValues(alpha: 0.95),
+                                borderRadius: AppRadii.r6All,
+                                border: Border.all(
+                                  color: widget.accentColor
+                                      .withValues(alpha: 0.7),
+                                  width: 1.0,
                                 ),
-                              ],
-                            ),
-                            child: Text(
-                              '${gain > 0 ? "+" : ""}${gain.toStringAsFixed(1)} dB',
-                              style: TextStyle(
-                                fontSize: AppFontSize.caption,
-                                fontWeight: FontWeight.w700,
-                                color: widget.accentColor,
-                                fontFeatures: const [
-                                  FontFeature.tabularFigures()
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: surfacePalette.shadowAt(0.35),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
                                 ],
+                              ),
+                              child: Text(
+                                '${gain > 0 ? "+" : ""}${gain.toStringAsFixed(1)} dB',
+                                style: TextStyle(
+                                  fontSize: AppFontSize.caption,
+                                  fontWeight: FontWeight.w700,
+                                  color: widget.accentColor,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              );
-            },
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -541,6 +556,7 @@ class _VerticalSliderPainter extends CustomPainter {
   final Color accentColor;
   final Color trackColor;
   final Color surfaceColor;
+  final Color coreColor;
 
   _VerticalSliderPainter({
     required this.fraction,
@@ -553,6 +569,7 @@ class _VerticalSliderPainter extends CustomPainter {
     required this.accentColor,
     required this.trackColor,
     required this.surfaceColor,
+    required this.coreColor,
   });
 
   @override
@@ -624,7 +641,7 @@ class _VerticalSliderPainter extends CustomPainter {
 
     // Thumb Inner Core
     final corePaint = Paint()
-      ..color = isEnabled ? Colors.white : surfaceColor
+      ..color = isEnabled ? coreColor : surfaceColor
       ..style = PaintingStyle.fill;
     canvas.drawCircle(
         Offset(centerX, thumbY), isDragging ? 3.5 : 3.0, corePaint);
@@ -636,6 +653,7 @@ class _VerticalSliderPainter extends CustomPainter {
         oldDelegate.thumbY != thumbY ||
         oldDelegate.isDragging != isDragging ||
         oldDelegate.isEnabled != isEnabled ||
-        oldDelegate.accentColor != accentColor;
+        oldDelegate.accentColor != accentColor ||
+        oldDelegate.coreColor != coreColor;
   }
 }

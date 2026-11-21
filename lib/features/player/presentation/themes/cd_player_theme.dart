@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/utils/adaptive.dart';
@@ -50,6 +51,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   late final AnimationController _pickupController;
   late final CurvedAnimation _pickupAnimation;
   late final AnimationController _glossController;
+  bool? _lastAllowMotion;
 
   @override
   void initState() {
@@ -85,6 +87,9 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
     );
   }
 
+  bool _allowMotion(BuildContext context) =>
+      PulsrMotion.shouldAnimate(context) && context.motionEnabled;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -94,8 +99,9 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
     _syncRotation();
   }
 
-  void _syncRotation() {
-    final shouldSpin = widget.props.state.isPlaying && context.motionEnabled;
+  void _syncRotation({bool? allowMotionOverride}) {
+    final allowMotion = allowMotionOverride ?? _allowMotion(context);
+    final shouldSpin = widget.props.state.isPlaying && allowMotion;
     if (shouldSpin) {
       if (!_rotationController.isAnimating) {
         _rotationController.repeat();
@@ -106,7 +112,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
         curve: Curves.easeOutCubic,
       );
     } else {
-      if (!context.motionEnabled) {
+      if (!allowMotion) {
         _velocityController.value = 0.0;
         if (_rotationController.isAnimating) {
           _rotationController.stop();
@@ -132,15 +138,21 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   @override
   void didUpdateWidget(covariant CdPlayerTheme oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final allowMotion = _allowMotion(context);
     if (widget.props.state.isPlaying != oldWidget.props.state.isPlaying) {
-      if (widget.props.state.isPlaying) {
-        _pickupController.forward();
+      if (!allowMotion) {
+        _pickupController.value = widget.props.state.isPlaying ? 1.0 : 0.0;
+        _glossController.value = 1.0;
       } else {
-        _pickupController.reverse();
+        if (widget.props.state.isPlaying) {
+          _pickupController.forward();
+        } else {
+          _pickupController.reverse();
+        }
+        _sweepCaseGloss();
       }
-      _sweepCaseGloss();
     }
-    _syncRotation();
+    _syncRotation(allowMotionOverride: allowMotion);
   }
 
   /// Replays the jewel-case highlight whenever playback starts or stops.
@@ -148,7 +160,7 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   /// With motion disabled the band is parked past the case instead of running,
   /// so a reduced-motion build never animates the lid.
   void _sweepCaseGloss() {
-    if (!context.motionEnabled) {
+    if (!_allowMotion(context)) {
       _glossController.value = 1.0;
       return;
     }
@@ -166,5 +178,23 @@ class _CdPlayerThemeState extends State<CdPlayerTheme>
   }
 
   @override
-  Widget build(BuildContext context) => _buildBody(context);
+  Widget build(BuildContext context) {
+    final allowMotion = _allowMotion(context);
+    if (_lastAllowMotion != allowMotion) {
+      _lastAllowMotion = allowMotion;
+      if (!allowMotion) {
+        if (_rotationController.isAnimating) {
+          _rotationController.stop();
+        }
+        _velocityController.value = 0.0;
+        _pickupController.value = widget.props.state.isPlaying ? 1.0 : 0.0;
+        _glossController.value = 1.0;
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _syncRotation(allowMotionOverride: allowMotion);
+        });
+      }
+    }
+    return _buildBody(context);
+  }
 }

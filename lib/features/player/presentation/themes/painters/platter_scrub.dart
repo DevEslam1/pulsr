@@ -13,6 +13,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
+import '../../../../../core/theme/aura_theme.dart';
 import '../../../../../core/utils/formatters.dart';
 import '../../../../../core/utils/l10n_extensions.dart';
 import '../../../../../core/utils/pulsr_haptics.dart';
@@ -215,6 +216,7 @@ class PlatterScrubPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     return ExcludeSemantics(
       child: AnimatedBuilder(
         animation: controller,
@@ -227,7 +229,7 @@ class PlatterScrubPill extends StatelessWidget {
               vertical: AppSpacing.s6,
             ),
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.82),
+              color: surface.tapeWindow.withValues(alpha: 0.90),
               borderRadius: AppRadii.full,
               border: Border.all(
                 color: activeColor.withValues(alpha: 0.65),
@@ -254,10 +256,10 @@ class PlatterScrubPill extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xxs),
                 Text(
                   '${seconds >= 0 ? '+' : ''}${seconds.toStringAsFixed(1)}s',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: AppFontSize.label,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: surface.highContrastInk,
                     letterSpacing: AppTracking.label,
                   ),
                 ),

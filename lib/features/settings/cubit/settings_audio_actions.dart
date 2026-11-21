@@ -26,6 +26,7 @@ mixin SettingsAudioActions on PulsrCubit<SettingsState> {
   /// Last rate pushed to the tap-side SRC, so a route refresh that changes
   /// nothing does not re-fan-out to every player. Null = never pushed.
   int? _lastTapSrcTargetRate;
+  int? _lastDynamicBtBufferMs;
   bool _suppressTapSrcSync = false;
 
   /// Restores user DSP/follow preferences when Strict Bit-Perfect is turned OFF.

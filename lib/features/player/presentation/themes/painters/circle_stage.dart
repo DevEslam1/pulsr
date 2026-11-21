@@ -172,6 +172,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final surface = context.playerSurfacePalette;
     final state = widget.props.state;
     final currentSong = state.currentSong;
     final durationMs = state.duration.inMilliseconds;
@@ -233,6 +234,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
                   size: Size(dialSize, dialSize),
                   painter: _RotaryBezelPainter(
                     palette: p,
+                    surface: surface,
                     activeColor: activeColor,
                   ),
                 ),
@@ -251,6 +253,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
                         progress: _dragProgress.value ?? progress,
                         isPlaying: state.isPlaying,
                         grab: _grabController.value,
+                        surface: surface,
                       ),
                     ),
                   ),
@@ -266,14 +269,14 @@ class _CircleArtworkState extends State<_CircleArtwork>
                         height: dialSize * 0.68,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: PlayerMaterialColors.circleSpindle,
+                          color: surface.vinylGroove,
                           border: Border.all(
-                            color: AppColors.specularAt(0.32),
+                            color: surface.specularAt(0.32),
                             width: 2.5,
                           ),
-                          boxShadow: const [
+                          boxShadow: [
                             BoxShadow(
-                              color: Colors.black87,
+                              color: surface.shadowAt(0.87),
                               blurRadius: 16,
                               spreadRadius: 2,
                             ),
@@ -286,7 +289,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
                             // Micro-Grooves on inner disc
                             CustomPaint(
                               size: Size(dialSize * 0.68, dialSize * 0.68),
-                              painter: _InnerGroovesPainter(),
+                              painter: _InnerGroovesPainter(surface: surface),
                             ),
 
                             // Album Artwork Label
@@ -296,7 +299,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                  color: Colors.white24,
+                                  color: surface.specularAt(0.24),
                                   width: 1.5,
                                 ),
                               ),
@@ -320,7 +323,7 @@ class _CircleArtworkState extends State<_CircleArtwork>
                                       child: Icon(
                                         Icons.album_rounded,
                                         size: dialSize * 0.22,
-                                        color: Colors.white54,
+                                        color: surface.mutedInk,
                                       ),
                                     ),
                             ),
@@ -333,19 +336,19 @@ class _CircleArtworkState extends State<_CircleArtwork>
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    Colors.grey.shade300,
-                                    Colors.grey.shade700,
+                                    surface.platterMetalHighlight,
+                                    surface.platterMetalDeep,
                                     PlayerMaterialColors.headshellShadow,
                                   ],
                                   stops: const [0.0, 0.6, 1.0],
                                 ),
                                 border: Border.all(
-                                  color: Colors.white38,
+                                  color: surface.specularAt(0.38),
                                   width: 1.2,
                                 ),
-                                boxShadow: const [
+                                boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black54,
+                                    color: surface.shadowAt(0.54),
                                     blurRadius: 4,
                                   ),
                                 ],
@@ -431,10 +434,12 @@ class _CircleArtworkState extends State<_CircleArtwork>
 // ---------------------------------------------------------------------------
 class _RotaryBezelPainter extends CustomPainter {
   final PulsrPalette palette;
+  final PlayerSurfacePalette surface;
   final Color activeColor;
 
   _RotaryBezelPainter({
     required this.palette,
+    required this.surface,
     required this.activeColor,
   });
 
@@ -446,10 +451,10 @@ class _RotaryBezelPainter extends CustomPainter {
     // 1. Dark titanium outer housing
     final housingPaint = Paint()
       ..shader = RadialGradient(
-        colors: const [
-          PlayerMaterialColors.circleRimOuter,
+        colors: [
+          surface.cassetteShell,
           PlayerMaterialColors.headshellShadow,
-          PlayerMaterialColors.circleRimInner,
+          surface.vinylGroove,
         ],
         stops: const [0.82, 0.94, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: outerRadius));
@@ -461,10 +466,10 @@ class _RotaryBezelPainter extends CustomPainter {
       ..strokeWidth = 2.0
       ..shader = SweepGradient(
         colors: [
-          Colors.white.withValues(alpha: 0.25),
-          Colors.white.withValues(alpha: 0.05),
-          Colors.white.withValues(alpha: 0.25),
-          Colors.white.withValues(alpha: 0.05),
+          surface.specularAt(0.25),
+          surface.specularAt(0.05),
+          surface.specularAt(0.25),
+          surface.specularAt(0.05),
         ],
         stops: const [0.0, 0.45, 0.70, 1.0],
       ).createShader(Rect.fromCircle(center: center, radius: outerRadius));
@@ -472,12 +477,12 @@ class _RotaryBezelPainter extends CustomPainter {
 
     // 3. Precision Swiss/Rotary knurling ticks around the perimeter
     final tickPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.22)
+      ..color = surface.specularAt(0.22)
       ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round;
 
     final majorTickPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.55)
+      ..color = surface.specularAt(0.55)
       ..strokeWidth = 1.6
       ..strokeCap = StrokeCap.round;
 
@@ -512,7 +517,7 @@ class _RotaryBezelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _RotaryBezelPainter oldDelegate) =>
-      oldDelegate.activeColor != activeColor;
+      oldDelegate.activeColor != activeColor || oldDelegate.surface != surface;
 }
 
 // ---------------------------------------------------------------------------
@@ -526,11 +531,13 @@ class _CircularProgressArcPainter extends CustomPainter {
   /// 0 when idle, 1 when the finger is holding the scrub band. Drives the bead
   /// swell and halo: the grab affordance that says the ring can be turned.
   final double grab;
+  final PlayerSurfacePalette surface;
 
   _CircularProgressArcPainter({
     required this.activeColor,
     required this.progress,
     required this.isPlaying,
+    required this.surface,
     this.grab = 0.0,
   });
 
@@ -543,7 +550,7 @@ class _CircularProgressArcPainter extends CustomPainter {
     final trackPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4.0
-      ..color = Colors.white.withValues(alpha: 0.08);
+      ..color = surface.specularAt(0.08);
     canvas.drawCircle(center, arcRadius, trackPaint);
 
     if (progress <= 0.001) return;
@@ -591,7 +598,7 @@ class _CircularProgressArcPainter extends CustomPainter {
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 6.0 + (4.0 * grab));
     canvas.drawCircle(beadPos, 6.0 + (4.5 * grab), beadGlowPaint);
 
-    final beadPaint = Paint()..color = Colors.white;
+    final beadPaint = Paint()..color = surface.highContrastInk;
     canvas.drawCircle(beadPos, 3.5 + (3.0 * grab), beadPaint);
 
     // A thin grip ring only while pressed, so the bead reads as a knob the
@@ -610,7 +617,8 @@ class _CircularProgressArcPainter extends CustomPainter {
       oldDelegate.progress != progress ||
       oldDelegate.activeColor != activeColor ||
       oldDelegate.isPlaying != isPlaying ||
-      oldDelegate.grab != grab;
+      oldDelegate.grab != grab ||
+      oldDelegate.surface != surface;
 }
 
 // ---------------------------------------------------------------------------
@@ -651,6 +659,10 @@ class _RingScrubHitArea extends CustomPainter {
 // Inner Disc Micro-Grooves Painter
 // ---------------------------------------------------------------------------
 class _InnerGroovesPainter extends CustomPainter {
+  final PlayerSurfacePalette surface;
+
+  _InnerGroovesPainter({required this.surface});
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -659,7 +671,7 @@ class _InnerGroovesPainter extends CustomPainter {
     final groovePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8
-      ..color = Colors.white.withValues(alpha: 0.04);
+      ..color = surface.specularAt(0.04);
 
     for (double r = radius * 0.40; r < radius - 4; r += 5.5) {
       canvas.drawCircle(center, r, groovePaint);
@@ -667,7 +679,8 @@ class _InnerGroovesPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _InnerGroovesPainter oldDelegate) =>
+      oldDelegate.surface != surface;
 }
 
 // ---------------------------------------------------------------------------

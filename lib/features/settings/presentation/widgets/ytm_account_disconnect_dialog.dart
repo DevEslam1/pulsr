@@ -15,6 +15,7 @@ import '../../../auth/presentation/ytm_web_login_sheet.dart';
 /// first one's WebView cookie deletion and native clear, and can re-import the
 /// jar the first pass was still tearing down.
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 
@@ -121,12 +122,10 @@ class _YtmAccountDisconnectDialogState
             foregroundColor: AppColors.textOnAccent(widget.error),
           ),
           child: _busy
-              ? SizedBox(
-                  width: AppSpacing.md,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.textOnAccent(widget.error)),
+              ? PulsrProgressBar.circular(
+                  size: AppSpacing.md,
+                  strokeWidth: 2,
+                  color: AppColors.textOnAccent(widget.error),
                 )
               : Text(context.l10n.disconnect),
         ),

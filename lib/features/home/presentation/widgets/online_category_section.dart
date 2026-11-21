@@ -98,29 +98,33 @@ class _OnlineCategorySectionState extends State<OnlineCategorySection> {
               PulsrSectionHeader(title: widget.title),
               SizedBox(
                 height: scaledCarouselHeight(context, isTablet),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  physics: const NeverScrollableScrollPhysics(),
-                  addAutomaticKeepAlives: false,
-                  addRepaintBoundaries: true,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  itemCount: 4,
-                  itemBuilder: (context, index) => Padding(
-                    padding:
-                        const EdgeInsetsDirectional.only(end: AppSpacing.s14),
-                    child: SizedBox(
-                      width: size,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SkeletonBox(
-                              width: size, height: size, radius: AppRadii.r18),
-                          const SizedBox(height: AppSpacing.xs),
-                          SkeletonLine(width: size * 0.75, height: 12),
-                          const SizedBox(height: AppSpacing.s6),
-                          SkeletonLine(width: size * 0.45, height: 10),
-                        ],
+                child: SkeletonShimmer(
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    physics: const NeverScrollableScrollPhysics(),
+                    addAutomaticKeepAlives: false,
+                    addRepaintBoundaries: true,
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context)),
+                    itemCount: 4,
+                    itemBuilder: (context, index) => Padding(
+                      padding:
+                          const EdgeInsetsDirectional.only(end: AppSpacing.s14),
+                      child: SizedBox(
+                        width: size,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SkeletonBox(
+                                width: size,
+                                height: size,
+                                radius: AppRadii.r18),
+                            const SizedBox(height: AppSpacing.xs),
+                            SkeletonLine(width: size * 0.75, height: 12),
+                            const SizedBox(height: AppSpacing.s6),
+                            SkeletonLine(width: size * 0.45, height: 10),
+                          ],
+                        ),
                       ),
                     ),
                   ),

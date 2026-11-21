@@ -88,8 +88,16 @@ public:
     // channels 1..8, taps 8..64 (even), phases 32..1024. Allocates the
     // coefficient table and the working buffers; returns false and leaves the
     // object unusable on bad geometry.
-    bool configure(int channels, int taps = kDefaultTaps, int phases = kDefaultPhases);
+    // allowDynamicBypass: true (default) allows ratio == 1.0 to enter a
+    // bit-identical memcpy bypass (clearing history on transition).
+    // Set to false for live clock-tracking (ClockSyncAsrc) so crossing nominal
+    // rate never wipes filter history, drops frames, or steps phase.
+    bool configure(int channels, int taps = kDefaultTaps, int phases = kDefaultPhases,
+                   bool allowDynamicBypass = true);
     bool isConfigured() const { return configured_; }
+
+    void setAllowDynamicBypass(bool allow);
+    bool allowDynamicBypass() const { return allowDynamicBypass_; }
 
     // See the ratio convention above. NaN/Inf/<=0 are ignored (previous ratio
     // is kept); everything else is clamped into [kMinRatio, kMaxRatio].
@@ -147,6 +155,7 @@ private:
     double step_ = 1.0;
     double pos_ = 0.0;  // fractional read position inside the pending region
     bool bypass_ = true;
+    bool allowDynamicBypass_ = true;
     bool configured_ = false;
 };
 

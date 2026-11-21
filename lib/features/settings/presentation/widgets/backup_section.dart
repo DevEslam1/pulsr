@@ -11,6 +11,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/utils/safe_file_path.dart';
 import '../../../../core/widgets/pulsr_dialog.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../data/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -289,10 +290,9 @@ class _BackupSectionState extends State<BackupSection> {
             style: TextStyle(color: textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: _isExporting
-              ? const SizedBox(
-                  width: AppSpacing.s20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              ? PulsrProgressBar.circular(
+                  size: AppSpacing.s20,
+                  strokeWidth: 2,
                 )
               : Icon(Icons.chevron_right_rounded, color: textSecondary),
           onTap: _isExporting ? null : () => _exportBackup(context),
@@ -310,10 +310,9 @@ class _BackupSectionState extends State<BackupSection> {
             style: TextStyle(color: textSecondary, fontSize: AppFontSize.label),
           ),
           trailing: _isImporting
-              ? const SizedBox(
-                  width: AppSpacing.s20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              ? PulsrProgressBar.circular(
+                  size: AppSpacing.s20,
+                  strokeWidth: 2,
                 )
               : Icon(Icons.chevron_right_rounded, color: textSecondary),
           onTap: _isImporting ? null : () => _importBackup(context),

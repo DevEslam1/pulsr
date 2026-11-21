@@ -574,30 +574,34 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       decoration: BoxDecoration(
         color: p.error.withValues(alpha: 0.94),
         borderRadius: AppRadii.r10All,
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Colors.black38,
+            color: p.scrimMedium,
             blurRadius: 8,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.visibility_off_rounded,
             size: 14,
-            color: Colors.white,
+            color: p.onError,
           ),
           const SizedBox(width: AppSpacing.xs),
-          Text(
-            context.l10n.folderPersistentExcludedBadge,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: AppFontSize.caption,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.4,
+          Flexible(
+            child: Text(
+              context.l10n.folderPersistentExcludedBadge,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: p.onError,
+                fontSize: AppFontSize.caption,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
             ),
           ),
         ],
@@ -737,6 +741,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
               if (_isExcluded)
                 Container(
                   color: AppColors.scrimAt(0.55),
+                  padding: const EdgeInsets.all(AppSpacing.xs),
                   child: Center(child: _buildExcludedBadge(context, p)),
                 ),
             ],
@@ -776,7 +781,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         border: Border.all(color: p.hairline, width: 1),
       ),
       child: Material(
-        color: Colors.transparent,
+        color: AppColors.fadeStopTransparent,
         child: InkWell(
           borderRadius: AppRadii.r16All,
           onTap: () {
@@ -887,11 +892,13 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
 
     final isUnixAbsolute = cleanPath.startsWith('/');
     final isWindowsDrive = RegExp(r'^[A-Za-z]:$').hasMatch(parts.first);
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.6);
 
     return GestureDetector(
       onLongPress: _copyFolderPath,
       child: Container(
-        height: compact ? 32 : 36,
+        height: ((compact ? 32.0 : 36.0) * textScale).roundToDouble(),
         margin: EdgeInsets.symmetric(
           horizontal: compact ? AppSpacing.sm : Adaptive.pagePadding(context),
           vertical: AppSpacing.xxs,
@@ -934,7 +941,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     child: Material(
                       color: isLast
                           ? p.accent.withValues(alpha: 0.14)
-                          : Colors.transparent,
+                          : AppColors.fadeStopTransparent,
                       borderRadius: AppRadii.r8All,
                       child: InkWell(
                         borderRadius: AppRadii.r8All,
@@ -989,14 +996,18 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
       padding: padding,
       child: Row(
         children: [
-          Text(
-            context.l10n.browseTopTracks,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  fontSize: AppFontSize.title,
-                  letterSpacing: -0.3,
-                  color: p.textPrimary,
-                ),
+          Flexible(
+            child: Text(
+              context.l10n.browseTopTracks,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    fontSize: AppFontSize.title,
+                    letterSpacing: -0.3,
+                    color: p.textPrimary,
+                  ),
+            ),
           ),
           const SizedBox(width: AppSpacing.xs),
           Container(
@@ -1106,17 +1117,17 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             decoration: BoxDecoration(
               color: isActive
                   ? p.accent.withValues(alpha: 0.10)
-                  : Colors.transparent,
+                  : AppColors.fadeStopTransparent,
               borderRadius: AppRadii.r14All,
               border: Border.all(
                 color: isActive
                     ? p.accent.withValues(alpha: 0.32)
-                    : Colors.transparent,
+                    : AppColors.fadeStopTransparent,
                 width: 1,
               ),
             ),
             child: Material(
-              color: Colors.transparent,
+              color: AppColors.fadeStopTransparent,
               child: InkWell(
                 borderRadius: AppRadii.r14All,
                 onTap: () {
@@ -1402,7 +1413,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                     pinned: true,
                     elevation: 0,
                     backgroundColor: p.bg,
-                    surfaceTintColor: Colors.transparent,
+                    surfaceTintColor: AppColors.fadeStopTransparent,
                     leading: const PulsrBackButton(),
                     title: AnimatedOpacity(
                       duration: context.motion(PulsrMotion.state),
@@ -1497,7 +1508,7 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                       ],
                                       colors: [
                                         AppColors.scrimLight,
-                                        Colors.transparent,
+                                        AppColors.fadeStopTransparent,
                                         p.bg.withValues(alpha: 0.42),
                                         p.bg.withValues(alpha: 0.92),
                                         p.bg,
@@ -1530,11 +1541,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                           letterSpacing: -0.5,
                                           color: p.textPrimary,
                                           shadows: p.isDark
-                                              ? const [
+                                              ? [
                                                   Shadow(
-                                                    color: Colors.black54,
+                                                    color: p.scrimMedium,
                                                     blurRadius: 14,
-                                                    offset: Offset(0, 2),
+                                                    offset: const Offset(0, 2),
                                                   ),
                                                 ]
                                               : null,
@@ -1549,11 +1560,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                                           fontSize: AppFontSize.caption,
                                           fontWeight: FontWeight.w600,
                                           shadows: p.isDark
-                                              ? const [
+                                              ? [
                                                   Shadow(
-                                                    color: Colors.black54,
+                                                    color: p.scrimMedium,
                                                     blurRadius: 10,
-                                                    offset: Offset(0, 1),
+                                                    offset: const Offset(0, 1),
                                                   ),
                                                 ]
                                               : null,

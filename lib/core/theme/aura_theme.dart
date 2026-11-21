@@ -288,15 +288,183 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   }
 }
 
+/// Semantic hardware, scrim, and high-contrast ink tokens for immersive player
+/// themes (vinyl, CD, cassette, rotary circle, waveform, and milkdrop).
+///
+/// Registered in [ThemeData.extensions] by [AuraTheme.customTheme] across Dark,
+/// Light, AMOLED, High Contrast, and Dynamic Aura modes. Consume via
+/// `context.playerSurfacePalette` or [AuraTheme.surfacePaletteOf].
+@immutable
+class PlayerSurfacePalette extends ThemeExtension<PlayerSurfacePalette> {
+  const PlayerSurfacePalette({
+    required this.platterMetal,
+    required this.vinylGroove,
+    required this.cassetteShell,
+    required this.tapeWindow,
+    required this.ledGlow,
+    required this.scrimStart,
+    required this.scrimEnd,
+    required this.highContrastInk,
+  });
+
+  /// Brushed aluminum / titanium hardware tone (platter rim, tonearm, hub, spindle).
+  final Color platterMetal;
+
+  /// Deep vinyl disc / microgroove substrate tone.
+  final Color vinylGroove;
+
+  /// Skeuomorphic deck / cassette housing surface.
+  final Color cassetteShell;
+
+  /// Recessed smoked-acrylic tape window, VFD tray, and hardware readout backdrop.
+  final Color tapeWindow;
+
+  /// Optical laser / VFD / LED status glow calibrated for >= 4.5:1 contrast
+  /// against [tapeWindow] and [cassetteShell].
+  final Color ledGlow;
+
+  /// Leading-edge player scrim / veil (top-edge shader & artwork legibility).
+  final Color scrimStart;
+
+  /// Trailing-edge player scrim / veil (bottom-edge control legibility).
+  final Color scrimEnd;
+
+  /// High-contrast foreground ink guaranteed >= 4.5:1 against hardware surfaces
+  /// ([cassetteShell], [tapeWindow], [vinylGroove]).
+  final Color highContrastInk;
+
+  /// Secondary hardware legend ink guaranteed >= 4.5:1 against [cassetteShell]
+  /// and [tapeWindow].
+  Color get mutedInk => highContrastInk.withValues(alpha: 0.72);
+
+  /// Specular highlight / hairline derived from [highContrastInk].
+  Color specularAt(double alpha) => highContrastInk.withValues(alpha: alpha);
+
+  /// Brushed-metal highlight crest derived from [platterMetal].
+  Color get platterMetalHighlight =>
+      Color.lerp(platterMetal, highContrastInk, 0.35) ?? highContrastInk;
+
+  /// Mid-dark shade of [platterMetal] for metallic gradients and bevels.
+  Color get platterMetalDeep =>
+      Color.lerp(platterMetal, vinylGroove, 0.50) ?? platterMetal;
+
+  /// Deep shadow shade of [platterMetal] for recessed bearings and screws.
+  Color get platterMetalShadow =>
+      Color.lerp(platterMetal, vinylGroove, 0.78) ?? vinylGroove;
+
+  /// Hardware drop shadow tint anchored to [AppColors.scrimAt].
+  Color shadowAt(double alpha) => AppColors.scrimAt(alpha);
+
+  @override
+  PlayerSurfacePalette copyWith({
+    Color? platterMetal,
+    Color? vinylGroove,
+    Color? cassetteShell,
+    Color? tapeWindow,
+    Color? ledGlow,
+    Color? scrimStart,
+    Color? scrimEnd,
+    Color? highContrastInk,
+  }) {
+    return PlayerSurfacePalette(
+      platterMetal: platterMetal ?? this.platterMetal,
+      vinylGroove: vinylGroove ?? this.vinylGroove,
+      cassetteShell: cassetteShell ?? this.cassetteShell,
+      tapeWindow: tapeWindow ?? this.tapeWindow,
+      ledGlow: ledGlow ?? this.ledGlow,
+      scrimStart: scrimStart ?? this.scrimStart,
+      scrimEnd: scrimEnd ?? this.scrimEnd,
+      highContrastInk: highContrastInk ?? this.highContrastInk,
+    );
+  }
+
+  @override
+  PlayerSurfacePalette lerp(
+    covariant ThemeExtension<PlayerSurfacePalette>? other,
+    double t,
+  ) {
+    if (other is! PlayerSurfacePalette) return this;
+    return PlayerSurfacePalette(
+      platterMetal:
+          Color.lerp(platterMetal, other.platterMetal, t) ?? platterMetal,
+      vinylGroove: Color.lerp(vinylGroove, other.vinylGroove, t) ?? vinylGroove,
+      cassetteShell:
+          Color.lerp(cassetteShell, other.cassetteShell, t) ?? cassetteShell,
+      tapeWindow: Color.lerp(tapeWindow, other.tapeWindow, t) ?? tapeWindow,
+      ledGlow: Color.lerp(ledGlow, other.ledGlow, t) ?? ledGlow,
+      scrimStart: Color.lerp(scrimStart, other.scrimStart, t) ?? scrimStart,
+      scrimEnd: Color.lerp(scrimEnd, other.scrimEnd, t) ?? scrimEnd,
+      highContrastInk:
+          Color.lerp(highContrastInk, other.highContrastInk, t) ??
+              highContrastInk,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is PlayerSurfacePalette &&
+        other.platterMetal == platterMetal &&
+        other.vinylGroove == vinylGroove &&
+        other.cassetteShell == cassetteShell &&
+        other.tapeWindow == tapeWindow &&
+        other.ledGlow == ledGlow &&
+        other.scrimStart == scrimStart &&
+        other.scrimEnd == scrimEnd &&
+        other.highContrastInk == highContrastInk;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        platterMetal,
+        vinylGroove,
+        cassetteShell,
+        tapeWindow,
+        ledGlow,
+        scrimStart,
+        scrimEnd,
+        highContrastInk,
+      );
+}
+
 extension PulsrThemeX on BuildContext {
   PulsrPalette get palette =>
       Theme.of(this).extension<PulsrPalette>() ?? AuraTheme.defaultDark;
+  PlayerSurfacePalette get playerSurfacePalette =>
+      AuraTheme.surfacePaletteOf(this);
   bool get isDarkUi => palette.isDark;
 }
 
 class AuraTheme {
   static PulsrPalette get defaultDark =>
       _palette(AppColors.primary, Brightness.dark, false);
+  static PlayerSurfacePalette get defaultSurfaceDark =>
+      _surfacePalette(defaultDark, isAmoled: false, isHighContrast: false);
+  static PlayerSurfacePalette get defaultSurfaceLight => _surfacePalette(
+        _palette(AppColors.lightPrimary, Brightness.light, false),
+        isAmoled: false,
+        isHighContrast: false,
+      );
+
+  /// Resolves the active [PlayerSurfacePalette] from [context], falling back
+  /// gracefully to a brightness-matched default when a widget test uses a bare
+  /// [ThemeData] without registered extensions.
+  static PlayerSurfacePalette surfacePaletteOf(BuildContext context) {
+    final theme = Theme.of(context);
+    final ext = theme.extension<PlayerSurfacePalette>();
+    if (ext != null) return ext;
+    final p = theme.extension<PulsrPalette>();
+    if (p != null) {
+      return _surfacePalette(
+        p,
+        isAmoled: p.isDark && p.bg == Colors.black,
+        isHighContrast: false,
+      );
+    }
+    return theme.brightness == Brightness.dark
+        ? defaultSurfaceDark
+        : defaultSurfaceLight;
+  }
   static ThemeData get darkTheme =>
       customTheme(AppColors.primary, brightness: Brightness.dark);
   static ThemeData get lightTheme =>
@@ -625,6 +793,140 @@ class AuraTheme {
     );
   }
 
+  static PlayerSurfacePalette _surfacePalette(
+    PulsrPalette p, {
+    required bool isAmoled,
+    required bool isHighContrast,
+  }) {
+    if (!p.isDark) {
+      if (isHighContrast) {
+        const shell = Color(0xFF151822);
+        const window = Color(0xFF090B10);
+        return PlayerSurfacePalette(
+          platterMetal: AppColors.discSteel,
+          vinylGroove: const Color(0xFF0C0E14),
+          cassetteShell: shell,
+          tapeWindow: window,
+          ledGlow: _darkReadable(
+            AppColors.accentCyan,
+            surface: shell,
+            minContrast: 8.0,
+            containerAlpha: 0.22,
+          ),
+          scrimStart: p.surface.withValues(alpha: 0.72),
+          scrimEnd: p.surface.withValues(alpha: 0.90),
+          highContrastInk: const Color(0xFFFFFFFF),
+        );
+      }
+      final shell = Color.alphaBlend(
+        p.accent.withValues(alpha: 0.05),
+        const Color(0xFF1F2330),
+      );
+      final window = Color.alphaBlend(
+        p.accent.withValues(alpha: 0.03),
+        const Color(0xFF11141D),
+      );
+      final ledSeed = Color.lerp(AppColors.accentCyan, p.accent, 0.30)!;
+      return PlayerSurfacePalette(
+        platterMetal: Color.alphaBlend(
+          p.accent.withValues(alpha: 0.07),
+          AppColors.discAluminum,
+        ),
+        vinylGroove: Color.alphaBlend(
+          p.accent.withValues(alpha: 0.04),
+          const Color(0xFF14161E),
+        ),
+        cassetteShell: shell,
+        tapeWindow: window,
+        ledGlow: _darkReadable(
+          ledSeed,
+          surface: shell,
+          minContrast: 7.0,
+          containerAlpha: 0.16,
+        ),
+        scrimStart: p.bg.withValues(alpha: 0.56),
+        scrimEnd: p.surface.withValues(alpha: 0.72),
+        highContrastInk: const Color(0xFFFFFFFF),
+      );
+    }
+
+    if (isHighContrast) {
+      const shell = Color(0xFF0D0E12);
+      return PlayerSurfacePalette(
+        platterMetal: AppColors.discSilver,
+        vinylGroove: Colors.black,
+        cassetteShell: shell,
+        tapeWindow: Colors.black,
+        ledGlow: _darkReadable(
+          p.accent,
+          surface: shell,
+          minContrast: 7.5,
+          containerAlpha: 0.22,
+        ),
+        scrimStart: AppColors.scrimAt(0.65),
+        scrimEnd: AppColors.scrimAt(0.90),
+        highContrastInk: const Color(0xFFFFFFFF),
+      );
+    }
+
+    if (isAmoled) {
+      final shell = Color.alphaBlend(
+        p.accent.withValues(alpha: 0.04),
+        const Color(0xFF101116),
+      );
+      final ledSeed = Color.lerp(AppColors.accentCyan, p.accent, 0.35)!;
+      return PlayerSurfacePalette(
+        platterMetal: Color.alphaBlend(
+          p.accent.withValues(alpha: 0.05),
+          AppColors.discSilver,
+        ),
+        vinylGroove: const Color(0xFF050608),
+        cassetteShell: shell,
+        tapeWindow: Colors.black,
+        ledGlow: _darkReadable(
+          ledSeed,
+          surface: shell,
+          minContrast: 7.0,
+          containerAlpha: 0.16,
+        ),
+        scrimStart: AppColors.scrimAt(0.50),
+        scrimEnd: AppColors.scrimAt(0.82),
+        highContrastInk: const Color(0xFFFFFFFF),
+      );
+    }
+
+    final shell = Color.alphaBlend(
+      p.accent.withValues(alpha: 0.05),
+      PlayerMaterialColors.cassetteShell,
+    );
+    final window = Color.alphaBlend(
+      p.accent.withValues(alpha: 0.03),
+      PlayerMaterialColors.cassetteWell,
+    );
+    final ledSeed = Color.lerp(AppColors.accentCyan, p.accent, 0.35)!;
+    return PlayerSurfacePalette(
+      platterMetal: Color.alphaBlend(
+        p.accent.withValues(alpha: 0.06),
+        AppColors.discSilver,
+      ),
+      vinylGroove: Color.alphaBlend(
+        p.accent.withValues(alpha: 0.04),
+        PlayerMaterialColors.recordBase,
+      ),
+      cassetteShell: shell,
+      tapeWindow: window,
+      ledGlow: _darkReadable(
+        ledSeed,
+        surface: shell,
+        minContrast: 7.0,
+        containerAlpha: 0.16,
+      ),
+      scrimStart: p.deepShade.withValues(alpha: 0.45),
+      scrimEnd: p.deepShade.withValues(alpha: 0.68),
+      highContrastInk: const Color(0xFFFFFFFF),
+    );
+  }
+
   static ThemeData customTheme(
     Color accent, {
     Brightness brightness = Brightness.dark,
@@ -643,6 +945,11 @@ class AuraTheme {
         dimWhitePoint: dimWhitePoint,
         isHighContrast: isHighContrast,
         isCalmDensity: isCalmDensity);
+    final surfacePalette = _surfacePalette(
+      p,
+      isAmoled: isAmoled,
+      isHighContrast: isHighContrast,
+    );
     final isDark = p.isDark;
     final outlineWidth = isHighContrast ? 1.6 : 1.0;
     final focusRingWidth = isHighContrast ? 2.6 : 1.5;
@@ -770,7 +1077,7 @@ class AuraTheme {
           ),
         ),
       ),
-      extensions: [p],
+      extensions: [p, surfacePalette],
       colorScheme: ColorScheme(
         brightness: brightness,
         primary: p.accent,

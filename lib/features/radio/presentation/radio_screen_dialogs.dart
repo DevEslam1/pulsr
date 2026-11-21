@@ -18,54 +18,58 @@ class _StationArtwork extends StatelessWidget {
                 url: station.url,
               );
     if (artworkUrl == null || artworkUrl.isEmpty) {
-      return Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: isPlaying
-              ? p.accent.withValues(alpha: 0.2)
-              : p.accentContainer.withValues(alpha: 0.35),
-          borderRadius: AppRadii.r12All,
-          border: isPlaying ? Border.all(color: p.accent, width: 1.5) : null,
-        ),
-        alignment: Alignment.center,
-        child: Icon(
-          isPlaying ? Icons.graphic_eq_rounded : Icons.radio_rounded,
-          color: p.accent,
-          size: 22,
+      return ExcludeSemantics(
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: isPlaying
+                ? p.accent.withValues(alpha: 0.2)
+                : p.accentContainer.withValues(alpha: 0.35),
+            borderRadius: AppRadii.r12All,
+            border: isPlaying ? Border.all(color: p.accent, width: 1.5) : null,
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            isPlaying ? Icons.graphic_eq_rounded : Icons.radio_rounded,
+            color: p.accent,
+            size: 22,
+          ),
         ),
       );
     }
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CachedArtwork(
-          id: 0,
-          remoteUrl: artworkUrl,
-          size: 44,
-          borderRadius: AppRadii.r12,
-          fallbackIcon: Icons.radio_rounded,
-        ),
-        if (isPlaying)
-          PositionedDirectional(
-            end: -2,
-            bottom: -2,
-            child: Container(
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: p.accent,
-                shape: BoxShape.circle,
-                border: Border.all(color: p.bg, width: 1.5),
-              ),
-              child: Icon(
-                Icons.graphic_eq_rounded,
-                color: p.onAccent,
-                size: 11,
+    return ExcludeSemantics(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CachedArtwork(
+            id: 0,
+            remoteUrl: artworkUrl,
+            size: 44,
+            borderRadius: AppRadii.r12,
+            fallbackIcon: Icons.radio_rounded,
+          ),
+          if (isPlaying)
+            PositionedDirectional(
+              end: -2,
+              bottom: -2,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: p.accent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: p.bg, width: 1.5),
+                ),
+                child: Icon(
+                  Icons.graphic_eq_rounded,
+                  color: p.onAccent,
+                  size: 11,
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -166,22 +170,30 @@ class _AddStationDialogState extends State<_AddStationDialog> {
   Widget _buildPresetChip(String label, String assetPath) {
     final isSelected = _artworkUrl == assetPath;
     final p = context.palette;
-    return ChoiceChip(
-      avatar: ClipOval(
-        child: Image.asset(
-          assetPath,
-          width: 18,
-          height: 18,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14),
-        ),
-      ),
-      label: Text(label, style: const TextStyle(fontSize: AppFontSize.caption)),
+    return Semantics(
+      button: true,
       selected: isSelected,
-      onSelected: (val) {
-        setState(() => _artworkUrl = val ? assetPath : null);
-      },
-      selectedColor: p.accent.withValues(alpha: 0.25),
+      label: label,
+      child: ChoiceChip(
+        avatar: ExcludeSemantics(
+          child: ClipOval(
+            child: Image.asset(
+              assetPath,
+              width: 18,
+              height: 18,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 14),
+            ),
+          ),
+        ),
+        label:
+            Text(label, style: const TextStyle(fontSize: AppFontSize.caption)),
+        selected: isSelected,
+        onSelected: (val) {
+          setState(() => _artworkUrl = val ? assetPath : null);
+        },
+        selectedColor: p.accent.withValues(alpha: 0.25),
+      ),
     );
   }
 
@@ -190,51 +202,57 @@ class _AddStationDialogState extends State<_AddStationDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Center(
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    borderRadius: AppRadii.r16All,
-                    color: p.surfaceContainerHigh,
-                    border: Border.all(color: p.hairline),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: _artworkUrl != null && _artworkUrl!.isNotEmpty
-                      ? CachedArtwork(
-                          id: 0,
-                          remoteUrl: _artworkUrl,
-                          size: 68,
-                          borderRadius: 16,
-                          fallbackIcon: Icons.radio_rounded,
-                        )
-                      : Icon(Icons.radio_rounded, color: p.accent, size: 36),
-                ),
-              ),
-              PositionedDirectional(
-                end: -4,
-                bottom: -4,
-                child: GestureDetector(
-                  onTap: _pickImage,
-                  child: Container(
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: p.accent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.camera_alt_rounded,
-                      color: p.onAccent,
-                      size: 14,
+          child: Semantics(
+            button: true,
+            label: context.l10n.chooseArtwork,
+            child: GestureDetector(
+              onTap: _pickImage,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ExcludeSemantics(
+                    child: Container(
+                      width: 68,
+                      height: 68,
+                      decoration: BoxDecoration(
+                        borderRadius: AppRadii.r16All,
+                        color: p.surfaceContainerHigh,
+                        border: Border.all(color: p.hairline),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: _artworkUrl != null && _artworkUrl!.isNotEmpty
+                          ? CachedArtwork(
+                              id: 0,
+                              remoteUrl: _artworkUrl,
+                              size: 68,
+                              borderRadius: 16,
+                              fallbackIcon: Icons.radio_rounded,
+                            )
+                          : Icon(Icons.radio_rounded,
+                              color: p.accent, size: 36),
                     ),
                   ),
-                ),
+                  PositionedDirectional(
+                    end: -4,
+                    bottom: -4,
+                    child: ExcludeSemantics(
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: BoxDecoration(
+                          color: p.accent,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.camera_alt_rounded,
+                          color: p.onAccent,
+                          size: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.s10),
@@ -377,10 +395,13 @@ class _AddStationDialogState extends State<_AddStationDialog> {
 
     return PulsrDialog(
       icon: Icon(Icons.radio_rounded, color: p.accent, size: 28),
-      title: Text(
-        _isEditing
-            ? context.l10n.radioEditStation
-            : context.l10n.radioAddStation,
+      title: Semantics(
+        header: true,
+        child: Text(
+          _isEditing
+              ? context.l10n.radioEditStation
+              : context.l10n.radioAddStation,
+        ),
       ),
       content: ConstrainedBox(
         constraints: BoxConstraints(
@@ -491,7 +512,10 @@ class _ImportStationsDialogState extends State<_ImportStationsDialog> {
 
     return PulsrDialog(
       icon: Icon(Icons.download_rounded, color: p.accent, size: 28),
-      title: Text(context.l10n.radioImportTitle),
+      title: Semantics(
+        header: true,
+        child: Text(context.l10n.radioImportTitle),
+      ),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: SingleChildScrollView(

@@ -133,12 +133,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
       SnackBar(
         content: Row(
           children: [
-            SizedBox(
-              width: AppSpacing.md,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Theme.of(context).colorScheme.onInverseSurface,
+            const SkeletonShimmer(
+              child: SkeletonBox(
+                width: AppSpacing.md,
+                height: 16,
+                radius: 8,
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -434,12 +433,11 @@ mixin LibraryFavoritesTab on State<LibraryScreen> {
                     ),
                   ),
                   child: isLoading
-                      ? SizedBox(
-                          width: AppSpacing.s20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: p.onAccent,
+                      ? const SkeletonShimmer(
+                          child: SkeletonLine(
+                            width: 96,
+                            height: 14,
+                            radius: 7,
                           ),
                         )
                       : Text(

@@ -301,7 +301,12 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
     }
     maxFramesPerPacket_ = std::min(capacityFrames, nominalFrames + 1);
     if (IsReservoirMode(renderMode_)) {
-        const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 3000;
+        // Real-time ExoPlayer playback is paced by DefaultAudioSink's ~250 ms
+        // AudioTrack buffer, so an untuned reservoir defaults to 200 ms (160 ms
+        // prefill gate, 100 ms ASRC midpoint) instead of a 3000 ms file-reader
+        // reservoir that ExoPlayer cannot prefill in one burst. StartPcmFile()
+        // reconfigures to 3000 ms when standalone file streaming is used.
+        const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 200;
         // Pull mode stores the wire bytes verbatim, so its frame size is the
         // wire frame size. ASRC mode stores decoded float frames (4 bytes each)
         // and packs after resampling.
@@ -317,7 +322,8 @@ UsbStreamResult UsbAudioSink::Open(int fd, int endpointAddress, int interfaceNum
         }
         if (renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
             if (!asrc_.configure(channels_, UsbAsrcClockSync::kDefaultTaps,
-                                 UsbAsrcClockSync::kDefaultPhases)) {
+                                 UsbAsrcClockSync::kDefaultPhases,
+                                 /*allowDynamicBypass=*/false)) {
                 lastError_.store(EINVAL, std::memory_order_relaxed);
                 releaseResources();
                 return UsbStreamResult::InvalidArgs;
@@ -1385,6 +1391,20 @@ void UsbAudioSink::workerLoop() {
                     feedbackRatePerSec_.load(std::memory_order_relaxed),
                     sampleRate_, availNow, steerWindow),
                 std::memory_order_relaxed);
+        } else if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull) &&
+                   feedbackEndpoint_ == 0 && prefillDone) {
+            // Whole-frame packet cadence steering for feedback-less UAC DACs in
+            // BitPerfectPull mode: samples remain bit-identical while packet
+            // lengths (e.g. 48 vs 47/49 frames) track the reservoir fill.
+            const size_t pullAvail = pullRenderer_.availableFrames();
+            const size_t pullWindow = pullRenderer_.configuredFrames();
+            if (pullWindow > 0) {
+                feedbackRatePerSec_.store(
+                    SteerPacketRateForRingFill(
+                        feedbackRatePerSec_.load(std::memory_order_relaxed),
+                        sampleRate_, pullAvail, pullWindow),
+                    std::memory_order_relaxed);
+            }
         }
         const uint32_t ratePerSec =
             static_cast<uint32_t>(feedbackRatePerSec_.load(std::memory_order_relaxed));
@@ -1423,7 +1443,6 @@ void UsbAudioSink::workerLoop() {
             } else if (renderMode_ == static_cast<int>(UsbRenderMode::BitPerfectPull)) {
                 pktLen = fillPullPacket(dst, framesInPacket, rawDepth);
             } else if (renderMode_ == static_cast<int>(UsbRenderMode::ClockSyncAsrc)) {
-                asrc_.setRatio(computeAsrcRatio());
                 pktLen = fillAsrcPacket(dst, framesInPacket, rawDepth);
             } else {
                 pktLen = fillPacketFromRing(
@@ -1872,7 +1891,7 @@ bool UsbAudioSink::StartPcmFile(const std::string& path) {
     const UsbPcmFormat target{sampleRate_, channels_, bytesPerSample_, validBitDepth_};
     const int reservoirMs = tunedBufferMs_ > 0 ? tunedBufferMs_ : 3000;
     if (!producer->open(path, target, pullRenderer_, reservoirMs,
-                       /*configureRenderer=*/false)) {
+                       /*configureRenderer=*/true)) {
         ReportWriteError(EINVAL);
         return false;
     }
@@ -2043,6 +2062,22 @@ int UsbAudioSink::WaitForWriteSpace(int frames, int maxWaitMs) {
         res = checkOnce();
     }
     return res;
+}
+
+bool UsbAudioSink::NeedsPrefillCushion() const {
+    if (!exclusive_.load(std::memory_order_acquire) ||
+        !active_.load(std::memory_order_acquire)) {
+        return false;
+    }
+    if (IsReservoirMode(renderMode_)) {
+        if (!pullRenderer_.prefillSatisfied()) return true;
+        const size_t configured = pullRenderer_.configuredFrames();
+        return configured > 0 && pullRenderer_.availableFrames() < (configured / 2);
+    }
+    const size_t w = ringWrite_.load(std::memory_order_acquire);
+    const size_t r = ringRead_.load(std::memory_order_acquire);
+    const size_t avail = w >= r ? (w - r) : 0;
+    return prefillFrames_ > 0 && avail < prefillFrames_;
 }
 
 bool UsbAudioSink::setupFeedbackUrbs() {

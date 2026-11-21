@@ -1175,4 +1175,62 @@ public class FloatDspAudioSinkTest {
         oldWrapper.reset();
         bypassProc.release();
     }
+
+    @Test
+    public void midStreamDirectUsbActivationExitsLatchedIntegerBypassAndFeedsUsbTee()
+            throws Exception {
+        final boolean[] usbExclusive = {false};
+        final int[] nativeCalls = {0};
+        NativeDspAudioProcessor processor = new NativeDspAudioProcessor() {
+            @Override boolean isNativeAvailableForConfiguration() { return true; }
+            @Override boolean isBitPerfectNative() { return true; }
+            @Override boolean isUsbExclusiveActive() { return usbExclusive[0]; }
+            @Override int processNativeBlock(ByteBuffer buffer, int frames, int channels,
+                    ByteBuffer gains, ByteBuffer source, int sourceOffset,
+                    int sourceDepth, int sourceRate) {
+                nativeCalls[0]++;
+                return Integer.MIN_VALUE;
+            }
+        };
+        processor.setFloatOutput(true);
+        FakeSink sink = new FakeSink();
+        FloatDspAudioSink wrapper = new FloatDspAudioSink(sink, processor, true, false, true);
+        Format format = source(48000, 2, C.ENCODING_PCM_16BIT);
+        wrapper.configure(format, 0, null);
+        assertTrue(wrapper.isBitPerfectIntegerBypassActive());
+
+        // Mid-stream Direct USB claims the DAC endpoint after configure() ran.
+        usbExclusive[0] = true;
+        ByteBuffer input = ByteBuffer.allocateDirect(4).order(ByteOrder.LITTLE_ENDIAN);
+        input.putShort((short) 1234).putShort((short) -1234).flip();
+        assertTrue(wrapper.handleBuffer(input, 100L, 1));
+        assertFalse(wrapper.isBitPerfectIntegerBypassActive());
+        assertEquals("buffer must route through NativeDspAudioProcessor into USB tee",
+                1, nativeCalls[0]);
+
+        wrapper.reset();
+        processor.release();
+    }
+
+    @Test
+    public void heapSourcePcmIsStagedAsDirectBufferForRawUsbDelivery() throws Exception {
+        NativeDecision processor = new NativeDecision();
+        processor.setFloatOutput(true);
+        processor.configure(new AudioFormat(48000, 2, C.ENCODING_PCM_FLOAT));
+        processor.flush();
+
+        ByteBuffer floats = ByteBuffer.allocateDirect(8).order(ByteOrder.nativeOrder());
+        floats.putFloat(0.25f).putFloat(-0.25f).flip();
+        ByteBuffer heapRaw = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
+        heapRaw.putShort((short) 8192).putShort((short) -8192).flip();
+
+        processor.queueInput(floats, heapRaw, 16, 48000);
+        org.junit.Assert.assertNotNull("heap sourcePcm must be staged into a direct buffer",
+                processor.raw);
+        assertEquals(16, processor.sourceDepth);
+        ByteBuffer actual = ByteBuffer.wrap(processor.raw).order(ByteOrder.LITTLE_ENDIAN);
+        assertEquals(8192, actual.getShort());
+        assertEquals(-8192, actual.getShort());
+        processor.release();
+    }
 }

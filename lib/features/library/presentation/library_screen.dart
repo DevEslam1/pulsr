@@ -669,10 +669,10 @@ class _LibraryScreenState extends State<LibraryScreen>
             SnackBar(
               content: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.info_outline_rounded,
                     size: 16,
-                    color: Colors.white70,
+                    color: context.palette.textSecondary,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -708,9 +708,11 @@ class _LibraryScreenState extends State<LibraryScreen>
         final isSortedCustom = activeSort != defaultSort;
         final sortLabel =
             LibraryTabSort.labelForKey(context, activeSort.sortBy);
-        final isGridView = state.viewMode == LibraryViewMode.grid;
         final losslessCount = state.songs.where(isLosslessSong).length;
         final p = context.palette;
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final headerTextScale =
+            MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.35);
 
         return Scaffold(
           backgroundColor: p.bg,
@@ -784,7 +786,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   backgroundColor: p.bg,
                   elevation: 0,
                   scrolledUnderElevation: 0,
-                  toolbarHeight: 72,
+                  toolbarHeight: (72.0 * headerTextScale).roundToDouble(),
                   titleSpacing: Adaptive.pagePadding(context),
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -792,6 +794,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                     children: [
                       Text(
                         context.l10n.navLibrary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: p.textPrimary,
                           fontSize: AppFontSize.titleXL,
@@ -818,21 +822,26 @@ class _LibraryScreenState extends State<LibraryScreen>
                           ),
                           if (losslessCount > 0) ...[
                             const SizedBox(width: AppSpacing.xs),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: p.info.withValues(alpha: 0.15),
-                                borderRadius: AppRadii.r4All,
-                              ),
-                              child: Text(
-                                context.l10n.flacHiResCountLabel(losslessCount),
-                                style: TextStyle(
-                                  color: p.info,
-                                  fontSize: AppFontSize.caption,
-                                  fontWeight: FontWeight.w800,
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 1,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: p.info.withValues(alpha: 0.15),
+                                  borderRadius: AppRadii.r4All,
+                                ),
+                                child: Text(
+                                  context.l10n
+                                      .flacHiResCountLabel(losslessCount),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.info,
+                                    fontSize: AppFontSize.caption,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
                             ),
@@ -843,79 +852,107 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                   actions: [
                     IconButton(
+                      key: const ValueKey('library_search_action'),
                       constraints: const BoxConstraints(
                         minWidth: AppSpacing.minTouchTarget,
                         minHeight: AppSpacing.minTouchTarget,
                       ),
-                      icon: const Icon(Icons.dashboard_customize_rounded),
+                      icon: const Icon(Icons.search_rounded),
                       color: p.textSecondary,
-                      tooltip:
-                          '${context.l10n.browseOverflowLabel} · ${context.l10n.libraryManageTabs}',
-                      onPressed: () => _showManageTabsSheet(context, state),
+                      tooltip: context.l10n.search,
+                      onPressed: () => context.push('/search'),
+                    ),
+                    Semantics(
+                      button: true,
+                      label: '${context.l10n.sortBy}: $sortLabel',
+                      child: Tooltip(
+                        message: '${context.l10n.sortBy}: $sortLabel',
+                        child: Material(
+                          color: AppColors.fadeStopTransparent,
+                          child: InkWell(
+                            key: const ValueKey('library_sort_filter_pill'),
+                            borderRadius: AppRadii.full,
+                            onTap: () =>
+                                _showSortAndViewSheet(context, state, cubit),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
+                                maxWidth: screenWidth < 360 ? 48 : 112,
+                              ),
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSpacing.s10,
+                                    vertical: AppSpacing.s6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSortedCustom
+                                        ? p.accent.withValues(alpha: 0.14)
+                                        : p.surfaceContainer,
+                                    borderRadius: AppRadii.full,
+                                    border: Border.all(
+                                      color: isSortedCustom
+                                          ? p.accent.withValues(alpha: 0.35)
+                                          : p.hairline,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.sort_rounded,
+                                        size: 16,
+                                        color: isSortedCustom
+                                            ? p.accent
+                                            : p.textSecondary,
+                                      ),
+                                      if (screenWidth >= 360) ...[
+                                        const SizedBox(width: AppSpacing.xxs),
+                                        Flexible(
+                                          child: Text(
+                                            sortLabel,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            textScaler: TextScaler.linear(
+                                              MediaQuery.textScalerOf(context)
+                                                  .scale(1.0)
+                                                  .clamp(1.0, 1.25),
+                                            ),
+                                            style: TextStyle(
+                                              color: isSortedCustom
+                                                  ? p.accent
+                                                  : p.textSecondary,
+                                              fontSize: AppFontSize.caption,
+                                              fontWeight: isSortedCustom
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                     IconButton(
+                      key: const ValueKey('library_overflow_menu'),
                       constraints: const BoxConstraints(
                         minWidth: AppSpacing.minTouchTarget,
                         minHeight: AppSpacing.minTouchTarget,
                       ),
-                      style: isGridView
-                          ? IconButton.styleFrom(
-                              backgroundColor:
-                                  p.accent.withValues(alpha: 0.14),
-                            )
-                          : null,
-                      icon: Icon(
-                        state.viewMode == LibraryViewMode.list
-                            ? Icons.grid_view_rounded
-                            : Icons.view_list_rounded,
-                      ),
-                      color: isGridView ? p.accent : p.textSecondary,
-                      tooltip: state.viewMode == LibraryViewMode.list
-                          ? context.l10n.libraryGridView
-                          : context.l10n.libraryListView,
-                      onPressed: cubit.toggleViewMode,
+                      icon: const Icon(Icons.more_vert_rounded),
+                      color: p.textSecondary,
+                      tooltip: context.l10n.moreOptions,
+                      onPressed: () =>
+                          _showSortAndViewSheet(context, state, cubit),
                     ),
-                    IconButton(
-                      constraints: const BoxConstraints(
-                        minWidth: AppSpacing.minTouchTarget,
-                        minHeight: AppSpacing.minTouchTarget,
-                      ),
-                      style: isSortedCustom
-                          ? IconButton.styleFrom(
-                              backgroundColor:
-                                  p.accent.withValues(alpha: 0.14),
-                            )
-                          : null,
-                      icon: const Icon(Icons.sort_rounded),
-                      color: isSortedCustom ? p.accent : p.textSecondary,
-                      tooltip: '${context.l10n.sortBy}: $sortLabel',
-                      onPressed: () {
-                        if (isSongsTab) {
-                          SortFilterSheet.show(
-                            context,
-                            currentSort: state.sortBy,
-                            ascending: state.ascending,
-                            onApply: (sort, asc) => cubit.updateSort(sort, asc),
-                          );
-                          return;
-                        }
-                        SortFilterSheet.show(
-                          context,
-                          currentSort: activeSort.sortBy,
-                          ascending: activeSort.ascending,
-                          options: LibraryTabSort.optionsForTab(
-                            context,
-                            activeTab.name,
-                          ),
-                          onApply: (sort, asc) => _setTabSort(
-                            activeTab.name,
-                            sort,
-                            asc,
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
+                    const SizedBox(width: AppSpacing.xxs),
                   ],
                   bottom: PreferredSize(
                     preferredSize: Size.fromHeight(
@@ -1372,6 +1409,188 @@ class _LibraryScreenState extends State<LibraryScreen>
     );
   }
 
+  void _showSortAndViewSheet(
+    BuildContext context,
+    LibraryState state,
+    LibraryCubit cubit,
+  ) {
+    final activeTab = _activeTab;
+    final isSongsTab = activeTab == null || activeTab == LibraryTabItem.songs;
+    final activeSort = isSongsTab
+        ? LibraryTabSortSpec(sortBy: state.sortBy, ascending: state.ascending)
+        : _tabSortFor(activeTab.name);
+    final customOptions = isSongsTab
+        ? null
+        : LibraryTabSort.optionsForTab(context, activeTab.name);
+
+    void applySort(String sort, bool asc) {
+      if (isSongsTab) {
+        cubit.updateSort(sort, asc);
+      } else {
+        _setTabSort(activeTab.name, sort, asc);
+      }
+    }
+
+    PulsrSheetHelper.showPulsrSheet<void>(
+      context: context,
+      wrapWithContainer: true,
+      builder: (sheetContext) {
+        final p = sheetContext.palette;
+        final isGrid = state.viewMode == LibraryViewMode.grid;
+        return Column(
+          key: const ValueKey('library_sort_and_view_sheet'),
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(
+                AppSpacing.md,
+                AppSpacing.xs,
+                AppSpacing.md,
+                AppSpacing.xs,
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: [
+                    _buildSortAndViewActionChip(
+                      sheetContext,
+                      key: const ValueKey('library_sheet_layout_toggle'),
+                      icon: isGrid
+                          ? Icons.view_list_rounded
+                          : Icons.grid_view_rounded,
+                      label: isGrid
+                          ? sheetContext.l10n.libraryListView
+                          : sheetContext.l10n.libraryGridView,
+                      p: p,
+                      selected: isGrid,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        cubit.toggleViewMode();
+                      },
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    _buildSortAndViewActionChip(
+                      sheetContext,
+                      key: const ValueKey('library_sheet_customize_tabs'),
+                      icon: Icons.dashboard_customize_rounded,
+                      label: sheetContext.l10n.libraryManageTabs,
+                      p: p,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _showManageTabsSheet(context, state);
+                      },
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    _buildSortAndViewActionChip(
+                      sheetContext,
+                      key: const ValueKey('library_sheet_select_all'),
+                      icon: Icons.select_all_rounded,
+                      label: sheetContext.l10n.selectAllAction,
+                      p: p,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _selectAllInCurrentTab(state, cubit);
+                      },
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    _buildSortAndViewActionChip(
+                      sheetContext,
+                      key: const ValueKey('library_sheet_settings'),
+                      icon: Icons.settings_outlined,
+                      label: sheetContext.l10n.settings,
+                      p: p,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        context.push('/settings');
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Flexible(
+              child: SortFilterSheet(
+                currentSort: activeSort.sortBy,
+                ascending: activeSort.ascending,
+                options: customOptions,
+                onApply: applySort,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSortAndViewActionChip(
+    BuildContext context, {
+    required Key key,
+    required IconData icon,
+    required String label,
+    required PulsrPalette p,
+    required VoidCallback onTap,
+    bool selected = false,
+  }) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: Material(
+        color: AppColors.fadeStopTransparent,
+        borderRadius: AppRadii.r12All,
+        child: InkWell(
+          key: key,
+          borderRadius: AppRadii.r12All,
+          onTap: () {
+            PulsrHaptics.selectionClick();
+            onTap();
+          },
+          child: Container(
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
+              minWidth: AppSpacing.minTouchTarget,
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.s12,
+              vertical: AppSpacing.xs,
+            ),
+            decoration: BoxDecoration(
+              color: selected
+                  ? p.accent.withValues(alpha: 0.14)
+                  : p.surfaceContainer,
+              borderRadius: AppRadii.r12All,
+              border: Border.all(
+                color:
+                    selected ? p.accent.withValues(alpha: 0.35) : p.hairline,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? p.accent : p.textSecondary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected ? p.accent : p.textPrimary,
+                    fontSize: AppFontSize.label,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showManageTabsSheet(
     BuildContext context,
     LibraryState state,
@@ -1458,9 +1677,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                         animation: animation,
                         builder: (context, child) {
                           return Material(
-                            color: Colors.transparent,
+                            color: AppColors.fadeStopTransparent,
                             elevation: 6,
-                            shadowColor: Colors.black45,
+                            shadowColor: p.scrimMedium,
                             borderRadius: AppRadii.r18All,
                             child: child,
                           );
@@ -1828,7 +2047,7 @@ class _LayoutToggleButton extends StatelessWidget {
         duration: context.motionMs(200),
         curve: context.motionCurve(PulsrMotion.enter),
         decoration: BoxDecoration(
-          color: selected ? p.accent : Colors.transparent,
+          color: selected ? p.accent : AppColors.fadeStopTransparent,
           borderRadius: AppRadii.r10All,
           boxShadow: selected
               ? [
@@ -1841,7 +2060,7 @@ class _LayoutToggleButton extends StatelessWidget {
               : null,
         ),
         child: Material(
-          color: Colors.transparent,
+          color: AppColors.fadeStopTransparent,
           child: InkWell(
             borderRadius: AppRadii.r10All,
             onTap: () {

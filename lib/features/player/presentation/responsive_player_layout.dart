@@ -120,11 +120,19 @@ class _ResponsivePlayerLayoutState extends State<ResponsivePlayerLayout>
     if (widget.state.isLyricsVisible != oldWidget.state.isLyricsVisible &&
         widget.state.isLyricsVisible &&
         _tabController.index != 0) {
-      _tabController.animateTo(0);
+      if (PulsrMotion.shouldAnimate(context)) {
+        _tabController.animateTo(0);
+      } else {
+        _tabController.index = 0;
+      }
     } else if (widget.state.isQueueVisible != oldWidget.state.isQueueVisible &&
         widget.state.isQueueVisible &&
         _tabController.index != 1) {
-      _tabController.animateTo(1);
+      if (PulsrMotion.shouldAnimate(context)) {
+        _tabController.animateTo(1);
+      } else {
+        _tabController.index = 1;
+      }
     }
   }
 
@@ -614,6 +622,7 @@ class _FoldableTabletopLayout extends StatelessWidget {
                           const SizedBox(width: AppSpacing.xs),
                           _DeckQuickActionButton(
                             icon: Icons.lyrics_rounded,
+                            label: context.l10n.lyrics,
                             isActive: state.isLyricsVisible,
                             activeColor: activeColor,
                             onTap: () {
@@ -621,9 +630,10 @@ class _FoldableTabletopLayout extends StatelessWidget {
                               cubit.toggleLyricsVisibility();
                             },
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           _DeckQuickActionButton(
                             icon: Icons.queue_music_rounded,
+                            label: context.l10n.queue,
                             isActive: state.isQueueVisible,
                             activeColor: activeColor,
                             onTap: () {
@@ -631,9 +641,10 @@ class _FoldableTabletopLayout extends StatelessWidget {
                               cubit.toggleQueueVisibility();
                             },
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 4),
                           _DeckQuickActionButton(
                             icon: Icons.tune_rounded,
+                            label: context.l10n.equalizer,
                             isActive: state.isEqEnabled,
                             activeColor: activeColor,
                             onTap: () {
@@ -679,12 +690,14 @@ class _FoldableTabletopLayout extends StatelessWidget {
 
 class _DeckQuickActionButton extends StatelessWidget {
   final IconData icon;
+  final String label;
   final bool isActive;
   final Color activeColor;
   final VoidCallback onTap;
 
   const _DeckQuickActionButton({
     required this.icon,
+    required this.label,
     required this.isActive,
     required this.activeColor,
     required this.onTap,
@@ -693,27 +706,43 @@ class _DeckQuickActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return PulsrPressable(
-      pressedScale: 0.92,
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: context.motionMs(200),
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          borderRadius: AppRadii.r14All,
-          color: isActive
-              ? activeColor.withValues(alpha: 0.22)
-              : AppColors.specularAt(0.06),
-          border: Border.all(
-            color: isActive ? activeColor.withValues(alpha: 0.55) : p.hairline,
-            width: 1.0,
-          ),
+    return Semantics(
+      button: true,
+      toggled: isActive,
+      label: label,
+      excludeSemantics: true,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minWidth: AppSpacing.minTouchTarget,
+          minHeight: AppSpacing.minTouchTarget,
         ),
-        child: Icon(
-          icon,
-          size: 17,
-          color: isActive ? activeColor : p.textSecondary,
+        child: Center(
+          child: PulsrPressable(
+            pressedScale: 0.92,
+            onTap: onTap,
+            child: AnimatedContainer(
+              duration: context.motionMs(200),
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                borderRadius: AppRadii.r14All,
+                color: isActive
+                    ? activeColor.withValues(alpha: 0.22)
+                    : AppColors.specularAt(0.06),
+                border: Border.all(
+                  color: isActive
+                      ? activeColor.withValues(alpha: 0.55)
+                      : p.hairline,
+                  width: 1.0,
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: isActive ? activeColor : p.textSecondary,
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1229,50 +1258,67 @@ class _TabletLandscapeFloatingDock extends StatelessWidget {
           required bool isSelected,
           required VoidCallback onTap,
         }) {
-          return Tooltip(
-            message: tooltip,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () {
-                  PulsrHaptics.selectionClick();
-                  onTap();
-                },
-                borderRadius: AppRadii.r16All,
-                child: AnimatedContainer(
-                  duration: context.motionMs(200),
-                  curve: context.motionCurve(Curves.easeOutCubic),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14.0,
-                    vertical: 8.0,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? activeColor.withValues(alpha: isDark ? 0.32 : 0.22)
-                        : Colors.transparent,
+          return Semantics(
+            button: true,
+            selected: isSelected,
+            label: tooltip,
+            excludeSemantics: true,
+            child: Tooltip(
+              message: tooltip,
+              excludeFromSemantics: true,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: AppSpacing.minTouchTarget,
+                  minHeight: AppSpacing.minTouchTarget,
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      PulsrHaptics.selectionClick();
+                      onTap();
+                    },
                     borderRadius: AppRadii.r16All,
-                    border: Border.all(
-                      color: isSelected
-                          ? activeColor.withValues(alpha: isDark ? 0.70 : 0.50)
-                          : Colors.transparent,
-                      width: 1.0,
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: context.motionMs(200),
+                        curve: context.motionCurve(Curves.easeOutCubic),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14.0,
+                          vertical: 8.0,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? activeColor.withValues(
+                                  alpha: isDark ? 0.32 : 0.22)
+                              : Colors.transparent,
+                          borderRadius: AppRadii.r16All,
+                          border: Border.all(
+                            color: isSelected
+                                ? activeColor.withValues(
+                                    alpha: isDark ? 0.70 : 0.50)
+                                : Colors.transparent,
+                            width: 1.0,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: activeColor.withValues(alpha: 0.32),
+                                    blurRadius: 12,
+                                    spreadRadius: -1,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Icon(
+                          icon,
+                          size: 20,
+                          color: isSelected
+                              ? (isDark ? Colors.white : activeColor)
+                              : p.textSecondary.withValues(alpha: 0.70),
+                        ),
+                      ),
                     ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: activeColor.withValues(alpha: 0.32),
-                              blurRadius: 12,
-                              spreadRadius: -1,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 20,
-                    color: isSelected
-                        ? (isDark ? Colors.white : activeColor)
-                        : p.textSecondary.withValues(alpha: 0.70),
                   ),
                 ),
               ),

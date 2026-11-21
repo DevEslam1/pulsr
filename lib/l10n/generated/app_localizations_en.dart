@@ -10847,4 +10847,281 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get badgeExclusive => 'EXCLUSIVE';
+
+  @override
+  String get multichannelSpeakerAlignment => 'Multichannel Speaker Alignment';
+
+  @override
+  String get multichannelSubtitle =>
+      'Per-channel trim, alignment delay & LFE crossover';
+
+  @override
+  String get multichannelInfoTooltip => 'Multichannel Info';
+
+  @override
+  String get multichannelBypassedByBitPerfect => 'Bypassed by Bit-Perfect Mode';
+
+  @override
+  String get multichannelAaudioNote =>
+      'AAudio is limited to 2 channels on Android; multichannel streams (>2 ch) route through Pulsr\'s 32-bit float AudioTrack path for genuine surround output.';
+
+  @override
+  String get multichannelSpeakerLayout => 'Speaker Layout';
+
+  @override
+  String multichannelChannelsShort(int count) {
+    return '$count ch';
+  }
+
+  @override
+  String multichannelLayoutSummary(String layoutName, int count) {
+    return '$layoutName ($count channels)';
+  }
+
+  @override
+  String multichannelLayoutChipLabel(String layoutName, int count) {
+    return '$layoutName ($count ch)';
+  }
+
+  @override
+  String get multichannelSelectChannel => 'Select Speaker Channel';
+
+  @override
+  String multichannelChannelShort(int index) {
+    return 'CH $index';
+  }
+
+  @override
+  String multichannelChannelFull(int index) {
+    return 'Channel $index';
+  }
+
+  @override
+  String get multichannelGainTrim => 'Gain Trim';
+
+  @override
+  String get multichannelAlignmentDelay => 'Alignment Delay';
+
+  @override
+  String get multichannelLfeTitle => 'LFE Crossover & Bass Management';
+
+  @override
+  String get multichannelLfeSubtitle =>
+      'Satellite HPF & dedicated subwoofer crossover';
+
+  @override
+  String get multichannelLfeInfoTooltip => 'LFE Crossover Info';
+
+  @override
+  String get multichannelLfeDescription =>
+      'Linkwitz-Riley crossover applies high-pass filter to satellite channels and routes redirected low frequencies to the dedicated LFE channel.';
+
+  @override
+  String get multichannelSatelliteCrossover => 'Satellite Crossover (HPF)';
+
+  @override
+  String get multichannelSubwooferLowPass => 'Subwoofer Low-Pass (LPF)';
+
+  @override
+  String get multichannelFilterSlope => 'Crossover Filter Slope';
+
+  @override
+  String get multichannelSlopeLr2 => '12 dB/oct (LR2)';
+
+  @override
+  String get multichannelSlopeLr4 => '24 dB/oct (LR4)';
+
+  @override
+  String get multichannelLfeGainTrim => 'LFE Channel Gain Trim';
+
+  @override
+  String get multichannelRedirectSatelliteBass => 'Redirect Satellite Bass';
+
+  @override
+  String get multichannelRedirectSatelliteBassDesc =>
+      'Sums satellite frequencies below crossover into LFE with 1/√(N-1) power normalization.';
+
+  @override
+  String get hrtfTitle => 'HRTF 3D Binaural Spatializer';
+
+  @override
+  String get hrtfSubtitle => 'Partitioned SOFA/HRIR convolution for 3D realism';
+
+  @override
+  String hrtfBlockedByBitPerfect(String reason) {
+    return 'Blocked by Bit-Perfect ($reason)';
+  }
+
+  @override
+  String get hrtfCrossfeedConflict =>
+      'Mutually exclusive: Engaging HRTF disables Headphone Crossfeed.';
+
+  @override
+  String get hrtfVirtualSpeakerAzimuth => 'Virtual Speaker Azimuth';
+
+  @override
+  String get hrtfDirectionLeft => 'Left';
+
+  @override
+  String get hrtfDirectionRight => 'Right';
+
+  @override
+  String get hrtfDirectionCenter => 'Center';
+
+  @override
+  String hrtfAngleDirection(String degrees, String direction) {
+    return '$degrees° ($direction)';
+  }
+
+  @override
+  String get hrtfVirtualSpeakerElevation => 'Virtual Speaker Elevation';
+
+  @override
+  String get hrtfElevationBelow => 'Below';
+
+  @override
+  String get hrtfElevationAbove => 'Above';
+
+  @override
+  String get hrtfElevationEarLevel => 'Ear Level';
+
+  @override
+  String hrtfSofaLoadedLabel(String fileName) {
+    return 'SOFA: $fileName';
+  }
+
+  @override
+  String get hrtfLoadCustomSofa => 'Load Custom SOFA / WAV...';
+
+  @override
+  String get hrtfResetTooltip => 'Reset Azimuth / Elevation / Dataset';
+
+  @override
+  String hrtfDatasetLoadedToast(String name) {
+    return 'Loaded HRTF dataset: $name';
+  }
+
+  @override
+  String get hrtfDatasetLoadFailedToast => 'Failed to load SOFA/HRIR dataset';
+
+  @override
+  String get remasterSuiteTitle => 'Remaster Suite';
+
+  @override
+  String get remasterSuiteSubtitle =>
+      'Output oversampling, reconstruction filters & PCM→DSD';
+
+  @override
+  String get remasterPcmOversampling => 'PCM Output Oversampling';
+
+  @override
+  String get remasterOff1x => 'Off (1x)';
+
+  @override
+  String remasterMultiplierValue(int factor) {
+    return '${factor}x';
+  }
+
+  @override
+  String get remasterFilterKernel => 'Reconstruction Filter Kernel';
+
+  @override
+  String get remasterKernelSharp => 'Sharp';
+
+  @override
+  String get remasterKernelSlowRolloff => 'Slow Roll-off';
+
+  @override
+  String get remasterKernelMinPhase => 'MinPhase';
+
+  @override
+  String get remasterKernelApodizing => 'Apodizing';
+
+  @override
+  String get remasterPcmToDsdModulator => 'PCM → DSD Modulator';
+
+  @override
+  String get remasterOfflineSdmNote =>
+      'Offline SDM engine (no playback route yet)';
+
+  @override
+  String get remasterDsdRate => 'DSD Rate';
+
+  @override
+  String get remasterDsdRate64 => 'DSD64';
+
+  @override
+  String remasterDsdRateValue(int rate) {
+    return '$rate';
+  }
+
+  @override
+  String get remasterSdmOrder => 'SDM Order (1-5)';
+
+  @override
+  String remasterSdmOrderValue(int order) {
+    return '$order';
+  }
+
+  @override
+  String get remasterStatusPcmToDsd =>
+      'PCM → DSD requested · offline engine only, not on the playback route';
+
+  @override
+  String remasterStatusOversampling(int multiplier) {
+    return 'Oversampling ${multiplier}x requested · Not Bit-Perfect (reconstruction DSP in path)';
+  }
+
+  @override
+  String get remasterStatusPassthrough =>
+      'Bit-Perfect compatible (passthrough)';
+
+  @override
+  String get telemetryDspPowerConsumption => 'DSP Power Consumption';
+
+  @override
+  String get telemetryLowPowerBypassBadge => '⚡ 0.0 mAh/h (Integer Low-Power)';
+
+  @override
+  String telemetryPowerDrainEstimate(String mah) {
+    return '~$mah mAh/h';
+  }
+
+  @override
+  String get telemetryLowPowerBypassDesc =>
+      'True low-power integer route active: float DSP processor is completely bypassed for bit-perfect integer PCM.';
+
+  @override
+  String get telemetryStageDrainBreakdown =>
+      'Active DSP stage drain breakdown:';
+
+  @override
+  String telemetryStageDrainItem(String stageName, String mah) {
+    return '$stageName: +$mah mAh/h';
+  }
+
+  @override
+  String get telemetryAllStagesIdle => 'All DSP stages idle (~0.0 mAh/h).';
+
+  @override
+  String get telemetryBandLow => 'Low';
+
+  @override
+  String get telemetryBandLoMid => 'Lo-Mid';
+
+  @override
+  String get telemetryBandHiMid => 'Hi-Mid';
+
+  @override
+  String get telemetryBandHigh => 'High';
+
+  @override
+  String telemetryDynEqBandShort(int index) {
+    return 'B$index';
+  }
+
+  @override
+  String telemetryDbValue(String value) {
+    return '$value dB';
+  }
 }

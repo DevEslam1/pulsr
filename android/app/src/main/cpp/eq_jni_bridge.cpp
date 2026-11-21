@@ -1995,6 +1995,12 @@ Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeIsUsbExclusive(
     return pulsr::UsbAudioSink::instance().IsExclusive() ? JNI_TRUE : JNI_FALSE;
 }
 
+JNIEXPORT jboolean JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeNeedsUsbPrefillCushion(
+        JNIEnv* /* env */, jclass /* clazz */, jlong /* engineHandle */) {
+    return pulsr::UsbAudioSink::instance().NeedsPrefillCushion() ? JNI_TRUE : JNI_FALSE;
+}
+
 JNIEXPORT jint JNICALL
 Java_com_pulsr_music_UsbExclusivePlugin_nativeUsbStreamStartWithFormat(
         JNIEnv* /* env */, jobject /* thiz */, jint fd, jint endpoint,

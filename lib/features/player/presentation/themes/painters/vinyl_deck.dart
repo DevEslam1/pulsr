@@ -44,6 +44,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
 
   @override
   Widget build(BuildContext context) {
+    final surface = context.playerSurfacePalette;
     final props = widget.props;
     final state = props.state;
     final cubit = props.cubit;
@@ -82,17 +83,20 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: PlayerMaterialColors.recordBase,
+                    color: surface.vinylGroove,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.scrimAt(0.5),
+                        color: surface.shadowAt(0.5),
                         blurRadius: 16,
                         offset: const Offset(0, 6),
                       ),
                     ],
                   ),
                   child: CustomPaint(
-                    painter: _VinylGroovesPainter(activeColor: activeColor),
+                    painter: _VinylGroovesPainter(
+                      activeColor: activeColor,
+                      surface: surface,
+                    ),
                     child: Center(
                       // Center Album Artwork
                       child: Container(
@@ -101,7 +105,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                         decoration: BoxDecoration(
                           borderRadius: AppRadii.circular(artRadius),
                           border: Border.all(
-                            color: AppColors.specularAt(0.3),
+                            color: surface.specularAt(0.3),
                             width: 1.5,
                           ),
                         ),
@@ -129,14 +133,14 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 shape: BoxShape.circle,
                                 gradient: RadialGradient(
                                   colors: [
-                                    Colors.grey.shade400,
-                                    Colors.grey.shade800,
-                                    AppColors.darkSurface,
+                                    surface.platterMetal,
+                                    surface.platterMetalShadow,
+                                    surface.vinylGroove,
                                   ],
                                   stops: const [0.0, 0.6, 1.0],
                                 ),
                                 border: Border.all(
-                                  color: Colors.white30,
+                                  color: surface.specularAt(0.30),
                                   width: 1,
                                 ),
                               ),
@@ -207,13 +211,13 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: state.isPlaying
-                                      ? activeColor
-                                      : Colors.white24,
+                                      ? surface.ledGlow
+                                      : surface.specularAt(0.24),
                                   boxShadow: state.isPlaying
                                       ? [
                                           BoxShadow(
-                                            color: activeColor.withValues(
-                                                alpha: 0.8),
+                                            color: surface.ledGlow
+                                                .withValues(alpha: 0.8),
                                             blurRadius: 6,
                                             spreadRadius: 1,
                                           ),
@@ -225,11 +229,11 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                               ExcludeSemantics(
                                 child: Text(
                                   context.l10n.vinylDirectDrive,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: AppFontSize.micro,
                                     fontWeight: FontWeight.w800,
                                     letterSpacing: AppTracking.wide,
-                                    color: Colors.white38,
+                                    color: surface.mutedInk,
                                   ),
                                 ),
                               ),
@@ -247,6 +251,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                             painter: _PlatterStrobePainter(
                               activeColor: activeColor,
                               isPlaying: state.isPlaying,
+                              surface: surface,
                             ),
                           ),
                         ),
@@ -366,6 +371,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                           armLength: armLength,
                                           liftProgress:
                                               widget.tonearmAnimation.value,
+                                          surface: surface,
                                         ),
                                       );
                                     },
@@ -392,7 +398,7 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                               decoration: BoxDecoration(
                                 color: state.isPlaying
                                     ? activeColor.withValues(alpha: 0.15)
-                                    : PlayerMaterialColors.recordSheenCenter,
+                                    : surface.tapeWindow,
                                 borderRadius: AppRadii.r6All,
                                 border: Border.all(
                                   color: state.isPlaying
@@ -410,8 +416,8 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                         : Icons.pause_circle_outline_rounded,
                                     size: 11,
                                     color: state.isPlaying
-                                        ? activeColor
-                                        : Colors.white38,
+                                        ? surface.ledGlow
+                                        : surface.mutedInk,
                                   ),
                                   const SizedBox(width: AppSpacing.xxs),
                                   // Painted plinth legends stay out of the
@@ -428,8 +434,8 @@ class _VinylTurntableDeckState extends State<_VinylTurntableDeck> {
                                         fontWeight: FontWeight.w800,
                                         letterSpacing: AppTracking.overline,
                                         color: state.isPlaying
-                                            ? activeColor
-                                            : Colors.white38,
+                                            ? surface.ledGlow
+                                            : surface.mutedInk,
                                       ),
                                     ),
                                   ),

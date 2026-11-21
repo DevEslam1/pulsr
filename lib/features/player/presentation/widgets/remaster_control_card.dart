@@ -172,23 +172,25 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
     await prefs.setInt(PrefsKeys.remasterPcmToDsdOrder, order);
   }
 
-  static String _kernelLabel(int kernel) {
+  static String _kernelLabel(BuildContext context, int kernel) {
+    final l10n = context.l10n;
     switch (kernel) {
       case 0:
-        return 'Sharp';
+        return l10n.remasterKernelSharp;
       case 1:
-        return 'Slow Roll-off';
+        return l10n.remasterKernelSlowRolloff;
       case 2:
-        return 'MinPhase';
+        return l10n.remasterKernelMinPhase;
       case 3:
       default:
-        return 'Apodizing';
+        return l10n.remasterKernelApodizing;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final l10n = context.l10n;
     final enabled =
         widget.blockedReason == null && widget.nativeAvailable && _loaded;
     final isRemasterActive = _multiplier > 1 || _pcmToDsdEnabled;
@@ -220,7 +222,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Remaster Suite',
+                      l10n.remasterSuiteTitle,
                       style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: AppFontSize.body,
@@ -229,7 +231,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      'Output oversampling, reconstruction filters & PCM→DSD',
+                      l10n.remasterSuiteSubtitle,
                       style: TextStyle(
                           fontSize: AppFontSize.caption, color: p.textTertiary),
                       maxLines: 2,
@@ -244,7 +246,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
 
           // Output Oversampling Multiplier
           Text(
-            'PCM Output Oversampling',
+            l10n.remasterPcmOversampling,
             style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: AppFontSize.caption,
@@ -261,22 +263,22 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                   EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                 ),
               ),
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: 1,
-                  label: Text('Off (1x)', style: _labelStyle),
+                  label: Text(l10n.remasterOff1x, style: _labelStyle),
                 ),
                 ButtonSegment(
                   value: 2,
-                  label: Text('2x', style: _labelStyle),
+                  label: Text(l10n.remasterMultiplierValue(2), style: _labelStyle),
                 ),
                 ButtonSegment(
                   value: 4,
-                  label: Text('4x', style: _labelStyle),
+                  label: Text(l10n.remasterMultiplierValue(4), style: _labelStyle),
                 ),
                 ButtonSegment(
                   value: 8,
-                  label: Text('8x', style: _labelStyle),
+                  label: Text(l10n.remasterMultiplierValue(8), style: _labelStyle),
                 ),
               ],
               selected: {_multiplier},
@@ -291,7 +293,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
 
           // Reconstruction Filter Kernel
           Text(
-            'Reconstruction Filter Kernel',
+            l10n.remasterFilterKernel,
             style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: AppFontSize.caption,
@@ -312,7 +314,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                 for (var i = 0; i < 4; i++)
                   ButtonSegment(
                     value: i,
-                    label: Text(_kernelLabel(i), style: _labelStyle),
+                    label: Text(_kernelLabel(context, i), style: _labelStyle),
                   ),
               ],
               selected: {_kernel},
@@ -333,14 +335,14 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'PCM → DSD Modulator',
+                    l10n.remasterPcmToDsdModulator,
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: AppFontSize.caption,
                         color: p.textSecondary),
                   ),
                   Text(
-                    'Offline SDM engine (no playback route yet)',
+                    l10n.remasterOfflineSdmNote,
                     style: TextStyle(
                         fontSize: AppFontSize.caption - 1,
                         color: p.textTertiary),
@@ -362,7 +364,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'DSD Rate',
+                        l10n.remasterDsdRate,
                         style: TextStyle(
                             fontSize: AppFontSize.caption - 1,
                             color: p.textTertiary,
@@ -377,18 +379,18 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                             EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                           ),
                         ),
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: 64,
-                            label: Text('DSD64', style: _labelStyle),
+                            label: Text(l10n.remasterDsdRate64, style: _labelStyle),
                           ),
                           ButtonSegment(
                             value: 128,
-                            label: Text('128', style: _labelStyle),
+                            label: Text(l10n.remasterDsdRateValue(128), style: _labelStyle),
                           ),
                           ButtonSegment(
                             value: 256,
-                            label: Text('256', style: _labelStyle),
+                            label: Text(l10n.remasterDsdRateValue(256), style: _labelStyle),
                           ),
                         ],
                         selected: {_pcmToDsdRate},
@@ -409,7 +411,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'SDM Order (1-5)',
+                        l10n.remasterSdmOrder,
                         style: TextStyle(
                             fontSize: AppFontSize.caption - 1,
                             color: p.textTertiary,
@@ -424,18 +426,18 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                             EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
                           ),
                         ),
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: 1,
-                            label: Text('1', style: _labelStyle),
+                            label: Text(l10n.remasterSdmOrderValue(1), style: _labelStyle),
                           ),
                           ButtonSegment(
                             value: 3,
-                            label: Text('3', style: _labelStyle),
+                            label: Text(l10n.remasterSdmOrderValue(3), style: _labelStyle),
                           ),
                           ButtonSegment(
                             value: 5,
-                            label: Text('5', style: _labelStyle),
+                            label: Text(l10n.remasterSdmOrderValue(5), style: _labelStyle),
                           ),
                         ],
                         selected: {_pcmToDsdOrder == 1 ? 1 : (_pcmToDsdOrder <= 3 ? 3 : 5)},
@@ -473,8 +475,8 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                   Expanded(
                     child: Text(
                       _pcmToDsdEnabled
-                          ? 'PCM → DSD requested · offline engine only, not on the playback route'
-                          : 'Oversampling ${_multiplier}x requested · Not Bit-Perfect (reconstruction DSP in path)',
+                          ? l10n.remasterStatusPcmToDsd
+                          : l10n.remasterStatusOversampling(_multiplier),
                       style: TextStyle(
                         color: p.warning,
                         fontSize: AppFontSize.caption,
@@ -501,7 +503,7 @@ class _RemasterControlCardState extends State<RemasterControlCard> {
                   const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: Text(
-                      'Bit-Perfect compatible (passthrough)',
+                      l10n.remasterStatusPassthrough,
                       style: TextStyle(
                         color: p.success,
                         fontSize: AppFontSize.caption,

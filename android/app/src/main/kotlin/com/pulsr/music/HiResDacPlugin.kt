@@ -689,14 +689,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 }
                 targetSampleRate = sampleRate
                 targetBitDepth = bitDepth
-                val applied = if (bitPerfectRequested) applyBitPerfectMode(true) else true
-                if (!applied) {
-                    targetSampleRate = previousRate
-                    targetBitDepth = previousDepth
-                    if (bitPerfectRequested) applyBitPerfectMode(true)
+                if (!bitPerfectRequested) {
+                    notifyDeviceChange()
+                    result.success(true)
+                    return
                 }
-                notifyDeviceChange()
-                result.success(applied)
+                runOnProbeThread(result, "TARGET_FORMAT_FAILED", "Failed to apply target output format") {
+                    val applied = applyBitPerfectMode(true)
+                    if (!applied) {
+                        targetSampleRate = previousRate
+                        targetBitDepth = previousDepth
+                        applyBitPerfectMode(true)
+                    }
+                    notifyDeviceChange()
+                    applied
+                }
             }
             else -> result.notImplemented()
         }
@@ -1805,6 +1812,35 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                         targetDepth = effectiveTargetDepth,
                     )
                     if (selectedAttr != null) {
+                        if (mixerAttributesApplied && bitPerfectUsbDeviceId == usbDevice.id) {
+                            val currentAttr = try {
+                                var getM = cachedGetMixerMethod
+                                if (getM == null) {
+                                    getM = AudioManager::class.java.getMethod(
+                                        "getPreferredMixerAttributes",
+                                        AudioAttributes::class.java,
+                                        AudioDeviceInfo::class.java,
+                                    )
+                                    cachedGetMixerMethod = getM
+                                }
+                                getM.invoke(audioManager, mediaAttributes, usbDevice)
+                            } catch (_: Throwable) {
+                                null
+                            }
+                            if (currentAttr != null && getMixerBehaviorCached(currentAttr) == 1) {
+                                val curFmt = mixerAttrFormat(currentAttr)
+                                val selFmt = mixerAttrFormat(selectedAttr)
+                                if (curFmt != null && selFmt != null &&
+                                    curFmt.sampleRate == selFmt.sampleRate &&
+                                    curFmt.encoding == selFmt.encoding &&
+                                    curFmt.channelMask == selFmt.channelMask
+                                ) {
+                                    bitPerfectRequested = true
+                                    directRouteFallbackActive = false
+                                    return true
+                                }
+                            }
+                        }
                         val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
                         var setM = cachedSetMixerMethod
                         if (setM == null) {
@@ -1915,6 +1951,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private fun probeNativeDsd(): DsdProbeResult {
         val device = selectUsbDacDevice() ?: return emptyDsdProbe
         if (usbManager?.hasPermission(device) != true) return emptyDsdProbe
+        synchronized(dsdProbeLock) {
+            if (dsdProbeDeviceId == device.deviceId) {
+                dsdProbeResult?.let { return it }
+            }
+        }
         val conn = try { usbManager?.openDevice(device) } catch (_: Throwable) { null }
             ?: return emptyDsdProbe
         try {

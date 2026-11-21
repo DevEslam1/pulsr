@@ -166,81 +166,99 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
               surfaceTintColor: Colors.transparent,
               elevation: 0,
               leading: const PulsrBackButton(),
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    context.l10n.managePlaylist,
-                    style: TextStyle(
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w600,
-                      color: p.textSecondary,
+              title: Semantics(
+                header: true,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      context.l10n.managePlaylist,
+                      style: TextStyle(
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w600,
+                        color: p.textSecondary,
+                      ),
                     ),
-                  ),
-                  Text(
-                    widget.playlist.name,
-                    style: TextStyle(
-                      fontSize: AppFontSize.bodyLarge,
-                      fontWeight: FontWeight.w800,
-                      color: p.accent,
-                      letterSpacing: -0.2,
+                    Text(
+                      widget.playlist.name,
+                      style: TextStyle(
+                        fontSize: AppFontSize.bodyLarge,
+                        fontWeight: FontWeight.w800,
+                        color: p.accent,
+                        letterSpacing: -0.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
               actions: [
                 if (allSongs.isNotEmpty)
-                  IconButton(
-                    tooltip:
-                        context.l10n.selectedCount(_selectedSongIds.length),
-                    icon: Icon(
-                      _showSelectedOnly
-                          ? Icons.filter_alt_rounded
-                          : Icons.filter_alt_outlined,
-                      color: _showSelectedOnly ? p.accent : p.textSecondary,
-                      size: 20,
+                  MergeSemantics(
+                    child: Semantics(
+                      toggled: _showSelectedOnly,
+                      child: IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        tooltip:
+                            context.l10n.selectedCount(_selectedSongIds.length),
+                        icon: Icon(
+                          _showSelectedOnly
+                              ? Icons.filter_alt_rounded
+                              : Icons.filter_alt_outlined,
+                          color: _showSelectedOnly ? p.accent : p.textSecondary,
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          PulsrHaptics.selectionClick();
+                          setState(
+                              () => _showSelectedOnly = !_showSelectedOnly);
+                        },
+                      ),
                     ),
-                    onPressed: () {
-                      PulsrHaptics.selectionClick();
-                      setState(() => _showSelectedOnly = !_showSelectedOnly);
-                    },
                   ),
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: AppSpacing.xs),
-                  child: TextButton.icon(
-                    onPressed: visibleSongs.isEmpty
-                        ? null
-                        : () {
-                            PulsrHaptics.selectionClick();
-                            setState(() {
-                              if (isAllSelected) {
-                                for (final s in visibleSongs) {
-                                  _selectedSongIds.remove(s.id);
-                                }
-                              } else {
-                                for (final s in visibleSongs) {
-                                  _selectedSongIds.add(s.id);
-                                }
-                              }
-                            });
-                          },
-                    icon: Icon(
-                      isAllSelected
-                          ? Icons.deselect_rounded
-                          : Icons.select_all_rounded,
-                      color: p.accent,
-                      size: 18,
-                    ),
-                    label: Text(
-                      isAllSelected
-                          ? context.l10n.browseDeselect
-                          : context.l10n.selectAllAction,
-                      style: TextStyle(
-                        color: p.accent,
-                        fontWeight: FontWeight.w700,
-                        fontSize: AppFontSize.bodySmall,
+                  child: MergeSemantics(
+                    child: Semantics(
+                      toggled: isAllSelected,
+                      child: TextButton.icon(
+                        onPressed: visibleSongs.isEmpty
+                            ? null
+                            : () {
+                                PulsrHaptics.selectionClick();
+                                setState(() {
+                                  if (isAllSelected) {
+                                    for (final s in visibleSongs) {
+                                      _selectedSongIds.remove(s.id);
+                                    }
+                                  } else {
+                                    for (final s in visibleSongs) {
+                                      _selectedSongIds.add(s.id);
+                                    }
+                                  }
+                                });
+                              },
+                        icon: Icon(
+                          isAllSelected
+                              ? Icons.deselect_rounded
+                              : Icons.select_all_rounded,
+                          color: p.accent,
+                          size: 18,
+                        ),
+                        label: Text(
+                          isAllSelected
+                              ? context.l10n.browseDeselect
+                              : context.l10n.selectAllAction,
+                          style: TextStyle(
+                            color: p.accent,
+                            fontWeight: FontWeight.w700,
+                            fontSize: AppFontSize.bodySmall,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -380,30 +398,42 @@ class _ManagePlaylistScreenState extends State<ManagePlaylistScreen> {
         ),
         child: Row(
           children: [
-            Icon(Icons.auto_awesome_mosaic_rounded, color: p.accent, size: 16),
+            ExcludeSemantics(
+              child: Icon(Icons.auto_awesome_mosaic_rounded,
+                  color: p.accent, size: 16),
+            ),
             const SizedBox(width: AppSpacing.xs),
             Expanded(
-              child: Text(
-                '${context.l10n.browseWillAdd}:$toAdd ${context.l10n.browseTracks} •${context.l10n.browseWillRemove}: $toRemove${context.l10n.browseTracks}',
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontSize: AppFontSize.label,
-                  fontWeight: FontWeight.w700,
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  '${context.l10n.browseWillAdd}:$toAdd ${context.l10n.browseTracks} •${context.l10n.browseWillRemove}: $toRemove${context.l10n.browseTracks}',
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontSize: AppFontSize.label,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-            InkWell(
-              borderRadius: AppRadii.r8All,
-              onTap: _resetSelection,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.xs,
-                  vertical: 2,
-                ),
-                child: Icon(
-                  Icons.restart_alt_rounded,
-                  size: 18,
-                  color: p.accent,
+            Semantics(
+              button: true,
+              label: context.l10n.reset,
+              child: InkWell(
+                borderRadius: AppRadii.r8All,
+                onTap: _resetSelection,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
+                  child: Center(
+                    child: Icon(
+                      Icons.restart_alt_rounded,
+                      size: 18,
+                      color: p.accent,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -582,114 +612,130 @@ class _ManageSongRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
-      child: AnimatedContainer(
-        duration: context.motion(PulsrMotion.state),
-        curve: context.motionCurve(PulsrMotion.enter),
-        decoration: BoxDecoration(
-          borderRadius: AppRadii.cardRadius,
-          color: bgColor,
-          border: Border.all(color: borderColor, width: 1),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: AppRadii.cardRadius,
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.s10,
-                vertical: AppSpacing.s6,
-              ),
-              child: Row(
-                children: [
-                  Checkbox(
-                    value: isSelected,
-                    activeColor: p.accent,
-                    checkColor: p.onAccent,
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.r6),
-                    ),
-                    onChanged: (_) => onTap(),
+      child: MergeSemantics(
+        child: Semantics(
+          container: true,
+          selected: isSelected,
+          child: AnimatedContainer(
+            duration: context.motion(PulsrMotion.state),
+            curve: context.motionCurve(PulsrMotion.enter),
+            decoration: BoxDecoration(
+              borderRadius: AppRadii.cardRadius,
+              color: bgColor,
+              border: Border.all(color: borderColor, width: 1),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: AppRadii.cardRadius,
+                onTap: onTap,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s10,
+                    vertical: AppSpacing.s6,
                   ),
-                  const SizedBox(width: AppSpacing.xs),
-                  CachedArtwork(
-                    id: song.id,
-                    albumId: song.albumId,
-                    remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
-                    type: ArtworkType.AUDIO,
-                    size: 46,
-                    borderRadius: 10,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        PulsrHighlightedText(
-                          text: song.title,
-                          query: query,
-                          baseStyle: titleStyle,
-                          matchStyle: titleStyle.copyWith(
-                            color: p.accent,
-                            fontWeight: FontWeight.w800,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: isSelected,
+                        activeColor: p.accent,
+                        checkColor: p.onAccent,
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.r6),
                         ),
-                        const SizedBox(height: AppSpacing.s2),
-                        PulsrHighlightedText(
-                          text: subtitle,
-                          query: query,
-                          baseStyle: subtitleStyle,
-                          matchStyle: subtitleStyle.copyWith(
-                            color: p.accent,
-                            fontWeight: FontWeight.w700,
+                        onChanged: (_) => onTap(),
+                      ),
+                      const SizedBox(width: AppSpacing.xs),
+                      ExcludeSemantics(
+                        child: CachedArtwork(
+                          id: song.id,
+                          albumId: song.albumId,
+                          remoteUrl: song.remoteArtworkUrl ?? song.artworkUri,
+                          type: ArtworkType.AUDIO,
+                          size: 46,
+                          borderRadius: 10,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            PulsrHighlightedText(
+                              text: song.title,
+                              query: query,
+                              baseStyle: titleStyle,
+                              matchStyle: titleStyle.copyWith(
+                                color: p.accent,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: AppSpacing.s2),
+                            PulsrHighlightedText(
+                              text: subtitle,
+                              query: query,
+                              baseStyle: subtitleStyle,
+                              matchStyle: subtitleStyle.copyWith(
+                                color: p.accent,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (isNewlyAdded || isMarkedRemoved) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Semantics(
+                          label: isNewlyAdded
+                              ? context.l10n.browseWillAdd
+                              : context.l10n.browseWillRemove,
+                          excludeSemantics: true,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.s6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: (isNewlyAdded ? p.accent : p.error)
+                                  .withValues(alpha: 0.16),
+                              borderRadius: AppRadii.r6All,
+                            ),
+                            child: Text(
+                              isNewlyAdded ? '+1' : '-1',
+                              style: TextStyle(
+                                color: isNewlyAdded ? p.accent : p.error,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                              ),
+                            ),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                    ),
-                  ),
-                  if (isNewlyAdded || isMarkedRemoved) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.s6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: (isNewlyAdded ? p.accent : p.error)
-                            .withValues(alpha: 0.16),
-                        borderRadius: AppRadii.r6All,
-                      ),
-                      child: Text(
-                        isNewlyAdded ? '+1' : '-1',
-                        style: TextStyle(
-                          color: isNewlyAdded ? p.accent : p.error,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w800,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                      if (song.durationMs > 0) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Text(
+                          Formatters.formatDurationMs(song.durationMs),
+                          style: TextStyle(
+                            color: p.textTertiary,
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                  if (song.durationMs > 0) ...[
-                    const SizedBox(width: AppSpacing.xs),
-                    Text(
-                      Formatters.formatDurationMs(song.durationMs),
-                      style: TextStyle(
-                        color: p.textTertiary,
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ],
-                ],
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

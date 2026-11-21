@@ -163,8 +163,8 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
 
     final double horizontalPadding = switch (mode) {
       SidebarRailMode.hidden => 0.0,
-      SidebarRailMode.iconOnly => 8.0,
-      SidebarRailMode.compact => 10.0,
+      SidebarRailMode.iconOnly => 4.0,
+      SidebarRailMode.compact => 6.0,
       SidebarRailMode.expanded => 12.0,
     };
 
@@ -172,7 +172,7 @@ class LandscapeSidebarState extends State<LandscapeSidebar> {
     final showCompactLabel = mode == SidebarRailMode.compact;
     final targetContentWidth = isExtended ? 240.0 : width;
 
-    final destinations = pulsrDestinations(context);
+    final destinations = pulsrRailDestinations(context);
     final primaryItems = destinations.where((d) => d.index <= 2);
     final secondaryItems = destinations.where((d) => d.index >= 3);
     final safePadding = MediaQuery.paddingOf(context);
@@ -554,8 +554,8 @@ class _SidebarNavItem extends StatelessWidget {
                 child: AnimatedContainer(
                   duration: context.motionMs(200),
                   curve: context.motionCurve(Curves.easeOutCubic),
-                  height: showCompactLabel ? 52 : 46,
-                  width: showCompactLabel ? 52 : 46,
+                  height: showCompactLabel ? 52 : AppSpacing.minTouchTarget,
+                  width: showCompactLabel ? 52 : AppSpacing.minTouchTarget,
                   decoration: BoxDecoration(
                     gradient: isSelected
                         ? LinearGradient(
@@ -669,7 +669,7 @@ class _SidebarNavItem extends StatelessWidget {
           child: AnimatedContainer(
             duration: context.motionMs(200),
             curve: context.motionCurve(Curves.easeOutCubic),
-            height: 46,
+            height: AppSpacing.minTouchTarget,
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.s10),
             decoration: BoxDecoration(
               gradient: isSelected

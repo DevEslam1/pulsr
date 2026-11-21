@@ -369,7 +369,15 @@ final class PulsrAudioSink implements AudioSink, OutputSinkControl {
     }
 
     private boolean shouldSkipDspProcessor(@Nullable Format inputFormat, Mode requested) {
-        return lowPowerRouteEnabled.get() && !PulsrOutputRouting.isDspActive() && isLowPowerIntegerPcmEligible(inputFormat, requested);
+        final Inner current = currentInner;
+        final NativeDspAudioProcessor proc = current != null && current.processor != null
+                ? current.processor
+                : continuousState;
+        return lowPowerRouteEnabled.get()
+                && !PulsrOutputRouting.isDspActive()
+                && !PulsrOutputRouting.isBitPerfectRequested()
+                && (proc == null || !proc.isUsbExclusiveActive())
+                && isLowPowerIntegerPcmEligible(inputFormat, requested);
     }
 
     /** Runs on the playback thread; also directly callable from unit tests. */

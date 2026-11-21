@@ -35,7 +35,7 @@ double sinc(double x) {
 
 }  // namespace
 
-bool UsbAsrcClockSync::configure(int channels, int taps, int phases) {
+bool UsbAsrcClockSync::configure(int channels, int taps, int phases, bool allowDynamicBypass) {
     if (channels < 1 || channels > kMaxChannels) return false;
     if (taps < kMinTaps || taps > kMaxTaps || (taps & 1) != 0) return false;
     if (phases < kMinPhases || phases > kMaxPhases) return false;
@@ -44,6 +44,7 @@ bool UsbAsrcClockSync::configure(int channels, int taps, int phases) {
     taps_ = taps;
     halfTaps_ = taps / 2;
     phases_ = phases;
+    allowDynamicBypass_ = allowDynamicBypass;
     coef_.assign(static_cast<size_t>(phases_ + 1) * static_cast<size_t>(taps_), 0.0f);
     buf_.assign(static_cast<size_t>(taps_ + kPendingCapacity) * static_cast<size_t>(channels_),
                 0.0f);
@@ -51,9 +52,19 @@ bool UsbAsrcClockSync::configure(int channels, int taps, int phases) {
     configured_ = true;
     ratio_ = 1.0;
     step_ = 1.0;
-    bypass_ = true;
+    bypass_ = allowDynamicBypass_;
     clearStream();
     return true;
+}
+
+void UsbAsrcClockSync::setAllowDynamicBypass(bool allow) {
+    if (allowDynamicBypass_ == allow) return;
+    allowDynamicBypass_ = allow;
+    const bool newBypass = allowDynamicBypass_ && (ratio_ == 1.0);
+    if (bypass_ != newBypass) {
+        bypass_ = newBypass;
+        clearStream();
+    }
 }
 
 void UsbAsrcClockSync::buildKernel() {
@@ -96,7 +107,7 @@ void UsbAsrcClockSync::setRatio(double outPerIn) {
     const bool wasBypass = bypass_;
     ratio_ = r;
     step_ = 1.0 / r;
-    bypass_ = (r == 1.0);
+    bypass_ = allowDynamicBypass_ && (r == 1.0);
     if (wasBypass != bypass_) {
         // Control path: entering or leaving the bit-perfect bypass starts from a
         // clean history so no fractional phase can leak into a locked stream.

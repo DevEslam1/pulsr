@@ -81,6 +81,7 @@ mixin PhoneLayoutSection
             const SettingsHeroCard(),
             const SizedBox(height: AppSpacing.md),
           ],
+          SettingsQuickControlsStrip(state: state, cubit: cubit),
           ..._buildDashboardCards(context, state, cubit),
         ],
       );

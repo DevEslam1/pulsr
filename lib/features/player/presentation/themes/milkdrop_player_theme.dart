@@ -44,6 +44,7 @@ class MilkdropPlayerTheme extends StatelessWidget {
     final song = state.currentSong;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final p = context.palette;
+    final surface = context.playerSurfacePalette;
 
     final themeMode =
         context.select<SettingsCubit, AppThemeMode>((c) => c.state.themeMode);
@@ -60,41 +61,39 @@ class MilkdropPlayerTheme extends StatelessWidget {
     final Color topBg;
     final Color bottomBg;
     if (isAmoled) {
-      topBg = Colors.black;
-      bottomBg = Colors.black;
+      topBg = p.bg;
+      bottomBg = p.bg;
     } else if (isDark) {
       topBg = Color.alphaBlend(
-        Colors.black.withValues(alpha: 0.40),
+        surface.shadowAt(0.40),
         props.bgColor,
       );
       bottomBg = Color.alphaBlend(
-        Colors.black.withValues(alpha: 0.60),
+        surface.shadowAt(0.60),
         props.bgColor,
       );
     } else {
       topBg = props.bgColor;
       bottomBg = Color.alphaBlend(
-        Colors.black.withValues(alpha: 0.06),
+        surface.shadowAt(0.06),
         props.bgColor,
       );
     }
 
-    // `off` means off: no shader, no ticker, no per-frame GPU work. Every other
-    // style renders as itself instead of being coerced into Milkdrop.
+    // `off` means off: no shader, no ticker, no per-frame GPU work. Reduced
+    // motion and scaled preview thumbnails also stay on the static ambient
+    // backdrop so no per-frame shader loop runs when animations are disabled.
+    final bool allowMotion = PulsrMotion.shouldAnimate(context);
+    final bool isPreview = PlayerThemePreviewScope.of(context);
     final VisualizerStyle? effectiveStyle =
-        visualizerStyle == VisualizerStyle.off ? null : visualizerStyle;
+        (visualizerStyle == VisualizerStyle.off || !allowMotion || isPreview)
+            ? null
+            : visualizerStyle;
 
     // One shader colour for both brightnesses would be white-on-white in light
     // mode; ink waves keep the identity while the palette text stays legible.
-    final Color visualizerColor = isDark ? Colors.white : p.textPrimary;
-
-    // The chrome inherits palette text (white glyphs on dark, ink on light), so
-    // the veil over the shader has to follow the same brightness. A black veil
-    // only protected dark-mode chrome and left light mode unreadable over
-    // mid-tone frames.
-    final Color veil = isDark ? Colors.black : Colors.white;
-    final double topVeilAlpha = isDark ? 0.45 : 0.55;
-    final double bottomVeilAlpha = isDark ? 0.62 : 0.64;
+    final Color visualizerColor =
+        isDark ? surface.highContrastInk : p.textPrimary;
 
     final milkdropBadge = Container(
       padding: const EdgeInsets.symmetric(
@@ -103,13 +102,11 @@ class MilkdropPlayerTheme extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: p.isDark
-            ? Colors.white.withValues(alpha: 0.15)
+            ? surface.specularAt(0.15)
             : p.textPrimary.withValues(alpha: 0.06),
         borderRadius: AppRadii.r12All,
         border: Border.all(
-          color: p.isDark
-              ? Colors.white.withValues(alpha: 0.24)
-              : p.hairline,
+          color: p.isDark ? surface.specularAt(0.24) : p.hairline,
           width: 0.8,
         ),
       ),
@@ -179,8 +176,8 @@ class MilkdropPlayerTheme extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        veil.withValues(alpha: topVeilAlpha),
-                        Colors.transparent,
+                        surface.scrimStart,
+                        surface.scrimStart.withValues(alpha: 0.0),
                       ],
                     ),
                   ),
@@ -199,8 +196,8 @@ class MilkdropPlayerTheme extends StatelessWidget {
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                       colors: [
-                        veil.withValues(alpha: bottomVeilAlpha),
-                        Colors.transparent,
+                        surface.scrimEnd,
+                        surface.scrimEnd.withValues(alpha: 0.0),
                       ],
                     ),
                   ),
@@ -214,7 +211,7 @@ class MilkdropPlayerTheme extends StatelessWidget {
         child: Center(
           key: const ValueKey('artwork_view_milkdrop'),
           child: AnimatedScale(
-            scale: state.isPlaying ? 1.0 : 0.97,
+            scale: (state.isPlaying || !allowMotion) ? 1.0 : 0.97,
             duration: context.motionMs(320),
             curve: context.motionCurve(Curves.easeOutCubic),
             child: AspectRatio(
@@ -236,9 +233,7 @@ class MilkdropPlayerTheme extends StatelessWidget {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(
-                          alpha: isDark ? 0.45 : 0.28,
-                        ),
+                        color: surface.shadowAt(isDark ? 0.45 : 0.28),
                         blurRadius: 36,
                         spreadRadius: 2,
                         offset: const Offset(0, 16),

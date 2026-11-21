@@ -1,6 +1,11 @@
 // lib/features/auth/presentation/auth_sheet.dart
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
+import 'package:pulsr/core/constants/app_radii.dart';
+import 'package:pulsr/core/constants/app_spacing.dart';
+import 'package:pulsr/core/constants/app_typography.dart';
+
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/error_message_resolver.dart';
@@ -8,17 +13,13 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
+import '../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../core/widgets/pulsr_progress.dart';
 import '../../settings/presentation/widgets/ytm_account_disconnect_dialog.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
-import 'ytm_web_login_sheet.dart';
 import 'ytm_oauth_login_sheet.dart';
-
-import '../../../core/widgets/pulsr_bottom_sheet.dart';
-import 'package:pulsr/core/constants/app_spacing.dart';
-import 'package:pulsr/core/constants/app_radii.dart';
-import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
+import 'ytm_web_login_sheet.dart';
 
 class AuthSheet extends StatefulWidget {
   const AuthSheet({super.key});
@@ -126,9 +127,6 @@ class _AuthSheetState extends State<AuthSheet> {
             Navigator.of(context).pop();
           }
         } else if (state.errorMessage != null) {
-          // Non-error statuses (e.g. sign-in cancelled, email result null)
-          // still carry a message that must reach the user; only genuine
-          // failures get the red error styling.
           final isError = state.status == AuthStatus.error;
           ScaffoldMessenger.of(context)
             ..clearSnackBars()
@@ -172,13 +170,15 @@ class _AuthSheetState extends State<AuthSheet> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Drag handle
-                        Center(
-                          child: Container(
-                            width: 36,
-                            height: 4,
-                            decoration: BoxDecoration(
-                              color: p.textTertiary.withValues(alpha: 0.3),
-                              borderRadius: AppRadii.r2All,
+                        ExcludeSemantics(
+                          child: Center(
+                            child: Container(
+                              width: 36,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: p.textTertiary.withValues(alpha: 0.3),
+                                borderRadius: AppRadii.r2All,
+                              ),
                             ),
                           ),
                         ),
@@ -202,14 +202,17 @@ class _AuthSheetState extends State<AuthSheet> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(
-                                    _isSignUp
-                                        ? context.l10n.browseCreateCloudAccount
-                                        : context.l10n.browseSignInToCloud,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontSize: AppFontSize.title,
-                                      fontWeight: FontWeight.w700,
+                                  Semantics(
+                                    header: true,
+                                    child: Text(
+                                      _isSignUp
+                                          ? context.l10n.browseCreateCloudAccount
+                                          : context.l10n.browseSignInToCloud,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontSize: AppFontSize.title,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ),
                                   Text(
@@ -235,8 +238,13 @@ class _AuthSheetState extends State<AuthSheet> {
                           style: FilledButton.styleFrom(
                             backgroundColor: p.surface,
                             foregroundColor: p.textPrimary,
+                            minimumSize: const Size.fromHeight(
+                              AppSpacing.minTouchTarget,
+                            ),
                             padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.s14),
+                              horizontal: AppSpacing.md,
+                              vertical: AppSpacing.s14,
+                            ),
                             shape: RoundedRectangleBorder(
                               borderRadius: AppRadii.r14All,
                               side: BorderSide(color: p.hairline),
@@ -245,8 +253,6 @@ class _AuthSheetState extends State<AuthSheet> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              // Offline-safe "G" badge: no network asset, no
-                              // webfont — renders identically offline.
                               Container(
                                 height: 20,
                                 width: 20,
@@ -266,11 +272,15 @@ class _AuthSheetState extends State<AuthSheet> {
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.sm),
-                              Text(
-                                context.l10n.continueWithGoogle,
-                                style: TextStyle(
-                                  fontSize: AppFontSize.callout,
-                                  fontWeight: FontWeight.w600,
+                              Flexible(
+                                child: Text(
+                                  context.l10n.continueWithGoogle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: AppFontSize.callout,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
@@ -410,16 +420,21 @@ class _AuthSheetState extends State<AuthSheet> {
                           Align(
                             alignment: AlignmentDirectional.centerEnd,
                             child: TextButton(
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(
+                                  AppSpacing.minTouchTarget,
+                                  AppSpacing.minTouchTarget,
+                                ),
+                              ),
                               onPressed: (_isSendingReset || isLoading)
                                   ? null
                                   : () => _handlePasswordReset(
                                       context.read<AuthCubit>()),
                               child: _isSendingReset
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2),
+                                  ? PulsrProgressBar.circular(
+                                      size: 16,
+                                      strokeWidth: 2,
+                                      color: p.accent,
                                     )
                                   : Text(
                                       context.l10n.forgotPassword,
@@ -434,55 +449,67 @@ class _AuthSheetState extends State<AuthSheet> {
                         ],
 
                         // Email Submit Button
-                        FilledButton(
-                          onPressed: isLoading
-                              ? null
-                              : () {
-                                  if (_formKey.currentState?.validate() ==
-                                      true) {
-                                    final email = _emailController.text.trim();
-                                    final password = _passwordController.text;
-                                    if (_isSignUp) {
-                                      context
-                                          .read<AuthCubit>()
-                                          .signUpWithEmail(email, password);
-                                    } else {
-                                      context
-                                          .read<AuthCubit>()
-                                          .signInWithEmail(email, password);
+                        Semantics(
+                          liveRegion: isLoading,
+                          child: FilledButton(
+                            onPressed: isLoading
+                                ? null
+                                : () {
+                                    if (_formKey.currentState?.validate() ==
+                                        true) {
+                                      final email =
+                                          _emailController.text.trim();
+                                      final password = _passwordController.text;
+                                      if (_isSignUp) {
+                                        context
+                                            .read<AuthCubit>()
+                                            .signUpWithEmail(email, password);
+                                      } else {
+                                        context
+                                            .read<AuthCubit>()
+                                            .signInWithEmail(email, password);
+                                      }
                                     }
-                                  }
-                                },
-                          style: FilledButton.styleFrom(
-                            backgroundColor: p.accent,
-                            foregroundColor: p.onAccent,
-                            padding: const EdgeInsets.symmetric(
-                                vertical: AppSpacing.s14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: AppRadii.r14All,
+                                  },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: p.accent,
+                              foregroundColor: p.onAccent,
+                              minimumSize: const Size.fromHeight(
+                                AppSpacing.minTouchTarget,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: AppSpacing.s14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: AppRadii.r14All,
+                              ),
                             ),
+                            child: isLoading
+                                ? PulsrProgressBar.circular(
+                                    size: AppSpacing.s20,
+                                    strokeWidth: 2,
+                                    color: p.onAccent,
+                                  )
+                                : Text(
+                                    _isSignUp
+                                        ? context.l10n.browseSignUp
+                                        : context.l10n.signIn,
+                                    style: const TextStyle(
+                                        fontSize: AppFontSize.callout,
+                                        fontWeight: FontWeight.w600),
+                                  ),
                           ),
-                          child: isLoading
-                              ? SizedBox(
-                                  width: AppSpacing.s20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2, color: p.onAccent),
-                                )
-                              : Text(
-                                  _isSignUp
-                                      ? context.l10n.browseSignUp
-                                      : context.l10n.signIn,
-                                  style: const TextStyle(
-                                      fontSize: AppFontSize.callout,
-                                      fontWeight: FontWeight.w600),
-                                ),
                         ),
 
                         const SizedBox(height: AppSpacing.sm),
 
                         // Toggle Sign Up / Sign In
                         TextButton(
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(
+                              AppSpacing.minTouchTarget,
+                              AppSpacing.minTouchTarget,
+                            ),
+                          ),
                           onPressed: () {
                             _passwordController.clear();
                             setState(() => _isSignUp = !_isSignUp);
@@ -559,6 +586,9 @@ class _AuthSheetState extends State<AuthSheet> {
                                   ),
                                 ),
                                 style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(
+                                    AppSpacing.minTouchTarget,
+                                  ),
                                   padding: const EdgeInsets.symmetric(
                                       vertical: AppSpacing.sm),
                                   side: BorderSide(color: p.hairline),
@@ -572,6 +602,12 @@ class _AuthSheetState extends State<AuthSheet> {
                           if (!ytmAccount.loginState.value) ...[
                             const SizedBox(height: AppSpacing.xs),
                             TextButton.icon(
+                              style: TextButton.styleFrom(
+                                minimumSize: const Size(
+                                  AppSpacing.minTouchTarget,
+                                  AppSpacing.minTouchTarget,
+                                ),
+                              ),
                               onPressed: () async {
                                 final ok =
                                     await YtmOAuthLoginSheet.show(context);

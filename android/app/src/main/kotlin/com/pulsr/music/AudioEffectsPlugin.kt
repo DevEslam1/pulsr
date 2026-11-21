@@ -458,6 +458,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // route (otherwise it is skipped, since the lossy codec re-quantises).
     @Volatile private var isBluetoothDitherAllowed = false
     @Volatile private var isDopActive = false
+    @Volatile private var directUsbVolumeGain = 1.0
     @Volatile private var isReplayGainEnabled = false
     private data class ReplayGainSnapshot(
         val mode: Int,
@@ -2316,9 +2317,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         lastNativeMultibandCompressorCrossovers = null
         lastNativeDynamicBassParams = null
         releaseEffects()
-        releaseNativeDsp()
         isBitPerfectBypassActive = false
         isDopActive = false
+        directUsbVolumeGain = 1.0
+        releaseNativeDsp()
         // A torn-down plugin must not leave a stale `true` request in the
         // Java sink layer: the AAudio sink would keep refusing volume.
         publishBitPerfectRequestToSinkLayer()
@@ -2374,7 +2376,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         safeCall(TAG, "nativeSetSincResamplerEnabled") { nativeSetSincResamplerEnabled(false) }
         safeCall(TAG, "nativeSetReplayGainEnabled") { nativeSetReplayGainEnabled(false) }
         safeCall(TAG, "nativeSetDirectVolumeParams") { nativeSetDirectVolumeParams(false, 1.0) }
-        safeCall(TAG, "nativeSetDirectUsbVolume") { nativeSetDirectUsbVolume(1.0) }
+        safeCall(TAG, "nativeSetDirectUsbVolume") { nativeSetDirectUsbVolume(directUsbVolumeGain) }
         safeCall(TAG, "nativeSetViperDdcEnabled") { nativeSetViperDdcEnabled(false) }
         safeCall(TAG, "nativeSetArbitraryEqEnabled") { nativeSetArbitraryEqEnabled(false) }
         safeCall(TAG, "nativeSetLiveProgEnabled") { nativeSetLiveProgEnabled(false) }
@@ -2391,9 +2393,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         safeCall(TAG, "nativeSetHrtfBinauralEnabled") { nativeSetHrtfBinauralEnabled(false) }
         safeCall(TAG, "nativeSetOversampleMultiplier") { nativeSetOversampleMultiplier(1) }
         safeCall(TAG, "nativeSetPcmToDsdEnabled") { nativeSetPcmToDsdEnabled(false) }
-        safeCall(TAG, "nativeSetBitPerfectParams") { nativeSetBitPerfectParams(false, false) }
+        safeCall(TAG, "nativeSetBitPerfectParams") {
+            nativeSetBitPerfectParams(isBitPerfectBypassActive, isBitPerfectBypassActive && isDopActive)
+        }
         safeCall(TAG, "nativeSetActiveStages") { nativeSetActiveStages(0) }
-        safeCall(TAG, "nativeReset") { nativeReset() }
+        if (!isBitPerfectBypassActive) {
+            safeCall(TAG, "nativeReset") { nativeReset() }
+        }
         try {
             com.ryanheise.just_audio.PulsrOutputRouting.setDspActive(false)
         } catch (_: Throwable) {}
@@ -5602,6 +5608,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "setDirectUsbVolume" -> {
                     val gain = ((call.argument<Number>("gain"))?.toDouble() ?: 1.0)
                         .coerceIn(0.0, 1.0)
+                    directUsbVolumeGain = gain
                     if (isNativeDspLoaded) {
                         try {
                             nativeSetDirectUsbVolume(gain)

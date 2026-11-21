@@ -1,6 +1,7 @@
 // lib/features/library/presentation/duplicate_finder_screen.dart
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -409,12 +410,15 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
           elevation: 0,
           scrolledUnderElevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(
-            context.l10n.duplicateCleaner,
-            style: TextStyle(
-              color: p.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: AppFontSize.bodyLarge,
+          title: Semantics(
+            header: true,
+            child: Text(
+              context.l10n.duplicateCleaner,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: AppFontSize.bodyLarge,
+              ),
             ),
           ),
           actions: [
@@ -431,12 +435,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             if (_keptSongByGroup.isNotEmpty)
               IconButton(
                 icon: _isBulkDeleting
-                    ? SizedBox(
-                        width: AppSpacing.s20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: p.error,
+                    ? const SkeletonShimmer(
+                        child: SkeletonBox(
+                          width: AppSpacing.s20,
+                          height: 20,
+                          radius: 10,
                         ),
                       )
                     : Icon(Icons.delete_sweep_rounded, color: p.error),
@@ -449,12 +452,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
               ),
             IconButton(
               icon: _isFetchingArtwork
-                  ? SizedBox(
-                      width: AppSpacing.s20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: p.primary,
+                  ? const SkeletonShimmer(
+                      child: SkeletonBox(
+                        width: AppSpacing.s20,
+                        height: 20,
+                        radius: 10,
                       ),
                     )
                   : Icon(Icons.image_search_rounded, color: p.textSecondary),
@@ -560,12 +562,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
             child: Container(
               padding: const EdgeInsets.all(AppSpacing.md),
               decoration: BoxDecoration(
-                color: (p.isDark ? Colors.white : Colors.black)
-                    .withValues(alpha: 0.05),
+                color: p.isDark
+                    ? AppColors.specularAt(0.05)
+                    : AppColors.scrimAt(0.05),
                 borderRadius: AppRadii.r18All,
                 border: Border.all(
-                  color: (p.isDark ? Colors.white : Colors.black)
-                      .withValues(alpha: 0.08),
+                  color: p.isDark
+                      ? AppColors.specularAt(0.08)
+                      : AppColors.scrimAt(0.08),
                 ),
               ),
               child: Column(
@@ -629,6 +633,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                           style: FilledButton.styleFrom(
                             backgroundColor: p.accent.withValues(alpha: 0.16),
                             foregroundColor: p.accent,
+                            minimumSize: const Size(
+                              AppSpacing.minTouchTarget,
+                              AppSpacing.minTouchTarget,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.padded,
                             shape: RoundedRectangleBorder(
                               borderRadius: AppRadii.r12All,
                             ),
@@ -651,6 +660,11 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                           style: FilledButton.styleFrom(
                             backgroundColor: p.error,
                             foregroundColor: p.onError,
+                            minimumSize: const Size(
+                              AppSpacing.minTouchTarget,
+                              AppSpacing.minTouchTarget,
+                            ),
+                            tapTargetSize: MaterialTapTargetSize.padded,
                             shape: RoundedRectangleBorder(
                               borderRadius: AppRadii.r12All,
                             ),
@@ -766,7 +780,9 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     return Container(
       margin: const EdgeInsets.only(top: AppSpacing.xxs),
       decoration: BoxDecoration(
-        color: isKept ? p.accent.withValues(alpha: 0.06) : Colors.transparent,
+        color: isKept
+            ? p.accent.withValues(alpha: 0.06)
+            : AppColors.fadeStopTransparent,
         borderRadius: AppRadii.r12All,
         border: isKept
             ? Border.all(color: p.accent.withValues(alpha: 0.3))
@@ -801,50 +817,63 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                       ),
                     ),
                   ),
-                PopupMenuButton<_ResolveAction>(
-                  icon: Icon(
-                    Icons.more_vert_rounded,
-                    size: 20,
-                    color: p.textTertiary,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
                   ),
-                  tooltip: context.l10n.resolveDuplicate,
-                  onSelected: (action) {
-                    if (action == _ResolveAction.keep) {
-                      _keepSong(group, song);
-                    } else {
-                      _confirmDelete(group, song);
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    PopupMenuItem(
-                      value: _ResolveAction.keep,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle_outline_rounded,
-                            size: 20,
-                            color: p.accent,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(context.l10n.keepThisOne),
-                        ],
+                  child: PopupMenuButton<_ResolveAction>(
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(
+                        AppSpacing.minTouchTarget,
+                        AppSpacing.minTouchTarget,
                       ),
+                      tapTargetSize: MaterialTapTargetSize.padded,
                     ),
-                    PopupMenuItem(
-                      value: _ResolveAction.delete,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete_outline_rounded,
-                            size: 20,
-                            color: p.error,
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Text(context.l10n.deleteFile),
-                        ],
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      size: 20,
+                      color: p.textTertiary,
+                    ),
+                    tooltip: context.l10n.resolveDuplicate,
+                    onSelected: (action) {
+                      if (action == _ResolveAction.keep) {
+                        _keepSong(group, song);
+                      } else {
+                        _confirmDelete(group, song);
+                      }
+                    },
+                    itemBuilder: (ctx) => [
+                      PopupMenuItem(
+                        value: _ResolveAction.keep,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.check_circle_outline_rounded,
+                              size: 20,
+                              color: p.accent,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(context.l10n.keepThisOne),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      PopupMenuItem(
+                        value: _ResolveAction.delete,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_outline_rounded,
+                              size: 20,
+                              color: p.error,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Text(context.l10n.deleteFile),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

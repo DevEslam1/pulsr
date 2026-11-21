@@ -1,4 +1,5 @@
 // lib/features/radio/presentation/radio_screen.dart
+import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -462,7 +463,7 @@ class _RadioScreenState extends State<RadioScreen> {
         const EdgeInsets.symmetric(horizontal: AppSpacing.md),
   }) {
     return SizedBox(
-      height: 38,
+      height: AppSpacing.minTouchTarget,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: padding,
@@ -471,25 +472,33 @@ class _RadioScreenState extends State<RadioScreen> {
         itemBuilder: (context, idx) {
           final g = availableGenres[idx];
           final isSelected = _selectedGenre == g;
-          return FilterChip(
-            label: Text(g == 'All' ? context.l10n.all : g),
+          final label = g == 'All' ? context.l10n.all : g;
+          return Semantics(
+            button: true,
             selected: isSelected,
-            selectedColor: p.accent.withValues(alpha: 0.2),
-            checkmarkColor: p.accent,
-            labelStyle: TextStyle(
-              color: isSelected ? p.accent : p.textSecondary,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              fontSize: AppFontSize.caption,
+            label: label,
+            child: FilterChip(
+              label: Text(label),
+              selected: isSelected,
+              selectedColor: p.accent.withValues(alpha: 0.2),
+              checkmarkColor: p.accent,
+              labelStyle: TextStyle(
+                color: isSelected ? p.accent : p.textSecondary,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: AppFontSize.caption,
+              ),
+              side: BorderSide(
+                color: isSelected
+                    ? p.accent.withValues(alpha: 0.4)
+                    : p.hairline,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: AppRadii.r12All,
+              ),
+              onSelected: (_) {
+                setState(() => _selectedGenre = g);
+              },
             ),
-            side: BorderSide(
-              color: isSelected ? p.accent.withValues(alpha: 0.4) : p.hairline,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: AppRadii.r12All,
-            ),
-            onSelected: (_) {
-              setState(() => _selectedGenre = g);
-            },
           );
         },
       ),
@@ -511,33 +520,38 @@ class _RadioScreenState extends State<RadioScreen> {
             AppSpacing.md,
             isCompactLandscape ? AppSpacing.xxs : AppSpacing.xs,
           ),
-          child: Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: isCompactLandscape ? AppSpacing.xs : AppSpacing.sm,
-            ),
-            decoration: BoxDecoration(
-              color: p.accentContainer.withValues(alpha: 0.35),
-              borderRadius: AppRadii.r16All,
-              border: Border.all(
-                color: p.accent.withValues(alpha: 0.3),
-                width: 1,
+          child: Semantics(
+            container: true,
+            liveRegion: true,
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: isCompactLandscape ? AppSpacing.xs : AppSpacing.sm,
               ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.xs),
-                  decoration: BoxDecoration(
-                    color: p.accent.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.visibility_off_rounded,
-                    color: p.accent,
-                    size: 20,
-                  ),
+              decoration: BoxDecoration(
+                color: p.accentContainer.withValues(alpha: 0.35),
+                borderRadius: AppRadii.r16All,
+                border: Border.all(
+                  color: p.accent.withValues(alpha: 0.3),
+                  width: 1,
                 ),
+              ),
+              child: Row(
+                children: [
+                  ExcludeSemantics(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.xs),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.visibility_off_rounded,
+                        color: p.accent,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Column(
@@ -586,12 +600,13 @@ class _RadioScreenState extends State<RadioScreen> {
                       borderRadius: AppRadii.r12All,
                     ),
                   ),
-                  child: Text(
-                    context.l10n.radioShowAction,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                    child: Text(
+                      context.l10n.radioShowAction,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -766,27 +781,32 @@ class _RadioScreenState extends State<RadioScreen> {
                 ),
                 onPressed: () => _showAddDialog(initial: station),
               ),
-              IconButton(
-                constraints: const BoxConstraints(
-                  minWidth: AppSpacing.minTouchTarget,
-                  minHeight: AppSpacing.minTouchTarget,
+              MergeSemantics(
+                child: Semantics(
+                  toggled: isPlaying,
+                  child: IconButton(
+                    constraints: const BoxConstraints(
+                      minWidth: AppSpacing.minTouchTarget,
+                      minHeight: AppSpacing.minTouchTarget,
+                    ),
+                    tooltip:
+                        isPlaying ? context.l10n.pause : context.l10n.radioPlay,
+                    icon: Icon(
+                      isPlaying
+                          ? Icons.pause_circle_filled_rounded
+                          : Icons.play_circle_fill_rounded,
+                      color: p.accent,
+                      size: 32,
+                    ),
+                    onPressed: () {
+                      if (isCurrent) {
+                        playerCubit.togglePlayPause();
+                      } else {
+                        playerCubit.playRadioStation(localizedStation);
+                      }
+                    },
+                  ),
                 ),
-                tooltip:
-                    isPlaying ? context.l10n.pause : context.l10n.radioPlay,
-                icon: Icon(
-                  isPlaying
-                      ? Icons.pause_circle_filled_rounded
-                      : Icons.play_circle_fill_rounded,
-                  color: p.accent,
-                  size: 32,
-                ),
-                onPressed: () {
-                  if (isCurrent) {
-                    playerCubit.togglePlayPause();
-                  } else {
-                    playerCubit.playRadioStation(localizedStation);
-                  }
-                },
               ),
             ],
           ),
@@ -800,7 +820,21 @@ class _RadioScreenState extends State<RadioScreen> {
           onLongPress: () => _showStationActions(station),
         );
 
-        if (!isCardMode) return tile;
+        final semanticTile = Semantics(
+          container: true,
+          selected: isCurrent,
+          customSemanticsActions: {
+            CustomSemanticsAction(label: context.l10n.radioEdit): () =>
+                _showAddDialog(initial: station),
+            CustomSemanticsAction(label: context.l10n.radioDelete): () =>
+                _confirmDelete(station),
+            CustomSemanticsAction(label: context.l10n.sortRadioCardsTitle):
+                () => _showStationActions(station),
+          },
+          child: tile,
+        );
+
+        if (!isCardMode) return semanticTile;
 
         return Material(
           color: isCurrent
@@ -814,7 +848,7 @@ class _RadioScreenState extends State<RadioScreen> {
             ),
           ),
           clipBehavior: Clip.antiAlias,
-          child: Center(child: tile),
+          child: Center(child: semanticTile),
         );
       },
     );
@@ -847,35 +881,40 @@ class _RadioScreenState extends State<RadioScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: avatarSize,
-                      height: avatarSize,
-                      decoration: BoxDecoration(
-                        color: p.accentContainer.withValues(alpha: 0.35),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: p.accent.withValues(alpha: 0.25),
-                          width: 1.5,
+                    ExcludeSemantics(
+                      child: Container(
+                        width: avatarSize,
+                        height: avatarSize,
+                        decoration: BoxDecoration(
+                          color: p.accentContainer.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: p.accent.withValues(alpha: 0.25),
+                            width: 1.5,
+                          ),
                         ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        Icons.radio_rounded,
-                        size: iconSize,
-                        color: p.accent,
+                        alignment: Alignment.center,
+                        child: Icon(
+                          Icons.radio_rounded,
+                          size: iconSize,
+                          color: p.accent,
+                        ),
                       ),
                     ),
                     SizedBox(
                       height:
                           isCompactLandscape ? AppSpacing.sm : AppSpacing.s20,
                     ),
-                    Text(
-                      context.l10n.radioEmptyTitle,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: p.textPrimary,
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w700,
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        context.l10n.radioEmptyTitle,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontSize: AppFontSize.title,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -973,7 +1012,10 @@ class _RadioScreenState extends State<RadioScreen> {
           backgroundColor: p.surface,
           elevation: 0,
           leading: const PulsrBackButton(),
-          title: Text(context.l10n.radioTitle),
+          title: Semantics(
+            header: true,
+            child: Text(context.l10n.radioTitle),
+          ),
           actions: [
             ValueListenableBuilder<bool>(
               valueListenable: RadioStationStore.heroCardsVisible,
@@ -1063,7 +1105,13 @@ class _RadioScreenState extends State<RadioScreen> {
             child: LayoutBuilder(
               builder: (context, viewport) {
                 if (_loading) {
-                  return const Center(child: CircularProgressIndicator());
+                  return Center(
+                    child: Semantics(
+                      liveRegion: true,
+                      label: context.l10n.pageLoadingProgress,
+                      child: const CircularProgressIndicator(),
+                    ),
+                  );
                 }
 
                 if (_loadFailed && _stations.isEmpty) {
@@ -1280,14 +1328,17 @@ class _RadioStationActionsSheet extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  displayStationName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: AppFontSize.title,
-                                    fontWeight: FontWeight.w700,
+                                Semantics(
+                                  header: true,
+                                  child: Text(
+                                    displayStationName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontSize: AppFontSize.title,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 2),
@@ -1339,15 +1390,21 @@ class _RadioStationActionsSheet extends StatelessWidget {
                       // Sort section header
                       Row(
                         children: [
-                          Icon(Icons.sort_rounded, size: 16, color: p.accent),
+                          ExcludeSemantics(
+                            child: Icon(Icons.sort_rounded,
+                                size: 16, color: p.accent),
+                          ),
                           const SizedBox(width: AppSpacing.xs),
-                          Text(
-                            context.l10n.sortRadioCardsTitle,
-                            style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: AppFontSize.caption,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
+                          Semantics(
+                            header: true,
+                            child: Text(
+                              context.l10n.sortRadioCardsTitle,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
                             ),
                           ),
                           const Spacer(),
@@ -1449,47 +1506,62 @@ class _RadioSortOptionChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: AppRadii.r12All,
-        child: InkWell(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        child: Material(
+          color: Colors.transparent,
           borderRadius: AppRadii.r12All,
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: context.motion(PulsrMotion.layout),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            decoration: BoxDecoration(
-              color: selected
-                  ? p.accent.withValues(alpha: 0.16)
-                  : p.surfaceContainerHigh.withValues(alpha: 0.55),
-              borderRadius: AppRadii.r12All,
-              border: Border.all(
-                color: selected
-                    ? p.accent.withValues(alpha: 0.60)
-                    : p.hairline.withValues(alpha: 0.7),
-                width: selected ? 1.2 : 0.8,
+          child: InkWell(
+            borderRadius: AppRadii.r12All,
+            onTap: onTap,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                minHeight: AppSpacing.minTouchTarget,
               ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: selected ? p.accent : p.textSecondary,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: selected ? p.accent : p.textPrimary,
-                    fontSize: AppFontSize.caption,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              child: AnimatedContainer(
+                duration: context.motion(PulsrMotion.layout),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                decoration: BoxDecoration(
+                  color: selected
+                      ? p.accent.withValues(alpha: 0.16)
+                      : p.surfaceContainerHigh.withValues(alpha: 0.55),
+                  borderRadius: AppRadii.r12All,
+                  border: Border.all(
+                    color: selected
+                        ? p.accent.withValues(alpha: 0.60)
+                        : p.hairline.withValues(alpha: 0.7),
+                    width: selected ? 1.2 : 0.8,
                   ),
                 ),
-              ],
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ExcludeSemantics(
+                      child: Icon(
+                        icon,
+                        size: 18,
+                        color: selected ? p.accent : p.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: selected ? p.accent : p.textPrimary,
+                        fontSize: AppFontSize.caption,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

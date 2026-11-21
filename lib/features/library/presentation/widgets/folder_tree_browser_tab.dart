@@ -14,6 +14,7 @@ import '../../../../domain/usecases/folder_usecases.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -324,7 +325,7 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                               decoration: BoxDecoration(
                                 color: isLast
                                     ? p.accent.withValues(alpha: 0.16)
-                                    : Colors.transparent,
+                                    : AppColors.fadeStopTransparent,
                                 borderRadius: AppRadii.r8All,
                               ),
                               child: Row(

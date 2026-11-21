@@ -6,6 +6,7 @@ import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
 import '../../../../services/discord/discord_rpc_service.dart';
 
@@ -397,14 +398,11 @@ class _DiscordRpcSheetState extends State<DiscordRpcSheet> {
                         ),
                         onPressed: _isSaving ? null : _saveToken,
                         child: _isSaving
-                            ? SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.textOnAccent(
-                                      AppColors.discordBlurple),
-                                ),
+                            ? PulsrProgressBar.circular(
+                                size: 20,
+                                strokeWidth: 2,
+                                color: AppColors.textOnAccent(
+                                    AppColors.discordBlurple),
                               )
                             : Text(hasToken
                                 ? context.l10n.discordUpdateToken

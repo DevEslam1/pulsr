@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/responsive/responsive_values.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -141,7 +142,8 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
   }
 
   Widget _buildSkeleton(BuildContext context) {
-    final size = widget.isTablet ? 158.0 : 138.0;
+    final size = context.responsive
+        .value(compact: 138.0, medium: 150.0, expanded: 158.0);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
       child: Column(
@@ -228,7 +230,8 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
         }
 
         final hasMore = _hasMore;
-        final size = widget.isTablet ? 158.0 : 138.0;
+        final size = context.responsive
+            .value(compact: 138.0, medium: 150.0, expanded: 158.0);
         final totalItemCount = songs.length + (hasMore ? 1 : 0);
 
         return Padding(
@@ -257,23 +260,22 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                       return Padding(
                         padding: const EdgeInsetsDirectional.only(
                             end: AppSpacing.s14),
-                        child: Container(
-                          width: size,
-                          height: size,
-                          decoration: BoxDecoration(
-                            color: p.surfaceCard.withValues(alpha: 0.5),
-                            borderRadius: AppRadii.r18All,
-                            border: Border.all(color: p.hairline),
-                          ),
-                          child: Center(
-                            child: SizedBox(
-                              width: AppSpacing.lg,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(p.accent),
-                              ),
+                        child: SkeletonShimmer(
+                          child: SizedBox(
+                            width: size,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SkeletonBox(
+                                  width: size,
+                                  height: size,
+                                  radius: AppRadii.r18,
+                                ),
+                                const SizedBox(height: AppSpacing.xs),
+                                SkeletonLine(width: size * 0.75, height: 12),
+                                const SizedBox(height: AppSpacing.s2),
+                                SkeletonLine(width: size * 0.5, height: 10),
+                              ],
                             ),
                           ),
                         ),

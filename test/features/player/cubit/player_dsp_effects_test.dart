@@ -118,6 +118,56 @@ void main() {
       verify(() => settings.setBitPerfectTrackFormat(
           sampleRate: 48000, bitDepth: 24)).called(1);
     });
+    test(
+        'deferred decodedPcmEncoding telemetry fill-in (0 -> 21) does not trigger redundant mid-track format switch',
+        () async {
+      var output = const AudioOutputInfo(
+          deviceName: 'DAC',
+          isUsbDac: true,
+          sampleRate: 48000,
+          bitDepth: 24,
+          decodedPcmEncoding: 0,
+          supportedSampleRates: [48000],
+          isBitPerfectActive: false);
+      when(() => settings.state).thenAnswer((_) => SettingsState(
+          bitPerfectOutput: true,
+          followTrackSampleRate: true,
+          outputFormatNegotiationEnabled: true,
+          currentOutputDevice: output));
+      when(() => settings.bitPerfectViaDirectStream).thenReturn(false);
+      final song =
+          buildSong(1, path: '/music/a.flac', sampleRate: 48000, bitDepth: 24);
+      when(() => settings.validateBitPerfectTrackSource(song))
+          .thenAnswer((_) async => true);
+      when(() => settings.setBitPerfectTrackFormat(
+          sampleRate: 48000, bitDepth: 24)).thenAnswer((_) async => true);
+      when(() => settings.refreshOutputDevice()).thenAnswer((_) async {});
+      const usb = MethodChannel(PulsrChannels.usbExclusive);
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(usb, (_) async => {'channels': 2});
+      addTearDown(() => messenger.setMockMethodCallHandler(usb, null));
+
+      // Initial call at track start (decodedPcmEncoding == 0) applies format once.
+      await controller.maybeFollowTrackSampleRate(song);
+      verify(() => settings.setBitPerfectTrackFormat(
+          sampleRate: 48000, bitDepth: 24)).called(1);
+
+      // 2-second routePoll fills in decodedPcmEncoding = 21 for the same track/depth.
+      output = const AudioOutputInfo(
+          deviceName: 'DAC',
+          isUsbDac: true,
+          sampleRate: 48000,
+          bitDepth: 24,
+          decodedPcmEncoding: 21,
+          supportedSampleRates: [48000],
+          isBitPerfectActive: false);
+      await controller.maybeFollowTrackSampleRate(song);
+
+      // Must NOT re-invoke setBitPerfectTrackFormat mid-playback.
+      verifyNever(() => settings.setBitPerfectTrackFormat(
+          sampleRate: 48000, bitDepth: 24));
+    });
     test('Bluetooth follow off dispatches nothing; unconfirmed requests retry',
         () async {
       const output = AudioOutputInfo(

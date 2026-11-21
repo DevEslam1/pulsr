@@ -28,31 +28,35 @@ import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../../search/presentation/search_screen.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../cubit/home_cubit.dart';
 import '../../../core/services/radio_station_store.dart';
 import 'widgets/quran_radio_hero_carousel.dart';
 import 'widgets/quick_tile.dart';
 import 'widgets/online_category_section.dart';
-import 'widgets/quick_discovery_header.dart';
 import 'widgets/recently_added_section.dart';
 import 'widgets/recently_played_section.dart';
+import 'widgets/studio_tools_rail.dart';
 
 import '../../../core/utils/pulsr_haptics.dart';
 export 'widgets/quick_actions_row.dart';
 export 'widgets/quick_card.dart';
 export 'widgets/quran_radio_hero_carousel.dart';
+export 'widgets/studio_tools_rail.dart';
 
 class HomeScreen extends StatelessWidget {
   final YtmService? ytmService;
   final YtmAccountService? ytmAccountService;
   final GetSongsUseCase? getSongsUseCase;
+  final bool? enableOnlineOverride;
 
   const HomeScreen({
     super.key,
     this.ytmService,
     this.ytmAccountService,
     this.getSongsUseCase,
+    this.enableOnlineOverride,
   });
 
   @override
@@ -68,6 +72,7 @@ class HomeScreen extends StatelessWidget {
         ytmService: ytmService,
         ytmAccountService: ytmAccountService,
         getSongsUseCase: getSongsUseCase,
+        enableOnlineOverride: enableOnlineOverride,
       ),
     );
   }
@@ -77,11 +82,13 @@ class _HomeScreenContent extends StatefulWidget {
   final YtmService? ytmService;
   final YtmAccountService? ytmAccountService;
   final GetSongsUseCase? getSongsUseCase;
+  final bool? enableOnlineOverride;
 
   const _HomeScreenContent({
     this.ytmService,
     this.ytmAccountService,
     this.getSongsUseCase,
+    this.enableOnlineOverride,
   });
 
   @override
@@ -295,7 +302,8 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
     final playerCubit = context.read<PlayerCubit>();
     final offlineOnly =
         context.select<SettingsCubit, bool>((c) => c.state.offlineOnlyMode);
-    final showOnlineTab = AppConfig.ytmEnabled && !offlineOnly;
+    final showOnlineTab =
+        (widget.enableOnlineOverride ?? AppConfig.ytmEnabled) && !offlineOnly;
 
     // Reset to local tab if offline only is enabled
     final currentTab = showOnlineTab ? _selectedTab : 0;
@@ -411,25 +419,44 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
                               ),
                             ),
                             if (offlineOnly)
-                              Padding(
-                                padding: const EdgeInsetsDirectional.only(
-                                    end: AppSpacing.sm),
-                                child: Chip(
-                                  avatar: Icon(Icons.wifi_off_rounded,
-                                      size: 14, color: p.accent),
-                                  label: Text(
-                                    context.l10n.offlineOnlyMode,
-                                    style: TextStyle(
-                                      fontSize: AppFontSize.caption,
-                                      fontWeight: FontWeight.w700,
-                                      color: p.accent,
+                              Flexible(
+                                child: Padding(
+                                  padding: const EdgeInsetsDirectional.only(
+                                      end: AppSpacing.xs),
+                                  child: Chip(
+                                    avatar: Icon(Icons.wifi_off_rounded,
+                                        size: 14, color: p.accent),
+                                    label: Text(
+                                      context.l10n.offlineOnlyMode,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: AppFontSize.caption,
+                                        fontWeight: FontWeight.w700,
+                                        color: p.accent,
+                                      ),
                                     ),
+                                    backgroundColor: p.accentContainer,
+                                    side: BorderSide(color: p.hairline),
+                                    visualDensity: VisualDensity.compact,
                                   ),
-                                  backgroundColor: p.accentContainer,
-                                  side: BorderSide(color: p.hairline),
-                                  visualDensity: VisualDensity.compact,
                                 ),
                               ),
+                            IconButton(
+                              key: const ValueKey('home_settings_button'),
+                              constraints: const BoxConstraints(
+                                minWidth: AppSpacing.minTouchTarget,
+                                minHeight: AppSpacing.minTouchTarget,
+                              ),
+                              icon: Icon(
+                                Icons.settings_outlined,
+                                color: p.textSecondary,
+                                size: 22,
+                              ),
+                              tooltip: context.l10n.settings,
+                              onPressed: () => context.push('/settings'),
+                            ),
+                            const SizedBox(width: AppSpacing.xxs),
                             // Logo in a soft badge with specular outline so the header has an elevated anchor.
                             Container(
                               width: 46,
@@ -647,7 +674,7 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
             ),
           ),
           child: Material(
-            color: Colors.transparent,
+            color: AppColors.fadeStopTransparent,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -720,12 +747,15 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
   ) {
     final offlineOnly =
         context.select<SettingsCubit, bool>((c) => c.state.offlineOnlyMode);
+    final showOnline =
+        (widget.enableOnlineOverride ?? AppConfig.ytmEnabled) && !offlineOnly;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ---------- Hero action + secondary tiles ----------
+        // ---------- Beat 1: Immediate Resume / QuranRadioHeroCarousel ----------
         const SizedBox(height: AppSpacing.md),
         Padding(
+          key: const ValueKey('home_beat_1_immediate_resume'),
           padding: EdgeInsetsDirectional.fromSTEB(Adaptive.pagePadding(context),
               0, Adaptive.pagePadding(context), AppSpacing.md),
           child: Builder(
@@ -835,26 +865,34 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
           ),
         ),
 
-        // ---------- Single shortcut strip ----------
-        QuickDiscoveryHeader(
-          showYtm: AppConfig.ytmEnabled && !offlineOnly,
-          onMore: () => _showDiscoveryToolsSheet(context),
+        // ---------- Beat 3: Consolidated horizontal "Studio Tools" rail ----------
+        KeyedSubtree(
+          key: const ValueKey('home_beat_3_studio_tools'),
+          child: StudioToolsRail(
+            showYtm: showOnline,
+            onMore: () => _showDiscoveryToolsSheet(context),
+          ),
         ),
+
         const SizedBox(height: AppSpacing.sm),
 
-        // ---------- Recently played ----------
-        RepaintBoundary(
-          child: RecentlyPlayedSection(
-            getSongsUseCase: getSongsUseCase,
-            isTablet: isTablet,
-          ),
-        ),
-
-        // ---------- Recently added ----------
-        RepaintBoundary(
-          child: RecentlyAddedSection(
-            getSongsUseCase: getSongsUseCase,
-          ),
+        // ---------- Beat 2: Personal Rails (Recently Played, Recently Added) ----------
+        Column(
+          key: const ValueKey('home_beat_2_personal_rails'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            RepaintBoundary(
+              child: RecentlyPlayedSection(
+                getSongsUseCase: getSongsUseCase,
+                isTablet: isTablet,
+              ),
+            ),
+            RepaintBoundary(
+              child: RecentlyAddedSection(
+                getSongsUseCase: getSongsUseCase,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -870,13 +908,19 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: AppSpacing.md),
-        // ---------- Search YouTube Music Action Banner ----------
+        // ---------- Search YouTube Music Action Banner (Unified Online Search) ----------
         Padding(
           padding:
               EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
           child: InkWell(
+            key: const ValueKey('home_online_search_banner'),
             borderRadius: AppRadii.r20All,
-            onTap: () => context.push('/ytm-search'),
+            onTap: () => context.push(
+              SearchScreen.routeLocation(
+                scope: SearchScope.online,
+                autofocus: true,
+              ),
+            ),
             child: Container(
               padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.md, vertical: AppSpacing.sm),
@@ -937,11 +981,12 @@ class _HomeScreenContentState extends State<_HomeScreenContent>
 
         const SizedBox(height: AppSpacing.md),
 
-        // ---------- Single shortcut strip ----------
-        QuickDiscoveryHeader(
+        // ---------- Beat 3: Consolidated horizontal "Studio Tools" rail ----------
+        StudioToolsRail(
           online: true,
           onMore: () => _showDiscoveryToolsSheet(context),
         ),
+
         const SizedBox(height: AppSpacing.sm),
 
         // ---------- Category Chips ----------

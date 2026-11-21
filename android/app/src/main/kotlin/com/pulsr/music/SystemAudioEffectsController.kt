@@ -247,6 +247,18 @@ class SystemAudioEffectsController(private val context: Context) {
      * Best-effort attach to session 0 (AUDIO_SESSION_OUTPUT_MIX) and disable.
      */
     private fun attemptDisableSession0(): Status {
+        if (managedEffects.isNotEmpty() &&
+            partiallyBypassedEffects.isEmpty() &&
+            managedEffects.all {
+                try {
+                    it.handle.hasControl() && !it.handle.enabled
+                } catch (_: Throwable) {
+                    false
+                }
+            }
+        ) {
+            return Status.BYPASSED
+        }
         releaseManagedEffects()
         partiallyBypassedEffects.clear()
 

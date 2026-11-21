@@ -145,7 +145,7 @@ void main() {
     expect(find.byType(GesturesSheet), findsOneWidget);
   });
 
-  testWidgets('Onboarding page 4 exposes View all gestures button',
+  testWidgets('Onboarding step 3 exposes View all gestures button',
       (tester) async {
     final scanner = _MockMediaScannerService();
     await tester.pumpWidget(
@@ -160,16 +160,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Advance to page 4 (index 3: privacy -> playback -> beauty -> gestures)
+    // Advance to step 3 (index 2: permissions -> mode/themes -> audio wizard & gestures)
     final l10n =
         AppLocalizations.of(tester.element(find.byType(OnboardingScreen)))!;
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 2; i++) {
       await tester.tap(find.text(l10n.next));
       await tester.pumpAndSettle();
     }
 
-    expect(find.text(l10n.viewAllGestures), findsOneWidget);
-    await tester.tap(find.text(l10n.viewAllGestures));
+    final gesturesButton = find.text(l10n.viewAllGestures);
+    expect(gesturesButton, findsOneWidget);
+    await tester.ensureVisible(gesturesButton);
+    await tester.pumpAndSettle();
+    await tester.tap(gesturesButton);
     await tester.pumpAndSettle();
 
     expect(find.byType(GesturesSheet), findsOneWidget);

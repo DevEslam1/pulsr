@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path/path.dart' as p_path;
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -1215,8 +1216,9 @@ class _FolderBrowserTabState extends State<FolderBrowserTab> {
     final p = sheetContext.palette;
     return ListTile(
       shape: RoundedRectangleBorder(borderRadius: AppRadii.r12All),
-      tileColor:
-          selected ? p.accent.withValues(alpha: 0.12) : Colors.transparent,
+      tileColor: selected
+          ? p.accent.withValues(alpha: 0.12)
+          : AppColors.fadeStopTransparent,
       leading: Icon(icon, color: selected ? p.accent : p.textSecondary),
       title: Text(
         title,

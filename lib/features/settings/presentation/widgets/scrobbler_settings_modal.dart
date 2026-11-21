@@ -9,6 +9,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_switch.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -161,9 +162,21 @@ class _ScrobblerConfigSheetState extends State<ScrobblerConfigSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     if (_isLoading) {
-      return const SizedBox(
-        height: 200,
-        child: Center(child: CircularProgressIndicator()),
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.s20),
+        child: SkeletonShimmer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SkeletonLine(width: 180, height: 20),
+              SizedBox(height: AppSpacing.md),
+              SkeletonBox(height: 64, radius: AppRadii.r14),
+              SizedBox(height: AppSpacing.sm),
+              SkeletonBox(height: 64, radius: AppRadii.r14),
+            ],
+          ),
+        ),
       );
     }
 

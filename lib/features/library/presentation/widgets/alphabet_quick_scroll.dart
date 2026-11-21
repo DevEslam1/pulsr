@@ -150,8 +150,8 @@ class _AlphabetQuickScrollState extends State<AlphabetQuickScroll> {
                 ),
                 child: Text(
                   _draggedLetter!,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: p.onAccent,
                     fontSize: AppFontSize.headline,
                     fontWeight: FontWeight.w900,
                   ),

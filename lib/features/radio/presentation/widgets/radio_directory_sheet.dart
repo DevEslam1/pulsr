@@ -154,84 +154,98 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
     final added = _isStationAlreadySaved(station);
     final checking = _checkingIds.contains(station.id);
 
-    return Material(
-      color: p.surfaceContainer,
-      borderRadius: AppRadii.r14All,
-      clipBehavior: Clip.antiAlias,
-      child: Center(
-        child: ListTile(
-          dense: isCompact,
-          contentPadding: EdgeInsetsDirectional.fromSTEB(
-            AppSpacing.sm,
-            isCompact ? 0 : AppSpacing.xxs,
-            AppSpacing.xs,
-            isCompact ? 0 : AppSpacing.xxs,
-          ),
-          leading: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: p.surface,
-              borderRadius: AppRadii.r12All,
+    return Semantics(
+      container: true,
+      child: Material(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.r14All,
+        clipBehavior: Clip.antiAlias,
+        child: Center(
+          child: ListTile(
+            dense: isCompact,
+            contentPadding: EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.sm,
+              isCompact ? 0 : AppSpacing.xxs,
+              AppSpacing.xs,
+              isCompact ? 0 : AppSpacing.xxs,
             ),
-            clipBehavior: Clip.antiAlias,
-            child: station.artworkUrl != null
-                ? Image.network(
-                    station.artworkUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Icon(Icons.radio_rounded, color: p.textTertiary),
-                  )
-                : Icon(Icons.radio_rounded, color: p.textTertiary),
-          ),
-          title: MarqueeText(
-            text: station.name,
-            textAlign: TextAlign.start,
-            allowUserPause: false,
-            velocity: 28.0,
-            blankSpace: 36.0,
-            style: TextStyle(
-              color: p.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: AppFontSize.bodySmall,
+            leading: ExcludeSemantics(
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: p.surface,
+                  borderRadius: AppRadii.r12All,
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: station.artworkUrl != null
+                    ? Image.network(
+                        station.artworkUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            Icon(Icons.radio_rounded, color: p.textTertiary),
+                      )
+                    : Icon(Icons.radio_rounded, color: p.textTertiary),
+              ),
             ),
-          ),
-          subtitle: (station.genre != null || station.qualityLabel != null)
-              ? Text(
-                  [
-                    if (station.genre != null && station.genre!.isNotEmpty)
-                      station.genre!,
-                    if (station.qualityLabel != null) station.qualityLabel!,
-                  ].join(' • '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: p.textSecondary,
-                    fontSize: AppFontSize.caption,
-                  ),
-                )
-              : null,
-          trailing: TextButton.icon(
-            onPressed: added || checking ? null : () => _add(station),
-            icon: checking
-                ? SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: p.accent,
+            title: MarqueeText(
+              text: station.name,
+              textAlign: TextAlign.start,
+              allowUserPause: false,
+              velocity: 28.0,
+              blankSpace: 36.0,
+              style: TextStyle(
+                color: p.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: AppFontSize.bodySmall,
+              ),
+            ),
+            subtitle: (station.genre != null || station.qualityLabel != null)
+                ? Text(
+                    [
+                      if (station.genre != null && station.genre!.isNotEmpty)
+                        station.genre!,
+                      if (station.qualityLabel != null) station.qualityLabel!,
+                    ].join(' • '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: AppFontSize.caption,
                     ),
                   )
-                : Icon(
-                    added ? Icons.check_rounded : Icons.add_rounded,
-                    size: 18,
-                  ),
-            label: Text(
-              added ? context.l10n.radioDirectoryAdded : context.l10n.radioAdd,
-            ),
-            style: TextButton.styleFrom(
-              foregroundColor: added ? p.textTertiary : p.accent,
-              minimumSize: const Size(64, AppSpacing.minTouchTarget),
+                : null,
+            trailing: Semantics(
+              button: true,
+              enabled: !added && !checking,
+              label: added
+                  ? '${station.name}, ${context.l10n.radioDirectoryAdded}'
+                  : '${context.l10n.radioAdd} ${station.name}',
+              child: TextButton.icon(
+                onPressed: added || checking ? null : () => _add(station),
+                icon: checking
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: p.accent,
+                        ),
+                      )
+                    : Icon(
+                        added ? Icons.check_rounded : Icons.add_rounded,
+                        size: 18,
+                      ),
+                label: Text(
+                  added
+                      ? context.l10n.radioDirectoryAdded
+                      : context.l10n.radioAdd,
+                ),
+                style: TextButton.styleFrom(
+                  foregroundColor: added ? p.textTertiary : p.accent,
+                  minimumSize: const Size(64, AppSpacing.minTouchTarget),
+                ),
+              ),
             ),
           ),
         ),
@@ -260,12 +274,14 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
               SizedBox(
                 height: isCompactLandscape ? AppSpacing.xs : AppSpacing.sm,
               ),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: p.hairline,
-                  borderRadius: AppRadii.r2All,
+              ExcludeSemantics(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: p.hairline,
+                    borderRadius: AppRadii.r2All,
+                  ),
                 ),
               ),
               if (isCompactLandscape)
@@ -280,14 +296,17 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
                     children: [
                       Flexible(
                         flex: 2,
-                        child: Text(
-                          context.l10n.radioDirectoryBrowse,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.body,
-                            fontWeight: FontWeight.w800,
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            context.l10n.radioDirectoryBrowse,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.body,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
@@ -326,12 +345,15 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          context.l10n.radioDirectoryBrowse,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontSize: AppFontSize.title,
-                            fontWeight: FontWeight.w800,
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            context.l10n.radioDirectoryBrowse,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: AppFontSize.title,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ),
@@ -381,7 +403,11 @@ class _RadioDirectorySheetState extends State<RadioDirectorySheet> {
 
     if (_loading) {
       return Center(
-        child: CircularProgressIndicator(color: p.accent),
+        child: Semantics(
+          liveRegion: true,
+          label: context.l10n.pageLoadingProgress,
+          child: CircularProgressIndicator(color: p.accent),
+        ),
       );
     }
 

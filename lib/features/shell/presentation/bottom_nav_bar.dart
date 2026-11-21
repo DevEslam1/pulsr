@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:pulsr/core/constants/app_blur.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_strokes.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
@@ -78,23 +79,23 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              for (int i = 0; i < items.length; i++)
+              for (final item in items)
                 Expanded(
                   child: _NavTabItem(
-                    item: items[i],
-                    index: i,
-                    isSelected: widget.currentIndex == i,
+                    item: item,
+                    index: item.index,
+                    isSelected: widget.currentIndex == item.index,
                     p: p,
                     isTablet: isTablet,
                     iconOnly: widget.iconOnly,
                     embedded: true,
-                    onTap: () => widget.onTap(i),
-                    onLongPress: i == 2
+                    onTap: () => widget.onTap(item.index),
+                    onLongPress: item.index == 2
                         ? () => (widget.onLongPress != null
-                            ? widget.onLongPress!(i)
+                            ? widget.onLongPress!(item.index)
                             : CommandPaletteSheet.show(context))
                         : (widget.onLongPress != null
-                            ? () => widget.onLongPress!(i)
+                            ? () => widget.onLongPress!(item.index)
                             : null),
                   ),
                 ),
@@ -247,17 +248,11 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                         decoration: BoxDecoration(
                                           gradient: LinearGradient(
                                             colors: [
-                                              Colors.white
-                                                  .withValues(alpha: 0.0),
-                                              (p.isDark
-                                                      ? Colors.white
-                                                      : Colors.black)
-                                                  .withValues(
-                                                      alpha: p.isDark
-                                                          ? 0.12
-                                                          : 0.04),
-                                              Colors.white
-                                                  .withValues(alpha: 0.0),
+                                              AppColors.specularAt(0.0),
+                                              p.isDark
+                                                  ? AppColors.specularAt(0.12)
+                                                  : AppColors.scrimAt(0.04),
+                                              AppColors.specularAt(0.0),
                                             ],
                                           ),
                                         ),
@@ -292,26 +287,29 @@ class _PulsrBottomNavBarState extends State<PulsrBottomNavBar> {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceEvenly,
                                     children: [
-                                      for (int i = 0; i < items.length; i++)
+                                      for (final item in items)
                                         Expanded(
                                           child: _NavTabItem(
-                                            item: items[i],
-                                            index: i,
+                                            item: item,
+                                            index: item.index,
                                             isSelected:
-                                                widget.currentIndex == i,
+                                                widget.currentIndex ==
+                                                    item.index,
                                             p: p,
                                             isTablet: isTablet,
                                             iconOnly: widget.iconOnly,
-                                            onTap: () => widget.onTap(i),
-                                            onLongPress: i == 2
+                                            onTap: () =>
+                                                widget.onTap(item.index),
+                                            onLongPress: item.index == 2
                                                 ? () => (widget.onLongPress !=
                                                         null
-                                                    ? widget.onLongPress!(i)
+                                                    ? widget.onLongPress!(
+                                                        item.index)
                                                     : CommandPaletteSheet.show(
                                                         context))
                                                 : (widget.onLongPress != null
-                                                    ? () =>
-                                                        widget.onLongPress!(i)
+                                                    ? () => widget.onLongPress!(
+                                                        item.index)
                                                     : null),
                                           ),
                                         ),
@@ -384,6 +382,7 @@ class _NavTabItem extends StatelessWidget {
       selected: isSelected,
       button: true,
       label: item.label,
+      excludeSemantics: true,
       sortKey: OrdinalSortKey(index.toDouble()),
       child: Tooltip(
         message: item.label,
@@ -407,6 +406,10 @@ class _NavTabItem extends StatelessWidget {
             child: AnimatedContainer(
               duration: context.motionMs(200),
               curve: context.motionCurve(PulsrMotion.enter),
+              constraints: const BoxConstraints(
+                minWidth: AppSpacing.minTouchTarget,
+                minHeight: AppSpacing.minTouchTarget,
+              ),
               margin: const EdgeInsets.symmetric(horizontal: 1.5),
               padding: EdgeInsets.symmetric(
                 horizontal: isTablet ? 10 : 6,
@@ -468,7 +471,7 @@ class _NavTabItem extends StatelessWidget {
                         AnimatedScale(
                           scale: isSelected ? 1.12 : 1.0,
                           duration: context.motionMs(200),
-                          curve: Curves.easeOutBack,
+                          curve: context.motionCurve(Curves.easeOutBack),
                           child: Icon(
                             isSelected ? item.activeIcon : item.icon,
                             size: iconSize,

@@ -10767,4 +10767,284 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get badgeExclusive => 'حصري';
+
+  @override
+  String get multichannelSpeakerAlignment => 'محاذاة السماعات متعددة القنوات';
+
+  @override
+  String get multichannelSubtitle =>
+      'ضبط كسب كل قناة وتأخير المحاذاة وتقسيم ترددات LFE';
+
+  @override
+  String get multichannelInfoTooltip => 'معلومات الصوت متعدد القنوات';
+
+  @override
+  String get multichannelBypassedByBitPerfect =>
+      'تم التجاوز بواسطة وضع Bit-Perfect';
+
+  @override
+  String get multichannelAaudioNote =>
+      'يقتصر AAudio على قناتين في أندرويد؛ لذا تُوجَّه التدفقات متعددة القنوات (أكثر من قناتين) عبر مسار AudioTrack العائم 32-بت في Pulsr للحصول على صوت محيطي حقيقي.';
+
+  @override
+  String get multichannelSpeakerLayout => 'تخطيط السماعات';
+
+  @override
+  String multichannelChannelsShort(int count) {
+    return '$count قناة';
+  }
+
+  @override
+  String multichannelLayoutSummary(String layoutName, int count) {
+    return '$layoutName ($count قنوات)';
+  }
+
+  @override
+  String multichannelLayoutChipLabel(String layoutName, int count) {
+    return '$layoutName ($count قناة)';
+  }
+
+  @override
+  String get multichannelSelectChannel => 'اختر قناة السماعة';
+
+  @override
+  String multichannelChannelShort(int index) {
+    return 'قناة $index';
+  }
+
+  @override
+  String multichannelChannelFull(int index) {
+    return 'القناة $index';
+  }
+
+  @override
+  String get multichannelGainTrim => 'ضبط الكسب';
+
+  @override
+  String get multichannelAlignmentDelay => 'تأخير المحاذاة';
+
+  @override
+  String get multichannelLfeTitle => 'تقسيم ترددات LFE وإدارة الجهير';
+
+  @override
+  String get multichannelLfeSubtitle =>
+      'مرشح تمرير عالٍ للسماعات وتقسيم مضخم الصوت المخصص';
+
+  @override
+  String get multichannelLfeInfoTooltip => 'معلومات تقسيم ترددات LFE';
+
+  @override
+  String get multichannelLfeDescription =>
+      'يطبّق مرشح Linkwitz-Riley تمريرًا عاليًا على القنوات الفرعية ويوجه الترددات المنخفضة المعاد توجيهها إلى قناة LFE المخصصة.';
+
+  @override
+  String get multichannelSatelliteCrossover => 'تردد تقسيم السماعات (HPF)';
+
+  @override
+  String get multichannelSubwooferLowPass =>
+      'مرشح التمرير المنخفض لمضخم الصوت (LPF)';
+
+  @override
+  String get multichannelFilterSlope => 'ميل مرشح التقسيم';
+
+  @override
+  String get multichannelSlopeLr2 => '12 ديسيبل/أوكتاف (LR2)';
+
+  @override
+  String get multichannelSlopeLr4 => '24 ديسيبل/أوكتاف (LR4)';
+
+  @override
+  String get multichannelLfeGainTrim => 'ضبط كسب قناة LFE';
+
+  @override
+  String get multichannelRedirectSatelliteBass => 'إعادة توجيه جهير السماعات';
+
+  @override
+  String get multichannelRedirectSatelliteBassDesc =>
+      'يجمع ترددات السماعات دون تردد التقسيم في قناة LFE مع تطبيع القدرة 1/√(N-1).';
+
+  @override
+  String get hrtfTitle => 'مكاني الصوت ثنائي الأذن ثلاثي الأبعاد HRTF';
+
+  @override
+  String get hrtfSubtitle => 'التفاف SOFA/HRIR مقسّم لواقعية ثلاثية الأبعاد';
+
+  @override
+  String hrtfBlockedByBitPerfect(String reason) {
+    return 'محظور بواسطة Bit-Perfect ($reason)';
+  }
+
+  @override
+  String get hrtfCrossfeedConflict =>
+      'متعارضان: تفعيل HRTF يعطّل Crossfeed للسماعات.';
+
+  @override
+  String get hrtfVirtualSpeakerAzimuth => 'سمت السماعة الافتراضية';
+
+  @override
+  String get hrtfDirectionLeft => 'يسار';
+
+  @override
+  String get hrtfDirectionRight => 'يمين';
+
+  @override
+  String get hrtfDirectionCenter => 'وسط';
+
+  @override
+  String hrtfAngleDirection(String degrees, String direction) {
+    return '$degrees° ($direction)';
+  }
+
+  @override
+  String get hrtfVirtualSpeakerElevation => 'ارتفاع السماعة الافتراضية';
+
+  @override
+  String get hrtfElevationBelow => 'أسفل';
+
+  @override
+  String get hrtfElevationAbove => 'أعلى';
+
+  @override
+  String get hrtfElevationEarLevel => 'مستوى الأذن';
+
+  @override
+  String hrtfSofaLoadedLabel(String fileName) {
+    return 'SOFA: $fileName';
+  }
+
+  @override
+  String get hrtfLoadCustomSofa => 'تحميل ملف SOFA / WAV مخصص...';
+
+  @override
+  String get hrtfResetTooltip =>
+      'إعادة تعيين السمت / الارتفاع / مجموعة البيانات';
+
+  @override
+  String hrtfDatasetLoadedToast(String name) {
+    return 'تم تحميل مجموعة بيانات HRTF: $name';
+  }
+
+  @override
+  String get hrtfDatasetLoadFailedToast => 'فشل تحميل مجموعة بيانات SOFA/HRIR';
+
+  @override
+  String get remasterSuiteTitle => 'حزمة إعادة الماستر';
+
+  @override
+  String get remasterSuiteSubtitle =>
+      'مضاعفة عينات الإخراج ومرشحات إعادة البناء وPCM→DSD';
+
+  @override
+  String get remasterPcmOversampling => 'مضاعفة عينات إخراج PCM';
+
+  @override
+  String get remasterOff1x => 'إيقاف (1x)';
+
+  @override
+  String remasterMultiplierValue(int factor) {
+    return '${factor}x';
+  }
+
+  @override
+  String get remasterFilterKernel => 'نواة مرشح إعادة البناء';
+
+  @override
+  String get remasterKernelSharp => 'حاد';
+
+  @override
+  String get remasterKernelSlowRolloff => 'انحدار بطيء';
+
+  @override
+  String get remasterKernelMinPhase => 'أدنى طور';
+
+  @override
+  String get remasterKernelApodizing => 'تخميد الحواف';
+
+  @override
+  String get remasterPcmToDsdModulator => 'معدّل PCM → DSD';
+
+  @override
+  String get remasterOfflineSdmNote =>
+      'محرك SDM غير متصل (لا يوجد مسار تشغيل بعد)';
+
+  @override
+  String get remasterDsdRate => 'معدل DSD';
+
+  @override
+  String get remasterDsdRate64 => 'DSD64';
+
+  @override
+  String remasterDsdRateValue(int rate) {
+    return '$rate';
+  }
+
+  @override
+  String get remasterSdmOrder => 'رتبة SDM (1-5)';
+
+  @override
+  String remasterSdmOrderValue(int order) {
+    return '$order';
+  }
+
+  @override
+  String get remasterStatusPcmToDsd =>
+      'تم طلب PCM → DSD · محرك غير متصل فقط، ليس على مسار التشغيل';
+
+  @override
+  String remasterStatusOversampling(int multiplier) {
+    return 'تم طلب مضاعفة العينات ${multiplier}x · ليس Bit-Perfect (مرشح DSP في المسار)';
+  }
+
+  @override
+  String get remasterStatusPassthrough => 'متوافق مع Bit-Perfect (تمرير مباشر)';
+
+  @override
+  String get telemetryDspPowerConsumption => 'استهلاك طاقة DSP';
+
+  @override
+  String get telemetryLowPowerBypassBadge =>
+      '⚡ 0.0 مللي أمبير/ساعة (طاقة منخفضة صحيحة)';
+
+  @override
+  String telemetryPowerDrainEstimate(String mah) {
+    return '~$mah مللي أمبير/ساعة';
+  }
+
+  @override
+  String get telemetryLowPowerBypassDesc =>
+      'مسار الأعداد الصحيحة منخفض الطاقة نشط: تم تجاوز معالج DSP العائم بالكامل لصوت PCM صحيح مطابق للأصل.';
+
+  @override
+  String get telemetryStageDrainBreakdown => 'تفصيل استهلاك مراحل DSP النشطة:';
+
+  @override
+  String telemetryStageDrainItem(String stageName, String mah) {
+    return '$stageName: +$mah مللي أمبير/ساعة';
+  }
+
+  @override
+  String get telemetryAllStagesIdle =>
+      'جميع مراحل DSP خاملة (~0.0 مللي أمبير/ساعة).';
+
+  @override
+  String get telemetryBandLow => 'منخفض';
+
+  @override
+  String get telemetryBandLoMid => 'متوسط سفلي';
+
+  @override
+  String get telemetryBandHiMid => 'متوسط علوي';
+
+  @override
+  String get telemetryBandHigh => 'عالٍ';
+
+  @override
+  String telemetryDynEqBandShort(int index) {
+    return 'ن$index';
+  }
+
+  @override
+  String telemetryDbValue(String value) {
+    return '$value ديسيبل';
+  }
 }

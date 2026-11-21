@@ -34,6 +34,14 @@ void main() {
     return prefs.getStringList('library_active_tabs');
   }
 
+  Future<void> openManageTabs(WidgetTester tester) async {
+    await tester.tap(find.byKey(const ValueKey('library_overflow_menu')));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('library_sheet_customize_tabs')));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('adding an inactive tab persists it', (tester) async {
     SharedPreferences.setMockInitialValues({
       'pulsr_hint_song_tile_swipe': true,
@@ -41,8 +49,7 @@ void main() {
     });
     await pumpScreen(tester);
 
-    await tester.tap(find.byIcon(Icons.dashboard_customize_rounded));
-    await tester.pumpAndSettle();
+    await openManageTabs(tester);
 
     // Active rows come first (Songs), so index 1 is the first inactive tab.
     await tester.tap(find.byType(PulsrSwitch).at(1));
@@ -60,8 +67,7 @@ void main() {
     });
     await pumpScreen(tester);
 
-    await tester.tap(find.byIcon(Icons.dashboard_customize_rounded));
-    await tester.pumpAndSettle();
+    await openManageTabs(tester);
 
     // Remove the first active tab (Songs).
     await tester.tap(find.byType(PulsrSwitch).first);
@@ -79,8 +85,7 @@ void main() {
     });
     await pumpScreen(tester);
 
-    await tester.tap(find.byIcon(Icons.dashboard_customize_rounded));
-    await tester.pumpAndSettle();
+    await openManageTabs(tester);
 
     await tester.tap(find.text('Reset'));
     await tester.pumpAndSettle();

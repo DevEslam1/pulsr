@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
 import '../../../../core/constants/app_typography.dart';
@@ -270,6 +269,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
 
   Widget _buildPowerDrainSection(
       BuildContext context, PulsrPalette p, DspBatteryEstimate? est) {
+    final l10n = context.l10n;
     final isBypassed = est?.lowPowerBypassActive ?? false;
     final mah = est?.estimatedMahPerHour ?? 0.0;
     final breakdown = est?.stageBreakdown ?? const <String, double>{};
@@ -288,11 +288,11 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
                       ? Icons.bolt_rounded
                       : Icons.battery_charging_full_rounded,
                   size: 16,
-                  color: isBypassed ? AppColors.dacGold : p.accent,
+                  color: isBypassed ? p.goldAccent : p.accent,
                 ),
                 const SizedBox(width: AppSpacing.xs),
                 Text(
-                  'DSP Power Consumption',
+                  l10n.telemetryDspPowerConsumption,
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w700,
@@ -305,14 +305,14 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: isBypassed
-                    ? AppColors.dacGold.withValues(alpha: 0.15)
+                    ? p.goldAccent.withValues(alpha: 0.15)
                     : (mah > 10.0
                         ? p.warning.withValues(alpha: 0.15)
                         : p.accent.withValues(alpha: 0.15)),
                 borderRadius: AppRadii.r4All,
                 border: Border.all(
                   color: isBypassed
-                      ? AppColors.dacGold.withValues(alpha: 0.4)
+                      ? p.goldAccent.withValues(alpha: 0.4)
                       : (mah > 10.0
                           ? p.warning.withValues(alpha: 0.4)
                           : p.accent.withValues(alpha: 0.3)),
@@ -320,13 +320,13 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
               ),
               child: Text(
                 isBypassed
-                    ? '⚡ 0.0 mAh/h (Integer Low-Power)'
-                    : '~${mah.toStringAsFixed(1)} mAh/h',
+                    ? l10n.telemetryLowPowerBypassBadge
+                    : l10n.telemetryPowerDrainEstimate(mah.toStringAsFixed(1)),
                 style: TextStyle(
                   fontSize: AppFontSize.caption,
                   fontWeight: FontWeight.w800,
                   color: isBypassed
-                      ? AppColors.dacGold
+                      ? p.goldAccent
                       : (mah > 10.0 ? p.warning : p.accent),
                 ),
               ),
@@ -338,7 +338,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              'True low-power integer route active: float DSP processor is completely bypassed for bit-perfect integer PCM.',
+              l10n.telemetryLowPowerBypassDesc,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 color: p.textTertiary,
@@ -350,7 +350,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
             child: Text(
-              'Active DSP stage drain breakdown:',
+              l10n.telemetryStageDrainBreakdown,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 color: p.textSecondary,
@@ -372,7 +372,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
                   border: Border.all(color: p.hairline),
                 ),
                 child: Text(
-                  '$name: +${cost.toStringAsFixed(1)} mAh/h',
+                  l10n.telemetryStageDrainItem(name, cost.toStringAsFixed(1)),
                   style: TextStyle(
                     fontSize: AppFontSize.caption,
                     fontWeight: FontWeight.w600,
@@ -387,7 +387,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
           Padding(
             padding: const EdgeInsets.only(top: 2),
             child: Text(
-              'All DSP stages idle (~0.0 mAh/h).',
+              l10n.telemetryAllStagesIdle,
               style: TextStyle(
                 fontSize: AppFontSize.caption,
                 color: p.textTertiary,
@@ -412,7 +412,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
             ),
           ),
           Text(
-            '${autoHeadroomDb.toStringAsFixed(1)} dB',
+            context.l10n.telemetryDbValue(autoHeadroomDb.toStringAsFixed(1)),
             style: TextStyle(
               color: active ? p.warning : p.textSecondary,
               fontSize: AppFontSize.caption,
@@ -444,7 +444,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
               ),
             ),
             Text(
-              '${limiterGrDb.toStringAsFixed(1)} dB',
+              context.l10n.telemetryDbValue(limiterGrDb.toStringAsFixed(1)),
               style: TextStyle(
                 color: limiterGrDb < -0.1 ? p.warning : p.textSecondary,
                 fontSize: AppFontSize.caption,
@@ -472,13 +472,19 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
 
   Widget _buildMultibandMeter(
       BuildContext context, PulsrPalette p, List<double> mbGr) {
-    final bandLabels = ['Low', 'Lo-Mid', 'Hi-Mid', 'High'];
+    final l10n = context.l10n;
+    final bandLabels = [
+      l10n.telemetryBandLow,
+      l10n.telemetryBandLoMid,
+      l10n.telemetryBandHiMid,
+      l10n.telemetryBandHigh,
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          context.l10n.multibandCompReduction,
+          l10n.multibandCompReduction,
           style: TextStyle(
             color: p.textSecondary,
             fontSize: AppFontSize.caption,
@@ -524,11 +530,12 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
 
   Widget _buildDynEqMeter(
       BuildContext context, PulsrPalette p, List<double> dynEqGr) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          context.l10n.dynamicEqAdjustments,
+          l10n.dynamicEqAdjustments,
           style: TextStyle(
             color: p.textSecondary,
             fontSize: AppFontSize.caption,
@@ -560,7 +567,7 @@ class _EngineTelemetryPanelState extends State<EngineTelemetryPanel>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'B${i + 1}',
+                      l10n.telemetryDynEqBandShort(i + 1),
                       style: TextStyle(
                         color: p.textSecondary,
                         fontSize: AppFontSize.caption,

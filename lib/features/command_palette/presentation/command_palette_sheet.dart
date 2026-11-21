@@ -1,14 +1,17 @@
 // lib/features/command_palette/presentation/command_palette_sheet.dart
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
 import '../../../core/constants/app_typography.dart';
+import '../../../core/motion/pulsr_motion.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -32,6 +35,7 @@ import '../../sheets/sleep_timer_sheet.dart';
 import '../../shell/presentation/widgets/shortcut_help_sheet.dart';
 
 enum CommandPaletteSection {
+  recent,
   navigation,
   actions,
   settings,
@@ -44,6 +48,7 @@ class CommandPaletteItem {
   final IconData icon;
   final CommandPaletteSection section;
   final List<String> keywords;
+  final String? shortcut;
   final void Function(BuildContext context) onSelect;
 
   const CommandPaletteItem({
@@ -53,6 +58,7 @@ class CommandPaletteItem {
     required this.icon,
     required this.section,
     this.keywords = const [],
+    this.shortcut,
     required this.onSelect,
   });
 
@@ -61,11 +67,84 @@ class CommandPaletteItem {
     final q = query.toLowerCase();
     if (title.toLowerCase().contains(q)) return true;
     if (subtitle?.toLowerCase().contains(q) == true) return true;
+    if (shortcut?.toLowerCase().contains(q) == true) return true;
     return keywords.any((k) => k.toLowerCase().contains(q));
   }
 }
 
+class _PaletteEntry {
+  final CommandPaletteItem item;
+  final CommandPaletteSection displaySection;
+
+  const _PaletteEntry({
+    required this.item,
+    required this.displaySection,
+  });
+}
+
 class CommandPaletteSheet extends StatefulWidget {
+  static const String _recentActionsPrefsKey = 'command_palette_recent_actions';
+  static const int maxRecentActions = 5;
+
+  static final List<String> _recentActionIds = <String>[];
+  static bool _recentLoadedFromPrefs = false;
+
+  /// Most recently executed command IDs (most recent first, capped at
+  /// [maxRecentActions]).
+  static List<String> get recentActionIds =>
+      List<String>.unmodifiable(_recentActionIds);
+
+  /// Records a command execution in MRU order (capped at [maxRecentActions])
+  /// and persists it to [SharedPreferences].
+  static void recordRecentAction(String id) {
+    _recentActionIds.remove(id);
+    _recentActionIds.insert(0, id);
+    if (_recentActionIds.length > maxRecentActions) {
+      _recentActionIds.removeRange(maxRecentActions, _recentActionIds.length);
+    }
+    _recentLoadedFromPrefs = true;
+    unawaited(_persistRecentActions());
+  }
+
+  static Future<void> _persistRecentActions() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        _recentActionsPrefsKey,
+        List<String>.of(_recentActionIds),
+      );
+    } catch (_) {
+      // Safe fallback when SharedPreferences is unavailable in isolated tests.
+    }
+  }
+
+  static Future<bool> _hydrateRecentActions() async {
+    if (_recentLoadedFromPrefs) return false;
+    _recentLoadedFromPrefs = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stored = prefs.getStringList(_recentActionsPrefsKey);
+      if (stored == null || stored.isEmpty) return false;
+      var changed = false;
+      for (final id in stored.take(maxRecentActions)) {
+        if (!_recentActionIds.contains(id) &&
+            _recentActionIds.length < maxRecentActions) {
+          _recentActionIds.add(id);
+          changed = true;
+        }
+      }
+      return changed;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @visibleForTesting
+  static void debugResetRecentActions() {
+    _recentActionIds.clear();
+    _recentLoadedFromPrefs = false;
+  }
+
   /// App-level context captured by [show] before the sheet is pushed.
   ///
   /// Item callbacks navigate, read cubits and open other sheets; they must not
@@ -100,6 +179,16 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
+    unawaited(_loadPersistedRecents());
+  }
+
+  Future<void> _loadPersistedRecents() async {
+    final changed = await CommandPaletteSheet._hydrateRecentActions();
+    if (changed && mounted) {
+      setState(() {
+        _itemKeys.clear();
+      });
+    }
   }
 
   @override
@@ -121,11 +210,12 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
       final key = _itemKeys[_selectedIndex];
       final itemContext = key?.currentContext;
       if (itemContext != null && itemContext.mounted) {
+        final shouldAnimate = PulsrMotion.shouldAnimate(itemContext);
         Scrollable.ensureVisible(
           itemContext,
           alignment: 0.5,
-          duration: const Duration(milliseconds: 150),
-          curve: Curves.easeInOut,
+          duration: shouldAnimate ? PulsrDurations.tap : Duration.zero,
+          curve: shouldAnimate ? PulsrMotion.enter : Curves.linear,
         );
       }
     });
@@ -136,6 +226,37 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
     _searchController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  List<_PaletteEntry> _buildVisibleEntries(List<CommandPaletteItem> allItems) {
+    if (_query.isNotEmpty) {
+      return [
+        for (final item in allItems)
+          if (item.matches(_query))
+            _PaletteEntry(item: item, displaySection: item.section),
+      ];
+    }
+
+    final byId = <String, CommandPaletteItem>{
+      for (final item in allItems) item.id: item,
+    };
+    final entries = <_PaletteEntry>[];
+    for (final recentId in CommandPaletteSheet._recentActionIds
+        .take(CommandPaletteSheet.maxRecentActions)) {
+      final match = byId[recentId];
+      if (match != null) {
+        entries.add(
+          _PaletteEntry(
+            item: match,
+            displaySection: CommandPaletteSection.recent,
+          ),
+        );
+      }
+    }
+    for (final item in allItems) {
+      entries.add(_PaletteEntry(item: item, displaySection: item.section));
+    }
+    return entries;
   }
 
   List<CommandPaletteItem> _buildAllItems(BuildContext context) {
@@ -188,7 +309,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         title: l10n.queue,
         icon: Icons.format_list_numbered_rounded,
         section: CommandPaletteSection.navigation,
-        keywords: ['up next', 'tracks', 'slots', 'playing'],
+        shortcut: 'Q',
+        keywords: ['queue', 'up next', 'tracks', 'slots', 'playing'],
         onSelect: (ctx) => ctx.push('/queue'),
       ),
       CommandPaletteItem(
@@ -317,6 +439,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         subtitle: l10n.shortcutPlayPauseDesc,
         icon: Icons.play_arrow_rounded,
         section: CommandPaletteSection.actions,
+        shortcut: 'Space',
         keywords: ['playback', 'resume', 'stop'],
         onSelect: (ctx) => ctx.read<PlayerCubit>().togglePlayPause(),
       ),
@@ -326,6 +449,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         subtitle: l10n.shortcutNextDesc,
         icon: Icons.skip_next_rounded,
         section: CommandPaletteSection.actions,
+        shortcut: 'N',
         keywords: ['forward', 'skip'],
         onSelect: (ctx) => ctx.read<PlayerCubit>().next(),
       ),
@@ -335,8 +459,39 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         subtitle: l10n.shortcutPreviousDesc,
         icon: Icons.skip_previous_rounded,
         section: CommandPaletteSection.actions,
+        shortcut: 'P',
         keywords: ['back', 'rewind'],
         onSelect: (ctx) => ctx.read<PlayerCubit>().previous(),
+      ),
+      CommandPaletteItem(
+        id: 'action_favorite',
+        title: l10n.shortcutFavorite,
+        subtitle: l10n.shortcutFavoriteDesc,
+        icon: Icons.favorite_rounded,
+        section: CommandPaletteSection.actions,
+        shortcut: 'F',
+        keywords: ['like', 'heart', 'favorite', 'love'],
+        onSelect: (ctx) => ctx.read<PlayerCubit>().toggleFavorite(),
+      ),
+      CommandPaletteItem(
+        id: 'action_mute',
+        title: l10n.shortcutMute,
+        subtitle: l10n.shortcutMuteDesc,
+        icon: Icons.volume_off_rounded,
+        section: CommandPaletteSection.actions,
+        shortcut: 'M',
+        keywords: ['silence', 'volume', 'mute', 'audio'],
+        onSelect: (ctx) => ctx.read<PlayerCubit>().toggleMute(),
+      ),
+      CommandPaletteItem(
+        id: 'action_lyrics',
+        title: l10n.shortcutLyrics,
+        subtitle: l10n.shortcutLyricsDesc,
+        icon: Icons.lyrics_rounded,
+        section: CommandPaletteSection.actions,
+        shortcut: 'L',
+        keywords: ['words', 'karaoke', 'synced', 'lyrics'],
+        onSelect: (ctx) => ctx.read<PlayerCubit>().toggleLyrics(),
       ),
       CommandPaletteItem(
         id: 'action_shuffle',
@@ -426,11 +581,21 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
         subtitle: l10n.shortcutHelpSubtitle,
         icon: Icons.keyboard_rounded,
         section: CommandPaletteSection.actions,
+        shortcut: '?',
         keywords: ['hotkeys', 'keys', 'desktop'],
         onSelect: (ctx) => ShortcutHelpSheet.show(ctx),
       ),
 
       // 3. Settings Sections
+      CommandPaletteItem(
+        id: 'nav_settings',
+        title: l10n.openSettings,
+        subtitle: l10n.settingsSectionSystemPrivacy,
+        icon: Icons.settings_rounded,
+        section: CommandPaletteSection.settings,
+        keywords: ['settings', 'preferences', 'config', 'options'],
+        onSelect: (ctx) => ctx.go('/settings'),
+      ),
       CommandPaletteItem(
         id: 'settings_sound',
         title: l10n.settingsSectionSoundPlayback,
@@ -509,6 +674,7 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
 
   void _handleSelect(CommandPaletteItem item) {
     PulsrHaptics.lightImpact();
+    CommandPaletteSheet.recordRecentAction(item.id);
     // Capture before the pop: after it the sheet's element is unmounted and
     // every item callback (go/push/read/EqualizerSheet.show) would throw.
     final appContext = _resolveAppContext();
@@ -535,28 +701,27 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     final allItems = _cachedAllItems ?? _buildAllItems(context);
-    final filtered = allItems
-        .where((item) => item.matches(_query))
-        .toList();
+    final entries = _buildVisibleEntries(allItems);
 
-    if (filtered.isEmpty) return KeyEventResult.ignored;
+    if (entries.isEmpty) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
       setState(() {
-        _selectedIndex = (_selectedIndex + 1) % filtered.length;
+        _selectedIndex = (_selectedIndex + 1) % entries.length;
       });
       _scrollToSelected();
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
       setState(() {
-        _selectedIndex = (_selectedIndex - 1 + filtered.length) % filtered.length;
+        _selectedIndex =
+            (_selectedIndex - 1 + entries.length) % entries.length;
       });
       _scrollToSelected();
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.enter ||
         event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-      if (_selectedIndex >= 0 && _selectedIndex < filtered.length) {
-        _handleSelect(filtered[_selectedIndex]);
+      if (_selectedIndex >= 0 && _selectedIndex < entries.length) {
+        _handleSelect(entries[_selectedIndex].item);
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.escape) {
@@ -570,6 +735,8 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   String _sectionTitle(BuildContext context, CommandPaletteSection section) {
     final l10n = context.l10n;
     switch (section) {
+      case CommandPaletteSection.recent:
+        return l10n.sortRadioCardsRecent;
       case CommandPaletteSection.navigation:
         return l10n.commandPaletteSectionRoutes;
       case CommandPaletteSection.actions:
@@ -583,227 +750,329 @@ class _CommandPaletteSheetState extends State<CommandPaletteSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final l10n = context.l10n;
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
     final allItems = _cachedAllItems ?? _buildAllItems(context);
-    final filtered = allItems.where((item) => item.matches(_query)).toList();
+    final entries = _buildVisibleEntries(allItems);
 
     final maxH = math.min(
       Adaptive.sheetMaxHeight(context),
       MediaQuery.sizeOf(context).height * 0.75,
     );
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxH),
-      child: Focus(
-        focusNode: _focusNode,
-        onKeyEvent: _handleKeyEvent,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Search Input Header
-            Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                AppSpacing.xs,
+    return Semantics(
+      label: l10n.commandPaletteTitle,
+      explicitChildNodes: true,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: Focus(
+          focusNode: _focusNode,
+          onKeyEvent: _handleKeyEvent,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Search Input Header
+              Padding(
+                padding: const EdgeInsetsDirectional.fromSTEB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.xs,
+                ),
+                child: Semantics(
+                  textField: true,
+                  label: l10n.commandPaletteHint,
+                  child: PulsrSearchField(
+                    controller: _searchController,
+                    hintText: l10n.commandPaletteHint,
+                    autofocus: true,
+                    onSubmitted: (_) {
+                      if (entries.isNotEmpty &&
+                          _selectedIndex >= 0 &&
+                          _selectedIndex < entries.length) {
+                        _handleSelect(entries[_selectedIndex].item);
+                      }
+                    },
+                  ),
+                ),
               ),
-              child: PulsrSearchField(
-                controller: _searchController,
-                hintText: l10n.commandPaletteHint,
-                autofocus: true,
-                onSubmitted: (_) {
-                  if (filtered.isNotEmpty &&
-                      _selectedIndex >= 0 &&
-                      _selectedIndex < filtered.length) {
-                    _handleSelect(filtered[_selectedIndex]);
-                  }
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xxs),
-            Divider(color: p.hairline, height: 1),
+              const SizedBox(height: AppSpacing.xxs),
+              Divider(color: p.hairline, height: 1),
 
-            // Filtered Items List
-            Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.xl),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.search_off_rounded,
-                                size: 36, color: p.textTertiary),
-                            const SizedBox(height: AppSpacing.sm),
-                            Text(
-                              l10n.commandPaletteNoResults,
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: AppFontSize.body,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.xs,
-                        horizontal: AppSpacing.sm,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final item = filtered[index];
-                        final isHighlighted = index == _selectedIndex;
-
-                        // Insert section separator if first item or section changes
-                        final showSectionHeader = index == 0 ||
-                            filtered[index - 1].section != item.section;
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (showSectionHeader) ...[
-                              Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
-                                  AppSpacing.sm,
-                                  AppSpacing.s8,
-                                  AppSpacing.sm,
-                                  AppSpacing.s4,
-                                ),
-                                child: Text(
-                                  _sectionTitle(context, item.section),
-                                  style: TextStyle(
+              // Filtered Items List
+              Expanded(
+                child: entries.isEmpty
+                    ? Semantics(
+                        liveRegion: true,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.xl),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ExcludeSemantics(
+                                  child: Icon(
+                                    Icons.search_off_rounded,
+                                    size: 36,
                                     color: p.textTertiary,
-                                    fontSize: AppFontSize.label,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: AppTracking.label,
                                   ),
                                 ),
-                              ),
-                            ],
-                            Semantics(
-                              button: true,
-                              label: item.title,
-                              hint: item.subtitle,
-                              child: Container(
-                                key: _itemKeys.putIfAbsent(index, GlobalKey.new),
-                                margin: const EdgeInsets.symmetric(
-                                  vertical: 1.5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isHighlighted
-                                      ? p.accent.withValues(alpha: 0.14)
-                                      : Colors.transparent,
-                                  borderRadius: AppRadii.r12All,
-                                  border: Border.all(
-                                    color: isHighlighted
-                                        ? p.accent.withValues(alpha: 0.35)
-                                        : Colors.transparent,
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  l10n.commandPaletteNoResults,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: AppFontSize.body,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                child: PulsrPressable(
-                                  pressedScale: 0.985,
-                                  onTap: () => _handleSelect(item),
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      minHeight: AppSpacing.minTouchTarget,
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.xs,
+                          horizontal: AppSpacing.sm,
+                        ),
+                        itemCount: entries.length,
+                        itemBuilder: (context, index) {
+                          final entry = entries[index];
+                          final item = entry.item;
+                          final isHighlighted = index == _selectedIndex;
+
+                          // Insert section separator if first item or section changes
+                          final showSectionHeader = index == 0 ||
+                              entries[index - 1].displaySection !=
+                                  entry.displaySection;
+                          final sectionTitle =
+                              _sectionTitle(context, entry.displaySection);
+                          final semanticLabel = item.shortcut != null
+                              ? '${item.title}, ${item.shortcut}'
+                              : item.title;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (showSectionHeader) ...[
+                                Semantics(
+                                  header: true,
+                                  child: Padding(
+                                    padding:
+                                        const EdgeInsetsDirectional.fromSTEB(
+                                      AppSpacing.sm,
+                                      AppSpacing.s8,
+                                      AppSpacing.sm,
+                                      AppSpacing.s4,
                                     ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.sm,
-                                        vertical: AppSpacing.xs,
+                                    child: Text(
+                                      sectionTitle,
+                                      style: TextStyle(
+                                        color: p.textTertiary,
+                                        fontSize: AppFontSize.label,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: AppTracking.label,
                                       ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 32,
-                                            height: 32,
-                                            decoration: BoxDecoration(
-                                              color: isHighlighted
-                                                  ? p.accent
-                                                  : p.surfaceContainerHigh,
-                                              shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              Semantics(
+                                button: true,
+                                selected: isHighlighted,
+                                label: semanticLabel,
+                                hint: item.subtitle,
+                                excludeSemantics: true,
+                                child: AnimatedContainer(
+                                  key: _itemKeys.putIfAbsent(
+                                    index,
+                                    GlobalKey.new,
+                                  ),
+                                  duration: shouldAnimate
+                                      ? context.motion(PulsrDurations.tap)
+                                      : Duration.zero,
+                                  curve:
+                                      context.motionCurve(PulsrMotion.enter),
+                                  margin: const EdgeInsets.symmetric(
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isHighlighted
+                                        ? p.accent.withValues(alpha: 0.14)
+                                        : Colors.transparent,
+                                    borderRadius: AppRadii.r12All,
+                                    border: Border.all(
+                                      color: isHighlighted
+                                          ? p.accent.withValues(alpha: 0.35)
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                  child: PulsrPressable(
+                                    pressedScale: 0.985,
+                                    onTap: () => _handleSelect(item),
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                        minWidth: AppSpacing.minTouchTarget,
+                                        minHeight: AppSpacing.minTouchTarget,
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.sm,
+                                          vertical: AppSpacing.xs,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              width: 32,
+                                              height: 32,
+                                              decoration: BoxDecoration(
+                                                color: isHighlighted
+                                                    ? p.accent
+                                                    : p.surfaceContainerHigh,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              alignment: Alignment.center,
+                                              child: Icon(
+                                                item.icon,
+                                                size: 17,
+                                                color: isHighlighted
+                                                    ? p.onAccent
+                                                    : p.textSecondary,
+                                              ),
                                             ),
-                                            alignment: Alignment.center,
-                                            child: Icon(
-                                              item.icon,
-                                              size: 17,
-                                              color: isHighlighted
-                                                  ? p.onAccent
-                                                  : p.textSecondary,
+                                            const SizedBox(
+                                              width: AppSpacing.sm,
                                             ),
-                                          ),
-                                          const SizedBox(width: AppSpacing.sm),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                PulsrHighlightedText(
-                                                  text: item.title,
-                                                  query: _query,
-                                                  baseStyle: TextStyle(
-                                                    color: isHighlighted
-                                                        ? p.textPrimary
-                                                        : p.textPrimary,
-                                                    fontSize: AppFontSize.body,
-                                                    fontWeight: isHighlighted
-                                                        ? FontWeight.w700
-                                                        : FontWeight.w600,
-                                                  ),
-                                                  matchStyle: TextStyle(
-                                                    color: p.accent,
-                                                    fontSize: AppFontSize.body,
-                                                    fontWeight: FontWeight.w800,
-                                                  ),
-                                                ),
-                                                if (item.subtitle != null) ...[
-                                                  const SizedBox(height: 2),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
                                                   PulsrHighlightedText(
-                                                    text: item.subtitle!,
+                                                    text: item.title,
                                                     query: _query,
                                                     baseStyle: TextStyle(
-                                                      color: p.textSecondary,
+                                                      color: p.textPrimary,
                                                       fontSize:
-                                                          AppFontSize.caption,
+                                                          AppFontSize.body,
+                                                      fontWeight: isHighlighted
+                                                          ? FontWeight.w700
+                                                          : FontWeight.w600,
                                                     ),
                                                     matchStyle: TextStyle(
                                                       color: p.accent,
                                                       fontSize:
-                                                          AppFontSize.caption,
+                                                          AppFontSize.body,
                                                       fontWeight:
-                                                          FontWeight.w700,
+                                                          FontWeight.w800,
                                                     ),
                                                   ),
+                                                  if (item.subtitle !=
+                                                      null) ...[
+                                                    const SizedBox(height: 2),
+                                                    PulsrHighlightedText(
+                                                      text: item.subtitle!,
+                                                      query: _query,
+                                                      baseStyle: TextStyle(
+                                                        color: p.textSecondary,
+                                                        fontSize:
+                                                            AppFontSize.caption,
+                                                      ),
+                                                      matchStyle: TextStyle(
+                                                        color: p.accent,
+                                                        fontSize:
+                                                            AppFontSize.caption,
+                                                        fontWeight:
+                                                            FontWeight.w700,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ],
-                                              ],
+                                              ),
                                             ),
-                                          ),
-                                          Icon(
-                                            Icons.chevron_right_rounded,
-                                            size: 16,
-                                            color: isHighlighted
-                                                ? p.accent
-                                                : p.textTertiary
-                                                    .withValues(alpha: 0.5),
-                                          ),
-                                        ],
+                                            if (item.shortcut != null) ...[
+                                              const SizedBox(
+                                                width: AppSpacing.xs,
+                                              ),
+                                              _ShortcutKeyBadge(
+                                                label: item.shortcut!,
+                                                isHighlighted: isHighlighted,
+                                                palette: p,
+                                              ),
+                                            ],
+                                            const SizedBox(
+                                              width: AppSpacing.xxs,
+                                            ),
+                                            Icon(
+                                              Icons.chevron_right_rounded,
+                                              size: 16,
+                                              color: isHighlighted
+                                                  ? p.accent
+                                                  : p.textTertiary
+                                                      .withValues(alpha: 0.5),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-            ),
-          ],
+                            ],
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Inline keyboard shortcut badge rendered on commands with active keybindings.
+class _ShortcutKeyBadge extends StatelessWidget {
+  final String label;
+  final bool isHighlighted;
+  final PulsrPalette palette;
+
+  const _ShortcutKeyBadge({
+    required this.label,
+    required this.isHighlighted,
+    required this.palette,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 26, minHeight: 24),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.s6,
+        vertical: AppSpacing.s2,
+      ),
+      decoration: BoxDecoration(
+        color: isHighlighted
+            ? palette.accent.withValues(alpha: 0.16)
+            : palette.surfaceContainerHigh,
+        borderRadius: AppRadii.r6All,
+        border: Border.all(
+          color: isHighlighted
+              ? palette.accent.withValues(alpha: 0.42)
+              : palette.hairline,
+          width: 1.0,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'monospace',
+          fontSize: AppFontSize.caption,
+          fontWeight: FontWeight.w700,
+          color: isHighlighted ? palette.accent : palette.textSecondary,
         ),
       ),
     );

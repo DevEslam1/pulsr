@@ -460,6 +460,116 @@ void testNoAllocation() {
     check(after == before, "process()/setRatio() must not allocate after configure()");
 }
 
+// ---- 9. Mid-stream transitions across 1.0 with allowDynamicBypass = false ---
+void testNoDynamicBypassSmoothTransition() {
+    UsbAsrcClockSync asrc;
+    check(asrc.configure(2, 32, 256, /*allowDynamicBypass=*/false),
+          "configure with allowDynamicBypass=false must succeed");
+    check(!asrc.allowDynamicBypass(), "allowDynamicBypass must report false");
+    check(!asrc.bypassed(),
+          "converter must not be bypassed even at initial ratio 1.0 when dynamic bypass is disabled");
+
+    const int channels = 2;
+    const double sampleRate = 48000.0;
+    const double freq = 1000.0;
+    const float amp = 0.5f;
+    const int chunkFrames = 480;
+    const int chunksPerStage = 25;  // 12,000 frames (~250 ms) per stage
+
+    std::vector<float> inputChunk(static_cast<size_t>(chunkFrames) * channels);
+    std::vector<float> outputChunk(static_cast<size_t>(chunkFrames + 128) * channels);
+    std::vector<float> continuousOut;
+    continuousOut.reserve(static_cast<size_t>(chunksPerStage * 3 * (chunkFrames + 128)) * channels);
+
+    double phase = 0.0;
+    const double phaseStep = 2.0 * kPi * freq / sampleRate;
+
+    auto streamStage = [&](double ratio) {
+        asrc.setRatio(ratio);
+        check(!asrc.bypassed(),
+              "must remain in resampler (not bypass) during clock-sync ratio change");
+        check(std::fabs(asrc.ratio() - ratio) < 1e-9, "ratio must match set value");
+
+        for (int chk = 0; chk < chunksPerStage; ++chk) {
+            for (int n = 0; n < chunkFrames; ++n) {
+                const float s = static_cast<float>(amp * std::sin(phase));
+                phase += phaseStep;
+                if (phase >= 2.0 * kPi) phase -= 2.0 * kPi;
+                inputChunk[static_cast<size_t>(n) * channels + 0] = s;
+                inputChunk[static_cast<size_t>(n) * channels + 1] = s * 0.8f;
+            }
+
+            const int got = asrc.process(inputChunk.data(), chunkFrames,
+                                         outputChunk.data(),
+                                         static_cast<int>(outputChunk.size() / channels));
+            check(got > 0, "process() must continuously produce output frames");
+            check(asrc.inputFramesConsumed() == chunkFrames,
+                  "process() must consume all input frames");
+
+            continuousOut.insert(continuousOut.end(),
+                                 outputChunk.begin(),
+                                 outputChunk.begin() + static_cast<size_t>(got) * channels);
+        }
+    };
+
+    // Stage 1: Fast clock ratio (1.0005)
+    streamStage(1.0005);
+    const size_t stage1Frames = continuousOut.size() / channels;
+
+    // Stage 2: Crossing exact nominal rate 1.0 (must NOT wipe filter history or enter bit-identical bypass)
+    streamStage(1.0000);
+    const size_t stage2Frames = continuousOut.size() / channels;
+
+    // Stage 3: Slow clock ratio (0.9995)
+    streamStage(0.9995);
+    const size_t totalFrames = continuousOut.size() / channels;
+
+    check(stage1Frames > 0 && stage2Frames > stage1Frames && totalFrames > stage2Frames,
+          "all three ratio stages must produce output frames");
+
+    // Skip initial filter warm-up latency (group delay is taps/2 = 16 frames)
+    const size_t warmUp = 64;
+    check(totalFrames > warmUp, "total output must exceed warmup");
+
+    // Check sample continuity across the entire stream (especially transitions at stage1Frames and stage2Frames).
+    // For 1 kHz sine at 48 kHz with amplitude 0.5: max sample-to-sample difference is ~0.5 * 2 * pi * 1000 / 48000 ≈ 0.0655.
+    // An abrupt filter reset or bypass phase jump of ~16 samples latency would produce jumps > 0.40.
+    float maxDeltaCh0 = 0.0f;
+    float maxDeltaCh1 = 0.0f;
+    for (size_t n = warmUp + 1; n < totalFrames; ++n) {
+        const float d0 = std::fabs(continuousOut[n * channels + 0] - continuousOut[(n - 1) * channels + 0]);
+        const float d1 = std::fabs(continuousOut[n * channels + 1] - continuousOut[(n - 1) * channels + 1]);
+        if (d0 > maxDeltaCh0) maxDeltaCh0 = d0;
+        if (d1 > maxDeltaCh1) maxDeltaCh1 = d1;
+    }
+
+    check(maxDeltaCh0 < 0.10f,
+          "ch0 must be smooth across nominal rate transition (no click/wipe/discontinuity)");
+    check(maxDeltaCh1 < 0.10f,
+          "ch1 must be smooth across nominal rate transition (no click/wipe/discontinuity)");
+
+    // Dynamic bypass enabled contrast check:
+    UsbAsrcClockSync asrcBypass;
+    check(asrcBypass.configure(2, 32, 256, /*allowDynamicBypass=*/true),
+          "configure with allowDynamicBypass=true must succeed");
+    check(asrcBypass.allowDynamicBypass(), "allowDynamicBypass must report true");
+    check(asrcBypass.bypassed(), "converter starts in bypass when allowDynamicBypass=true");
+    asrcBypass.setRatio(1.0005);
+    check(!asrcBypass.bypassed(), "ratio 1.0005 leaves bypass");
+    asrcBypass.setRatio(1.0000);
+    check(asrcBypass.bypassed(), "ratio 1.0 re-enters bypass when allowDynamicBypass=true");
+
+    // Runtime toggle validation:
+    asrcBypass.setAllowDynamicBypass(false);
+    check(!asrcBypass.allowDynamicBypass(), "setAllowDynamicBypass(false) must update getter");
+    check(!asrcBypass.bypassed(),
+          "setAllowDynamicBypass(false) at ratio 1.0 must immediately leave bypass");
+    asrcBypass.setAllowDynamicBypass(true);
+    check(asrcBypass.allowDynamicBypass(), "setAllowDynamicBypass(true) must update getter");
+    check(asrcBypass.bypassed(),
+          "setAllowDynamicBypass(true) at ratio 1.0 must immediately enter bypass");
+}
+
 }  // namespace
 
 int main() {
@@ -473,6 +583,7 @@ int main() {
     testDenormals();
     testChannelsAndReset();
     testNoAllocation();
+    testNoDynamicBypassSmoothTransition();
 
     if (gFailures != 0) {
         std::cout << "[FAIL] " << gFailures << " of " << gChecks
@@ -480,7 +591,7 @@ int main() {
         return 1;
     }
     std::cout << "[PASS] USB ASRC: " << gChecks
-              << " checks (bypass, clamp, 1 ppm tracking, THD+N, impulse, denormals)."
+              << " checks (bypass, clamp, 1 ppm tracking, THD+N, impulse, denormals, no-dynamic-bypass)."
               << std::endl;
     return 0;
 }

@@ -129,11 +129,10 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                               vertical: AppSpacing.xs),
                         ),
                         icon: isTestingAll
-                            ? SizedBox(
-                                width: AppSpacing.s14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: p.accent),
+                            ? PulsrProgressBar.circular(
+                                size: AppSpacing.s14,
+                                strokeWidth: 2,
+                                color: p.accent,
                               )
                             : const Icon(Icons.speed_rounded, size: 16),
                         label: Text(
@@ -350,11 +349,10 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
                       padding: EdgeInsets.zero,
                       tooltip: context.l10n.settingsTestLatency,
                       icon: item.isTesting
-                          ? SizedBox(
-                              width: AppSpacing.s14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: p.accent),
+                          ? PulsrProgressBar.circular(
+                              size: AppSpacing.s14,
+                              strokeWidth: 2,
+                              color: p.accent,
                             )
                           : Icon(Icons.speed_rounded,
                               size: 18, color: p.accent),
@@ -473,11 +471,10 @@ mixin ProxySettingsSections on State<ProxySettingsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(
-              width: AppSpacing.xs,
-              height: 8,
-              child:
-                  CircularProgressIndicator(strokeWidth: 1.5, color: p.accent),
+            PulsrProgressBar.circular(
+              size: AppSpacing.xs,
+              strokeWidth: 1.5,
+              color: p.accent,
             ),
             const SizedBox(width: AppSpacing.s6),
             Text(context.l10n.testingLabel,

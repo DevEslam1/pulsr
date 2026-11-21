@@ -9,6 +9,7 @@ import '../../../../core/errors/error_message_resolver.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../domain/services/smart_audio_plan.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../data/services/device_profile_service.dart';
@@ -236,25 +237,9 @@ class _SmartAudioSectionState extends State<SmartAudioSection> {
         ],
         if (_isLoading) ...[
           const SizedBox(height: AppSpacing.xs),
-          Row(
-            children: [
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.xs),
-              Text(
-                '${context.l10n.settingsAudioOutputDevice}...',
-                style: TextStyle(
-                  fontSize: AppFontSize.label,
-                  color: p.textTertiary,
-                ),
-              ),
-            ],
+          const SkeletonBox(
+            height: 44,
+            radius: AppRadii.r10,
           ),
         ] else if (_deviceName != null) ...[
           const SizedBox(height: AppSpacing.xs),

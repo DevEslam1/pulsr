@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../widgets/audio_visualizer.dart';
 import '../../../../core/motion/pulsr_motion.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/theme/player_material_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/l10n_extensions.dart';
@@ -17,7 +18,6 @@ import 'player_theme_scaffold.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
-import 'package:pulsr/core/constants/app_colors.dart';
 
 part 'painters/cassette_body.dart';
 part 'parts/cassette_player_theme_build.dart';

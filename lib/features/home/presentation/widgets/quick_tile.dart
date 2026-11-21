@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/aura_theme.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -35,7 +36,7 @@ class QuickTile extends StatelessWidget {
       button: true,
       label: '$title, $subtitle',
       child: Material(
-        color: Colors.transparent,
+        color: AppColors.fadeStopTransparent,
         borderRadius: AppRadii.r18All,
         child: InkWell(
           borderRadius: AppRadii.r18All,

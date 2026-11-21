@@ -233,6 +233,7 @@ mixin TabletLayoutSection
               ),
               physics: const BouncingScrollPhysics(),
               children: [
+                SettingsQuickControlsStrip(state: state, cubit: cubit),
                 _buildCategoryHeroHeader(context, currentCat),
                 const SizedBox(height: AppSpacing.md),
                 ..._buildCategoryWidgets(context, effectiveId, state, cubit),

@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/responsive/adaptive_grid.dart';
-import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/pulsr_static_grid.dart';
@@ -149,18 +148,10 @@ class _RecentlyAddedSectionState extends State<RecentlyAddedSection> {
   }
 
   Widget _buildAutoLoadIndicator(BuildContext context) {
-    final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      child: Center(
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(p.accent),
-          ),
-        ),
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      child: SkeletonShimmer(
+        child: SkeletonSongRow(artworkSize: 44),
       ),
     );
   }

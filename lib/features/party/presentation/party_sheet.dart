@@ -1,6 +1,7 @@
+import 'package:flutter/semantics.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/constants/app_spacing.dart';
@@ -180,57 +181,78 @@ class _PartySheetState extends State<PartySheet> {
               // Header
               Row(
                 children: [
-                  Icon(
-                    Icons.group_rounded,
-                    color: inParty ? p.accent : p.textPrimary,
-                    size: 24,
+                  ExcludeSemantics(
+                    child: Icon(
+                      Icons.group_rounded,
+                      color: inParty ? p.accent : p.textPrimary,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.s8),
                   Expanded(
-                    child: Text(
-                      context.l10n.partyListenTogether,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: AppFontSize.title,
-                        fontWeight: FontWeight.w800,
-                        color: p.textPrimary,
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        context.l10n.partyListenTogether,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: AppFontSize.title,
+                          fontWeight: FontWeight.w800,
+                          color: p.textPrimary,
+                        ),
                       ),
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      _showSettings
-                          ? Icons.close_rounded
-                          : Icons.settings_rounded,
-                      color: p.textSecondary,
-                      size: 20,
+                  MergeSemantics(
+                    child: Semantics(
+                      toggled: _showSettings,
+                      child: IconButton(
+                        constraints: const BoxConstraints(
+                          minWidth: AppSpacing.minTouchTarget,
+                          minHeight: AppSpacing.minTouchTarget,
+                        ),
+                        icon: Icon(
+                          _showSettings
+                              ? Icons.close_rounded
+                              : Icons.settings_rounded,
+                          color: p.textSecondary,
+                          size: 20,
+                        ),
+                        tooltip: context.l10n.partyServerSettings,
+                        onPressed: () {
+                          setState(() => _showSettings = !_showSettings);
+                        },
+                      ),
                     ),
-                    tooltip: context.l10n.partyServerSettings,
-                    onPressed: () {
-                      setState(() => _showSettings = !_showSettings);
-                    },
                   ),
                 ],
               ),
               if (_partyService.connectionState.value ==
                   PartyConnectionState.connecting)
-                const Padding(
-                  padding: EdgeInsets.only(top: AppSpacing.xs),
-                  child: LinearProgressIndicator(minHeight: 2),
+                Padding(
+                  padding: const EdgeInsets.only(top: AppSpacing.xs),
+                  child: Semantics(
+                    liveRegion: true,
+                    label: context.l10n.partySynchronizingClock,
+                    child: const LinearProgressIndicator(minHeight: 2),
+                  ),
                 ),
               if (_partyService.connectionState.value ==
                       PartyConnectionState.offline &&
                   _partyService.lastError.value != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.xs),
-                  child: Text(
-                    resolveUiErrorMessage(
-                        context, _partyService.lastError.value!),
-                    style: TextStyle(
-                      color: p.error,
-                      fontSize: AppFontSize.caption,
-                      fontWeight: FontWeight.w600,
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      resolveUiErrorMessage(
+                          context, _partyService.lastError.value!),
+                      style: TextStyle(
+                        color: p.error,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -274,12 +296,15 @@ class _PartySheetState extends State<PartySheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          context.l10n.partyServerConfiguration,
-          style: TextStyle(
-            fontSize: AppFontSize.body,
-            fontWeight: FontWeight.w700,
-            color: p.textPrimary,
+        Semantics(
+          header: true,
+          child: Text(
+            context.l10n.partyServerConfiguration,
+            style: TextStyle(
+              fontSize: AppFontSize.body,
+              fontWeight: FontWeight.w700,
+              color: p.textPrimary,
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
@@ -364,16 +389,21 @@ class _PartySheetState extends State<PartySheet> {
         // Create Room Button
         FilledButton.icon(
           icon: _isCreating
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2, color: p.onAccent),
                 )
               : const Icon(Icons.add_rounded),
           label: Text(context.l10n.partyCreateNew),
           style: FilledButton.styleFrom(
             backgroundColor: p.accent,
+            foregroundColor: p.onAccent,
+            minimumSize: const Size(
+              AppSpacing.minTouchTarget,
+              AppSpacing.minTouchTarget,
+            ),
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: AppRadii.r14All),
           ),
@@ -433,10 +463,13 @@ class _PartySheetState extends State<PartySheet> {
 
         if (_errorMessage != null) ...[
           const SizedBox(height: AppSpacing.sm),
-          Text(
-            _errorMessage!,
-            style: const TextStyle(
-                color: Colors.redAccent, fontSize: AppFontSize.bodySmall),
+          Semantics(
+            liveRegion: true,
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(
+                  color: p.error, fontSize: AppFontSize.bodySmall),
+            ),
           ),
         ],
       ],
@@ -452,106 +485,125 @@ class _PartySheetState extends State<PartySheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         // Room Code Banner
-        Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: p.accent.withValues(alpha: 0.12),
-            borderRadius: AppRadii.r16All,
-            border: Border.all(color: p.accent.withValues(alpha: 0.3)),
-          ),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          context.l10n.partyRoomCode,
-                          style: TextStyle(
-                            fontSize: AppFontSize.caption,
-                            fontWeight: FontWeight.w800,
-                            color: p.textSecondary,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text(
-                            snap.code,
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: AppFontSize.display,
-                              fontWeight: FontWeight.w900,
-                              color: p.accent,
-                              letterSpacing: 4.0,
+        Semantics(
+          container: true,
+          customSemanticsActions: {
+            CustomSemanticsAction(label: context.l10n.partyCopyInvite): () =>
+                _copyInvite(snap.code),
+            CustomSemanticsAction(label: context.l10n.partyShareInvite): () =>
+                _shareInvite(snap.code),
+          },
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: p.accent.withValues(alpha: 0.12),
+              borderRadius: AppRadii.r16All,
+              border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        label:
+                            '${context.l10n.partyRoomCode}: ${snap.code.split('').join(' ')}',
+                        excludeSemantics: true,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              context.l10n.partyRoomCode,
+                              style: TextStyle(
+                                fontSize: AppFontSize.caption,
+                                fontWeight: FontWeight.w800,
+                                color: p.textSecondary,
+                                letterSpacing: 1.2,
+                              ),
                             ),
+                            const SizedBox(height: 2),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(
+                                snap.code,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.display,
+                                  fontWeight: FontWeight.w900,
+                                  color: p.accent,
+                                  letterSpacing: 4.0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton.filledTonal(
+                          constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
                           ),
+                          icon: const Icon(Icons.copy_rounded, size: 20),
+                          tooltip: context.l10n.partyCopyInvite,
+                          onPressed: () => _copyInvite(snap.code),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        IconButton.filledTonal(
+                          constraints: const BoxConstraints(
+                            minWidth: AppSpacing.minTouchTarget,
+                            minHeight: AppSpacing.minTouchTarget,
+                          ),
+                          icon: const Icon(Icons.share_rounded, size: 20),
+                          tooltip: context.l10n.partyShareInvite,
+                          onPressed: () => _shareInvite(snap.code),
                         ),
                       ],
                     ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Semantics(
+                  liveRegion: true,
+                  child: Row(
                     children: [
-                      IconButton.filledTonal(
-                        constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget,
+                      ExcludeSemantics(
+                        child: PulsrBadge(
+                          dot: true,
+                          color: isSynced
+                              ? PulsrBadgeColor.success
+                              : PulsrBadgeColor.warning,
                         ),
-                        icon: const Icon(Icons.copy_rounded, size: 20),
-                        tooltip: context.l10n.partyCopyInvite,
-                        onPressed: () => _copyInvite(snap.code),
                       ),
-                      const SizedBox(width: AppSpacing.xs),
-                      IconButton.filledTonal(
-                        constraints: const BoxConstraints(
-                          minWidth: AppSpacing.minTouchTarget,
-                          minHeight: AppSpacing.minTouchTarget,
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          isSynced
+                              ? context.l10n.partySyncedRtt(rtt)
+                              : context.l10n.partySynchronizingClock,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: AppFontSize.caption,
+                            color: p.textSecondary,
+                          ),
                         ),
-                        icon: const Icon(Icons.share_rounded, size: 20),
-                        tooltip: context.l10n.partyShareInvite,
-                        onPressed: () => _shareInvite(snap.code),
                       ),
+                      if (isHost)
+                        PulsrBadge(
+                          label: context.l10n.partyHost,
+                          color: PulsrBadgeColor.accent,
+                        ),
                     ],
                   ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Row(
-                children: [
-                  PulsrBadge(
-                    dot: true,
-                    color: isSynced
-                        ? PulsrBadgeColor.success
-                        : PulsrBadgeColor.warning,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      isSynced
-                          ? context.l10n.partySyncedRtt(rtt)
-                          : context.l10n.partySynchronizingClock,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        color: p.textSecondary,
-                      ),
-                    ),
-                  ),
-                  if (isHost)
-                    PulsrBadge(
-                      label: context.l10n.partyHost,
-                      color: PulsrBadgeColor.accent,
-                    ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.md),
@@ -560,12 +612,15 @@ class _PartySheetState extends State<PartySheet> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              context.l10n.partyMembers(snap.members.length, snap.maxMembers),
-              style: TextStyle(
-                fontSize: AppFontSize.body,
-                fontWeight: FontWeight.w700,
-                color: p.textPrimary,
+            Semantics(
+              header: true,
+              child: Text(
+                context.l10n.partyMembers(snap.members.length, snap.maxMembers),
+                style: TextStyle(
+                  fontSize: AppFontSize.body,
+                  fontWeight: FontWeight.w700,
+                  color: p.textPrimary,
+                ),
               ),
             ),
           ],
@@ -576,80 +631,84 @@ class _PartySheetState extends State<PartySheet> {
         ...snap.members.map((member) {
           final isMe =
               member.memberId == _partyService.currentMember.value?.memberId;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: p.surfaceContainerHigh,
-                  backgroundImage: member.avatarUrl != null
-                      ? NetworkImage(member.avatarUrl!)
-                      : null,
-                  child: member.avatarUrl == null
-                      ? Text(
-                          member.displayName.isNotEmpty
-                              ? member.displayName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              member.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+          return MergeSemantics(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  ExcludeSemantics(
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: p.surfaceContainerHigh,
+                      backgroundImage: member.avatarUrl != null
+                          ? NetworkImage(member.avatarUrl!)
+                          : null,
+                      child: member.avatarUrl == null
+                          ? Text(
+                              member.displayName.isNotEmpty
+                                  ? member.displayName[0].toUpperCase()
+                                  : '?',
                               style: TextStyle(
-                                fontSize: AppFontSize.body,
-                                fontWeight:
-                                    isMe ? FontWeight.w800 : FontWeight.w600,
                                 color: p.textPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                member.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: AppFontSize.body,
+                                  fontWeight:
+                                      isMe ? FontWeight.w800 : FontWeight.w600,
+                                  color: p.textPrimary,
+                                ),
                               ),
                             ),
-                          ),
-                          if (isMe) ...[
-                            const SizedBox(width: 6),
-                            Text(
-                              context.l10n.partyYouLabel,
-                              style: TextStyle(
-                                  fontSize: AppFontSize.caption,
-                                  color: p.textSecondary),
-                            ),
+                            if (isMe) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                context.l10n.partyYouLabel,
+                                style: TextStyle(
+                                    fontSize: AppFontSize.caption,
+                                    color: p.textSecondary),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                if (member.isHost)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.2),
-                      borderRadius: AppRadii.r6All,
-                    ),
-                    child: Text(
-                      context.l10n.partyHostMember,
-                      style: TextStyle(
-                        fontSize: AppFontSize.caption,
-                        fontWeight: FontWeight.w700,
-                        color: p.accent,
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-              ],
+                  if (member.isHost)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.2),
+                        borderRadius: AppRadii.r6All,
+                      ),
+                      child: Text(
+                        context.l10n.partyHostMember,
+                        style: TextStyle(
+                          fontSize: AppFontSize.caption,
+                          fontWeight: FontWeight.w700,
+                          color: p.accent,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           );
         }),
@@ -658,11 +717,15 @@ class _PartySheetState extends State<PartySheet> {
 
         // Leave Party Button
         OutlinedButton.icon(
-          icon: const Icon(Icons.exit_to_app_rounded, color: Colors.redAccent),
+          icon: Icon(Icons.exit_to_app_rounded, color: p.error),
           label: Text(context.l10n.partyLeave,
-              style: TextStyle(color: Colors.redAccent)),
+              style: TextStyle(color: p.error)),
           style: OutlinedButton.styleFrom(
-            side: const BorderSide(color: Colors.redAccent),
+            side: BorderSide(color: p.error),
+            minimumSize: const Size(
+              AppSpacing.minTouchTarget,
+              AppSpacing.minTouchTarget,
+            ),
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: AppRadii.r14All),
           ),

@@ -1,10 +1,11 @@
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:pulsr/core/utils/adaptive.dart';
 import 'package:pulsr/features/shell/presentation/bottom_nav_bar.dart';
+import 'package:pulsr/features/shell/presentation/nav_destinations.dart';
+import 'package:pulsr/l10n/app_localizations_delegates.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
-import 'package:pulsr/l10n/app_localizations_delegates.dart';
 void main() {
   group('Adaptive Tablet & Responsive Engine Tests', () {
     testWidgets(
@@ -137,9 +138,11 @@ void main() {
       );
     });
 
-    testWidgets('PulsrBottomNavBar renders all 5 button destinations on tablet',
+    testWidgets(
+        'PulsrBottomNavBar renders 4 primary destinations while tablet rail includes Settings',
         (tester) async {
       int selectedIdx = 0;
+      late BuildContext capturedContext;
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: appLocalizationsDelegates,
@@ -148,23 +151,36 @@ void main() {
             data: const MediaQueryData(
               size: Size(800, 1280),
             ),
-            child: Scaffold(
-              bottomNavigationBar: PulsrBottomNavBar(
-                currentIndex: selectedIdx,
-                onTap: (idx) => selectedIdx = idx,
-              ),
+            child: Builder(
+              builder: (context) {
+                capturedContext = context;
+                return Scaffold(
+                  bottomNavigationBar: PulsrBottomNavBar(
+                    currentIndex: selectedIdx,
+                    onTap: (idx) => selectedIdx = idx,
+                  ),
+                );
+              },
             ),
           ),
         ),
       );
 
-      // Verify all 5 destinations are rendered.
+      // Verify the 4 primary dock destinations (Home, Library, Search, Playlists).
       expect(find.byType(PulsrBottomNavBar), findsOneWidget);
       expect(find.byIcon(Icons.home_rounded), findsOneWidget);
       expect(find.byIcon(Icons.library_music_outlined), findsOneWidget);
       expect(find.byIcon(Icons.search_rounded), findsOneWidget);
       expect(find.byIcon(Icons.queue_music_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.settings_outlined), findsNothing);
+
+      // Settings remains directly reachable in the 5-destination tablet rail.
+      final railDests = pulsrRailDestinations(capturedContext);
+      expect(railDests.length, equals(5));
+      expect(
+        railDests.any((d) => d.icon == Icons.settings_outlined),
+        isTrue,
+      );
 
       // Verify bottom nav bar height is strictly bounded and does not swallow the screen
       final navBarSize = tester.getSize(find.byType(PulsrBottomNavBar));

@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import 'party_sheet.dart';
 
 /// Full-screen home for Pulsr Party.
@@ -24,7 +25,14 @@ class PartyScreen extends StatelessWidget {
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
-      body: const SafeArea(top: false, child: PartySheet()),
+      body: SafeArea(
+        top: false,
+        child: Semantics(
+          container: true,
+          label: context.l10n.partyListenTogether,
+          child: const PartySheet(),
+        ),
+      ),
     );
   }
 }

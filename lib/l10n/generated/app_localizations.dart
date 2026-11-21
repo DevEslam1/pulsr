@@ -19081,6 +19081,468 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'EXCLUSIVE'**
   String get badgeExclusive;
+
+  /// Card title for multichannel speaker gain trim and alignment delay controls
+  ///
+  /// In en, this message translates to:
+  /// **'Multichannel Speaker Alignment'**
+  String get multichannelSpeakerAlignment;
+
+  /// Subtitle for multichannel speaker alignment card
+  ///
+  /// In en, this message translates to:
+  /// **'Per-channel trim, alignment delay & LFE crossover'**
+  String get multichannelSubtitle;
+
+  /// Tooltip for multichannel speaker alignment info button
+  ///
+  /// In en, this message translates to:
+  /// **'Multichannel Info'**
+  String get multichannelInfoTooltip;
+
+  /// Status notice when multichannel DSP is bypassed by Bit-Perfect mode
+  ///
+  /// In en, this message translates to:
+  /// **'Bypassed by Bit-Perfect Mode'**
+  String get multichannelBypassedByBitPerfect;
+
+  /// Informational note explaining multichannel AudioTrack routing on Android
+  ///
+  /// In en, this message translates to:
+  /// **'AAudio is limited to 2 channels on Android; multichannel streams (>2 ch) route through Pulsr\'s 32-bit float AudioTrack path for genuine surround output.'**
+  String get multichannelAaudioNote;
+
+  /// Section label for selecting the speaker channel layout
+  ///
+  /// In en, this message translates to:
+  /// **'Speaker Layout'**
+  String get multichannelSpeakerLayout;
+
+  /// Short channel count fallback label
+  ///
+  /// In en, this message translates to:
+  /// **'{count} ch'**
+  String multichannelChannelsShort(int count);
+
+  /// Summary of active speaker layout and channel count
+  ///
+  /// In en, this message translates to:
+  /// **'{layoutName} ({count} channels)'**
+  String multichannelLayoutSummary(String layoutName, int count);
+
+  /// Choice chip label for a speaker layout option
+  ///
+  /// In en, this message translates to:
+  /// **'{layoutName} ({count} ch)'**
+  String multichannelLayoutChipLabel(String layoutName, int count);
+
+  /// Section label for picking an individual speaker channel
+  ///
+  /// In en, this message translates to:
+  /// **'Select Speaker Channel'**
+  String get multichannelSelectChannel;
+
+  /// Short fallback label for a speaker channel
+  ///
+  /// In en, this message translates to:
+  /// **'CH {index}'**
+  String multichannelChannelShort(int index);
+
+  /// Full fallback name for a speaker channel
+  ///
+  /// In en, this message translates to:
+  /// **'Channel {index}'**
+  String multichannelChannelFull(int index);
+
+  /// Slider label for per-channel gain trim
+  ///
+  /// In en, this message translates to:
+  /// **'Gain Trim'**
+  String get multichannelGainTrim;
+
+  /// Slider label for per-channel speaker alignment delay
+  ///
+  /// In en, this message translates to:
+  /// **'Alignment Delay'**
+  String get multichannelAlignmentDelay;
+
+  /// Section title for LFE crossover and subwoofer bass management
+  ///
+  /// In en, this message translates to:
+  /// **'LFE Crossover & Bass Management'**
+  String get multichannelLfeTitle;
+
+  /// Subtitle for LFE crossover section
+  ///
+  /// In en, this message translates to:
+  /// **'Satellite HPF & dedicated subwoofer crossover'**
+  String get multichannelLfeSubtitle;
+
+  /// Tooltip for LFE crossover info button
+  ///
+  /// In en, this message translates to:
+  /// **'LFE Crossover Info'**
+  String get multichannelLfeInfoTooltip;
+
+  /// Explanatory description of Linkwitz-Riley LFE bass management
+  ///
+  /// In en, this message translates to:
+  /// **'Linkwitz-Riley crossover applies high-pass filter to satellite channels and routes redirected low frequencies to the dedicated LFE channel.'**
+  String get multichannelLfeDescription;
+
+  /// Slider label for satellite high-pass crossover frequency
+  ///
+  /// In en, this message translates to:
+  /// **'Satellite Crossover (HPF)'**
+  String get multichannelSatelliteCrossover;
+
+  /// Slider label for dedicated LFE subwoofer low-pass filter frequency
+  ///
+  /// In en, this message translates to:
+  /// **'Subwoofer Low-Pass (LPF)'**
+  String get multichannelSubwooferLowPass;
+
+  /// Label for Linkwitz-Riley crossover filter slope selector
+  ///
+  /// In en, this message translates to:
+  /// **'Crossover Filter Slope'**
+  String get multichannelFilterSlope;
+
+  /// 12 dB per octave Linkwitz-Riley 2nd-order filter slope option
+  ///
+  /// In en, this message translates to:
+  /// **'12 dB/oct (LR2)'**
+  String get multichannelSlopeLr2;
+
+  /// 24 dB per octave Linkwitz-Riley 4th-order filter slope option
+  ///
+  /// In en, this message translates to:
+  /// **'24 dB/oct (LR4)'**
+  String get multichannelSlopeLr4;
+
+  /// Slider label for dedicated LFE channel gain trim
+  ///
+  /// In en, this message translates to:
+  /// **'LFE Channel Gain Trim'**
+  String get multichannelLfeGainTrim;
+
+  /// Toggle title for redirecting low frequencies from satellites into LFE
+  ///
+  /// In en, this message translates to:
+  /// **'Redirect Satellite Bass'**
+  String get multichannelRedirectSatelliteBass;
+
+  /// Description of satellite bass redirection into LFE
+  ///
+  /// In en, this message translates to:
+  /// **'Sums satellite frequencies below crossover into LFE with 1/√(N-1) power normalization.'**
+  String get multichannelRedirectSatelliteBassDesc;
+
+  /// Card title for HRTF 3D binaural spatialization
+  ///
+  /// In en, this message translates to:
+  /// **'HRTF 3D Binaural Spatializer'**
+  String get hrtfTitle;
+
+  /// Subtitle for HRTF 3D binaural spatializer card
+  ///
+  /// In en, this message translates to:
+  /// **'Partitioned SOFA/HRIR convolution for 3D realism'**
+  String get hrtfSubtitle;
+
+  /// Notice when HRTF is blocked by Bit-Perfect mode
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked by Bit-Perfect ({reason})'**
+  String hrtfBlockedByBitPerfect(String reason);
+
+  /// Warning explaining mutual exclusivity between HRTF and Headphone Crossfeed
+  ///
+  /// In en, this message translates to:
+  /// **'Mutually exclusive: Engaging HRTF disables Headphone Crossfeed.'**
+  String get hrtfCrossfeedConflict;
+
+  /// Slider label for HRTF virtual speaker azimuth angle
+  ///
+  /// In en, this message translates to:
+  /// **'Virtual Speaker Azimuth'**
+  String get hrtfVirtualSpeakerAzimuth;
+
+  /// Left directional label for HRTF azimuth
+  ///
+  /// In en, this message translates to:
+  /// **'Left'**
+  String get hrtfDirectionLeft;
+
+  /// Right directional label for HRTF azimuth
+  ///
+  /// In en, this message translates to:
+  /// **'Right'**
+  String get hrtfDirectionRight;
+
+  /// Center directional label for HRTF azimuth
+  ///
+  /// In en, this message translates to:
+  /// **'Center'**
+  String get hrtfDirectionCenter;
+
+  /// Formatted angle with directional label for HRTF azimuth or elevation
+  ///
+  /// In en, this message translates to:
+  /// **'{degrees}° ({direction})'**
+  String hrtfAngleDirection(String degrees, String direction);
+
+  /// Slider label for HRTF virtual speaker elevation angle
+  ///
+  /// In en, this message translates to:
+  /// **'Virtual Speaker Elevation'**
+  String get hrtfVirtualSpeakerElevation;
+
+  /// Below-ear directional label for HRTF elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Below'**
+  String get hrtfElevationBelow;
+
+  /// Above-ear directional label for HRTF elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Above'**
+  String get hrtfElevationAbove;
+
+  /// Ear-level directional label for HRTF elevation
+  ///
+  /// In en, this message translates to:
+  /// **'Ear Level'**
+  String get hrtfElevationEarLevel;
+
+  /// Button label showing the currently loaded SOFA or WAV HRIR file name
+  ///
+  /// In en, this message translates to:
+  /// **'SOFA: {fileName}'**
+  String hrtfSofaLoadedLabel(String fileName);
+
+  /// Button label to pick a custom SOFA or WAV HRIR dataset
+  ///
+  /// In en, this message translates to:
+  /// **'Load Custom SOFA / WAV...'**
+  String get hrtfLoadCustomSofa;
+
+  /// Tooltip for resetting HRTF azimuth, elevation, and dataset to defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Reset Azimuth / Elevation / Dataset'**
+  String get hrtfResetTooltip;
+
+  /// Toast shown after successfully loading a custom HRTF dataset
+  ///
+  /// In en, this message translates to:
+  /// **'Loaded HRTF dataset: {name}'**
+  String hrtfDatasetLoadedToast(String name);
+
+  /// Toast shown when loading a custom SOFA or HRIR dataset fails
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load SOFA/HRIR dataset'**
+  String get hrtfDatasetLoadFailedToast;
+
+  /// Card title for output oversampling and PCM-to-DSD remaster controls
+  ///
+  /// In en, this message translates to:
+  /// **'Remaster Suite'**
+  String get remasterSuiteTitle;
+
+  /// Subtitle for Remaster Suite card
+  ///
+  /// In en, this message translates to:
+  /// **'Output oversampling, reconstruction filters & PCM→DSD'**
+  String get remasterSuiteSubtitle;
+
+  /// Label for PCM output oversampling multiplier selector
+  ///
+  /// In en, this message translates to:
+  /// **'PCM Output Oversampling'**
+  String get remasterPcmOversampling;
+
+  /// Oversampling disabled (1x) segment label
+  ///
+  /// In en, this message translates to:
+  /// **'Off (1x)'**
+  String get remasterOff1x;
+
+  /// Oversampling multiplier segment label
+  ///
+  /// In en, this message translates to:
+  /// **'{factor}x'**
+  String remasterMultiplierValue(int factor);
+
+  /// Label for reconstruction filter kernel selector
+  ///
+  /// In en, this message translates to:
+  /// **'Reconstruction Filter Kernel'**
+  String get remasterFilterKernel;
+
+  /// Sharp roll-off reconstruction filter kernel option
+  ///
+  /// In en, this message translates to:
+  /// **'Sharp'**
+  String get remasterKernelSharp;
+
+  /// Slow roll-off reconstruction filter kernel option
+  ///
+  /// In en, this message translates to:
+  /// **'Slow Roll-off'**
+  String get remasterKernelSlowRolloff;
+
+  /// Minimum-phase reconstruction filter kernel option
+  ///
+  /// In en, this message translates to:
+  /// **'MinPhase'**
+  String get remasterKernelMinPhase;
+
+  /// Apodizing reconstruction filter kernel option
+  ///
+  /// In en, this message translates to:
+  /// **'Apodizing'**
+  String get remasterKernelApodizing;
+
+  /// Toggle label for PCM to DSD sigma-delta modulator
+  ///
+  /// In en, this message translates to:
+  /// **'PCM → DSD Modulator'**
+  String get remasterPcmToDsdModulator;
+
+  /// Clarification subtitle for PCM to DSD modulator
+  ///
+  /// In en, this message translates to:
+  /// **'Offline SDM engine (no playback route yet)'**
+  String get remasterOfflineSdmNote;
+
+  /// Label for DSD rate selector
+  ///
+  /// In en, this message translates to:
+  /// **'DSD Rate'**
+  String get remasterDsdRate;
+
+  /// DSD64 rate option label
+  ///
+  /// In en, this message translates to:
+  /// **'DSD64'**
+  String get remasterDsdRate64;
+
+  /// Numeric DSD rate option label (128, 256)
+  ///
+  /// In en, this message translates to:
+  /// **'{rate}'**
+  String remasterDsdRateValue(int rate);
+
+  /// Label for sigma-delta modulator order selector
+  ///
+  /// In en, this message translates to:
+  /// **'SDM Order (1-5)'**
+  String get remasterSdmOrder;
+
+  /// Numeric sigma-delta modulator order option label
+  ///
+  /// In en, this message translates to:
+  /// **'{order}'**
+  String remasterSdmOrderValue(int order);
+
+  /// Status banner when PCM to DSD modulator is enabled
+  ///
+  /// In en, this message translates to:
+  /// **'PCM → DSD requested · offline engine only, not on the playback route'**
+  String get remasterStatusPcmToDsd;
+
+  /// Status banner when PCM oversampling is active
+  ///
+  /// In en, this message translates to:
+  /// **'Oversampling {multiplier}x requested · Not Bit-Perfect (reconstruction DSP in path)'**
+  String remasterStatusOversampling(int multiplier);
+
+  /// Status banner when Remaster Suite is in Bit-Perfect passthrough mode
+  ///
+  /// In en, this message translates to:
+  /// **'Bit-Perfect compatible (passthrough)'**
+  String get remasterStatusPassthrough;
+
+  /// Header for DSP power consumption telemetry section
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Power Consumption'**
+  String get telemetryDspPowerConsumption;
+
+  /// Badge text when low-power integer PCM bypass is active
+  ///
+  /// In en, this message translates to:
+  /// **'⚡ 0.0 mAh/h (Integer Low-Power)'**
+  String get telemetryLowPowerBypassBadge;
+
+  /// Estimated DSP battery drain in mAh per hour
+  ///
+  /// In en, this message translates to:
+  /// **'~{mah} mAh/h'**
+  String telemetryPowerDrainEstimate(String mah);
+
+  /// Explanation shown when true low-power integer PCM bypass is active
+  ///
+  /// In en, this message translates to:
+  /// **'True low-power integer route active: float DSP processor is completely bypassed for bit-perfect integer PCM.'**
+  String get telemetryLowPowerBypassDesc;
+
+  /// Heading above per-stage DSP power drain chips
+  ///
+  /// In en, this message translates to:
+  /// **'Active DSP stage drain breakdown:'**
+  String get telemetryStageDrainBreakdown;
+
+  /// Per-stage DSP battery drain chip text
+  ///
+  /// In en, this message translates to:
+  /// **'{stageName}: +{mah} mAh/h'**
+  String telemetryStageDrainItem(String stageName, String mah);
+
+  /// Message shown when all DSP stages are idle with zero power drain
+  ///
+  /// In en, this message translates to:
+  /// **'All DSP stages idle (~0.0 mAh/h).'**
+  String get telemetryAllStagesIdle;
+
+  /// Multiband compressor low frequency band label
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get telemetryBandLow;
+
+  /// Multiband compressor low-mid frequency band label
+  ///
+  /// In en, this message translates to:
+  /// **'Lo-Mid'**
+  String get telemetryBandLoMid;
+
+  /// Multiband compressor high-mid frequency band label
+  ///
+  /// In en, this message translates to:
+  /// **'Hi-Mid'**
+  String get telemetryBandHiMid;
+
+  /// Multiband compressor high frequency band label
+  ///
+  /// In en, this message translates to:
+  /// **'High'**
+  String get telemetryBandHigh;
+
+  /// Short band index label for dynamic EQ telemetry meter
+  ///
+  /// In en, this message translates to:
+  /// **'B{index}'**
+  String telemetryDynEqBandShort(int index);
+
+  /// Decibel readout value in DSP telemetry
+  ///
+  /// In en, this message translates to:
+  /// **'{value} dB'**
+  String telemetryDbValue(String value);
 }
 
 class _AppLocalizationsDelegate

@@ -122,10 +122,12 @@ mixin LibraryCollectionsTabs on State<LibraryScreen> {
                                           ),
                                           child: Text(
                                             '${album.songCount}',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: AppFontSize.caption,
                                               fontWeight: FontWeight.w800,
-                                              color: Colors.white,
+                                              color: context
+                                                  .playerSurfacePalette
+                                                  .highContrastInk,
                                             ),
                                           ),
                                         ),

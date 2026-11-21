@@ -405,6 +405,7 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         final boolean eligibleEncoding = encoding == C.ENCODING_PCM_16BIT
                 || (encoding == C.ENCODING_PCM_24BIT && !pcm16Boundary);
         if (!eligibleEncoding) return false;
+        if (processor != null && processor.isUsbExclusiveActive()) return false;
         if (lowPowerIntegerBypass) return true;
         return allowBitPerfectIntegerBypass
                 && processor != null
@@ -422,8 +423,21 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         // policy change therefore takes effect at the next configure() (track
         // boundary / gapless hand-off), while isBitPerfectIntegerBypassActive()
         // keeps reporting the live truth for the stream that is configured.
+        // Exception: when Direct USB exclusive streaming starts after configure()
+        // latched integer bypass, we must engage the processor so the native USB
+        // tee receives the PCM buffers instead of starving the USB endpoint.
         if ((!processFloat || processor == null) && frameEditor == null) {
-            return super.handleBuffer(input, presentationTimeUs, accessUnits);
+            if (bypassedForBitPerfect && processor != null && lastInputFormat != null
+                    && processor.isUsbExclusiveActive()) {
+                try {
+                    configure(lastInputFormat, lastBufferSize, null);
+                } catch (ConfigurationException e) {
+                    throw new InitializationException("Direct USB tee configuration failed", 0,
+                            lastInputFormat, false, e);
+                }
+            } else {
+                return super.handleBuffer(input, presentationTimeUs, accessUnits);
+            }
         }
         if (pendingOutput == null) {
             final boolean edited = frameEditor != null && frameEditor.edits();
@@ -463,7 +477,16 @@ final class FloatDspAudioSink extends ForwardingAudioSink {
         // An SRC may buffer input without emitting frames yet. Empty output is
         // not an AudioSink write, but the consumed source bytes still advance.
         if (pendingOutput.hasRemaining() && !super.handleBuffer(pendingOutput,
-                pendingPresentationTimeUs, pendingAccessUnits)) return false;
+                pendingPresentationTimeUs, pendingAccessUnits)) {
+            // When Direct USB is active, pendingOutput is zeroed silence fed to
+            // DefaultAudioSink's AudioTrack for media-clock pacing. If the
+            // silent AudioTrack is temporarily full while the Direct USB ring or
+            // pull reservoir still needs frames to reach/maintain its prefill
+            // cushion, do not stall the USB producer behind the silent track.
+            if (!(processFloat && processor != null && processor.needsUsbPrefillCushion())) {
+                return false;
+            }
+        }
         input.position(pendingInputEnd);
         pendingOutput = null;
         pendingInput = null;

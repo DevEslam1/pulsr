@@ -2,9 +2,11 @@ part of '../vinyl_player_theme.dart';
 
 class _VinylGroovesPainter extends CustomPainter {
   final Color activeColor;
+  final PlayerSurfacePalette surface;
 
   _VinylGroovesPainter({
     required this.activeColor,
+    required this.surface,
   });
 
   @override
@@ -15,9 +17,9 @@ class _VinylGroovesPainter extends CustomPainter {
     // 1. Vinyl base sheen (radial gradient from center to rim)
     final basePaint = Paint()
       ..shader = RadialGradient(
-        colors: const [
+        colors: [
           PlayerMaterialColors.recordSheenCenter,
-          PlayerMaterialColors.recordSheenMid,
+          surface.vinylGroove,
           PlayerMaterialColors.recordSheenDeep,
           PlayerMaterialColors.recordSheenRim,
         ],
@@ -39,12 +41,12 @@ class _VinylGroovesPainter extends CustomPainter {
       final isBandGap = (r > labelRadius + 38 && r < labelRadius + 42) ||
           (r > labelRadius + 74 && r < labelRadius + 78);
       if (isBandGap) {
-        groovePaint.color = AppColors.scrimAt(0.4);
+        groovePaint.color = surface.shadowAt(0.4);
         groovePaint.strokeWidth = 1.2;
       } else {
         final opacity =
             ((math.sin(r * 0.8) + 1.0) * 0.025 + 0.02).clamp(0.015, 0.055);
-        groovePaint.color = AppColors.specularAt(opacity);
+        groovePaint.color = surface.specularAt(opacity);
         groovePaint.strokeWidth = 0.6;
       }
       canvas.drawCircle(center, r, groovePaint);
@@ -52,7 +54,7 @@ class _VinylGroovesPainter extends CustomPainter {
 
     // 4. Run-out dead wax groove
     final deadWaxPaint = Paint()
-      ..color = AppColors.specularAt(0.035)
+      ..color = surface.specularAt(0.035)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8;
     canvas.drawCircle(center, labelRadius + 5, deadWaxPaint);
@@ -75,7 +77,7 @@ class _VinylGroovesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _VinylGroovesPainter oldDelegate) =>
-      oldDelegate.activeColor != activeColor;
+      oldDelegate.activeColor != activeColor || oldDelegate.surface != surface;
 }
 
 /// Specular reflection anchored to the virtual light source. It is painted
@@ -132,10 +134,12 @@ class _VinylSheenPainter extends CustomPainter {
 class _PlatterStrobePainter extends CustomPainter {
   final Color activeColor;
   final bool isPlaying;
+  final PlayerSurfacePalette surface;
 
   _PlatterStrobePainter({
     this.activeColor = PlayerMaterialColors.cartridgeAccentRed,
     this.isPlaying = true,
+    required this.surface,
   });
 
   @override
@@ -147,11 +151,11 @@ class _PlatterStrobePainter extends CustomPainter {
     final bevelPaint = Paint()
       ..shader = SweepGradient(
         colors: [
-          Colors.grey.shade600,
-          Colors.grey.shade400,
-          Colors.grey.shade700,
-          Colors.grey.shade500,
-          Colors.grey.shade600,
+          surface.platterMetalDeep,
+          surface.platterMetal,
+          surface.platterMetalShadow,
+          surface.platterMetalHighlight,
+          surface.platterMetalDeep,
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
@@ -180,7 +184,7 @@ class _PlatterStrobePainter extends CustomPainter {
       final x = center.dx + (radius - 2) * math.cos(angle);
       final y = center.dy + (radius - 2) * math.sin(angle);
 
-      Color dotColor = AppColors.specularAt(0.5);
+      Color dotColor = surface.specularAt(0.5);
       double dotRadius = 0.9;
 
       if (isPlaying) {
@@ -213,7 +217,8 @@ class _PlatterStrobePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PlatterStrobePainter oldDelegate) =>
       oldDelegate.activeColor != activeColor ||
-      oldDelegate.isPlaying != isPlaying;
+      oldDelegate.isPlaying != isPlaying ||
+      oldDelegate.surface != surface;
 }
 
 class _TonearmPainter extends CustomPainter {
@@ -222,6 +227,7 @@ class _TonearmPainter extends CustomPainter {
   final Color activeColor;
   final double armLength;
   final double liftProgress;
+  final PlayerSurfacePalette surface;
 
   static const double _gimbalRadius = 22.0;
   static const double _screwCircleRadius = 16.0;
@@ -235,6 +241,7 @@ class _TonearmPainter extends CustomPainter {
     required this.activeColor,
     required this.armLength,
     this.liftProgress = 1.0,
+    required this.surface,
   });
 
   @override
@@ -289,7 +296,7 @@ class _TonearmPainter extends CustomPainter {
       ..strokeWidth = 1.5;
     canvas.drawCircle(pivot, _gimbalRadius, baseRimPaint);
 
-    final screwPaint = Paint()..color = Colors.grey.shade400;
+    final screwPaint = Paint()..color = surface.platterMetal;
     for (int i = 0; i < 4; i++) {
       final a = (i * math.pi) / 2 + 0.4;
       final sx = pivot.dx + _screwCircleRadius * math.cos(a);
@@ -338,7 +345,7 @@ class _TonearmPainter extends CustomPainter {
     canvas.drawRect(calibRect, calibPaint);
 
     final tickPaint = Paint()
-      ..color = Colors.white70
+      ..color = surface.mutedInk
       ..strokeWidth = 0.8;
     for (double tx = -7; tx <= 7; tx += 3.5) {
       canvas.drawLine(Offset(tx, -18), Offset(tx, -14), tickPaint);
@@ -378,10 +385,10 @@ class _TonearmPainter extends CustomPainter {
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
         colors: [
-          Colors.grey.shade400,
-          Colors.white,
-          Colors.grey.shade600,
-          Colors.grey.shade800,
+          surface.platterMetal,
+          surface.highContrastInk,
+          surface.platterMetalDeep,
+          surface.platterMetalShadow,
         ],
         stops: const [0.0, 0.3, 0.7, 1.0],
       ).createShader(Rect.fromLTWH(-10, 0, 20, l))
@@ -427,7 +434,7 @@ class _TonearmPainter extends CustomPainter {
     canvas.drawRRect(stylusHousingRect, stylusHousingPaint);
 
     final needlePaint = Paint()
-      ..color = Colors.white
+      ..color = surface.highContrastInk
       ..strokeWidth = 1.5;
     canvas.drawLine(
       Offset(headshellEnd.dx, headshellEnd.dy + 9),
@@ -446,7 +453,7 @@ class _TonearmPainter extends CustomPainter {
       headshellEnd.dy - 10,
     );
     final fingerLiftPaint = Paint()
-      ..color = Colors.grey.shade400
+      ..color = surface.platterMetal
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4
       ..strokeCap = StrokeCap.round;
@@ -457,9 +464,9 @@ class _TonearmPainter extends CustomPainter {
     final bearingPaint = Paint()
       ..shader = RadialGradient(
         colors: [
-          Colors.white,
-          Colors.grey.shade400,
-          Colors.grey.shade800,
+          surface.highContrastInk,
+          surface.platterMetal,
+          surface.platterMetalShadow,
         ],
       ).createShader(const Rect.fromLTWH(-7, -7, 14, 14));
     canvas.drawCircle(Offset.zero, _pivotBearingRadius, bearingPaint);
@@ -502,6 +509,7 @@ class _TonearmPainter extends CustomPainter {
         oldDelegate.activeColor != activeColor ||
         oldDelegate.armLength != armLength ||
         oldDelegate.pivot != pivot ||
-        oldDelegate.liftProgress != liftProgress;
+        oldDelegate.liftProgress != liftProgress ||
+        oldDelegate.surface != surface;
   }
 }

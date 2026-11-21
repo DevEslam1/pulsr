@@ -201,9 +201,9 @@ void main() {
     }
 
     final l10n = lookupAppLocalizations(const Locale('en'));
-    expect(find.text(l10n.artworkWall), findsOneWidget);
-    expect(find.text(l10n.duplicateCleaner), findsOneWidget);
-    expect(find.text(l10n.themeStudio), findsOneWidget);
+    expect(find.text(l10n.artworkWall), findsWidgets);
+    expect(find.text(l10n.duplicateCleaner), findsWidgets);
+    expect(find.text(l10n.themeStudio), findsWidgets);
   });
 
   testWidgets('the notification banner Open Settings clears the denied flag',

@@ -253,7 +253,10 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
   /// floor when higher.
   Future<void> _syncDynamicOutputBuffer(AudioOutputInfo? info) async {
     if (info == null || !getIt.isRegistered<PulsrAudioHandler>()) return;
-    if (!info.isBt) return;
+    if (!info.isBt) {
+      _lastDynamicBtBufferMs = null;
+      return;
+    }
     final rec = recommendedBluetoothBufferMs(
       codecName: info.btCodecName,
       bitrateKbps: info.btEstimatedBitrateKbps,
@@ -262,7 +265,11 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
     );
     final effectiveBuffer =
         rec > state.aaudioTargetBufferMs ? rec : state.aaudioTargetBufferMs;
-    if (effectiveBuffer == state.aaudioTargetBufferMs) return;
+    if (effectiveBuffer == state.aaudioTargetBufferMs ||
+        effectiveBuffer == _lastDynamicBtBufferMs) {
+      return;
+    }
+    _lastDynamicBtBufferMs = effectiveBuffer;
     try {
       await getIt<PulsrAudioHandler>().setAaudioOutputEnabled(
         state.aaudioOutputEnabled,
@@ -270,6 +277,7 @@ extension SettingsAudioOutputSync on SettingsAudioActions {
         targetBufferMs: effectiveBuffer,
       );
     } catch (e, st) {
+      _lastDynamicBtBufferMs = null;
       ErrorLogger.log(
           'Failed to apply dynamic BT buffer (${effectiveBuffer}ms)',
           error: e,

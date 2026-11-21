@@ -269,6 +269,33 @@ class PlayerThemeMetrics {
   }
 }
 
+/// Inherited scope indicating that a player theme is being rendered inside a
+/// scaled picker thumbnail ([ThemeRegistry.preview] with `isPreview: true`).
+///
+/// Themes and shared chrome consult [PlayerThemePreviewScope.of] to suppress
+/// transient banners, radio recommendation cards, lyrics/queue overlays, and
+/// live tickers so preview thumbnails fit cleanly without overflow.
+class PlayerThemePreviewScope extends InheritedWidget {
+  final bool isPreview;
+
+  const PlayerThemePreviewScope({
+    super.key,
+    required this.isPreview,
+    required super.child,
+  });
+
+  static bool of(BuildContext context) {
+    return context
+            .dependOnInheritedWidgetOfExactType<PlayerThemePreviewScope>()
+            ?.isPreview ??
+        false;
+  }
+
+  @override
+  bool updateShouldNotify(PlayerThemePreviewScope oldWidget) =>
+      isPreview != oldWidget.isPreview;
+}
+
 /// Standard player header bar shared by themes.
 class PlayerHeaderBar extends StatelessWidget {
   final PlayerThemeProps props;
@@ -288,6 +315,7 @@ class PlayerHeaderBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final song = props.state.currentSong;
+    final allowMotion = PulsrMotion.shouldAnimate(context);
 
     return Row(
       children: [
@@ -301,13 +329,18 @@ class PlayerHeaderBar extends StatelessWidget {
           onPressed: onBack ?? () => Navigator.of(context).maybePop(),
         ),
         Expanded(
-          child: Center(
-            child: titleWidget ??
-                WaveformLogo(
-                  animate: props.state.isPlaying,
-                  color: props.activeColor,
-                  size: 13,
-                ),
+          child: Semantics(
+            header: true,
+            child: Center(
+              child: titleWidget ??
+                  ExcludeSemantics(
+                    child: WaveformLogo(
+                      animate: props.state.isPlaying && allowMotion,
+                      color: props.activeColor,
+                      size: 13,
+                    ),
+                  ),
+            ),
           ),
         ),
         // Download and favourite live in the track header beside the title;
@@ -362,6 +395,7 @@ class PlayerThemeScaffold extends StatelessWidget {
       viewSwitcher;
   final EdgeInsetsGeometry padding;
   final bool hideTopBarInLandscape;
+  final bool showLegibilityScrims;
 
   PlayerThemeScaffold({
     super.key,
@@ -384,6 +418,7 @@ class PlayerThemeScaffold extends StatelessWidget {
     this.viewSwitcher,
     this.padding = const EdgeInsets.symmetric(horizontal: 20),
     this.hideTopBarInLandscape = false,
+    this.showLegibilityScrims = false,
   }) : body = stage ?? body ?? ((context, metrics) => const SizedBox.shrink());
 
   @override
@@ -393,6 +428,11 @@ class PlayerThemeScaffold extends StatelessWidget {
     final song = state.currentSong;
     final activeColor = props.activeColor;
     final isInSplitView = PlayerSplitViewScope.of(context);
+    final isPreview = PlayerThemePreviewScope.of(context);
+    final surface = context.playerSurfacePalette;
+    final effectiveShowOverlays = showLyricsAndQueueOverlays && !isPreview;
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 2.0);
 
     final content = LayoutBuilder(
       builder: (context, constraints) {
@@ -425,7 +465,7 @@ class PlayerThemeScaffold extends StatelessWidget {
         final resolvedTopBar = topBar ?? PlayerHeaderBar(props: props);
 
         final Widget resolvedChild;
-        if (showLyricsAndQueueOverlays && state.isLyricsVisible) {
+        if (effectiveShowOverlays && state.isLyricsVisible) {
           resolvedChild = LyricsView(
             key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
             lyrics: state.lyrics,
@@ -433,7 +473,7 @@ class PlayerThemeScaffold extends StatelessWidget {
             activeColor: activeColor,
             source: state.lyricsSource,
           );
-        } else if (showLyricsAndQueueOverlays && state.isQueueVisible) {
+        } else if (effectiveShowOverlays && state.isQueueVisible) {
           resolvedChild =
               const NowPlayingQueueView(key: ValueKey('queue_view'));
         } else {
@@ -443,7 +483,7 @@ class PlayerThemeScaffold extends StatelessWidget {
           );
         }
 
-        final Widget resolvedCenter = showLyricsAndQueueOverlays
+        final Widget resolvedCenter = effectiveShowOverlays
             ? AnimatedSwitcher(
                 duration: context.motionMs(320),
                 transitionBuilder: (child, anim) =>
@@ -459,9 +499,9 @@ class PlayerThemeScaffold extends StatelessWidget {
                 activeColor: activeColor,
                 songId: song?.id,
                 filePath: song?.path,
-                loopPointA: state.abPointA,
-                loopPointB: state.abPointB,
-                showUpNext: metrics.showUpNext,
+                loopPointA: isPreview ? null : state.abPointA,
+                loopPointB: isPreview ? null : state.abPointB,
+                showUpNext: !isPreview && metrics.showUpNext,
                 waveformHeight: metrics.waveformHeight,
                 onSeek: (pos) => cubit.seek(pos),
               );
@@ -471,16 +511,17 @@ class PlayerThemeScaffold extends StatelessWidget {
           mode = context.select<SettingsCubit, ExperienceMode>(
               (c) => c.state.experienceMode);
         } catch (_) {}
-        final showAbControls = mode == ExperienceMode.professional ||
-            state.abPointA != null ||
-            state.abPointB != null;
+        final showAbControls = !isPreview &&
+            (mode == ExperienceMode.professional ||
+                state.abPointA != null ||
+                state.abPointB != null);
 
         final Widget resolvedControls = controls != null
             ? controls!(context, metrics)
             : Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (state.bookmarkPosition != null) ...[
+                  if (!isPreview && state.bookmarkPosition != null) ...[
                     _buildBookmarkPrompt(
                         context, cubit, state.bookmarkPosition!),
                     const SizedBox(height: 8),
@@ -492,10 +533,10 @@ class PlayerThemeScaffold extends StatelessWidget {
                     repeatMode: state.repeatMode,
                     hasPrevious: state.hasPreviousNeighbour,
                     hasNext: state.hasNextNeighbour,
-                    abLoopActive: state.abLoopEnabled,
+                    abLoopActive: isPreview ? false : state.abLoopEnabled,
                     showAbControls: showAbControls,
-                    abPointA: state.abPointA,
-                    abPointB: state.abPointB,
+                    abPointA: isPreview ? null : state.abPointA,
+                    abPointB: isPreview ? null : state.abPointB,
                     onSetAbPointA: () => cubit.setAbPointA(),
                     onSetAbPointB: () => cubit.setAbPointB(),
                     onToggleAbLoop: () => cubit.toggleAbLoop(),
@@ -522,7 +563,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                     SizedBox(height: metrics.spacingTrackToSeek),
                   ],
                   resolvedSeekBar,
-                  if (song?.source == SongSource.radio) ...[
+                  if (!isPreview && song?.source == SongSource.radio) ...[
                     const SizedBox(height: AppSpacing.xs),
                     RadioNowPlayingRecommendations(
                       props: props,
@@ -534,13 +575,28 @@ class PlayerThemeScaffold extends StatelessWidget {
                     SizedBox(height: metrics.spacingSeekToControls),
                   ],
                   resolvedControls,
-                  if (isInSplitView && !metrics.isVeryShortHeight)
+                  if (!isPreview &&
+                      isInSplitView &&
+                      !metrics.isVeryShortHeight)
                     PlayerVolumeBar(cubit: cubit, activeColor: activeColor),
                   SizedBox(height: metrics.spacingControlsToDock),
                   resolvedDock,
                   SizedBox(height: metrics.spacingBelowDock),
                 ],
               );
+
+        if (isPreview) {
+          return Padding(
+            padding: padding,
+            child: Column(
+              children: [
+                const SizedBox(height: AppSpacing.sm),
+                Expanded(child: resolvedCenter),
+                resolvedChrome,
+              ],
+            ),
+          );
+        }
 
         if (isInSplitView) {
           return Padding(
@@ -579,6 +635,7 @@ class PlayerThemeScaffold extends StatelessWidget {
                   child: Center(
                     key: const ValueKey('track_controls_pane'),
                     child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -600,8 +657,10 @@ class PlayerThemeScaffold extends StatelessWidget {
           );
         }
 
-        // Portrait Mode: Fallback to scrolling on very short screens
-        if (constraints.maxHeight < 560 &&
+        // Portrait Mode: Fallback to scrolling on very short screens or large
+        // accessibility text scales so chrome never overflows the viewport.
+        final double portraitScrollThreshold = 560.0 + (textScale - 1.0) * 120.0;
+        if (constraints.maxHeight < portraitScrollThreshold &&
             !state.isLyricsVisible &&
             !state.isQueueVisible) {
           final double scrollSize =
@@ -650,14 +709,65 @@ class PlayerThemeScaffold extends StatelessWidget {
       return content;
     }
 
+    final bool effectiveScrims =
+        showLegibilityScrims || (background == null && !isPreview);
+
     return AnimatedContainer(
       duration: context.motionMs(400),
       curve: context.motionCurve(Curves.easeInOut),
       color: props.bgColor,
       child: Stack(
         children: [
-          if (background != null) Positioned.fill(child: background!),
-          if (ambientGlow != null) Positioned.fill(child: ambientGlow!),
+          if (background != null)
+            Positioned.fill(child: ExcludeSemantics(child: background!)),
+          if (ambientGlow != null)
+            Positioned.fill(child: ExcludeSemantics(child: ambientGlow!)),
+          if (effectiveScrims) ...[
+            PositionedDirectional(
+              top: 0,
+              start: 0,
+              end: 0,
+              height: 120,
+              child: ExcludeSemantics(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          surface.scrimStart.withValues(alpha: 0.48),
+                          surface.scrimStart.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            PositionedDirectional(
+              bottom: 0,
+              start: 0,
+              end: 0,
+              height: 200,
+              child: ExcludeSemantics(
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          surface.scrimEnd.withValues(alpha: 0.52),
+                          surface.scrimEnd.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
           SafeArea(child: content),
         ],
       ),
@@ -668,29 +778,40 @@ class PlayerThemeScaffold extends StatelessWidget {
       BuildContext context, PlayerCubit cubit, Duration pos) {
     final l10n = context.l10n;
     final p = context.palette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
-      child: Material(
-        color: p.warning.withValues(alpha: 0.15),
-        borderRadius: AppRadii.circular(12),
-        child: ListTile(
-          dense: true,
-          leading: Icon(Icons.bookmark, color: p.warning),
-          title: Text(l10n.resumeFromPrompt(Formatters.formatDuration(pos))),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextButton(
-                  onPressed: cubit.seekToBookmark, child: Text(l10n.resume)),
-              IconButton(
-                  constraints: const BoxConstraints(
-                      minWidth: AppSpacing.minTouchTarget,
-                      minHeight: AppSpacing.minTouchTarget),
-                  tooltip: l10n.close,
-                  onPressed: cubit.dismissBookmark,
-                  icon: const Icon(Icons.close, size: 18)),
-            ],
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md, vertical: AppSpacing.xxs),
+        child: Material(
+          color: p.warning.withValues(alpha: 0.15),
+          borderRadius: AppRadii.circular(12),
+          child: ListTile(
+            dense: true,
+            leading: Icon(Icons.bookmark, color: p.warning),
+            title: Text(l10n.resumeFromPrompt(Formatters.formatDuration(pos))),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(
+                        AppSpacing.minTouchTarget,
+                        AppSpacing.minTouchTarget,
+                      ),
+                    ),
+                    onPressed: cubit.seekToBookmark,
+                    child: Text(l10n.resume)),
+                IconButton(
+                    constraints: const BoxConstraints(
+                        minWidth: AppSpacing.minTouchTarget,
+                        minHeight: AppSpacing.minTouchTarget),
+                    tooltip: l10n.close,
+                    onPressed: cubit.dismissBookmark,
+                    icon: const Icon(Icons.close, size: 18)),
+              ],
+            ),
           ),
         ),
       ),

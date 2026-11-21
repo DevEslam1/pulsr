@@ -389,7 +389,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
       );
       final window = MediaQuery.sizeOf(context);
       final canvas = Size(
-        math.max(window.width, 320.0),
+        math.max(window.width, 360.0),
         window.height.clamp(760.0, 960.0),
       );
       final scale = math.min(
@@ -401,6 +401,7 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
         props,
         scale: scale,
         canvasSize: canvas,
+        isPreview: true,
       );
     } catch (_) {
       return null;
@@ -621,11 +622,15 @@ class _ThemePickerSheetContentState extends State<_ThemePickerSheetContent> {
                         onTap: () {
                           setState(() => _selectedMode = t.mode);
                           widget.cubit.setPlayerThemeMode(t.mode);
-                          _pageController.animateToPage(
-                            index,
-                            duration: context.motion(PulsrDurations.layout),
-                            curve: Curves.easeOutCubic,
-                          );
+                          if (PulsrMotion.shouldAnimate(context)) {
+                            _pageController.animateToPage(
+                              index,
+                              duration: context.motion(PulsrDurations.layout),
+                              curve: Curves.easeOutCubic,
+                            );
+                          } else {
+                            _pageController.jumpToPage(index);
+                          }
                         },
                       ),
                     ),

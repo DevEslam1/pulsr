@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/constants/app_radii.dart';
 import 'package:pulsr/core/constants/app_spacing.dart';
 import 'package:pulsr/core/constants/app_typography.dart';
@@ -298,14 +299,14 @@ class _RecentsScreenState extends State<RecentsScreen> {
                                   vertical: AppSpacing.sm,
                                 ),
                                 decoration: BoxDecoration(
-                                  color:
-                                      (p.isDark ? Colors.white : Colors.black)
-                                          .withValues(alpha: 0.05),
+                                  color: p.isDark
+                                      ? AppColors.specularAt(0.05)
+                                      : AppColors.scrimAt(0.05),
                                   borderRadius: AppRadii.r18All,
                                   border: Border.all(
-                                    color:
-                                        (p.isDark ? Colors.white : Colors.black)
-                                            .withValues(alpha: 0.08),
+                                    color: p.isDark
+                                        ? AppColors.specularAt(0.08)
+                                        : AppColors.scrimAt(0.08),
                                     width: 1,
                                   ),
                                 ),

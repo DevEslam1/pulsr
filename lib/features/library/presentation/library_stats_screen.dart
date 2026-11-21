@@ -844,7 +844,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
       child: Material(
-        color: Colors.transparent,
+        color: AppColors.fadeStopTransparent,
         child: InkWell(
           borderRadius: AppRadii.r14All,
           onTap: () {
@@ -870,7 +870,7 @@ class _LibraryStatsScreenState extends State<LibraryStatsScreen>
                     decoration: BoxDecoration(
                       color: rank <= 3
                           ? rankColor.withValues(alpha: 0.15)
-                          : Colors.transparent,
+                          : AppColors.fadeStopTransparent,
                       shape: BoxShape.circle,
                     ),
                     child: Text(

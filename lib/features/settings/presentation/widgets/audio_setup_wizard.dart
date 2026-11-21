@@ -1,6 +1,6 @@
 // lib/features/settings/presentation/widgets/audio_setup_wizard.dart
-import 'package:material_ui/material_ui.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/constants/app_spacing.dart';
@@ -8,17 +8,224 @@ import '../../../../core/constants/app_typography.dart';
 import '../../../../core/motion/pulsr_motion.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
+import '../../../../core/utils/pulsr_haptics.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_pressable.dart';
+import '../../../../core/widgets/pulsr_progress.dart';
 import '../../cubit/settings_cubit.dart';
-
-import '../../../../core/utils/pulsr_haptics.dart';
+import '../../cubit/settings_state.dart';
 
 enum AudioWizardOutputType { usbDac, bluetooth, speaker, headphones }
 
 enum AudioWizardPriority { fidelity, balanced, dataSaver }
 
 enum AudioWizardTransition { gapless, crossfade, none }
+
+/// Guardrail card in Audio Settings that resets the audio engine & DSP pipeline
+/// to safe recommended defaults via [SettingsCubit].
+class ResetAudioEngineGuardrailCard extends StatefulWidget {
+  final SettingsCubit? cubit;
+
+  const ResetAudioEngineGuardrailCard({super.key, this.cubit});
+
+  static String titleFor(BuildContext context) {
+    final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+    switch (code) {
+      case 'ar':
+        return 'إعادة تعيين محرك الصوت إلى الإعدادات الموصى بها';
+      case 'es':
+        return 'Restablecer motor de audio a valores recomendados';
+      default:
+        return 'Reset Audio Engine to Recommended';
+    }
+  }
+
+  static String subtitleFor(BuildContext context) {
+    final code = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+    switch (code) {
+      case 'ar':
+        return 'استعادة الإعدادات الآمنة الموصى بها (إيقاف Bit-Perfect وتفعيل Float DSP وGapless)';
+      case 'es':
+        return 'Restaura los valores seguros recomendados (Float DSP, Gapless, Bit-Perfect desactivado)';
+      default:
+        return 'Restore safe recommended defaults (Float DSP, Gapless, Bit-Perfect off)';
+    }
+  }
+
+  static Future<void> _safeCall(Future<void>? Function() fn) async {
+    try {
+      final future = fn();
+      if (future != null) {
+        await future;
+      }
+    } catch (_) {}
+  }
+
+  /// Safely resets audio engine and playback pipeline settings to recommended
+  /// defaults using existing [SettingsCubit] methods.
+  static Future<void> resetToRecommended(
+    BuildContext context,
+    SettingsCubit cubit,
+  ) async {
+    await _safeCall(() => cubit.setStrictBitPerfect(false));
+    await _safeCall(() => cubit.setBitPerfectOutput(false));
+    await _safeCall(() => cubit.setAaudioOutputEnabled(false));
+    await _safeCall(() => cubit.setDvcEnabled(false));
+    await _safeCall(() => cubit.setFloatOutputEnabled(true));
+    await _safeCall(() => cubit.setFollowTrackSampleRate(true));
+    await _safeCall(() => cubit.setOutputFormatNegotiationEnabled(true));
+    await _safeCall(() => cubit.setBluetoothHiResEnabled(true));
+    await _safeCall(() => cubit.setReplayGainMode(ReplayGainMode.off));
+    await _safeCall(() => cubit.setCrossfade(0.0));
+    await _safeCall(() => cubit.setGapless(true));
+
+    if (!context.mounted) return;
+    final appliedText =
+        context.l10n.presetAppliedMessage(context.l10n.settingsWizardBalanced);
+    ScaffoldMessenger.maybeOf(context)
+      ?..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(appliedText),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  @override
+  State<ResetAudioEngineGuardrailCard> createState() =>
+      _ResetAudioEngineGuardrailCardState();
+}
+
+class _ResetAudioEngineGuardrailCardState
+    extends State<ResetAudioEngineGuardrailCard> {
+  bool _isResetting = false;
+
+  Future<void> _handleReset() async {
+    if (_isResetting) return;
+    setState(() => _isResetting = true);
+    try {
+      final activeCubit = widget.cubit ?? context.read<SettingsCubit>();
+      await ResetAudioEngineGuardrailCard.resetToRecommended(
+        context,
+        activeCubit,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isResetting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final title = ResetAudioEngineGuardrailCard.titleFor(context);
+    final subtitle = ResetAudioEngineGuardrailCard.subtitleFor(context);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: AppSpacing.md),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Semantics(
+        button: true,
+        enabled: !_isResetting,
+        label: title,
+        child: PulsrPressable(
+          pressedScale: 0.985,
+          onTap: _isResetting
+              ? null
+              : () {
+                  PulsrHaptics.selectionClick();
+                  _handleReset();
+                },
+          child: ConstrainedBox(
+            key: const ValueKey('reset_audio_engine_recommended_btn'),
+            constraints: const BoxConstraints(
+              minHeight: AppSpacing.minTouchTarget,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.14),
+                      borderRadius: AppRadii.r12All,
+                    ),
+                    child: _isResetting
+                        ? Center(
+                            child: PulsrProgressBar.circular(
+                              size: 18,
+                              strokeWidth: 2,
+                              color: p.accent,
+                            ),
+                          )
+                        : Icon(
+                            Icons.restore_rounded,
+                            color: p.accent,
+                            size: 20,
+                          ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodySmall,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: AppFontSize.caption,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xs,
+                      vertical: AppSpacing.xxs,
+                    ),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.14),
+                      borderRadius: AppRadii.r8All,
+                    ),
+                    child: Text(
+                      context.l10n.reset,
+                      style: TextStyle(
+                        color: p.accent,
+                        fontSize: AppFontSize.caption,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class AudioSetupWizardSheet extends StatefulWidget {
   final SettingsCubit cubit;
@@ -95,7 +302,6 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
 
       // 2. Hardware-specific guard rails
       if (!isUsbDac) {
-        // A previous USB session may have armed exclusive output.
         await cubit.setBitPerfectOutput(false);
       } else if (_selectedPriority == AudioWizardPriority.fidelity) {
         await cubit.setFollowTrackSampleRate(true);
@@ -137,6 +343,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final l10n = context.l10n;
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
 
     return SafeArea(
       top: false,
@@ -169,27 +376,37 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        l10n.settingsWizardTitle,
-                        style: TextStyle(
-                          color: p.textPrimary,
-                          fontSize: AppFontSize.bodyLarge,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: AppTracking.heading,
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          l10n.settingsWizardTitle,
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: AppFontSize.bodyLarge,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: AppTracking.heading,
+                          ),
                         ),
                       ),
-                      Text(
-                        l10n.wizardStepLabel(_currentStep + 1, 3),
-                        style: TextStyle(
-                          color: p.accent,
-                          fontSize: AppFontSize.caption,
-                          fontWeight: FontWeight.w700,
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          l10n.wizardStepLabel(_currentStep + 1, 3),
+                          style: TextStyle(
+                            color: p.accent,
+                            fontSize: AppFontSize.caption,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: AppSpacing.minTouchTarget,
+                    minHeight: AppSpacing.minTouchTarget,
+                  ),
                   icon: const Icon(Icons.close_rounded),
                   color: p.textTertiary,
                   tooltip: context.l10n.close,
@@ -205,7 +422,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                   if (i > 0) const SizedBox(width: AppSpacing.xs),
                   Expanded(
                     child: AnimatedContainer(
-                      duration: context.motionMs(200),
+                      duration:
+                          shouldAnimate ? context.motionMs(200) : Duration.zero,
                       height: 4,
                       decoration: BoxDecoration(
                         color: i <= _currentStep
@@ -219,14 +437,19 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            // Animated Step Body
-            AnimatedSwitcher(
-              duration: context.motionMs(200),
-              child: switch (_currentStep) {
-                0 => _buildStep1(context),
-                1 => _buildStep2(context),
-                _ => _buildStep3(context),
-              },
+            // Animated Step Body (scrollable to handle 1.3x / 1.6x text scale)
+            Flexible(
+              child: SingleChildScrollView(
+                child: AnimatedSwitcher(
+                  duration:
+                      shouldAnimate ? context.motionMs(200) : Duration.zero,
+                  child: switch (_currentStep) {
+                    0 => _buildStep1(context),
+                    1 => _buildStep2(context),
+                    _ => _buildStep3(context),
+                  },
+                ),
+              ),
             ),
             const SizedBox(height: AppSpacing.lg),
             // Bottom Action Buttons
@@ -236,6 +459,9 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                   Expanded(
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(
+                          AppSpacing.minTouchTarget,
+                        ),
                         padding:
                             const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                         side: BorderSide(color: p.hairline),
@@ -248,6 +474,8 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                       },
                       child: Text(
                         context.l10n.cancel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: p.textSecondary,
                           fontWeight: FontWeight.w600,
@@ -263,6 +491,9 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                     style: FilledButton.styleFrom(
                       backgroundColor: p.accent,
                       foregroundColor: p.onAccent,
+                      minimumSize: const Size.fromHeight(
+                        AppSpacing.minTouchTarget,
+                      ),
                       padding:
                           const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                       shape:
@@ -279,18 +510,17 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
                             }
                           },
                     child: _isApplying
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: p.onAccent,
-                            ),
+                        ? PulsrProgressBar.circular(
+                            size: 20,
+                            strokeWidth: 2,
+                            color: p.onAccent,
                           )
                         : Text(
                             _currentStep < 2
                                 ? 'Next'
                                 : l10n.settingsWizardApply,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontWeight: FontWeight.w800,
                               fontSize: AppFontSize.bodySmall,
@@ -500,6 +730,7 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
     required VoidCallback onTap,
   }) {
     final p = context.palette;
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
     return Semantics(
       button: true,
       selected: isSelected,
@@ -511,7 +742,10 @@ class _AudioSetupWizardSheetState extends State<AudioSetupWizardSheet> {
           onTap();
         },
         child: AnimatedContainer(
-          duration: context.motionMs(200),
+          duration: shouldAnimate ? context.motionMs(200) : Duration.zero,
+          constraints: const BoxConstraints(
+            minHeight: AppSpacing.minTouchTarget,
+          ),
           padding: const EdgeInsets.all(AppSpacing.sm),
           decoration: BoxDecoration(
             color: isSelected

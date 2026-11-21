@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
@@ -15,12 +16,15 @@ import '../../../../core/theme/pulsr_button_style.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/marquee_text.dart';
+import '../../../../core/widgets/shimmer_skeleton.dart';
 import '../../../../domain/models/radio_station.dart';
 import '../../../../core/widgets/pulsr_bottom_sheet.dart';
 import '../../../../core/widgets/pulsr_toast.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 import '../../../../core/utils/pulsr_haptics.dart';
+
+part 'quran_radio_hero_painters.dart';
 
 /// Data descriptor for a Quran radio station presented in the hero card carousel.
 class QuranHeroItem {
@@ -65,12 +69,16 @@ class QuranRadioHeroCarousel extends StatefulWidget {
   final PlayerCubit? playerCubit;
   final double height;
   final VoidCallback? onMoreStations;
+  final bool autoScroll;
+  final Duration autoScrollInterval;
 
   const QuranRadioHeroCarousel({
     super.key,
     this.playerCubit,
     this.height = 152.0,
     this.onMoreStations,
+    this.autoScroll = true,
+    this.autoScrollInterval = const Duration(seconds: 12),
   });
 
   /// The curated list of Quran stations ordered specifically with Minshawi first.
@@ -396,6 +404,10 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
   Map<String, int> _lastPlayedByUrl = const {};
   List<QuranHeroItem> _stations = const [];
   bool _isArabic = false;
+  Timer? _autoScrollTimer;
+
+  @visibleForTesting
+  bool get isAutoScrollTimerActive => _autoScrollTimer?.isActive ?? false;
 
   @override
   void initState() {
@@ -446,10 +458,53 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
       _isArabic = isArabic;
       _rebuildOrderedStations();
     }
+    _syncAutoScrollTimer(PulsrMotion.shouldAnimate(context));
+  }
+
+  @override
+  void didUpdateWidget(covariant QuranRadioHeroCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.autoScroll != widget.autoScroll ||
+        oldWidget.autoScrollInterval != widget.autoScrollInterval) {
+      _autoScrollTimer?.cancel();
+      _autoScrollTimer = null;
+      _syncAutoScrollTimer(PulsrMotion.shouldAnimate(context));
+    }
+  }
+
+  void _syncAutoScrollTimer(bool shouldAnimate) {
+    if (!widget.autoScroll || !shouldAnimate || _stations.length <= 1) {
+      _autoScrollTimer?.cancel();
+      _autoScrollTimer = null;
+      return;
+    }
+    if (_autoScrollTimer == null || !_autoScrollTimer!.isActive) {
+      _autoScrollTimer = Timer.periodic(
+        widget.autoScrollInterval,
+        (_) => _onAutoScrollTick(),
+      );
+    }
+  }
+
+  void _onAutoScrollTick() {
+    if (!mounted ||
+        !PulsrMotion.shouldAnimate(context) ||
+        !_pageController.hasClients ||
+        _stations.length <= 1) {
+      return;
+    }
+    try {
+      final player = _resolvePlayerCubit(context);
+      if (player.state.isPlaying) return;
+    } catch (_) {}
+    final nextPage = (_currentPage + 1) % _stations.length;
+    _goToPage(nextPage);
   }
 
   @override
   void dispose() {
+    _autoScrollTimer?.cancel();
+    _autoScrollTimer = null;
     RadioStationStore.heroPinnedUrls.removeListener(_onOrderPrefsChanged);
     RadioStationStore.heroSortMode.removeListener(_onOrderPrefsChanged);
     _pageController.dispose();
@@ -476,20 +531,23 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
     }
   }
 
-  void _jumpToFirstPage() {
+  void _goToPage(int page) {
     if (!_pageController.hasClients) return;
-    setState(() => _currentPage = 0);
+    setState(() => _currentPage = page);
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
     final dur = context.motion(PulsrMotion.page);
-    if (dur == Duration.zero) {
-      _pageController.jumpToPage(0);
+    if (!shouldAnimate || dur == Duration.zero) {
+      _pageController.jumpToPage(page);
     } else {
       _pageController.animateToPage(
-        0,
+        page,
         duration: dur,
         curve: context.motionCurve(PulsrMotion.enter),
       );
     }
   }
+
+  void _jumpToFirstPage() => _goToPage(0);
 
   PlayerCubit _resolvePlayerCubit(BuildContext context) {
     return widget.playerCubit ?? context.read<PlayerCubit>();
@@ -514,6 +572,14 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
     final p = context.palette;
     final gilt = _giltOf(context);
     final total = _stations.length;
+    final shouldAnimate = PulsrMotion.shouldAnimate(context);
+    _syncAutoScrollTimer(shouldAnimate);
+    final textScale =
+        MediaQuery.textScalerOf(context).scale(1.0).clamp(1.0, 1.8);
+    final effectiveHeight = math.max(
+      widget.height,
+      widget.height + (textScale - 1.0) * 68.0,
+    );
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -521,7 +587,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
       children: [
         // ── Swipeable mihrab cards ──────────────────────────────────────────
         SizedBox(
-          height: widget.height,
+          height: effectiveHeight,
           child: PageView.builder(
             key: const PageStorageKey('quran_radio_hero_carousel_pv'),
             controller: _pageController,
@@ -536,6 +602,28 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
             },
             itemBuilder: (context, index) {
               final item = _stations[index];
+              final cardChild = Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                child: _QuranHeroCard(
+                  item: item,
+                  pageController: _pageController,
+                  pageIndex: index,
+                  isPinned: RadioStationStore.heroPinnedUrls.value
+                      .contains(item.station.url),
+                  onTap: () {
+                    final player = _resolvePlayerCubit(context);
+                    final isCurrent =
+                        player.state.currentSong?.path == item.station.url;
+                    _onPlayStation(item, isCurrent);
+                  },
+                  onPlayPressed: (isCurrent) => _onPlayStation(item, isCurrent),
+                  onLongPress: () {
+                    PulsrHaptics.heavyImpact();
+                    _showCardOptionsSheet(context, item);
+                  },
+                ),
+              );
+              if (!shouldAnimate) return cardChild;
               return AnimatedBuilder(
                 animation: _pageController,
                 builder: (context, child) {
@@ -561,28 +649,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                     ),
                   );
                 },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: _QuranHeroCard(
-                    item: item,
-                    pageController: _pageController,
-                    pageIndex: index,
-                    isPinned: RadioStationStore.heroPinnedUrls.value
-                        .contains(item.station.url),
-                    onTap: () {
-                      final player = _resolvePlayerCubit(context);
-                      final isCurrent =
-                          player.state.currentSong?.path == item.station.url;
-                      _onPlayStation(item, isCurrent);
-                    },
-                    onPlayPressed: (isCurrent) =>
-                        _onPlayStation(item, isCurrent),
-                    onLongPress: () {
-                      PulsrHaptics.heavyImpact();
-                      _showCardOptionsSheet(context, item);
-                    },
-                  ),
-                ),
+                child: cardChild,
               );
             },
           ),
@@ -598,16 +665,7 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                 currentPage: _currentPage,
                 onDotTap: (i) {
                   PulsrHaptics.selectionClick();
-                  final dur = context.motion(PulsrMotion.page);
-                  if (dur == Duration.zero) {
-                    _pageController.jumpToPage(i);
-                  } else {
-                    _pageController.animateToPage(
-                      i,
-                      duration: dur,
-                      curve: context.motionCurve(PulsrMotion.enter),
-                    );
-                  }
+                  _goToPage(i);
                 },
               ),
               const SizedBox(width: AppSpacing.xs),
@@ -636,74 +694,83 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
                   ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: AppSpacing.xs),
               // Quick "All Stations" tonal action chip
-              Semantics(
-                button: true,
-                label: context.l10n.viewAllRadioStations,
-                child: Material(
-                  color: Colors.transparent,
-                  child: Builder(
-                    builder: (context) {
-                      final isCapsule = context.isCapsuleButtons;
-                      final radius = context.buttonRadius(rectRadius: 10.0);
-                      return InkWell(
-                        borderRadius: radius,
-                        onTap: widget.onMoreStations ??
-                            () {
-                              PulsrHaptics.selectionClick();
-                              context.push('/radio');
-                            },
-                        child: Container(
-                          padding: const EdgeInsetsDirectional.fromSTEB(
-                            9.0,
-                            4.5,
-                            6.0,
-                            4.5,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                p.accent.withValues(alpha: 0.16),
-                                gilt.withValues(alpha: 0.10),
-                              ],
-                            ),
-                            borderRadius:
-                                isCapsule ? radius : AppRadii.circular(999),
-                            border: Border.all(
-                              color: p.accent.withValues(alpha: 0.28),
-                              width: 0.8,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.radio_rounded,
-                                size: 12.5,
-                                color: p.accent,
+              Expanded(
+                child: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Semantics(
+                    button: true,
+                    label: context.l10n.viewAllRadioStations,
+                    child: Material(
+                      color: AppColors.fadeStopTransparent,
+                      child: Builder(
+                        builder: (context) {
+                          final isCapsule = context.isCapsuleButtons;
+                          final radius = context.buttonRadius(rectRadius: 10.0);
+                          return InkWell(
+                            borderRadius: radius,
+                            onTap: widget.onMoreStations ??
+                                () {
+                                  PulsrHaptics.selectionClick();
+                                  context.push('/radio');
+                                },
+                            child: Container(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
+                                9.0,
+                                4.5,
+                                6.0,
+                                4.5,
                               ),
-                              const SizedBox(width: 4.5),
-                              Text(
-                                context.l10n.radioTitle,
-                                style: TextStyle(
-                                  color: p.accent,
-                                  fontSize: AppFontSize.caption,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.2,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    p.accent.withValues(alpha: 0.16),
+                                    gilt.withValues(alpha: 0.10),
+                                  ],
+                                ),
+                                borderRadius:
+                                    isCapsule ? radius : AppRadii.circular(999),
+                                border: Border.all(
+                                  color: p.accent.withValues(alpha: 0.28),
+                                  width: 0.8,
                                 ),
                               ),
-                              const SizedBox(width: 1),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                size: 14,
-                                color: p.accent.withValues(alpha: 0.85),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.radio_rounded,
+                                    size: 12.5,
+                                    color: p.accent,
+                                  ),
+                                  const SizedBox(width: 4.5),
+                                  Flexible(
+                                    child: Text(
+                                      context.l10n.radioTitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.accent,
+                                        fontSize: AppFontSize.caption,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 1),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 14,
+                                    color: p.accent.withValues(alpha: 0.85),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1050,366 +1117,6 @@ class _QuranRadioHeroCarouselState extends State<QuranRadioHeroCarousel> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Illumination palette: manuscript gilt derived from the active theme accent,
-// so ornamentation stays coherent across all ten Pulsr themes.
-// ─────────────────────────────────────────────────────────────────────────────
-
-Color _giltOf(BuildContext context) {
-  final p = context.palette;
-  return Color.lerp(
-    p.accent,
-    AppColors.giltGold,
-    p.isDark ? 0.58 : 0.50,
-  )!;
-}
-
-Color _onGilt(Color gilt) {
-  return ThemeData.estimateBrightnessForColor(gilt) == Brightness.dark
-      ? AppColors.onGiltLight
-      : AppColors.onGiltDark;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Geometry: eight-pointed khatam star + pointed mihrab arch path.
-// ─────────────────────────────────────────────────────────────────────────────
-
-Path _eightPointStarPath(Offset center, double radius) {
-  const points = 8;
-  final inner = radius * 0.46;
-  final path = Path();
-  for (var i = 0; i < points * 2; i++) {
-    final r = i.isEven ? radius : inner;
-    final a = -math.pi / 2 + i * math.pi / points;
-    final pt = Offset(
-      center.dx + r * math.cos(a),
-      center.dy + r * math.sin(a),
-    );
-    if (i == 0) {
-      path.moveTo(pt.dx, pt.dy);
-    } else {
-      path.lineTo(pt.dx, pt.dy);
-    }
-  }
-  path.close();
-  return path;
-}
-
-Path _mihrabPath(double w, double h) {
-  final shoulder = h * 0.34;
-  const r = 12.0;
-  final path = Path()
-    ..moveTo(0, h - r)
-    ..lineTo(0, shoulder)
-    ..cubicTo(0, h * 0.12, w * 0.22, h * 0.045, w / 2, 0)
-    ..cubicTo(w * 0.78, h * 0.045, w, h * 0.12, w, shoulder)
-    ..lineTo(w, h - r)
-    ..quadraticBezierTo(w, h, w - r, h)
-    ..lineTo(r, h)
-    ..quadraticBezierTo(0, h, 0, h - r)
-    ..close();
-  return path;
-}
-
-class _MihrabClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) => _mihrabPath(size.width, size.height);
-
-  @override
-  bool shouldReclip(covariant _MihrabClipper oldClipper) => false;
-}
-
-/// Gilt rim stroked over the arch aperture, with a soft broadcast glow and a
-/// finial bead at the apex. [glow] animates 0→1 while the station is on air.
-class _MihrabRimPainter extends CustomPainter {
-  final Color color;
-  final double glow;
-
-  const _MihrabRimPainter({required this.color, required this.glow});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = _mihrabPath(size.width, size.height);
-    if (glow > 0.01) {
-      canvas.drawPath(
-        path,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 6
-          ..color = color.withValues(alpha: 0.30 * glow)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-      );
-    }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.3
-        ..color = color.withValues(alpha: 0.55 + 0.35 * glow),
-    );
-    canvas.drawCircle(
-      Offset(size.width / 2, 2.2),
-      2.0,
-      Paint()..color = color.withValues(alpha: 0.9),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _MihrabRimPainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.glow != glow;
-}
-
-/// Faint eight-fold star lattice etched across the card surface — painted once
-/// inside a [RepaintBoundary], never per scroll frame.
-class _KhatamLatticePainter extends CustomPainter {
-  static const double cell = 46.0;
-  final Color color;
-
-  const _KhatamLatticePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final star = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8
-      ..color = color;
-    final dot = Paint()..color = color;
-    for (double y = cell / 2; y < size.height + cell; y += cell) {
-      for (double x = cell / 2; x < size.width + cell; x += cell) {
-        canvas.drawPath(_eightPointStarPath(Offset(x, y), cell * 0.30), star);
-      }
-    }
-    for (double y = 0; y <= size.height + cell; y += cell) {
-      for (double x = 0; x <= size.width + cell; x += cell) {
-        canvas.drawCircle(Offset(x, y), 0.9, dot);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _KhatamLatticePainter oldDelegate) =>
-      oldDelegate.color != color;
-}
-
-/// Small filled eight-point star used as a station seal / ornamental glyph.
-class _StarGlyph extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _StarGlyph({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(painter: _StarFillPainter(color)),
-    );
-  }
-}
-
-class _StarFillPainter extends CustomPainter {
-  final Color color;
-
-  const _StarFillPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawPath(
-      _eightPointStarPath(
-        Offset(size.width / 2, size.height / 2),
-        math.min(size.width, size.height) / 2,
-      ),
-      Paint()..color = color,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _StarFillPainter oldDelegate) =>
-      oldDelegate.color != color;
-}
-
-/// Hairline rule interrupted by a gilt diamond and flanking beads.
-class _OrnamentDivider extends StatelessWidget {
-  const _OrnamentDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return SizedBox(
-      height: 12,
-      width: double.infinity,
-      child: CustomPaint(
-        painter: _OrnamentDividerPainter(
-          line: p.hairline,
-          ornament: _giltOf(context),
-        ),
-      ),
-    );
-  }
-}
-
-class _OrnamentDividerPainter extends CustomPainter {
-  final Color line;
-  final Color ornament;
-
-  const _OrnamentDividerPainter({required this.line, required this.ornament});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final y = size.height / 2;
-    final cx = size.width / 2;
-    final lp = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.8
-      ..color = line;
-    canvas.drawLine(Offset(0, y), Offset(cx - 14, y), lp);
-    canvas.drawLine(Offset(cx + 14, y), Offset(size.width, y), lp);
-    final diamond = Path()
-      ..moveTo(cx, y - 4)
-      ..lineTo(cx + 4, y)
-      ..lineTo(cx, y + 4)
-      ..lineTo(cx - 4, y)
-      ..close();
-    canvas.drawPath(diamond, Paint()..color = ornament);
-    final bead = Paint()..color = ornament.withValues(alpha: 0.7);
-    canvas.drawCircle(Offset(cx - 9, y), 1.1, bead);
-    canvas.drawCircle(Offset(cx + 9, y), 1.1, bead);
-  }
-
-  @override
-  bool shouldRepaint(covariant _OrnamentDividerPainter oldDelegate) =>
-      oldDelegate.line != line || oldDelegate.ornament != ornament;
-}
-
-/// Miniature arch-framed artwork used in the options sheet header.
-class _ArchThumb extends StatelessWidget {
-  final QuranHeroItem item;
-  final double width;
-  final double height;
-
-  const _ArchThumb({
-    required this.item,
-    required this.width,
-    required this.height,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final isNetwork = item.artworkAsset.startsWith('http://') ||
-        item.artworkAsset.startsWith('https://');
-    final isHomeCard = item.artworkAsset.contains('home card') ||
-        item.artworkAsset.contains('home_card');
-    return SizedBox(
-      width: width,
-      height: height,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          ClipPath(
-            clipper: _MihrabClipper(),
-            child: isNetwork
-                ? CachedArtwork(
-                    id: 0,
-                    remoteUrl: item.artworkAsset,
-                    size: width,
-                    fallbackIcon: Icons.radio_rounded,
-                  )
-                : Image.asset(
-                    item.artworkAsset,
-                    fit: BoxFit.cover,
-                    alignment: isHomeCard
-                        ? Alignment.centerRight
-                        : const Alignment(0.0, -0.15),
-                    errorBuilder: (_, __, ___) => Container(
-                      color: p.accentContainer.withValues(alpha: 0.2),
-                      child: Icon(
-                        Icons.radio_rounded,
-                        size: 20,
-                        color: p.accent.withValues(alpha: 0.4),
-                      ),
-                    ),
-                  ),
-          ),
-          IgnorePointer(
-            child: CustomPaint(
-              painter: _MihrabRimPainter(color: _giltOf(context), glow: 0),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Tactile pill selector for radio card sorting options inside the long-press sheet.
-class _SortOptionChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _SortOptionChip({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: AppRadii.r12All,
-        child: InkWell(
-          borderRadius: AppRadii.r12All,
-          onTap: onTap,
-          child: AnimatedContainer(
-            duration: context.motion(PulsrMotion.layout),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            decoration: BoxDecoration(
-              color: selected
-                  ? p.accent.withValues(alpha: 0.16)
-                  : p.surfaceContainerHigh.withValues(alpha: 0.55),
-              borderRadius: AppRadii.r12All,
-              border: Border.all(
-                color: selected
-                    ? p.accent.withValues(alpha: 0.60)
-                    : p.hairline.withValues(alpha: 0.7),
-                width: selected ? 1.2 : 0.8,
-              ),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 18,
-                  color: selected ? p.accent : p.textSecondary,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: selected ? p.accent : p.textPrimary,
-                    fontSize: AppFontSize.caption,
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// The individual mihrab hero card for a single Quran station.
 class _QuranHeroCard extends StatelessWidget {
   final QuranHeroItem item;
@@ -1483,7 +1190,7 @@ class _QuranHeroCard extends StatelessWidget {
           label: '$reciterTitle, $displaySubtitle. '
               '${isPlaying ? context.l10n.radioNowPlayingSemantics : context.l10n.radioTapToPlaySemantics}',
           child: Material(
-            color: Colors.transparent,
+            color: AppColors.fadeStopTransparent,
             borderRadius: AppRadii.r24All,
             child: InkWell(
               borderRadius: AppRadii.r24All,
@@ -1549,7 +1256,7 @@ class _QuranHeroCard extends StatelessWidget {
                                   colors: [
                                     gilt.withValues(
                                         alpha: isPlaying ? 0.24 : 0.12),
-                                    Colors.transparent,
+                                    AppColors.fadeStopTransparent,
                                   ],
                                 ),
                               ),
@@ -1584,7 +1291,9 @@ class _QuranHeroCard extends StatelessWidget {
                                         animation: pageController,
                                         builder: (context, _) {
                                           double v = 0.0;
-                                          if (pageController.hasClients &&
+                                          if (PulsrMotion.shouldAnimate(
+                                                  context) &&
+                                              pageController.hasClients &&
                                               pageController
                                                   .position.haveDimensions) {
                                             v = ((pageController.page ??
@@ -1630,7 +1339,7 @@ class _QuranHeroCard extends StatelessWidget {
                                           begin: Alignment.topCenter,
                                           end: Alignment.bottomCenter,
                                           colors: [
-                                            Colors.transparent,
+                                            AppColors.fadeStopTransparent,
                                             surfaceEnd.withValues(
                                               alpha: p.isDark ? 0.34 : 0.16,
                                             ),
@@ -1679,16 +1388,16 @@ class _QuranHeroCard extends StatelessWidget {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Colors.transparent,
-                                    (p.isDark ? Colors.white : Colors.black)
-                                        .withValues(
-                                            alpha: p.isDark ? 0.14 : 0.05),
+                                    AppColors.fadeStopTransparent,
+                                    p.isDark
+                                        ? AppColors.specularAt(0.14)
+                                        : AppColors.scrimAt(0.05),
                                     gilt.withValues(
                                         alpha: isPlaying ? 0.65 : 0.40),
-                                    (p.isDark ? Colors.white : Colors.black)
-                                        .withValues(
-                                            alpha: p.isDark ? 0.14 : 0.05),
-                                    Colors.transparent,
+                                    p.isDark
+                                        ? AppColors.specularAt(0.14)
+                                        : AppColors.scrimAt(0.05),
+                                    AppColors.fadeStopTransparent,
                                   ],
                                 ),
                               ),
@@ -1872,18 +1581,20 @@ class _QuranHeroCard extends StatelessWidget {
                                   Flexible(
                                     child: ExcludeSemantics(
                                       child: Material(
-                                        color: Colors.transparent,
+                                        color: AppColors.fadeStopTransparent,
                                         child: InkWell(
                                           borderRadius: ctaRadius,
                                           onTap: () => onPlayPressed(isCurrent),
                                           child: Container(
-                                            height: 34,
+                                            constraints: const BoxConstraints(
+                                              minHeight: 34,
+                                            ),
                                             padding:
                                                 EdgeInsetsDirectional.fromSTEB(
                                               isPlaying ? 11 : 10,
-                                              0,
+                                              4,
                                               isPlaying ? 11 : 13,
-                                              0,
+                                              4,
                                             ),
                                             decoration: BoxDecoration(
                                               gradient: LinearGradient(
@@ -1891,8 +1602,7 @@ class _QuranHeroCard extends StatelessWidget {
                                                 end: Alignment.bottomRight,
                                                 colors: [
                                                   Color.alphaBlend(
-                                                    Colors.white
-                                                        .withValues(alpha: 0.20),
+                                                    AppColors.specularAt(0.20),
                                                     gilt,
                                                   ),
                                                   gilt,
@@ -1921,13 +1631,11 @@ class _QuranHeroCard extends StatelessWidget {
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 if (isBuffering)
-                                                  SizedBox(
-                                                    width: 14,
-                                                    height: 14,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      strokeWidth: 2.0,
-                                                      color: onGilt,
+                                                  const SkeletonShimmer(
+                                                    child: SkeletonBox(
+                                                      width: 14,
+                                                      height: 14,
+                                                      radius: 7,
                                                     ),
                                                   )
                                                 else
@@ -1968,38 +1676,49 @@ class _QuranHeroCard extends StatelessWidget {
                                   ),
                                   if (isPlaying) ...[
                                     const SizedBox(width: 8),
-                                    Container(
-                                      height: 34,
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: p.accent.withValues(alpha: 0.14),
-                                        borderRadius: ctaRadius,
-                                        border: Border.all(
-                                          color:
-                                              p.accent.withValues(alpha: 0.35),
-                                          width: 0.85,
+                                    Flexible(
+                                      child: Container(
+                                        constraints: const BoxConstraints(
+                                          minHeight: 34,
                                         ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _MiniEqualizerBars(
-                                            isPlaying: true,
-                                            color: p.accent,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              p.accent.withValues(alpha: 0.14),
+                                          borderRadius: ctaRadius,
+                                          border: Border.all(
+                                            color:
+                                                p.accent.withValues(alpha: 0.35),
+                                            width: 0.85,
                                           ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            context.l10n.radioLiveShortBadge,
-                                            style: TextStyle(
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _MiniEqualizerBars(
+                                              isPlaying: true,
                                               color: p.accent,
-                                              fontSize: AppFontSize.caption,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 0.3,
                                             ),
-                                          ),
-                                        ],
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: Text(
+                                                context
+                                                    .l10n.radioLiveShortBadge,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: p.accent,
+                                                  fontSize: AppFontSize.caption,
+                                                  fontWeight: FontWeight.w800,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -2037,257 +1756,6 @@ class _QuranHeroCard extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-/// Bounded sliding-window indicator: gilt lozenge for the active page,
-/// rotated-square diamonds for the rest, faded micro-diamonds at clipped edges.
-class _CarouselWindowedDots extends StatelessWidget {
-  final int total;
-  final int currentPage;
-  final ValueChanged<int> onDotTap;
-
-  const _CarouselWindowedDots({
-    required this.total,
-    required this.currentPage,
-    required this.onDotTap,
-  });
-
-  static const int _maxVisible = 7;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final gilt = _giltOf(context);
-    if (total <= 0) return const SizedBox.shrink();
-    final visibleCount = math.min(total, _maxVisible);
-    final half = visibleCount ~/ 2;
-    final start = total <= _maxVisible
-        ? 0
-        : (currentPage - half).clamp(0, total - visibleCount);
-    final end = start + visibleCount;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (int i = start; i < end; i++)
-          Builder(
-            builder: (context) {
-              final isActive = i == currentPage;
-              final isEdgeClipped =
-                  (i == start && start > 0) || (i == end - 1 && end < total);
-              final dotSize = isEdgeClipped ? 3.5 : 5.5;
-              Widget glyph = AnimatedContainer(
-                duration: context.motion(PulsrMotion.layout),
-                curve: context.motionCurve(PulsrMotion.enter),
-                width: isActive ? 20.0 : dotSize,
-                height: isActive ? 6.0 : dotSize,
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? gilt
-                      : p.textTertiary
-                          .withValues(alpha: isEdgeClipped ? 0.22 : 0.36),
-                  borderRadius: BorderRadius.circular(isActive ? 3.0 : 1.2),
-                  boxShadow: isActive
-                      ? [
-                          BoxShadow(
-                            color: gilt.withValues(alpha: 0.40),
-                            blurRadius: 6,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-              );
-              if (!isActive) {
-                glyph = Transform.rotate(angle: math.pi / 4, child: glyph);
-              }
-              return Semantics(
-                button: true,
-                label: '${i + 1} / $total',
-                child: GestureDetector(
-                  onTap: () => onDotTap(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.fromSTEB(0, 6, 4.5, 6),
-                    child: glyph,
-                  ),
-                ),
-              );
-            },
-          ),
-      ],
-    );
-  }
-}
-
-/// Pulsing dot indicating live broadcast in theme accent color.
-class _PulsingLiveDot extends StatefulWidget {
-  const _PulsingLiveDot();
-
-  @override
-  State<_PulsingLiveDot> createState() => _PulsingLiveDotState();
-}
-
-class _PulsingLiveDotState extends State<_PulsingLiveDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (context.motionEnabled) {
-      if (!_controller.isAnimating) {
-        _controller.repeat(reverse: true);
-      }
-    } else {
-      _controller.stop();
-      _controller.value = 1.0;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dotColor = context.palette.accent;
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final alpha = 0.5 + (_controller.value * 0.5);
-        return Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: dotColor.withValues(alpha: alpha),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: dotColor.withValues(alpha: _controller.value * 0.7),
-                blurRadius: 4,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Mini animated 4-bar equalizer that pulses smoothly when live audio plays.
-class _MiniEqualizerBars extends StatefulWidget {
-  final bool isPlaying;
-  final Color? color;
-
-  const _MiniEqualizerBars({required this.isPlaying, this.color});
-
-  @override
-  State<_MiniEqualizerBars> createState() => _MiniEqualizerBarsState();
-}
-
-class _MiniEqualizerBarsState extends State<_MiniEqualizerBars>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _anim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    );
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _syncAnimation();
-  }
-
-  void _syncAnimation() {
-    if (widget.isPlaying && context.motionEnabled) {
-      if (!_anim.isAnimating) {
-        _anim.repeat();
-      }
-    } else {
-      _anim.stop();
-      _anim.reset();
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _MiniEqualizerBars oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isPlaying != oldWidget.isPlaying) {
-      _syncAnimation();
-    }
-  }
-
-  @override
-  void dispose() {
-    _anim.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
-    final barColor = widget.color ?? p.accent;
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, child) {
-        final t = _anim.value * 2 * math.pi;
-        final h1 =
-            widget.isPlaying ? (5.0 + 7.0 * (0.5 + 0.5 * math.sin(t))) : 4.0;
-        final h2 = widget.isPlaying
-            ? (5.0 + 9.0 * (0.5 + 0.5 * math.sin(t + 1.2)))
-            : 7.0;
-        final h3 = widget.isPlaying
-            ? (4.0 + 8.0 * (0.5 + 0.5 * math.sin(t + 2.5)))
-            : 5.0;
-        final h4 = widget.isPlaying
-            ? (5.0 + 6.0 * (0.5 + 0.5 * math.sin(t + 3.8)))
-            : 6.0;
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            _buildBar(h1, barColor),
-            const SizedBox(width: 2.2),
-            _buildBar(h2, barColor),
-            const SizedBox(width: 2.2),
-            _buildBar(h3, barColor),
-            const SizedBox(width: 2.2),
-            _buildBar(h4, barColor),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildBar(double height, Color color) {
-    return Container(
-      width: 2.5,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(1.5),
-      ),
     );
   }
 }
